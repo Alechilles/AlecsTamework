@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
@@ -71,9 +72,12 @@ final class InteractionInventoryEffects {
         if (inventory == null) {
             return false;
         }
-        ItemContainer hotbar = inventory.getHotbar();
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
         CombinedItemContainer combined = resolveInventoryContainer(player);
-        byte activeSlot = inventory.getActiveHotbarSlot();
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (activeSlot < 0) {
+            return false;
+        }
         boolean applied = false;
         for (ItemQuantity item : items) {
             if (item == null || item.getItem() == null || item.getItem().isBlank()) {

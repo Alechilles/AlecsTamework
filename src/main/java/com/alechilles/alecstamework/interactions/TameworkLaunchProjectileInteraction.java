@@ -11,9 +11,9 @@ import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Transform;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.WaitForDataFrom;
@@ -201,8 +201,8 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
 
         float yaw = PhysicsMath.headingFromDirection(
-                targetPosition.getX() - sourceLook.getPosition().getX(),
-                targetPosition.getZ() - sourceLook.getPosition().getZ()
+                targetPosition.x - sourceLook.getPosition().x,
+                targetPosition.z - sourceLook.getPosition().z
         );
         Float pitch = this.trajectoryMode == TrajectoryMode.DIRECT
                 ? solveDirectPitch(sourceLook.getPosition(), targetPosition)
@@ -223,7 +223,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
 
         UUID sourceUuid = sourceUuidComponent.getUuid();
         TimeResource timeResource = commandBuffer.getResource(TimeResource.getResourceType());
-        Vector3f lookRotation = new Vector3f(pitch, yaw, sourceLook.getRotation().getRoll());
+        Rotation3f lookRotation = new Rotation3f(pitch, yaw, sourceLook.getRotation().roll());
         Holder<EntityStore> holder = ProjectileComponent.assembleDefaultProjectile(timeResource, this.projectileId, sourceLook.getPosition(), lookRotation);
         ProjectileComponent projectileComponent = holder.getComponent(ProjectileComponent.getComponentType());
         if (projectileComponent == null) {
@@ -243,9 +243,9 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         projectileComponent.shoot(
                 holder,
                 sourceUuid,
-                sourceLook.getPosition().getX(),
-                sourceLook.getPosition().getY(),
-                sourceLook.getPosition().getZ(),
+                sourceLook.getPosition().x,
+                sourceLook.getPosition().y,
+                sourceLook.getPosition().z,
                 yaw,
                 pitch
         );
@@ -323,9 +323,9 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         double maxRadiusSquared = maxRadius * maxRadius;
         double radius = Math.sqrt(random.nextDouble(minRadiusSquared, maxRadiusSquared));
         return new Vector3d(
-                center.getX() + Math.cos(angle) * radius,
-                center.getY() + this.randomAroundSourceVerticalOffset,
-                center.getZ() + Math.sin(angle) * radius
+                center.x + Math.cos(angle) * radius,
+                center.y + this.randomAroundSourceVerticalOffset,
+                center.z + Math.sin(angle) * radius
         );
     }
 
@@ -344,7 +344,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
 
         Vector3d position = transformComponent.getPosition();
-        return new Vector3d(position.getX(), position.getY() + eyeHeight, position.getZ());
+        return new Vector3d(position.x, position.y + eyeHeight, position.z);
     }
 
     @Nullable
@@ -352,10 +352,10 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                                       @Nonnull Vector3d targetPosition,
                                       double muzzleVelocity,
                                       double gravity) {
-        double dx = targetPosition.getX() - sourcePosition.getX();
-        double dz = targetPosition.getZ() - sourcePosition.getZ();
+        double dx = targetPosition.x - sourcePosition.x;
+        double dz = targetPosition.z - sourcePosition.z;
         double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
-        double verticalDelta = targetPosition.getY() - sourcePosition.getY();
+        double verticalDelta = targetPosition.y - sourcePosition.y;
 
         if (horizontalDistance <= MIN_HORIZONTAL_DISTANCE) {
             if (verticalDelta <= 0.0) {
@@ -383,10 +383,10 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
 
     @Nullable
     private Float solveDirectPitch(@Nonnull Vector3d sourcePosition, @Nonnull Vector3d targetPosition) {
-        double dx = targetPosition.getX() - sourcePosition.getX();
-        double dz = targetPosition.getZ() - sourcePosition.getZ();
+        double dx = targetPosition.x - sourcePosition.x;
+        double dz = targetPosition.z - sourcePosition.z;
         double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
-        double verticalDelta = targetPosition.getY() - sourcePosition.getY();
+        double verticalDelta = targetPosition.y - sourcePosition.y;
         if (horizontalDistance <= MIN_HORIZONTAL_DISTANCE && Math.abs(verticalDelta) <= MIN_POSITIVE_VALUE) {
             return 0.0F;
         }

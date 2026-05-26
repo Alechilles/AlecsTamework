@@ -30,8 +30,8 @@ import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -113,7 +113,7 @@ final class CommandRespawnService {
         if (destination == null) {
             return recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId);
         }
-        Vector3f rotation = resolveRespawnRotation(store, playerRef, destination);
+        Rotation3f rotation = resolveRespawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             return recordRespawnFailure("spawn_entity_failed", deadSnapshot, roleId);
@@ -603,15 +603,15 @@ final class CommandRespawnService {
         );
     }
 
-    private Vector3f resolveRespawnRotation(Store<EntityStore> store,
-                                            Ref<EntityStore> playerRef,
-                                            Vector3d spawnPosition) {
+    private Rotation3f resolveRespawnRotation(Store<EntityStore> store,
+                                              Ref<EntityStore> playerRef,
+                                              Vector3d spawnPosition) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         Vector3d playerPos = new Vector3d(transform.getPosition());
         if (spawnPosition != null) {
@@ -620,10 +620,10 @@ final class CommandRespawnService {
                     0.0,
                     playerPos.z - spawnPosition.z
             );
-            if (relative.squaredLength() > 0.0001) {
-                return Vector3f.lookAt(relative);
+            if (relative.lengthSquared() > 0.0001) {
+                return Rotation3f.lookAt(relative);
             }
         }
-        return new Vector3f(transform.getRotation());
+        return new Rotation3f(transform.getRotation());
     }
 }

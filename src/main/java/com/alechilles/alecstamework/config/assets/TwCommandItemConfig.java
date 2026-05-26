@@ -19,7 +19,7 @@ import com.hypixel.hytale.codec.schema.config.Schema;
 import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import com.hypixel.hytale.math.codec.Vector3dArrayCodec;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;

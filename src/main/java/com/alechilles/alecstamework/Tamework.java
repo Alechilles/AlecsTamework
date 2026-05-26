@@ -1424,25 +1424,16 @@ public class Tamework extends JavaPlugin {
         if (commandAssetsRegistered) {
             return;
         }
-        try {
-            getAssetRegistry().register(
-                    HytaleAssetStore.builder(TwCommandItemConfig.class, new DefaultAssetMap<>())
-                            .setPath("Tamework/Items/Commands")
-                            .setCodec(TwCommandItemConfig.CODEC)
-                            .setKeyFunction(TwCommandItemConfig::getId)
-                            .build()
-            );
-            getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
-            getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
-            commandAssetsRegistered = true;
-        } catch (LinkageError error) {
-            if (!isMissingVector3d(error)) {
-                throw error;
-            }
-            getLogger().at(Level.WARNING).withCause(error).log(
-                    "Skipping command-item asset registration because Vector3d is unavailable in this runtime."
-            );
-        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwCommandItemConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Items/Commands")
+                        .setCodec(TwCommandItemConfig.CODEC)
+                        .setKeyFunction(TwCommandItemConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
+        commandAssetsRegistered = true;
     }
 
     private void registerOptionalCommandLinkedRevivableDropSuppressionSystem() {
@@ -1454,20 +1445,6 @@ public class Tamework extends JavaPlugin {
                             + "are unavailable during setup."
             );
         }
-    }
-
-    private static boolean isMissingVector3d(@Nullable Throwable throwable) {
-        Throwable cursor = throwable;
-        while (cursor != null) {
-            if (cursor instanceof NoClassDefFoundError || cursor instanceof ClassNotFoundException) {
-                String message = cursor.getMessage();
-                if (message != null && message.contains("com/hypixel/hytale/math/vector/Vector3d")) {
-                    return true;
-                }
-            }
-            cursor = cursor.getCause();
-        }
-        return false;
     }
 
     @Nullable
@@ -2136,18 +2113,7 @@ public class Tamework extends JavaPlugin {
         if (commandItemRegistry == null) {
             return 0;
         }
-        DefaultAssetMap<String, TwCommandItemConfig> assetMap;
-        try {
-            assetMap = TwCommandItemConfig.getAssetMap();
-        } catch (LinkageError error) {
-            if (!isMissingVector3d(error)) {
-                throw error;
-            }
-            getLogger().at(Level.WARNING).withCause(error).log(
-                    "Skipping command-item asset loading because Vector3d is unavailable in this runtime."
-            );
-            return 0;
-        }
+        DefaultAssetMap<String, TwCommandItemConfig> assetMap = TwCommandItemConfig.getAssetMap();
         if (assetMap == null) {
             return 0;
         }

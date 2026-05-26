@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.integration.simpleclaims;
 
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import javax.annotation.Nullable;

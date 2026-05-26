@@ -79,6 +79,6 @@ final class AssetPatchScannerTest {
     }
 
     private static AssetPack pack(String name, Path root) {
-        return new AssetPack(root, name, root, FileSystems.getDefault(), false, null);
+        return new AssetPack(root, name, root, FileSystems.getDefault(), false, null, AssetPack.PackSource.RUNTIME);
     }
 }

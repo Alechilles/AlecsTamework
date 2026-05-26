@@ -3,9 +3,9 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -145,7 +145,7 @@ final class BreedingOffspringSpawnService {
                                                          @Nullable Store<EntityStore> store,
                                                          int roleIndex,
                                                          @Nullable Vector3d spawnPosition,
-                                                         @Nullable Vector3f spawnRotation) {
+                                                         @Nullable Rotation3f spawnRotation) {
         if (npcPlugin == null || store == null || roleIndex < 0 || spawnPosition == null || spawnRotation == null) {
             return null;
         }
@@ -219,7 +219,7 @@ final class BreedingOffspringSpawnService {
                                                                   @Nullable Store<EntityStore> store,
                                                                   int roleIndex,
                                                                   @Nullable Vector3d candidate,
-                                                                  @Nullable Vector3f spawnRotation) {
+                                                                  @Nullable Rotation3f spawnRotation) {
         if (npcPlugin == null || store == null || roleIndex < 0 || candidate == null || spawnRotation == null) {
             return null;
         }

@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -390,7 +390,7 @@ public final class ActionTameworkDebugCombatSnapshot extends TameworkActionBase 
 
         Vector3d targetPosition = resolvePosition(ref, store);
         if (npcPosition != null && targetPosition != null) {
-            out.append("@d=").append(formatNumber(npcPosition.distanceTo(targetPosition)));
+            out.append("@d=").append(formatNumber(npcPosition.distance(targetPosition)));
         }
         return out.toString();
     }

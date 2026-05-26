@@ -96,6 +96,6 @@ final class AssetPatchReloadCoordinatorTest {
     }
 
     private static AssetPack pack(Path tempDir) {
-        return new AssetPack(tempDir, "Generated", tempDir, null, false, null);
+        return new AssetPack(tempDir, "Generated", tempDir, null, false, null, AssetPack.PackSource.RUNTIME);
     }
 }

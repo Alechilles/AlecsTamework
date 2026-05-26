@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;

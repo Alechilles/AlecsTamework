@@ -361,7 +361,7 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("lastRiddenBackwardBraking"));
         assertTrue(content.contains("backwardAirbrake=%s"));
         assertTrue(content.contains("if (!lastRidden)"));
-        assertTrue(content.contains("targetVelocity.scale(effectHorizontalSpeedMultiplier)"));
+        assertTrue(content.contains("targetVelocity.mul(effectHorizontalSpeedMultiplier)"));
         assertFalse(content.contains("collisionResult.disableCharacterCollisions()"));
         assertFalse(content.contains("collisionResult.enableCharacterCollsions()"));
     }

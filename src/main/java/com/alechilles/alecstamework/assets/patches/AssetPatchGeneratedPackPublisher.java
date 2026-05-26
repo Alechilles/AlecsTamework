@@ -96,7 +96,7 @@ public final class AssetPatchGeneratedPackPublisher {
                 );
             }
             case REGISTER_PACK -> {
-                assetModule.registerPack(generatedPackId, root, plugin.getManifest(), false);
+                assetModule.registerPack(generatedPackId, root, plugin.getManifest(), AssetPack.PackSource.RUNTIME);
                 moveGeneratedPackToEnd(assetModule);
                 return new PublicationResult(
                         true,

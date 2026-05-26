@@ -2,11 +2,12 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
@@ -86,16 +87,13 @@ final class SpawnerSpawnPositionService {
             return null;
         }
         Vector3d playerPosition = new Vector3d(transform.getPosition());
-        Vector3f rotation = new Vector3f(transform.getRotation());
+        Rotation3f rotation = TameworkRotationUtil.copyOrDefault(transform.getRotation());
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
         if (headRotation != null) {
-            rotation = new Vector3f(headRotation.getRotation());
+            rotation = TameworkRotationUtil.copyOrDefault(headRotation.getRotation());
         }
 
-        Vector3f forward = new Vector3f(Vector3f.FORWARD);
-        forward.rotateY(rotation.getYaw());
-        forward.rotateX(rotation.getPitch());
-        forward.normalize();
+        Vector3d forward = TameworkRotationUtil.directionFrom(rotation).normalize();
 
         Vector3d targetLocation = TargetUtil.getTargetLocation(
                 playerRef,
@@ -160,15 +158,15 @@ final class SpawnerSpawnPositionService {
         return clampedSpawnPos;
     }
 
-    Vector3f resolveSpawnRotation(@Nullable Store<EntityStore> store,
-                                  @Nullable Ref<EntityStore> playerRef,
-                                  @Nullable Vector3d spawnPosition) {
+    Rotation3f resolveSpawnRotation(@Nullable Store<EntityStore> store,
+                                    @Nullable Ref<EntityStore> playerRef,
+                                    @Nullable Vector3d spawnPosition) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         Vector3d playerPos = new Vector3d(transform.getPosition());
         if (spawnPosition != null) {
@@ -177,14 +175,14 @@ final class SpawnerSpawnPositionService {
                     0.0,
                     playerPos.z - spawnPosition.z
             );
-            if (relative.squaredLength() > 0.0001) {
-                return Vector3f.lookAt(relative);
+            if (relative.lengthSquared() > 0.0001) {
+                return Rotation3f.lookAt(relative);
             }
         }
-        Vector3f rotation = new Vector3f(transform.getRotation());
+        Rotation3f rotation = TameworkRotationUtil.copyOrDefault(transform.getRotation());
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
         if (headRotation != null) {
-            rotation = new Vector3f(headRotation.getRotation());
+            rotation = TameworkRotationUtil.copyOrDefault(headRotation.getRotation());
         }
         return rotation;
     }
@@ -204,7 +202,7 @@ final class SpawnerSpawnPositionService {
                                @Nullable Vector3d targetLocation,
                                @Nullable Vector3d adjusted,
                                @Nullable Vector3d spawnPos,
-                               @Nullable Vector3f forward,
+                               @Nullable Vector3d forward,
                                double rayDistance,
                                double maxDistance,
                                int blockX,
@@ -236,13 +234,6 @@ final class SpawnerSpawnPositionService {
     }
 
     private static String formatVector(Vector3d vector) {
-        if (vector == null) {
-            return "(null)";
-        }
-        return String.format(Locale.US, "(%.3f, %.3f, %.3f)", vector.x, vector.y, vector.z);
-    }
-
-    private static String formatVector(Vector3f vector) {
         if (vector == null) {
             return "(null)";
         }

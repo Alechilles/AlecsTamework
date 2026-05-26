@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -15,11 +16,10 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
-import com.hypixel.hytale.math.vector.Vector3i;
-import com.hypixel.hytale.server.core.Message;
+import org.joml.Vector3d;
+import org.joml.Vector3i;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -28,7 +28,6 @@ import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -850,7 +849,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 entityStore,
                 roleIndex,
                 spawnPosition,
-                new Vector3f(),
+                new Rotation3f(),
                 null,
                 null
         );
@@ -966,12 +965,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             stateSnapshotService.applyRestoredHealth(reference, store, snapshot.healthPercent());
         }
         if (snapshot.npcName() != null && snapshot.npcName().getName() != null && !snapshot.npcName().getName().isBlank()) {
-            safePutComponent(
-                    store,
-                    reference,
-                    DisplayNameComponent.getComponentType(),
-                    new DisplayNameComponent(Message.raw(snapshot.npcName().getName()))
-            );
+            NpcDisplayNameComponentService.putPersistentAndRuntimeName(store, reference, snapshot.npcName().getName());
         }
     }
 
@@ -1010,12 +1004,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                             TameworkNpcNameComponent.NameSource.System
                     )
             );
-            safePutComponent(
-                    store,
-                    reference,
-                    DisplayNameComponent.getComponentType(),
-                    new DisplayNameComponent(Message.raw(snapshot.displayName()))
-            );
+            NpcDisplayNameComponentService.putPersistentAndRuntimeName(store, reference, snapshot.displayName());
         }
     }
 
@@ -1057,7 +1046,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         try {
             EntitySupport.setDisplayName(reference, displayName, store);
         } catch (IllegalStateException ignored) {
-            // DisplayNameComponent fallback is already applied; this path is best-effort.
+            // Persistent/runtime display-name fallback is already applied; this path is best-effort.
         }
     }
 

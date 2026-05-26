@@ -1,12 +1,13 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -34,16 +35,12 @@ final class TameworkCommandTargeting {
         }
 
         Vector3d playerPos = new Vector3d(transform.getPosition());
-        Vector3f rotation = new Vector3f(transform.getRotation());
+        Rotation3f rotation = TameworkRotationUtil.copyOrDefault(transform.getRotation());
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
-        Vector3f headRot = headRotation != null ? headRotation.getRotation() : rotation;
+        Rotation3f headRot = headRotation != null ? headRotation.getRotation() : rotation;
 
         // Forward vector uses head rotation so targeting matches the camera.
-        Vector3f forward = new Vector3f(Vector3f.FORWARD);
-        forward.rotateY(headRot.getYaw());
-        forward.rotateX(headRot.getPitch());
-        forward.normalize();
-        Vector3d forwardDir = new Vector3d(forward.x, forward.y, forward.z);
+        Vector3d forwardDir = TameworkRotationUtil.directionFrom(headRot).normalize();
 
         BestCandidate best = new BestCandidate();
 
@@ -60,7 +57,7 @@ final class TameworkCommandTargeting {
                     continue;
                 }
                 Vector3d npcPos = npcTransform.getPosition();
-                Vector3d toNpc = new Vector3d(npcPos).subtract(playerPos);
+                Vector3d toNpc = new Vector3d(npcPos).sub(playerPos);
                 double dist = toNpc.length();
                 if (dist <= 0.1 || dist > MAX_DISTANCE) {
                     continue;

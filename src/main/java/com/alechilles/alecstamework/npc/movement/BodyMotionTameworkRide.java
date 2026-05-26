@@ -5,8 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
@@ -21,6 +20,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /**
  * Suppresses normal AI body motion while mounted and steers from the latest rider input snapshot.
@@ -158,8 +158,8 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         TransformComponent transform = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         float fallbackYaw = 0.0f;
         if (transform != null) {
-            Vector3f rotation = transform.getRotation();
-            fallbackYaw = rotation.getYaw();
+            Rotation3f rotation = transform.getRotation();
+            fallbackYaw = rotation.yaw();
         }
         return resolveYawFromSnapshot(ride, fallbackYaw);
     }
@@ -220,7 +220,7 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         );
         double length = result.length();
         if (length > 1.0) {
-            result.scale(1.0 / length);
+            result.mul(1.0 / length);
         }
         return result;
     }
@@ -242,7 +242,7 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         translation.y = GROUNDED_FLIGHT_ASSIST;
         double length = translation.length();
         if (length > 1.0) {
-            translation.scale(1.0 / length);
+            translation.mul(1.0 / length);
         }
     }
 

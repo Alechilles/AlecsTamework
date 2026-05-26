@@ -6,7 +6,7 @@
 
     <groupId>com.alechilles</groupId>
     <artifactId>alecstamework</artifactId>
-    <version>2.11.1</version>
+    <version>2.11.2</version>
     <packaging>jar</packaging>
 
     <name>.Alec's Tamework!</name>
@@ -25,6 +25,7 @@
         <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/UserData</hytale.userdata.path>
         <hytale.toolkit.path>C:/Users/22ale/AppData/Local/Hytale-Toolkit</hytale.toolkit.path>
         <hytale.jdk.path>C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot</hytale.jdk.path>
+        <argLine></argLine>
         <hytale.server.jvm.args />
         <hytale.server.extra.args />
     </properties>
@@ -174,6 +175,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <argLine>@{argLine} -Djava.util.logging.manager=com.hypixel.hytale.logger.backend.HytaleLogManager</argLine>
                     <useModulePath>false</useModulePath>
                 </configuration>
             </plugin>
@@ -192,6 +194,7 @@
             </activation>
             <properties>
                 <hytale.install.path>${hytale.install.path.prerelease}</hytale.install.path>
+                <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/data/pre-release</hytale.userdata.path>
             </properties>
         </profile>
         <!-- Run the Hytale server with the plugin installed -->

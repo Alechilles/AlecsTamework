@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -172,7 +173,7 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
             return;
         }
         double elapsedMs = elapsedNs / 1_000_000.0;
-        String playerName = player != null ? player.getDisplayName() : "<unknown>";
+        String playerName = player != null ? OwnerNameUtil.resolve(player) : "<unknown>";
         String itemId = heldItem != null ? heldItem.getItemId() : "<none>";
         plugin.getLogger().at(Level.WARNING).log(
                 "Tamework lag probe: spawner "

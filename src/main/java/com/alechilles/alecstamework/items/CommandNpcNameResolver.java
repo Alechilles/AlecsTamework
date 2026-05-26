@@ -3,11 +3,11 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -132,6 +132,10 @@ final class CommandNpcNameResolver {
         return resolveDisplayNameComponent(npcRef, store);
     }
 
+    private String resolveDisplayNameComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(npcRef, store);
+    }
+
     private String resolveNpcNameComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
@@ -143,21 +147,7 @@ final class CommandNpcNameResolver {
                 return nameComponent.getName();
             }
         }
-        return null;
-    }
-
-    private String resolveDisplayNameComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return null;
-        }
-        DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
-        if (displayName != null && displayName.getDisplayName() != null) {
-            String ansi = displayName.getDisplayName().getAnsiMessage();
-            if (ansi != null && !ansi.isBlank()) {
-                return ansi;
-            }
-        }
-        return null;
+        return NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(npcRef, store);
     }
 
     String resolveNpcNameKey(NPCEntity npc) {

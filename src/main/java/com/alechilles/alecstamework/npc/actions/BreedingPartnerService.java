@@ -14,7 +14,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -153,7 +153,7 @@ final class BreedingPartnerService {
                     continue;
                 }
 
-                double distanceSq = new Vector3d(candidateTransform.getPosition()).subtract(sourcePos).squaredLength();
+                double distanceSq = new Vector3d(candidateTransform.getPosition()).sub(sourcePos).lengthSquared();
                 if (distanceSq <= 0.000001 || distanceSq > radiusSq) {
                     continue;
                 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.11.2 - Hytale 0.5.0 Compatibility - 2026-05-26
+
+### Changed
+- Updated Tamework for Hytale `0.5.0` release compatibility, including the newer motion, rotation, projectile/event, custom HUD, hotbar, and display-name APIs used by companion commands, spawners, naming, interactions, needs, breeding, damage, and persistence flows.
+- Updated release metadata for Hytale `0.5.0` and promoted the package configuration from prerelease/beta to a stable release.
+- Renamed the optional asset patch wiki source page to the final asset-patches guide path and refreshed related wiki links.
+
+### Fixed
+- Fixed startup failures from stricter runtime asset-pack ID parsing by using parseable generated/self-test pack IDs and only registering the writable self-test pack when `/tw patches selftest` runs.
+- Fixed Update 5 compatibility guard coverage for removed velocity APIs and unkeyed custom HUD construction.
+- Fixed the `Glowing Purple Mushroom Spores` crafting output display so it matches the two-spore recipe output.
+
 ## 2.11.1 - Universal Asset Patches, Live Self-Test, and German Localization - 2026-05-22
 
 ### Added
@@ -51,6 +63,19 @@
 ### Fixed
 - Fixed Tamework-managed attachment sync restoring harvestable fur/wool visuals while a harvested NPC is still on cooldown.
 - Fixed linked companion panels showing generic base-species labels when a role-specific translation exists, such as body-type cat variants.
+
+## 2.10.0-Update5-Prerelease - Update 5 Pre-Release Compatibility - 2026-05-07
+
+### Changed
+- Updated Tamework for Hytale Update 5 pre-release APIs, including the renamed vector package, quaternion rotation helpers, projectile/event signatures, and NPC/component access changes used by companion commands, spawners, naming, interactions, needs, breeding, damage, and persistence flows.
+- Updated player hotbar access to read the Update 5 hotbar component, restoring contextual prompts, item-sensitive interactions, command tools, naming items, and spawner item behavior.
+- Updated custom NPC display-name handling to write both persistent and runtime display-name components required by Update 5.
+- Updated release metadata for the 2026.05.07 Update 5 pre-release server build and marked this build as a beta/prerelease release for platform publishing.
+
+### Fixed
+- Fixed startup failure on Update 5 caused by removed `com.hypixel.hytale.math.vector.Vector3d` / `Vector3f` / `Vector3i` classes.
+- Fixed Update 5 command/interaction targeting paths that depended on older inventory, rotation, and display-name APIs.
+- Fixed Maven test configuration so caller-provided Surefire `argLine` values are preserved while still installing the Hytale log manager for tests.
 
 ## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-04
 

@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;

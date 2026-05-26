@@ -6,17 +6,18 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -143,7 +144,7 @@ public final class OwnerInteractionListener {
             event.setCancelled(true);
             OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, ownershipPolicy.verb());
             logger.at(Level.FINE).log(
-                    "Owner restrict: denied interaction player=" + player.getDisplayName()
+                    "Owner restrict: denied interaction player=" + OwnerNameUtil.resolve(player)
                             + " target=" + target.getUuid()
             );
         } finally {
@@ -170,7 +171,7 @@ public final class OwnerInteractionListener {
             return;
         }
         double elapsedMs = elapsedNs / 1_000_000.0;
-        String playerName = player != null ? player.getDisplayName() : "<unknown>";
+        String playerName = player != null ? OwnerNameUtil.resolve(player) : "<unknown>";
         String targetId = target != null && target.getUuid() != null ? target.getUuid().toString() : "<none>";
         logger.at(Level.WARNING).log(
                 "Tamework lag probe: owner interaction listener took "
@@ -189,8 +190,7 @@ public final class OwnerInteractionListener {
         if (player == null) {
             return InteractionOwnershipPolicy.INTERACTION;
         }
-        Inventory inventory = player.getInventory();
-        ItemStack active = inventory != null ? inventory.getActiveHotbarItem() : null;
+        ItemStack active = PlayerInventoryAccess.getActiveHotbarItem(player);
         if (active == null || active.isEmpty()) {
             return InteractionOwnershipPolicy.INTERACTION;
         }

@@ -5,7 +5,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
@@ -101,7 +101,7 @@ public final class TameworkFindNpcCommand extends AbstractPlayerCommand {
         if (targetTransform == null || playerTransform == null) {
             return Double.NaN;
         }
-        return targetTransform.getPosition().distanceTo(playerTransform.getPosition());
+        return targetTransform.getPosition().distance(playerTransform.getPosition());
     }
 
     private static boolean parseOptionalMark(String arg) {

@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
@@ -25,10 +26,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3i;
-import com.hypixel.hytale.server.core.Message;
+import org.joml.Vector3i;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -376,11 +375,7 @@ public final class CoopResidentStateSnapshotService {
         if (npcName == null || npcName.getName() == null || npcName.getName().isBlank()) {
             return;
         }
-        commandBuffer.putComponent(
-                reference,
-                DisplayNameComponent.getComponentType(),
-                new DisplayNameComponent(Message.raw(npcName.getName()))
-        );
+        NpcDisplayNameComponentService.putPersistentAndRuntimeName(commandBuffer, reference, npcName.getName());
     }
 
     @Nullable

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.items.NamingOverrides;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -248,7 +249,7 @@ public class TameworkNameNpcInteraction extends SimpleInteraction {
             return;
         }
         double elapsedMs = elapsedNs / 1_000_000.0;
-        String playerName = player != null ? player.getDisplayName() : "<unknown>";
+        String playerName = player != null ? OwnerNameUtil.resolve(player) : "<unknown>";
         String itemId = heldItem != null ? heldItem.getItemId() : "<none>";
         plugin.getLogger().at(Level.WARNING).log(
                 "Tamework lag probe: naming interaction took "

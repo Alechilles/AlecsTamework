@@ -9,7 +9,7 @@ import com.hypixel.hytale.protocol.ApplyLookType;
 import com.hypixel.hytale.protocol.ApplyMovementType;
 import com.hypixel.hytale.protocol.AttachedToType;
 import com.hypixel.hytale.protocol.CanMoveType;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.ClientCameraView;
 import com.hypixel.hytale.protocol.ComponentUpdateType;
 import com.hypixel.hytale.protocol.Direction;
@@ -19,8 +19,8 @@ import com.hypixel.hytale.protocol.PositionDistanceOffsetType;
 import com.hypixel.hytale.protocol.PositionType;
 import com.hypixel.hytale.protocol.RotationType;
 import com.hypixel.hytale.protocol.ServerCameraSettings;
-import com.hypixel.hytale.protocol.Vector2f;
-import com.hypixel.hytale.protocol.Vector3f;
+import org.joml.Vector2f;
+import org.joml.Vector3f;
 import com.hypixel.hytale.protocol.packets.camera.SetServerCamera;
 import com.hypixel.hytale.protocol.packets.interaction.DismountNPC;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -184,7 +184,7 @@ public final class MountedRideClientAttachment {
                                                @Nonnull TameworkRideMountComponent mount) {
         Vector3d mountPosition = mountTransform.getPosition();
         var mountRotation = mountTransform.getRotation();
-        double yaw = mountRotation == null ? 0.0 : mountRotation.getYaw();
+        double yaw = mountRotation == null ? 0.0 : mountRotation.yaw();
         double sin = Math.sin(yaw);
         double cos = Math.cos(yaw);
         double worldX = mount.getAnchorX() * cos - mount.getAnchorZ() * sin;

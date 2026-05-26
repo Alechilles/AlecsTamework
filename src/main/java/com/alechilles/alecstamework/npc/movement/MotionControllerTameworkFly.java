@@ -5,7 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -72,10 +72,10 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     }
 
     @Override
-    public boolean canAct(@Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+    public boolean canSteer(@Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         return isAlive(ref, componentAccessor)
                 && role.couldBreatheCached()
-                && forceVelocity.equals(Vector3d.ZERO)
+                && externalVelocity.lengthSquared() == 0.0
                 && appliedVelocities.isEmpty()
                 && effectHorizontalSpeedMultiplier != 0.0;
     }
@@ -83,7 +83,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     private boolean canApplyTameworkFlySteering(@Nonnull Ref<EntityStore> ref,
                                                 @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         return isAlive(ref, componentAccessor)
-                && forceVelocity.equals(Vector3d.ZERO)
+                && externalVelocity.lengthSquared() == 0.0
                 && appliedVelocities.isEmpty()
                 && effectHorizontalSpeedMultiplier != 0.0;
     }
@@ -101,10 +101,10 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         currentRelativeSpeed = steering.getSpeed();
 
         if (!isAlive(ref, componentAccessor)) {
-            forceVelocity.assign(0.0);
+            clearExternalVelocity();
             appliedVelocities.clear();
         }
-        if (!forceVelocity.equals(Vector3d.ZERO) || !appliedVelocities.isEmpty()) {
+        if (externalVelocity.lengthSquared() != 0.0 || !appliedVelocities.isEmpty()) {
             return super.computeMove(ref, role, steering, dt, translation, componentAccessor);
         }
         if (!canApplyTameworkFlySteering(ref, componentAccessor)) {
@@ -113,9 +113,9 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
             steering.setRoll(getRoll());
             if (onGround()) {
                 setMotionKind(MotionKind.STANDING);
-                lastVelocity.assign(0.0);
+                lastVelocity.set(0.0);
                 lastSpeed = 0.0;
-                translation.assign(0.0);
+                translation.set(0.0);
                 return dt;
             }
             return super.computeMove(ref, role, steering, dt, translation, componentAccessor);
@@ -126,7 +126,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         targetPitch = clamp(targetPitch, -maxSinkAngle, maxClimbAngle);
         targetPitch = TameworkFlyVisualState.limitPitch(targetPitch);
 
-        translation.assign(steering.getTranslation());
+        translation.set(steering.getTranslation());
         TameworkRideMountComponent ride = rideMount(ref, componentAccessor);
         lastRiderSprinting = ride != null && ride.isRiderSprinting();
         lastRidden = ride != null;
@@ -148,9 +148,9 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
             resetRiddenBackwardBrake();
             captureActiveLimits();
             setMotionKind(onGround() ? MotionKind.STANDING : MotionKind.FLYING);
-            lastVelocity.assign(0.0);
+            lastVelocity.set(0.0);
             lastSpeed = 0.0;
-            translation.assign(0.0);
+            translation.set(0.0);
             lastTargetVelocityX = 0.0;
             lastTargetVelocityY = 0.0;
             lastTargetVelocityZ = 0.0;
@@ -163,7 +163,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
             return dt;
         }
         if (inputLength > 1.0) {
-            translation.scale(1.0 / inputLength);
+            translation.mul(1.0 / inputLength);
         }
 
         captureActiveLimits();
@@ -178,7 +178,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
             lastRiddenBackwardBraking = riddenBackwardBrakeState.isBraking();
         } else {
             resetRiddenBackwardBrake();
-            targetVelocity.scale(effectHorizontalSpeedMultiplier);
+            targetVelocity.mul(effectHorizontalSpeedMultiplier);
         }
         lastTargetVelocityX = targetVelocity.x;
         lastTargetVelocityY = targetVelocity.y;
@@ -206,8 +206,8 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         steering.setPitch(lastVisualPitch);
         steering.setRoll(lastRoll);
 
-        translation.assign(lastVelocity);
-        translation.scale(dt);
+        translation.set(lastVelocity);
+        translation.mul(dt);
         return dt;
     }
 
@@ -346,13 +346,13 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     }
 
     private void approachVelocity(@Nonnull Vector3d targetVelocity, double maxDelta) {
-        Vector3d delta = new Vector3d(targetVelocity).subtract(lastVelocity);
+        Vector3d delta = new Vector3d(targetVelocity).sub(lastVelocity);
         double deltaLength = delta.length();
         if (deltaLength <= maxDelta || deltaLength <= 1.0E-6) {
-            lastVelocity.assign(targetVelocity);
+            lastVelocity.set(targetVelocity);
             return;
         }
-        lastVelocity.addScaled(delta, maxDelta / deltaLength);
+        lastVelocity.add(delta.mul(maxDelta / deltaLength));
     }
 
     private void resetRiddenBackwardBrake() {
@@ -395,14 +395,14 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         double forwardZ = -Math.cos(yaw) * cosPitch;
         double rightX = -Math.sin(yaw - Math.PI / 2.0);
         double rightZ = -Math.cos(yaw - Math.PI / 2.0);
-        translation.assign(
+        translation.set(
                 forwardX * forwardAmount + rightX * strafe,
                 vertical,
                 forwardZ * forwardAmount + rightZ * strafe
         );
         double length = translation.length();
         if (length > 1.0) {
-            translation.scale(1.0 / length);
+            translation.mul(1.0 / length);
         }
     }
 

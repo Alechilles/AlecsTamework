@@ -6,7 +6,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.group.EntityGroup;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
@@ -211,7 +211,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         Vector3d npcPosition = npcTransform != null ? npcTransform.getPosition() : null;
         Vector3d leashPoint = npc.getLeashPoint();
         double distanceToLeash = (npcPosition != null && leashPoint != null)
-                ? npcPosition.distanceTo(leashPoint)
+                ? npcPosition.distance(leashPoint)
                 : Double.NaN;
 
         FlockMembership membership = store.getComponent(npcRef, FlockMembership.getComponentType());
@@ -228,7 +228,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                         hasLeader = true;
                         TransformComponent leaderTransform = store.getComponent(leaderRef, TransformComponent.getComponentType());
                         if (npcPosition != null && leaderTransform != null) {
-                            distanceToLeader = npcPosition.distanceTo(leaderTransform.getPosition());
+                            distanceToLeader = npcPosition.distance(leaderTransform.getPosition());
                         }
                     }
                 }

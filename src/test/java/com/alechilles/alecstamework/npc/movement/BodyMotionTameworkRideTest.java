@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

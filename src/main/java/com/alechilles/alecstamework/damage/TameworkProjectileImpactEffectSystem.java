@@ -80,7 +80,7 @@ public final class TameworkProjectileImpactEffectSystem extends RefSystem<Entity
                             continue;
                         }
                         TransformComponent targetTransform = targets.getComponent(j, transformType);
-                        if (targetTransform == null || targetTransform.getPosition().distanceSquaredTo(transform.getPosition()) > radiusSq) {
+                        if (targetTransform == null || targetTransform.getPosition().distanceSquared(transform.getPosition()) > radiusSq) {
                             continue;
                         }
                         if (impactEffect.isExcludeSource() && sourceEntityUuid != null && isSourceEntity(targetRef, sourceEntityUuid, store)) {

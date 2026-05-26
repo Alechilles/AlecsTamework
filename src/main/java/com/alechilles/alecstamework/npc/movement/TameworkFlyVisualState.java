@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.npc.movement;
 
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import javax.annotation.Nonnull;
 
 final class TameworkFlyVisualState {

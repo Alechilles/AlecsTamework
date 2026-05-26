@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.npc.components;
 
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

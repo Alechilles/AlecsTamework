@@ -12,6 +12,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import com.hypixel.hytale.assetstore.AssetPack;
+import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import com.hypixel.hytale.common.plugin.PluginManifest;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.asset.AssetModule;
@@ -20,12 +21,14 @@ import com.hypixel.hytale.server.core.asset.AssetModule;
  * Owns the isolated writable asset pack used by `/tw patches selftest`.
  */
 public final class AssetPatchSelfTestPack {
-    public static final String PACK_ID = "alecstamework_AssetPatchSelfTest";
+    private static final String DEFAULT_GROUP = "Alechilles";
+    private static final String PACK_NAME_SUFFIX = "AssetPatchSelfTest";
     private static final String DIRECTORY_NAME = "AssetPatchSelfTestPack";
 
     private final Path root;
     private final PluginManifest manifest;
     private final HytaleLogger logger;
+    private final String packId;
 
     public AssetPatchSelfTestPack(@Nonnull Path dataDirectory,
                                   @Nullable PluginManifest manifest,
@@ -33,6 +36,7 @@ public final class AssetPatchSelfTestPack {
         this.root = dataDirectory.resolve(DIRECTORY_NAME).toAbsolutePath().normalize();
         this.manifest = manifest;
         this.logger = logger;
+        this.packId = createPackId(manifest);
     }
 
     @Nonnull
@@ -44,16 +48,21 @@ public final class AssetPatchSelfTestPack {
         Files.createDirectories(root);
     }
 
+    @Nonnull
+    public String packId() {
+        return packId;
+    }
+
     public void registerIfMissing(@Nullable AssetModule assetModule) {
         if (assetModule == null) {
             return;
         }
-        if (assetModule.getAssetPack(PACK_ID) != null) {
+        if (assetModule.getAssetPack(packId) != null) {
             return;
         }
         try {
             prepareRoot();
-            assetModule.registerPack(PACK_ID, root, manifest, false);
+            assetModule.registerPack(packId, root, manifest, AssetPack.PackSource.RUNTIME);
             if (logger != null) {
                 logger.at(Level.INFO).log("Registered Tamework asset patch self-test pack at " + root + ".");
             }
@@ -96,7 +105,16 @@ public final class AssetPatchSelfTestPack {
 
     @Nonnull
     AssetPack pack() {
-        return new AssetPack(root, PACK_ID, root, null, false, manifest);
+        return new AssetPack(root, packId, root, null, false, manifest, AssetPack.PackSource.RUNTIME);
+    }
+
+    @Nonnull
+    private static String createPackId(@Nullable PluginManifest manifest) {
+        if (manifest == null) {
+            return DEFAULT_GROUP + ":" + PACK_NAME_SUFFIX;
+        }
+        PluginIdentifier pluginId = new PluginIdentifier(manifest);
+        return pluginId.getGroup() + ":" + pluginId.getName() + "_" + PACK_NAME_SUFFIX;
     }
 
     private void writeRelative(@Nonnull String relativePath, @Nonnull String content) throws IOException {

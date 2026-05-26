@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.npc.movement.TameworkRideVelocityIntent;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountSystems;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -191,9 +191,9 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                     transform.getPosition().x,
                     transform.getPosition().y,
                     transform.getPosition().z,
-                    transform.getRotation().getYaw(),
-                    transform.getRotation().getPitch(),
-                    transform.getRotation().getRoll()
+                    transform.getRotation().yaw(),
+                    transform.getRotation().pitch(),
+                    transform.getRotation().roll()
             );
             commandBuffer.putComponent(mountRef, rideMountComponentType, mount);
             return false;
@@ -201,9 +201,9 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         double dx = transform.getPosition().x - mount.getAuthoritativeX();
         double dy = transform.getPosition().y - mount.getAuthoritativeY();
         double dz = transform.getPosition().z - mount.getAuthoritativeZ();
-        float yawDelta = normalizeAngle(transform.getRotation().getYaw() - mount.getAuthoritativeYaw());
-        float pitchDelta = normalizeAngle(transform.getRotation().getPitch() - mount.getAuthoritativePitch());
-        float rollDelta = normalizeAngle(transform.getRotation().getRoll() - mount.getAuthoritativeRoll());
+        float yawDelta = normalizeAngle(transform.getRotation().yaw() - mount.getAuthoritativeYaw());
+        float pitchDelta = normalizeAngle(transform.getRotation().pitch() - mount.getAuthoritativePitch());
+        float rollDelta = normalizeAngle(transform.getRotation().roll() - mount.getAuthoritativeRoll());
         if (dx * dx + dy * dy + dz * dz < 1.0E-8
                 && yawDelta * yawDelta + pitchDelta * pitchDelta + rollDelta * rollDelta < 1.0E-8f) {
             return false;
@@ -537,18 +537,18 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 archetypeChunk.getComponent(index, TransformComponent.getComponentType());
         if (transform != null && transform.getRotation() != null) {
             mount.captureBodyRotation(
-                    transform.getRotation().getYaw(),
-                    transform.getRotation().getPitch(),
-                    transform.getRotation().getRoll()
+                    transform.getRotation().yaw(),
+                    transform.getRotation().pitch(),
+                    transform.getRotation().roll()
             );
         }
         HeadRotation headRotation =
                 archetypeChunk.getComponent(index, HeadRotation.getComponentType());
         if (headRotation != null && headRotation.getRotation() != null) {
             mount.captureHeadRotation(
-                    headRotation.getRotation().getYaw(),
-                    headRotation.getRotation().getPitch(),
-                    headRotation.getRotation().getRoll()
+                    headRotation.getRotation().yaw(),
+                    headRotation.getRotation().pitch(),
+                    headRotation.getRotation().roll()
             );
         }
     }

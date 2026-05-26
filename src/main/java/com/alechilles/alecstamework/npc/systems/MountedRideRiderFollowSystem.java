@@ -16,7 +16,7 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -88,9 +88,9 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
                     mountPosition.x,
                     mountPosition.y,
                     mountPosition.z,
-                    mountRotation.getYaw(),
-                    mountRotation.getPitch(),
-                    mountRotation.getRoll()
+                    mountRotation.yaw(),
+                    mountRotation.pitch(),
+                    mountRotation.roll()
             );
             commandBuffer.putComponent(mountRef, rideMountComponentType, mount);
         }

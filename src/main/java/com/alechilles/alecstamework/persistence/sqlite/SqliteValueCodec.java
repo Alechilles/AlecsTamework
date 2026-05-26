@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -19,7 +20,6 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
-import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -590,11 +590,7 @@ public final class NamingFeatureHandler {
         if (player == null) {
             return null;
         }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return null;
-        }
-        ItemStack stack = inventory.getActiveHotbarItem();
+        ItemStack stack = PlayerInventoryAccess.getActiveHotbarItem(player);
         if (stack == null || stack.isEmpty()) {
             return null;
         }
@@ -605,15 +601,11 @@ public final class NamingFeatureHandler {
         if (player == null || rules == null) {
             return;
         }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
+        byte slot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (slot < 0) {
             return;
         }
-        byte slot = inventory.getActiveHotbarSlot();
-        if (slot == Inventory.INACTIVE_SLOT_INDEX) {
-            return;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
         if (hotbar == null) {
             return;
         }
@@ -659,7 +651,9 @@ public final class NamingFeatureHandler {
         if (player == null || message == null || message.isBlank()) {
             return;
         }
-        player.sendMessage(Message.raw(message));
+        if (player.getPlayerRef() != null) {
+            player.getPlayerRef().sendMessage(Message.raw(message));
+        }
     }
 
     private void sendMessageKey(Player player, String key, Object... args) {

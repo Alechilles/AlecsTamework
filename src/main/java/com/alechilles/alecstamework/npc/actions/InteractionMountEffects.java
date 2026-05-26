@@ -200,9 +200,9 @@ final class InteractionMountEffects {
                     npcTransform.getPosition().x,
                     npcTransform.getPosition().y,
                     npcTransform.getPosition().z,
-                    npcTransform.getRotation().getYaw(),
-                    npcTransform.getRotation().getPitch(),
-                    npcTransform.getRotation().getRoll()
+                    npcTransform.getRotation().yaw(),
+                    npcTransform.getRotation().pitch(),
+                    npcTransform.getRotation().roll()
             );
         }
         TameworkRideRiderComponent rideRider = new TameworkRideRiderComponent(npcUuid.getUuid().toString());

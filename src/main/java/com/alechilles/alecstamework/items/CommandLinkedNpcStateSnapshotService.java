@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -19,8 +20,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -330,18 +330,9 @@ public final class CommandLinkedNpcStateSnapshotService {
         if (customName != null && !customName.isBlank()) {
             return customName;
         }
-        String resolvedName = new CommandNpcNameResolver().resolveNpcDisplayName(npcRef, store, npc);
-        if (resolvedName != null && !resolvedName.isBlank()) {
-            return resolvedName;
-        }
-        if (npcRef != null && npcRef.isValid() && store != null) {
-            DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
-            if (displayName != null && displayName.getDisplayName() != null) {
-                String ansi = displayName.getDisplayName().getAnsiMessage();
-                if (ansi != null && !ansi.isBlank()) {
-                    return ansi;
-                }
-            }
+        String componentName = NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(npcRef, store);
+        if (componentName != null && !componentName.isBlank()) {
+            return componentName;
         }
         if (npc != null) {
             String legacy = npc.getLegacyDisplayName();

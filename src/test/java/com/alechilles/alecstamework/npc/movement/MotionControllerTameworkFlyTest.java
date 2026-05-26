@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.MovementStates;
 import org.junit.jupiter.api.Test;
 
@@ -105,8 +105,8 @@ class MotionControllerTameworkFlyTest {
         assertEquals(0.0, targetVelocity.x);
         assertEquals(0.0, targetVelocity.z);
 
-        currentVelocity.assign(0.0);
-        targetVelocity.assign(0.0, 0.0, -5.0);
+        currentVelocity.set(0.0);
+        targetVelocity.set(0.0, 0.0, -5.0);
         braking = RiddenBackwardBrake.apply(
                 targetVelocity,
                 currentVelocity,
@@ -118,7 +118,7 @@ class MotionControllerTameworkFlyTest {
         assertTrue(braking);
         assertEquals(0.0, targetVelocity.z);
 
-        targetVelocity.assign(0.0, 0.0, -5.0);
+        targetVelocity.set(0.0, 0.0, -5.0);
         braking = RiddenBackwardBrake.apply(
                 targetVelocity,
                 currentVelocity,
@@ -140,10 +140,10 @@ class MotionControllerTameworkFlyTest {
         RiddenBackwardBrake.apply(targetVelocity, stopped, state, true, 0.3);
         assertEquals(0.0, targetVelocity.z);
 
-        targetVelocity.assign(0.0, 0.0, 0.0);
+        targetVelocity.set(0.0, 0.0, 0.0);
         assertFalse(RiddenBackwardBrake.apply(targetVelocity, stopped, state, false, 0.05));
 
-        targetVelocity.assign(0.0, 0.0, -5.0);
+        targetVelocity.set(0.0, 0.0, -5.0);
         assertTrue(RiddenBackwardBrake.apply(targetVelocity, stopped, state, true, 0.05));
         assertEquals(0.0, targetVelocity.z);
     }
