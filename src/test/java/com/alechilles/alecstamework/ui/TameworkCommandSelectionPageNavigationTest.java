@@ -70,4 +70,28 @@ class TameworkCommandSelectionPageNavigationTest {
                 "Replacement-page navigation should not close the page manager while opening the next page."
         );
     }
+
+    @Test
+    void replacementPageNavigationWaitsForQueuedUiCommandsToDrain() throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int helperStart = content.indexOf("private void navigateAfterUiDrain");
+        int helperEnd = content.indexOf("private void dispatchNavigationAction", helperStart);
+
+        assertTrue(helperStart >= 0, "Deferred page navigation helper should exist.");
+        assertTrue(helperEnd > helperStart, "Deferred page navigation helper should be bounded by the dispatcher.");
+
+        String helper = content.substring(helperStart, helperEnd);
+        assertTrue(
+                content.contains("PAGE_NAVIGATION_DRAIN_DELAY_MS"),
+                "Replacement-page navigation should use an explicit UI drain delay."
+        );
+        assertTrue(
+                helper.contains("CompletableFuture.delayedExecutor(PAGE_NAVIGATION_DRAIN_DELAY_MS"),
+                "Replacement-page navigation should wait briefly so already-sent linked-panel commands apply before the new page opens."
+        );
+        assertTrue(
+                helper.contains("dispatchNavigationAction(action)"),
+                "Replacement-page navigation should still run the replacement-page open on the world thread."
+        );
+    }
 }
