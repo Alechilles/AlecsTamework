@@ -16,7 +16,8 @@ class TameworkDataPathServiceTest {
     Path tempDir;
 
     @Test
-    void resolvesUniverseDataDirectoryFromServerPath() {
+    void resolvesUniverseDataDirectoryFromServerPath() throws Exception {
+        Files.createDirectories(tempDir.resolve("universe"));
         Path legacyDataDir = tempDir.resolve("Server").resolve("mods").resolve("Alechilles_Alec's Tamework!");
         TameworkDataPathService service = new TameworkDataPathService();
 
@@ -117,6 +118,7 @@ class TameworkDataPathServiceTest {
 
     @Test
     void fallsBackToLegacyDirectoryWhenNoServerAncestorExists() throws Exception {
+        Files.createDirectories(tempDir.resolve("universe"));
         Path legacyDataDir = tempDir.resolve("TameworkData");
         Files.createDirectories(legacyDataDir);
         Files.writeString(legacyDataDir.resolve("CommandLinkedNpcCaptures.dat"), "captures", StandardCharsets.UTF_8);

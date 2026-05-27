@@ -94,14 +94,19 @@ public final class TameworkDataPathService {
 
     @Nullable
     private Path resolveRuntimeRoot(@Nonnull Path legacyDataDirectory) {
-        Path rootWithUniverse = findAncestorWithChildDirectory(legacyDataDirectory, UNIVERSE_DIR_NAME);
-        if (rootWithUniverse != null) {
-            return rootWithUniverse;
+        Path modsDir = findAncestorNamed(legacyDataDirectory, MODS_DIR_NAME);
+        Path modsRuntimeRoot = modsDir != null ? modsDir.getParent() : null;
+        if (modsRuntimeRoot != null && hasChildDirectory(modsRuntimeRoot, UNIVERSE_DIR_NAME)) {
+            return modsRuntimeRoot;
         }
 
-        Path modsDir = findAncestorNamed(legacyDataDirectory, MODS_DIR_NAME);
-        if (modsDir != null && modsDir.getParent() != null && isLikelyRuntimeRoot(modsDir.getParent())) {
-            return modsDir.getParent();
+        Path namedRootWithUniverse = findNamedRuntimeAncestorWithUniverse(legacyDataDirectory);
+        if (namedRootWithUniverse != null) {
+            return namedRootWithUniverse;
+        }
+
+        if (modsRuntimeRoot != null && isLikelyRuntimeRoot(modsRuntimeRoot)) {
+            return modsRuntimeRoot;
         }
 
         Path serverAncestor = findAncestorNamed(legacyDataDirectory, SERVER_DIR_NAME);
@@ -125,10 +130,10 @@ public final class TameworkDataPathService {
     }
 
     @Nullable
-    private Path findAncestorWithChildDirectory(@Nonnull Path startingPath, @Nonnull String childDirectoryName) {
+    private Path findNamedRuntimeAncestorWithUniverse(@Nonnull Path startingPath) {
         Path cursor = startingPath;
         while (cursor != null) {
-            if (hasChildDirectory(cursor, childDirectoryName)) {
+            if (hasRuntimeRootName(cursor) && hasChildDirectory(cursor, UNIVERSE_DIR_NAME)) {
                 return cursor;
             }
             cursor = cursor.getParent();
@@ -137,13 +142,14 @@ public final class TameworkDataPathService {
     }
 
     private boolean isLikelyRuntimeRoot(@Nonnull Path directory) {
+        return hasRuntimeRootName(directory) || hasChildDirectory(directory, WORLDS_DIR_NAME);
+    }
+
+    private boolean hasRuntimeRootName(@Nonnull Path directory) {
         Path fileName = directory.getFileName();
         String currentName = fileName != null ? fileName.toString() : null;
-        if (currentName != null
-                && (SERVER_DIR_NAME.equalsIgnoreCase(currentName) || HYTALE_DIR_NAME.equalsIgnoreCase(currentName))) {
-            return true;
-        }
-        return hasChildDirectory(directory, UNIVERSE_DIR_NAME) || hasChildDirectory(directory, WORLDS_DIR_NAME);
+        return currentName != null
+                && (SERVER_DIR_NAME.equalsIgnoreCase(currentName) || HYTALE_DIR_NAME.equalsIgnoreCase(currentName));
     }
 
     private boolean hasChildDirectory(@Nonnull Path parent, @Nonnull String childDirectoryName) {
