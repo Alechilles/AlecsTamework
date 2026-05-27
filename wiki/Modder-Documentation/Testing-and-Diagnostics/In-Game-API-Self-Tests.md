@@ -40,7 +40,7 @@ The fixtures use Tamework’s bundled example content:
 Each fixture is marked with an internal self-test component, linked to the generated whistle tool id, and written through the normal profile-persistence queue.
 
 ## What `run` validates
-`run core` checks API availability, versioning, capabilities, global config reads, and persistence diagnostics.
+`run core` checks API availability, versioning, capabilities including `COMPANION_XP_EVENTS`, global config reads, and persistence diagnostics.
 
 `run profile` checks:
 - profile id resolution

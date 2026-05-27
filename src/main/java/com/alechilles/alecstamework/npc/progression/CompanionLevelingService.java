@@ -1,14 +1,23 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
+import com.alechilles.alecstamework.api.CompanionXpSource;
+import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -74,25 +83,25 @@ public final class CompanionLevelingService {
     public static AwardResult awardXp(@Nullable Ref<EntityStore> npcRef,
                                       @Nullable Store<EntityStore> store,
                                       double amount) {
-        return awardXp(npcRef, store, null, amount);
+        return awardXp(npcRef, store, null, null, CompanionXpSource.CUSTOM, amount);
     }
 
     @Nonnull
     public static AwardResult awardFeedXp(@Nullable Ref<EntityStore> npcRef,
                                           @Nullable Store<EntityStore> store) {
-        return awardSimpleSourceXp(npcRef, store, SimpleXpSourceType.FEED);
+        return awardSimpleSourceXp(npcRef, store, SimpleXpSourceType.FEED, CompanionXpSource.FEED);
     }
 
     @Nonnull
     public static AwardResult awardHarvestXp(@Nullable Ref<EntityStore> npcRef,
                                              @Nullable Store<EntityStore> store) {
-        return awardSimpleSourceXp(npcRef, store, SimpleXpSourceType.HARVEST);
+        return awardSimpleSourceXp(npcRef, store, SimpleXpSourceType.HARVEST, CompanionXpSource.HARVEST);
     }
 
     @Nonnull
     public static AwardResult awardBreedingXp(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store) {
-        return awardSimpleSourceXp(npcRef, store, SimpleXpSourceType.BREEDING);
+        return awardSimpleSourceXp(npcRef, store, SimpleXpSourceType.BREEDING, CompanionXpSource.BREEDING);
     }
 
     @Nonnull
@@ -100,7 +109,7 @@ public final class CompanionLevelingService {
                                       @Nullable Store<EntityStore> store,
                                       @Nullable String roleIdHint,
                                       double amount) {
-        return awardXp(npcRef, store, null, roleIdHint, amount);
+        return awardXp(npcRef, store, null, roleIdHint, CompanionXpSource.CUSTOM, amount);
     }
 
     @Nonnull
@@ -108,6 +117,16 @@ public final class CompanionLevelingService {
                                       @Nullable Store<EntityStore> store,
                                       @Nullable CommandBuffer<EntityStore> commandBuffer,
                                       @Nullable String roleIdHint,
+                                      double amount) {
+        return awardXp(npcRef, store, commandBuffer, roleIdHint, CompanionXpSource.CUSTOM, amount);
+    }
+
+    @Nonnull
+    public static AwardResult awardXp(@Nullable Ref<EntityStore> npcRef,
+                                      @Nullable Store<EntityStore> store,
+                                      @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                      @Nullable String roleIdHint,
+                                      @Nonnull CompanionXpSource source,
                                       double amount) {
         if (npcRef == null || !npcRef.isValid() || store == null || !Double.isFinite(amount) || amount <= 0.0) {
             return AwardResult.notApplied();
@@ -136,6 +155,7 @@ public final class CompanionLevelingService {
         }
         int previousLevel = component.getLevel();
         double previousTotalXp = component.getTotalXp();
+        double previousCurrentXp = component.getCurrentXp();
         double nextTotalXp = previousTotalXp + amount;
         TameworkLevelingComponent updated = normalizeComponent(
                 new TameworkLevelingComponent(component.getConfigId(), component.getLevel(), component.getCurrentXp(), nextTotalXp),
@@ -148,6 +168,7 @@ public final class CompanionLevelingService {
         if (updated.getLevel() != previousLevel) {
             applyTraitModifiers(npcRef, store, commandBuffer);
         }
+        emitXpAwardedEvent(npcRef, store, config, roleId, source, amount, previousLevel, previousTotalXp, previousCurrentXp, updated);
         return new AwardResult(true, amount, previousLevel, updated.getLevel(), updated.getTotalXp());
     }
 
@@ -260,6 +281,119 @@ public final class CompanionLevelingService {
     }
 
     @Nullable
+    private static CompanionXpAwardedEvent buildXpAwardedEvent(@Nonnull Ref<EntityStore> npcRef,
+                                                               @Nonnull Store<EntityStore> store,
+                                                               @Nonnull TwLevelingConfig config,
+                                                               @Nullable String roleId,
+                                                               @Nonnull CompanionXpSource source,
+                                                               double awardedXp,
+                                                               int previousLevel,
+                                                               double previousTotalXp,
+                                                               double previousCurrentXp,
+                                                               @Nonnull TameworkLevelingComponent updated,
+                                                               long nowMs) {
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        if (npcUuid == null) {
+            return null;
+        }
+        CreditContext creditContext = resolveCreditContext(npcRef, store);
+        int maxLevel = config.getLevels().getMaxLevel();
+        boolean atMaxLevel = updated.getLevel() >= maxLevel;
+        double nextLevelXp = atMaxLevel ? 0.0 : nextLevelDeltaXp(config, updated.getLevel());
+        return new CompanionXpAwardedEvent(
+                npcUuid,
+                creditContext.ownerUuid(),
+                creditContext.toolIds(),
+                roleId,
+                updated.getConfigId(),
+                source,
+                awardedXp,
+                previousLevel,
+                updated.getLevel(),
+                previousTotalXp,
+                updated.getTotalXp(),
+                previousCurrentXp,
+                updated.getCurrentXp(),
+                nextLevelXp,
+                maxLevel,
+                atMaxLevel,
+                updated.getLevel() != previousLevel,
+                nowMs,
+                nowMs
+        );
+    }
+
+    private static void emitXpAwardedEvent(@Nonnull Ref<EntityStore> npcRef,
+                                           @Nonnull Store<EntityStore> store,
+                                           @Nonnull TwLevelingConfig config,
+                                           @Nullable String roleId,
+                                           @Nonnull CompanionXpSource source,
+                                           double awardedXp,
+                                           int previousLevel,
+                                           double previousTotalXp,
+                                           double previousCurrentXp,
+                                           @Nonnull TameworkLevelingComponent updated) {
+        Tamework instance = Tamework.getInstance();
+        TameworkEventBus eventBus = instance != null ? instance.getApiEventBus() : null;
+        if (eventBus == null) {
+            return;
+        }
+        CompanionXpAwardedEvent event = buildXpAwardedEvent(
+                npcRef,
+                store,
+                config,
+                roleId,
+                source,
+                awardedXp,
+                previousLevel,
+                previousTotalXp,
+                previousCurrentXp,
+                updated,
+                System.currentTimeMillis()
+        );
+        if (event != null) {
+            eventBus.emitCompanionXpAwarded(event);
+        }
+    }
+
+    @Nullable
+    private static UUID resolveNpcUuid(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        return npc != null ? npc.getUuid() : null;
+    }
+
+    @Nonnull
+    private static CreditContext resolveCreditContext(@Nonnull Ref<EntityStore> npcRef,
+                                                      @Nonnull Store<EntityStore> store) {
+        UUID ownerUuid = null;
+        LinkedHashSet<String> toolIds = new LinkedHashSet<>();
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        TameworkCommandLinksComponent links = linksType != null ? store.getComponent(npcRef, linksType) : null;
+        if (links != null) {
+            ownerUuid = links.getOwnerId();
+            addToolIds(toolIds, links.getToolIds());
+        }
+        if (ownerUuid == null) {
+            ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+            TameworkOwnerComponent owner = ownerType != null ? store.getComponent(npcRef, ownerType) : null;
+            ownerUuid = owner != null ? owner.getOwnerId() : null;
+        }
+        return new CreditContext(ownerUuid, toolIds);
+    }
+
+    private static void addToolIds(@Nonnull LinkedHashSet<String> target, @Nullable String[] values) {
+        if (values == null) {
+            return;
+        }
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            target.add(value.trim());
+        }
+    }
+
+    @Nullable
     private static TwLevelingConfig resolveConfig(@Nullable TameworkLevelingComponent component,
                                                   @Nullable String roleId) {
         if (component != null && component.getConfigId() != null && !component.getConfigId().isBlank()) {
@@ -342,6 +476,12 @@ public final class CompanionLevelingService {
         return Math.max(0.0, total);
     }
 
+    private static double nextLevelDeltaXp(@Nonnull TwLevelingConfig config, int level) {
+        double currentLevelStartXp = resolveCumulativeXpForLevel(config, level);
+        double nextLevelTotalXp = resolveCumulativeXpForLevel(config, level + 1);
+        return Math.max(0.0, nextLevelTotalXp - currentLevelStartXp);
+    }
+
     private static double sanitizeXp(double value) {
         if (!Double.isFinite(value) || value <= 0.0) {
             return 0.0;
@@ -352,7 +492,8 @@ public final class CompanionLevelingService {
     @Nonnull
     private static AwardResult awardSimpleSourceXp(@Nullable Ref<EntityStore> npcRef,
                                                    @Nullable Store<EntityStore> store,
-                                                   @Nonnull SimpleXpSourceType sourceType) {
+                                                   @Nonnull SimpleXpSourceType sourceType,
+                                                   @Nonnull CompanionXpSource xpSource) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return AwardResult.notApplied();
         }
@@ -372,7 +513,7 @@ public final class CompanionLevelingService {
         if (!settings.isEnabled() || !(settings.getFlatXp() > 0.0)) {
             return AwardResult.notApplied();
         }
-        return awardXp(npcRef, store, roleId, settings.getFlatXp());
+        return awardXp(npcRef, store, null, roleId, xpSource, settings.getFlatXp());
     }
 
     private enum SimpleXpSourceType {
@@ -389,6 +530,10 @@ public final class CompanionLevelingService {
         static AwardResult notApplied() {
             return new AwardResult(false, 0.0, 1, 1, 0.0);
         }
+    }
+
+    private record CreditContext(@Nullable UUID ownerUuid,
+                                 @Nonnull Set<String> toolIds) {
     }
 
     public record LevelingSnapshot(@Nullable String configId,

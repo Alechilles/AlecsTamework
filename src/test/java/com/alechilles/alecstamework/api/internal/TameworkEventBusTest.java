@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ConfigReloadedEvent;
+import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
+import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
 import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
@@ -14,6 +16,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import org.joml.Vector3d;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -57,6 +60,57 @@ class TameworkEventBusTest {
 
         bus.emitConfigReload(TameworkConfigFamily.GLOBAL, Set.of("global/default"));
         assertEquals(1, successfulDeliveries.get());
+    }
+
+    @Test
+    void emitsCompanionXpAwardedEventsWithDefensiveToolIdCopy() {
+        TameworkEventBus bus = new TameworkEventBus(null);
+        List<TameworkEvent> allEvents = new ArrayList<>();
+        List<CompanionXpAwardedEvent> xpEvents = new ArrayList<>();
+        bus.subscribe(TameworkEvent.class, allEvents::add);
+        bus.subscribe(CompanionXpAwardedEvent.class, xpEvents::add);
+
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        LinkedHashSet<String> toolIds = new LinkedHashSet<>();
+        toolIds.add("tool-a");
+        toolIds.add("tool-b");
+        CompanionXpAwardedEvent event = new CompanionXpAwardedEvent(
+                npcUuid,
+                ownerUuid,
+                toolIds,
+                "Mob_Test",
+                "Leveling_Test",
+                CompanionXpSource.FEED,
+                8.0,
+                1,
+                2,
+                70.0,
+                78.0,
+                70.0,
+                3.0,
+                75.0,
+                20,
+                false,
+                true,
+                123L,
+                456L
+        );
+        toolIds.add("mutated-after-create");
+
+        bus.emitCompanionXpAwarded(event);
+
+        assertEquals(1, allEvents.size());
+        assertEquals(1, xpEvents.size());
+        CompanionXpAwardedEvent delivered = xpEvents.get(0);
+        assertEquals(npcUuid, delivered.npcUuid());
+        assertEquals(ownerUuid, delivered.ownerUuid());
+        assertEquals(Set.of("tool-a", "tool-b"), delivered.toolIds());
+        assertEquals(CompanionXpSource.FEED, delivered.source());
+        assertEquals(8.0, delivered.awardedXp());
+        assertEquals(1, delivered.previousLevel());
+        assertEquals(2, delivered.currentLevel());
+        assertTrue(delivered.leveledUp());
     }
 
     @Test

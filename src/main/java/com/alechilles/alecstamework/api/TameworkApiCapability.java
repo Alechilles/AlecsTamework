@@ -10,6 +10,7 @@ public enum TameworkApiCapability {
     TRAIT_EFFECTS,
     PROFILE_DATA,
     EVENTS,
+    COMPANION_XP_EVENTS,
     CONFIG_READ,
     DIAGNOSTICS
 }

@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.5.0`)**
+> **Experimental API Contract (`0.6.0`)**
 > This reference tracks the current `configs()` contract in `TameworkApi`.
 
 Capability: `CONFIG_READ`

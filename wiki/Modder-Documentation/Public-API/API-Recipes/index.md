@@ -10,7 +10,7 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection provides task-focused examples for common Tamework API integration workflows.
 
-> **Experimental API Contract (`0.5.0`)**
+> **Experimental API Contract (`0.6.0`)**
 > Recipe behavior should always be gated behind runtime capability checks.
 
 ## Child Pages
@@ -27,6 +27,7 @@ This subsection provides task-focused examples for common Tamework API integrati
 - [Auto-Register Companion on Capture Event Recipe](/mod/alecs-tamework/auto-register-companion-on-capture-event-recipe)
 - [Pause Companion Jobs on Death or Lost Event Recipe](/mod/alecs-tamework/pause-companion-jobs-on-death-or-lost-event-recipe)
 - [Keep Companion Cache in Sync with Profile Changed Events Recipe](/mod/alecs-tamework/keep-companion-cache-in-sync-with-profile-changed-events-recipe)
+- [Credit External Skill XP from Companion XP Recipe](/mod/alecs-tamework/credit-external-skill-xp-from-companion-xp-recipe)
 - [Enforce Ownership before Custom Command or Effect Recipe](/mod/alecs-tamework/enforce-ownership-before-custom-command-or-effect-recipe)
 - [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
 - [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)

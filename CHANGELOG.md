@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added public alpha companion XP award events through `TameworkApi.events()` so external mods can subscribe and credit owner-facing skills from successful companion XP activity.
+
 ## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27
 
 ### Added

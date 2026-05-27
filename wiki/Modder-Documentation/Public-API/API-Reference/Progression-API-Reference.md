@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.5.0`)**
+> **Experimental API Contract (`0.6.0`)**
 > This reference tracks the current `progression()` contract in `TameworkApi`.
 
 Capabilities: `PROGRESSION`, `PROGRESSION_MUTATIONS`
@@ -41,6 +41,8 @@ Capabilities: `PROGRESSION`, `PROGRESSION_MUTATIONS`
 - `needs`
 - `breeding`
 - `lifeStage`
+- `leveling`
+- `talents`
 - `traits`
 - `attachments`
 

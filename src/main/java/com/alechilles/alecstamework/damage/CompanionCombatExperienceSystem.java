@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -78,7 +79,7 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         }
         double xp = finalDamage * combat.getDamageTakenXpPerPoint();
         if (xp > 0.0) {
-            CompanionLevelingService.awardXp(targetRef, store, commandBuffer, roleId, xp);
+            CompanionLevelingService.awardXp(targetRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_TAKEN, xp);
         }
     }
 
@@ -105,7 +106,7 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         }
         double xp = finalDamage * combat.getDamageDealtXpPerPoint();
         if (xp > 0.0) {
-            CompanionLevelingService.awardXp(sourceRef, store, commandBuffer, roleId, xp);
+            CompanionLevelingService.awardXp(sourceRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_DEALT, xp);
         }
     }
 

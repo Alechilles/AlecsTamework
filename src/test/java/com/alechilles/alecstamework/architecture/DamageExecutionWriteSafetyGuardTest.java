@@ -76,11 +76,11 @@ class DamageExecutionWriteSafetyGuardTest {
         String combatXpContent = Files.readString(COMBAT_XP_SYSTEM, StandardCharsets.UTF_8);
 
         assertTrue(
-                combatXpContent.contains("CompanionLevelingService.awardXp(targetRef, store, commandBuffer, roleId, xp);"),
+                combatXpContent.contains("CompanionLevelingService.awardXp(targetRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_TAKEN, xp);"),
                 "Combat XP taken awards must pass CommandBuffer into CompanionLevelingService."
         );
         assertTrue(
-                combatXpContent.contains("CompanionLevelingService.awardXp(sourceRef, store, commandBuffer, roleId, xp);"),
+                combatXpContent.contains("CompanionLevelingService.awardXp(sourceRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_DEALT, xp);"),
                 "Combat XP dealt awards must pass CommandBuffer into CompanionLevelingService."
         );
     }

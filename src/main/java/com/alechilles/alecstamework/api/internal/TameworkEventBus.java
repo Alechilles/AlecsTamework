@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ConfigReloadedEvent;
+import com.alechilles.alecstamework.api.CompanionXpAwardedEvent;
 import com.alechilles.alecstamework.api.NpcCapturedEvent;
 import com.alechilles.alecstamework.api.NpcDeathRecordedEvent;
 import com.alechilles.alecstamework.api.NpcLostRecordedEvent;
@@ -131,6 +132,10 @@ public final class TameworkEventBus
             return;
         }
         dispatch(new ConfigReloadedEvent(family, normalizedIds, System.currentTimeMillis()));
+    }
+
+    public void emitCompanionXpAwarded(@Nonnull CompanionXpAwardedEvent event) {
+        dispatch(event);
     }
 
     @Override

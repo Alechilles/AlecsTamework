@@ -1170,6 +1170,11 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
+    public TameworkEventBus getApiEventBus() {
+        return apiEventBus;
+    }
+
+    @Nullable
     public CrashTelemetryService getCrashTelemetryService() {
         return crashTelemetryService;
     }
