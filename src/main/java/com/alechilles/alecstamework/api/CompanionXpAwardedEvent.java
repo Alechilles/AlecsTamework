@@ -7,7 +7,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Event emitted after a linked companion successfully receives XP.
+ * Event emitted after a companion successfully receives XP.
+ *
+ * <p>{@code toolIds} is contextual command-tool metadata and may be empty for unlinked companions.
  *
  * <p>This event is informational and non-cancelable. Listener failures are isolated by the
  * Tamework event bus, so one integration cannot prevent companion progression or other listeners.

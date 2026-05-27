@@ -78,14 +78,14 @@ class CompanionXpEventDebugLogServiceTest {
                 logs::add
         );
 
-        service.logHarvestDropAttempt("award applied=false reason=missing-command-link");
+        service.logHarvestDropAttempt("award applied=false reason=not-tamed-or-owned");
         assertTrue(logs.isEmpty(), "Harvest drop diagnostics should stay quiet until the debug toggle is enabled.");
 
         assertTrue(service.setEnabled(true));
-        service.logHarvestDropAttempt("award applied=false reason=missing-command-link");
+        service.logHarvestDropAttempt("award applied=false reason=not-tamed-or-owned");
 
         assertTrue(logs.stream().anyMatch(line -> line.contains("[Tamework XP Event Debug] harvestDrop")));
-        assertTrue(logs.stream().anyMatch(line -> line.contains("reason=missing-command-link")));
+        assertTrue(logs.stream().anyMatch(line -> line.contains("reason=not-tamed-or-owned")));
     }
 
     private static CompanionXpAwardedEvent event(CompanionXpSource source, double awardedXp) {

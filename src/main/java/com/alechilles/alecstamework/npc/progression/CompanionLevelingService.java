@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -137,7 +138,7 @@ public final class CompanionLevelingService {
         if (npcRef == null || !npcRef.isValid() || store == null || !Double.isFinite(amount) || amount <= 0.0) {
             return AwardResult.notApplied();
         }
-        if (!isXpEligibleLink(npcRef, store)) {
+        if (!isXpEligibleCompanion(npcRef, store)) {
             return AwardResult.notApplied();
         }
         String roleId = roleIdHint;
@@ -277,7 +278,7 @@ public final class CompanionLevelingService {
         return Math.max(0, level - 1) * config.getTalentPoints().getPointsPerLevel();
     }
 
-    private static boolean isXpEligibleLink(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
+    private static boolean isXpEligibleCompanion(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
         return resolveXpEligibility(npcRef, store).eligible();
     }
 
@@ -553,13 +554,13 @@ public final class CompanionLevelingService {
         if (!(settings.getFlatXp() > 0.0)) {
             return "reason=" + sourceName + "-xp-zero roleId=" + roleId + " configId=" + config.getId();
         }
-        XpEligibility eligibility = resolveXpEligibility(npcRef, store);
-        if (!eligibility.eligible()) {
-            return "reason=" + eligibility.reason() + " roleId=" + roleId + " configId=" + config.getId();
-        }
         ComponentType<EntityStore, TameworkLevelingComponent> type = TameworkLevelingComponent.getComponentType();
         if (type == null) {
             return "reason=missing-leveling-component-type roleId=" + roleId + " configId=" + config.getId();
+        }
+        XpEligibility eligibility = resolveXpEligibility(npcRef, store);
+        if (!eligibility.eligible()) {
+            return "reason=" + eligibility.reason() + " roleId=" + roleId + " configId=" + config.getId();
         }
         return "reason=ready roleId=" + roleId + " configId=" + config.getId() + " flatXp=" + settings.getFlatXp();
     }
@@ -567,19 +568,26 @@ public final class CompanionLevelingService {
     @Nonnull
     private static XpEligibility resolveXpEligibility(@Nonnull Ref<EntityStore> npcRef,
                                                      @Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType == null) {
-            return XpEligibility.rejected("missing-command-links-component-type");
+        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
+        if (tamedType != null) {
+            TameworkTamedComponent tamed = store.getComponent(npcRef, tamedType);
+            if (tamed != null && tamed.isTamed()) {
+                return XpEligibility.accepted("tamed");
+            }
         }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
-        if (links == null) {
-            return XpEligibility.rejected("missing-command-links-component");
+
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        if (ownerType != null) {
+            TameworkOwnerComponent owner = store.getComponent(npcRef, ownerType);
+            if (owner != null && owner.hasOwner()) {
+                return XpEligibility.accepted("owned");
+            }
         }
-        String[] toolIds = links.getToolIds();
-        if (toolIds == null || toolIds.length == 0) {
-            return XpEligibility.rejected("missing-command-tool-link");
+
+        if (tamedType == null && ownerType == null) {
+            return XpEligibility.rejected("missing-companion-state-component-types");
         }
-        return XpEligibility.accepted();
+        return XpEligibility.rejected("not-tamed-or-owned");
     }
 
     private enum SimpleXpSourceType {
@@ -591,8 +599,8 @@ public final class CompanionLevelingService {
     private record XpEligibility(boolean eligible,
                                  @Nonnull String reason) {
         @Nonnull
-        static XpEligibility accepted() {
-            return new XpEligibility(true, "ready");
+        static XpEligibility accepted(@Nonnull String reason) {
+            return new XpEligibility(true, reason);
         }
 
         @Nonnull

@@ -41,6 +41,7 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - Always close the returned `AutoCloseable` during unload/shutdown.
 - Payloads are immutable snapshots (`record` + defensive copies).
 - `CompanionXpAwardedEvent` is emitted only after Tamework accepts an XP award and applies or queues the component write.
+- Companion XP does not require a command-tool link; command links only add optional tool id context.
 
 ## `CompanionXpAwardedEvent`
 Use this successful-only event when an integration wants to credit external player progression from companion activity.
@@ -56,7 +57,7 @@ Source buckets:
 Payload fields:
 - `npcUuid`
 - `ownerUuid` nullable; treat null as not creditable to a player.
-- `toolIds` immutable command-tool ids linked to the NPC.
+- `toolIds` immutable command-tool ids linked to the NPC; empty when the companion is not linked to a command tool.
 - `roleId` nullable role id resolved for the award.
 - `levelingConfigId` nullable leveling config id used for the award.
 - `source`

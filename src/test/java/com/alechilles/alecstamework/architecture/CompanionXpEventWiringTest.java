@@ -65,6 +65,29 @@ class CompanionXpEventWiringTest {
     }
 
     @Test
+    void xpEligibilityUsesCompanionStateNotCommandLinks() throws IOException {
+        String content = readService();
+
+        assertTrue(
+                !content.contains("isXpEligibleLink"),
+                "XP eligibility should not be tied to command link state."
+        );
+        assertTrue(
+                !content.contains("missing-command-links-component")
+                        && !content.contains("missing-command-tool-link"),
+                "Missing command links should not reject otherwise eligible companion XP."
+        );
+        assertTrue(
+                content.contains("TameworkTamedComponent tamed = store.getComponent(npcRef, tamedType);"),
+                "Tamed companion state should make XP awards eligible."
+        );
+        assertTrue(
+                content.contains("TameworkOwnerComponent owner = store.getComponent(npcRef, ownerType);"),
+                "Owned companion state should make unlinked XP awards eligible."
+        );
+    }
+
+    @Test
     void tameworkHarvestDropAwardsHarvestXpAfterSuccessfulDrop() throws IOException {
         String content = Files.readString(HARVEST_DROP_ACTION, StandardCharsets.UTF_8);
 

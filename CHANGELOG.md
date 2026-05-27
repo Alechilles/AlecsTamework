@@ -8,6 +8,7 @@
 
 ### Fixed
 - Fixed state-driven `TameworkHarvestDrop` harvest flows so successful harvest drops award companion harvest XP and emit companion XP events.
+- Fixed companion XP awards so unlinked tamed or owned companions can gain XP and emit XP events; command links now only provide optional event tool-id context.
 
 ## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27
 

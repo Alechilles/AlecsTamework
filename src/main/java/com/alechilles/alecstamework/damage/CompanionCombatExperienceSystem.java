@@ -23,7 +23,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Awards combat XP for linked companions based on final damage dealt and taken.
+ * Awards combat XP for eligible companions based on final damage dealt and taken.
  */
 public final class CompanionCombatExperienceSystem extends DamageEventSystem {
     @Override

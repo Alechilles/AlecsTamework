@@ -62,6 +62,7 @@ private double scaleForExternalSkill(CompanionXpSource source, double companionX
 ## Notes
 - `CompanionXpAwardedEvent` fires only after Tamework accepts the XP award and applies or queues the companion component write.
 - `ownerUuid` is the player UUID to credit. If it is null, skip player skill credit.
+- `toolIds` may be empty for unlinked companions; do not use command links as the creditability check.
 - Automatic storage food, storage water, natural water, and manual feeding use the public `FEED` source bucket.
 - Listener failures are isolated by Tamework, but integrations should still avoid heavy work inside the synchronous callback.
 
