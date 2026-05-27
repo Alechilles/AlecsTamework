@@ -13,7 +13,7 @@
 - Replaced the linked companion XP and talent point rows with a compact level progress ring and spendable talent point button.
 
 ### Fixed
-- Fixed the `0.5.1` manifest version range so the packaged `2.11.3` jar loads instead of being rejected while an older jar remains active.
+- Fixed the Hytale `0.5.x` manifest version range so the packaged `2.11.3` jar loads on compatible `0.5` patch releases instead of being rejected while an older jar remains active.
 - Fixed `/tw` failing to register on Hytale `0.5.1` servers because stricter permission validation rejected the display-name-derived permission node, restoring startup for affected servers.
 - Fixed combat XP writes so damage-system leveling updates route through `CommandBuffer` instead of mutating the entity store directly during damage event handling.
 - Fixed linked companion cards clipping the new level, XP, talent point, and talent-button rows before they could be seen.
