@@ -78,7 +78,7 @@ public final class TameworkCommandSelectionPage
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
-    private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 750L;
+    private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L;
     private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
     private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandOption[] options;

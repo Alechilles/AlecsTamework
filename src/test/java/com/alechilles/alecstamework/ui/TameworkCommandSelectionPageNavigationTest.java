@@ -94,8 +94,8 @@ class TameworkCommandSelectionPageNavigationTest {
                 "Replacement-page navigation should wait briefly so already-sent linked-panel commands apply before the new page opens."
         );
         assertTrue(
-                content.contains("PAGE_NAVIGATION_DRAIN_DELAY_MS = 750L"),
-                "Replacement-page navigation needs enough delay for already-sent linked-panel refresh commands to drain."
+                content.contains("PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L"),
+                "Replacement-page navigation should use only a short drain delay now that stale refresh owners are blocked."
         );
         assertTrue(
                 helper.contains("dispatchNavigationAction(action)"),

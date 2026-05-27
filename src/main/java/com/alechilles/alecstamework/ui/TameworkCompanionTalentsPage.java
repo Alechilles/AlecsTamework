@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.List;
 import java.util.function.Function;
@@ -37,6 +38,7 @@ public final class TameworkCompanionTalentsPage
     private final Supplier<PageData> dataSupplier;
     private final Function<String, String> purchaseCallback;
     private final Runnable backCallback;
+    private boolean navigationPending;
     private boolean handled;
     private int pageIndex;
     private String statusMessage;
@@ -49,6 +51,7 @@ public final class TameworkCompanionTalentsPage
         this.dataSupplier = dataSupplier;
         this.purchaseCallback = purchaseCallback;
         this.backCallback = backCallback;
+        this.navigationPending = false;
         this.handled = false;
         this.pageIndex = 0;
         this.statusMessage = null;
@@ -79,12 +82,13 @@ public final class TameworkCompanionTalentsPage
         if (data == null || data.action == null || data.action.isBlank()) {
             return;
         }
+        if (navigationPending) {
+            return;
+        }
         if (ACTION_BACK.equalsIgnoreCase(data.action)) {
             handled = true;
-            close();
-            if (backCallback != null) {
-                backCallback.run();
-            }
+            navigationPending = true;
+            navigateBackOnWorldThread();
             return;
         }
         PageData currentData = getPageData();
@@ -111,16 +115,49 @@ public final class TameworkCompanionTalentsPage
             return;
         }
         handled = true;
-        if (backCallback != null) {
-            backCallback.run();
-        }
+        navigationPending = true;
+        navigateBackOnWorldThread();
     }
 
     private void sendRefreshUpdate() {
+        if (handled || navigationPending) {
+            return;
+        }
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
         bindPage(commandBuilder, eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
+    }
+
+    private void navigateBackOnWorldThread() {
+        Ref<EntityStore> ref = playerRef.getReference();
+        if (ref == null || !ref.isValid()) {
+            navigationPending = false;
+            return;
+        }
+        Store<EntityStore> store = ref.getStore();
+        if (store == null || store.getExternalData() == null) {
+            navigationPending = false;
+            return;
+        }
+        World world = store.getExternalData().getWorld();
+        if (world == null) {
+            navigationPending = false;
+            return;
+        }
+        world.execute(() -> {
+            try {
+                Ref<EntityStore> activeRef = playerRef.getReference();
+                if (activeRef == null || !activeRef.isValid()) {
+                    return;
+                }
+                if (backCallback != null) {
+                    backCallback.run();
+                }
+            } finally {
+                navigationPending = false;
+            }
+        });
     }
 
     private void bindPage(@Nonnull UICommandBuilder commandBuilder,
