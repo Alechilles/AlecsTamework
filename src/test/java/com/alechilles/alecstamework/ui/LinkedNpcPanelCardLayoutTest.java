@@ -86,6 +86,8 @@ class LinkedNpcPanelCardLayoutTest {
         int badgeTop = Integer.parseInt(talentPointBadge.group(1));
         int badgeLeft = Integer.parseInt(talentPointBadge.group(2));
         int badgeWidth = Integer.parseInt(talentPointBadge.group(3));
+        int badgeHeight = Integer.parseInt(talentPointBadge.group(4));
+        int badgeRight = badgeLeft + badgeWidth;
 
         assertTrue(
                 parsedCardHeight >= xpRingBottom,
@@ -107,12 +109,20 @@ class LinkedNpcPanelCardLayoutTest {
                 () -> "Talent point badge should stay near the top of the button; top was " + badgeTop + "."
         );
         assertTrue(
-                badgeLeft >= talentPointWidth / 2,
-                () -> "Talent point badge should sit on the right side of the button; left was " + badgeLeft + "."
+                badgeRight >= talentPointWidth,
+                () -> "Talent point badge should align to the right edge of the button; right was " + badgeRight + "."
         );
         assertTrue(
-                badgeWidth <= 12,
+                badgeWidth <= 14,
                 () -> "Talent point badge should stay compact; width was " + badgeWidth + "."
+        );
+        assertTrue(
+                badgeHeight >= 12,
+                () -> "Talent point badge should preserve the original text height; height was " + badgeHeight + "."
+        );
+        assertTrue(
+                cardUi.contains("FontSize: 8"),
+                "Talent point count should preserve the original readable text size."
         );
     }
 
