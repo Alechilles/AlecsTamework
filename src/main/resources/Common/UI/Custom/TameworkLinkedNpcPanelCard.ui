@@ -929,55 +929,112 @@ Group {
         }
     }
 
-    Group #FutureStatAFrame {
-        Anchor: (Top: 124, Left: 0, Width: 360, Height: 10);
-        Background: #0a121b(0.95);
+    Group #TalentPointAction {
+        Anchor: (Top: 52, Left: 196, Width: 24, Height: 24);
         Visible: false;
 
-        Group #FutureStatAFill {
-            Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
+        Group #TalentPointIcon {
+            Anchor: (Top: 2, Left: 2, Width: 20, Height: 20);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png");
+        }
+
+        Label #TalentPointCountShadow {
+            Anchor: (Top: 11, Left: 2, Width: 22, Height: 12);
+            Text: +1;
+            Style: (FontSize: 9, RenderBold: true, TextColor: #06101a, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        Label #TalentPointCount {
+            Anchor: (Top: 10, Left: 1, Width: 22, Height: 12);
+            Text: +1;
+            Style: (FontSize: 9, RenderBold: true, TextColor: #fff4a4, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        TextButton #TalentPointButton {
+            Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+            Style: @TraitTooltipButtonStyle;
+            Text: "";
+            TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents;
+            TextTooltipStyle: @LinkedActionTooltipStyle;
+        }
+    }
+
+    Group #XpProgressRing {
+        Anchor: (Top: 52, Left: 226, Width: 24, Height: 24);
+        Visible: false;
+
+        Group #RingTrackTopLeft {
+            Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+            Background: #23354a;
+        }
+
+        Group #RingTrackTopRight {
+            Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+            Background: #23354a;
+        }
+
+        Group #RingTrackLeft {
+            Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+            Background: #23354a;
+        }
+
+        Group #RingTrackBottom {
+            Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+            Background: #23354a;
+        }
+
+        Group #RingTrackRight {
+            Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+            Background: #23354a;
+        }
+
+        Group #RingFillBar1 {
+            Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
             Background: #7cc6f2;
         }
 
-        Label #FutureStatAText {
-            Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-            Text: %server.tamework.ui.linkedPanel.futureStat.a.default;
-            Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
-        }
-    }
-
-    Group #FutureStatBFrame {
-        Anchor: (Top: 138, Left: 0, Width: 360, Height: 10);
-        Background: #0a121b(0.95);
-        Visible: false;
-
-        Group #FutureStatBFill {
-            Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
-            Background: #f2c97c;
+        Group #RingFillBar2 {
+            Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+            Background: #7cc6f2;
         }
 
-        Label #FutureStatBText {
-            Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-            Text: %server.tamework.ui.linkedPanel.futureStat.b.default;
-            Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
-        }
-    }
-
-    Group #FutureActionBar {
-        Anchor: (Top: 152, Left: 0, Width: 360, Height: 24);
-        LayoutMode: Left;
-        Visible: false;
-
-        TextButton #TraitsButton {
-            Anchor: (Left: 0, Width: 108, Height: 22);
-            Text: %server.tamework.ui.linkedPanel.futureAction.traits;
-            Visible: false;
+        Group #RingFillBar3 {
+            Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+            Background: #7cc6f2;
         }
 
-        TextButton #TalentsButton {
-            Anchor: (Left: 6, Width: 108, Height: 22);
-            Text: %server.tamework.ui.linkedPanel.futureAction.talents;
-            Visible: false;
+        Group #RingFillBar4 {
+            Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+            Background: #7cc6f2;
+        }
+
+        Group #RingFillBar5 {
+            Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+            Background: #7cc6f2;
+        }
+
+        Group #CornerMaskOverlay {
+            Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+        }
+
+        Group {
+            Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+            Background: #081220;
+        }
+
+        Label #XpLevelText {
+            Anchor: (Top: 4, Left: 3, Width: 18, Height: 16);
+            Text: 1;
+            Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        TextButton #XpTooltip {
+            Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+            Style: @TraitTooltipButtonStyle;
+            Text: "";
+            TooltipText: 0/0 XP;
+            TextTooltipStyle: @LinkedActionTooltipStyle;
         }
     }
 }

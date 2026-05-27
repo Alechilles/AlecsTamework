@@ -10,6 +10,7 @@
 - Updated release metadata for Hytale `0.5.1`.
 - Settings announcements now use per-player Tamework version history: first-time users see the welcome message, while version-specific notices appear only after that player has used an older Tamework version.
 - The local build now references a stable shared NameplateBuilder jar copy under the Hytale Modding directory instead of depending on whichever server mods folder is active.
+- Replaced the linked companion XP and talent point rows with a compact level progress ring and spendable talent point button.
 
 ### Fixed
 - Fixed the `0.5.1` manifest version range so the packaged `2.11.3` jar loads instead of being rejected while an older jar remains active.

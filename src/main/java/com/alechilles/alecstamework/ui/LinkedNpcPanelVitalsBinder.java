@@ -8,13 +8,6 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
  */
 final class LinkedNpcPanelVitalsBinder {
     private static final int VITAL_FILL_MAX_WIDTH = 204;
-    private static final double NEED_RING_BAR1_LENGTH = 12.0;
-    private static final double NEED_RING_BAR2_LENGTH = 24.0;
-    private static final double NEED_RING_BAR3_LENGTH = 24.0;
-    private static final double NEED_RING_BAR4_LENGTH = 24.0;
-    private static final double NEED_RING_BAR5_LENGTH = 12.0;
-    private static final double NEED_RING_PERIMETER_PIXELS =
-            NEED_RING_BAR1_LENGTH + NEED_RING_BAR2_LENGTH + NEED_RING_BAR3_LENGTH + NEED_RING_BAR4_LENGTH + NEED_RING_BAR5_LENGTH;
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
@@ -225,7 +218,7 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(slotSelector + " #NeedIcon.Text", icon.fallbackText());
         }
         commandBuilder.set(slotSelector + " #NeedTooltip.TooltipText", visual.tooltipText());
-        SegmentFill fill = resolveSegmentFill(visual.available() ? visual.fillRatio() : 0.0);
+        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(visual.available() ? visual.fillRatio() : 0.0);
         commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
         commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
         commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
@@ -247,37 +240,12 @@ final class LinkedNpcPanelVitalsBinder {
                 slotSelector + " #BreedingCooldownTooltip.TooltipText",
                 LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry, language)
         );
-        SegmentFill fill = resolveSegmentFill(entry.breedingCooldownRatio());
+        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(entry.breedingCooldownRatio());
         commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
         commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
         commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
         commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
         commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
-    }
-
-    private static SegmentFill resolveSegmentFill(double fillRatio) {
-        int coveredPixels = (int) Math.floor(clamp(fillRatio) * NEED_RING_PERIMETER_PIXELS + 1.0e-9);
-        int remaining = coveredPixels;
-        int bar1 = consumePixels(remaining, (int) NEED_RING_BAR1_LENGTH);
-        remaining -= bar1;
-        int bar2 = consumePixels(remaining, (int) NEED_RING_BAR2_LENGTH);
-        remaining -= bar2;
-        int bar3 = consumePixels(remaining, (int) NEED_RING_BAR3_LENGTH);
-        remaining -= bar3;
-        int bar4 = consumePixels(remaining, (int) NEED_RING_BAR4_LENGTH);
-        remaining -= bar4;
-        int bar5 = consumePixels(remaining, (int) NEED_RING_BAR5_LENGTH);
-        return new SegmentFill(
-                bar1,
-                bar2,
-                bar3,
-                bar4,
-                bar5
-        );
-    }
-
-    private static int consumePixels(int remaining, int segmentLength) {
-        return Math.max(0, Math.min(segmentLength, remaining));
     }
 
     private static int percent(double ratio) {
@@ -300,6 +268,4 @@ final class LinkedNpcPanelVitalsBinder {
         }
     }
 
-    private record SegmentFill(int bar1, int bar2, int bar3, int bar4, int bar5) {
-    }
 }
