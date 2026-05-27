@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,12 @@ class LinkedNpcPanelCardLayoutTest {
         assertFalse(cardUi.contains("FutureStatAFrame"), "Linked cards should not show expanded XP bars.");
         assertFalse(cardUi.contains("FutureActionBar"), "Linked cards should not show expanded talent action rows.");
         assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed UI text fails Hytale's CustomUI parser.");
+        List<String> bareMultiWordTextDefaults = findBareMultiWordTextDefaults(cardUi);
+        assertTrue(
+                bareMultiWordTextDefaults.isEmpty(),
+                () -> "Bare multi-word Text or TooltipText values fail Hytale's CustomUI parser: "
+                        + bareMultiWordTextDefaults
+        );
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
 
         int parsedCardHeight = Integer.parseInt(cardHeight.group(1));
@@ -65,5 +73,26 @@ class LinkedNpcPanelCardLayoutTest {
                 () -> "Linked-panel card height " + parsedCardHeight
                         + " clips talent point action ending at " + talentPointBottom + "."
         );
+    }
+
+    private static List<String> findBareMultiWordTextDefaults(String cardUi) {
+        List<String> matches = new ArrayList<>();
+        String[] lines = cardUi.split("\\R");
+        for (int i = 0; i < lines.length; i++) {
+            String trimmed = lines[i].trim();
+            if (!trimmed.startsWith("Text:") && !trimmed.startsWith("TooltipText:")) {
+                continue;
+            }
+            int colon = trimmed.indexOf(':');
+            int semicolon = trimmed.lastIndexOf(';');
+            if (colon < 0 || semicolon <= colon) {
+                continue;
+            }
+            String value = trimmed.substring(colon + 1, semicolon).trim();
+            if (value.contains(" ") && !value.startsWith("\"") && !value.startsWith("%")) {
+                matches.add((i + 1) + ": " + trimmed);
+            }
+        }
+        return matches;
     }
 }
