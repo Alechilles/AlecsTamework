@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -50,12 +51,17 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         ModelComponent modelComponent = store.getComponent(ref, ModelComponent.getComponentType());
         float eyeHeight = modelComponent != null ? modelComponent.getModel().getEyeHeight(ref, store) : 0.0F;
         float height = -eyeHeight;
+        boolean dropped = false;
         for (ItemStack drop : drops) {
             if (drop == null || drop.isEmpty()) {
                 continue;
             }
             newDirection(ref, pickDistance(), height, store);
             ItemUtils.throwItem(ref, store, drop, this.dropDirection, this.throwSpeed);
+            dropped = true;
+        }
+        if (dropped) {
+            CompanionLevelingService.awardHarvestXp(ref, store);
         }
         return true;
     }

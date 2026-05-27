@@ -17,6 +17,10 @@ class CompanionXpEventWiringTest {
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "npc", "progression", "CompanionLevelingService.java"
     );
+    private static final Path HARVEST_DROP_ACTION = Paths.get(
+            "src", "main", "java",
+            "com", "alechilles", "alecstamework", "npc", "actions", "ActionTameworkHarvestDrop.java"
+    );
 
     @Test
     void simpleXpSourcesUsePublicSourceBuckets() throws IOException {
@@ -58,6 +62,21 @@ class CompanionXpEventWiringTest {
 
         assertTrue(commandLinkOwner >= 0, "XP event owner credit should read TameworkCommandLinksComponent owner id.");
         assertTrue(ownerFallback > commandLinkOwner, "Owner component lookup should remain a fallback after command links.");
+    }
+
+    @Test
+    void tameworkHarvestDropAwardsHarvestXpAfterSuccessfulDrop() throws IOException {
+        String content = Files.readString(HARVEST_DROP_ACTION, StandardCharsets.UTF_8);
+
+        int dropFlag = content.indexOf("boolean dropped = false;");
+        int itemDrop = content.indexOf("ItemUtils.throwItem(ref, store, drop, this.dropDirection, this.throwSpeed);");
+        int markDropped = content.indexOf("dropped = true;");
+        int awardXp = content.indexOf("CompanionLevelingService.awardHarvestXp(ref, store);");
+
+        assertTrue(dropFlag >= 0, "TameworkHarvestDrop should track whether any item actually dropped.");
+        assertTrue(itemDrop > dropFlag, "Drop tracking should start before harvest items are thrown.");
+        assertTrue(markDropped > itemDrop, "Drop tracking should mark success only after an item is thrown.");
+        assertTrue(awardXp > markDropped, "Harvest XP should be awarded after TameworkHarvestDrop succeeds.");
     }
 
     private static String readService() throws IOException {
