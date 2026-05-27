@@ -51,6 +51,18 @@ class LinkedNpcPanelCardLayoutTest {
         assertFalse(cardUi.contains("FutureStatAFrame"), "Linked cards should not show expanded XP bars.");
         assertFalse(cardUi.contains("FutureActionBar"), "Linked cards should not show expanded talent action rows.");
         assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed UI text fails Hytale's CustomUI parser.");
+        assertTrue(
+                cardUi.contains("Group #TalentPointCountBadgeBorder"),
+                "Talent point count should use a badge frame instead of floating over the icon."
+        );
+        assertTrue(
+                cardUi.contains("Group #TalentPointCountBadgeFill"),
+                "Talent point count should have a dark badge fill for contrast."
+        );
+        assertTrue(
+                binder.contains("Integer.toString(availableTalentPoints(stat))"),
+                "Talent point badge should show the compact count without a plus prefix."
+        );
         List<String> unquotedStringTextDefaults = findUnquotedStringTextDefaults(cardUi);
         assertTrue(
                 unquotedStringTextDefaults.isEmpty(),

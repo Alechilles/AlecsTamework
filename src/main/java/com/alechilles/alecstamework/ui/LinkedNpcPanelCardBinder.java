@@ -312,7 +312,7 @@ final class LinkedNpcPanelCardBinder {
         if (!visible) {
             return;
         }
-        String text = "+" + availableTalentPoints(stat);
+        String text = Integer.toString(availableTalentPoints(stat));
         commandBuilder.set(countSelector + ".Text", text);
         commandBuilder.set(countShadowSelector + ".Text", text);
     }
