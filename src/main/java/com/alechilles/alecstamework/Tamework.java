@@ -53,6 +53,7 @@ import com.alechilles.alecstamework.damage.TameworkLingeringHazardSystem;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
+import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
@@ -216,6 +217,7 @@ public class Tamework extends JavaPlugin {
     private TraitEffectRegistry traitEffectRegistry;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
+    private CompanionXpEventDebugLogService companionXpEventDebugLogService;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private CrashTelemetryService crashTelemetryService;
@@ -702,6 +704,10 @@ public class Tamework extends JavaPlugin {
                 interactionExtensionRegistry,
                 traitEffectRegistry
         );
+        companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
+                () -> api,
+                message -> getLogger().at(Level.INFO).log(message)
+        );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(persistenceRuntime);
         apiSelfTestRunner = new ApiSelfTestRunner();
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
@@ -998,6 +1004,10 @@ public class Tamework extends JavaPlugin {
         if (crashTelemetryService != null) {
             crashTelemetryService.shutdown();
         }
+        if (companionXpEventDebugLogService != null) {
+            companionXpEventDebugLogService.close();
+            companionXpEventDebugLogService = null;
+        }
         overrideInitializedScopeKeys.clear();
         if (spawnerTooltipBridge != null) {
             spawnerTooltipBridge.shutdown();
@@ -1167,6 +1177,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkApi getApi() {
         return api;
+    }
+
+    @Nullable
+    public CompanionXpEventDebugLogService getCompanionXpEventDebugLogService() {
+        return companionXpEventDebugLogService;
     }
 
     @Nullable

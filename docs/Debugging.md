@@ -65,11 +65,15 @@
 - `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debuglag [on|off]`
+- `/tw debugxpevents [on|off]`
 
 `/tw debugdespawn` notes:
 - Default (no role filter) tracks all tamed companions.
 - You can target a role by name (for example `Rat` or `Tamed_Rat`).
 - Use `all` or `clear` to remove a role filter without disabling the toggle.
+
+`/tw debugxpevents` subscribes through `TameworkApi.events()` and logs each `CompanionXpAwardedEvent`
+hit, including source, owner UUID, tool ids, XP, and level delta.
 
 ## Useful quick checks
 - `/tw getowner`, `/tw setowner`

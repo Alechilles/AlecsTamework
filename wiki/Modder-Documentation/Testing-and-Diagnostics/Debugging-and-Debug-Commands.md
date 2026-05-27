@@ -46,10 +46,14 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw debugneedsconsume [on|off]`
 - `/tw debugneedsdamage [on|off]`
 - `/tw debugneedsseek [on|off]`
+- `/tw debugxpevents [on|off]`
 
 `TwDebugConfig` can supply default values for those debug toggles, including `DespawnRoleFilter`.
 
 `/tw showhitboxes` is diagnostic rendering, but it is not part of `TwDebugConfig` startup defaults.
+
+`/tw debugxpevents` subscribes through `TameworkApi.events()` and logs each public
+`CompanionXpAwardedEvent` hit, including source, owner UUID, tool ids, XP, and level delta.
 
 ## Log patterns to watch
 - Missing builder ids
