@@ -71,12 +71,14 @@ class CompanionXpEventWiringTest {
         int dropFlag = content.indexOf("boolean dropped = false;");
         int itemDrop = content.indexOf("ItemUtils.throwItem(ref, store, drop, this.dropDirection, this.throwSpeed);");
         int markDropped = content.indexOf("dropped = true;");
-        int awardXp = content.indexOf("CompanionLevelingService.awardHarvestXp(ref, store);");
+        int awardXp = content.indexOf("AwardResult result = CompanionLevelingService.awardHarvestXp(ref, store);");
+        int debugLog = content.indexOf("logHarvestDropAward(ref, store");
 
         assertTrue(dropFlag >= 0, "TameworkHarvestDrop should track whether any item actually dropped.");
         assertTrue(itemDrop > dropFlag, "Drop tracking should start before harvest items are thrown.");
         assertTrue(markDropped > itemDrop, "Drop tracking should mark success only after an item is thrown.");
         assertTrue(awardXp > markDropped, "Harvest XP should be awarded after TameworkHarvestDrop succeeds.");
+        assertTrue(debugLog > awardXp, "Harvest XP debug diagnostics should log the award outcome.");
     }
 
     private static String readService() throws IOException {

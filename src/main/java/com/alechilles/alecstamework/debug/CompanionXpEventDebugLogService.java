@@ -50,6 +50,13 @@ public final class CompanionXpEventDebugLogService implements AutoCloseable {
         return eventCount.get();
     }
 
+    public void logHarvestDropAttempt(@Nonnull String message) {
+        if (!isEnabled()) {
+            return;
+        }
+        infoLogger.accept("[Tamework XP Event Debug] harvestDrop " + message);
+    }
+
     private boolean enable() {
         if (enabled) {
             return true;

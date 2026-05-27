@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -18,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Drop-item action for harvest flows that supports trait-driven bonus drops.
@@ -44,6 +48,8 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
 
         List<ItemStack> baseDrops = resolveDrops();
         if (baseDrops.isEmpty()) {
+            logHarvestDropAttempt("skipped reason=no-resolved-drops item=" + valueOrNull(this.item)
+                    + " dropList=" + valueOrNull(this.dropList));
             return true;
         }
         List<ItemStack> drops = shouldDoubleDrops(ref, store) ? duplicateDrops(baseDrops) : baseDrops;
@@ -52,6 +58,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         float eyeHeight = modelComponent != null ? modelComponent.getModel().getEyeHeight(ref, store) : 0.0F;
         float height = -eyeHeight;
         boolean dropped = false;
+        int droppedCount = 0;
         for (ItemStack drop : drops) {
             if (drop == null || drop.isEmpty()) {
                 continue;
@@ -59,9 +66,16 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             newDirection(ref, pickDistance(), height, store);
             ItemUtils.throwItem(ref, store, drop, this.dropDirection, this.throwSpeed);
             dropped = true;
+            droppedCount++;
         }
         if (dropped) {
-            CompanionLevelingService.awardHarvestXp(ref, store);
+            AwardResult result = CompanionLevelingService.awardHarvestXp(ref, store);
+            logHarvestDropAward(ref, store, baseDrops.size(), drops.size(), droppedCount, result);
+        } else {
+            logHarvestDropAttempt("skipped reason=resolved-drops-empty baseDrops=" + baseDrops.size()
+                    + " attemptedDrops=" + drops.size()
+                    + " item=" + valueOrNull(this.item)
+                    + " dropList=" + valueOrNull(this.dropList));
         }
         return true;
     }
@@ -144,5 +158,52 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             return min;
         }
         return Math.max(min, Math.min(max, value));
+    }
+
+    private void logHarvestDropAward(@Nonnull Ref<EntityStore> ref,
+                                     @Nonnull Store<EntityStore> store,
+                                     int baseDropCount,
+                                     int attemptedDropCount,
+                                     int droppedCount,
+                                     @Nonnull AwardResult result) {
+        if (!isXpEventDebugEnabled()) {
+            return;
+        }
+        String readiness = result.applied()
+                ? "reason=awarded"
+                : CompanionLevelingService.describeHarvestXpReadiness(ref, store);
+        logHarvestDropAttempt("award applied=" + result.applied()
+                + " awardedXp=" + result.awardedXp()
+                + " level=" + result.previousLevel() + "->" + result.currentLevel()
+                + " totalXp=" + result.totalXp()
+                + " baseDrops=" + baseDropCount
+                + " attemptedDrops=" + attemptedDropCount
+                + " dropped=" + droppedCount
+                + " item=" + valueOrNull(this.item)
+                + " dropList=" + valueOrNull(this.dropList)
+                + " " + readiness);
+    }
+
+    private void logHarvestDropAttempt(@Nonnull String message) {
+        CompanionXpEventDebugLogService debugLog = resolveXpEventDebugLogService();
+        if (debugLog != null) {
+            debugLog.logHarvestDropAttempt(message);
+        }
+    }
+
+    private boolean isXpEventDebugEnabled() {
+        CompanionXpEventDebugLogService debugLog = resolveXpEventDebugLogService();
+        return debugLog != null && debugLog.isEnabled();
+    }
+
+    @Nullable
+    private CompanionXpEventDebugLogService resolveXpEventDebugLogService() {
+        Tamework instance = Tamework.getInstance();
+        return instance != null ? instance.getCompanionXpEventDebugLogService() : null;
+    }
+
+    @Nonnull
+    private static String valueOrNull(@Nullable Object value) {
+        return value == null ? "<null>" : value.toString();
     }
 }

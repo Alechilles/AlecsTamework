@@ -74,6 +74,8 @@
 
 `/tw debugxpevents` subscribes through `TameworkApi.events()` and logs each `CompanionXpAwardedEvent`
 hit, including source, owner UUID, tool ids, XP, and level delta.
+When enabled, it also logs `TameworkHarvestDrop` attempts before the public event exists so rejected harvest
+XP can be diagnosed with a reason such as missing command link, disabled harvest XP, or missing drop output.
 
 ## Useful quick checks
 - `/tw getowner`, `/tw setowner`

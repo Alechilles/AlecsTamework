@@ -69,6 +69,25 @@ class CompanionXpEventDebugLogServiceTest {
         assertTrue(logs.stream().anyMatch(line -> line.contains("could not be enabled")));
     }
 
+    @Test
+    void harvestDropDiagnosticsOnlyLogWhileEnabled() {
+        TameworkEventBus bus = new TameworkEventBus(null);
+        List<String> logs = new ArrayList<>();
+        CompanionXpEventDebugLogService service = new CompanionXpEventDebugLogService(
+                () -> new FakeApi(bus, EnumSet.of(TameworkApiCapability.EVENTS, TameworkApiCapability.COMPANION_XP_EVENTS)),
+                logs::add
+        );
+
+        service.logHarvestDropAttempt("award applied=false reason=missing-command-link");
+        assertTrue(logs.isEmpty(), "Harvest drop diagnostics should stay quiet until the debug toggle is enabled.");
+
+        assertTrue(service.setEnabled(true));
+        service.logHarvestDropAttempt("award applied=false reason=missing-command-link");
+
+        assertTrue(logs.stream().anyMatch(line -> line.contains("[Tamework XP Event Debug] harvestDrop")));
+        assertTrue(logs.stream().anyMatch(line -> line.contains("reason=missing-command-link")));
+    }
+
     private static CompanionXpAwardedEvent event(CompanionXpSource source, double awardedXp) {
         return new CompanionXpAwardedEvent(
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),

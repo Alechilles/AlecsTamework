@@ -54,6 +54,8 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 
 `/tw debugxpevents` subscribes through `TameworkApi.events()` and logs each public
 `CompanionXpAwardedEvent` hit, including source, owner UUID, tool ids, XP, and level delta.
+It also logs `TameworkHarvestDrop` award attempts while enabled, including rejected attempts that do not
+emit a public XP event.
 
 ## Log patterns to watch
 - Missing builder ids

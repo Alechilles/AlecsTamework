@@ -99,6 +99,12 @@ public final class CompanionLevelingService {
     }
 
     @Nonnull
+    public static String describeHarvestXpReadiness(@Nullable Ref<EntityStore> npcRef,
+                                                    @Nullable Store<EntityStore> store) {
+        return describeSimpleSourceXpReadiness(npcRef, store, SimpleXpSourceType.HARVEST);
+    }
+
+    @Nonnull
     public static AwardResult awardBreedingXp(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store) {
         return awardSimpleSourceXp(npcRef, store, SimpleXpSourceType.BREEDING, CompanionXpSource.BREEDING);
@@ -272,12 +278,7 @@ public final class CompanionLevelingService {
     }
 
     private static boolean isXpEligibleLink(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType == null) {
-            return false;
-        }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
-        return links != null && links.getToolIds() != null && links.getToolIds().length > 0;
+        return resolveXpEligibility(npcRef, store).eligible();
     }
 
     @Nullable
@@ -516,10 +517,88 @@ public final class CompanionLevelingService {
         return awardXp(npcRef, store, null, roleId, xpSource, settings.getFlatXp());
     }
 
+    @Nonnull
+    private static String describeSimpleSourceXpReadiness(@Nullable Ref<EntityStore> npcRef,
+                                                          @Nullable Store<EntityStore> store,
+                                                          @Nonnull SimpleXpSourceType sourceType) {
+        if (npcRef == null) {
+            return "reason=missing-npc-ref";
+        }
+        if (!npcRef.isValid()) {
+            return "reason=invalid-npc-ref";
+        }
+        if (store == null) {
+            return "reason=missing-store";
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId == null || roleId.isBlank()) {
+            return "reason=missing-role-id";
+        }
+        TwLevelingConfig config = TwLevelingConfig.resolveForRole(roleId);
+        if (config == null) {
+            return "reason=missing-leveling-config roleId=" + roleId;
+        }
+        if (!config.isEnabled()) {
+            return "reason=leveling-config-disabled roleId=" + roleId + " configId=" + config.getId();
+        }
+        TwLevelingConfig.SimpleXpSourceSettings settings = switch (sourceType) {
+            case FEED -> config.getXpSources().getFeed();
+            case HARVEST -> config.getXpSources().getHarvest();
+            case BREEDING -> config.getXpSources().getBreeding();
+        };
+        String sourceName = sourceType.name().toLowerCase();
+        if (!settings.isEnabled()) {
+            return "reason=" + sourceName + "-xp-disabled roleId=" + roleId + " configId=" + config.getId();
+        }
+        if (!(settings.getFlatXp() > 0.0)) {
+            return "reason=" + sourceName + "-xp-zero roleId=" + roleId + " configId=" + config.getId();
+        }
+        XpEligibility eligibility = resolveXpEligibility(npcRef, store);
+        if (!eligibility.eligible()) {
+            return "reason=" + eligibility.reason() + " roleId=" + roleId + " configId=" + config.getId();
+        }
+        ComponentType<EntityStore, TameworkLevelingComponent> type = TameworkLevelingComponent.getComponentType();
+        if (type == null) {
+            return "reason=missing-leveling-component-type roleId=" + roleId + " configId=" + config.getId();
+        }
+        return "reason=ready roleId=" + roleId + " configId=" + config.getId() + " flatXp=" + settings.getFlatXp();
+    }
+
+    @Nonnull
+    private static XpEligibility resolveXpEligibility(@Nonnull Ref<EntityStore> npcRef,
+                                                     @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        if (linksType == null) {
+            return XpEligibility.rejected("missing-command-links-component-type");
+        }
+        TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
+        if (links == null) {
+            return XpEligibility.rejected("missing-command-links-component");
+        }
+        String[] toolIds = links.getToolIds();
+        if (toolIds == null || toolIds.length == 0) {
+            return XpEligibility.rejected("missing-command-tool-link");
+        }
+        return XpEligibility.accepted();
+    }
+
     private enum SimpleXpSourceType {
         FEED,
         HARVEST,
         BREEDING
+    }
+
+    private record XpEligibility(boolean eligible,
+                                 @Nonnull String reason) {
+        @Nonnull
+        static XpEligibility accepted() {
+            return new XpEligibility(true, "ready");
+        }
+
+        @Nonnull
+        static XpEligibility rejected(@Nonnull String reason) {
+            return new XpEligibility(false, reason);
+        }
     }
 
     public record AwardResult(boolean applied,
