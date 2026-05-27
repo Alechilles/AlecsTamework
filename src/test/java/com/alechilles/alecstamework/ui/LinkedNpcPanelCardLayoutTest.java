@@ -48,6 +48,7 @@ class LinkedNpcPanelCardLayoutTest {
         assertTrue(talentPoint.find(), "TalentPointAction anchor must stay parseable by the layout guard.");
         assertFalse(cardUi.contains("FutureStatAFrame"), "Linked cards should not show expanded XP bars.");
         assertFalse(cardUi.contains("FutureActionBar"), "Linked cards should not show expanded talent action rows.");
+        assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed UI text fails Hytale's CustomUI parser.");
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
 
         int parsedCardHeight = Integer.parseInt(cardHeight.group(1));
