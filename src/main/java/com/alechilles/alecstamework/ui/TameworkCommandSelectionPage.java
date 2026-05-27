@@ -384,11 +384,10 @@ public final class TameworkCommandSelectionPage
         }
         if (PANEL_MANAGE_GROUPS_COMMAND_ID.equals(commandId)) {
             if (panelManageGroupsCallback != null) {
-                if (navigationPending) {
+                if (!beginPageNavigation()) {
                     return;
                 }
                 pendingUnlinkNpcUuid = null;
-                navigationPending = true;
                 navigateAfterUiDrain(() -> {
                     try {
                         panelManageGroupsCallback.run();
@@ -568,10 +567,9 @@ public final class TameworkCommandSelectionPage
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_TALENTS_COMMAND_PREFIX);
             if (npcUuid != null) {
-                if (navigationPending) {
+                if (!beginPageNavigation()) {
                     return;
                 }
-                navigationPending = true;
                 navigateAfterUiDrain(() -> {
                     try {
                         openTalentsCallback.accept(npcUuid);
@@ -804,6 +802,16 @@ public final class TameworkCommandSelectionPage
         dismissed = true;
         navigationPending = false;
         close();
+    }
+
+    private boolean beginPageNavigation() {
+        if (navigationPending) {
+            return false;
+        }
+        navigationPending = true;
+        dismissed = true;
+        cancelPendingFilterTextApply();
+        return true;
     }
 
     private void navigateAfterUiDrain(@Nonnull Runnable action) {
