@@ -16,6 +16,7 @@
 - Fixed `/tw` failing to register on Hytale `0.5.1` servers because stricter permission validation rejected the display-name-derived permission node, restoring startup for affected servers.
 - Fixed combat XP writes so damage-system leveling updates route through `CommandBuffer` instead of mutating the entity store directly during damage event handling.
 - Fixed linked companion cards clipping the new level, XP, talent point, and talent-button rows before they could be seen.
+- Fixed the talents button reopening the linked panel or disconnecting the player by deferring the page swap instead of closing the linked panel first.
 
 ## 2.11.2 - Hytale 0.5.0 Compatibility - 2026-05-26
 

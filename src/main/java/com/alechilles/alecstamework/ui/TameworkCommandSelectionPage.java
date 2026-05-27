@@ -568,9 +568,17 @@ public final class TameworkCommandSelectionPage
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_TALENTS_COMMAND_PREFIX);
             if (npcUuid != null) {
+                if (navigationPending) {
+                    return;
+                }
                 navigationPending = true;
-                closePage();
-                openTalentsCallback.accept(npcUuid);
+                navigateAfterUiDrain(() -> {
+                    try {
+                        openTalentsCallback.accept(npcUuid);
+                    } finally {
+                        navigationPending = false;
+                    }
+                });
             }
             return;
         }
