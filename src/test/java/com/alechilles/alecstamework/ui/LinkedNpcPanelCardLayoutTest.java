@@ -35,6 +35,10 @@ class LinkedNpcPanelCardLayoutTest {
             "Group #TalentPointAction \\{\\s*Anchor: \\(Top: (\\d+), Left: (\\d+), Width: (\\d+), Height: (\\d+)\\);",
             Pattern.MULTILINE
     );
+    private static final Pattern TALENT_POINT_BADGE_BORDER_ANCHOR = Pattern.compile(
+            "Group #TalentPointCountBadgeBorder \\{\\s*Anchor: \\(Top: (\\d+), Left: (\\d+), Width: (\\d+), Height: (\\d+)\\);",
+            Pattern.MULTILINE
+    );
 
     @Test
     void compactLinkedPanelCardContainsProgressionControls() throws IOException {
@@ -44,10 +48,12 @@ class LinkedNpcPanelCardLayoutTest {
         Matcher cardHeight = CARD_HEIGHT.matcher(binder);
         Matcher xpRing = XP_RING_ANCHOR.matcher(cardUi);
         Matcher talentPoint = TALENT_POINT_ANCHOR.matcher(cardUi);
+        Matcher talentPointBadge = TALENT_POINT_BADGE_BORDER_ANCHOR.matcher(cardUi);
 
         assertTrue(cardHeight.find(), "LinkedNpcPanelCardBinder must define CARD_HEIGHT.");
         assertTrue(xpRing.find(), "XpProgressRing anchor must stay parseable by the layout guard.");
         assertTrue(talentPoint.find(), "TalentPointAction anchor must stay parseable by the layout guard.");
+        assertTrue(talentPointBadge.find(), "Talent point badge anchor must stay parseable by the layout guard.");
         assertFalse(cardUi.contains("FutureStatAFrame"), "Linked cards should not show expanded XP bars.");
         assertFalse(cardUi.contains("FutureActionBar"), "Linked cards should not show expanded talent action rows.");
         assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed UI text fails Hytale's CustomUI parser.");
@@ -76,6 +82,10 @@ class LinkedNpcPanelCardLayoutTest {
         int xpRingBottom = Integer.parseInt(xpRing.group(1)) + Integer.parseInt(xpRing.group(4));
         int talentPointRight = Integer.parseInt(talentPoint.group(2)) + Integer.parseInt(talentPoint.group(3));
         int talentPointBottom = Integer.parseInt(talentPoint.group(1)) + Integer.parseInt(talentPoint.group(4));
+        int talentPointWidth = Integer.parseInt(talentPoint.group(3));
+        int badgeTop = Integer.parseInt(talentPointBadge.group(1));
+        int badgeLeft = Integer.parseInt(talentPointBadge.group(2));
+        int badgeWidth = Integer.parseInt(talentPointBadge.group(3));
 
         assertTrue(
                 parsedCardHeight >= xpRingBottom,
@@ -91,6 +101,18 @@ class LinkedNpcPanelCardLayoutTest {
                 parsedCardHeight >= talentPointBottom,
                 () -> "Linked-panel card height " + parsedCardHeight
                         + " clips talent point action ending at " + talentPointBottom + "."
+        );
+        assertTrue(
+                badgeTop <= 2,
+                () -> "Talent point badge should stay near the top of the button; top was " + badgeTop + "."
+        );
+        assertTrue(
+                badgeLeft >= talentPointWidth / 2,
+                () -> "Talent point badge should sit on the right side of the button; left was " + badgeLeft + "."
+        );
+        assertTrue(
+                badgeWidth <= 12,
+                () -> "Talent point badge should stay compact; width was " + badgeWidth + "."
         );
     }
 

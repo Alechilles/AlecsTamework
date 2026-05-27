@@ -939,25 +939,25 @@ Group {
         }
 
         Group #TalentPointCountBadgeBorder {
-            Anchor: (Top: 11, Left: 8, Width: 16, Height: 12);
+            Anchor: (Top: 0, Left: 12, Width: 12, Height: 10);
             Background: #f6d56b;
         }
 
         Group #TalentPointCountBadgeFill {
-            Anchor: (Top: 12, Left: 9, Width: 14, Height: 10);
+            Anchor: (Top: 1, Left: 13, Width: 10, Height: 8);
             Background: #081220;
         }
 
         Label #TalentPointCountShadow {
-            Anchor: (Top: 12, Left: 10, Width: 14, Height: 10);
+            Anchor: (Top: 1, Left: 13, Width: 10, Height: 8);
             Text: "1";
-            Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Style: (FontSize: 7, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
 
         Label #TalentPointCount {
-            Anchor: (Top: 11, Left: 9, Width: 14, Height: 10);
+            Anchor: (Top: 0, Left: 12, Width: 10, Height: 8);
             Text: "1";
-            Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Style: (FontSize: 7, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
 
         TextButton #TalentPointButton {
