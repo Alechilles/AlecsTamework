@@ -930,7 +930,7 @@ Group {
     }
 
     Group #TalentPointAction {
-        Anchor: (Top: 52, Left: 196, Width: 24, Height: 24);
+        Anchor: (Top: 52, Left: 166, Width: 24, Height: 24);
         Visible: false;
 
         Group #TalentPointIcon {
@@ -960,7 +960,7 @@ Group {
     }
 
     Group #XpProgressRing {
-        Anchor: (Top: 52, Left: 226, Width: 24, Height: 24);
+        Anchor: (Top: 52, Left: 196, Width: 24, Height: 24);
         Visible: false;
 
         Group #RingTrackTopLeft {

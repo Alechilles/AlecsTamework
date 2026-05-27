@@ -28,11 +28,11 @@ class LinkedNpcPanelCardLayoutTest {
             "CARD_HEIGHT\\s*=\\s*(\\d+)"
     );
     private static final Pattern XP_RING_ANCHOR = Pattern.compile(
-            "Group #XpProgressRing \\{\\s*Anchor: \\(Top: (\\d+),[^)]*Height: (\\d+)\\);",
+            "Group #XpProgressRing \\{\\s*Anchor: \\(Top: (\\d+), Left: (\\d+), Width: (\\d+), Height: (\\d+)\\);",
             Pattern.MULTILINE
     );
     private static final Pattern TALENT_POINT_ANCHOR = Pattern.compile(
-            "Group #TalentPointAction \\{\\s*Anchor: \\(Top: (\\d+),[^)]*Height: (\\d+)\\);",
+            "Group #TalentPointAction \\{\\s*Anchor: \\(Top: (\\d+), Left: (\\d+), Width: (\\d+), Height: (\\d+)\\);",
             Pattern.MULTILINE
     );
 
@@ -60,13 +60,20 @@ class LinkedNpcPanelCardLayoutTest {
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
 
         int parsedCardHeight = Integer.parseInt(cardHeight.group(1));
-        int xpRingBottom = Integer.parseInt(xpRing.group(1)) + Integer.parseInt(xpRing.group(2));
-        int talentPointBottom = Integer.parseInt(talentPoint.group(1)) + Integer.parseInt(talentPoint.group(2));
+        int xpRingLeft = Integer.parseInt(xpRing.group(2));
+        int xpRingBottom = Integer.parseInt(xpRing.group(1)) + Integer.parseInt(xpRing.group(4));
+        int talentPointRight = Integer.parseInt(talentPoint.group(2)) + Integer.parseInt(talentPoint.group(3));
+        int talentPointBottom = Integer.parseInt(talentPoint.group(1)) + Integer.parseInt(talentPoint.group(4));
 
         assertTrue(
                 parsedCardHeight >= xpRingBottom,
                 () -> "Linked-panel card height " + parsedCardHeight
                         + " clips XP ring ending at " + xpRingBottom + "."
+        );
+        assertTrue(
+                talentPointRight < xpRingLeft,
+                () -> "Talent point action should remain left of XP ring; talent right "
+                        + talentPointRight + ", XP left " + xpRingLeft + "."
         );
         assertTrue(
                 parsedCardHeight >= talentPointBottom,
