@@ -1,16 +1,29 @@
 # Changelog
 
+## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27
+
+### Added
+- Added alpha companion XP and talent systems for Tamework example mobs. These systems are available for early testing and may change before they are treated as stable.
+
+### Changed
+- Carried forward the corrected Hytale `0.5.x` target server version metadata so the release is not pinned to a single `0.5` patch version.
+- Reworked the linked companion panel progression UI to show level and XP in the compact progress circle, with spendable talent points shown as a talent button only when points are available.
+
+### Fixed
+- Fixed automatic food, storage water, and natural water consumption so eligible linked companions gain progression XP from the same survival flows as manual feeding.
+- Fixed talent page navigation and stale linked-panel refresh commands that could disconnect players when opening, closing, or reopening the talents menu.
+
 ## 2.11.3 - Hytale 0.5.1 Command Registration Hotfix - 2026-05-26
 
 ### Added
 - Added a first-run "Welcome to Alec's Tamework" settings announcement with a Review Settings button so new eligible players see setup guidance instead of an old version-specific update notice.
-- Added bundled example leveling and talent configs so the Tamework example mobs can gain XP, level up, and exercise the talent page out of the box.
+- Added bundled alpha example leveling and talent configs so the Tamework example mobs can gain XP, level up, and exercise the talent page out of the box.
 
 ### Changed
 - Updated release metadata for Hytale `0.5.1`.
 - Settings announcements now use per-player Tamework version history: first-time users see the welcome message, while version-specific notices appear only after that player has used an older Tamework version.
 - The local build now references a stable shared NameplateBuilder jar copy under the Hytale Modding directory instead of depending on whichever server mods folder is active.
-- Replaced the linked companion XP and talent point rows with a compact level progress ring and spendable talent point button.
+- Replaced the alpha linked companion XP and talent point rows with a compact level progress ring and spendable talent point button.
 
 ### Fixed
 - Fixed the Hytale `0.5.x` manifest version range so the packaged `2.11.3` jar loads on compatible `0.5` patch releases instead of being rejected while an older jar remains active.
