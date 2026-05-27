@@ -51,11 +51,11 @@ class LinkedNpcPanelCardLayoutTest {
         assertFalse(cardUi.contains("FutureStatAFrame"), "Linked cards should not show expanded XP bars.");
         assertFalse(cardUi.contains("FutureActionBar"), "Linked cards should not show expanded talent action rows.");
         assertFalse(cardUi.contains("Text: +"), "Bare plus-prefixed UI text fails Hytale's CustomUI parser.");
-        List<String> bareMultiWordTextDefaults = findBareMultiWordTextDefaults(cardUi);
+        List<String> unquotedStringTextDefaults = findUnquotedStringTextDefaults(cardUi);
         assertTrue(
-                bareMultiWordTextDefaults.isEmpty(),
-                () -> "Bare multi-word Text or TooltipText values fail Hytale's CustomUI parser: "
-                        + bareMultiWordTextDefaults
+                unquotedStringTextDefaults.isEmpty(),
+                () -> "Text or TooltipText defaults must be quoted or localized for Hytale's CustomUI parser: "
+                        + unquotedStringTextDefaults
         );
         assertFalse(binder.contains("EXPANDED_CARD_HEIGHT"), "Progression controls should fit inside the compact card.");
 
@@ -75,7 +75,7 @@ class LinkedNpcPanelCardLayoutTest {
         );
     }
 
-    private static List<String> findBareMultiWordTextDefaults(String cardUi) {
+    private static List<String> findUnquotedStringTextDefaults(String cardUi) {
         List<String> matches = new ArrayList<>();
         String[] lines = cardUi.split("\\R");
         for (int i = 0; i < lines.length; i++) {
@@ -89,7 +89,7 @@ class LinkedNpcPanelCardLayoutTest {
                 continue;
             }
             String value = trimmed.substring(colon + 1, semicolon).trim();
-            if (value.contains(" ") && !value.startsWith("\"") && !value.startsWith("%")) {
+            if (!value.startsWith("\"") && !value.startsWith("%")) {
                 matches.add((i + 1) + ": " + trimmed);
             }
         }

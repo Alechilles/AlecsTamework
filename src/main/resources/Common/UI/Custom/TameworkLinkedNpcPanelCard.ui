@@ -1025,7 +1025,7 @@ Group {
 
         Label #XpLevelText {
             Anchor: (Top: 4, Left: 3, Width: 18, Height: 16);
-            Text: 1;
+            Text: "1";
             Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
 
