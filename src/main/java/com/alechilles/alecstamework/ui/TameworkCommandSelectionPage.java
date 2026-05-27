@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -77,9 +79,13 @@ public final class TameworkCommandSelectionPage
     private static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
     private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 750L;
+    private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
+    private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandOption[] options;
     private final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
     private final boolean requireUnlinkConfirm;
+    private final UUID playerUuid;
+    private final long linkedPanelGeneration;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcBaseEntriesSupplier;
     private final Supplier<String> panelModeValueSupplier;
@@ -169,6 +175,9 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
+        this.playerUuid = playerRef.getUuid();
+        this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
+        markLinkedPanelOwner();
         this.options = buildOptions(config, commandOptionPredicate);
         this.cardBindingConfig = buildCardBindingConfig(recallActionEnabled);
         this.requireUnlinkConfirm = requireUnlinkConfirm;
@@ -278,7 +287,13 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
+        if (dismissed && !navigationPending) {
+            return;
+        }
         if (navigationPending) {
+            return;
+        }
+        if (!isCurrentLinkedPanelOwner()) {
             return;
         }
         if (data.panelGroupAssignValue != null) {
@@ -595,6 +610,7 @@ public final class TameworkCommandSelectionPage
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         dismissed = true;
         navigationPending = false;
+        clearLinkedPanelOwner();
     }
 
     private void buildCommandButtons(@Nonnull UICommandBuilder commandBuilder,
@@ -652,7 +668,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void dispatchRefreshTick() {
-        if (dismissed) {
+        if (dismissed || !isCurrentLinkedPanelOwner()) {
             return;
         }
         Ref<EntityStore> ref = playerRef.getReference();
@@ -679,7 +695,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void dispatchDebouncedFilterTextApply(long version) {
-        if (dismissed || version != pendingFilterTextApplyVersion) {
+        if (dismissed || !isCurrentLinkedPanelOwner() || version != pendingFilterTextApplyVersion) {
             return;
         }
         Ref<EntityStore> ref = playerRef.getReference();
@@ -698,7 +714,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void runDebouncedFilterTextApplyOnWorldThread(long version) {
-        if (dismissed || version != pendingFilterTextApplyVersion) {
+        if (dismissed || !isCurrentLinkedPanelOwner() || version != pendingFilterTextApplyVersion) {
             return;
         }
         if (panelSetFilterTextCallback != null) {
@@ -716,7 +732,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void runRefreshTickOnWorldThread() {
-        if (dismissed) {
+        if (dismissed || !isCurrentLinkedPanelOwner()) {
             return;
         }
         if (isFilterEditPending()) {
@@ -733,7 +749,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void sendCardRefreshUpdate() {
-        if (dismissed) {
+        if (dismissed || !isCurrentLinkedPanelOwner()) {
             return;
         }
         UICommandBuilder commandBuilder = new UICommandBuilder();
@@ -802,6 +818,7 @@ public final class TameworkCommandSelectionPage
     private void closePage() {
         dismissed = true;
         navigationPending = false;
+        clearLinkedPanelOwner();
         close();
     }
 
@@ -811,8 +828,28 @@ public final class TameworkCommandSelectionPage
         }
         navigationPending = true;
         dismissed = true;
+        clearLinkedPanelOwner();
         cancelPendingFilterTextApply();
         return true;
+    }
+
+    private void markLinkedPanelOwner() {
+        if (playerUuid != null) {
+            ACTIVE_LINKED_PANEL_GENERATIONS.put(playerUuid, linkedPanelGeneration);
+        }
+    }
+
+    private void clearLinkedPanelOwner() {
+        if (playerUuid != null) {
+            ACTIVE_LINKED_PANEL_GENERATIONS.remove(playerUuid, linkedPanelGeneration);
+        }
+    }
+
+    private boolean isCurrentLinkedPanelOwner() {
+        if (playerUuid == null) {
+            return true;
+        }
+        return Long.valueOf(linkedPanelGeneration).equals(ACTIVE_LINKED_PANEL_GENERATIONS.get(playerUuid));
     }
 
     private void navigateAfterUiDrain(@Nonnull Runnable action) {

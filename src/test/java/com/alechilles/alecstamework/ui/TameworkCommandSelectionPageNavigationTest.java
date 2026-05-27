@@ -62,6 +62,10 @@ class TameworkCommandSelectionPageNavigationTest {
                 "Opening a replacement page should stop this page's delayed refresh loop."
         );
         assertTrue(
+                helper.contains("clearLinkedPanelOwner()"),
+                "Opening a replacement page should invalidate stale linked-panel refresh ownership."
+        );
+        assertTrue(
                 helper.contains("cancelPendingFilterTextApply()"),
                 "Opening a replacement page should cancel delayed filter writes for the old page."
         );
@@ -96,6 +100,39 @@ class TameworkCommandSelectionPageNavigationTest {
         assertTrue(
                 helper.contains("dispatchNavigationAction(action)"),
                 "Replacement-page navigation should still run the replacement-page open on the world thread."
+        );
+    }
+
+    @Test
+    void linkedPanelRefreshUpdatesRequireCurrentPageOwnership() throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+        int updateStart = content.indexOf("private void sendCardRefreshUpdate()");
+        int updateEnd = content.indexOf("private boolean isPendingUnlink", updateStart);
+        int dismissStart = content.indexOf("public void onDismiss(");
+        int dismissEnd = content.indexOf("private void buildCommandButtons", dismissStart);
+
+        assertTrue(updateStart >= 0, "Linked-panel refresh sender should exist.");
+        assertTrue(updateEnd > updateStart, "Linked-panel refresh sender should be bounded by the next helper.");
+        assertTrue(dismissStart >= 0, "Dismiss lifecycle hook should exist.");
+        assertTrue(dismissEnd > dismissStart, "Dismiss lifecycle hook should be bounded by buildCommandButtons.");
+
+        String update = content.substring(updateStart, updateEnd);
+        String dismiss = content.substring(dismissStart, dismissEnd);
+        assertTrue(
+                content.contains("ACTIVE_LINKED_PANEL_GENERATIONS"),
+                "Linked-panel pages should track the active page generation per player."
+        );
+        assertTrue(
+                content.contains("markLinkedPanelOwner()"),
+                "Constructed linked-panel pages should claim ownership before scheduling refreshes."
+        );
+        assertTrue(
+                update.contains("!isCurrentLinkedPanelOwner()"),
+                "Delayed linked-panel refreshes should not send commands from stale page instances."
+        );
+        assertTrue(
+                dismiss.contains("clearLinkedPanelOwner()"),
+                "Dismissing a linked panel should clear ownership for that page generation."
         );
     }
 }
