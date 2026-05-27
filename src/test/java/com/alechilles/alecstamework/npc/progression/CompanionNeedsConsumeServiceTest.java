@@ -12,7 +12,7 @@ class CompanionNeedsConsumeServiceTest {
     }
 
     @Test
-    void awardsFeedXpWhenStoredWaterConsumptionApplies() {
+    void awardsFeedXpWhenWaterRefillApplies() {
         assertTrue(CompanionNeedsConsumeService.shouldAwardFeedXpForResourceConsume(0, true, true, false));
     }
 
@@ -22,7 +22,7 @@ class CompanionNeedsConsumeServiceTest {
     }
 
     @Test
-    void doesNotAwardFeedXpForWorldWaterOnly() {
+    void doesNotAwardFeedXpWhenNoFoodOrWaterRefillApplies() {
         assertFalse(CompanionNeedsConsumeService.shouldAwardFeedXpForResourceConsume(0, false, true, false));
     }
 

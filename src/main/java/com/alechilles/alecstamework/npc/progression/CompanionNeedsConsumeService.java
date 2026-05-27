@@ -168,7 +168,7 @@ public final class CompanionNeedsConsumeService {
         double hungerGain = 0.0;
         double thirstGain = 0.0;
         int consumedItems = 0;
-        boolean consumedTroughCharge = false;
+        boolean waterRefillApplied = false;
         Map<String, Integer> consumedItemCountsByItemId = null;
 
         if (mode.consumesFood()) {
@@ -212,7 +212,7 @@ public final class CompanionNeedsConsumeService {
             if (!passiveRefill.isNearbyWaterDrinkEnabled()) {
                 NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "water_refill_disabled");
             } else {
-                consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
+                boolean consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
                         npcRef,
                         store,
                         config,
@@ -232,6 +232,7 @@ public final class CompanionNeedsConsumeService {
                 }
                 if (nearWater) {
                     thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
+                    waterRefillApplied = true;
                 } else {
                     NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "not_near_water");
                 }
@@ -275,7 +276,7 @@ public final class CompanionNeedsConsumeService {
                 null,
                 consumedItemCountsByItemId
         );
-        if (shouldAwardFeedXpForResourceConsume(consumedItems, consumedTroughCharge, updated, happinessChanged)) {
+        if (shouldAwardFeedXpForResourceConsume(consumedItems, waterRefillApplied, updated, happinessChanged)) {
             CompanionLevelingService.awardFeedXp(npcRef, store);
         }
         if (updated) {
@@ -324,10 +325,10 @@ public final class CompanionNeedsConsumeService {
     }
 
     static boolean shouldAwardFeedXpForResourceConsume(int consumedItems,
-                                                       boolean consumedTroughCharge,
+                                                       boolean waterRefillApplied,
                                                        boolean updated,
                                                        boolean happinessChanged) {
-        return (updated || happinessChanged) && (consumedItems > 0 || consumedTroughCharge);
+        return (updated || happinessChanged) && (consumedItems > 0 || waterRefillApplied);
     }
 
     @Nonnull
