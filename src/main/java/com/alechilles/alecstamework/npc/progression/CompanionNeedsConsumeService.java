@@ -168,6 +168,7 @@ public final class CompanionNeedsConsumeService {
         double hungerGain = 0.0;
         double thirstGain = 0.0;
         int consumedItems = 0;
+        boolean consumedTroughCharge = false;
         Map<String, Integer> consumedItemCountsByItemId = null;
 
         if (mode.consumesFood()) {
@@ -211,7 +212,7 @@ public final class CompanionNeedsConsumeService {
             if (!passiveRefill.isNearbyWaterDrinkEnabled()) {
                 NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "water_refill_disabled");
             } else {
-                boolean consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
+                consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
                         npcRef,
                         store,
                         config,
@@ -274,6 +275,9 @@ public final class CompanionNeedsConsumeService {
                 null,
                 consumedItemCountsByItemId
         );
+        if (shouldAwardFeedXpForResourceConsume(consumedItems, consumedTroughCharge, updated, happinessChanged)) {
+            CompanionLevelingService.awardFeedXp(npcRef, store);
+        }
         if (updated) {
             NeedsConsumeDiagnostics.maybeLogConsume(
                     diagnostics,
@@ -317,6 +321,13 @@ public final class CompanionNeedsConsumeService {
                 thirstGain
         );
         return false;
+    }
+
+    static boolean shouldAwardFeedXpForResourceConsume(int consumedItems,
+                                                       boolean consumedTroughCharge,
+                                                       boolean updated,
+                                                       boolean happinessChanged) {
+        return (updated || happinessChanged) && (consumedItems > 0 || consumedTroughCharge);
     }
 
     @Nonnull
