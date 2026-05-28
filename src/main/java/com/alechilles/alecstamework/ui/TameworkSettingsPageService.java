@@ -53,7 +53,7 @@ public final class TameworkSettingsPageService {
         if (player == null) {
             return "Unable to open settings right now.";
         }
-        if (!hasAccess(playerRef, player)) {
+        if (!hasAccess(playerRef, playerRef)) {
             return "You do not have permission to use /tw settings.";
         }
         return openSettingsPage(player, ref, store, world, "api", "settings_api");
@@ -118,7 +118,7 @@ public final class TameworkSettingsPageService {
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return "Unable to open settings right now.";
         }
-        if (!hasAccess(uiPlayerRef, player)) {
+        if (!hasAccess(uiPlayerRef, uiPlayerRef)) {
             return "You do not have permission to use /tw settings.";
         }
         try {

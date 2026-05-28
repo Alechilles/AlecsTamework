@@ -20,7 +20,7 @@ public final class TameworkSettingsCommand extends AbstractPlayerCommand {
     public TameworkSettingsCommand() {
         super("settings", "Open the Tamework settings page.");
         requirePermission(TameworkConfigPermission.NODE);
-        setPermissionGroups("OP", "Admin", "Operator");
+        setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         setAllowsExtraArguments(true);
     }
 

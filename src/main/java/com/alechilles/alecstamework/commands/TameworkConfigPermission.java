@@ -8,6 +8,12 @@ import javax.annotation.Nullable;
  */
 public final class TameworkConfigPermission {
     public static final String NODE = "tamework.config";
+    private static final String[] ADMIN_PERMISSION_GROUPS = {
+            "hytale:Admin",
+            "OP",
+            "Admin",
+            "Operator"
+    };
     private static final String[] FALLBACK_NODES = {
             "op",
             "admin",
@@ -18,6 +24,10 @@ public final class TameworkConfigPermission {
     };
 
     private TameworkConfigPermission() {
+    }
+
+    public static String[] adminPermissionGroups() {
+        return ADMIN_PERMISSION_GROUPS.clone();
     }
 
     public static boolean hasAccess(@Nullable PermissionHolder holder) {

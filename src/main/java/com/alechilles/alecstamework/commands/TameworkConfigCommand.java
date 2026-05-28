@@ -22,7 +22,7 @@ public final class TameworkConfigCommand extends AbstractPlayerCommand {
     public TameworkConfigCommand() {
         super("config", "Open the Tamework config editor.");
         requirePermission(TameworkConfigPermission.NODE);
-        setPermissionGroups("OP", "Admin", "Operator");
+        setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         setAllowsExtraArguments(true);
     }
 

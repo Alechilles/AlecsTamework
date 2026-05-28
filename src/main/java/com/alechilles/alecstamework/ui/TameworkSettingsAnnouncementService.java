@@ -129,7 +129,7 @@ public final class TameworkSettingsAnnouncementService {
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return respectEnabled ? null : "Unable to open Tamework news right now.";
         }
-        if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, player)) {
+        if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, uiPlayerRef)) {
             return respectEnabled ? null : "You do not have permission to use /tw news.";
         }
 
