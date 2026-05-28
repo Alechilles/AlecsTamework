@@ -4,14 +4,11 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
-import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
@@ -51,8 +48,6 @@ import javax.annotation.Nullable;
  * health snapshots, and home flags) from command orchestration flows.
  */
 final class CommandLinkedPanelEntryService {
-    private static final int MAX_TRAIT_INDICATORS = 4;
-
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
@@ -61,6 +56,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandGroupService groupService;
+    private final CommandLinkedPanelProgressionPresentationService progressionPresentationService;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
@@ -78,6 +74,7 @@ final class CommandLinkedPanelEntryService {
         this.npcNameResolver = npcNameResolver;
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();
+        this.progressionPresentationService = new CommandLinkedPanelProgressionPresentationService();
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -95,7 +92,6 @@ final class CommandLinkedPanelEntryService {
         World world = player.getWorld();
         String playerLanguage = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
-        ComponentType<EntityStore, TameworkTraitsComponent> traitType = TameworkTraitsComponent.getComponentType();
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
         for (LinkedNpcRecord record : records) {
             if (record == null || record.npcUuid == null) {
@@ -197,7 +193,11 @@ final class CommandLinkedPanelEntryService {
                         CompanionLevelingService.LevelingSnapshot levelingSnapshot =
                                 CompanionLevelingService.resolveSnapshot(npcRef, store, resolvedRoleId);
                         if (levelingSnapshot != null) {
-                            futureStatA = buildLevelFutureStat(levelingSnapshot, playerLanguage);
+                            futureStatA = progressionPresentationService.buildLevelFutureStat(
+                                    levelingSnapshot,
+                                    playerLanguage,
+                                    progressionPresentationService.buildModifierTooltip(npcRef, store, npc)
+                            );
                         }
                         TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(npcRef, store);
                         if (talentConfig != null && talentConfig.isEnabled()) {
@@ -208,11 +208,15 @@ final class CommandLinkedPanelEntryService {
                                     levelingSnapshot.configId()
                             )
                                     : 0;
-                            futureStatB = buildTalentPointFutureStat(availableTalentPoints, totalEarnedTalentPoints, playerLanguage);
+                            futureStatB = progressionPresentationService.buildTalentPointFutureStat(
+                                    availableTalentPoints,
+                                    totalEarnedTalentPoints,
+                                    playerLanguage
+                            );
                             talentsActionVisible = true;
                             talentsActionEnabled = true;
                         }
-                        traitIndicators = readTraitIndicators(npcRef, store, traitType);
+                        traitIndicators = progressionPresentationService.readLoadedTraitIndicators(npcRef, store);
                     }
                 }
             }
@@ -334,24 +338,6 @@ final class CommandLinkedPanelEntryService {
         return entries;
     }
 
-    private LinkedNpcEntry.FutureStat buildLevelFutureStat(@Nonnull CompanionLevelingService.LevelingSnapshot snapshot,
-                                                           @Nullable String language) {
-        String prefix = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.levelPrefix");
-        if (snapshot.atMaxLevel()) {
-            return new LinkedNpcEntry.FutureStat(prefix + " " + snapshot.level() + " MAX", 1, 1);
-        }
-        int current = Math.max(0, (int) Math.round(snapshot.currentXp()));
-        int max = Math.max(1, (int) Math.round(snapshot.nextLevelDeltaXp()));
-        return new LinkedNpcEntry.FutureStat(prefix + " " + snapshot.level() + " XP", current, max);
-    }
-
-    private LinkedNpcEntry.FutureStat buildTalentPointFutureStat(int availablePoints,
-                                                                 int totalEarnedPoints,
-                                                                 @Nullable String language) {
-        String label = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.talentPoints");
-        return new LinkedNpcEntry.FutureStat(label, Math.max(0, availablePoints), Math.max(1, totalEarnedPoints));
-    }
-
     @Nullable
     private String resolveDeathCauseHint(@Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
                                          @Nullable String language) {
@@ -393,64 +379,7 @@ final class CommandLinkedPanelEntryService {
 
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
                                                         Store<EntityStore> store) {
-        return readTraitIndicators(npcRef, store, TameworkTraitsComponent.getComponentType());
-    }
-
-    private LinkedNpcTraitIndicator[] readTraitIndicators(Ref<EntityStore> npcRef,
-                                                          Store<EntityStore> store,
-                                                          ComponentType<EntityStore, TameworkTraitsComponent> traitType) {
-        if (npcRef == null || !npcRef.isValid() || store == null || traitType == null) {
-            return LinkedNpcTraitIndicator.EMPTY;
-        }
-        TameworkTraitsComponent traits = safeGetComponent(store, npcRef, traitType);
-        if (traits == null) {
-            return LinkedNpcTraitIndicator.EMPTY;
-        }
-        TwTraitConfig config = resolveTraitConfig(npcRef, store, traits);
-        if (config == null) {
-            return LinkedNpcTraitIndicator.EMPTY;
-        }
-        Map<String, Double> rolledValues = buildRolledValueMap(traits);
-        if (rolledValues.isEmpty()) {
-            return LinkedNpcTraitIndicator.EMPTY;
-        }
-        ArrayList<LinkedNpcTraitIndicator> indicators = new ArrayList<>(MAX_TRAIT_INDICATORS);
-        for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
-            if (definition == null) {
-                continue;
-            }
-            String traitId = normalize(definition.getId());
-            if (traitId == null) {
-                continue;
-            }
-            Double value = rolledValues.get(traitId);
-            if (value == null || !Double.isFinite(value)) {
-                continue;
-            }
-            double min = Math.min(definition.getBreedingMin(), definition.getBreedingMax());
-            double max = Math.max(definition.getBreedingMin(), definition.getBreedingMax());
-            double defaultValue = clamp(definition.getDefaultValue(), min, max);
-            boolean belowDefault = value < defaultValue;
-            double fillRatio = belowDefault
-                    ? ratioToLowerBound(value, min, defaultValue)
-                    : ratioToUpperBound(value, defaultValue, max);
-            String label = resolveLabel(definition);
-            indicators.add(new LinkedNpcTraitIndicator(
-                    resolveIconGlyph(definition),
-                    resolveIconTexturePath(definition),
-                    label,
-                    buildTooltip(label, value, min, defaultValue, max),
-                    fillRatio,
-                    !belowDefault,
-                    belowDefault
-            ));
-            if (indicators.size() >= MAX_TRAIT_INDICATORS) {
-                break;
-            }
-        }
-        return indicators.isEmpty()
-                ? LinkedNpcTraitIndicator.EMPTY
-                : indicators.toArray(new LinkedNpcTraitIndicator[0]);
+        return progressionPresentationService.readLoadedTraitIndicators(npcRef, store);
     }
 
     private HealthSnapshot readNpcHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
@@ -732,92 +661,6 @@ final class CommandLinkedPanelEntryService {
         return raw.length() >= 8 ? raw.substring(0, 8) : raw;
     }
 
-    private TwTraitConfig resolveTraitConfig(Ref<EntityStore> npcRef,
-                                             Store<EntityStore> store,
-                                             TameworkTraitsComponent traits) {
-        String configId = traits.getConfigId();
-        if (configId != null && !configId.isBlank()) {
-            TwTraitConfig config = TwTraitConfig.resolveById(configId);
-            if (config != null) {
-                return config;
-            }
-        }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        if (roleId == null || roleId.isBlank()) {
-            return null;
-        }
-        return TwTraitConfig.resolveForRole(roleId);
-    }
-
-    private Map<String, Double> buildRolledValueMap(TameworkTraitsComponent traits) {
-        HashMap<String, Double> values = new HashMap<>();
-        for (TameworkTraitsComponent.TraitValue traitValue : traits.getTraitValues()) {
-            if (traitValue == null) {
-                continue;
-            }
-            String traitId = normalize(traitValue.getId());
-            if (traitId == null || values.containsKey(traitId)) {
-                continue;
-            }
-            double value = traitValue.getValue();
-            if (!Double.isFinite(value)) {
-                continue;
-            }
-            values.put(traitId, value);
-        }
-        return values;
-    }
-
-    private String resolveIconGlyph(TwTraitConfig.TraitDefinition definition) {
-        String source = resolveLabel(definition);
-        for (int i = 0; i < source.length(); i++) {
-            char c = source.charAt(i);
-            if (Character.isLetterOrDigit(c)) {
-                return String.valueOf(Character.toUpperCase(c));
-            }
-        }
-        return "?";
-    }
-
-    private String resolveIconTexturePath(TwTraitConfig.TraitDefinition definition) {
-        if (definition == null) {
-            return null;
-        }
-        String iconPath = definition.getIconPath();
-        if (iconPath == null || iconPath.isBlank()) {
-            return null;
-        }
-        return iconPath;
-    }
-
-    private String resolveLabel(TwTraitConfig.TraitDefinition definition) {
-        String displayName = definition.getDisplayName();
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName;
-        }
-        String id = definition.getId();
-        if (id != null && !id.isBlank()) {
-            return id;
-        }
-        return "Trait";
-    }
-
-    private double ratioToUpperBound(double value, double defaultValue, double max) {
-        double distance = max - defaultValue;
-        if (distance <= 0.0) {
-            return 0.0;
-        }
-        return clamp((value - defaultValue) / distance, 0.0, 1.0);
-    }
-
-    private double ratioToLowerBound(double value, double min, double defaultValue) {
-        double distance = defaultValue - min;
-        if (distance <= 0.0) {
-            return 0.0;
-        }
-        return clamp((defaultValue - value) / distance, 0.0, 1.0);
-    }
-
     private double clamp(double value, double min, double max) {
         if (!Double.isFinite(value)) {
             return min;
@@ -909,61 +752,11 @@ final class CommandLinkedPanelEntryService {
         return lookup.get(normalize(groupId));
     }
 
-    private String buildTooltip(String label,
-                                double value,
-                                double min,
-                                double defaultValue,
-                                double max) {
-        double safeMin = Double.isFinite(min) ? min : 0.0;
-        double safeMax = Double.isFinite(max) ? max : 0.0;
-        if (safeMax < safeMin) {
-            double swap = safeMin;
-            safeMin = safeMax;
-            safeMax = swap;
-        }
-        double safeDefault = clamp(defaultValue, safeMin, safeMax);
-        double safeValue = clamp(value, safeMin, safeMax);
-        boolean belowDefault = safeValue < safeDefault;
-        double normalized = belowDefault
-                ? ratioToLowerBound(safeValue, safeMin, safeDefault)
-                : ratioToUpperBound(safeValue, safeDefault, safeMax);
-        String boundLabel = belowDefault ? "min" : "max";
-        double boundValue = belowDefault ? safeMin : safeMax;
-        return label
-                + ": "
-                + format(safeValue)
-                + " / "
-                + format(boundValue)
-                + " "
-                + boundLabel
-                + " ("
-                + formatPercent(normalized, belowDefault)
-                + ")";
-    }
-
-    private String format(double value) {
-        if (!Double.isFinite(value)) {
-            return "0.00";
-        }
-        return String.format(Locale.ROOT, "%.2f", value);
-    }
-
     private String formatSigned(double value) {
         if (!Double.isFinite(value)) {
             return "0.00";
         }
         return String.format(Locale.ROOT, "%+.2f", value);
-    }
-
-    private String formatPercent(double ratio, boolean negativeDirection) {
-        if (!Double.isFinite(ratio)) {
-            return "0%";
-        }
-        int percent = (int) Math.round(clamp(ratio, 0.0, 1.0) * 100.0);
-        if (negativeDirection && percent > 0) {
-            return "-" + percent + "%";
-        }
-        return percent + "%";
     }
 
     private BreedingCooldownSnapshot readBreedingCooldownSnapshot(Ref<EntityStore> npcRef,

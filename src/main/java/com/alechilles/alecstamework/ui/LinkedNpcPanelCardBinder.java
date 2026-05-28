@@ -340,10 +340,12 @@ final class LinkedNpcPanelCardBinder {
     }
 
     private static String resolveXpTooltip(LinkedNpcEntry.FutureStat stat) {
+        String detail = stat.tooltipText();
+        String suffix = detail == null || detail.isBlank() ? "" : "\n" + detail.trim();
         if (stat.label() != null && stat.label().toUpperCase().contains("MAX")) {
-            return stat.label();
+            return stat.label() + suffix;
         }
-        return stat.current() + "/" + stat.max() + " XP";
+        return stat.current() + "/" + stat.max() + " XP" + suffix;
     }
 
     private static double progressRatio(int current, int max) {
