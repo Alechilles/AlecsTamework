@@ -260,12 +260,12 @@ public final class CommandItemFeatureHandler {
         if (event == null || event.getWorld() == null || event.getHolder() == null || relocationService == null) {
             return;
         }
-        Player player = event.getHolder().getComponent(Player.getComponentType());
-        if (player == null) {
+        PlayerRef playerRef = event.getHolder().getComponent(PlayerRef.getComponentType());
+        if (playerRef == null) {
             return;
         }
         World world = event.getWorld();
-        UUID playerUuid = player.getUuid();
+        UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
             return;
         }
