@@ -104,8 +104,8 @@ This lets you keep Alec's built-in re-arm behavior while still replacing the vis
 ## Runtime Behavior
 - Applying settings writes updated files and refreshes runtime state.
 - Loading a preset only changes the current UI form; `Apply` persists it.
-- Disabling leveling stops companion XP awards, level snapshots, level-based growth, and new leveling component bootstrapping.
-- Disabling talents hides talent availability, blocks talent purchases, and suppresses purchased talent passive effects.
+- Disabling leveling stops companion XP awards, level snapshots, level-based growth, and new leveling component bootstrapping. Applying the setting also refreshes loaded NPC stat modifiers so stale level-based bonuses are removed immediately.
+- Disabling talents hides talent availability, blocks talent purchases, and suppresses purchased talent passive effects. Applying the setting also refreshes loaded NPC stat modifiers so stale talent bonuses are removed immediately.
 - Crash telemetry enablement and breadcrumbs are applied immediately when possible and mirrored into the embedded Alec's Telemetry project override.
 - Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` values are imported only when the universe settings file does not already contain telemetry values.
 - `/tw settings` is intended for world-level operations and diagnostics, not per-mod content packs.

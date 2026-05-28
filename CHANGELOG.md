@@ -14,6 +14,7 @@
 - Fixed `/tw settings` and `/tw news` permission checks so OPs/admins are evaluated through the live `PlayerRef` permission holder instead of the player component after Hytale Update 5.
 - Fixed state-driven `TameworkHarvestDrop` harvest flows so successful harvest drops award companion harvest XP and emit companion XP events.
 - Fixed companion XP awards so unlinked tamed or owned companions can gain XP and emit XP events; command links now only provide optional event tool-id context.
+- Fixed `/tw settings` progression toggles so disabling leveling or talents immediately reapplies loaded companion stat modifiers and removes stale max-health bonuses.
 - Fixed Tamework data directory discovery so startup and migrations stay anchored to the active server/userdata layout instead of drifting into unrelated temp `universe` folders.
 
 ## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27

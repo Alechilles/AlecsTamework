@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
+import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -137,7 +138,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 refreshUi();
             }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
-            case ACTION_APPLY -> onApply(data);
+            case ACTION_APPLY -> onApply(data, store);
             default -> {
             }
         }
@@ -266,7 +267,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value", currentValues.telemetryBreadcrumbsEnabled());
     }
 
-    private void onApply(@Nonnull EventPayload payload) {
+    private void onApply(@Nonnull EventPayload payload, @Nonnull Store<EntityStore> store) {
         if (applyInProgress) {
             warningLine = "Apply already in progress.";
             statusLine = "";
@@ -304,9 +305,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         statusLine = "";
                         warningLine = "Failed to apply settings.";
                     } else if (outcome.partial()) {
+                        CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = outcome.warning();
                     } else if (outcome.success()) {
+                        CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = "";
                     } else {
