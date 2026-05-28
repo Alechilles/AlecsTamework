@@ -37,11 +37,23 @@ final class CommandLinkedPanelProgressionPresentationService {
                                                    @Nullable String modifierTooltip) {
         String prefix = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.levelPrefix");
         if (snapshot.atMaxLevel()) {
-            return new LinkedNpcEntry.FutureStat(prefix + " " + snapshot.level() + " MAX", 1, 1, modifierTooltip);
+            return new LinkedNpcEntry.FutureStat(
+                    prefix + " " + snapshot.level() + " MAX",
+                    1,
+                    1,
+                    "Level: " + snapshot.level() + "/" + snapshot.maxLevel() + " - MAX XP",
+                    modifierTooltip
+            );
         }
         int current = Math.max(0, (int) Math.round(snapshot.currentXp()));
         int max = Math.max(1, (int) Math.round(snapshot.nextLevelDeltaXp()));
-        return new LinkedNpcEntry.FutureStat(prefix + " " + snapshot.level() + " XP", current, max, modifierTooltip);
+        return new LinkedNpcEntry.FutureStat(
+                prefix + " " + snapshot.level() + " XP",
+                current,
+                max,
+                "Level: " + snapshot.level() + "/" + snapshot.maxLevel() + " - " + current + "/" + max + " XP",
+                modifierTooltip
+        );
     }
 
     LinkedNpcEntry.FutureStat buildTalentPointFutureStat(int availablePoints,

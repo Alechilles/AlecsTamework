@@ -342,6 +342,10 @@ final class LinkedNpcPanelCardBinder {
     private static String resolveXpTooltip(LinkedNpcEntry.FutureStat stat) {
         String detail = stat.tooltipText();
         String suffix = detail == null || detail.isBlank() ? "" : "\n" + detail.trim();
+        String header = stat.tooltipHeaderText();
+        if (header != null && !header.isBlank()) {
+            return header.trim() + suffix;
+        }
         if (stat.label() != null && stat.label().toUpperCase().contains("MAX")) {
             return stat.label() + suffix;
         }

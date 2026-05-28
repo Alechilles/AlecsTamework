@@ -721,16 +721,22 @@ public final class LinkedNpcEntry {
         private final String label;
         private final int current;
         private final int max;
+        private final String tooltipHeaderText;
         private final String tooltipText;
 
         public FutureStat(String label, int current, int max) {
-            this(label, current, max, null);
+            this(label, current, max, null, null);
         }
 
         public FutureStat(String label, int current, int max, String tooltipText) {
+            this(label, current, max, null, tooltipText);
+        }
+
+        public FutureStat(String label, int current, int max, String tooltipHeaderText, String tooltipText) {
             this.label = label;
             this.current = current;
             this.max = max;
+            this.tooltipHeaderText = tooltipHeaderText;
             this.tooltipText = tooltipText;
         }
 
@@ -744,6 +750,10 @@ public final class LinkedNpcEntry {
 
         public int max() {
             return max;
+        }
+
+        public String tooltipHeaderText() {
+            return tooltipHeaderText;
         }
 
         public String tooltipText() {
@@ -761,12 +771,13 @@ public final class LinkedNpcEntry {
             return current == other.current
                     && max == other.max
                     && Objects.equals(label, other.label)
+                    && Objects.equals(tooltipHeaderText, other.tooltipHeaderText)
                     && Objects.equals(tooltipText, other.tooltipText);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(label, current, max, tooltipText);
+            return Objects.hash(label, current, max, tooltipHeaderText, tooltipText);
         }
     }
 }
