@@ -1,15 +1,18 @@
 # Changelog
 
-## Unreleased
+## 2.11.5 - Companion XP Events and Persistence Path Fixes - 2026-05-28
 
 ### Added
 - Added public alpha companion XP award events through `TameworkApi.events()` so external mods can subscribe and credit owner-facing skills from successful companion XP activity.
 - Added `/tw debugxpevents [on|off]` to subscribe to Tamework's own public companion XP events and log event hits for in-game verification, with extra harvest-drop diagnostics for XP attempts that are rejected before an API event is emitted.
 
+### Changed
+- Updated the embedded Alec's Telemetry runtime to `0.1.2`.
+
 ### Fixed
 - Fixed state-driven `TameworkHarvestDrop` harvest flows so successful harvest drops award companion harvest XP and emit companion XP events.
 - Fixed companion XP awards so unlinked tamed or owned companions can gain XP and emit XP events; command links now only provide optional event tool-id context.
-- Updated the embedded Alec's Telemetry runtime to `0.1.2`.
+- Fixed Tamework data directory discovery so startup and migrations stay anchored to the active server/userdata layout instead of drifting into unrelated temp `universe` folders.
 
 ## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27
 
