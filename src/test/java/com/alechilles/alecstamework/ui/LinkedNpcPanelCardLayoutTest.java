@@ -69,6 +69,12 @@ class LinkedNpcPanelCardLayoutTest {
                 binder.contains("Integer.toString(availableTalentPoints(stat))"),
                 "Talent point badge should show the compact count without a plus prefix."
         );
+        assertTrue(
+                cardUi.contains("@LinkedProgressionTooltipStyle = TextTooltipStyle")
+                        && cardUi.contains("MaxWidth: 360")
+                        && cardUi.contains("TextTooltipStyle: @LinkedProgressionTooltipStyle;"),
+                "XP progression tooltip should use its wider local tooltip style."
+        );
         List<String> unquotedStringTextDefaults = findUnquotedStringTextDefaults(cardUi);
         assertTrue(
                 unquotedStringTextDefaults.isEmpty(),

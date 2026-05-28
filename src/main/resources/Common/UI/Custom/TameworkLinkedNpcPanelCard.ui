@@ -14,6 +14,7 @@ $C = "Common.ui";
 @LinkedBreedingStateOnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedBreedingStateOffButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 220, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
+@LinkedProgressionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 360, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
 @TraitTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
 
@@ -1044,7 +1045,7 @@ Group {
             Style: @TraitTooltipButtonStyle;
             Text: "";
             TooltipText: "0/0 XP";
-            TextTooltipStyle: @LinkedActionTooltipStyle;
+            TextTooltipStyle: @LinkedProgressionTooltipStyle;
         }
     }
 }
