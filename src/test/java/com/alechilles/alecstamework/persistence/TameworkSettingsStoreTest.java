@@ -55,6 +55,8 @@ class TameworkSettingsStoreTest {
                 false,
                 true,
                 false,
+                true,
+                false,
                 false,
                 true,
                 false
@@ -95,6 +97,8 @@ class TameworkSettingsStoreTest {
         assertEquals(false, overrides.breedingRequiresHappiness());
         assertEquals(false, overrides.breedingGenderEnabled());
         assertEquals(true, overrides.traitsEnabled());
+        assertEquals(false, overrides.levelingEnabled());
+        assertEquals(true, overrides.talentsEnabled());
         assertEquals(false, overrides.reviveSystemEnabled());
         assertEquals(false, overrides.recallTeleportingEnabled());
         assertEquals(true, overrides.telemetryEnabled());
@@ -116,6 +120,9 @@ class TameworkSettingsStoreTest {
         assertTrue(raw.contains("\"breeding\""));
         assertTrue(raw.contains("\"genderEnabled\""));
         assertTrue(raw.contains("\"traits\""));
+        assertTrue(raw.contains("\"progression\""));
+        assertTrue(raw.contains("\"levelingEnabled\""));
+        assertTrue(raw.contains("\"talentsEnabled\""));
         assertTrue(raw.contains("\"revive\""));
         assertTrue(raw.contains("\"travel\""));
         assertTrue(raw.contains("\"recallTeleportingEnabled\""));
@@ -164,6 +171,8 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.breedingRequiresHappiness());
         assertEquals(true, overrides.breedingGenderEnabled());
         assertEquals(true, overrides.traitsEnabled());
+        assertEquals(true, overrides.levelingEnabled());
+        assertEquals(true, overrides.talentsEnabled());
         assertEquals(true, overrides.reviveSystemEnabled());
         assertEquals(true, overrides.recallTeleportingEnabled());
         assertEquals(true, overrides.telemetryEnabled());

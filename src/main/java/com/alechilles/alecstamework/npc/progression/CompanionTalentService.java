@@ -23,6 +23,9 @@ public final class CompanionTalentService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return 0;
         }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return 0;
+        }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         if (roleId == null || roleId.isBlank()) {
             return 0;
@@ -48,6 +51,9 @@ public final class CompanionTalentService {
                                                 @Nullable String talentId) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return PurchaseResult.invalid("Companion is not available.");
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return PurchaseResult.invalid("Companion talents are disabled in Tamework settings.");
         }
         if (talentId == null || talentId.isBlank()) {
             return PurchaseResult.invalid("No talent was selected.");
@@ -109,6 +115,9 @@ public final class CompanionTalentService {
         if (npcRef == null || !npcRef.isValid() || store == null || effectKey == null || effectKey.isBlank()) {
             return defaultMultiplier;
         }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return defaultMultiplier;
+        }
         ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
         TameworkTalentsComponent component = type != null ? store.getComponent(npcRef, type) : null;
         if (component == null || component.getPurchasedTalentIds().length == 0) {
@@ -141,6 +150,9 @@ public final class CompanionTalentService {
     public static TwTalentConfig resolveTalentConfig(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
             return null;
         }
         ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();

@@ -52,6 +52,9 @@ public final class CompanionLevelingService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
+        if (!CompanionProgressionSettings.isLevelingEnabled()) {
+            return null;
+        }
         ComponentType<EntityStore, TameworkLevelingComponent> type = TameworkLevelingComponent.getComponentType();
         if (type == null) {
             return null;
@@ -138,6 +141,9 @@ public final class CompanionLevelingService {
         if (npcRef == null || !npcRef.isValid() || store == null || !Double.isFinite(amount) || amount <= 0.0) {
             return AwardResult.notApplied();
         }
+        if (!CompanionProgressionSettings.isLevelingEnabled()) {
+            return AwardResult.notApplied();
+        }
         if (!isXpEligibleCompanion(npcRef, store)) {
             return AwardResult.notApplied();
         }
@@ -192,6 +198,9 @@ public final class CompanionLevelingService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
+        if (!CompanionProgressionSettings.isLevelingEnabled()) {
+            return null;
+        }
         String roleId = roleIdHint;
         if (roleId == null || roleId.isBlank()) {
             roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
@@ -232,6 +241,9 @@ public final class CompanionLevelingService {
                                                       @Nullable String effectKey,
                                                       double defaultMultiplier) {
         if (npcRef == null || !npcRef.isValid() || store == null || effectKey == null || effectKey.isBlank()) {
+            return defaultMultiplier;
+        }
+        if (!CompanionProgressionSettings.isLevelingEnabled()) {
             return defaultMultiplier;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
@@ -499,6 +511,9 @@ public final class CompanionLevelingService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return AwardResult.notApplied();
         }
+        if (!CompanionProgressionSettings.isLevelingEnabled()) {
+            return AwardResult.notApplied();
+        }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         if (roleId == null || roleId.isBlank()) {
             return AwardResult.notApplied();
@@ -530,6 +545,9 @@ public final class CompanionLevelingService {
         }
         if (store == null) {
             return "reason=missing-store";
+        }
+        if (!CompanionProgressionSettings.isLevelingEnabled()) {
+            return "reason=leveling-system-disabled";
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         if (roleId == null || roleId.isBlank()) {

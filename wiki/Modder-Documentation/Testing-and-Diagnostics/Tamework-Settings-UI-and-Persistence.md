@@ -22,9 +22,9 @@ Use it for live world tuning of high-impact server settings without editing many
 - Presets only change the experience/system toggles below, so ownership, claims, telemetry, and other admin policies stay under manual control.
 
 Current presets:
-- `Simplified (Minecraft-like)`: disables needs, needs damage, happiness, passive breeding, breeding happiness requirements, and traits.
+- `Simplified (Minecraft-like)`: disables needs, needs damage, happiness, passive breeding, breeding happiness requirements, traits, leveling, and talents.
 - `Easier`: enables most systems but keeps needs damage off.
-- `Full Experience`: enables the full needs, happiness, passive breeding, breeding happiness, and traits stack.
+- `Full Experience`: enables the full needs, happiness, passive breeding, breeding happiness, traits, leveling, and talents stack.
 - Presets do not change the breeding-gender toggle; that setting remains a manual server policy.
 
 ## Automatic Review Announcement
@@ -93,6 +93,8 @@ This lets you keep Alec's built-in re-arm behavior while still replacing the vis
 - Breeding requires happiness toggle
 - Breeding genders enabled toggle
 - Traits system enabled toggle
+- Leveling system enabled toggle
+- Talents system enabled toggle
 - Revive system enabled toggle
 
 ### Crash Telemetry
@@ -102,6 +104,8 @@ This lets you keep Alec's built-in re-arm behavior while still replacing the vis
 ## Runtime Behavior
 - Applying settings writes updated files and refreshes runtime state.
 - Loading a preset only changes the current UI form; `Apply` persists it.
+- Disabling leveling stops companion XP awards, level snapshots, level-based growth, and new leveling component bootstrapping.
+- Disabling talents hides talent availability, blocks talent purchases, and suppresses purchased talent passive effects.
 - Crash telemetry enablement and breadcrumbs are applied immediately when possible and mirrored into the embedded Alec's Telemetry project override.
 - Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` values are imported only when the universe settings file does not already contain telemetry values.
 - `/tw settings` is intended for world-level operations and diagnostics, not per-mod content packs.

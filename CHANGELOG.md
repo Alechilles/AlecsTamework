@@ -5,6 +5,7 @@
 ### Added
 - Added public alpha companion XP award events through `TameworkApi.events()` so external mods can subscribe and credit owner-facing skills from successful companion XP activity.
 - Added `/tw debugxpevents [on|off]` to subscribe to Tamework's own public companion XP events and log event hits for in-game verification, with extra harvest-drop diagnostics for XP attempts that are rejected before an API event is emitted.
+- Added `/tw settings` toggles for the alpha companion leveling and talents systems, enabled by default for existing worlds.
 
 ### Changed
 - Updated the embedded Alec's Telemetry runtime to `0.1.2`.

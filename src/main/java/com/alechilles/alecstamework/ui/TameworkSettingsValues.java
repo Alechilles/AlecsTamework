@@ -43,6 +43,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean breedingRequiresHappiness,
                                      boolean breedingGenderEnabled,
                                      boolean traitsEnabled,
+                                     boolean levelingEnabled,
+                                     boolean talentsEnabled,
                                      boolean reviveSystemEnabled,
                                      boolean recallTeleportingEnabled,
                                      boolean telemetryEnabled,
@@ -82,6 +84,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 breedingRequiresHappiness,
                 breedingGenderEnabled,
                 traitsEnabled,
+                levelingEnabled,
+                talentsEnabled,
                 reviveSystemEnabled,
                 recallTeleportingEnabled,
                 telemetryEnabled,
@@ -96,7 +100,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                                   boolean happinessEnabled,
                                                   boolean passiveBreedingEnabled,
                                                   boolean breedingRequiresHappiness,
-                                                  boolean traitsEnabled) {
+                                                  boolean traitsEnabled,
+                                                  boolean levelingEnabled,
+                                                  boolean talentsEnabled) {
         return new TameworkSettingsValues(
                 populationLimitPerPlayerOwnedTotal,
                 populationPerPlayerLimitScope,
@@ -129,6 +135,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 breedingRequiresHappiness,
                 breedingGenderEnabled,
                 traitsEnabled,
+                levelingEnabled,
+                talentsEnabled,
                 reviveSystemEnabled,
                 recallTeleportingEnabled,
                 telemetryEnabled,
@@ -172,6 +180,12 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         boolean traitsEnabled = overrides != null && overrides.traitsEnabled() != null
                 ? overrides.traitsEnabled()
                 : traitConfig != null && traitConfig.isEnabled();
+        boolean levelingEnabled = overrides == null
+                || overrides.levelingEnabled() == null
+                || overrides.levelingEnabled();
+        boolean talentsEnabled = overrides == null
+                || overrides.talentsEnabled() == null
+                || overrides.talentsEnabled();
         boolean recallTeleportingEnabled = overrides == null
                 || overrides.recallTeleportingEnabled() == null
                 || overrides.recallTeleportingEnabled();
@@ -218,6 +232,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 breedingRequiresHappiness,
                 breedingGenderEnabled,
                 traitsEnabled,
+                levelingEnabled,
+                talentsEnabled,
                 global.isCommandDeadRespawnEnabled(),
                 recallTeleportingEnabled,
                 telemetryEnabled,
