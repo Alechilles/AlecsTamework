@@ -4,7 +4,7 @@
 
 **Goal:** Replace the current paged talent list with a real branch/tier tree canvas that visually presents talent nodes, prerequisite links, node states, and focused purchase details.
 
-**Architecture:** Keep `TwTalentConfig` authoring unchanged: `Branch`, `Tier`, `MinLevel`, `PointCost`, and `RequiresTalentIds` remain the source of truth. Add a small layout/view-model layer that converts talents into fixed UI slots and connector segments, then bind those slots into a static CustomUI asset. Use paging only for overflow branches or overflow tier bands, not as the primary experience.
+**Architecture:** Keep `TwTalentConfig` authoring unchanged: `Branch`, `Tier`, `MinLevel`, `PointCost`, and `RequiresTalentIds` remain the source of truth. Add a small layout/view-model layer that converts talents into fixed UI slots and connector segments, then bind those slots into a static CustomUI asset inside a native scrolling viewport. The tree never paginates; oversized trees extend the scrollable canvas.
 
 **Tech Stack:** Java 25, Hytale CustomUI `.ui` assets, `InteractiveCustomUIPage`, `UICommandBuilder`, `UIEventBuilder`, JUnit source-contract and model tests.
 
@@ -13,31 +13,31 @@
 ## Design Decisions
 
 - Use a static canvas because Hytale CustomUI pages are asset-defined, not DOM-like dynamic layouts.
-- Support a primary page capacity of 5 branches by 6 tiers, for 30 visible node slots.
-- Keep a deterministic overflow mode: if a config exceeds 5 branches or 6 tier rows, show branch/tier "pages" with Prev/Next controls.
+- Support a primary viewport designed around 5 branches by 6 tiers, but build a larger scrollable canvas with spare node/connector slots so deeper trees can extend below the fold.
+- Do not use branch/tier pagination. If a tree is larger than the visible area, the player scrolls the tree viewport and keeps the same spatial layout.
 - Show connectors as static thin `Group` elements. Java toggles their visibility and color based on whether the parent/child path is purchased, available, or locked.
 - Use a focused detail panel instead of embedding long descriptions in each node. Nodes show short labels; selecting one updates detail text, status, cost, effects, and purchase button.
-- Treat the current Animal Husbandry configs as the target dataset: 14 to 22 nodes per archetype should fit without pagination.
+- Treat the current Animal Husbandry configs as the target dataset: 14 to 22 nodes per archetype should fit comfortably, and deeper Beast chains should scroll instead of splitting into pages.
 - Do not add coordinate fields to `TwTalentConfig` for v1.
 
 ## File Map
 
 - Modify `src/main/java/com/alechilles/alecstamework/ui/TameworkCompanionTalentsPage.java`
-  - Owns CustomUI binding, selected node state, branch/tier page state, node click events, purchase/reset/back behavior.
+  - Owns CustomUI binding, selected node state, scrollable tree node click events, purchase/reset/back behavior.
 - Create `src/main/java/com/alechilles/alecstamework/ui/TalentTreeLayoutService.java`
   - Converts unsorted talent entries into visible node slots and connector slots.
 - Create `src/main/java/com/alechilles/alecstamework/ui/TalentTreeViewModel.java`
-  - Immutable records for tree page, node slots, connector slots, selected node, overflow state.
+  - Immutable records for tree canvas, node slots, connector slots, selected node, and computed content size.
 - Modify `src/main/java/com/alechilles/alecstamework/items/CommandTalentPageService.java`
   - Builds richer `TreeNodeEntry` data: raw display name, branch, tier, prerequisites, effect summary, state reason, point cost.
 - Replace `src/main/resources/Common/UI/Custom/TameworkCompanionTalentsPage.ui`
   - Static full-screen-ish tree canvas, node slots, connector segments, detail panel, controls.
 - Modify `src/test/java/com/alechilles/alecstamework/ui/TameworkCompanionTalentsPageNavigationTest.java`
-  - Update source-contract tests from list/page rows to tree slots, focus state, connector binding, overflow paging.
+  - Update source-contract tests from list/page rows to tree slots, focus state, connector binding, and scroll viewport structure.
 - Create `src/test/java/com/alechilles/alecstamework/ui/TalentTreeLayoutServiceTest.java`
-  - Unit-test branch/tier placement, prerequisite connectors, overflow windows, collision handling.
+  - Unit-test branch/tier placement, prerequisite connectors, scroll content sizing, and collision handling.
 - Modify `wiki/Modder-Documentation/Config-Reference/TwTalentConfig-Reference.md`
-  - Document the 5 branch by 6 tier display guidance and overflow behavior.
+  - Document branch/tier display guidance and scroll behavior.
 
 ---
 
@@ -63,9 +63,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class TalentTreeLayoutServiceTest {
     @Test
     void treePageCarriesNodesConnectorsAndOverflowState() {
-        TalentTreeViewModel.TreePage page = new TalentTreeViewModel.TreePage(
-                0,
-                1,
+        TalentTreeViewModel.TreeCanvas canvas = new TalentTreeViewModel.TreeCanvas(
+                820,
+                760,
                 List.of("Care"),
                 List.of(new TalentTreeViewModel.NodeSlot(
                         0,
@@ -89,13 +89,13 @@ class TalentTreeLayoutServiceTest {
                         true
                 )),
                 "talent_a",
-                false,
                 false
         );
 
-        assertEquals(1, page.nodes().size());
-        assertEquals(1, page.connectors().size());
-        assertEquals("talent_a", page.selectedTalentId());
+        assertEquals(1, canvas.nodes().size());
+        assertEquals(1, canvas.connectors().size());
+        assertEquals("talent_a", canvas.selectedTalentId());
+        assertEquals(760, canvas.contentHeight());
     }
 }
 ```
@@ -125,16 +125,15 @@ public final class TalentTreeViewModel {
     private TalentTreeViewModel() {
     }
 
-    public record TreePage(int branchPageIndex,
-                           int branchPageCount,
-                           @Nonnull List<String> visibleBranches,
-                           @Nonnull List<NodeSlot> nodes,
-                           @Nonnull List<ConnectorSlot> connectors,
-                           @Nullable String selectedTalentId,
-                           boolean hasPreviousPage,
-                           boolean hasNextPage) {
-        public TreePage {
-            visibleBranches = List.copyOf(visibleBranches);
+    public record TreeCanvas(int contentWidth,
+                             int contentHeight,
+                             @Nonnull List<String> branches,
+                             @Nonnull List<NodeSlot> nodes,
+                             @Nonnull List<ConnectorSlot> connectors,
+                             @Nullable String selectedTalentId,
+                             boolean scrollable) {
+        public TreeCanvas {
+            branches = List.copyOf(branches);
             nodes = List.copyOf(nodes);
             connectors = List.copyOf(connectors);
         }
@@ -202,16 +201,16 @@ void layoutGroupsBranchesIntoColumnsAndTiersIntoRows() {
             node("breed_a", "Breeding", 1, "Purchased")
     );
 
-    TalentTreeViewModel.TreePage page = TalentTreeLayoutService.layout(entries, "care_a", 0);
+    TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(entries, "care_a");
 
-    assertEquals(List.of("Breeding", "Care"), page.visibleBranches());
-    assertEquals(3, page.nodes().size());
-    assertEquals(0, slot(page, "breed_a").column());
-    assertEquals(0, slot(page, "breed_a").row());
-    assertEquals(1, slot(page, "care_a").column());
-    assertEquals(0, slot(page, "care_a").row());
-    assertEquals(1, slot(page, "care_b").column());
-    assertEquals(1, slot(page, "care_b").row());
+    assertEquals(List.of("Breeding", "Care"), canvas.branches());
+    assertEquals(3, canvas.nodes().size());
+    assertEquals(0, slot(canvas, "breed_a").column());
+    assertEquals(0, slot(canvas, "breed_a").row());
+    assertEquals(1, slot(canvas, "care_a").column());
+    assertEquals(0, slot(canvas, "care_a").row());
+    assertEquals(1, slot(canvas, "care_b").column());
+    assertEquals(1, slot(canvas, "care_b").row());
 }
 
 @Test
@@ -221,16 +220,16 @@ void layoutCreatesPrerequisiteConnectorsForVisibleNodes() {
             node("child", "Care", 2, "Available", "root")
     );
 
-    TalentTreeViewModel.TreePage page = TalentTreeLayoutService.layout(entries, "child", 0);
+    TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(entries, "child");
 
-    assertEquals(1, page.connectors().size());
-    assertEquals("root", page.connectors().getFirst().fromTalentId());
-    assertEquals("child", page.connectors().getFirst().toTalentId());
-    assertEquals("Available", page.connectors().getFirst().state());
+    assertEquals(1, canvas.connectors().size());
+    assertEquals("root", canvas.connectors().getFirst().fromTalentId());
+    assertEquals("child", canvas.connectors().getFirst().toTalentId());
+    assertEquals("Available", canvas.connectors().getFirst().state());
 }
 
 @Test
-void layoutPaginatesWhenMoreThanFiveBranchesExist() {
+void layoutExpandsCanvasForLargeTrees() {
     List<TameworkCompanionTalentsPage.TreeNodeEntry> entries = List.of(
             node("a", "A", 1, "Available"),
             node("b", "B", 1, "Available"),
@@ -240,14 +239,12 @@ void layoutPaginatesWhenMoreThanFiveBranchesExist() {
             node("f", "F", 1, "Available")
     );
 
-    TalentTreeViewModel.TreePage first = TalentTreeLayoutService.layout(entries, "a", 0);
-    TalentTreeViewModel.TreePage second = TalentTreeLayoutService.layout(entries, "f", 1);
+    TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(entries, "a");
 
-    assertEquals(2, first.branchPageCount());
-    assertEquals(List.of("A", "B", "C", "D", "E"), first.visibleBranches());
-    assertEquals(List.of("F"), second.visibleBranches());
-    assertEquals(true, first.hasNextPage());
-    assertEquals(true, second.hasPreviousPage());
+    assertEquals(List.of("A", "B", "C", "D", "E", "F"), canvas.branches());
+    assertEquals(6, canvas.nodes().size());
+    assertEquals(true, canvas.contentWidth() > TalentTreeLayoutService.VIEWPORT_WIDTH);
+    assertEquals(true, canvas.scrollable());
 }
 
 private static TameworkCompanionTalentsPage.TreeNodeEntry node(String id,
@@ -271,8 +268,8 @@ private static TameworkCompanionTalentsPage.TreeNodeEntry node(String id,
     );
 }
 
-private static TalentTreeViewModel.NodeSlot slot(TalentTreeViewModel.TreePage page, String talentId) {
-    return page.nodes().stream()
+private static TalentTreeViewModel.NodeSlot slot(TalentTreeViewModel.TreeCanvas canvas, String talentId) {
+    return canvas.nodes().stream()
             .filter(node -> talentId.equals(node.talentId()))
             .findFirst()
             .orElseThrow();
@@ -330,16 +327,21 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public final class TalentTreeLayoutService {
-    static final int MAX_VISIBLE_BRANCHES = 5;
-    static final int MAX_VISIBLE_TIERS = 6;
+    static final int VIEWPORT_WIDTH = 820;
+    static final int VIEWPORT_HEIGHT = 560;
+    static final int MAX_NODE_SLOTS = 60;
+    static final int MAX_CONNECTOR_SLOTS = 80;
+    private static final int COLUMN_WIDTH = 150;
+    private static final int ROW_HEIGHT = 92;
+    private static final int HORIZONTAL_PADDING = 36;
+    private static final int VERTICAL_PADDING = 28;
 
     private TalentTreeLayoutService() {
     }
 
     @Nonnull
-    public static TalentTreeViewModel.TreePage layout(@Nonnull List<TameworkCompanionTalentsPage.TreeNodeEntry> entries,
-                                                      @Nullable String selectedTalentId,
-                                                      int requestedBranchPageIndex) {
+    public static TalentTreeViewModel.TreeCanvas layout(@Nonnull List<TameworkCompanionTalentsPage.TreeNodeEntry> entries,
+                                                        @Nullable String selectedTalentId) {
         List<TameworkCompanionTalentsPage.TreeNodeEntry> sorted = entries.stream()
                 .filter(entry -> entry != null && entry.id() != null && !entry.id().isBlank())
                 .sorted(Comparator
@@ -353,27 +355,24 @@ public final class TalentTreeLayoutService {
             branchSet.add(resolveBranch(entry.branchName()));
         }
         List<String> branches = List.copyOf(branchSet);
-        int pageCount = Math.max(1, (int) Math.ceil((double) branches.size() / (double) MAX_VISIBLE_BRANCHES));
-        int pageIndex = Math.max(0, Math.min(requestedBranchPageIndex, pageCount - 1));
-        int branchStart = pageIndex * MAX_VISIBLE_BRANCHES;
-        int branchEnd = Math.min(branches.size(), branchStart + MAX_VISIBLE_BRANCHES);
-        List<String> visibleBranches = branchStart < branchEnd ? branches.subList(branchStart, branchEnd) : List.of();
 
         Map<String, Integer> branchColumns = new HashMap<>();
-        for (int i = 0; i < visibleBranches.size(); i++) {
-            branchColumns.put(visibleBranches.get(i), i);
+        for (int i = 0; i < branches.size(); i++) {
+            branchColumns.put(branches.get(i), i);
         }
 
         ArrayList<TalentTreeViewModel.NodeSlot> nodes = new ArrayList<>();
         Map<String, TalentTreeViewModel.NodeSlot> nodeByTalentId = new HashMap<>();
         int nodeSlot = 0;
+        int maxRow = 0;
         for (TameworkCompanionTalentsPage.TreeNodeEntry entry : sorted) {
             String branch = resolveBranch(entry.branchName());
             Integer column = branchColumns.get(branch);
             int row = Math.max(0, entry.tier() - 1);
-            if (column == null || row >= MAX_VISIBLE_TIERS) {
+            if (column == null) {
                 continue;
             }
+            maxRow = Math.max(maxRow, row);
             TalentTreeViewModel.NodeSlot slot = new TalentTreeViewModel.NodeSlot(
                     nodeSlot++,
                     entry.id(),
@@ -419,15 +418,17 @@ public final class TalentTreeLayoutService {
             selected = nodes.isEmpty() ? null : nodes.getFirst().talentId();
         }
 
-        return new TalentTreeViewModel.TreePage(
-                pageIndex,
-                pageCount,
-                visibleBranches,
+        int contentWidth = Math.max(VIEWPORT_WIDTH, HORIZONTAL_PADDING * 2 + branches.size() * COLUMN_WIDTH);
+        int contentHeight = Math.max(VIEWPORT_HEIGHT, VERTICAL_PADDING * 2 + (maxRow + 1) * ROW_HEIGHT);
+
+        return new TalentTreeViewModel.TreeCanvas(
+                contentWidth,
+                contentHeight,
+                branches,
                 nodes,
                 connectors,
                 selected,
-                pageIndex > 0,
-                pageIndex + 1 < pageCount
+                contentWidth > VIEWPORT_WIDTH || contentHeight > VIEWPORT_HEIGHT
         );
     }
 
@@ -564,10 +565,14 @@ void talentPageUiDefinesTreeCanvasNodeSlotsAndConnectors() throws IOException {
     ), StandardCharsets.UTF_8);
 
     assertTrue(ui.contains("#TalentTreeCanvas"));
+    assertTrue(ui.contains("#TalentTreeViewport"));
+    assertTrue(ui.contains("LayoutMode: TopScrolling"));
+    assertTrue(ui.contains("KeepScrollPosition: true"));
+    assertTrue(ui.contains("ScrollbarStyle: $C.@DefaultScrollbarStyle"));
     assertTrue(ui.contains("#TalentNode0"));
-    assertTrue(ui.contains("#TalentNode29"));
+    assertTrue(ui.contains("#TalentNode59"));
     assertTrue(ui.contains("#TalentConnector0"));
-    assertTrue(ui.contains("#TalentConnector39"));
+    assertTrue(ui.contains("#TalentConnector79"));
     assertTrue(ui.contains("#TalentDetailPanel"));
     assertTrue(ui.contains("#TalentDetailPurchaseButton"));
 }
@@ -590,14 +595,15 @@ Replace the row list with:
 - Root container: `Anchor: (Width: 1120, Height: 720)`
 - Header row: title, level summary, points summary
 - Main row:
-  - Tree canvas: `Anchor: (Width: 820, Height: 560)`
+  - Tree viewport: `Group #TalentTreeViewport` with `Anchor: (Width: 820, Height: 560)`, `LayoutMode: TopScrolling`, `KeepScrollPosition: true`, and `ScrollbarStyle: $C.@DefaultScrollbarStyle`
+  - Tree canvas/content inside the viewport: `Group #TalentTreeCanvas` with an anchor tall enough for deep trees, for example `Anchor: (Width: 980, Height: 980)`
   - Detail panel: `Anchor: (Width: 260, Height: 560)`
-- Footer row: Back, Reset, Previous Branches, Next Branches, page indicator
+- Footer row: Back and Reset. Do not include previous/next branch controls or a page indicator.
 
-Define 30 node groups:
+Define 60 node groups:
 
 ```text
-#TalentNode0..#TalentNode29
+#TalentNode0..#TalentNode59
 ```
 
 Each node group contains:
@@ -609,10 +615,10 @@ Each node group contains:
 #TalentNodeStateN
 ```
 
-Define 40 connector groups:
+Define 80 connector groups:
 
 ```text
-#TalentConnector0..#TalentConnector39
+#TalentConnector0..#TalentConnector79
 ```
 
 Each connector is a `Group` with small height or width. For v1, use orthogonal line segments by exposing multiple connector segment slots if the UI parser handles them better:
@@ -635,9 +641,10 @@ Use state colors:
 In `TameworkCompanionTalentsPage.bindPage`:
 
 - Replace row loop with:
-  - `TalentTreeViewModel.TreePage treePage = TalentTreeLayoutService.layout(data.entries(), selectedTalentId, branchPageIndex);`
-  - Loop 0..29 and bind node visibility/text/state.
-  - Loop 0..39 and bind connector visibility/state.
+  - `TalentTreeViewModel.TreeCanvas treeCanvas = TalentTreeLayoutService.layout(data.entries(), selectedTalentId);`
+  - Bind `#TalentTreeCanvas.Anchor` or fixed canvas size selectors if CustomUI supports runtime anchor updates; otherwise size the `.ui` canvas for the expected maximum and let unused space scroll.
+  - Loop 0..59 and bind node visibility/text/state.
+  - Loop 0..79 and bind connector visibility/state.
   - Bind selected node details.
 
 Add event actions:
@@ -782,13 +789,13 @@ git commit -m "Feat: add talent tree selection states"
 
 ---
 
-## Task 6: Validate Animal Husbandry Trees Against UI Capacity
+## Task 6: Validate Animal Husbandry Trees Against Scroll Canvas
 
 **Files:**
-- Create: `src/test/java/com/alechilles/alecstamework/ui/TalentTreeAnimalHusbandryCapacityTest.java`
-- Optionally modify AH configs only if capacity fails.
+- Create: `src/test/java/com/alechilles/alecstamework/ui/TalentTreeAnimalHusbandryScrollCanvasTest.java`
+- Optionally increase static node/connector slot counts if a real config exceeds them.
 
-- [ ] **Step 1: Add capacity test**
+- [ ] **Step 1: Add scroll-canvas test**
 
 Create:
 
@@ -806,29 +813,51 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TalentTreeAnimalHusbandryCapacityTest {
+class TalentTreeAnimalHusbandryScrollCanvasTest {
     @Test
-    void animalHusbandryTalentConfigsFitPrimaryTreeCanvas() throws IOException {
+    void animalHusbandryTalentConfigsFitScrollCanvasSlots() throws IOException {
         Path root = Path.of("..", "Alec's Animal Husbandry!", "Server", "Tamework", "Talents");
-        assertFits(root.resolve("AHTalentLivestock.json"));
-        assertFits(root.resolve("AHTalentNeutral.json"));
-        assertFits(root.resolve("AHTalentCritter.json"));
-        assertFits(root.resolve("AHTalentBeast.json"));
+        assertFitsSlots(root.resolve("AHTalentLivestock.json"));
+        assertFitsSlots(root.resolve("AHTalentNeutral.json"));
+        assertFitsSlots(root.resolve("AHTalentCritter.json"));
+        assertFitsSlots(root.resolve("AHTalentBeast.json"));
     }
 
-    private static void assertFits(Path path) throws IOException {
+    private static void assertFitsSlots(Path path) throws IOException {
         String json = Files.readString(path, StandardCharsets.UTF_8);
-        assertTrue(countUniqueBranches(json) <= TalentTreeLayoutService.MAX_VISIBLE_BRANCHES, path + " has too many branches");
-        assertTrue(maxTier(json) <= TalentTreeLayoutService.MAX_VISIBLE_TIERS, path + " has too many tiers");
+        assertTrue(countTalents(json) <= TalentTreeLayoutService.MAX_NODE_SLOTS, path + " has too many talents for static node slots");
+        assertTrue(countPrerequisites(json) <= TalentTreeLayoutService.MAX_CONNECTOR_SLOTS, path + " has too many prerequisite connectors");
+        assertTrue(maxTier(json) >= 1, path + " should have at least one tier");
     }
 
-    private static int countUniqueBranches(String json) {
-        Matcher matcher = Pattern.compile("\"Branch\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
-        java.util.HashSet<String> branches = new java.util.HashSet<>();
+    private static int countTalents(String json) {
+        Matcher matcher = Pattern.compile("\"Id\"\\s*:\\s*\"AH_").matcher(json);
+        int count = 0;
         while (matcher.find()) {
-            branches.add(matcher.group(1));
+            count++;
         }
-        return branches.size();
+        return count;
+    }
+
+    private static int countPrerequisites(String json) {
+        Matcher matcher = Pattern.compile("\"AH_[^\"]+\"").matcher(json);
+        int count = 0;
+        boolean inRequires = false;
+        for (String line : json.split("\\R")) {
+            if (line.contains("\"RequiresTalentIds\"")) {
+                inRequires = true;
+            }
+            if (inRequires) {
+                Matcher lineMatcher = matcher.matcher(line);
+                while (lineMatcher.find()) {
+                    count++;
+                }
+                if (line.contains("]")) {
+                    inRequires = false;
+                }
+            }
+        }
+        return count;
     }
 
     private static int maxTier(String json) {
@@ -842,30 +871,29 @@ class TalentTreeAnimalHusbandryCapacityTest {
 }
 ```
 
-- [ ] **Step 2: Run capacity test**
+- [ ] **Step 2: Run scroll-canvas test**
 
 Run:
 
 ```powershell
-.\mvnw.cmd "-Dtest=TalentTreeAnimalHusbandryCapacityTest" test
+.\mvnw.cmd "-Dtest=TalentTreeAnimalHusbandryScrollCanvasTest" test
 ```
 
-Expected: pass for current AH configs, except Beast may need tier compression if it uses tier 6.
+Expected: pass for current AH configs. Tier count and branch count must not fail the test because scrolling is the overflow mechanism.
 
-- [ ] **Step 3: If Beast fails tier capacity, compress display tiers only**
+- [ ] **Step 3: If a config exceeds static slots, increase slots**
 
-If Beast has tier 6, do not weaken its talent prerequisites. Either:
+If a real config exceeds the static slot count, increase the static `.ui` capacity and constants. Do not compress branches or tiers just to make the tree fit.
 
-- Increase `MAX_VISIBLE_TIERS` to 7 and update the UI to 35 slots, or
-- Adjust Beast config tiers so final nodes fit tier 5 while preserving prerequisites.
-
-Preferred: increase visible tiers to 7 if the UI height still fits at 720px.
+- Increase node slots in batches of 20.
+- Increase connector slots in batches of 40.
+- Keep the viewport size stable and let the content canvas grow.
 
 - [ ] **Step 4: Commit**
 
 ```powershell
-git add src/test/java/com/alechilles/alecstamework/ui/TalentTreeAnimalHusbandryCapacityTest.java src/main/java/com/alechilles/alecstamework/ui/TalentTreeLayoutService.java src/main/resources/Common/UI/Custom/TameworkCompanionTalentsPage.ui
-git commit -m "Test: verify companion talent tree capacity"
+git add src/test/java/com/alechilles/alecstamework/ui/TalentTreeAnimalHusbandryScrollCanvasTest.java src/main/java/com/alechilles/alecstamework/ui/TalentTreeLayoutService.java src/main/resources/Common/UI/Custom/TameworkCompanionTalentsPage.ui
+git commit -m "Test: verify companion talent tree scroll canvas"
 ```
 
 ---
@@ -883,12 +911,12 @@ Add a section to `TwTalentConfig-Reference.md`:
 ```markdown
 ## Talent Tree UI Guidance
 
-The talent UI renders `Branch` values as columns and `Tier` values as rows.
-For the best no-pagination presentation, keep a companion talent config to five or fewer branches and six or fewer tiers.
+The talent UI renders `Branch` values as columns and `Tier` values as rows inside a scrollable tree viewport.
+Companion configs do not need to fit a fixed visible grid; larger trees should extend the canvas and remain scrollable.
 
 `RequiresTalentIds[]` draws prerequisite connector lines between visible nodes. Cross-branch prerequisites are allowed, but simple parent-to-child chains are easier to read in-game.
 
-If a config exceeds the visible branch or tier capacity, the page uses tree paging. Paging should be reserved for unusually large configs; normal companion archetypes should fit on one tree page.
+If a config is unusually large, increase the static node/connector slot capacity in the UI asset rather than adding page navigation. Do not split a single tree into pages.
 ```
 
 - [ ] **Step 2: Document player interaction**
@@ -928,7 +956,7 @@ git commit -m "Docs: document talent tree UI authoring"
 Run:
 
 ```powershell
-.\mvnw.cmd "-Dtest=TalentTreeLayoutServiceTest,TameworkCompanionTalentsPageNavigationTest,TalentTreeAnimalHusbandryCapacityTest" test
+.\mvnw.cmd "-Dtest=TalentTreeLayoutServiceTest,TameworkCompanionTalentsPageNavigationTest,TalentTreeAnimalHusbandryScrollCanvasTest" test
 ```
 
 Expected: all focused tests pass.
@@ -971,7 +999,7 @@ In game:
 4. Verify the detail panel updates without leaving the tree.
 5. Purchase a prerequisite node and verify connectors/node colors update.
 6. Reset talents and verify the tree returns to unpurchased state.
-7. Repeat with beast config to verify larger trees fit without list-like pagination.
+7. Repeat with beast config to verify larger trees scroll without list-like pagination.
 
 - [ ] **Step 5: Commit final cleanup**
 
@@ -985,6 +1013,6 @@ git commit -m "Feat: replace talent list with tree UI"
 
 ## Self-Review
 
-- Spec coverage: The plan replaces the list with a visual tree canvas, uses branch/tier/prereq authoring, preserves purchase/reset behavior, supports overflow pagination only as a fallback, and adds tests/docs/manual smoke.
+- Spec coverage: The plan replaces the list with a visual tree canvas, uses branch/tier/prereq authoring, preserves purchase/reset behavior, uses scrolling for oversized trees, and adds tests/docs/manual smoke.
 - Placeholder scan: No implementation step relies on "TBD" or vague future work.
 - Type consistency: `TreeNodeEntry`, `TalentTreeViewModel`, and `TalentTreeLayoutService.layout(...)` are defined before later tasks consume them.
