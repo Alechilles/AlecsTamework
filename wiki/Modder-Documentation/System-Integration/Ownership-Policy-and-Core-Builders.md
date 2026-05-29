@@ -22,7 +22,10 @@ Use this page when you need the shared building blocks rather than one specific 
 - `TameworkSetTamed`
 - `TameworkNeedsResourceConsume`
 - `TameworkHarvestDrop`
+- `TameworkHarvestAlarm`
 - `TameworkDebugMessage`
+
+`TameworkHarvestAlarm` sets the `Harvest_Ready` alarm from the role's `HarvestTimeout` builder parameter and applies the companion's `HarvestCooldownMultiplier` passive effect before scheduling the alarm.
 
 ## Core sensors and filters
 - `TameworkIsOwner`

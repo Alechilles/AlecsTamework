@@ -1,0 +1,52 @@
+package com.alechilles.alecstamework.npc.progression;
+
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class TalentUtilityEffectContractTest {
+    @Test
+    void needsDecayUsesCompanionProgressionMultiplier() throws IOException {
+        String content = readSource("npc", "progression", "CompanionNeedsService.java");
+        assertTrue(content.contains("NEEDS_DECAY_MULTIPLIER_EFFECT_KEY = \"NeedsDecayMultiplier\""));
+        assertTrue(content.contains("resolveNeedsDecayMultiplier(npcRef, store)"));
+        assertTrue(content.contains("decay.getHungerPerMinute() * elapsedMinutes * needsDecayMultiplier"));
+        assertTrue(content.contains("decay.getThirstPerMinute() * elapsedMinutes * needsDecayMultiplier"));
+    }
+
+    @Test
+    void reviveCooldownUsesLiveAndSnapshotTalentMultipliers() throws IOException {
+        String content = readSource("items", "CommandLinkedNpcDeathService.java");
+        assertTrue(content.contains("REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY = \"ReviveCooldownMultiplier\""));
+        assertTrue(content.contains("resolveRespawnCooldownMs(roleId, reference, store)"));
+        assertTrue(content.contains("resolveRespawnCooldownMs(roleId, cached)"));
+        assertTrue(content.contains("resolveSnapshotTalentMultiplier(snapshot, REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY, 1.0)"));
+    }
+
+    @Test
+    void progressionBreakdownPrioritizesNewUtilityEffectKeys() throws IOException {
+        String content = readSource("npc", "progression", "CompanionProgressionModifierBreakdownService.java");
+        assertTrue(content.contains("\"NeedsDecayMultiplier\""));
+        assertTrue(content.contains("\"ReviveCooldownMultiplier\""));
+        assertTrue(content.contains("\"TraitMutationChanceMultiplier\""));
+        assertTrue(content.contains("\"HarvestCooldownMultiplier\""));
+    }
+
+    private static String readSource(String... parts) throws IOException {
+        String[] pathParts = new String[5 + parts.length];
+        pathParts[0] = "main";
+        pathParts[1] = "java";
+        pathParts[2] = "com";
+        pathParts[3] = "alechilles";
+        pathParts[4] = "alecstamework";
+        System.arraycopy(parts, 0, pathParts, 5, parts.length);
+        Path path = Path.of("src", Arrays.copyOf(pathParts, pathParts.length));
+        return Files.readString(path, StandardCharsets.UTF_8);
+    }
+}

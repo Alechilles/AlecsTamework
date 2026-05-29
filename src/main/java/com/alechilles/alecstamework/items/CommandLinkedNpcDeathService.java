@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -20,6 +21,8 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
@@ -58,6 +61,7 @@ public final class CommandLinkedNpcDeathService {
     private static final String ATTACHMENT_KV_SEPARATOR = ",";
     private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
     private static final long BLOCKED_TELEMETRY_INTERVAL_MS = 5000L;
+    private static final String REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY = "ReviveCooldownMultiplier";
 
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
     @Nullable
@@ -163,7 +167,7 @@ public final class CommandLinkedNpcDeathService {
             if (cached != null) {
                 String roleId = firstNonBlank(cached.roleId(), resolveRoleId(npc), null);
                 long diedAtMs = System.currentTimeMillis();
-                long respawnAvailableAtMs = diedAtMs + resolveRespawnCooldownMs(roleId);
+                long respawnAvailableAtMs = diedAtMs + resolveRespawnCooldownMs(roleId, cached);
                 DeathDetails deathDetails = resolveDeathDetails(npcUuid, diedAtMs);
                 deadByNpc.put(
                         npcUuid,
@@ -319,7 +323,7 @@ public final class CommandLinkedNpcDeathService {
         String customName = resolveCustomName(reference, store);
         String displayName = resolveDisplayName(reference, store, npc, roleId, customName);
         long diedAtMs = System.currentTimeMillis();
-        long respawnAvailableAtMs = diedAtMs + resolveRespawnCooldownMs(roleId);
+        long respawnAvailableAtMs = diedAtMs + resolveRespawnCooldownMs(roleId, reference, store);
         DeathDetails deathDetails = resolveDeathDetails(npcUuid, diedAtMs);
 
         deadByNpc.put(
@@ -1069,10 +1073,59 @@ public final class CommandLinkedNpcDeathService {
         return normalized.contains("death") || normalized.contains("killed");
     }
 
-    private long resolveRespawnCooldownMs(@Nullable String roleId) {
+    private long resolveRespawnCooldownMs(@Nullable String roleId,
+                                          @Nullable Ref<EntityStore> npcRef,
+                                          @Nullable Store<EntityStore> store) {
         TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
         long configured = settings.getDeadRespawnCooldownMs();
-        return Math.max(0L, configured);
+        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY,
+                1.0
+        );
+        return scaleRespawnCooldownMs(configured, multiplier);
+    }
+
+    private long resolveRespawnCooldownMs(@Nullable String roleId,
+                                          @Nullable DeadLinkedNpcSnapshot snapshot) {
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+        long configured = settings.getDeadRespawnCooldownMs();
+        double multiplier = resolveSnapshotTalentMultiplier(snapshot, REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY, 1.0);
+        return scaleRespawnCooldownMs(configured, multiplier);
+    }
+
+    private long scaleRespawnCooldownMs(long configured, double multiplier) {
+        if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
+            multiplier = 1.0;
+        }
+        double scaled = Math.max(0L, configured) * multiplier;
+        if (!Double.isFinite(scaled)) {
+            return Math.max(0L, configured);
+        }
+        return Math.max(0L, Math.round(scaled));
+    }
+
+    private double resolveSnapshotTalentMultiplier(@Nullable DeadLinkedNpcSnapshot snapshot,
+                                                   @Nullable String effectKey,
+                                                   double defaultMultiplier) {
+        if (snapshot == null
+                || snapshot.talentsConfigId() == null
+                || snapshot.talentsConfigId().isBlank()
+                || snapshot.purchasedTalentIds() == null
+                || snapshot.purchasedTalentIds().isBlank()) {
+            return defaultMultiplier;
+        }
+        TwTalentConfig config = TwTalentConfig.resolveById(snapshot.talentsConfigId());
+        if (config == null) {
+            return defaultMultiplier;
+        }
+        return CompanionTalentService.resolvePurchasedEffectMultiplier(
+                config,
+                TalentIdCodec.decode(snapshot.purchasedTalentIds()),
+                effectKey,
+                defaultMultiplier
+        );
     }
 
     @Nonnull

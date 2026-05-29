@@ -238,6 +238,18 @@ final class CommandLinkedPanelProgressionPresentationService {
         if ("BreedCooldownMultiplier".equalsIgnoreCase(effectKey)) {
             return "Breeding Cooldown";
         }
+        if ("NeedsDecayMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Needs Decay";
+        }
+        if ("ReviveCooldownMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Revive Cooldown";
+        }
+        if ("TraitMutationChanceMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Mutation Chance";
+        }
+        if ("HarvestCooldownMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Harvest Reset";
+        }
         if ("SizeMultiplier".equalsIgnoreCase(effectKey)) {
             return "Size";
         }

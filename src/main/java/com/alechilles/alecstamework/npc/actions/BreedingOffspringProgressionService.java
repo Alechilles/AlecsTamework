@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitInheritanceService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
@@ -42,6 +43,7 @@ import javax.annotation.Nullable;
  * Applies offspring inheritance and progression initialization after spawn.
  */
 final class BreedingOffspringProgressionService {
+    private static final String TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY = "TraitMutationChanceMultiplier";
     private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
     private static final long FAMILY_FLOCK_RETRY_INTERVAL_MS = 100L;
     private static final int FAMILY_FLOCK_RETRY_MAX_ATTEMPTS = 12;
@@ -342,8 +344,9 @@ final class BreedingOffspringProgressionService {
                 "SizeMultiplier",
                 1.0
         );
+        double mutationChanceMultiplier = resolvePairMutationChanceMultiplier(parentARef, parentBRef, store);
         TameworkTraitsComponent.TraitValue[] values = inheritTraits
-                ? TraitInheritanceService.inheritTraits(traitConfig, parentATraits, parentBTraits, seed)
+                ? TraitInheritanceService.inheritTraits(traitConfig, parentATraits, parentBTraits, seed, mutationChanceMultiplier)
                 : TraitRollService.rollTraits(traitConfig, seed);
         TameworkTraitsComponent updatedTraits = new TameworkTraitsComponent(traitConfig.getId(), seed, values);
         double nextSizeMultiplier = TraitModifierService.resolveMultiplier(
@@ -363,6 +366,30 @@ final class BreedingOffspringProgressionService {
                 previousSizeMultiplier,
                 nextSizeMultiplier
         );
+    }
+
+    private double resolvePairMutationChanceMultiplier(@Nullable Ref<EntityStore> parentARef,
+                                                       @Nullable Ref<EntityStore> parentBRef,
+                                                       @Nonnull Store<EntityStore> store) {
+        double parentA = CompanionProgressionModifierService.resolveMultiplier(
+                parentARef,
+                store,
+                TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY,
+                1.0
+        );
+        double parentB = CompanionProgressionModifierService.resolveMultiplier(
+                parentBRef,
+                store,
+                TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY,
+                1.0
+        );
+        if (!Double.isFinite(parentA) || parentA <= 0.0) {
+            parentA = 1.0;
+        }
+        if (!Double.isFinite(parentB) || parentB <= 0.0) {
+            parentB = 1.0;
+        }
+        return Math.max(0.0, (parentA + parentB) * 0.5);
     }
 
     private void applyOffspringBreedingLock(Ref<EntityStore> childRef,

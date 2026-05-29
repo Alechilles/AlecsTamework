@@ -18,6 +18,7 @@ public final class TraitInheritanceService {
     private static final TameworkTraitsComponent.TraitValue[] EMPTY_VALUES =
             new TameworkTraitsComponent.TraitValue[0];
     private static final double EPSILON = 0.000001;
+    private static final String TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY = "TraitMutationChanceMultiplier";
 
     private TraitInheritanceService() {
     }
@@ -26,6 +27,14 @@ public final class TraitInheritanceService {
                                                                      @Nullable TameworkTraitsComponent parentA,
                                                                      @Nullable TameworkTraitsComponent parentB,
                                                                      long seed) {
+        return inheritTraits(config, parentA, parentB, seed, 1.0);
+    }
+
+    public static TameworkTraitsComponent.TraitValue[] inheritTraits(@Nullable TwTraitConfig config,
+                                                                     @Nullable TameworkTraitsComponent parentA,
+                                                                     @Nullable TameworkTraitsComponent parentB,
+                                                                     long seed,
+                                                                     double mutationChanceMultiplier) {
         TameworkTraitsComponent.TraitValue[] fallback = TraitRollService.rollTraits(config, seed);
         if (config == null || !config.isEnabled()) {
             return fallback;
@@ -73,7 +82,7 @@ public final class TraitInheritanceService {
                     targetCount,
                     definitionById,
                     allowDuplicates,
-                    clamp01(inheritance.getMutationChance()),
+                    resolveEffectiveMutationChance(inheritance.getMutationChance(), mutationChanceMultiplier),
                     random
             );
         }
@@ -377,6 +386,14 @@ public final class TraitInheritanceService {
             return min;
         }
         return min + (random.nextDouble() * (max - min));
+    }
+
+    public static double resolveEffectiveMutationChance(double baseChance, double multiplier) {
+        double base = clamp01(baseChance);
+        if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
+            multiplier = 1.0;
+        }
+        return clamp01(base * multiplier);
     }
 
     private static double clampToDefinition(double value, @Nullable TwTraitConfig.TraitDefinition definition) {

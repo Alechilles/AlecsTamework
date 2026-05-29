@@ -31,6 +31,10 @@ public final class CompanionProgressionModifierBreakdownService {
             "HappinessGainMultiplier",
             "HappinessDecayMultiplier",
             "BreedCooldownMultiplier",
+            "NeedsDecayMultiplier",
+            "ReviveCooldownMultiplier",
+            "TraitMutationChanceMultiplier",
+            "HarvestCooldownMultiplier",
             "SizeMultiplier"
     );
 

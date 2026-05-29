@@ -176,6 +176,35 @@ public final class CompanionTalentService {
         return matched ? multiplier : defaultMultiplier;
     }
 
+    public static double resolvePurchasedEffectMultiplier(@Nullable TwTalentConfig config,
+                                                          @Nullable String[] purchasedTalentIds,
+                                                          @Nullable String effectKey,
+                                                          double defaultMultiplier) {
+        if (config == null || !config.isEnabled()
+                || purchasedTalentIds == null
+                || purchasedTalentIds.length == 0
+                || effectKey == null
+                || effectKey.isBlank()) {
+            return defaultMultiplier;
+        }
+        double multiplier = defaultMultiplier;
+        boolean matched = false;
+        for (String talentId : purchasedTalentIds) {
+            TwTalentConfig.TalentDefinition talent = config.findTalent(talentId);
+            if (talent == null) {
+                continue;
+            }
+            for (TwTalentConfig.PassiveEffect effect : talent.getEffects()) {
+                if (effect == null || effect.getEffectKey() == null || !effect.getEffectKey().equalsIgnoreCase(effectKey)) {
+                    continue;
+                }
+                matched = true;
+                multiplier *= effect.getMultiplier();
+            }
+        }
+        return matched ? multiplier : defaultMultiplier;
+    }
+
     @Nullable
     public static TwTalentConfig resolveTalentConfig(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store) {
