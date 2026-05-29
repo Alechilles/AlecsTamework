@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
@@ -317,11 +318,10 @@ public final class TameworkCompanionTalentsPage
 
     @Nonnull
     private String resolveRequirementText(@Nonnull TreeNodeEntry entry) {
-        String level = "Requires Level " + entry.minLevel();
-        if (entry.requiredTalentIds().isEmpty()) {
-            return level;
-        }
-        return level + " and " + entry.requiredTalentIds().size() + " prerequisite";
+        ArrayList<String> lines = new ArrayList<>();
+        lines.add("Level " + entry.minLevel());
+        lines.addAll(entry.requiredTalentNames());
+        return String.join("\n", lines);
     }
 
     private void bindNodeState(@Nonnull UICommandBuilder commandBuilder,
@@ -381,10 +381,12 @@ public final class TameworkCompanionTalentsPage
                                 int pointCost,
                                 int minLevel,
                                 @Nonnull List<String> requiredTalentIds,
+                                @Nonnull List<String> requiredTalentNames,
                                 @Nonnull String effectSummary,
                                 boolean canPurchase) {
         public TreeNodeEntry {
             requiredTalentIds = requiredTalentIds == null ? List.of() : List.copyOf(requiredTalentIds);
+            requiredTalentNames = requiredTalentNames == null ? List.of() : List.copyOf(requiredTalentNames);
             effectSummary = effectSummary == null || effectSummary.isBlank() ? "No passive effects" : effectSummary;
         }
     }

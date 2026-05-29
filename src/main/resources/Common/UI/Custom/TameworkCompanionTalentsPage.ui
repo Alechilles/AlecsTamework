@@ -134,7 +134,7 @@ $C.@PageOverlay {
 
             Label #TalentDetailRequirements {
               Anchor: (Top: 260, Left: 0, Right: 0, Height: 42);
-              Text: "Requires Level 1";
+              Text: "Level 1";
               Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
             }
 

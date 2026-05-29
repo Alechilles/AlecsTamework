@@ -138,10 +138,23 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertTrue(content.contains("state"), "Tree nodes should carry display state.");
         assertTrue(content.contains("pointCost"), "Tree nodes should carry their point cost.");
         assertTrue(content.contains("requiredTalentIds"), "Tree nodes should carry prerequisite links.");
+        assertTrue(content.contains("requiredTalentNames"), "Tree nodes should carry prerequisite display names.");
         assertTrue(content.contains("effectSummary"), "Tree nodes should carry passive effect summaries.");
         assertTrue(content.contains("Purchased"), "Tree node states should include purchased talents.");
         assertTrue(content.contains("Locked"), "Tree node states should include locked talents.");
         assertTrue(content.contains("Available"), "Tree node states should include purchasable talents.");
+    }
+
+    @Test
+    void talentDetailsFormatRequirementsAsSeparateLines() throws IOException {
+        String content = Files.readString(TALENTS_PAGE, StandardCharsets.UTF_8);
+        int start = content.indexOf("private String resolveRequirementText");
+        int end = content.indexOf("private void bindNodeState", start);
+        String method = content.substring(start, end);
+
+        assertTrue(method.contains("\"Level \" + entry.minLevel()"), "Requirements should show level without extra prose.");
+        assertTrue(method.contains("entry.requiredTalentNames()"), "Requirements should use prerequisite display names.");
+        assertTrue(method.contains("String.join(\"\\n\", lines)"), "Requirements should render one line per requirement.");
     }
 
     @Test

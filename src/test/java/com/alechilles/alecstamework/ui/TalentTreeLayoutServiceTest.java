@@ -106,6 +106,7 @@ class TalentTreeLayoutServiceTest {
                 1,
                 1,
                 requirements,
+                requirements,
                 "Health x1.02",
                 TameworkCompanionTalentsPage.STATE_AVAILABLE.equals(state)
         );

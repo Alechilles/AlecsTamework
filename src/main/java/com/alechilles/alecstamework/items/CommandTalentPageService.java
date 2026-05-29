@@ -166,6 +166,7 @@ final class CommandTalentPageService {
                     Arrays.stream(talent.getRequiresTalentIds())
                             .filter(requiredId -> requiredId != null && !requiredId.isBlank())
                             .toList(),
+                    resolvePrerequisiteNames(talentConfig, talent),
                     summarizeEffects(talent.getEffects()),
                     canPurchase
             ));
@@ -212,7 +213,7 @@ final class CommandTalentPageService {
             }
             summaries.add(formatEffectKey(effect.getEffectKey()) + " " + formatMultiplierChange(effect.getMultiplier()));
         }
-        return summaries.isEmpty() ? "No passive effects" : String.join("; ", summaries);
+        return summaries.isEmpty() ? "No passive effects" : String.join("\n", summaries);
     }
 
     @Nonnull
@@ -240,6 +241,20 @@ final class CommandTalentPageService {
             return String.format(Locale.ROOT, "%.0f", roundedWhole);
         }
         return String.format(Locale.ROOT, "%.1f", percent);
+    }
+
+    @Nonnull
+    private List<String> resolvePrerequisiteNames(@Nonnull TwTalentConfig talentConfig,
+                                                  @Nonnull TwTalentConfig.TalentDefinition talent) {
+        ArrayList<String> names = new ArrayList<>();
+        for (String requiredTalentId : talent.getRequiresTalentIds()) {
+            if (requiredTalentId == null || requiredTalentId.isBlank()) {
+                continue;
+            }
+            TwTalentConfig.TalentDefinition prerequisite = talentConfig.findTalent(requiredTalentId);
+            names.add(prerequisite != null ? prerequisite.getDisplayName() : requiredTalentId.trim());
+        }
+        return names;
     }
 
     @Nonnull

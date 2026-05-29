@@ -28,7 +28,7 @@ class CommandTalentPageServiceEffectSummaryTest {
                 }
         );
 
-        assertEquals("Max Health +4%; Revive Cooldown -15%; Move Speed +3.5%", summary);
+        assertEquals("Max Health +4%\nRevive Cooldown -15%\nMove Speed +3.5%", summary);
     }
 
     private static TwTalentConfig.PassiveEffect effect(String effectKey, double multiplier) throws Exception {
