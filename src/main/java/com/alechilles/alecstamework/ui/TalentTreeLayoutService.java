@@ -358,7 +358,7 @@ final class TalentTreeLayoutService {
         int childX = child.centerX();
         int startY = parent.bottomY();
         int endY = child.topY();
-        int midY = startY + Math.max(CONNECTOR_THICKNESS, (endY - startY) / 2);
+        int midY = resolveConnectorElbowY(startY, endY);
         Anchor startAnchor = buildLineAnchor(parentX, startY, parentX, midY);
         Anchor middleAnchor = buildLineAnchor(parentX, midY, childX, midY);
         Anchor endAnchor = buildLineAnchor(childX, midY, childX, endY);
@@ -376,6 +376,17 @@ final class TalentTreeLayoutService {
                 hasMiddle,
                 endAnchor != null
         );
+    }
+
+    private static int resolveConnectorElbowY(int startY, int endY) {
+        int verticalGap = endY - startY;
+        if (verticalGap <= CONNECTOR_THICKNESS) {
+            return startY + CONNECTOR_THICKNESS;
+        }
+        if (verticalGap > ROW_GAP) {
+            return startY + Math.max(CONNECTOR_THICKNESS, ROW_GAP / 2);
+        }
+        return startY + Math.max(CONNECTOR_THICKNESS, verticalGap / 2);
     }
 
     static int resolveViewportWidth(int branchCount) {

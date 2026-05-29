@@ -1,7 +1,10 @@
 package com.alechilles.alecstamework.ui;
 
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -65,6 +68,28 @@ class TalentTreeLayoutServiceTest {
                 2
         );
         assertTrue(canvas.width() > TalentTreeLayoutService.resolveContentWidth(1));
+    }
+
+    @Test
+    void longBranchConnectorRunsAboveInterveningSiblingNodes() {
+        List<TameworkCompanionTalentsPage.TreeNodeEntry> entries = List.of(
+                entry("gentle_disposition", "Breeding", 1, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of()),
+                entry("patient_courtship", "Breeding", 2, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of("gentle_disposition")),
+                entry("strong_lineage", "Breeding", 3, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of("patient_courtship")),
+                entry("pattern_spark", "Breeding", 4, TameworkCompanionTalentsPage.STATE_LOCKED, List.of("strong_lineage")),
+                entry("strange_spark", "Breeding", 4, TameworkCompanionTalentsPage.STATE_LOCKED, List.of("strong_lineage")),
+                entry("stable_line", "Breeding", 5, TameworkCompanionTalentsPage.STATE_LOCKED, List.of("strong_lineage"))
+        );
+
+        TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(entries, null);
+        TalentTreeViewModel.NodeSlot patternSpark = node(canvas, "pattern_spark");
+        TalentTreeViewModel.NodeSlot strangeSpark = node(canvas, "strange_spark");
+        TalentTreeViewModel.ConnectorSlot stableConnector = connectorTo(canvas, "stable_line");
+
+        int horizontalTop = anchorValue(stableConnector.middleAnchor(), "top");
+        int horizontalBottom = horizontalTop + anchorValue(stableConnector.middleAnchor(), "height");
+        assertTrue(horizontalBottom <= patternSpark.topY(), "Stable line branch should run above Pattern Spark.");
+        assertTrue(horizontalBottom <= strangeSpark.topY(), "Stable line branch should run above Strange Spark.");
     }
 
     @Test
@@ -146,6 +171,28 @@ class TalentTreeLayoutServiceTest {
                 .filter(slot -> slot.entry().id().equals(id))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static TalentTreeViewModel.ConnectorSlot connectorTo(TalentTreeViewModel.TreeCanvas canvas, String childId) {
+        TalentTreeViewModel.NodeSlot child = node(canvas, childId);
+        return canvas.connectors().stream()
+                .filter(slot -> anchorValue(slot.endAnchor(), "left") <= child.centerX()
+                        && anchorValue(slot.endAnchor(), "left") + anchorValue(slot.endAnchor(), "width") >= child.centerX()
+                        && anchorValue(slot.endAnchor(), "top") + anchorValue(slot.endAnchor(), "height") == child.topY())
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static int anchorValue(Anchor anchor, String fieldName) {
+        try {
+            Field field = Anchor.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            Value<Integer> value = (Value<Integer>) field.get(anchor);
+            return value == null ? 0 : value.getValue();
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError("Unable to read anchor " + fieldName, exception);
+        }
     }
 
     private static TameworkCompanionTalentsPage.TreeNodeEntry entry(String id,
