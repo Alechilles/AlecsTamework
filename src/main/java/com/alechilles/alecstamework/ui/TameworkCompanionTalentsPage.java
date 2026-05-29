@@ -33,10 +33,12 @@ public final class TameworkCompanionTalentsPage
     private static final String ACTION_BACK = "Back";
     private static final String ACTION_PREV = "Prev";
     private static final String ACTION_NEXT = "Next";
+    private static final String ACTION_RESET = "Reset";
     private static final String ACTION_BUY_PREFIX = "Buy:";
 
     private final Supplier<PageData> dataSupplier;
     private final Function<String, String> purchaseCallback;
+    private final Supplier<String> resetCallback;
     private final Runnable backCallback;
     private boolean navigationPending;
     private boolean handled;
@@ -46,10 +48,12 @@ public final class TameworkCompanionTalentsPage
     public TameworkCompanionTalentsPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull Supplier<PageData> dataSupplier,
                                         @Nonnull Function<String, String> purchaseCallback,
+                                        @Nonnull Supplier<String> resetCallback,
                                         @Nonnull Runnable backCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
         this.dataSupplier = dataSupplier;
         this.purchaseCallback = purchaseCallback;
+        this.resetCallback = resetCallback;
         this.backCallback = backCallback;
         this.navigationPending = false;
         this.handled = false;
@@ -89,6 +93,11 @@ public final class TameworkCompanionTalentsPage
             handled = true;
             navigationPending = true;
             navigateBackOnWorldThread();
+            return;
+        }
+        if (ACTION_RESET.equalsIgnoreCase(data.action) && resetCallback != null) {
+            statusMessage = resetCallback.get();
+            sendRefreshUpdate();
             return;
         }
         PageData currentData = getPageData();
@@ -184,6 +193,7 @@ public final class TameworkCompanionTalentsPage
                 "#TameworkCompanionTalentsNextButton.Visible",
                 totalPages > 1 && (clampedPageIndex + 1) < totalPages
         );
+        commandBuilder.set("#TameworkCompanionTalentsResetButton.Visible", data.canReset());
 
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
@@ -191,6 +201,14 @@ public final class TameworkCompanionTalentsPage
                 EventData.of(KEY_ACTION, ACTION_BACK),
                 false
         );
+        if (data.canReset()) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    "#TameworkCompanionTalentsResetButton",
+                    EventData.of(KEY_ACTION, ACTION_RESET),
+                    false
+            );
+        }
         if (totalPages > 1 && clampedPageIndex > 0) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -259,6 +277,7 @@ public final class TameworkCompanionTalentsPage
                            @Nonnull String levelSummary,
                            @Nonnull String pointsSummary,
                            @Nonnull String statusText,
+                           boolean canReset,
                            @Nonnull List<TalentEntry> entries) {
         public PageData {
             entries = List.copyOf(entries);
@@ -270,6 +289,7 @@ public final class TameworkCompanionTalentsPage
                     "Companion unavailable",
                     "Talent Points: 0 available",
                     "No companion data is available.",
+                    false,
                     List.of()
             );
         }

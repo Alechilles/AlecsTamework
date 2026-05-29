@@ -108,6 +108,36 @@ public final class CompanionTalentService {
         return PurchaseResult.applied(component, resolveAvailablePoints(npcRef, store));
     }
 
+    @Nonnull
+    public static ResetResult resetTalents(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return ResetResult.invalid("Companion is not available.");
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return ResetResult.invalid("Companion talents are disabled in Tamework settings.");
+        }
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        if (type == null) {
+            return ResetResult.invalid("Talent storage is unavailable.");
+        }
+        TameworkTalentsComponent existing = store.getComponent(npcRef, type);
+        if (existing == null || (existing.getSpentPoints() <= 0 && existing.getPurchasedTalentIds().length == 0)) {
+            return ResetResult.invalid("No talent points are spent.");
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        TwTalentConfig config = resolveConfig(existing, roleId);
+        TameworkTalentsComponent component = existing.clone();
+        if (config != null) {
+            component.setConfigId(config.getId());
+        }
+        component.setSpentPoints(0);
+        component.setPurchasedTalentIds(new String[0]);
+        store.putComponent(npcRef, type, component);
+        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
+        return ResetResult.applied(component, resolveAvailablePoints(npcRef, store));
+    }
+
     public static double resolvePurchasedEffectMultiplier(@Nullable Ref<EntityStore> npcRef,
                                                           @Nullable Store<EntityStore> store,
                                                           @Nullable String effectKey,
@@ -196,6 +226,19 @@ public final class CompanionTalentService {
 
         static PurchaseResult invalid(@Nonnull String message) {
             return new PurchaseResult(false, message, null, 0);
+        }
+    }
+
+    public record ResetResult(boolean applied,
+                              @Nonnull String message,
+                              @Nullable TameworkTalentsComponent component,
+                              int availablePoints) {
+        static ResetResult applied(@Nonnull TameworkTalentsComponent component, int availablePoints) {
+            return new ResetResult(true, "Talent points refunded.", component, availablePoints);
+        }
+
+        static ResetResult invalid(@Nonnull String message) {
+            return new ResetResult(false, message, null, 0);
         }
     }
 }

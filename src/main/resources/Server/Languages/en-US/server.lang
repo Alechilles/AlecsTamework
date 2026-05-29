@@ -230,6 +230,7 @@ tamework.ui.talents.button.back=Back
 tamework.ui.talents.button.prev=Prev
 tamework.ui.talents.button.next=Next
 tamework.ui.talents.button.unlock=Unlock
+tamework.ui.talents.button.reset=Reset Points
 tamework.ui.linkedPanel.groupAssign.none=None
 tamework.ui.linkedPanel.groupAssign.noneGroups=No groups
 tamework.ui.linkedPanel.groupAssign.prompt=Choose a group.

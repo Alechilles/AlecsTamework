@@ -98,6 +98,7 @@ Breeding depends on more than one family:
 The linked panel can surface:
 - level progress and unspent talent points
 - talent tree access when the current companion is loaded
+- a talent reset action for loaded companions that have spent points
 - happiness and needs state
 - breeding cooldown or readiness
 - traits and life-stage data

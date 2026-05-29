@@ -90,4 +90,41 @@ class TameworkCompanionTalentsPageNavigationTest {
                 "Talent page refreshes should stop once the page is closing or navigating away."
         );
     }
+
+    @Test
+    void resetActionRefreshesTalentPageWithoutNavigatingAway() throws IOException {
+        String content = Files.readString(TALENTS_PAGE, StandardCharsets.UTF_8);
+        int branchStart = content.indexOf("ACTION_RESET.equalsIgnoreCase(data.action)");
+        int branchEnd = content.indexOf("PageData currentData = getPageData()", branchStart);
+        int bindStart = content.indexOf("commandBuilder.set(\"#TameworkCompanionTalentsResetButton.Visible\"");
+        int bindEnd = content.indexOf("if (totalPages > 1 && clampedPageIndex > 0)", bindStart);
+
+        assertTrue(branchStart >= 0, "Talent reset branch should exist.");
+        assertTrue(branchEnd > branchStart, "Talent reset branch should run before page navigation actions.");
+        assertTrue(bindStart >= 0, "Talent reset button visibility should be bound.");
+        assertTrue(bindEnd > bindStart, "Talent reset button binding should be bounded by page controls.");
+
+        String branch = content.substring(branchStart, branchEnd);
+        String binding = content.substring(bindStart, bindEnd);
+        assertTrue(
+                branch.contains("resetCallback.get()"),
+                "Reset action should run the reset callback."
+        );
+        assertTrue(
+                branch.contains("sendRefreshUpdate()"),
+                "Reset action should refresh the current talents page after refunding points."
+        );
+        assertFalse(
+                branch.contains("navigateBackOnWorldThread()"),
+                "Reset action should not navigate back to the linked panel."
+        );
+        assertTrue(
+                binding.contains("data.canReset()"),
+                "Reset button should only be visible and bound when the current companion has spent talents."
+        );
+        assertTrue(
+                binding.contains("EventData.of(KEY_ACTION, ACTION_RESET)"),
+                "Reset button should emit the reset action payload."
+        );
+    }
 }

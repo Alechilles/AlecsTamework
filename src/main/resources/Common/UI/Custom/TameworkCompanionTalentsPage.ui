@@ -46,6 +46,17 @@ $C.@PageOverlay {
           Anchor: (Width: 12);
         }
 
+        $C.@SmallSecondaryTextButton #TameworkCompanionTalentsResetButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = %server.tamework.ui.talents.button.reset;
+          @Anchor = (MinWidth: 132);
+          Visible: false;
+        }
+
+        Group {
+          Anchor: (Width: 12);
+        }
+
         $C.@SmallSecondaryTextButton #TameworkCompanionTalentsPrevButton {
           @Sounds = $C.@ButtonSounds;
           @Text = %server.tamework.ui.talents.button.prev;

@@ -46,6 +46,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 ## Runtime Notes
 - Talents are passive-only in the current implementation
 - Talent spending is only available while the companion is loaded
+- Spent talent points can be reset from the in-game talents page, which clears purchased nodes and makes the earned points available to spend again
 - Available points come from the active `TwLevelingConfig`
 
 ## Related Pages
