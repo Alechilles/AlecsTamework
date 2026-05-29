@@ -210,7 +210,7 @@ final class CommandTalentPageService {
             if (effect == null || effect.getEffectKey() == null) {
                 continue;
             }
-            summaries.add(formatEffectKey(effect.getEffectKey()) + " x" + formatMultiplier(effect.getMultiplier()));
+            summaries.add(formatEffectKey(effect.getEffectKey()) + " " + formatMultiplierChange(effect.getMultiplier()));
         }
         return summaries.isEmpty() ? "No passive effects" : String.join("; ", summaries);
     }
@@ -225,8 +225,21 @@ final class CommandTalentPageService {
     }
 
     @Nonnull
-    private String formatMultiplier(double multiplier) {
-        return String.format(Locale.ROOT, "%.2f", multiplier);
+    private String formatMultiplierChange(double multiplier) {
+        double percent = (multiplier - 1.0) * 100.0;
+        if (Math.abs(percent) < 0.05) {
+            return "+0%";
+        }
+        return (percent > 0.0 ? "+" : "-") + formatPercentMagnitude(Math.abs(percent)) + "%";
+    }
+
+    @Nonnull
+    private String formatPercentMagnitude(double percent) {
+        double roundedWhole = Math.rint(percent);
+        if (Math.abs(percent - roundedWhole) < 0.05) {
+            return String.format(Locale.ROOT, "%.0f", roundedWhole);
+        }
+        return String.format(Locale.ROOT, "%.1f", percent);
     }
 
     @Nonnull
