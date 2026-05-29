@@ -1,0 +1,12 @@
+$C = "Common.ui";
+
+Group {
+  Anchor: (Width: 146, Height: 22);
+  Background: #101f32(0.92);
+
+  Label #TalentBranchName {
+    Anchor: (Top: 0, Left: 6, Right: 6, Bottom: 0);
+    Text: "Branch";
+    Style: (FontSize: 12, RenderBold: true, TextColor: #cfe4ff, HorizontalAlignment: Center, VerticalAlignment: Center);
+  }
+}

@@ -43,6 +43,8 @@ Decide:
 
 Tamework ships `Server/Tamework/Talents/TwTalentsExample.json` for the bundled example mobs. It is intentionally passive-only and demonstrates health, movement, combat, toughness, and harvest-bonus effect keys.
 
+The in-game talent page presents these nodes as a scrollable branch/tier tree. Keep node names compact, put long explanations in `Description`, and use `RequiresTalentIds[]` for every visible dependency line you expect players to follow.
+
 ### 3. Start with happiness
 Set the baseline first:
 - current default
@@ -97,7 +99,7 @@ Breeding depends on more than one family:
 ### Linked panel and UI
 The linked panel can surface:
 - level progress and unspent talent points
-- talent tree access when the current companion is loaded
+- talent tree access when the current companion is loaded, including a scrollable tree view with node state, prerequisites, effect summaries, and selected-node purchase details
 - a talent reset action for loaded companions that have spent points
 - happiness and needs state
 - breeding cooldown or readiness

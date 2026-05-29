@@ -17,8 +17,10 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -122,7 +124,7 @@ final class CommandTalentPageService {
         ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
         TameworkTalentsComponent talents = talentsType != null ? context.store().getComponent(context.npcRef(), talentsType) : null;
         boolean canReset = talents != null && (talents.getSpentPoints() > 0 || talents.getPurchasedTalentIds().length > 0);
-        ArrayList<TameworkCompanionTalentsPage.TalentEntry> entries = new ArrayList<>();
+        ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry> entries = new ArrayList<>();
         for (TwTalentConfig.TalentDefinition talent : talentConfig.getTalents()) {
             if (talent == null || talent.getId() == null) {
                 continue;
@@ -132,23 +134,39 @@ final class CommandTalentPageService {
             String missingPrerequisite = resolveMissingPrerequisiteName(talents, talentConfig, talent);
             boolean prerequisitesMet = missingPrerequisite == null;
             boolean canPurchase = !purchased && levelMet && prerequisitesMet && availablePoints >= talent.getPointCost();
+            String state;
             String status;
             if (purchased) {
+                state = TameworkCompanionTalentsPage.STATE_PURCHASED;
                 status = "Unlocked";
             } else if (!levelMet) {
+                state = TameworkCompanionTalentsPage.STATE_LOCKED;
                 status = "Requires Level " + talent.getMinLevel();
             } else if (!prerequisitesMet) {
+                state = TameworkCompanionTalentsPage.STATE_LOCKED;
                 status = "Requires " + missingPrerequisite;
             } else if (availablePoints < talent.getPointCost()) {
+                state = TameworkCompanionTalentsPage.STATE_UNAFFORDABLE;
                 status = "Costs " + talent.getPointCost() + " points";
             } else {
+                state = TameworkCompanionTalentsPage.STATE_AVAILABLE;
                 status = "Cost " + talent.getPointCost() + " points";
             }
-            entries.add(new TameworkCompanionTalentsPage.TalentEntry(
+            String branchName = talent.getBranch() != null ? talent.getBranch() : "General";
+            entries.add(new TameworkCompanionTalentsPage.TreeNodeEntry(
                     talent.getId(),
-                    "Tier " + talent.getTier() + " - " + talent.getDisplayName(),
+                    branchName,
+                    talent.getTier(),
+                    state,
+                    talent.getDisplayName(),
                     talent.getDescription() != null ? talent.getDescription() : "Passive talent",
-                    status,
+                    state + " - " + status,
+                    talent.getPointCost(),
+                    talent.getMinLevel(),
+                    Arrays.stream(talent.getRequiresTalentIds())
+                            .filter(requiredId -> requiredId != null && !requiredId.isBlank())
+                            .toList(),
+                    summarizeEffects(talent.getEffects()),
                     canPurchase
             ));
         }
@@ -162,6 +180,14 @@ final class CommandTalentPageService {
             if (right == null) {
                 return -1;
             }
+            int branch = normalizeBranch(left.branchName()).compareTo(normalizeBranch(right.branchName()));
+            if (branch != 0) {
+                return branch;
+            }
+            int tier = Integer.compare(left.tier(), right.tier());
+            if (tier != 0) {
+                return tier;
+            }
             return left.displayName().compareToIgnoreCase(right.displayName());
         });
         return new TameworkCompanionTalentsPage.PageData(
@@ -172,6 +198,40 @@ final class CommandTalentPageService {
                 canReset,
                 entries
         );
+    }
+
+    @Nonnull
+    private String summarizeEffects(@Nullable TwTalentConfig.PassiveEffect[] effects) {
+        if (effects == null || effects.length == 0) {
+            return "No passive effects";
+        }
+        ArrayList<String> summaries = new ArrayList<>();
+        for (TwTalentConfig.PassiveEffect effect : effects) {
+            if (effect == null || effect.getEffectKey() == null) {
+                continue;
+            }
+            summaries.add(formatEffectKey(effect.getEffectKey()) + " x" + formatMultiplier(effect.getMultiplier()));
+        }
+        return summaries.isEmpty() ? "No passive effects" : String.join("; ", summaries);
+    }
+
+    @Nonnull
+    private String formatEffectKey(@Nonnull String effectKey) {
+        String spaced = effectKey
+                .replace("Multiplier", "")
+                .replaceAll("([a-z])([A-Z])", "$1 $2")
+                .trim();
+        return spaced.isBlank() ? effectKey : spaced;
+    }
+
+    @Nonnull
+    private String formatMultiplier(double multiplier) {
+        return String.format(Locale.ROOT, "%.2f", multiplier);
+    }
+
+    @Nonnull
+    private String normalizeBranch(@Nullable String value) {
+        return value == null || value.isBlank() ? "general" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     @Nonnull
