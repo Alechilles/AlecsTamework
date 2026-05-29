@@ -91,8 +91,7 @@ public final class MountedOwnerReferenceSanitySystem extends RefSystem<EntitySto
         if (playerType == null) {
             return true;
         }
-        Player ownerPlayer = safeGetComponent(store, ownerRef, playerType);
-        return ownerPlayer != null && ownerPlayer.getMountEntityId() != 0;
+        return safeGetComponent(store, ownerRef, playerType) != null;
     }
 
     @Nullable

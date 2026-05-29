@@ -499,6 +499,33 @@ class TameworkRideArchitectureTest {
         assertTrue(riderCleanup.contains("TameworkRide debug: cleanup source=riderCleanup"));
     }
 
+    @Test
+    void mountOwnerSanityDoesNotClearOwnersBeforeVanillaMountOnAdd() throws IOException {
+        String ownerSanity = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "systems",
+                "MountedOwnerReferenceSanitySystem.java"
+        );
+        String teleportSafety = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "systems",
+                "MountedNpcTeleportSafetySystem.java"
+        );
+
+        assertFalse(ownerSanity.contains("getMountEntityId()"));
+        assertTrue(ownerSanity.contains("return safeGetComponent(store, ownerRef, playerType) != null;"));
+        assertTrue(teleportSafety.contains("if (ownerPlayer.getMountEntityId() == 0) {\n            return;\n        }")
+                || teleportSafety.contains("if (ownerPlayer.getMountEntityId() == 0) {\r\n            return;\r\n        }"));
+        assertTrue(teleportSafety.indexOf("if (ownerPlayer.getMountEntityId() == 0)")
+                < teleportSafety.indexOf("MountPlugin.checkDismountNpc(commandBuffer, ownerRef, ownerPlayer)"));
+    }
+
     private static String readMain(String first, String... more) throws IOException {
         return Files.readString(MAIN_JAVA.resolve(Paths.get(first, more)), StandardCharsets.UTF_8);
     }

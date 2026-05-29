@@ -17,6 +17,7 @@
 - Fixed companion XP awards so unlinked tamed or owned companions can gain XP and emit XP events; command links now only provide optional event tool-id context.
 - Fixed `/tw settings` progression toggles so disabling leveling or talents immediately reapplies loaded companion stat modifiers and removes stale max-health bonuses.
 - Fixed Tamework data directory discovery so startup and migrations stay anchored to the active server/userdata layout instead of drifting into unrelated temp `universe` folders.
+- Fixed compatibility with summoned mounts from other mods by preserving valid mount owner references until vanilla mount setup finishes.
 
 ## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27
 
