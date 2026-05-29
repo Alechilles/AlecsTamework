@@ -78,6 +78,13 @@ class TalentTreeLayoutServiceTest {
     }
 
     @Test
+    void talentNodeColumnsUseCompactBranchingTreeDimensions() {
+        assertEquals(117, TalentTreeLayoutService.NODE_WIDTH);
+        assertEquals(117, TalentTreeLayoutService.BRANCH_WIDTH);
+        assertEquals(20, TalentTreeLayoutService.BRANCH_GAP);
+    }
+
+    @Test
     void layoutCapsNodeAndConnectorSlots() {
         ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry> entries = new ArrayList<>();
         entries.add(entry("node0", "Care", 1, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of()));
@@ -114,8 +121,8 @@ class TalentTreeLayoutServiceTest {
         int fourColumnRoot = TalentTreeLayoutService.resolveRootWidth(4);
         int fiveColumnRoot = TalentTreeLayoutService.resolveRootWidth(5);
 
-        assertTrue(fourColumnViewport < TalentTreeLayoutService.VIEWPORT_WIDTH);
-        assertTrue(fiveColumnViewport > TalentTreeLayoutService.VIEWPORT_WIDTH);
+        assertTrue(fourColumnViewport <= TalentTreeLayoutService.VIEWPORT_WIDTH);
+        assertTrue(fourColumnViewport < fiveColumnViewport);
         assertTrue(fourColumnRoot < fiveColumnRoot);
         assertEquals(
                 TalentTreeLayoutService.resolveRootWidthForViewport(fiveColumnViewport),

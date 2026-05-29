@@ -38,6 +38,9 @@ public final class TameworkCompanionTalentsPage
     private static final String ACTION_RESET = "Reset";
     private static final String ACTION_SELECT_PREFIX = "Select:";
     private static final String ACTION_BUY_SELECTED = "BuySelected";
+    private static final String ACTION_PAN_LEFT = "PanLeft";
+    private static final String ACTION_PAN_RIGHT = "PanRight";
+    private static final int HORIZONTAL_PAN_STEP = 260;
     public static final String STATE_PURCHASED = "Purchased";
     public static final String STATE_LOCKED = "Locked";
     public static final String STATE_UNAFFORDABLE = "Unaffordable";
@@ -51,6 +54,7 @@ public final class TameworkCompanionTalentsPage
     private boolean handled;
     private String selectedTalentId;
     private String statusMessage;
+    private int horizontalOffset;
 
     public TameworkCompanionTalentsPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull Supplier<PageData> dataSupplier,
@@ -66,6 +70,7 @@ public final class TameworkCompanionTalentsPage
         this.handled = false;
         this.selectedTalentId = null;
         this.statusMessage = null;
+        this.horizontalOffset = 0;
     }
 
     @Override
@@ -104,6 +109,16 @@ public final class TameworkCompanionTalentsPage
         }
         if (ACTION_RESET.equalsIgnoreCase(data.action) && resetCallback != null) {
             statusMessage = resetCallback.get();
+            sendRefreshUpdate();
+            return;
+        }
+        if (ACTION_PAN_LEFT.equalsIgnoreCase(data.action)) {
+            horizontalOffset = Math.max(0, horizontalOffset - HORIZONTAL_PAN_STEP);
+            sendRefreshUpdate();
+            return;
+        }
+        if (ACTION_PAN_RIGHT.equalsIgnoreCase(data.action)) {
+            horizontalOffset += HORIZONTAL_PAN_STEP;
             sendRefreshUpdate();
             return;
         }
@@ -181,6 +196,10 @@ public final class TameworkCompanionTalentsPage
         selectedTalentId = canvas.selectedTalentId();
         TreeNodeEntry selectedEntry = data.findEntry(selectedTalentId);
         int viewportWidth = TalentTreeLayoutService.resolveViewportWidthForContent(canvas.width());
+        int maxHorizontalOffset = Math.max(canvas.width() - viewportWidth, 0);
+        horizontalOffset = Math.max(0, Math.min(horizontalOffset, maxHorizontalOffset));
+        boolean canPanLeft = horizontalOffset > 0;
+        boolean canPanRight = horizontalOffset < maxHorizontalOffset;
 
         commandBuilder.setObject(
                 "#TameworkCompanionTalentsRoot.Anchor",
@@ -197,9 +216,12 @@ public final class TameworkCompanionTalentsPage
                 statusMessage != null && !statusMessage.isBlank() ? statusMessage : data.statusText()
         );
         commandBuilder.set("#TameworkCompanionTalentsResetButton.Visible", data.canReset());
+        commandBuilder.set("#TalentTreePanControls.Visible", maxHorizontalOffset > 0);
+        commandBuilder.set("#TalentTreePanLeftButton.Visible", canPanLeft);
+        commandBuilder.set("#TalentTreePanRightButton.Visible", canPanRight);
         commandBuilder.setObject(
                 "#TalentTreeCanvas.Anchor",
-                TalentTreeLayoutService.buildAnchor(0, 0, Math.max(canvas.width(), viewportWidth), canvas.height())
+                TalentTreeLayoutService.buildAnchor(-horizontalOffset, 0, Math.max(canvas.width(), viewportWidth), canvas.height())
         );
         commandBuilder.setObject(
                 "#TalentTreeViewport.Anchor",
@@ -220,6 +242,22 @@ public final class TameworkCompanionTalentsPage
                     CustomUIEventBindingType.Activating,
                     "#TameworkCompanionTalentsResetButton",
                     EventData.of(KEY_ACTION, ACTION_RESET),
+                    false
+            );
+        }
+        if (canPanLeft) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    "#TalentTreePanLeftButton",
+                    EventData.of(KEY_ACTION, ACTION_PAN_LEFT),
+                    false
+            );
+        }
+        if (canPanRight) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    "#TalentTreePanRightButton",
+                    EventData.of(KEY_ACTION, ACTION_PAN_RIGHT),
                     false
             );
         }

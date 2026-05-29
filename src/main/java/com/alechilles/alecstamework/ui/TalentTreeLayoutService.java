@@ -30,10 +30,10 @@ final class TalentTreeLayoutService {
     static final int CANVAS_PADDING_TOP = 34;
     static final int CANVAS_PADDING_RIGHT = 24;
     static final int CANVAS_PADDING_BOTTOM = 28;
-    static final int BRANCH_WIDTH = 146;
-    static final int BRANCH_GAP = 26;
+    static final int BRANCH_WIDTH = 117;
+    static final int BRANCH_GAP = 20;
     static final int BRANCH_LABEL_HEIGHT = 22;
-    static final int NODE_WIDTH = 146;
+    static final int NODE_WIDTH = 117;
     static final int NODE_HEIGHT = 66;
     static final int ROW_GAP = 38;
     static final int CONNECTOR_THICKNESS = 3;
@@ -416,8 +416,8 @@ final class TalentTreeLayoutService {
     @Nonnull
     static Anchor buildAnchor(int left, int top, int width, int height) {
         Anchor anchor = new Anchor();
-        anchor.setLeft(Value.of(Math.max(0, left)));
-        anchor.setTop(Value.of(Math.max(0, top)));
+        anchor.setLeft(Value.of(left));
+        anchor.setTop(Value.of(top));
         anchor.setWidth(Value.of(Math.max(1, width)));
         anchor.setHeight(Value.of(Math.max(1, height)));
         return anchor;

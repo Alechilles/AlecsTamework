@@ -186,4 +186,21 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertFalse(page.contains("ACTION_NEXT"), "Talent tree UI should not use next-page actions.");
         assertFalse(ui.contains("TameworkCompanionTalentsPageIndicator"), "Talent tree UI should not show a page indicator.");
     }
+
+    @Test
+    void talentPageProvidesHorizontalPanControlsForWideTrees() throws IOException {
+        String page = Files.readString(TALENTS_PAGE, StandardCharsets.UTF_8);
+        String ui = Files.readString(
+                Path.of("src", "main", "resources", "Common", "UI", "Custom", "TameworkCompanionTalentsPage.ui"),
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(page.contains("ACTION_PAN_LEFT"), "Wide talent trees should expose a left pan action.");
+        assertTrue(page.contains("ACTION_PAN_RIGHT"), "Wide talent trees should expose a right pan action.");
+        assertTrue(page.contains("horizontalOffset"), "The talent page should preserve horizontal tree position.");
+        assertTrue(page.contains("Math.max(canvas.width() - viewportWidth, 0)"), "Pan bounds should use canvas overflow.");
+        assertTrue(page.contains("buildAnchor(-horizontalOffset"), "The canvas should shift horizontally when panned.");
+        assertTrue(ui.contains("#TalentTreePanLeftButton"), "Talent page should include a left pan button.");
+        assertTrue(ui.contains("#TalentTreePanRightButton"), "Talent page should include a right pan button.");
+    }
 }

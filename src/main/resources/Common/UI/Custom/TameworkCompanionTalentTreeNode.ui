@@ -4,7 +4,7 @@ $C = "Common.ui";
 @TalentNodeButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TalentNodeButtonLabelStyle), Hovered: (Background: (Color: #ffffff(0.08)), LabelStyle: @TalentNodeButtonLabelStyle), Pressed: (Background: (Color: #ffffff(0.14)), LabelStyle: @TalentNodeButtonLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TalentNodeButtonLabelStyle), Sounds: $C.@ButtonSounds);
 
 Group {
-  Anchor: (Width: 146, Height: 66);
+  Anchor: (Width: 117, Height: 66);
   Background: #182433(0.96);
 
   Group #TalentNodeLockedBackground {
@@ -38,19 +38,19 @@ Group {
   }
 
   Label #TalentNodeName {
-    Anchor: (Top: 6, Left: 8, Right: 8, Height: 34);
+    Anchor: (Top: 6, Left: 6, Right: 6, Height: 34);
     Text: "Talent";
-    Style: (FontSize: 12, RenderBold: true, TextColor: #f0f6ff, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
+    Style: (FontSize: 11, RenderBold: true, TextColor: #f0f6ff, HorizontalAlignment: Center, VerticalAlignment: Center, Wrap: true);
   }
 
   Label #TalentNodeCost {
-    Anchor: (Bottom: 6, Left: 8, Width: 44, Height: 16);
+    Anchor: (Bottom: 6, Left: 6, Width: 34, Height: 16);
     Text: "1 pt";
     Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
   }
 
   Label #TalentNodeState {
-    Anchor: (Bottom: 6, Right: 8, Width: 82, Height: 16);
+    Anchor: (Bottom: 6, Right: 6, Width: 62, Height: 16);
     Text: "Locked";
     Style: (FontSize: 10, TextColor: #d8e8f7, HorizontalAlignment: End, VerticalAlignment: Center);
   }

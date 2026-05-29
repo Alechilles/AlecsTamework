@@ -87,6 +87,30 @@ $C.@PageOverlay {
           }
         }
 
+        Group #TalentTreePanControls {
+          Anchor: (Top: 522, Left: 10, Width: 92, Height: 30);
+          LayoutMode: Left;
+          Visible: false;
+
+          $C.@SmallSecondaryTextButton #TalentTreePanLeftButton {
+            @Sounds = $C.@ButtonSounds;
+            @Text = "<";
+            @Anchor = (Width: 40, Height: 28);
+            Visible: false;
+          }
+
+          Group {
+            Anchor: (Width: 8);
+          }
+
+          $C.@SmallSecondaryTextButton #TalentTreePanRightButton {
+            @Sounds = $C.@ButtonSounds;
+            @Text = ">";
+            @Anchor = (Width: 40, Height: 28);
+            Visible: false;
+          }
+        }
+
         Group #TalentDetailPanel {
           Anchor: (Top: 0, Right: 0, Width: 260, Height: 560);
           Background: #0a121b(0.96);
