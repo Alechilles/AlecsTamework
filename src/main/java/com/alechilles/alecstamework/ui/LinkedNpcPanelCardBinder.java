@@ -138,6 +138,11 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor());
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         bindXpProgressRing(commandBuilder, xpProgressRingSelector, xpLevelTextSelector, xpTooltipSelector, entry.futureStatA());
+        boolean canOpenTalentsFromLevelIndicator =
+                entry.isTalentsActionVisible()
+                        && entry.isTalentsActionEnabled()
+                        && entry.futureStatA() != null
+                        && !pendingUnlink;
         boolean showTalentPointAction =
                 entry.isTalentsActionVisible()
                         && entry.isTalentsActionEnabled()
@@ -270,6 +275,14 @@ final class LinkedNpcPanelCardBinder {
                     CustomUIEventBindingType.Activating,
                     cullSelector,
                     EventData.of(config.eventCommandId(), config.cullCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (canOpenTalentsFromLevelIndicator) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    xpTooltipSelector,
+                    EventData.of(config.eventCommandId(), config.openTalentsCommandPrefix() + entry.npcUuid()),
                     false
             );
         }

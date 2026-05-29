@@ -132,6 +132,30 @@ class LinkedNpcPanelCardLayoutTest {
         );
     }
 
+    @Test
+    void levelIndicatorCanOpenTalentsWithoutSpendableTalentPoints() throws IOException {
+        String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
+        int levelActionStart = binder.indexOf("boolean canOpenTalentsFromLevelIndicator");
+        int talentPointActionStart = binder.indexOf("boolean showTalentPointAction");
+        int bindingStart = binder.indexOf("if (canOpenTalentsFromLevelIndicator)");
+        int talentPointBindingStart = binder.indexOf("if (showTalentPointAction)");
+
+        assertTrue(levelActionStart >= 0, "Linked card binder should define level-indicator talent access.");
+        assertTrue(talentPointActionStart > levelActionStart, "Level-indicator talent access should be independent from the spendable-point badge.");
+        assertTrue(bindingStart >= 0, "Linked card binder should bind the level indicator as an action.");
+        assertTrue(talentPointBindingStart > bindingStart, "Level-indicator action should not be nested under the spendable-point action.");
+
+        String conditionBlock = binder.substring(levelActionStart, talentPointActionStart);
+        String bindingBlock = binder.substring(bindingStart, talentPointBindingStart);
+        assertTrue(conditionBlock.contains("entry.isTalentsActionVisible()"), "Level-indicator action should respect talent visibility.");
+        assertTrue(conditionBlock.contains("entry.isTalentsActionEnabled()"), "Level-indicator action should respect talent enablement.");
+        assertTrue(conditionBlock.contains("entry.futureStatA() != null"), "Level-indicator action should only bind when the level indicator exists.");
+        assertTrue(conditionBlock.contains("!pendingUnlink"), "Level-indicator action should not fire during unlink confirmation.");
+        assertFalse(conditionBlock.contains("availableTalentPoints"), "Level-indicator talent access must not require spendable points.");
+        assertTrue(bindingBlock.contains("xpTooltipSelector"), "Level-indicator action should use the existing XP tooltip click target.");
+        assertTrue(bindingBlock.contains("config.openTalentsCommandPrefix() + entry.npcUuid()"), "Level-indicator action should open the same talent page.");
+    }
+
     private static List<String> findUnquotedStringTextDefaults(String cardUi) {
         List<String> matches = new ArrayList<>();
         String[] lines = cardUi.split("\\R");
