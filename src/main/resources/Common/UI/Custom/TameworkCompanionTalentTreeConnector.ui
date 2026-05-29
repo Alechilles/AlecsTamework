@@ -5,19 +5,19 @@ Group {
 
   Group #TalentConnectorStart {
     Anchor: (Top: 0, Left: 0, Width: 3, Height: 3);
-    Background: #405263(0.65);
+    Background: #76add8(0.72);
     Visible: false;
   }
 
   Group #TalentConnectorMiddle {
     Anchor: (Top: 0, Left: 0, Width: 3, Height: 3);
-    Background: #405263(0.65);
+    Background: #76add8(0.72);
     Visible: false;
   }
 
   Group #TalentConnectorEnd {
     Anchor: (Top: 0, Left: 0, Width: 3, Height: 3);
-    Background: #405263(0.65);
+    Background: #76add8(0.72);
     Visible: false;
   }
 }

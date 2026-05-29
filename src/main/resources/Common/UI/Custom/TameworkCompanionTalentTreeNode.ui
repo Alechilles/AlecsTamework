@@ -7,6 +7,30 @@ Group {
   Anchor: (Width: 146, Height: 66);
   Background: #182433(0.96);
 
+  Group #TalentNodeLockedBackground {
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: #182433(0.96);
+    Visible: true;
+  }
+
+  Group #TalentNodeUnaffordableBackground {
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: #3a344a(0.98);
+    Visible: false;
+  }
+
+  Group #TalentNodeAvailableBackground {
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: #204c73(0.98);
+    Visible: false;
+  }
+
+  Group #TalentNodePurchasedBackground {
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: #1f573c(0.98);
+    Visible: false;
+  }
+
   Group #TalentNodeSelected {
     Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
     Background: #ffffff(0.12);

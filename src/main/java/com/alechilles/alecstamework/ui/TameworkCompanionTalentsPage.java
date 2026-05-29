@@ -243,7 +243,7 @@ public final class TameworkCompanionTalentsPage
             String selector = "#TalentNodeLayer[" + node.slotIndex() + "]";
             TreeNodeEntry entry = node.entry();
             commandBuilder.setObject(selector + ".Anchor", node.anchor());
-            commandBuilder.set(selector + ".Background", resolveNodeBackground(entry.state(), node.selected()));
+            bindNodeState(commandBuilder, selector, entry.state());
             commandBuilder.set(selector + " #TalentNodeSelected.Visible", node.selected());
             commandBuilder.set(selector + " #TalentNodeName.Text", entry.displayName());
             commandBuilder.set(selector + " #TalentNodeCost.Text", entry.pointCost() + " pt");
@@ -262,20 +262,17 @@ public final class TameworkCompanionTalentsPage
         for (TalentTreeViewModel.ConnectorSlot connector : connectorSlots) {
             commandBuilder.append("#TalentConnectorLayer", CONNECTOR_SLOT_UI_PATH);
             String selector = "#TalentConnectorLayer[" + connector.slotIndex() + "]";
-            String color = resolveConnectorColor(connector.state());
-            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorStart", connector.startAnchor(), connector.startVisible(), color);
-            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorMiddle", connector.middleAnchor(), connector.middleVisible(), color);
-            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorEnd", connector.endAnchor(), connector.endVisible(), color);
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorStart", connector.startAnchor(), connector.startVisible());
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorMiddle", connector.middleAnchor(), connector.middleVisible());
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorEnd", connector.endAnchor(), connector.endVisible());
         }
     }
 
     private void bindConnectorSegment(@Nonnull UICommandBuilder commandBuilder,
                                       @Nonnull String selector,
                                       @Nonnull Anchor anchor,
-                                      boolean visible,
-                                      @Nonnull String color) {
+                                      boolean visible) {
         commandBuilder.set(selector + ".Visible", visible);
-        commandBuilder.set(selector + ".Background", color);
         commandBuilder.setObject(selector + ".Anchor", anchor);
     }
 
@@ -314,27 +311,13 @@ public final class TameworkCompanionTalentsPage
         return level + " and " + entry.requiredTalentIds().size() + " prerequisite";
     }
 
-    @Nonnull
-    private String resolveNodeBackground(@Nonnull String state, boolean selected) {
-        if (selected) {
-            return "#285b82(0.98)";
-        }
-        return switch (state) {
-            case STATE_PURCHASED -> "#1f573c(0.98)";
-            case STATE_AVAILABLE -> "#204c73(0.98)";
-            case STATE_UNAFFORDABLE -> "#3a344a(0.98)";
-            default -> "#182433(0.96)";
-        };
-    }
-
-    @Nonnull
-    private String resolveConnectorColor(@Nonnull String state) {
-        return switch (state) {
-            case STATE_PURCHASED -> "#66d08a(0.92)";
-            case STATE_AVAILABLE -> "#76add8(0.88)";
-            case STATE_UNAFFORDABLE -> "#8f83aa(0.75)";
-            default -> "#405263(0.65)";
-        };
+    private void bindNodeState(@Nonnull UICommandBuilder commandBuilder,
+                               @Nonnull String selector,
+                               @Nonnull String state) {
+        commandBuilder.set(selector + " #TalentNodeLockedBackground.Visible", STATE_LOCKED.equals(state));
+        commandBuilder.set(selector + " #TalentNodeUnaffordableBackground.Visible", STATE_UNAFFORDABLE.equals(state));
+        commandBuilder.set(selector + " #TalentNodeAvailableBackground.Visible", STATE_AVAILABLE.equals(state));
+        commandBuilder.set(selector + " #TalentNodePurchasedBackground.Visible", STATE_PURCHASED.equals(state));
     }
 
     /** Immutable page view model. */

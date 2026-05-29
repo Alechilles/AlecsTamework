@@ -158,6 +158,10 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertTrue(page.contains("commandBuilder.clear(\"#TalentNodeLayer\")"), "Tree refresh should rebuild dynamic nodes.");
         assertTrue(page.contains("ACTION_SELECT_PREFIX"), "Node clicks should select a talent.");
         assertTrue(page.contains("ACTION_BUY_SELECTED"), "The detail pane should buy the selected talent.");
+        assertFalse(
+                page.contains(".Background\", resolve"),
+                "Talent tree nodes and connectors should not set runtime string backgrounds that can resolve as missing textures."
+        );
         assertFalse(page.contains("ACTION_PREV"), "Talent tree UI should not use previous-page actions.");
         assertFalse(page.contains("ACTION_NEXT"), "Talent tree UI should not use next-page actions.");
         assertFalse(ui.contains("TameworkCompanionTalentsPageIndicator"), "Talent tree UI should not show a page indicator.");
