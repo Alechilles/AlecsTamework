@@ -158,6 +158,13 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertTrue(page.contains("commandBuilder.clear(\"#TalentNodeLayer\")"), "Tree refresh should rebuild dynamic nodes.");
         assertTrue(page.contains("ACTION_SELECT_PREFIX"), "Node clicks should select a talent.");
         assertTrue(page.contains("ACTION_BUY_SELECTED"), "The detail pane should buy the selected talent.");
+        assertTrue(
+                page.contains("#TameworkCompanionTalentsRoot.Anchor")
+                        && page.contains("resolveRootWidth(branchCount)")
+                        && page.contains("#TalentTreeViewport.Anchor")
+                        && page.contains("resolveViewportWidth(branchCount)"),
+                "Talent tree root and viewport widths should scale with the number of branch columns."
+        );
         assertFalse(
                 page.contains(".Background\", resolve"),
                 "Talent tree nodes and connectors should not set runtime string backgrounds that can resolve as missing textures."

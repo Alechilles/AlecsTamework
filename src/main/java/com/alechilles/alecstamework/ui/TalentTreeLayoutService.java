@@ -18,6 +18,12 @@ import javax.annotation.Nullable;
 final class TalentTreeLayoutService {
     static final int VIEWPORT_WIDTH = 820;
     static final int VIEWPORT_HEIGHT = 560;
+    static final int ROOT_HEIGHT = 720;
+    static final int MIN_VIEWPORT_WIDTH = 704;
+    static final int MAX_VIEWPORT_WIDTH = 920;
+    static final int DETAIL_PANEL_WIDTH = 260;
+    static final int TREE_DETAIL_GAP = 14;
+    static final int ROOT_EXTRA_WIDTH = 40;
     static final int CANVAS_PADDING_LEFT = 24;
     static final int CANVAS_PADDING_TOP = 34;
     static final int CANVAS_PADDING_RIGHT = 24;
@@ -42,7 +48,7 @@ final class TalentTreeLayoutService {
                 .toList();
         if (safeEntries.isEmpty()) {
             return new TalentTreeViewModel.TreeCanvas(
-                    VIEWPORT_WIDTH,
+                    resolveViewportWidth(0),
                     VIEWPORT_HEIGHT,
                     null,
                     List.of(),
@@ -82,13 +88,7 @@ final class TalentTreeLayoutService {
         }
 
         ArrayList<TalentTreeViewModel.ConnectorSlot> connectors = buildConnectors(nodeSlots, slotsByTalentId);
-        int canvasWidth = Math.max(
-                VIEWPORT_WIDTH,
-                CANVAS_PADDING_LEFT
-                        + Math.max(1, branchColumns.size()) * BRANCH_WIDTH
-                        + Math.max(0, branchColumns.size() - 1) * BRANCH_GAP
-                        + CANVAS_PADDING_RIGHT
-        );
+        int canvasWidth = resolveContentWidth(branchColumns.size());
         int canvasHeight = Math.max(
                 VIEWPORT_HEIGHT,
                 CANVAS_PADDING_TOP
@@ -218,11 +218,39 @@ final class TalentTreeLayoutService {
         );
     }
 
+    static int resolveViewportWidth(int branchCount) {
+        int width = resolveContentWidth(branchCount) + 16;
+        return Math.max(MIN_VIEWPORT_WIDTH, Math.min(MAX_VIEWPORT_WIDTH, width));
+    }
+
+    static int resolveRootWidth(int branchCount) {
+        return resolveViewportWidth(branchCount)
+                + DETAIL_PANEL_WIDTH
+                + TREE_DETAIL_GAP
+                + ROOT_EXTRA_WIDTH;
+    }
+
+    static int resolveContentWidth(int branchCount) {
+        int columns = Math.max(1, branchCount);
+        return CANVAS_PADDING_LEFT
+                + columns * BRANCH_WIDTH
+                + Math.max(0, columns - 1) * BRANCH_GAP
+                + CANVAS_PADDING_RIGHT;
+    }
+
     @Nonnull
     static Anchor buildAnchor(int left, int top, int width, int height) {
         Anchor anchor = new Anchor();
         anchor.setLeft(Value.of(Math.max(0, left)));
         anchor.setTop(Value.of(Math.max(0, top)));
+        anchor.setWidth(Value.of(Math.max(1, width)));
+        anchor.setHeight(Value.of(Math.max(1, height)));
+        return anchor;
+    }
+
+    @Nonnull
+    static Anchor buildSizeAnchor(int width, int height) {
+        Anchor anchor = new Anchor();
         anchor.setWidth(Value.of(Math.max(1, width)));
         anchor.setHeight(Value.of(Math.max(1, height)));
         return anchor;

@@ -65,10 +65,29 @@ class TalentTreeLayoutServiceTest {
     void emptyLayoutReturnsBlankCanvas() {
         TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(List.of(), null);
 
-        assertEquals(TalentTreeLayoutService.VIEWPORT_WIDTH, canvas.width());
+        assertEquals(TalentTreeLayoutService.resolveViewportWidth(0), canvas.width());
         assertEquals(TalentTreeLayoutService.VIEWPORT_HEIGHT, canvas.height());
         assertTrue(canvas.nodes().isEmpty());
         assertTrue(canvas.branches().isEmpty());
+    }
+
+    @Test
+    void viewportAndRootWidthsScaleWithBranchCount() {
+        int fourColumnViewport = TalentTreeLayoutService.resolveViewportWidth(4);
+        int fiveColumnViewport = TalentTreeLayoutService.resolveViewportWidth(5);
+        int fourColumnRoot = TalentTreeLayoutService.resolveRootWidth(4);
+        int fiveColumnRoot = TalentTreeLayoutService.resolveRootWidth(5);
+
+        assertTrue(fourColumnViewport < TalentTreeLayoutService.VIEWPORT_WIDTH);
+        assertTrue(fiveColumnViewport > TalentTreeLayoutService.VIEWPORT_WIDTH);
+        assertTrue(fourColumnRoot < fiveColumnRoot);
+        assertEquals(
+                fiveColumnViewport
+                        + TalentTreeLayoutService.DETAIL_PANEL_WIDTH
+                        + TalentTreeLayoutService.TREE_DETAIL_GAP
+                        + TalentTreeLayoutService.ROOT_EXTRA_WIDTH,
+                fiveColumnRoot
+        );
     }
 
     private static TameworkCompanionTalentsPage.TreeNodeEntry entry(String id,

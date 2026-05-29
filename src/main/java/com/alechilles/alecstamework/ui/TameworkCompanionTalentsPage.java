@@ -179,7 +179,16 @@ public final class TameworkCompanionTalentsPage
         TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(data.entries(), selectedTalentId);
         selectedTalentId = canvas.selectedTalentId();
         TreeNodeEntry selectedEntry = data.findEntry(selectedTalentId);
+        int branchCount = canvas.branches().size();
+        int viewportWidth = TalentTreeLayoutService.resolveViewportWidth(branchCount);
 
+        commandBuilder.setObject(
+                "#TameworkCompanionTalentsRoot.Anchor",
+                TalentTreeLayoutService.buildSizeAnchor(
+                        TalentTreeLayoutService.resolveRootWidth(branchCount),
+                        TalentTreeLayoutService.ROOT_HEIGHT
+                )
+        );
         commandBuilder.set("#TameworkCompanionTalentsTitle.Text", data.companionName());
         commandBuilder.set("#TameworkCompanionTalentsLevelSummary.Text", data.levelSummary());
         commandBuilder.set("#TameworkCompanionTalentsPointsSummary.Text", data.pointsSummary());
@@ -190,7 +199,11 @@ public final class TameworkCompanionTalentsPage
         commandBuilder.set("#TameworkCompanionTalentsResetButton.Visible", data.canReset());
         commandBuilder.setObject(
                 "#TalentTreeCanvas.Anchor",
-                TalentTreeLayoutService.buildAnchor(0, 0, canvas.width(), canvas.height())
+                TalentTreeLayoutService.buildAnchor(0, 0, Math.max(canvas.width(), viewportWidth), canvas.height())
+        );
+        commandBuilder.setObject(
+                "#TalentTreeViewport.Anchor",
+                TalentTreeLayoutService.buildAnchor(0, 0, viewportWidth, TalentTreeLayoutService.VIEWPORT_HEIGHT)
         );
         commandBuilder.clear("#TalentConnectorLayer");
         commandBuilder.clear("#TalentBranchLayer");
