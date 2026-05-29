@@ -121,6 +121,7 @@ public final class CommandItemFeatureHandler {
     private final CommandPanelActionService panelActionService;
     private final CommandGroupManagerPageService groupManagerPageService;
     private final CommandGroupAssignPageService groupAssignPageService;
+    private final CommandGroupActivationService groupActivationService;
     private final CommandTalentPageService talentPageService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
@@ -251,9 +252,14 @@ public final class CommandItemFeatureHandler {
                 panelActionService,
                 this.groupService
         );
+        this.groupActivationService = new CommandGroupActivationService(
+                linkedNpcRecordStore,
+                this.groupService
+        );
         this.groupAssignPageService = new CommandGroupAssignPageService(
                 panelActionService,
-                toolInventoryService
+                toolInventoryService,
+                groupActivationService
         );
     }
 
@@ -736,6 +742,8 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
+                () -> groupAssignPageService.resolveGroupActivationDropdownEntries(player, toolId),
+                () -> groupAssignPageService.resolveGroupActivationValue(player, toolId),
                 () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId),
                 entry -> recallTeleportingEnabled || !resolutionService.isRecallCommand(entry),
                 recallTeleportingEnabled,
@@ -765,6 +773,7 @@ public final class CommandItemFeatureHandler {
                 value -> panelActionService.applySetFilterMode(player, toolId, value),
                 value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
                 () -> panelActionService.applyClearFilters(player, toolId),
+                value -> groupAssignPageService.applyGroupActivation(player, toolId, value),
                 (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
                         player,
                         toolId,

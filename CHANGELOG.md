@@ -10,6 +10,7 @@
 
 ### Changed
 - Updated the embedded Alec's Telemetry runtime to `0.1.2`.
+- Moved the linked companion count into the panel header and replaced the subtitle count row with a group selector that can activate all companions, none, or one configured group.
 
 ### Fixed
 - Fixed `/tw settings` and `/tw news` permission checks so OPs/admins are evaluated through the live `PlayerRef` permission holder instead of the player component after Hytale Update 5.
