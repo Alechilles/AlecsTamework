@@ -35,7 +35,20 @@ class TalentUtilityEffectContractTest {
         assertTrue(content.contains("\"NeedsDecayMultiplier\""));
         assertTrue(content.contains("\"ReviveCooldownMultiplier\""));
         assertTrue(content.contains("\"TraitMutationChanceMultiplier\""));
+        assertTrue(content.contains("\"AppearanceMutationChanceMultiplier\""));
         assertTrue(content.contains("\"HarvestCooldownMultiplier\""));
+    }
+
+    @Test
+    void appearanceMutationUsesParentTalentMultipliers() throws IOException {
+        String breedingContent = readSource("npc", "actions", "BreedingOffspringProgressionService.java");
+        assertTrue(breedingContent.contains(
+                "APPEARANCE_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY = \"AppearanceMutationChanceMultiplier\""
+        ));
+        assertTrue(breedingContent.contains("withMutationChanceMultiplier(resolvePairMutationChanceMultiplier"));
+
+        String inheritanceContent = readSource("npc", "progression", "CompanionAttachmentInheritanceService.java");
+        assertTrue(inheritanceContent.contains("withMutationChanceMultiplier(double multiplier)"));
     }
 
     private static String readSource(String... parts) throws IOException {

@@ -194,6 +194,19 @@ public final class CompanionAttachmentInheritanceService {
             return new AttachmentInheritanceProfile(false, 0.0, 0.0, 0.0);
         }
 
+        public AttachmentInheritanceProfile withMutationChanceMultiplier(double multiplier) {
+            if (!enabled) {
+                return this;
+            }
+            double safeMultiplier = Double.isFinite(multiplier) && multiplier > 0.0 ? multiplier : 1.0;
+            return new AttachmentInheritanceProfile(
+                    true,
+                    parentWeight,
+                    randomWeight,
+                    sanitizeMutationChance(mutationChance * safeMultiplier)
+            );
+        }
+
         private static double sanitizeWeight(double value, double fallback) {
             if (!Double.isFinite(value) || value < 0.0) {
                 return fallback;

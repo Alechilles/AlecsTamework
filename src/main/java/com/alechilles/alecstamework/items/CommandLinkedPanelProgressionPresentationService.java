@@ -245,7 +245,10 @@ final class CommandLinkedPanelProgressionPresentationService {
             return "Revive Cooldown";
         }
         if ("TraitMutationChanceMultiplier".equalsIgnoreCase(effectKey)) {
-            return "Mutation Chance";
+            return "Trait Mutation";
+        }
+        if ("AppearanceMutationChanceMultiplier".equalsIgnoreCase(effectKey)) {
+            return "Appearance Mutation";
         }
         if ("HarvestCooldownMultiplier".equalsIgnoreCase(effectKey)) {
             return "Harvest Reset";

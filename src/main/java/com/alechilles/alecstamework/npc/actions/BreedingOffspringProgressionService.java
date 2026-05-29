@@ -44,6 +44,7 @@ import javax.annotation.Nullable;
  */
 final class BreedingOffspringProgressionService {
     private static final String TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY = "TraitMutationChanceMultiplier";
+    private static final String APPEARANCE_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY = "AppearanceMutationChanceMultiplier";
     private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
     private static final long FAMILY_FLOCK_RETRY_INTERVAL_MS = 100L;
     private static final int FAMILY_FLOCK_RETRY_MAX_ATTEMPTS = 12;
@@ -167,7 +168,13 @@ final class BreedingOffspringProgressionService {
                 ? breedingConfig.resolveInheritance(childRoleId)
                 : null;
         CompanionAttachmentInheritanceService.AttachmentInheritanceProfile profile =
-                CompanionAttachmentInheritanceService.AttachmentInheritanceProfile.fromConfig(inheritance);
+                CompanionAttachmentInheritanceService.AttachmentInheritanceProfile.fromConfig(inheritance)
+                        .withMutationChanceMultiplier(resolvePairMutationChanceMultiplier(
+                                parentARef,
+                                parentBRef,
+                                store,
+                                APPEARANCE_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY
+                        ));
         if (!profile.enabled()) {
             return;
         }
@@ -344,7 +351,12 @@ final class BreedingOffspringProgressionService {
                 "SizeMultiplier",
                 1.0
         );
-        double mutationChanceMultiplier = resolvePairMutationChanceMultiplier(parentARef, parentBRef, store);
+        double mutationChanceMultiplier = resolvePairMutationChanceMultiplier(
+                parentARef,
+                parentBRef,
+                store,
+                TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY
+        );
         TameworkTraitsComponent.TraitValue[] values = inheritTraits
                 ? TraitInheritanceService.inheritTraits(traitConfig, parentATraits, parentBTraits, seed, mutationChanceMultiplier)
                 : TraitRollService.rollTraits(traitConfig, seed);
@@ -370,17 +382,18 @@ final class BreedingOffspringProgressionService {
 
     private double resolvePairMutationChanceMultiplier(@Nullable Ref<EntityStore> parentARef,
                                                        @Nullable Ref<EntityStore> parentBRef,
-                                                       @Nonnull Store<EntityStore> store) {
+                                                       @Nonnull Store<EntityStore> store,
+                                                       @Nonnull String effectKey) {
         double parentA = CompanionProgressionModifierService.resolveMultiplier(
                 parentARef,
                 store,
-                TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY,
+                effectKey,
                 1.0
         );
         double parentB = CompanionProgressionModifierService.resolveMultiplier(
                 parentBRef,
                 store,
-                TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY,
+                effectKey,
                 1.0
         );
         if (!Double.isFinite(parentA) || parentA <= 0.0) {

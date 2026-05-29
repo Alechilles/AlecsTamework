@@ -75,4 +75,22 @@ class CompanionAttachmentInheritanceServiceTest {
 
         assertTrue(options.get("Fur").contains(result.get("Fur")));
     }
+
+    @Test
+    void mutationChanceMultiplierScalesAndClampsBaseChance() {
+        AttachmentInheritanceProfile profile = new AttachmentInheritanceProfile(true, 1.0, 0.25, 0.10);
+
+        assertEquals(0.18, profile.withMutationChanceMultiplier(1.8).mutationChance(), 0.000001);
+        assertEquals(1.0, profile.withMutationChanceMultiplier(20.0).mutationChance(), 0.000001);
+        assertEquals(0.10, profile.withMutationChanceMultiplier(0.0).mutationChance(), 0.000001);
+        assertEquals(0.10, profile.withMutationChanceMultiplier(Double.NaN).mutationChance(), 0.000001);
+        assertEquals(
+                0.0,
+                new AttachmentInheritanceProfile(true, 1.0, 0.25, -1.0)
+                        .withMutationChanceMultiplier(1.8)
+                        .mutationChance(),
+                0.000001
+        );
+        assertFalse(AttachmentInheritanceProfile.disabled().withMutationChanceMultiplier(2.0).enabled());
+    }
 }

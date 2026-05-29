@@ -34,6 +34,7 @@ public final class CompanionProgressionModifierBreakdownService {
             "NeedsDecayMultiplier",
             "ReviveCooldownMultiplier",
             "TraitMutationChanceMultiplier",
+            "AppearanceMutationChanceMultiplier",
             "HarvestCooldownMultiplier",
             "SizeMultiplier"
     );
