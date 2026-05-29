@@ -290,6 +290,41 @@ public final class CompanionLevelingService {
         return Math.max(0, level - 1) * config.getTalentPoints().getPointsPerLevel();
     }
 
+    @Nonnull
+    public static SetLevelResult setLevel(@Nullable Ref<EntityStore> npcRef,
+                                          @Nullable Store<EntityStore> store,
+                                          int requestedLevel) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return SetLevelResult.notApplied("missing NPC or store");
+        }
+        if (!CompanionProgressionSettings.isLevelingEnabled()) {
+            return SetLevelResult.notApplied("leveling system is disabled");
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId == null || roleId.isBlank()) {
+            return SetLevelResult.notApplied("target NPC has no role id");
+        }
+        TwLevelingConfig config = TwLevelingConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return SetLevelResult.notApplied("no enabled leveling config for role " + roleId);
+        }
+        ComponentType<EntityStore, TameworkLevelingComponent> type = TameworkLevelingComponent.getComponentType();
+        if (type == null) {
+            return SetLevelResult.notApplied("leveling component is not available");
+        }
+
+        int maxLevel = config.getLevels().getMaxLevel();
+        int appliedLevel = Math.max(1, Math.min(requestedLevel, maxLevel));
+        double totalXp = resolveCumulativeXpForLevel(config, appliedLevel);
+        TameworkLevelingComponent previous = store.getComponent(npcRef, type);
+        int previousLevel = previous != null ? normalizeComponent(previous, config).getLevel() : 1;
+        TameworkLevelingComponent updated = new TameworkLevelingComponent(config.getId(), appliedLevel, 0.0, totalXp);
+
+        store.putComponent(npcRef, type, updated);
+        applyTraitModifiers(npcRef, store, null);
+        return new SetLevelResult(true, null, previousLevel, appliedLevel, maxLevel, totalXp);
+    }
+
     private static boolean isXpEligibleCompanion(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
         return resolveXpEligibility(npcRef, store).eligible();
     }
@@ -634,6 +669,18 @@ public final class CompanionLevelingService {
                               double totalXp) {
         static AwardResult notApplied() {
             return new AwardResult(false, 0.0, 1, 1, 0.0);
+        }
+    }
+
+    public record SetLevelResult(boolean applied,
+                                 @Nullable String reason,
+                                 int previousLevel,
+                                 int currentLevel,
+                                 int maxLevel,
+                                 double totalXp) {
+        @Nonnull
+        static SetLevelResult notApplied(@Nonnull String reason) {
+            return new SetLevelResult(false, reason, 1, 1, 1, 0.0);
         }
     }
 
