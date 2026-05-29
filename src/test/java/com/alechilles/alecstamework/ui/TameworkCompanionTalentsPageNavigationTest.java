@@ -173,10 +173,10 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertTrue(page.contains("ACTION_BUY_SELECTED"), "The detail pane should buy the selected talent.");
         assertTrue(
                 page.contains("#TameworkCompanionTalentsRoot.Anchor")
-                        && page.contains("resolveRootWidth(branchCount)")
+                        && page.contains("resolveRootWidthForViewport(viewportWidth)")
                         && page.contains("#TalentTreeViewport.Anchor")
-                        && page.contains("resolveViewportWidth(branchCount)"),
-                "Talent tree root and viewport widths should scale with the number of branch columns."
+                        && page.contains("resolveViewportWidthForContent(canvas.width())"),
+                "Talent tree root and viewport widths should scale with the rendered tree canvas."
         );
         assertFalse(
                 page.contains(".Background\", resolve"),

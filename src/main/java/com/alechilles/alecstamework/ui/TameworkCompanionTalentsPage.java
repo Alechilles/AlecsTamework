@@ -180,13 +180,12 @@ public final class TameworkCompanionTalentsPage
         TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(data.entries(), selectedTalentId);
         selectedTalentId = canvas.selectedTalentId();
         TreeNodeEntry selectedEntry = data.findEntry(selectedTalentId);
-        int branchCount = canvas.branches().size();
-        int viewportWidth = TalentTreeLayoutService.resolveViewportWidth(branchCount);
+        int viewportWidth = TalentTreeLayoutService.resolveViewportWidthForContent(canvas.width());
 
         commandBuilder.setObject(
                 "#TameworkCompanionTalentsRoot.Anchor",
                 TalentTreeLayoutService.buildSizeAnchor(
-                        TalentTreeLayoutService.resolveRootWidth(branchCount),
+                        TalentTreeLayoutService.resolveRootWidthForViewport(viewportWidth),
                         TalentTreeLayoutService.ROOT_HEIGHT
                 )
         );

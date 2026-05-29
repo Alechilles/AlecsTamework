@@ -42,6 +42,42 @@ class TalentTreeLayoutServiceTest {
     }
 
     @Test
+    void layoutFansOutSiblingTalentsFromSharedPrerequisite() {
+        List<TameworkCompanionTalentsPage.TreeNodeEntry> entries = List.of(
+                entry("strong_blood", "Breeding", 3, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of()),
+                entry("mutagenic_line", "Breeding", 4, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("strong_blood")),
+                entry("pack_line", "Breeding", 4, TameworkCompanionTalentsPage.STATE_AVAILABLE, List.of("strong_blood"))
+        );
+
+        TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(entries, null);
+        TalentTreeViewModel.NodeSlot strongBlood = node(canvas, "strong_blood");
+        TalentTreeViewModel.NodeSlot mutagenicLine = node(canvas, "mutagenic_line");
+        TalentTreeViewModel.NodeSlot packLine = node(canvas, "pack_line");
+
+        assertEquals(1, canvas.branches().size());
+        assertEquals(2, canvas.connectors().size());
+        assertEquals(mutagenicLine.topY(), packLine.topY());
+        assertTrue(mutagenicLine.centerX() < strongBlood.centerX());
+        assertTrue(packLine.centerX() > strongBlood.centerX());
+        assertEquals(
+                (mutagenicLine.centerX() + packLine.centerX()) / 2,
+                strongBlood.centerX(),
+                2
+        );
+        assertTrue(canvas.width() > TalentTreeLayoutService.resolveContentWidth(1));
+    }
+
+    @Test
+    void viewportWidthCanScaleFromExpandedCanvasContent() {
+        int expandedContentWidth = TalentTreeLayoutService.resolveContentWidth(5);
+
+        assertEquals(
+                TalentTreeLayoutService.resolveViewportWidth(5),
+                TalentTreeLayoutService.resolveViewportWidthForContent(expandedContentWidth)
+        );
+    }
+
+    @Test
     void layoutCapsNodeAndConnectorSlots() {
         ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry> entries = new ArrayList<>();
         entries.add(entry("node0", "Care", 1, TameworkCompanionTalentsPage.STATE_PURCHASED, List.of()));
@@ -82,12 +118,16 @@ class TalentTreeLayoutServiceTest {
         assertTrue(fiveColumnViewport > TalentTreeLayoutService.VIEWPORT_WIDTH);
         assertTrue(fourColumnRoot < fiveColumnRoot);
         assertEquals(
-                fiveColumnViewport
-                        + TalentTreeLayoutService.DETAIL_PANEL_WIDTH
-                        + TalentTreeLayoutService.TREE_DETAIL_GAP
-                        + TalentTreeLayoutService.ROOT_EXTRA_WIDTH,
+                TalentTreeLayoutService.resolveRootWidthForViewport(fiveColumnViewport),
                 fiveColumnRoot
         );
+    }
+
+    private static TalentTreeViewModel.NodeSlot node(TalentTreeViewModel.TreeCanvas canvas, String id) {
+        return canvas.nodes().stream()
+                .filter(slot -> slot.entry().id().equals(id))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static TameworkCompanionTalentsPage.TreeNodeEntry entry(String id,

@@ -5,10 +5,12 @@ import com.hypixel.hytale.server.core.ui.Value;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -58,37 +60,42 @@ final class TalentTreeLayoutService {
         }
 
         String resolvedSelectedTalentId = resolveSelectedTalentId(safeEntries, selectedTalentId);
-        Map<String, Integer> branchColumns = resolveBranchColumns(safeEntries);
-        ArrayList<TalentTreeViewModel.BranchSlot> branchSlots = buildBranchSlots(branchColumns);
+        ArrayList<BranchLayout> branchLayouts = resolveBranchLayouts(safeEntries);
+        ArrayList<TalentTreeViewModel.BranchSlot> branchSlots = buildBranchSlots(branchLayouts);
         ArrayList<TalentTreeViewModel.NodeSlot> nodeSlots = new ArrayList<>();
         HashMap<String, TalentTreeViewModel.NodeSlot> slotsByTalentId = new HashMap<>();
-        HashMap<String, Integer> branchRows = new HashMap<>();
         int maxRow = 0;
-        for (TameworkCompanionTalentsPage.TreeNodeEntry entry : safeEntries) {
-            if (nodeSlots.size() >= TalentTreeViewModel.MAX_NODE_SLOTS) {
-                break;
+        for (BranchLayout branchLayout : branchLayouts) {
+            for (TameworkCompanionTalentsPage.TreeNodeEntry entry : branchLayout.entries()) {
+                if (nodeSlots.size() >= TalentTreeViewModel.MAX_NODE_SLOTS) {
+                    break;
+                }
+                NodePosition position = branchLayout.positionsByTalentId().get(entry.id().toLowerCase(Locale.ROOT));
+                if (position == null) {
+                    continue;
+                }
+                maxRow = Math.max(maxRow, position.row());
+                int x = branchLayout.left() + (int) Math.round(position.column() * (NODE_WIDTH + BRANCH_GAP));
+                int y = CANVAS_PADDING_TOP
+                        + BRANCH_LABEL_HEIGHT
+                        + 14
+                        + position.row() * (NODE_HEIGHT + ROW_GAP);
+                TalentTreeViewModel.NodeSlot slot = new TalentTreeViewModel.NodeSlot(
+                        nodeSlots.size(),
+                        entry,
+                        entry.id().equalsIgnoreCase(resolvedSelectedTalentId),
+                        buildAnchor(x, y, NODE_WIDTH, NODE_HEIGHT),
+                        x + NODE_WIDTH / 2,
+                        y,
+                        y + NODE_HEIGHT
+                );
+                nodeSlots.add(slot);
+                slotsByTalentId.put(entry.id().toLowerCase(Locale.ROOT), slot);
             }
-            String branchKey = normalize(entry.branchName());
-            int column = branchColumns.getOrDefault(branchKey, 0);
-            int row = branchRows.merge(branchKey, 1, Integer::sum) - 1;
-            maxRow = Math.max(maxRow, row);
-            int x = CANVAS_PADDING_LEFT + column * (BRANCH_WIDTH + BRANCH_GAP);
-            int y = CANVAS_PADDING_TOP + BRANCH_LABEL_HEIGHT + 14 + row * (NODE_HEIGHT + ROW_GAP);
-            TalentTreeViewModel.NodeSlot slot = new TalentTreeViewModel.NodeSlot(
-                    nodeSlots.size(),
-                    entry,
-                    entry.id().equalsIgnoreCase(resolvedSelectedTalentId),
-                    buildAnchor(x, y, NODE_WIDTH, NODE_HEIGHT),
-                    x + NODE_WIDTH / 2,
-                    y,
-                    y + NODE_HEIGHT
-            );
-            nodeSlots.add(slot);
-            slotsByTalentId.put(entry.id().toLowerCase(Locale.ROOT), slot);
         }
 
         ArrayList<TalentTreeViewModel.ConnectorSlot> connectors = buildConnectors(nodeSlots, slotsByTalentId);
-        int canvasWidth = resolveContentWidth(branchColumns.size());
+        int canvasWidth = resolveContentWidth(branchLayouts);
         int canvasHeight = Math.max(
                 VIEWPORT_HEIGHT,
                 CANVAS_PADDING_TOP
@@ -137,31 +144,183 @@ final class TalentTreeLayoutService {
     }
 
     @Nonnull
-    private static Map<String, Integer> resolveBranchColumns(
+    private static ArrayList<BranchLayout> resolveBranchLayouts(
             @Nonnull List<TameworkCompanionTalentsPage.TreeNodeEntry> entries) {
-        LinkedHashMap<String, Integer> branchColumns = new LinkedHashMap<>();
+        LinkedHashMap<String, ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry>> entriesByBranch = new LinkedHashMap<>();
         for (TameworkCompanionTalentsPage.TreeNodeEntry entry : entries) {
             String branchKey = normalize(entry.branchName());
-            if (branchColumns.containsKey(branchKey)) {
-                continue;
-            }
-            branchColumns.put(branchKey, branchColumns.size());
+            entriesByBranch.computeIfAbsent(branchKey, ignored -> new ArrayList<>()).add(entry);
         }
-        return branchColumns;
+        ArrayList<BranchLayout> layouts = new ArrayList<>();
+        int left = CANVAS_PADDING_LEFT;
+        for (Map.Entry<String, ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry>> branch : entriesByBranch.entrySet()) {
+            BranchNodeLayout nodeLayout = resolveBranchNodeLayout(branch.getValue());
+            int width = Math.max(
+                    BRANCH_WIDTH,
+                    (int) Math.round(nodeLayout.maxColumn() * (NODE_WIDTH + BRANCH_GAP)) + NODE_WIDTH
+            );
+            layouts.add(new BranchLayout(
+                    branch.getKey(),
+                    branch.getValue(),
+                    nodeLayout.positionsByTalentId(),
+                    left,
+                    width
+            ));
+            left += width + BRANCH_GAP;
+        }
+        return layouts;
     }
 
     @Nonnull
-    private static ArrayList<TalentTreeViewModel.BranchSlot> buildBranchSlots(@Nonnull Map<String, Integer> branchColumns) {
+    private static BranchNodeLayout resolveBranchNodeLayout(
+            @Nonnull List<TameworkCompanionTalentsPage.TreeNodeEntry> entries) {
+        HashMap<String, TameworkCompanionTalentsPage.TreeNodeEntry> entriesById = new HashMap<>();
+        for (TameworkCompanionTalentsPage.TreeNodeEntry entry : entries) {
+            entriesById.put(entry.id().toLowerCase(Locale.ROOT), entry);
+        }
+        HashMap<String, ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry>> childrenByParentId = new HashMap<>();
+        ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry> roots = new ArrayList<>();
+        for (TameworkCompanionTalentsPage.TreeNodeEntry entry : entries) {
+            String primaryParentId = resolvePrimaryParentId(entry, entriesById);
+            if (primaryParentId == null) {
+                roots.add(entry);
+            } else {
+                childrenByParentId.computeIfAbsent(primaryParentId, ignored -> new ArrayList<>()).add(entry);
+            }
+        }
+        for (ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry> children : childrenByParentId.values()) {
+            children.sort(entryComparator());
+        }
+        roots.sort(entryComparator());
+
+        int minTier = entries.stream()
+                .mapToInt(TameworkCompanionTalentsPage.TreeNodeEntry::tier)
+                .min()
+                .orElse(1);
+        HashMap<String, NodePosition> positions = new HashMap<>();
+        HashSet<String> assignedTalentIds = new HashSet<>();
+        double nextColumn = 0.0;
+        for (TameworkCompanionTalentsPage.TreeNodeEntry root : roots) {
+            nextColumn = assignBranchSubtree(
+                    root,
+                    nextColumn,
+                    minTier,
+                    childrenByParentId,
+                    positions,
+                    assignedTalentIds,
+                    new HashSet<>()
+            );
+        }
+        for (TameworkCompanionTalentsPage.TreeNodeEntry entry : entries) {
+            if (assignedTalentIds.contains(entry.id().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            nextColumn = assignBranchSubtree(
+                    entry,
+                    nextColumn,
+                    minTier,
+                    childrenByParentId,
+                    positions,
+                    assignedTalentIds,
+                    new HashSet<>()
+            );
+        }
+        double maxColumn = positions.values().stream()
+                .mapToDouble(NodePosition::column)
+                .max()
+                .orElse(0.0);
+        return new BranchNodeLayout(positions, maxColumn);
+    }
+
+    @Nullable
+    private static String resolvePrimaryParentId(
+            @Nonnull TameworkCompanionTalentsPage.TreeNodeEntry entry,
+            @Nonnull Map<String, TameworkCompanionTalentsPage.TreeNodeEntry> entriesById) {
+        for (String requiredTalentId : entry.requiredTalentIds()) {
+            if (requiredTalentId == null || requiredTalentId.isBlank()) {
+                continue;
+            }
+            String normalized = requiredTalentId.toLowerCase(Locale.ROOT);
+            if (normalized.equals(entry.id().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            if (entriesById.containsKey(normalized)) {
+                return normalized;
+            }
+        }
+        return null;
+    }
+
+    private static double assignBranchSubtree(
+            @Nonnull TameworkCompanionTalentsPage.TreeNodeEntry entry,
+            double startColumn,
+            int minTier,
+            @Nonnull Map<String, ArrayList<TameworkCompanionTalentsPage.TreeNodeEntry>> childrenByParentId,
+            @Nonnull Map<String, NodePosition> positions,
+            @Nonnull Set<String> assignedTalentIds,
+            @Nonnull Set<String> visitingTalentIds) {
+        String talentId = entry.id().toLowerCase(Locale.ROOT);
+        if (assignedTalentIds.contains(talentId)) {
+            return startColumn;
+        }
+        if (!visitingTalentIds.add(talentId)) {
+            positions.put(talentId, new NodePosition(startColumn, resolveRow(entry, minTier)));
+            assignedTalentIds.add(talentId);
+            return startColumn + 1.0;
+        }
+
+        List<TameworkCompanionTalentsPage.TreeNodeEntry> children = childrenByParentId.getOrDefault(talentId, new ArrayList<>());
+        double nextColumn = startColumn;
+        Double firstChildColumn = null;
+        Double lastChildColumn = null;
+        for (TameworkCompanionTalentsPage.TreeNodeEntry child : children) {
+            String childId = child.id().toLowerCase(Locale.ROOT);
+            if (assignedTalentIds.contains(childId)) {
+                continue;
+            }
+            nextColumn = assignBranchSubtree(
+                    child,
+                    nextColumn,
+                    minTier,
+                    childrenByParentId,
+                    positions,
+                    assignedTalentIds,
+                    visitingTalentIds
+            );
+            NodePosition childPosition = positions.get(childId);
+            if (childPosition == null) {
+                continue;
+            }
+            if (firstChildColumn == null) {
+                firstChildColumn = childPosition.column();
+            }
+            lastChildColumn = childPosition.column();
+        }
+
+        double column = firstChildColumn == null || lastChildColumn == null
+                ? startColumn
+                : (firstChildColumn + lastChildColumn) / 2.0;
+        positions.put(talentId, new NodePosition(column, resolveRow(entry, minTier)));
+        assignedTalentIds.add(talentId);
+        visitingTalentIds.remove(talentId);
+        return Math.max(nextColumn, startColumn + 1.0);
+    }
+
+    private static int resolveRow(@Nonnull TameworkCompanionTalentsPage.TreeNodeEntry entry, int minTier) {
+        return Math.max(0, entry.tier() - minTier);
+    }
+
+    @Nonnull
+    private static ArrayList<TalentTreeViewModel.BranchSlot> buildBranchSlots(@Nonnull List<BranchLayout> branchLayouts) {
         ArrayList<TalentTreeViewModel.BranchSlot> slots = new ArrayList<>();
-        for (Map.Entry<String, Integer> branch : branchColumns.entrySet()) {
+        for (BranchLayout branch : branchLayouts) {
             if (slots.size() >= TalentTreeViewModel.MAX_BRANCH_SLOTS) {
                 break;
             }
-            int x = CANVAS_PADDING_LEFT + branch.getValue() * (BRANCH_WIDTH + BRANCH_GAP);
             slots.add(new TalentTreeViewModel.BranchSlot(
                     slots.size(),
-                    titleCase(branch.getKey()),
-                    buildAnchor(x, CANVAS_PADDING_TOP, BRANCH_WIDTH, BRANCH_LABEL_HEIGHT)
+                    titleCase(branch.branchKey()),
+                    buildAnchor(branch.left(), CANVAS_PADDING_TOP, branch.width(), BRANCH_LABEL_HEIGHT)
             ));
         }
         return slots;
@@ -219,12 +378,20 @@ final class TalentTreeLayoutService {
     }
 
     static int resolveViewportWidth(int branchCount) {
-        int width = resolveContentWidth(branchCount) + 16;
+        return resolveViewportWidthForContent(resolveContentWidth(branchCount));
+    }
+
+    static int resolveViewportWidthForContent(int contentWidth) {
+        int width = Math.max(1, contentWidth) + 16;
         return Math.max(MIN_VIEWPORT_WIDTH, Math.min(MAX_VIEWPORT_WIDTH, width));
     }
 
     static int resolveRootWidth(int branchCount) {
-        return resolveViewportWidth(branchCount)
+        return resolveRootWidthForViewport(resolveViewportWidth(branchCount));
+    }
+
+    static int resolveRootWidthForViewport(int viewportWidth) {
+        return viewportWidth
                 + DETAIL_PANEL_WIDTH
                 + TREE_DETAIL_GAP
                 + ROOT_EXTRA_WIDTH;
@@ -236,6 +403,14 @@ final class TalentTreeLayoutService {
                 + columns * BRANCH_WIDTH
                 + Math.max(0, columns - 1) * BRANCH_GAP
                 + CANVAS_PADDING_RIGHT;
+    }
+
+    private static int resolveContentWidth(@Nonnull List<BranchLayout> branchLayouts) {
+        if (branchLayouts.isEmpty()) {
+            return resolveContentWidth(0);
+        }
+        BranchLayout last = branchLayouts.get(branchLayouts.size() - 1);
+        return last.left() + last.width() + CANVAS_PADDING_RIGHT;
     }
 
     @Nonnull
@@ -282,5 +457,26 @@ final class TalentTreeLayoutService {
     private static String titleCase(@Nullable String value) {
         String normalized = normalize(value);
         return Character.toUpperCase(normalized.charAt(0)) + normalized.substring(1);
+    }
+
+    private record BranchLayout(@Nonnull String branchKey,
+                                @Nonnull List<TameworkCompanionTalentsPage.TreeNodeEntry> entries,
+                                @Nonnull Map<String, NodePosition> positionsByTalentId,
+                                int left,
+                                int width) {
+        private BranchLayout {
+            entries = List.copyOf(entries);
+            positionsByTalentId = Map.copyOf(positionsByTalentId);
+        }
+    }
+
+    private record BranchNodeLayout(@Nonnull Map<String, NodePosition> positionsByTalentId,
+                                    double maxColumn) {
+        private BranchNodeLayout {
+            positionsByTalentId = Map.copyOf(positionsByTalentId);
+        }
+    }
+
+    private record NodePosition(double column, int row) {
     }
 }
