@@ -130,6 +130,17 @@ class TalentTreeLayoutServiceTest {
         );
     }
 
+    @Test
+    void viewportCanAutoScaleWideEnoughForTenCompactColumns() {
+        int tenColumnContent = TalentTreeLayoutService.resolveContentWidth(10);
+        int tenColumnViewport = TalentTreeLayoutService.resolveViewportWidth(10);
+        int elevenColumnViewport = TalentTreeLayoutService.resolveViewportWidth(11);
+
+        assertEquals(tenColumnContent + 16, tenColumnViewport);
+        assertEquals(tenColumnViewport, TalentTreeLayoutService.MAX_VIEWPORT_WIDTH);
+        assertEquals(TalentTreeLayoutService.MAX_VIEWPORT_WIDTH, elevenColumnViewport);
+    }
+
     private static TalentTreeViewModel.NodeSlot node(TalentTreeViewModel.TreeCanvas canvas, String id) {
         return canvas.nodes().stream()
                 .filter(slot -> slot.entry().id().equals(id))

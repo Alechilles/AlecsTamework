@@ -31,9 +31,35 @@ $C.@PageOverlay {
         }
 
         Label #TameworkCompanionTalentsStatus {
-          Anchor: (Top: 50, Left: 0, Right: 310, Height: 22);
+          Anchor: (Top: 50, Left: 0, Width: 340, Height: 22);
           Text: "";
           Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Group #TalentTreePanControls {
+          Anchor: (Top: 48, Left: 374, Width: 112, Height: 28);
+          LayoutMode: Left;
+          Visible: false;
+
+          $C.@SmallSecondaryTextButton #TalentTreePanLeftButton {
+            @Sounds = $C.@ButtonSounds;
+            @Text = "<";
+            @Anchor = (Width: 32, Height: 26);
+            Visible: false;
+          }
+
+          Label #TalentTreePanLabel {
+            Anchor: (Width: 48, Height: 26);
+            Text: "Pan";
+            Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Center, VerticalAlignment: Center);
+          }
+
+          $C.@SmallSecondaryTextButton #TalentTreePanRightButton {
+            @Sounds = $C.@ButtonSounds;
+            @Text = ">";
+            @Anchor = (Width: 32, Height: 26);
+            Visible: false;
+          }
         }
 
         Group #TameworkCompanionTalentsButtons {
@@ -84,30 +110,6 @@ $C.@PageOverlay {
             Group #TalentNodeLayer {
               Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
             }
-          }
-        }
-
-        Group #TalentTreePanControls {
-          Anchor: (Top: 522, Left: 10, Width: 92, Height: 30);
-          LayoutMode: Left;
-          Visible: false;
-
-          $C.@SmallSecondaryTextButton #TalentTreePanLeftButton {
-            @Sounds = $C.@ButtonSounds;
-            @Text = "<";
-            @Anchor = (Width: 40, Height: 28);
-            Visible: false;
-          }
-
-          Group {
-            Anchor: (Width: 8);
-          }
-
-          $C.@SmallSecondaryTextButton #TalentTreePanRightButton {
-            @Sounds = $C.@ButtonSounds;
-            @Text = ">";
-            @Anchor = (Width: 40, Height: 28);
-            Visible: false;
           }
         }
 

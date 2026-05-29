@@ -198,8 +198,6 @@ public final class TameworkCompanionTalentsPage
         int viewportWidth = TalentTreeLayoutService.resolveViewportWidthForContent(canvas.width());
         int maxHorizontalOffset = Math.max(canvas.width() - viewportWidth, 0);
         horizontalOffset = Math.max(0, Math.min(horizontalOffset, maxHorizontalOffset));
-        boolean canPanLeft = horizontalOffset > 0;
-        boolean canPanRight = horizontalOffset < maxHorizontalOffset;
 
         commandBuilder.setObject(
                 "#TameworkCompanionTalentsRoot.Anchor",
@@ -217,8 +215,8 @@ public final class TameworkCompanionTalentsPage
         );
         commandBuilder.set("#TameworkCompanionTalentsResetButton.Visible", data.canReset());
         commandBuilder.set("#TalentTreePanControls.Visible", maxHorizontalOffset > 0);
-        commandBuilder.set("#TalentTreePanLeftButton.Visible", canPanLeft);
-        commandBuilder.set("#TalentTreePanRightButton.Visible", canPanRight);
+        commandBuilder.set("#TalentTreePanLeftButton.Visible", maxHorizontalOffset > 0);
+        commandBuilder.set("#TalentTreePanRightButton.Visible", maxHorizontalOffset > 0);
         commandBuilder.setObject(
                 "#TalentTreeCanvas.Anchor",
                 TalentTreeLayoutService.buildAnchor(-horizontalOffset, 0, Math.max(canvas.width(), viewportWidth), canvas.height())
@@ -245,7 +243,7 @@ public final class TameworkCompanionTalentsPage
                     false
             );
         }
-        if (canPanLeft) {
+        if (maxHorizontalOffset > 0) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     "#TalentTreePanLeftButton",
@@ -253,7 +251,7 @@ public final class TameworkCompanionTalentsPage
                     false
             );
         }
-        if (canPanRight) {
+        if (maxHorizontalOffset > 0) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     "#TalentTreePanRightButton",

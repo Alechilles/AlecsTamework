@@ -22,7 +22,6 @@ final class TalentTreeLayoutService {
     static final int VIEWPORT_HEIGHT = 560;
     static final int ROOT_HEIGHT = 720;
     static final int MIN_VIEWPORT_WIDTH = 704;
-    static final int MAX_VIEWPORT_WIDTH = 920;
     static final int DETAIL_PANEL_WIDTH = 260;
     static final int TREE_DETAIL_GAP = 14;
     static final int ROOT_EXTRA_WIDTH = 40;
@@ -32,6 +31,8 @@ final class TalentTreeLayoutService {
     static final int CANVAS_PADDING_BOTTOM = 28;
     static final int BRANCH_WIDTH = 117;
     static final int BRANCH_GAP = 20;
+    static final int MAX_AUTO_SCALE_COLUMNS = 10;
+    static final int MAX_VIEWPORT_WIDTH = resolveContentWidth(MAX_AUTO_SCALE_COLUMNS) + 16;
     static final int BRANCH_LABEL_HEIGHT = 22;
     static final int NODE_WIDTH = 117;
     static final int NODE_HEIGHT = 66;

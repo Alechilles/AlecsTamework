@@ -203,4 +203,30 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertTrue(ui.contains("#TalentTreePanLeftButton"), "Talent page should include a left pan button.");
         assertTrue(ui.contains("#TalentTreePanRightButton"), "Talent page should include a right pan button.");
     }
+
+    @Test
+    void talentPageShowsPanControlsAboveTreeAsButtonLabelButtonStrip() throws IOException {
+        String page = Files.readString(TALENTS_PAGE, StandardCharsets.UTF_8);
+        String ui = Files.readString(
+                Path.of("src", "main", "resources", "Common", "UI", "Custom", "TameworkCompanionTalentsPage.ui"),
+                StandardCharsets.UTF_8
+        );
+        int headerStart = ui.indexOf("Group #TameworkCompanionTalentsHeader");
+        int bodyStart = ui.indexOf("Group #TameworkCompanionTalentsBody");
+        int panStart = ui.indexOf("Group #TalentTreePanControls");
+        int leftStart = ui.indexOf("#TalentTreePanLeftButton", panStart);
+        int labelStart = ui.indexOf("#TalentTreePanLabel", panStart);
+        int rightStart = ui.indexOf("#TalentTreePanRightButton", panStart);
+
+        assertTrue(headerStart >= 0, "Talent page should have a header.");
+        assertTrue(bodyStart > headerStart, "Talent page body should follow the header.");
+        assertTrue(panStart > headerStart && panStart < bodyStart, "Pan controls should sit in the header above the tree.");
+        assertTrue(leftStart > panStart, "Pan strip should start with a left button.");
+        assertTrue(labelStart > leftStart, "Pan strip should show a label after the left button.");
+        assertTrue(rightStart > labelStart, "Pan strip should end with a right button.");
+        assertTrue(ui.contains("Label #TalentTreePanLabel"), "Pan strip should include a non-button label.");
+        assertTrue(ui.contains("Text: \"Pan\""), "Pan strip label should read Pan.");
+        assertTrue(page.contains("#TalentTreePanLeftButton.Visible\", maxHorizontalOffset > 0"), "Left pan button should show whenever overflow controls are needed.");
+        assertTrue(page.contains("#TalentTreePanRightButton.Visible\", maxHorizontalOffset > 0"), "Right pan button should show whenever overflow controls are needed.");
+    }
 }
