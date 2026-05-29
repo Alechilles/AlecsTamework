@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
-import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.ItemUtils;
@@ -19,7 +18,6 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.InventoryHelper;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -30,8 +28,6 @@ import javax.annotation.Nullable;
  * one additional identical drop pass when the Bounty trait proc succeeds.
  */
 public final class ActionTameworkHarvestDrop extends ActionDropItem {
-    private static final String HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY = "HarvestDoubleDropChanceMultiplier";
-
     public ActionTameworkHarvestDrop(@Nonnull BuilderActionTameworkHarvestDrop builder, @Nonnull BuilderSupport support) {
         super(builder, support);
     }
@@ -52,7 +48,9 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                     + " dropList=" + valueOrNull(this.dropList));
             return true;
         }
-        List<ItemStack> drops = shouldDoubleDrops(ref, store) ? duplicateDrops(baseDrops) : baseDrops;
+        List<ItemStack> drops = CompanionHarvestBonusService.shouldDuplicateDrops(ref, store, role)
+                ? duplicateDrops(baseDrops)
+                : baseDrops;
 
         ModelComponent modelComponent = store.getComponent(ref, ModelComponent.getComponentType());
         float eyeHeight = modelComponent != null ? modelComponent.getModel().getEyeHeight(ref, store) : 0.0F;
@@ -103,20 +101,6 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         return drops;
     }
 
-    private boolean shouldDoubleDrops(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
-        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
-                npcRef,
-                store,
-                HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY,
-                1.0
-        );
-        if (!Double.isFinite(multiplier)) {
-            return false;
-        }
-        double chance = clamp(multiplier - 1.0, 0.0, 1.0);
-        return chance > 0.0 && ThreadLocalRandom.current().nextDouble() < chance;
-    }
-
     private List<ItemStack> duplicateDrops(List<ItemStack> drops) {
         if (drops == null || drops.isEmpty()) {
             return List.of();
@@ -151,13 +135,6 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
                 stack.getMaxDurability(),
                 stack.getMetadata()
         );
-    }
-
-    private double clamp(double value, double min, double max) {
-        if (!Double.isFinite(value)) {
-            return min;
-        }
-        return Math.max(min, Math.min(max, value));
     }
 
     private void logHarvestDropAward(@Nonnull Ref<EntityStore> ref,

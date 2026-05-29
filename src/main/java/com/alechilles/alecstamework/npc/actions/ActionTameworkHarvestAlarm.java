@@ -69,6 +69,9 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (alarm == null) {
             return false;
         }
+        if (CompanionHarvestBonusService.consumeCooldownSkip(npcRef, store)) {
+            return true;
+        }
         alarm.set(npcRef, Instant.now().plusMillis(Math.max(0L, Math.round(cooldownSeconds * 1000.0))), store);
         return true;
     }

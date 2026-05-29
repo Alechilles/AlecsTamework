@@ -9,33 +9,6 @@
   ],
   "Interactions": [
     {
-      "Type": "Custom",
-      "Requires": {
-        "All": {
-          "ItemsInHand": [
-            {
-              "Items": [
-                "Container_Bucket"
-              ]
-            }
-          ]
-        }
-      },
-      "Effects": {
-        "AddItemsHand": {
-          "ItemsParam": "HarvestAddItemBucket"
-        },
-        "RemoveItemsHand": {
-          "Items": [
-            "Container_Bucket"
-          ]
-        },
-        "PlaySound": {
-          "SoundEvent": "SFX_Water_MoveIn"
-        }
-      }
-    },
-    {
       "Type": "Tame",
       "ItemsParam": "TestTameItemsParam",
       "Effects": {

@@ -102,6 +102,11 @@ final class InteractionExecutor {
             );
         }
         if (entry instanceof HarvestInteraction) {
+            TameworkInteractEffects.HarvestContainerResult containerResult =
+                    effects.applyHarvestContainerTransform(npcRef, store, role, player, ctx);
+            if (containerResult == TameworkInteractEffects.HarvestContainerResult.FAILED) {
+                return false;
+            }
             boolean applied = effects.applyStartHarvest(npcRef, role, store);
             return applied
                     | effects.applyCustomEffects(

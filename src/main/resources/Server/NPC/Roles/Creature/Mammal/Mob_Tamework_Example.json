@@ -183,12 +183,13 @@
     "MountAnchorZ": 0.3,
     "MountMovementConfig": "Mount",
     "IsHarvestable": true,
-    "HarvestDropList": "Drop_Sheep_Harvest",
-    "HarvestInteractionContext": "Shear",
+    "HarvestDropList": "Drop_Cow_Harvest",
+    "HarvestInteractionContext": "Milk",
     "HarvestParticles": "Sheep_Wool_Shear",
     "HarvestSound": "SFX_Sheep_Sheared",
     "HarvestAddItemBucket": "*Container_Bucket_State_Filled_Milk",
     "HarvestAddItemDecoBucket": "*Deco_Bucket_State_Filled_Milk",
+    "HarvestBonusMode": "CooldownPreserve",
     "DisableDamageGroups": [
       "Self"
     ],

@@ -1,15 +1,36 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ActionTameworkHarvestAlarmTest {
+    private static final Path HARVEST_ALARM_ACTION = Paths.get(
+            "src", "main", "java",
+            "com", "alechilles", "alecstamework", "npc", "actions", "ActionTameworkHarvestAlarm.java"
+    );
+
     @Test
     void scalesHarvestCooldownSecondsWithTalentMultiplier() {
         assertEquals(45.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(60.0, 0.75), 0.000001);
         assertEquals(60.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(60.0, 0.0), 0.000001);
         assertEquals(60.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(60.0, Double.NaN), 0.000001);
         assertEquals(0.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(-10.0, 0.75), 0.000001);
+    }
+
+    @Test
+    void consumesCooldownSkipBeforeSettingHarvestAlarm() throws Exception {
+        String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
+
+        int skipCheck = content.indexOf("CompanionHarvestBonusService.consumeCooldownSkip");
+        int setAlarm = content.indexOf("alarm.set");
+
+        assertTrue(skipCheck >= 0, "Harvest alarm should consume cooldown-preserve skip tokens.");
+        assertTrue(setAlarm > skipCheck, "Cooldown skip must happen before the harvest alarm is set.");
     }
 }
