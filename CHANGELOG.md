@@ -15,18 +15,11 @@
 - Added `/tw settings` toggles for the alpha companion leveling and talents systems, enabled by default for existing worlds.
 
 ### Changed
-- Replaced the paged companion talent list with the tree view and updated talent details to show percentage-based effect lines and one requirement per line.
-- Reworked talent tree layout so prerequisite chains can branch into multiple columns while keeping connectors clear of sibling nodes.
-- Let linked-panel level indicators open the talents page even when a companion has no unspent talent points.
 - Updated progression tooltips and linked-panel layout to fit the expanded level, XP, talent, trait, and modifier information.
 - Updated example mobs and config documentation to exercise the newer progression and talent utility hooks.
 - Moved the linked companion count into the panel header and replaced the subtitle count row with the group selector.
 
 ### Fixed
-- Fixed talent-tree placeholder texture boxes by relying on local UI styling instead of missing runtime background image paths.
-- Fixed wide talent trees by compacting node/column sizing, auto-sizing the panel up to wider trees, and exposing horizontal pan controls when needed.
-- Fixed long talent-tree connector routing so branch connectors no longer cross through sibling talent nodes.
-- Fixed companion talent and settings refresh paths so progression modifier changes immediately reapply loaded companion stat modifiers and clear stale max-health bonuses.
 - Fixed `/tw settings` and `/tw news` permission checks so OPs/admins are evaluated through the live `PlayerRef` permission holder instead of the player component after Hytale Update 5.
 - Fixed compatibility with summoned mounts from other mods by preserving valid mount owner references until vanilla mount setup finishes.
 
