@@ -1,24 +1,48 @@
 # Changelog
 
+## 2.12.0 - Companion Talent Trees and Progression Utilities - 2026-05-30
+
+### Added
+- Added a scrollable branch/tier companion talent tree UI with prerequisite connectors, selected-node detail panels, horizontal panning for wide trees, dynamic panel sizing, and centered pan controls that adapt to the active tree width.
+- Added companion talent reset support so purchased talents can be refunded and re-spent while the companion is loaded.
+- Added progression modifier breakdowns for linked-panel tooltips so level, talent, and trait effects are easier to inspect.
+- Added `/tw setlevel <level>` to set the companion level for the NPC in front of the player, intended for testing and balance verification.
+- Added a linked-panel group selector that can show all linked companions, no linked companions, or one configured command group.
+- Added utility talent effect support for needs decay, revive cooldown, trait mutation chance, appearance mutation chance, harvest cooldown, happiness gain, breed cooldown, and fertility.
+- Added `TameworkHarvestAlarm` so harvest-ready timers can be scaled by progression effects instead of hard-coded raw alarm durations.
+- Added harvest-luck cooldown preservation support for container-style harvests, such as filling a bucket, so luck can avoid consuming the harvest cooldown without duplicating containers.
+- Added `Feed.AwardCooldownSeconds` to `TwLevelingConfig` and per-companion feed XP cooldown state so repeated feed interactions cannot spam XP.
+- Added `/tw settings` toggles for the alpha companion leveling and talents systems, enabled by default for existing worlds.
+
+### Changed
+- Replaced the paged companion talent list with the tree view and updated talent details to show percentage-based effect lines and one requirement per line.
+- Reworked talent tree layout so prerequisite chains can branch into multiple columns while keeping connectors clear of sibling nodes.
+- Let linked-panel level indicators open the talents page even when a companion has no unspent talent points.
+- Updated progression tooltips and linked-panel layout to fit the expanded level, XP, talent, trait, and modifier information.
+- Updated example mobs and config documentation to exercise the newer progression and talent utility hooks.
+- Moved the linked companion count into the panel header and replaced the subtitle count row with the group selector.
+
+### Fixed
+- Fixed talent-tree placeholder texture boxes by relying on local UI styling instead of missing runtime background image paths.
+- Fixed wide talent trees by compacting node/column sizing, auto-sizing the panel up to wider trees, and exposing horizontal pan controls when needed.
+- Fixed long talent-tree connector routing so branch connectors no longer cross through sibling talent nodes.
+- Fixed companion talent and settings refresh paths so progression modifier changes immediately reapply loaded companion stat modifiers and clear stale max-health bonuses.
+- Fixed `/tw settings` and `/tw news` permission checks so OPs/admins are evaluated through the live `PlayerRef` permission holder instead of the player component after Hytale Update 5.
+- Fixed compatibility with summoned mounts from other mods by preserving valid mount owner references until vanilla mount setup finishes.
+
 ## 2.11.5 - Companion XP Events and Persistence Path Fixes - 2026-05-28
 
 ### Added
 - Added public alpha companion XP award events through `TameworkApi.events()` so external mods can subscribe and credit owner-facing skills from successful companion XP activity.
 - Added `/tw debugxpevents [on|off]` to subscribe to Tamework's own public companion XP events and log event hits for in-game verification, with extra harvest-drop diagnostics for XP attempts that are rejected before an API event is emitted.
-- Added a reset-points button to the alpha companion talents page so purchased talents can be refunded and re-spent while the companion is loaded.
-- Added `/tw settings` toggles for the alpha companion leveling and talents systems, enabled by default for existing worlds.
 
 ### Changed
 - Updated the embedded Alec's Telemetry runtime to `0.1.2`.
-- Moved the linked companion count into the panel header and replaced the subtitle count row with a group selector that can activate all companions, none, or one configured group.
 
 ### Fixed
-- Fixed `/tw settings` and `/tw news` permission checks so OPs/admins are evaluated through the live `PlayerRef` permission holder instead of the player component after Hytale Update 5.
 - Fixed state-driven `TameworkHarvestDrop` harvest flows so successful harvest drops award companion harvest XP and emit companion XP events.
 - Fixed companion XP awards so unlinked tamed or owned companions can gain XP and emit XP events; command links now only provide optional event tool-id context.
-- Fixed `/tw settings` progression toggles so disabling leveling or talents immediately reapplies loaded companion stat modifiers and removes stale max-health bonuses.
 - Fixed Tamework data directory discovery so startup and migrations stay anchored to the active server/userdata layout instead of drifting into unrelated temp `universe` folders.
-- Fixed compatibility with summoned mounts from other mods by preserving valid mount owner references until vanilla mount setup finishes.
 
 ## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27
 
