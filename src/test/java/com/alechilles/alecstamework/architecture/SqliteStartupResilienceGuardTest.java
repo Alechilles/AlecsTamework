@@ -37,5 +37,14 @@ class SqliteStartupResilienceGuardTest {
                 content.contains("throw new SQLException(\"sqlite_native_unavailable\", error);"),
                 "SqliteConnectionManager.openConnection must wrap sqlite native linkage errors as SQLException."
         );
+        assertTrue(
+                content.contains("private void ensureDriverLoaded() throws SQLException"),
+                "SqliteConnectionManager must expose driver-load failures as SQLExceptions for startup degradation."
+        );
+        assertTrue(
+                !content.contains("this.jdbcUrl = \"jdbc:sqlite:\" + this.databasePath;\r\n        ensureDriverLoaded();")
+                        && !content.contains("this.jdbcUrl = \"jdbc:sqlite:\" + this.databasePath;\n        ensureDriverLoaded();"),
+                "SqliteConnectionManager constructor must not load SQLite before startup degradation is available."
+        );
     }
 }

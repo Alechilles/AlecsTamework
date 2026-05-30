@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -114,7 +115,10 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 }
             }
         } catch (Exception ex) {
-            health.markDegraded("sqlite_schema_bootstrap_failed");
+            String healthReason = isSqliteDriverUnavailable(ex)
+                    ? "sqlite_native_unavailable"
+                    : "sqlite_schema_bootstrap_failed";
+            health.markDegraded(healthReason);
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_schema_bootstrap_failed",
                     ex,
@@ -149,9 +153,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 logger
         );
 
-        runtime.runLegacyDatImport(logger);
-        runtime.scheduleSnapshotPruning();
-        runtime.scheduleDatabaseMaintenance();
+        if (health.isHealthy()) {
+            runtime.runLegacyDatImport(logger);
+            runtime.scheduleSnapshotPruning();
+            runtime.scheduleDatabaseMaintenance();
+        }
         return runtime;
     }
 
@@ -374,7 +380,10 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         boolean alreadyV2 = false;
         try (Connection connection = connectionManager.openConnection()) {
             alreadyV2 = schemaMigrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V2);
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            if (isSqliteDriverUnavailable(ex)) {
+                throw ex;
+            }
             alreadyV2 = false;
         }
         if (alreadyV2) {
@@ -407,5 +416,23 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                          long totalBytes,
                                          @Nonnull PersistenceWriteQueue.QueueMetrics queueMetrics,
                                          @Nonnull PersistenceHealthService.HealthState healthState) {
+    }
+
+    static boolean isSqliteDriverUnavailable(@Nullable Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof LinkageError) {
+                return true;
+            }
+            if (current instanceof SQLException) {
+                String message = current.getMessage();
+                if ("sqlite_native_unavailable".equals(message)
+                        || "sqlite_jdbc_driver_missing".equals(message)) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

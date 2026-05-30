@@ -21,7 +21,6 @@ public final class SqliteConnectionManager {
     public SqliteConnectionManager(@Nonnull Path databasePath) {
         this.databasePath = databasePath.toAbsolutePath().normalize();
         this.jdbcUrl = "jdbc:sqlite:" + this.databasePath;
-        ensureDriverLoaded();
     }
 
     @Nonnull
@@ -35,6 +34,7 @@ public final class SqliteConnectionManager {
         ensureParentDirectory();
         Connection connection;
         try {
+            ensureDriverLoaded();
             connection = DriverManager.getConnection(jdbcUrl);
         } catch (LinkageError error) {
             throw new SQLException("sqlite_native_unavailable", error);
@@ -43,7 +43,7 @@ public final class SqliteConnectionManager {
         return connection;
     }
 
-    private void ensureDriverLoaded() {
+    private void ensureDriverLoaded() throws SQLException {
         if (driverLoaded) {
             return;
         }
@@ -55,7 +55,9 @@ public final class SqliteConnectionManager {
                 Class.forName("org.sqlite.JDBC");
                 driverLoaded = true;
             } catch (ClassNotFoundException ex) {
-                throw new IllegalStateException("sqlite_jdbc_driver_missing", ex);
+                throw new SQLException("sqlite_jdbc_driver_missing", ex);
+            } catch (LinkageError error) {
+                throw new SQLException("sqlite_native_unavailable", error);
             }
         }
     }
