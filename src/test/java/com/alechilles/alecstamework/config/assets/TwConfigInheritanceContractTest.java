@@ -423,6 +423,7 @@ class TwConfigInheritanceContractTest {
         TwLevelingConfig.CombatXpSourceSettings childCombat = new TwLevelingConfig.CombatXpSourceSettings();
         setField(parentFeed, "enabled", false);
         setField(parentFeed, "flatXp", 8.0d);
+        setField(parentFeed, "awardCooldownSeconds", 900);
         setField(childFeed, "enabled", true);
         setField(parentCombat, "damageDealtXpPerPoint", 1.25d);
         setField(parentCombat, "awardVsPlayers", true);
@@ -453,6 +454,7 @@ class TwConfigInheritanceContractTest {
         assertEquals(1.4d, child.getLevels().getGrowthFactor(), 0.00001d);
         assertTrue(child.getXpSources().getFeed().isEnabled());
         assertEquals(8.0d, child.getXpSources().getFeed().getFlatXp(), 0.00001d);
+        assertEquals(900, child.getXpSources().getFeed().getAwardCooldownSeconds());
         assertEquals(1.25d, child.getXpSources().getCombat().getDamageDealtXpPerPoint(), 0.00001d);
         assertEquals(0.4d, child.getXpSources().getCombat().getDamageTakenXpPerPoint(), 0.00001d);
         assertTrue(child.getXpSources().getCombat().isAwardVsPlayers());

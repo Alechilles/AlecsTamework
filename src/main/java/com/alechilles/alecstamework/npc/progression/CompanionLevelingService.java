@@ -138,6 +138,17 @@ public final class CompanionLevelingService {
                                       @Nullable String roleIdHint,
                                       @Nonnull CompanionXpSource source,
                                       double amount) {
+        return awardXp(npcRef, store, commandBuffer, roleIdHint, source, amount, null);
+    }
+
+    @Nonnull
+    private static AwardResult awardXp(@Nullable Ref<EntityStore> npcRef,
+                                       @Nullable Store<EntityStore> store,
+                                       @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                       @Nullable String roleIdHint,
+                                       @Nonnull CompanionXpSource source,
+                                       double amount,
+                                       @Nullable Long feedXpAwardedAtMs) {
         if (npcRef == null || !npcRef.isValid() || store == null || !Double.isFinite(amount) || amount <= 0.0) {
             return AwardResult.notApplied();
         }
@@ -170,8 +181,17 @@ public final class CompanionLevelingService {
         double previousTotalXp = component.getTotalXp();
         double previousCurrentXp = component.getCurrentXp();
         double nextTotalXp = previousTotalXp + amount;
+        long nextFeedXpAwardedAtMs = feedXpAwardedAtMs != null
+                ? Math.max(0L, feedXpAwardedAtMs)
+                : component.getLastFeedXpAwardedAtMs();
         TameworkLevelingComponent updated = normalizeComponent(
-                new TameworkLevelingComponent(component.getConfigId(), component.getLevel(), component.getCurrentXp(), nextTotalXp),
+                new TameworkLevelingComponent(
+                        component.getConfigId(),
+                        component.getLevel(),
+                        component.getCurrentXp(),
+                        nextTotalXp,
+                        nextFeedXpAwardedAtMs
+                ),
                 config
         );
         if (!hasMeaningfulChange(component, updated)) {
@@ -460,14 +480,21 @@ public final class CompanionLevelingService {
         double totalXp = sanitizeXp(component.getTotalXp());
         int resolvedLevel = resolveLevelFromTotalXp(config, totalXp);
         double currentXp = Math.max(0.0, totalXp - resolveCumulativeXpForLevel(config, resolvedLevel));
-        return new TameworkLevelingComponent(config.getId(), resolvedLevel, currentXp, totalXp);
+        return new TameworkLevelingComponent(
+                config.getId(),
+                resolvedLevel,
+                currentXp,
+                totalXp,
+                component.getLastFeedXpAwardedAtMs()
+        );
     }
 
     private static boolean hasMeaningfulChange(@Nonnull TameworkLevelingComponent left,
                                                @Nonnull TameworkLevelingComponent right) {
         return left.getLevel() != right.getLevel()
                 || Math.abs(left.getCurrentXp() - right.getCurrentXp()) > EPSILON
-                || Math.abs(left.getTotalXp() - right.getTotalXp()) > EPSILON;
+                || Math.abs(left.getTotalXp() - right.getTotalXp()) > EPSILON
+                || left.getLastFeedXpAwardedAtMs() != right.getLastFeedXpAwardedAtMs();
     }
 
     private static boolean configIdChanged(@Nonnull TameworkLevelingComponent left,
@@ -565,7 +592,19 @@ public final class CompanionLevelingService {
         if (!settings.isEnabled() || !(settings.getFlatXp() > 0.0)) {
             return AwardResult.notApplied();
         }
-        return awardXp(npcRef, store, null, roleId, xpSource, settings.getFlatXp());
+        Long feedXpAwardedAtMs = null;
+        if (sourceType == SimpleXpSourceType.FEED) {
+            TameworkLevelingComponent component = ensureLevelingComponent(npcRef, store, null, roleId);
+            if (component == null) {
+                return AwardResult.notApplied();
+            }
+            long nowMs = System.currentTimeMillis();
+            if (!isFeedXpCooldownReady(component.getLastFeedXpAwardedAtMs(), nowMs, settings.getAwardCooldownSeconds())) {
+                return AwardResult.notApplied();
+            }
+            feedXpAwardedAtMs = nowMs;
+        }
+        return awardXp(npcRef, store, null, roleId, xpSource, settings.getFlatXp(), feedXpAwardedAtMs);
     }
 
     @Nonnull
@@ -615,7 +654,41 @@ public final class CompanionLevelingService {
         if (!eligibility.eligible()) {
             return "reason=" + eligibility.reason() + " roleId=" + roleId + " configId=" + config.getId();
         }
+        if (sourceType == SimpleXpSourceType.FEED) {
+            TameworkLevelingComponent component = ensureLevelingComponent(npcRef, store, null, roleId);
+            if (component == null) {
+                return "reason=missing-leveling-component roleId=" + roleId + " configId=" + config.getId();
+            }
+            long nowMs = System.currentTimeMillis();
+            if (!isFeedXpCooldownReady(component.getLastFeedXpAwardedAtMs(), nowMs, settings.getAwardCooldownSeconds())) {
+                long remainingMs = Math.max(0L, resolveFeedXpCooldownUntilMs(
+                        component.getLastFeedXpAwardedAtMs(),
+                        settings.getAwardCooldownSeconds()
+                ) - nowMs);
+                return "reason=feed-xp-cooldown roleId=" + roleId
+                        + " configId=" + config.getId()
+                        + " remainingMs=" + remainingMs;
+            }
+        }
         return "reason=ready roleId=" + roleId + " configId=" + config.getId() + " flatXp=" + settings.getFlatXp();
+    }
+
+    static boolean isFeedXpCooldownReady(long lastAwardedAtMs, long nowMs, int cooldownSeconds) {
+        if (cooldownSeconds <= 0 || lastAwardedAtMs <= 0L) {
+            return true;
+        }
+        return nowMs >= resolveFeedXpCooldownUntilMs(lastAwardedAtMs, cooldownSeconds);
+    }
+
+    static long resolveFeedXpCooldownUntilMs(long lastAwardedAtMs, int cooldownSeconds) {
+        if (cooldownSeconds <= 0 || lastAwardedAtMs <= 0L) {
+            return 0L;
+        }
+        long cooldownMs = (long) cooldownSeconds * 1000L;
+        if (Long.MAX_VALUE - lastAwardedAtMs < cooldownMs) {
+            return Long.MAX_VALUE;
+        }
+        return lastAwardedAtMs + cooldownMs;
     }
 
     @Nonnull
