@@ -41,6 +41,9 @@ public final class TameworkCompanionTalentsPage
     private static final String ACTION_PAN_LEFT = "PanLeft";
     private static final String ACTION_PAN_RIGHT = "PanRight";
     private static final int HORIZONTAL_PAN_STEP = 260;
+    private static final int PAN_CONTROLS_TOP = 48;
+    private static final int PAN_CONTROLS_WIDTH = 112;
+    private static final int PAN_CONTROLS_HEIGHT = 28;
     public static final String STATE_PURCHASED = "Purchased";
     public static final String STATE_LOCKED = "Locked";
     public static final String STATE_UNAFFORDABLE = "Unaffordable";
@@ -215,6 +218,7 @@ public final class TameworkCompanionTalentsPage
         );
         commandBuilder.set("#TameworkCompanionTalentsResetButton.Visible", data.canReset());
         commandBuilder.set("#TalentTreePanControls.Visible", maxHorizontalOffset > 0);
+        commandBuilder.setObject("#TalentTreePanControls.Anchor", resolvePanControlsAnchor(viewportWidth));
         commandBuilder.set("#TalentTreePanLeftButton.Visible", maxHorizontalOffset > 0);
         commandBuilder.set("#TalentTreePanRightButton.Visible", maxHorizontalOffset > 0);
         commandBuilder.setObject(
@@ -263,6 +267,20 @@ public final class TameworkCompanionTalentsPage
         bindConnectorSlots(commandBuilder, canvas.connectors());
         bindNodeSlots(commandBuilder, eventBuilder, canvas.nodes());
         bindSelectedTalent(commandBuilder, eventBuilder, selectedEntry);
+    }
+
+    @Nonnull
+    static Anchor resolvePanControlsAnchor(int viewportWidth) {
+        return TalentTreeLayoutService.buildAnchor(
+                resolvePanControlsLeft(viewportWidth),
+                PAN_CONTROLS_TOP,
+                PAN_CONTROLS_WIDTH,
+                PAN_CONTROLS_HEIGHT
+        );
+    }
+
+    static int resolvePanControlsLeft(int viewportWidth) {
+        return Math.max(0, (viewportWidth - PAN_CONTROLS_WIDTH) / 2);
     }
 
     @Nonnull

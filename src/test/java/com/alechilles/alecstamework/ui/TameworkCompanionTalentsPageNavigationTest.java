@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -228,5 +229,19 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertTrue(ui.contains("Text: \"Pan\""), "Pan strip label should read Pan.");
         assertTrue(page.contains("#TalentTreePanLeftButton.Visible\", maxHorizontalOffset > 0"), "Left pan button should show whenever overflow controls are needed.");
         assertTrue(page.contains("#TalentTreePanRightButton.Visible\", maxHorizontalOffset > 0"), "Right pan button should show whenever overflow controls are needed.");
+    }
+
+    @Test
+    void talentPanControlsCenterOverDynamicTreeViewport() throws IOException {
+        String page = Files.readString(TALENTS_PAGE, StandardCharsets.UTF_8);
+
+        assertTrue(
+                page.contains("#TalentTreePanControls.Anchor")
+                        && page.contains("resolvePanControlsAnchor(viewportWidth)"),
+                "Pan controls should bind their anchor from the current viewport width."
+        );
+        assertEquals(296, TameworkCompanionTalentsPage.resolvePanControlsLeft(704));
+        assertEquals(354, TameworkCompanionTalentsPage.resolvePanControlsLeft(820));
+        assertEquals(0, TameworkCompanionTalentsPage.resolvePanControlsLeft(80));
     }
 }
