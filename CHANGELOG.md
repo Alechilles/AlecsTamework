@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.12.1 - SQLite Startup Hotfix - 2026-05-30
+
+### Fixed
+- Fixed Hytale `0.5.3` setup crashes caused by SQLite JDBC seeing another mod's SLF4J classes first, keeping persistence driver failures recoverable instead of setup-fatal.
+
 ## 2.12.0 - Companion Talent Trees and Progression Utilities - 2026-05-30
 
 ### Added
@@ -20,7 +25,6 @@
 - Moved the linked companion count into the panel header and replaced the subtitle count row with the group selector.
 
 ### Fixed
-- Fixed Hytale `0.5.3` setup crashes caused by SQLite JDBC seeing another mod's SLF4J classes first, keeping persistence driver failures recoverable instead of setup-fatal.
 - Fixed `/tw settings` and `/tw news` permission checks so OPs/admins are evaluated through the live `PlayerRef` permission holder instead of the player component after Hytale Update 5.
 - Fixed compatibility with summoned mounts from other mods by preserving valid mount owner references until vanilla mount setup finishes.
 
