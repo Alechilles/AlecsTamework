@@ -1,14 +1,19 @@
 # Changelog
 
-## 2.12.1 - SQLite Startup Hotfix - 2026-05-30
+## 2.12.2 - Simplified Preset Hotfix - 2026-06-01
 
 ### Changed
+- Updated Modtale release metadata to target Hytale `0.5.3`.
 - Updated the simplified Minecraft-like settings preset to turn companion genders off by default.
 
 ### Fixed
-- Fixed Hytale `0.5.3` setup crashes caused by SQLite JDBC seeing another mod's SLF4J classes first, keeping persistence driver failures recoverable instead of setup-fatal.
 - Fixed Hytale `0.5.3` setup crashes when Hytale reports a player-event registry as already shut down during startup; affected optional listeners now warn and Tamework continues loading.
 - Fixed simplified Minecraft-like settings leaving juvenile lifecycle roles without growth state, preventing baby animals from growing into breedable adults.
+
+## 2.12.1 - SQLite Startup Hotfix - 2026-05-30
+
+### Fixed
+- Fixed Hytale `0.5.3` setup crashes caused by SQLite JDBC seeing another mod's SLF4J classes first, keeping persistence driver failures recoverable instead of setup-fatal.
 
 ## 2.12.0 - Companion Talent Trees and Progression Utilities - 2026-05-30
 
