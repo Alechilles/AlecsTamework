@@ -2,6 +2,9 @@
 
 ## 2.12.1 - SQLite Startup Hotfix - 2026-05-30
 
+### Changed
+- Updated the simplified Minecraft-like settings preset to turn companion genders off by default.
+
 ### Fixed
 - Fixed Hytale `0.5.3` setup crashes caused by SQLite JDBC seeing another mod's SLF4J classes first, keeping persistence driver failures recoverable instead of setup-fatal.
 - Fixed Hytale `0.5.3` setup crashes when Hytale reports a player-event registry as already shut down during startup; affected optional listeners now warn and Tamework continues loading.

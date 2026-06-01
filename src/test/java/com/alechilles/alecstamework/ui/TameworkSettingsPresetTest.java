@@ -20,7 +20,7 @@ class TameworkSettingsPresetTest {
         assertEquals(false, presetValues.happinessEnabled());
         assertEquals(false, presetValues.passiveBreedingEnabled());
         assertEquals(false, presetValues.breedingRequiresHappiness());
-        assertEquals(true, presetValues.breedingGenderEnabled());
+        assertEquals(false, presetValues.breedingGenderEnabled());
         assertEquals(false, presetValues.traitsEnabled());
         assertEquals(false, presetValues.levelingEnabled());
         assertEquals(false, presetValues.talentsEnabled());
@@ -33,11 +33,13 @@ class TameworkSettingsPresetTest {
         TameworkSettingsValues easier = TameworkSettingsPreset.EASIER.applyTo(baseValues());
         assertEquals(false, easier.needsDamageEnabled());
         assertEquals(false, easier.needsDamageLethal());
+        assertEquals(true, easier.breedingGenderEnabled());
         assertEquals(TameworkSettingsPreset.EASIER, TameworkSettingsPreset.match(easier));
 
         TameworkSettingsValues full = TameworkSettingsPreset.FULL_EXPERIENCE.applyTo(baseValues());
         assertEquals(true, full.needsDamageEnabled());
         assertEquals(true, full.needsDamageLethal());
+        assertEquals(true, full.breedingGenderEnabled());
         assertEquals(true, full.levelingEnabled());
         assertEquals(true, full.talentsEnabled());
         assertEquals(TameworkSettingsPreset.FULL_EXPERIENCE, TameworkSettingsPreset.match(full));

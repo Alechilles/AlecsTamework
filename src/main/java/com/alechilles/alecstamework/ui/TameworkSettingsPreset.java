@@ -40,9 +40,9 @@ public enum TameworkSettingsPreset {
     public TameworkSettingsValues applyTo(@Nonnull TameworkSettingsValues values) {
         return switch (this) {
             case CUSTOM -> values;
-            case SIMPLIFIED -> values.withExperienceSettings(false, false, false, false, false, false, false, false, false);
-            case EASIER -> values.withExperienceSettings(true, false, false, true, true, true, true, true, true);
-            case FULL_EXPERIENCE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true);
+            case SIMPLIFIED -> values.withExperienceSettings(false, false, false, false, false, false, false, false, false, false);
+            case EASIER -> values.withExperienceSettings(true, false, false, true, true, true, true, true, true, true);
+            case FULL_EXPERIENCE -> values.withExperienceSettings(true, true, true, true, true, true, true, true, true, true);
         };
     }
 
@@ -61,13 +61,13 @@ public enum TameworkSettingsPreset {
 
     @Nonnull
     public static TameworkSettingsPreset match(@Nonnull TameworkSettingsValues values) {
-        if (matches(values, false, false, false, false, false, false, false, false, false)) {
+        if (matches(values, false, false, false, false, false, false, false, false, false, false)) {
             return SIMPLIFIED;
         }
-        if (matches(values, true, false, false, true, true, true, true, true, true)) {
+        if (matches(values, true, false, false, true, true, true, true, true, true, true)) {
             return EASIER;
         }
-        if (matches(values, true, true, true, true, true, true, true, true, true)) {
+        if (matches(values, true, true, true, true, true, true, true, true, true, true)) {
             return FULL_EXPERIENCE;
         }
         return CUSTOM;
@@ -90,6 +90,7 @@ public enum TameworkSettingsPreset {
                                    boolean happinessEnabled,
                                    boolean passiveBreedingEnabled,
                                    boolean breedingRequiresHappiness,
+                                   boolean breedingGenderEnabled,
                                    boolean traitsEnabled,
                                    boolean levelingEnabled,
                                    boolean talentsEnabled) {
@@ -99,6 +100,7 @@ public enum TameworkSettingsPreset {
                 && values.happinessEnabled() == happinessEnabled
                 && values.passiveBreedingEnabled() == passiveBreedingEnabled
                 && values.breedingRequiresHappiness() == breedingRequiresHappiness
+                && values.breedingGenderEnabled() == breedingGenderEnabled
                 && values.traitsEnabled() == traitsEnabled
                 && values.levelingEnabled() == levelingEnabled
                 && values.talentsEnabled() == talentsEnabled;

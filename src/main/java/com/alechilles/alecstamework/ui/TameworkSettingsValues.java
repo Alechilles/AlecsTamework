@@ -100,6 +100,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                                   boolean happinessEnabled,
                                                   boolean passiveBreedingEnabled,
                                                   boolean breedingRequiresHappiness,
+                                                  boolean breedingGenderEnabled,
                                                   boolean traitsEnabled,
                                                   boolean levelingEnabled,
                                                   boolean talentsEnabled) {
