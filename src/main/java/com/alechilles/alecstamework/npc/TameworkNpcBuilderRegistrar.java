@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc;
 
 import java.util.logging.Level;
 
+import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
@@ -64,12 +65,12 @@ public final class TameworkNpcBuilderRegistrar {
             return;
         }
         plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: NPCPlugin not ready, waiting for PluginSetupEvent.");
-        if (plugin.getEventRegistry() != null) {
-            plugin.getEventRegistry().registerGlobal(
-                    PluginSetupEvent.class,
-                    this::onPluginSetup
-            );
-        }
+        TameworkEventRegistrationSupport.registerGlobal(
+                plugin,
+                PluginSetupEvent.class,
+                this::onPluginSetup,
+                "NPC builder plugin setup listener"
+        );
     }
 
     // Called when plugins are set up; used to detect NPCPlugin availability.

@@ -80,6 +80,7 @@ import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
+import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
@@ -845,54 +846,84 @@ public class Tamework extends JavaPlugin {
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 PlayerInteractEvent.class,
-                ownerInteractionListener::onPlayerInteract
+                ownerInteractionListener::onPlayerInteract,
+                "owner interaction enforcement"
         );
         OwnerPresenceTimelineService ownerPresenceTimelineService = OwnerPresenceTimelineService.get();
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 PlayerConnectEvent.class,
-                ownerPresenceTimelineService::onPlayerConnect
+                ownerPresenceTimelineService::onPlayerConnect,
+                "owner presence connect tracking"
         );
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 PlayerDisconnectEvent.class,
-                ownerPresenceTimelineService::onPlayerDisconnect
+                ownerPresenceTimelineService::onPlayerDisconnect,
+                "owner presence disconnect tracking"
         );
         if (settingsAnnouncementService != null) {
-            getEventRegistry().registerGlobal(
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
                     PlayerConnectEvent.class,
-                    settingsAnnouncementService::onPlayerConnect
+                    settingsAnnouncementService::onPlayerConnect,
+                    "settings announcement connect reset"
             );
-            getEventRegistry().registerGlobal(
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
                     PlayerDisconnectEvent.class,
-                    settingsAnnouncementService::onPlayerDisconnect
+                    settingsAnnouncementService::onPlayerDisconnect,
+                    "settings announcement disconnect reset"
             );
-            getEventRegistry().registerGlobal(
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
                     PlayerReadyEvent.class,
-                    settingsAnnouncementService::onPlayerReady
+                    settingsAnnouncementService::onPlayerReady,
+                    "settings announcement ready prompt"
             );
         }
         if (namingFeatureHandler != null) {
-            getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
-            getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
-        }
-        if (commandItemFeatureHandler != null) {
-            getEventRegistry().registerGlobal(
-                    AddPlayerToWorldEvent.class,
-                    commandItemFeatureHandler::onAddPlayerToWorld
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    PlayerChatEvent.class,
+                    namingFeatureHandler::onPlayerChat,
+                    "name item chat capture"
+            );
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    PlayerDisconnectEvent.class,
+                    namingFeatureHandler::onPlayerDisconnect,
+                    "name item disconnect cleanup"
             );
         }
-        getEventRegistry().registerGlobal(
+        if (commandItemFeatureHandler != null) {
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    AddPlayerToWorldEvent.class,
+                    commandItemFeatureHandler::onAddPlayerToWorld,
+                    "command item relocation resume"
+            );
+        }
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 AddPlayerToWorldEvent.class,
-                this::onPlayerAddedToWorldForOverrides
+                this::onPlayerAddedToWorldForOverrides,
+                "loaded world override initialization"
         );
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 RemoveWorldEvent.class,
-                this::onWorldRemovedForCrashTelemetry
+                this::onWorldRemovedForCrashTelemetry,
+                "crash telemetry world cleanup"
         );
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 RemoveWorldEvent.class,
-                this::onWorldRemovedForProgressionTiming
+                this::onWorldRemovedForProgressionTiming,
+                "progression timing world cleanup"
         );
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(

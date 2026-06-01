@@ -4,6 +4,7 @@
 
 ### Fixed
 - Fixed Hytale `0.5.3` setup crashes caused by SQLite JDBC seeing another mod's SLF4J classes first, keeping persistence driver failures recoverable instead of setup-fatal.
+- Fixed Hytale `0.5.3` setup crashes when Hytale reports a player-event registry as already shut down during startup; affected optional listeners now warn and Tamework continues loading.
 
 ## 2.12.0 - Companion Talent Trees and Progression Utilities - 2026-05-30
 
