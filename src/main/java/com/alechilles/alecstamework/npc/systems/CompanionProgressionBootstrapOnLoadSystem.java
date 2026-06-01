@@ -112,6 +112,9 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         if (isBreedingBootstrapRequired(reference, store, roleId)) {
             return true;
         }
+        if (isLifeStageBootstrapRequired(reference, store, roleId)) {
+            return true;
+        }
         return isTraitBootstrapRequired(reference, store, roleId);
     }
 
@@ -178,6 +181,28 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         return store.getComponent(reference, lifeStageType) == null;
     }
 
+    private boolean isLifeStageBootstrapRequired(@Nonnull Ref<EntityStore> reference,
+                                                 @Nonnull Store<EntityStore> store,
+                                                 @Nonnull String roleId) {
+        TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        TwBreedingConfig.OffspringLifecycleSettings lifecycle = config.resolveOffspringLifecycle(roleId);
+        if (lifecycle == null || !lifecycle.isEnabled()) {
+            return false;
+        }
+        TwBreedingConfig.RoleFamily family = config.resolveLifecycleLineFamilyForRole(roleId);
+        if (family == null) {
+            family = config.resolveLifecycleFamilyForRole(roleId);
+        }
+        if (!isJuvenileLifecycleRole(roleId, family)) {
+            return false;
+        }
+        var lifeStageType = TameworkLifeStageComponent.getComponentType();
+        return lifeStageType != null && store.getComponent(reference, lifeStageType) == null;
+    }
+
     private boolean isAttachmentBootstrapRequired(@Nonnull Ref<EntityStore> reference,
                                                   @Nonnull Store<EntityStore> store,
                                                   @Nonnull String roleId,
@@ -200,6 +225,43 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
                                                     boolean hasStoredAttachments,
                                                     boolean hasMigrationConfig) {
         return reason == AddReason.LOAD && (hasStoredAttachments || hasMigrationConfig);
+    }
+
+    static boolean isJuvenileLifecycleRole(@Nullable String roleId,
+                                           @Nullable TwBreedingConfig.RoleFamily family) {
+        if (roleId == null || roleId.isBlank() || family == null) {
+            return false;
+        }
+        if (matchesRoleId(roleId, family.getBabyRoleId())
+                || matchesRoleId(roleId, family.getAdolescentRoleId())) {
+            return true;
+        }
+        for (TwBreedingConfig.RoleLine line : family.getLines()) {
+            if (line == null) {
+                continue;
+            }
+            if (matchesRoleId(roleId, line.getBabyRoleId())
+                    || matchesRoleId(roleId, line.getAdolescentRoleId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesRoleId(@Nullable String left, @Nullable String right) {
+        if (left == null || left.isBlank() || right == null || right.isBlank()) {
+            return false;
+        }
+        return normalizeRoleId(left).equals(normalizeRoleId(right));
+    }
+
+    private static String normalizeRoleId(@Nonnull String roleId) {
+        String normalized = roleId.trim().toLowerCase(java.util.Locale.ROOT);
+        int separator = normalized.lastIndexOf(':');
+        if (separator >= 0 && separator < normalized.length() - 1) {
+            return normalized.substring(separator + 1);
+        }
+        return normalized;
     }
 
     private static boolean isTamed(@Nullable TameworkTamedComponent tamed) {
