@@ -143,7 +143,11 @@ public final class TameworkHappinessComponent implements Component<EntityStore> 
 
     @Override
     public TameworkHappinessComponent clone() {
-        ActiveImpulse[] clonedImpulses = getActiveImpulses().clone();
+        ActiveImpulse[] impulses = getActiveImpulses();
+        if (impulses.length == 0) {
+            return new TameworkHappinessComponent(configId, value, lastUpdateMs, EMPTY_ACTIVE_IMPULSES);
+        }
+        ActiveImpulse[] clonedImpulses = impulses.clone();
         for (int i = 0; i < clonedImpulses.length; i++) {
             if (clonedImpulses[i] != null) {
                 clonedImpulses[i] = clonedImpulses[i].clone();
