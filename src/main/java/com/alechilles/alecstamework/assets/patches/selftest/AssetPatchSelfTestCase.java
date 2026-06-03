@@ -375,7 +375,7 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                   ]
                                 }
                         """,
-                        AssetPatchReloadMode.RESTART_REQUIRED,
+                        AssetPatchReloadMode.TAMEWORK_CONFIG,
                         ReloadRequirement.HOT_RELOAD_OR_RESTART_REQUIRED,
                         List.of(
                                 checkString("/CommandList/0/Id", "SelfTest"),

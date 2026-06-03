@@ -181,6 +181,11 @@ final class AssetPatchGeneratedPackPublisherTest {
         ));
         assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 true,
+                AssetPatchGeneratedPackPublisher.PublicationAction.REGISTER_PACK,
+                false
+        ));
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
+                true,
                 AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 true
         ));

@@ -151,6 +151,7 @@ public final class AssetPatchGeneratedPackPublisher {
             return false;
         }
         return action == PublicationAction.REFRESH_EXISTING_PACK
+                || action == PublicationAction.REGISTER_PACK
                 || (action == PublicationAction.NO_GENERATED_ASSETS && existingPackPresent);
     }
 

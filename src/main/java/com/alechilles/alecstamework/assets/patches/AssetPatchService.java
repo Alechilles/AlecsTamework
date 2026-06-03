@@ -14,6 +14,7 @@ import javax.annotation.Nonnull;
 
 import javax.annotation.Nullable;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetMap;
@@ -50,7 +51,10 @@ public final class AssetPatchService {
         this.targetResolver = new AssetPatchTargetResolver();
         this.patchEngine = new AssetPatchEngine();
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
-        this.reloadCoordinator = new AssetPatchReloadCoordinator();
+        this.reloadCoordinator = new AssetPatchReloadCoordinator(
+                AssetPatchReloadCoordinator::loadGeneratedTameworkConfigFamily,
+                createItemFeatureConfigReloader(plugin)
+        );
         this.hotReloadTracker = new AssetPatchHotReloadTracker(generatedPackId, publisher.cacheRoot());
     }
 
@@ -76,19 +80,7 @@ public final class AssetPatchService {
         RegenerationResult result = regenerateAndPublish(
                 AssetPatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
         );
-        if (result.publicationResult().shouldReloadRuntimeTargets()) {
-            try {
-                reloadCoordinator.reloadPublishedTargets(
-                        publisher.getGeneratedPack(),
-                        result.publicationResult().affectedTargets(),
-                        result.status()
-                );
-            } catch (IOException ex) {
-                String message = "Generated Tamework patch pack could not be hot-reloaded: " + ex.getMessage();
-                result.status().addFailed(message);
-                plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
-            }
-        }
+        reloadRuntimeTargetsIfNeeded(result);
         return result.status();
     }
 
@@ -146,6 +138,7 @@ public final class AssetPatchService {
             RegenerationResult result = regenerateAndPublish(
                     AssetPatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
             );
+            reloadRuntimeTargetsIfNeeded(result);
             if (result.status().hasFailures()) {
                 event.failed(false, "Tamework patch errors");
             }
@@ -155,6 +148,32 @@ public final class AssetPatchService {
             );
             event.failed(false, "Tamework patch generation failed");
         }
+    }
+
+    private void reloadRuntimeTargetsIfNeeded(@Nonnull RegenerationResult result) {
+        if (!result.publicationResult().shouldReloadRuntimeTargets()) {
+            return;
+        }
+        try {
+            reloadCoordinator.reloadPublishedTargets(
+                    publisher.getGeneratedPack(),
+                    result.publicationResult().affectedTargets(),
+                    result.status()
+            );
+        } catch (IOException ex) {
+            String message = "Generated Tamework patch pack could not be hot-reloaded: " + ex.getMessage();
+            result.status().addFailed(message);
+            plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
+        }
+    }
+
+    @Nonnull
+    private static Runnable createItemFeatureConfigReloader(@Nonnull JavaPlugin plugin) {
+        if (plugin instanceof Tamework tamework) {
+            return tamework::reloadItemFeatureConfigs;
+        }
+        return () -> {
+        };
     }
 
     @Nonnull

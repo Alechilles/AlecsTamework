@@ -25,12 +25,12 @@ final class AssetPatchTargetClassifierTest {
     }
 
     @Test
-    void classifiesTameworkConfigTargetsAsRestartRequired() {
+    void classifiesTameworkConfigTargetsAsTameworkConfigReloads() {
         AssetPatchTargetClassification result =
                 AssetPatchTargetClassifier.classify("Server/Tamework/Items/Commands/MyCommandConfig.json");
 
         assertEquals(AssetPatchTargetKind.TAMEWORK_CONFIG, result.kind());
-        assertEquals(AssetPatchReloadMode.RESTART_REQUIRED, result.reloadMode());
+        assertEquals(AssetPatchReloadMode.TAMEWORK_CONFIG, result.reloadMode());
     }
 
     @Test

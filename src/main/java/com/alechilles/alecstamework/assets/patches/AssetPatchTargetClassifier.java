@@ -21,7 +21,7 @@ public final class AssetPatchTargetClassifier {
         if (normalized.startsWith("Server/Tamework/") && !normalized.startsWith("Server/Tamework/Patches/")) {
             return new AssetPatchTargetClassification(
                     AssetPatchTargetKind.TAMEWORK_CONFIG,
-                    AssetPatchReloadMode.RESTART_REQUIRED
+                    AssetPatchReloadMode.TAMEWORK_CONFIG
             );
         }
         if (normalized.startsWith("Server/") && isServerJsonLikeTarget(normalized)) {
