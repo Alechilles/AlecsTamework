@@ -86,6 +86,19 @@ Supported conditions:
 - `JsonPathEquals`: compares a JSON pointer value with `Value` or `Equals`.
 - `TameworkSetting`: compares a resolved `/tw settings` value with `Value` or `Equals`, such as `traits.enabled`, `progression.levelingEnabled`, or `telemetry.enabled`.
 
+Version condition values must be exact dotted versions such as `2.12.3` or `0.5.3`; wildcard values such as `0.5.x` and `*` are rejected.
+
+`TameworkSetting` accepts the `ResolvedTameworkSettings` accessor name and the persisted settings JSON path. Common aliases include:
+
+| Setting area | Paths |
+| --- | --- |
+| Population | `populationLimitPerPlayerOwnedTotal`, `population.limitPerPlayerOwnedTotal`, `populationPerPlayerLimitScope`, `population.perPlayerLimitScope` |
+| Simple Claims | `simpleClaimsEnabled`, `simpleClaims.simpleClaimsEnabled`, `simpleClaims.enabled`, `simpleClaimsLimitPerClaimChunk`, `simpleClaims.limitPerClaimChunk`, `simpleClaimsLimitPerClaimTotal`, `simpleClaims.limitPerClaimTotal`, `simpleClaimsBreedingRequiresClaim`, `simpleClaims.breedingRequiresClaim`, `simpleClaimsProtectTamedFromNonMembers`, `simpleClaims.protectTamedFromNonMembers` |
+| Ownership | `blockOwnerDamage`, `ownership.damageProtection.blockOwnerDamage`, `blockAllPlayerDamageIfOwned`, `ownership.damageProtection.blockAllPlayerDamageIfOwned`, `invulnerableIfOwned`, `ownership.damageProtection.invulnerableIfOwned`, `captureClearsOwner`, `ownership.capture.captureClearsOwner`, `spawnSetsOwner`, `ownership.capture.spawnSetsOwner`, `captureRequiresOwner`, `ownership.capture.captureRequiresOwner`, `spawnRequiresOwner`, `ownership.capture.spawnRequiresOwner`, `interactionRequiresOwner`, `ownership.interactionRequiresOwner`, `linkingRequiresOwner`, `ownership.linkingRequiresOwner` |
+| Needs | `needsEnabled`, `needs.enabled`, `needsTickPolicyMode`, `needs.tickPolicy.mode`, `needs.tickPolicyMode`, `needsOwnerOfflineGraceHours`, `needs.tickPolicy.ownerOfflineGraceHours`, `needs.ownerOfflineGraceHours`, `needsOwnerOfflineDecayMultiplier`, `needs.tickPolicy.ownerOfflineDecayMultiplier`, `needs.ownerOfflineDecayMultiplier`, `needsDamageEnabled`, `needs.damage.enabled`, `needsDamageModel`, `needs.damage.model`, `needsDamageDualNeedRule`, `needs.damage.dualNeedRule`, `needsStarvationDamagePerMinute`, `needs.damage.starvationDamagePerMinute`, `needsDehydrationDamagePerMinute`, `needs.damage.dehydrationDamagePerMinute`, `needsDamageLethal`, `needs.damage.lethal` |
+| Companion features | `happinessEnabled`, `happiness.enabled`, `passiveBreedingEnabled`, `breeding.passiveBreedingEnabled`, `breeding.passiveEnabled`, `breedingRequiresHappiness`, `breeding.requiresHappiness`, `breedingGenderEnabled`, `breeding.genderEnabled`, `traitsEnabled`, `traits.enabled`, `levelingEnabled`, `progression.levelingEnabled`, `talentsEnabled`, `progression.talentsEnabled` |
+| Utility systems | `reviveSystemEnabled`, `revive.enabled`, `recallTeleportingEnabled`, `travel.recallTeleportingEnabled`, `telemetryEnabled`, `telemetry.enabled`, `telemetryBreadcrumbsEnabled`, `telemetry.breadcrumbsEnabled` |
+
 ## Macros
 
 Macros are convenience expansions, not automatic placement. They still require explicit paths and anchors.

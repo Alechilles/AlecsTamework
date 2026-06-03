@@ -338,7 +338,12 @@ public final class AssetPatchCondition {
                                              @Nonnull String field) {
         JsonElement element = object.get(field);
         if (element != null && !element.isJsonNull()) {
-            readString(element, conditionName + "." + field);
+            String version = readString(element, conditionName + "." + field);
+            if (!isDottedNumericVersion(version)) {
+                throw new IllegalArgumentException(
+                        conditionName + "." + field + " must be an exact dotted numeric version."
+                );
+            }
         }
     }
 
@@ -373,7 +378,7 @@ public final class AssetPatchCondition {
 
     private static boolean versionMatches(@Nullable String actual, @Nonnull JsonObject matcher) {
         String normalized = trimToNull(actual);
-        if (normalized == null) {
+        if (normalized == null || containsVersionWildcard(normalized)) {
             return false;
         }
         return matchesVersionField(normalized, matcher, "Equals", 0)
@@ -418,13 +423,22 @@ public final class AssetPatchCondition {
         return 0;
     }
 
+    private static boolean containsVersionWildcard(@Nonnull String version) {
+        String lower = version.toLowerCase(Locale.ROOT);
+        return lower.contains("x") || lower.contains("*");
+    }
+
+    private static boolean isDottedNumericVersion(@Nonnull String version) {
+        return version.matches("\\d+(\\.\\d+)*");
+    }
+
     @Nonnull
     private static String normalizeVersion(@Nonnull String version) {
         String trimmed = version.trim().toLowerCase(Locale.ROOT);
         if (trimmed.startsWith("=") || trimmed.startsWith("^") || trimmed.startsWith("~")) {
             trimmed = trimmed.substring(1);
         }
-        return trimmed.replace('x', '0').replace('*', '0');
+        return trimmed;
     }
 
     private static int parseVersionPart(@Nonnull String rawPart) {

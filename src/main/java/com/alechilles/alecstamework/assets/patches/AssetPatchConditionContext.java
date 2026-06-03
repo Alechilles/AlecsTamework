@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.assets.patches;
 
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -90,8 +89,8 @@ public final class AssetPatchConditionContext {
             return false;
         }
         for (PackInfo pack : packs) {
-            Path root = pack.root();
-            if (root != null && Files.isRegularFile(root.resolve(normalized))) {
+            Path candidate = resolvePackAsset(pack.root(), normalized);
+            if (candidate != null && Files.isRegularFile(candidate)) {
                 return true;
             }
         }
@@ -140,17 +139,6 @@ public final class AssetPatchConditionContext {
         if (property != null) {
             return property;
         }
-        try (Reader reader = new InputStreamReader(
-                AssetPatchConditionContext.class.getClassLoader().getResourceAsStream("manifest.json"),
-                StandardCharsets.UTF_8
-        )) {
-            JsonElement manifest = JsonParser.parseReader(reader);
-            if (manifest != null && manifest.isJsonObject()) {
-                return readManifestString(manifest.getAsJsonObject(), "ServerVersion");
-            }
-        } catch (Exception ignored) {
-            return null;
-        }
         return null;
     }
 
@@ -183,12 +171,8 @@ public final class AssetPatchConditionContext {
     private JsonElement readWinningJson(@Nonnull String assetPath) {
         Path winningSource = null;
         for (PackInfo pack : packs) {
-            Path root = pack.root();
-            if (root == null) {
-                continue;
-            }
-            Path candidate = root.resolve(assetPath);
-            if (Files.isRegularFile(candidate)) {
+            Path candidate = resolvePackAsset(pack.root(), assetPath);
+            if (candidate != null && Files.isRegularFile(candidate)) {
                 winningSource = candidate;
             }
         }
@@ -200,6 +184,16 @@ public final class AssetPatchConditionContext {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    @Nullable
+    private static Path resolvePackAsset(@Nullable Path root, @Nonnull String assetPath) {
+        if (root == null) {
+            return null;
+        }
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        Path candidate = normalizedRoot.resolve(assetPath).toAbsolutePath().normalize();
+        return candidate.startsWith(normalizedRoot) ? candidate : null;
     }
 
     @Nonnull
@@ -284,84 +278,116 @@ public final class AssetPatchConditionContext {
     @Nonnull
     private static Map<String, JsonElement> settingsByPath(@Nonnull ResolvedTameworkSettings settings) {
         Map<String, JsonElement> values = new LinkedHashMap<>();
-        put(values, "population.limitPerPlayerOwnedTotal", settings.populationLimitPerPlayerOwnedTotal());
-        put(values, "population.perPlayerLimitScope", settings.populationPerPlayerLimitScope());
-        put(values, "simpleClaims.enabled", settings.simpleClaimsEnabled());
-        put(values, "simpleClaims.limitPerClaimChunk", settings.simpleClaimsLimitPerClaimChunk());
-        put(values, "simpleClaims.limitPerClaimTotal", settings.simpleClaimsLimitPerClaimTotal());
-        put(values, "simpleClaims.breedingRequiresClaim", settings.simpleClaimsBreedingRequiresClaim());
-        put(values, "simpleClaims.protectTamedFromNonMembers", settings.simpleClaimsProtectTamedFromNonMembers());
-        put(values, "ownership.blockOwnerDamage", settings.blockOwnerDamage());
-        put(values, "ownership.blockAllPlayerDamageIfOwned", settings.blockAllPlayerDamageIfOwned());
-        put(values, "ownership.invulnerableIfOwned", settings.invulnerableIfOwned());
-        put(values, "spawner.captureClearsOwner", settings.captureClearsOwner());
-        put(values, "spawner.spawnSetsOwner", settings.spawnSetsOwner());
-        put(values, "ownership.captureRequiresOwner", settings.captureRequiresOwner());
-        put(values, "ownership.spawnRequiresOwner", settings.spawnRequiresOwner());
-        put(values, "ownership.interactionRequiresOwner", settings.interactionRequiresOwner());
-        put(values, "ownership.linkingRequiresOwner", settings.linkingRequiresOwner());
-        put(values, "needs.enabled", settings.needsEnabled());
-        put(values, "needs.tickPolicyMode", settings.needsTickPolicyMode());
-        put(values, "needs.ownerOfflineGraceHours", settings.needsOwnerOfflineGraceHours());
-        put(values, "needs.ownerOfflineDecayMultiplier", settings.needsOwnerOfflineDecayMultiplier());
-        put(values, "needs.damage.enabled", settings.needsDamageEnabled());
-        put(values, "needs.damage.model", settings.needsDamageModel());
-        put(values, "needs.damage.dualNeedRule", settings.needsDamageDualNeedRule());
-        put(values, "needs.damage.starvationDamagePerMinute", settings.needsStarvationDamagePerMinute());
-        put(values, "needs.damage.dehydrationDamagePerMinute", settings.needsDehydrationDamagePerMinute());
-        put(values, "needs.damage.lethal", settings.needsDamageLethal());
-        put(values, "happiness.enabled", settings.happinessEnabled());
-        put(values, "breeding.passiveEnabled", settings.passiveBreedingEnabled());
-        put(values, "breeding.requiresHappiness", settings.breedingRequiresHappiness());
-        put(values, "breeding.genderEnabled", settings.breedingGenderEnabled());
-        put(values, "traits.enabled", settings.traitsEnabled());
-        put(values, "progression.levelingEnabled", settings.levelingEnabled());
-        put(values, "progression.talentsEnabled", settings.talentsEnabled());
-        put(values, "revive.enabled", settings.reviveSystemEnabled());
-        put(values, "travel.recallTeleportingEnabled", settings.recallTeleportingEnabled());
-        put(values, "telemetry.enabled", settings.telemetryEnabled());
-        put(values, "telemetry.breadcrumbsEnabled", settings.telemetryBreadcrumbsEnabled());
+        put(values, settings.populationLimitPerPlayerOwnedTotal(),
+                "populationLimitPerPlayerOwnedTotal", "population.limitPerPlayerOwnedTotal");
+        put(values, settings.populationPerPlayerLimitScope(),
+                "populationPerPlayerLimitScope", "population.perPlayerLimitScope");
+        put(values, settings.simpleClaimsEnabled(),
+                "simpleClaimsEnabled", "simpleClaims.simpleClaimsEnabled", "simpleClaims.enabled");
+        put(values, settings.simpleClaimsLimitPerClaimChunk(),
+                "simpleClaimsLimitPerClaimChunk", "simpleClaims.limitPerClaimChunk");
+        put(values, settings.simpleClaimsLimitPerClaimTotal(),
+                "simpleClaimsLimitPerClaimTotal", "simpleClaims.limitPerClaimTotal");
+        put(values, settings.simpleClaimsBreedingRequiresClaim(),
+                "simpleClaimsBreedingRequiresClaim", "simpleClaims.breedingRequiresClaim");
+        put(values, settings.simpleClaimsProtectTamedFromNonMembers(),
+                "simpleClaimsProtectTamedFromNonMembers", "simpleClaims.protectTamedFromNonMembers");
+        put(values, settings.blockOwnerDamage(),
+                "blockOwnerDamage", "ownership.damageProtection.blockOwnerDamage", "ownership.blockOwnerDamage");
+        put(values, settings.blockAllPlayerDamageIfOwned(),
+                "blockAllPlayerDamageIfOwned", "ownership.damageProtection.blockAllPlayerDamageIfOwned",
+                "ownership.blockAllPlayerDamageIfOwned");
+        put(values, settings.invulnerableIfOwned(),
+                "invulnerableIfOwned", "ownership.damageProtection.invulnerableIfOwned",
+                "ownership.invulnerableIfOwned");
+        put(values, settings.captureClearsOwner(),
+                "captureClearsOwner", "ownership.capture.captureClearsOwner", "ownership.captureClearsOwner",
+                "spawner.captureClearsOwner");
+        put(values, settings.spawnSetsOwner(),
+                "spawnSetsOwner", "ownership.capture.spawnSetsOwner", "ownership.spawnSetsOwner",
+                "spawner.spawnSetsOwner");
+        put(values, settings.captureRequiresOwner(),
+                "captureRequiresOwner", "ownership.capture.captureRequiresOwner", "ownership.captureRequiresOwner");
+        put(values, settings.spawnRequiresOwner(),
+                "spawnRequiresOwner", "ownership.capture.spawnRequiresOwner", "ownership.spawnRequiresOwner");
+        put(values, settings.interactionRequiresOwner(),
+                "interactionRequiresOwner", "ownership.interactionRequiresOwner");
+        put(values, settings.linkingRequiresOwner(),
+                "linkingRequiresOwner", "ownership.linkingRequiresOwner");
+        put(values, settings.needsEnabled(),
+                "needsEnabled", "needs.enabled");
+        put(values, settings.needsTickPolicyMode(),
+                "needsTickPolicyMode", "needs.tickPolicy.mode", "needs.tickPolicyMode");
+        put(values, settings.needsOwnerOfflineGraceHours(),
+                "needsOwnerOfflineGraceHours", "needs.tickPolicy.ownerOfflineGraceHours",
+                "needs.ownerOfflineGraceHours");
+        put(values, settings.needsOwnerOfflineDecayMultiplier(),
+                "needsOwnerOfflineDecayMultiplier", "needs.tickPolicy.ownerOfflineDecayMultiplier",
+                "needs.ownerOfflineDecayMultiplier");
+        put(values, settings.needsDamageEnabled(),
+                "needsDamageEnabled", "needs.damage.enabled");
+        put(values, settings.needsDamageModel(),
+                "needsDamageModel", "needs.damage.model");
+        put(values, settings.needsDamageDualNeedRule(),
+                "needsDamageDualNeedRule", "needs.damage.dualNeedRule");
+        put(values, settings.needsStarvationDamagePerMinute(),
+                "needsStarvationDamagePerMinute", "needs.damage.starvationDamagePerMinute");
+        put(values, settings.needsDehydrationDamagePerMinute(),
+                "needsDehydrationDamagePerMinute", "needs.damage.dehydrationDamagePerMinute");
+        put(values, settings.needsDamageLethal(),
+                "needsDamageLethal", "needs.damage.lethal");
+        put(values, settings.happinessEnabled(),
+                "happinessEnabled", "happiness.enabled");
+        put(values, settings.passiveBreedingEnabled(),
+                "passiveBreedingEnabled", "breeding.passiveBreedingEnabled", "breeding.passiveEnabled");
+        put(values, settings.breedingRequiresHappiness(),
+                "breedingRequiresHappiness", "breeding.requiresHappiness");
+        put(values, settings.breedingGenderEnabled(),
+                "breedingGenderEnabled", "breeding.genderEnabled");
+        put(values, settings.traitsEnabled(),
+                "traitsEnabled", "traits.enabled");
+        put(values, settings.levelingEnabled(),
+                "levelingEnabled", "progression.levelingEnabled");
+        put(values, settings.talentsEnabled(),
+                "talentsEnabled", "progression.talentsEnabled");
+        put(values, settings.reviveSystemEnabled(),
+                "reviveSystemEnabled", "revive.enabled");
+        put(values, settings.recallTeleportingEnabled(),
+                "recallTeleportingEnabled", "travel.recallTeleportingEnabled");
+        put(values, settings.telemetryEnabled(),
+                "telemetryEnabled", "telemetry.enabled");
+        put(values, settings.telemetryBreadcrumbsEnabled(),
+                "telemetryBreadcrumbsEnabled", "telemetry.breadcrumbsEnabled");
         return Map.copyOf(values);
     }
 
-    private static void put(@Nonnull Map<String, JsonElement> values, @Nonnull String path, boolean value) {
-        JsonElement element = new JsonPrimitive(value);
-        values.put(normalizeSettingPath(path), element);
-        values.put(normalizeSettingPath(toRecordName(path)), element);
+    private static void put(@Nonnull Map<String, JsonElement> values, boolean value, @Nonnull String... aliases) {
+        put(values, new JsonPrimitive(value), aliases);
     }
 
-    private static void put(@Nonnull Map<String, JsonElement> values, @Nonnull String path, int value) {
-        JsonElement element = new JsonPrimitive(value);
-        values.put(normalizeSettingPath(path), element);
-        values.put(normalizeSettingPath(toRecordName(path)), element);
+    private static void put(@Nonnull Map<String, JsonElement> values, int value, @Nonnull String... aliases) {
+        put(values, new JsonPrimitive(value), aliases);
     }
 
-    private static void put(@Nonnull Map<String, JsonElement> values, @Nonnull String path, double value) {
-        JsonElement element = new JsonPrimitive(value);
-        values.put(normalizeSettingPath(path), element);
-        values.put(normalizeSettingPath(toRecordName(path)), element);
+    private static void put(@Nonnull Map<String, JsonElement> values, double value, @Nonnull String... aliases) {
+        put(values, new JsonPrimitive(value), aliases);
     }
 
-    private static void put(@Nonnull Map<String, JsonElement> values, @Nonnull String path, @Nonnull String value) {
-        JsonElement element = new JsonPrimitive(value);
-        values.put(normalizeSettingPath(path), element);
-        values.put(normalizeSettingPath(toRecordName(path)), element);
+    private static void put(@Nonnull Map<String, JsonElement> values,
+                            @Nonnull String value,
+                            @Nonnull String... aliases) {
+        put(values, new JsonPrimitive(value), aliases);
     }
 
-    @Nonnull
-    private static String toRecordName(@Nonnull String path) {
-        StringBuilder builder = new StringBuilder();
-        boolean upperNext = false;
-        for (int i = 0; i < path.length(); i++) {
-            char c = path.charAt(i);
-            if (c == '.') {
-                upperNext = true;
-                continue;
+    private static void put(@Nonnull Map<String, JsonElement> values,
+                            @Nonnull JsonElement value,
+                            @Nonnull String... aliases) {
+        for (String alias : aliases) {
+            String key = normalizeSettingPath(alias);
+            if (key != null) {
+                values.put(key, value);
             }
-            builder.append(upperNext ? Character.toUpperCase(c) : c);
-            upperNext = false;
         }
-        return builder.toString();
     }
 
     @Nullable
