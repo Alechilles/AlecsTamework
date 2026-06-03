@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.config.overrides;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetLoadResult;
 import com.hypixel.hytale.assetstore.AssetMap;
@@ -77,6 +78,15 @@ public final class TwConfigOverrideManager {
     @Nonnull
     public JsonObject readSourceJson(@Nonnull TwConfigAssetDescriptor descriptor) {
         return TwConfigJsonUtil.readObjectOrEmpty(descriptor.sourcePath());
+    }
+
+    @Nonnull
+    private JsonObject readEffectiveSourceJson(@Nonnull TwConfigAssetDescriptor descriptor) {
+        Path generatedPatchPath = resolveGeneratedPatchPath(resolveGeneratedPatchCacheRoot(), descriptor);
+        if (generatedPatchPath != null && Files.isRegularFile(generatedPatchPath)) {
+            return TwConfigJsonUtil.readObjectOrEmpty(generatedPatchPath);
+        }
+        return readSourceJson(descriptor);
     }
 
     @Nonnull
@@ -232,7 +242,7 @@ public final class TwConfigOverrideManager {
             LinkedHashSet<String> refreshPackKeys = new LinkedHashSet<>(loadedOverrideSourcePackKeys);
             for (TwConfigAssetDescriptor descriptor : snapshot.getDescriptors()) {
                 JsonObject overrideJson = readOverrideJson(world, descriptor);
-                if (!TwConfigJsonUtil.isEmptyObject(overrideJson)) {
+                if (!TwConfigJsonUtil.isEmptyObject(overrideJson) || hasGeneratedPatchForDescriptor(descriptor)) {
                     refreshPackKeys.add(descriptor.sourcePackKey());
                 }
             }
@@ -246,7 +256,7 @@ public final class TwConfigOverrideManager {
                     errors.add("No asset store binding found for family " + descriptor.familyDisplayName() + ".");
                     continue;
                 }
-                JsonObject sourceJson = readSourceJson(descriptor);
+                JsonObject sourceJson = readEffectiveSourceJson(descriptor);
                 JsonObject overrideJson = readOverrideJson(world, descriptor);
                 if (TwConfigJsonUtil.isEmptyObject(sourceJson) && TwConfigJsonUtil.isEmptyObject(overrideJson)) {
                     continue;
@@ -993,8 +1003,40 @@ public final class TwConfigOverrideManager {
         return sanitized.isBlank() ? "Unknown" : sanitized;
     }
 
+    private boolean hasGeneratedPatchForDescriptor(@Nonnull TwConfigAssetDescriptor descriptor) {
+        Path generatedPatchPath = resolveGeneratedPatchPath(resolveGeneratedPatchCacheRoot(), descriptor);
+        return generatedPatchPath != null && Files.isRegularFile(generatedPatchPath);
+    }
+
+    @Nullable
+    private Path resolveGeneratedPatchCacheRoot() {
+        AssetPatchService assetPatchService = plugin.getAssetPatchService();
+        return assetPatchService == null ? null : assetPatchService.getGeneratedPatchCacheRoot();
+    }
+
+    @Nullable
+    static Path resolveGeneratedPatchPath(@Nullable Path generatedPatchCacheRoot,
+                                          @Nonnull TwConfigAssetDescriptor descriptor) {
+        if (generatedPatchCacheRoot == null) {
+            return null;
+        }
+        String normalizedTarget = descriptor.relativeServerPath().toString().replace('\\', '/');
+        if (!normalizedTarget.startsWith("Server/Tamework/")
+                || normalizedTarget.startsWith("Server/Tamework/Patches/")) {
+            return null;
+        }
+        Path normalizedRoot = generatedPatchCacheRoot.toAbsolutePath().normalize();
+        Path resolved = resolvePortable(normalizedRoot, descriptor.relativeServerPath())
+                .toAbsolutePath()
+                .normalize();
+        if (!resolved.startsWith(normalizedRoot)) {
+            return null;
+        }
+        return resolved;
+    }
+
     @Nonnull
-    private Path resolvePortable(@Nonnull Path base, @Nonnull Path relative) {
+    private static Path resolvePortable(@Nonnull Path base, @Nonnull Path relative) {
         Path resolved = base;
         for (Path segment : relative) {
             if (segment == null) {
@@ -1017,6 +1059,7 @@ public final class TwConfigOverrideManager {
             for (TwConfigAssetDescriptor descriptor : descriptors) {
                 appendDigest(digest, descriptor.descriptorKey());
                 appendDigest(digest, hashFile(descriptor.sourcePath()));
+                appendDigest(digest, hashFile(resolveGeneratedPatchPath(resolveGeneratedPatchCacheRoot(), descriptor)));
                 appendDigest(digest, hashFile(resolveOverridePath(world, descriptor)));
             }
             return toHex(digest.digest());

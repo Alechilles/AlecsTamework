@@ -14,7 +14,6 @@ import javax.annotation.Nonnull;
 
 import javax.annotation.Nullable;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetMap;
@@ -51,10 +50,7 @@ public final class AssetPatchService {
         this.targetResolver = new AssetPatchTargetResolver();
         this.patchEngine = new AssetPatchEngine();
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
-        this.reloadCoordinator = new AssetPatchReloadCoordinator(
-                AssetPatchReloadCoordinator::loadGeneratedTameworkConfigFamily,
-                createItemFeatureConfigReloader(plugin)
-        );
+        this.reloadCoordinator = new AssetPatchReloadCoordinator();
         this.hotReloadTracker = new AssetPatchHotReloadTracker(generatedPackId, publisher.cacheRoot());
     }
 
@@ -165,15 +161,6 @@ public final class AssetPatchService {
             result.status().addFailed(message);
             plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
         }
-    }
-
-    @Nonnull
-    private static Runnable createItemFeatureConfigReloader(@Nonnull JavaPlugin plugin) {
-        if (plugin instanceof Tamework tamework) {
-            return tamework::reloadItemFeatureConfigs;
-        }
-        return () -> {
-        };
     }
 
     @Nonnull
