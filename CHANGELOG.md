@@ -2,8 +2,18 @@
 
 ## Unreleased
 
+## 2.13.0 - Conditional Asset Patches and Settings Cleanup - 2026-06-03
+
 ### Added
 - Added multi-target and expanded conditional optional asset patches so integration authors can apply the same patch to several assets and gate patches on installed mods, target/asset presence, mod/game versions, JSON paths, and `/tw settings` values.
+
+### Changed
+- Updated settings-owned Tamework config fields so runtime behavior follows `/tw settings` first while preserving defaults for older worlds and existing assets.
+- Reduced repeated prompt planning, needs resource scans, attachment sync sweeps, and nameplate trait segment churn in common companion flows.
+
+### Fixed
+- Fixed generated Tamework config overlay reloads so `/tw patches reload` and hot reloads refresh generated config patches consistently.
+- Fixed settings cleanup runtime overrides so spawners, happiness, breeding, ownership, needs, progression, revive, travel, and telemetry checks honor the resolved `/tw settings` values.
 
 ## 2.12.2 - Simplified Preset Hotfix - 2026-06-01
 
