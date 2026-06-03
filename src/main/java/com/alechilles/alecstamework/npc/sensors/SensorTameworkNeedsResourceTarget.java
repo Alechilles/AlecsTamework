@@ -18,8 +18,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -283,13 +283,14 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             return itemIds;
         }
         String[] passiveItemIds = needsConfig.getPassiveRefill().getContainerFoodItemIds();
-        if (hasConfiguredItemIds && !hasAnyItemId(passiveItemIds)) {
+        String[] sanitizedPassiveItemIds = sanitizeItemIds(passiveItemIds);
+        if (hasConfiguredItemIds && sanitizedPassiveItemIds.length == 0) {
             return itemIds;
         }
-        FoodItemIdsCacheKey key = FoodItemIdsCacheKey.from(needsConfig, passiveItemIds, hasConfiguredItemIds);
+        FoodItemIdsCacheKey key = FoodItemIdsCacheKey.from(needsConfig, sanitizedPassiveItemIds, hasConfiguredItemIds);
         return foodItemIdsByConfig.computeIfAbsent(key, ignored -> hasConfiguredItemIds
-                ? mergeItemIds(itemIds, passiveItemIds)
-                : sanitizeItemIds(passiveItemIds));
+                ? mergeItemIds(itemIds, sanitizedPassiveItemIds)
+                : sanitizedPassiveItemIds);
     }
 
     private static boolean hasAnyItemId(@Nullable String[] ids) {
@@ -524,18 +525,16 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     }
 
     private record FoodItemIdsCacheKey(@Nonnull String configId,
-                                       int passiveItemIdsHash,
-                                       int passiveItemIdsLength,
+                                       @Nonnull List<String> passiveItemIds,
                                        boolean hasConfiguredItemIds) {
         @Nonnull
         private static FoodItemIdsCacheKey from(@Nonnull TwNeedsConfig config,
-                                                @Nullable String[] passiveItemIds,
+                                                @Nonnull String[] passiveItemIds,
                                                 boolean hasConfiguredItemIds) {
             String configId = config.getId();
             return new FoodItemIdsCacheKey(
                     configId == null || configId.isBlank() ? "<default>" : configId.trim().toLowerCase(Locale.ROOT),
-                    Arrays.hashCode(passiveItemIds),
-                    passiveItemIds == null ? 0 : passiveItemIds.length,
+                    List.of(passiveItemIds),
                     hasConfiguredItemIds
             );
         }

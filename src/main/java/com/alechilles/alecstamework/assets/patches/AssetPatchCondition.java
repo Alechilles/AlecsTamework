@@ -58,24 +58,39 @@ public final class AssetPatchCondition {
 
     @Nonnull
     public static AssetPatchCondition parse(@Nonnull JsonObject object) {
-        if (object.size() != 1) {
+        String conditionKey = null;
+        JsonElement conditionValue = null;
+        for (var entry : object.entrySet()) {
+            String key = entry.getKey();
+            if ("$Comment".equals(key)) {
+                continue;
+            }
+            if (!isConditionKey(key)) {
+                throw new IllegalArgumentException("Unsupported condition key.");
+            }
+            if (conditionKey != null) {
+                throw new IllegalArgumentException("Condition object must define exactly one condition key.");
+            }
+            conditionKey = key;
+            conditionValue = entry.getValue();
+        }
+        if (conditionKey == null) {
             throw new IllegalArgumentException("Condition object must define exactly one condition key.");
         }
-        if (object.has("ModInstalled")) {
-            return modInstalled(readString(object.get("ModInstalled"), "ModInstalled"));
+        if ("ModInstalled".equals(conditionKey)) {
+            return modInstalled(readString(conditionValue, "ModInstalled"));
         }
-        if (object.has("All")) {
-            return composite(Kind.ALL, object.get("All"), "All");
+        if ("All".equals(conditionKey)) {
+            return composite(Kind.ALL, conditionValue, "All");
         }
-        if (object.has("Any")) {
-            return composite(Kind.ANY, object.get("Any"), "Any");
+        if ("Any".equals(conditionKey)) {
+            return composite(Kind.ANY, conditionValue, "Any");
         }
-        if (object.has("Not")) {
-            JsonElement element = object.get("Not");
-            if (element == null || !element.isJsonObject()) {
+        if ("Not".equals(conditionKey)) {
+            if (conditionValue == null || !conditionValue.isJsonObject()) {
                 throw new IllegalArgumentException("Not must be a condition object.");
             }
-            return new AssetPatchCondition(Kind.NOT, null, List.of(), parse(element.getAsJsonObject()));
+            return new AssetPatchCondition(Kind.NOT, null, List.of(), parse(conditionValue.getAsJsonObject()));
         }
         throw new IllegalArgumentException("Unsupported condition key.");
     }
@@ -106,6 +121,10 @@ public final class AssetPatchCondition {
         return new AssetPatchCondition(Kind.MOD_INSTALLED, packId, List.of(), null);
     }
 
+    private static boolean isConditionKey(@Nonnull String key) {
+        return "ModInstalled".equals(key) || "All".equals(key) || "Any".equals(key) || "Not".equals(key);
+    }
+
     @Nonnull
     private static AssetPatchCondition composite(@Nonnull Kind kind,
                                                  JsonElement element,
@@ -134,7 +153,7 @@ public final class AssetPatchCondition {
                 || element.getAsString().isBlank()) {
             throw new IllegalArgumentException(name + " must be a non-empty string.");
         }
-        return element.getAsString();
+        return element.getAsString().trim();
     }
 
     @Nonnull

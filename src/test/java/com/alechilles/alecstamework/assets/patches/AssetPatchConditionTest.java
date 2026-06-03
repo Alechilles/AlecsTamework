@@ -30,6 +30,22 @@ final class AssetPatchConditionTest {
     }
 
     @Test
+    void modInstalledTrimsConfiguredPackId() {
+        AssetPatchCondition condition = AssetPatchCondition.parse(object("""
+                {
+                  "ModInstalled": " alec:animal_husbandry "
+                }
+                """));
+        AssetPatchConditionContext context = new AssetPatchConditionContext(
+                "generated:patches",
+                List.of("alec:animal_husbandry")
+        );
+
+        assertTrue(condition.matches(context));
+        assertEquals("ModInstalled alec:animal_husbandry", condition.describe());
+    }
+
+    @Test
     void modInstalledDoesNotMatchMissingPack() {
         AssetPatchCondition condition = AssetPatchCondition.parse(object("""
                 {
@@ -85,6 +101,34 @@ final class AssetPatchConditionTest {
         AssetPatchCondition condition = AssetPatchCondition.parse(object("""
                 {
                   "Not": { "ModInstalled": "conflicting:mod" }
+                }
+                """));
+        AssetPatchConditionContext context = new AssetPatchConditionContext(
+                "generated:patches",
+                List.of("alec:animal_husbandry")
+        );
+
+        assertTrue(condition.matches(context));
+    }
+
+    @Test
+    void ignoresCommentFieldsInsideConditions() {
+        AssetPatchCondition condition = AssetPatchCondition.parse(object("""
+                {
+                  "$Comment": "Only patch when AH is available.",
+                  "All": [
+                    {
+                      "$Comment": "Dependency gate.",
+                      "ModInstalled": "alec:animal_husbandry"
+                    },
+                    {
+                      "$Comment": "Avoid conflicting pack.",
+                      "Not": {
+                        "$Comment": "Negated dependency gate.",
+                        "ModInstalled": "conflicting:mod"
+                      }
+                    }
+                  ]
                 }
                 """));
         AssetPatchConditionContext context = new AssetPatchConditionContext(
