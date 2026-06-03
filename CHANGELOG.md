@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added multi-target and conditional optional asset patches so integration authors can apply the same patch to several assets and gate patches on installed mods.
+
 ## 2.12.2 - Simplified Preset Hotfix - 2026-06-01
 
 ### Changed

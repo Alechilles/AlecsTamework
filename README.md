@@ -10,6 +10,8 @@
 
 ## Now Includes a Universal, Non-Destructive Asset Patcher!
 - Add, merge, and insert JSON into *any* Hytale asset at runtime
+- Apply one patch file across multiple target assets
+- Gate optional integrations on installed mods
 - Supports hot-reloading
 - Inspired by Hytalor
 - [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/asset-patches)
@@ -26,7 +28,7 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 
 ## Why Tamework
 - **No Java required for most integrations**: the main integration path is built around JSON assets, templates, role wiring, and `Tw*Config` files rather than custom Java systems.
-- **Non-destructive asset patching**: Add, merge, and insert JSON into *any* Hytale asset at runtime with hot-reload support.
+- **Non-destructive asset patching**: Add, merge, and insert JSON into one or many Hytale assets at runtime, with installed-mod conditions and hot-reload support.
 - **A shared standard for tameable NPCs**: mods built on Tamework can present familiar ownership, naming, command, linked-panel, breeding, and progression behavior instead of inventing incompatible one-off systems.
 - **Optimized interactions**: build taming, feeding, mounting, harvesting, breeding, and custom interactions with `TwInteractionConfig` and `TameworkInteract`.
 - **Ownership and tame-state systems**: use reusable builders and role-scoped policy for owner checks, protection rules, and companion behavior.
@@ -45,7 +47,7 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 
 ### Optional Dependency
 - Keep your base assets clean of any references to Tamework functionality.
-- Create asset patches under `Server/Tamework/Patches` that add Tamework actions, interactions, configs, and other JSON-based behavior at runtime only when Tamework is installed.
+- Create asset patches under `Server/Tamework/Patches` that add Tamework actions, interactions, configs, and other JSON-based behavior at runtime only when Tamework is installed. Use `Targets` for shared operations across several assets and `When.ModInstalled` for optional cross-mod gates.
 - Add configs for the Tamework systems you want to support.
 - Add Alec's Tamework as an optional dependency when deploying to CurseForge.
 
