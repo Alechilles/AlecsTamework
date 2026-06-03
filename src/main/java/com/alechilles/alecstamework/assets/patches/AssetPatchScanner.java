@@ -90,12 +90,14 @@ public final class AssetPatchScanner {
             if (element == null || !element.isJsonObject()) {
                 throw new IllegalArgumentException("Patch file must contain a JSON object.");
             }
-            AssetPatchDefinition definition =
-                    AssetPatchDefinition.parse((JsonObject) element, pack.getName(), sourcePath);
-            if (definition.isEnabled()) {
-                definitions.add(definition);
-            } else {
-                status.addSkipped(definition.getId() + " disabled");
+            List<AssetPatchDefinition> parsed =
+                    AssetPatchDefinition.parseAll((JsonObject) element, pack.getName(), sourcePath);
+            for (AssetPatchDefinition definition : parsed) {
+                if (definition.isEnabled()) {
+                    definitions.add(definition);
+                } else {
+                    status.addSkipped(definition.getId() + " disabled");
+                }
             }
         } catch (Exception ex) {
             String message = "Failed to parse asset patch " + pack.getName() + ":" + sourcePath + ": " + ex.getMessage();

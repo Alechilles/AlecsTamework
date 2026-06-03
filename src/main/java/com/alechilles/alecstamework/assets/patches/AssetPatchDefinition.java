@@ -2,7 +2,9 @@ package com.alechilles.alecstamework.assets.patches;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -43,13 +45,36 @@ public final class AssetPatchDefinition {
     public static AssetPatchDefinition parse(@Nonnull JsonObject root,
                                                    @Nonnull String sourcePack,
                                                    @Nonnull String sourcePath) {
+        List<AssetPatchDefinition> definitions = parseAll(root, sourcePack, sourcePath);
+        if (definitions.isEmpty()) {
+            throw new IllegalArgumentException("Patch '" + sourcePack + ":" + sourcePath + "' produced no definitions.");
+        }
+        return definitions.getFirst();
+    }
+
+    @Nonnull
+    public static List<AssetPatchDefinition> parseAll(@Nonnull JsonObject root,
+                                                            @Nonnull String sourcePack,
+                                                            @Nonnull String sourcePath) {
         String fallbackId = sourcePack + ":" + sourcePath;
         String id = readString(root, "Id", fallbackId);
-        String target = readRequiredString(root, "Target", id);
         int priority = readInt(root, "Priority", 0);
         boolean enabled = readBoolean(root, "Enabled", true);
         List<AssetPatchOperation> operations = readOperations(root, id);
-        return new AssetPatchDefinition(id, normalizeAssetPath(target), priority, enabled, operations, sourcePack, sourcePath);
+        List<String> targets = readTargets(root, id);
+        List<AssetPatchDefinition> definitions = new ArrayList<>(targets.size());
+        for (String target : targets) {
+            definitions.add(new AssetPatchDefinition(
+                    id,
+                    target,
+                    priority,
+                    enabled,
+                    operations,
+                    sourcePack,
+                    sourcePath
+            ));
+        }
+        return definitions;
     }
 
     @Nonnull
@@ -113,6 +138,54 @@ public final class AssetPatchDefinition {
             operations.add(AssetPatchOperation.parse(element.getAsJsonObject(), patchId, i));
         }
         return operations;
+    }
+
+    @Nonnull
+    private static List<String> readTargets(@Nonnull JsonObject root, @Nonnull String patchId) {
+        JsonElement singleTarget = root.get("Target");
+        JsonElement multipleTargets = root.get("Targets");
+        if (singleTarget != null && !singleTarget.isJsonNull()
+                && multipleTargets != null && !multipleTargets.isJsonNull()) {
+            throw new IllegalArgumentException("Patch '" + patchId + "' must define either Target or Targets, not both.");
+        }
+        if (multipleTargets != null && !multipleTargets.isJsonNull()) {
+            return readTargetArray(multipleTargets, patchId);
+        }
+        String target = readRequiredString(root, "Target", patchId);
+        return List.of(normalizedTarget(target, patchId));
+    }
+
+    @Nonnull
+    private static List<String> readTargetArray(@Nonnull JsonElement element, @Nonnull String patchId) {
+        if (!element.isJsonArray()) {
+            throw new IllegalArgumentException("Patch '" + patchId + "' Targets must be an array.");
+        }
+        JsonArray array = element.getAsJsonArray();
+        if (array.isEmpty()) {
+            throw new IllegalArgumentException("Patch '" + patchId + "' Targets must not be empty.");
+        }
+        Set<String> targets = new LinkedHashSet<>();
+        for (int i = 0; i < array.size(); i++) {
+            JsonElement target = array.get(i);
+            if (target == null || !target.isJsonPrimitive() || !target.getAsJsonPrimitive().isString()) {
+                throw new IllegalArgumentException("Patch '" + patchId + "' Targets entry " + i + " must be a string.");
+            }
+            String normalized = normalizedTarget(target.getAsString(), patchId);
+            if (!targets.add(normalized)) {
+                throw new IllegalArgumentException(
+                        "Patch '" + patchId + "' Targets contains duplicate target " + normalized + "."
+                );
+            }
+        }
+        return List.copyOf(targets);
+    }
+
+    @Nonnull
+    private static String normalizedTarget(@Nonnull String target, @Nonnull String patchId) {
+        if (target.isBlank()) {
+            throw new IllegalArgumentException("Patch '" + patchId + "' target must not be blank.");
+        }
+        return normalizeAssetPath(target);
     }
 
     @Nonnull
