@@ -197,6 +197,14 @@ public final class TameworkRuntimeSettings {
         return values.traitsEnabled();
     }
 
+    public boolean levelingEnabled() {
+        return values.levelingEnabled();
+    }
+
+    public boolean talentsEnabled() {
+        return values.talentsEnabled();
+    }
+
     public boolean reviveSystemEnabled() {
         return values.reviveSystemEnabled();
     }
@@ -308,9 +316,24 @@ public final class TameworkRuntimeSettings {
         return settings != null ? settings.traitsEnabled() : configEnabled;
     }
 
+    public static boolean levelingEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.levelingEnabled() : configEnabled;
+    }
+
+    public static boolean talentsEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.talentsEnabled() : configEnabled;
+    }
+
     public static boolean passiveBreedingEnabled(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.passiveBreedingEnabled() : configEnabled;
+    }
+
+    public static boolean breedingRequiresHappiness(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.breedingRequiresHappiness() : configEnabled;
     }
 
     public static boolean breedingGenderEnabled(boolean configEnabled) {

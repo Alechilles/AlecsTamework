@@ -6,7 +6,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;

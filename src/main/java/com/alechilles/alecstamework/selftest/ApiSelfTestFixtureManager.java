@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.selftest;
 
 import com.alechilles.alecstamework.config.TameworkIds;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.items.ApiSelfTestCommandToolFactory;
 import com.alechilles.alecstamework.items.ApiSelfTestCommandToolFactory.LinkedNpcSpec;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -17,8 +18,8 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -89,7 +90,7 @@ public final class ApiSelfTestFixtureManager {
             return FixtureOperationResult.failure("Unable to read your position for fixture placement.", null);
         }
         Vector3d playerPosition = new Vector3d(playerTransform.getPosition());
-        Vector3f playerRotation = new Vector3f(playerTransform.getRotation());
+        Rotation3f playerRotation = new Rotation3f(playerTransform.getRotation());
         String playerOwnerName = defaultIfBlank(OwnerNameUtil.resolve(player), "API Self-Test Owner");
         UUID strangerOwnerUuid = createStrangerOwnerUuid(ownerPlayerUuid);
         String fixtureSetId = UUID.randomUUID().toString();
@@ -321,7 +322,7 @@ public final class ApiSelfTestFixtureManager {
     @Nonnull
     private SpawnedFixture spawnFixture(@Nonnull Store<EntityStore> store,
                                         @Nonnull Vector3d spawnPosition,
-                                        @Nonnull Vector3f rotation,
+                                        @Nonnull Rotation3f rotation,
                                         @Nonnull String fixtureSetId,
                                         @Nonnull String fixtureKey,
                                         @Nonnull String toolId,
@@ -484,7 +485,7 @@ public final class ApiSelfTestFixtureManager {
                 return slot;
             }
         }
-        byte activeSlot = inventory.getActiveHotbarSlot();
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
         short fallbackSlot = activeSlot >= 0 ? (short) activeSlot : 0;
         if (fallbackSlot >= capacity) {
             return -1;

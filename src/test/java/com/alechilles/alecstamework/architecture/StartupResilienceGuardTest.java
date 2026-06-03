@@ -22,6 +22,16 @@ class StartupResilienceGuardTest {
             "alecstamework",
             "Tamework.java"
     );
+    private static final Path EVENT_REGISTRATION_SUPPORT_PATH = Paths.get(
+            "src",
+            "main",
+            "java",
+            "com",
+            "alechilles",
+            "alecstamework",
+            "lifecycle",
+            "TameworkEventRegistrationSupport.java"
+    );
 
     @Test
     void revivableDropSuppressionSystemRegistrationIsOptional() throws IOException {
@@ -38,24 +48,6 @@ class StartupResilienceGuardTest {
         assertTrue(
                 content.contains("Skipping command-linked revivable drop suppression system"),
                 "Optional revivable-drop-suppression setup must log a warning when skipped."
-        );
-    }
-
-    @Test
-    void commandItemAssetSetupHandlesMissingVector3dGracefully() throws IOException {
-        String content = Files.readString(TAMEWORK_PATH, StandardCharsets.UTF_8);
-
-        assertTrue(
-                content.contains("private static boolean isMissingVector3d"),
-                "Tamework must keep Vector3d runtime-availability guard helper."
-        );
-        assertTrue(
-                content.contains("Skipping command-item asset registration because Vector3d is unavailable"),
-                "Command-item registration must degrade gracefully when Vector3d is absent."
-        );
-        assertTrue(
-                content.contains("Skipping command-item asset loading because Vector3d is unavailable"),
-                "Command-item loading must degrade gracefully when Vector3d is absent."
         );
     }
 
@@ -78,6 +70,25 @@ class StartupResilienceGuardTest {
         assertTrue(
                 content.contains("SpawnBeaconReference component type is unavailable"),
                 "Missing spawn beacon component type should warn and continue startup."
+        );
+    }
+
+    @Test
+    void setupGlobalEventListenersHandleShutdownRegistryGracefully() throws IOException {
+        String tameworkContent = Files.readString(TAMEWORK_PATH, StandardCharsets.UTF_8);
+        String helperContent = Files.readString(EVENT_REGISTRATION_SUPPORT_PATH, StandardCharsets.UTF_8);
+
+        assertTrue(
+                tameworkContent.contains("TameworkEventRegistrationSupport.registerGlobal("),
+                "Setup-time global listeners should use the startup-safe registration helper."
+        );
+        assertTrue(
+                helperContent.contains("EventRegistry is shutdown!"),
+                "The helper must recognize the Hytale shutdown-registry startup failure."
+        );
+        assertTrue(
+                helperContent.contains("throw ex;"),
+                "The helper should only swallow the known shutdown-registry failure."
         );
     }
 }

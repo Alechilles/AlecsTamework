@@ -22,9 +22,9 @@ Use it for live world tuning of high-impact server settings without editing many
 - Presets only change the experience/system toggles below, so ownership, claims, telemetry, and other admin policies stay under manual control.
 
 Current presets:
-- `Simplified (Minecraft-like)`: disables needs, needs damage, happiness, passive breeding, breeding happiness requirements, and traits.
+- `Simplified (Minecraft-like)`: disables needs, needs damage, happiness, passive breeding, breeding happiness requirements, traits, leveling, and talents.
 - `Easier`: enables most systems but keeps needs damage off.
-- `Full Experience`: enables the full needs, happiness, passive breeding, breeding happiness, and traits stack.
+- `Full Experience`: enables the full needs, happiness, passive breeding, breeding happiness, traits, leveling, and talents stack.
 - Presets do not change the breeding-gender toggle; that setting remains a manual server policy.
 
 ## Automatic Review Announcement
@@ -71,7 +71,7 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 | SimpleClaims | Enablement, claim limits, breeding-claim requirement, and tamed damage protection |
 | Ownership | Owner damage protection, capture/spawn/interaction/linking owner requirements, capture owner clearing, and spawn owner assignment |
 | Needs | Master enable, owner-offline tick policy, damage model/rates/lethal |
-| Progression | Happiness master enable, passive breeding master enable, breeding happiness requirement, breeding gender master toggle, traits master enable |
+| Progression | Happiness master enable, passive breeding master enable, breeding happiness requirement, breeding gender master toggle, traits master enable, leveling master enable, and talent tree master enable |
 | Commands | Revive system master enable and recall/return-home teleporting master enable |
 | Telemetry | Crash telemetry and breadcrumb enablement |
 
@@ -105,6 +105,8 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 - Breeding requires happiness toggle
 - Breeding genders enabled toggle
 - Traits system enabled toggle
+- Leveling system enabled toggle
+- Talents system enabled toggle
 - Revive system enabled toggle
 
 ### Crash Telemetry
@@ -114,6 +116,8 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 ## Runtime Behavior
 - Applying settings writes updated files and refreshes runtime state.
 - Loading a preset only changes the current UI form; `Apply` persists it.
+- Disabling leveling stops companion XP awards, level snapshots, level-based growth, and new leveling component bootstrapping. Applying the setting also refreshes loaded NPC stat modifiers so stale level-based bonuses are removed immediately.
+- Disabling talents hides talent availability, blocks talent purchases, and suppresses purchased talent passive effects. Applying the setting also refreshes loaded NPC stat modifiers so stale talent bonuses are removed immediately.
 - Crash telemetry enablement and breadcrumbs are applied immediately when possible and mirrored into the embedded Alec's Telemetry project override.
 - Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` values are imported only when the universe settings file does not already contain telemetry values.
 - `/tw settings` is intended for world-level operations and diagnostics, not per-mod content packs.

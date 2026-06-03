@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
+import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -27,6 +29,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.UUID;
 import java.util.logging.Level;
+import javax.annotation.Nonnull;
 
 /** Applies mount-related interaction effects. */
 final class InteractionMountEffects {
@@ -123,9 +126,30 @@ final class InteractionMountEffects {
         if (rideMountType == null || rideRiderType == null) {
             return false;
         }
+        UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
+        UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
+        PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
+        if (npcUuid == null || riderUuid == null) {
+            return false;
+        }
+        TameworkRideMountComponent existingNpcRide = store.getComponent(npcRef, rideMountType);
+        TameworkRideRiderComponent existingRider = store.getComponent(playerRef, rideRiderType);
+        if (isSameActiveTameworkRide(existingNpcRide, existingRider, npcUuid, riderUuid)) {
+            maybeLogTameworkRideRefreshDebug(role, existingNpcRide, existingRider, npcUuid, riderUuid);
+            MountedRidePacketHandler.registerRide(
+                    playerRefComponent == null ? null : playerRefComponent.getUuid(),
+                    riderUuid.getUuid(),
+                    npcUuid.getUuid(),
+                    store.getExternalData().getWorld()
+            );
+            MountedRideClientAttachment.placeRiderAtMountAnchor(store, playerRef, npcRef, existingNpcRide);
+            MountedRideClientAttachment.attach(store, playerRef, npcRef, existingNpcRide);
+            return true;
+        }
         if ((mountedType != null && store.getComponent(playerRef, mountedType) != null)
-                || store.getComponent(npcRef, rideMountType) != null
-                || store.getComponent(playerRef, rideRiderType) != null) {
+                || existingNpcRide != null
+                || existingRider != null) {
+            maybeLogTameworkRideExistingStateDebug(role, existingNpcRide, existingRider, npcUuid, riderUuid);
             clearInvalidExistingRideState(playerRef, mountedType, rideRiderType, rideMountType, store);
         }
         if ((mountedType != null && store.getComponent(playerRef, mountedType) != null)
@@ -135,9 +159,7 @@ final class InteractionMountEffects {
         }
         NPCEntity npcComponent = store.getComponent(npcRef, NPCEntity.getComponentType());
         Player playerComponent = store.getComponent(playerRef, Player.getComponentType());
-        UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
-        UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
-        if (npcComponent == null || playerComponent == null || npcUuid == null || riderUuid == null) {
+        if (npcComponent == null || playerComponent == null) {
             return false;
         }
 
@@ -178,21 +200,46 @@ final class InteractionMountEffects {
                     npcTransform.getPosition().x,
                     npcTransform.getPosition().y,
                     npcTransform.getPosition().z,
-                    npcTransform.getRotation().getYaw(),
-                    npcTransform.getRotation().getPitch(),
-                    npcTransform.getRotation().getRoll()
+                    npcTransform.getRotation().yaw(),
+                    npcTransform.getRotation().pitch(),
+                    npcTransform.getRotation().roll()
             );
         }
+        TameworkRideRiderComponent rideRider = new TameworkRideRiderComponent(npcUuid.getUuid().toString());
         store.putComponent(npcRef, rideMountType, rideMount);
-        store.putComponent(playerRef, rideRiderType, new TameworkRideRiderComponent(npcUuid.getUuid().toString()));
+        store.putComponent(playerRef, rideRiderType, rideRider);
+        MountedRidePacketHandler.registerRide(
+                playerRefComponent == null ? null : playerRefComponent.getUuid(),
+                riderUuid.getUuid(),
+                npcUuid.getUuid(),
+                store.getExternalData().getWorld()
+        );
+        MountedRideClientAttachment.placeRiderAtMountAnchor(store, playerRef, npcRef, rideMount);
+        MountedRideClientAttachment.attach(store, playerRef, npcRef, rideMount);
         clearStatusAnimation(npcRef, npcComponent, store);
         applyRideState(npcRef, role, store, rideState);
-        maybeLogTameworkRideMountDebug(role, rideMount, anchorX, anchorY, anchorZ);
+        maybeLogTameworkRideMountDebug(role, rideMount, playerRefComponent, anchorX, anchorY, anchorZ);
         return true;
+    }
+
+    private boolean isSameActiveTameworkRide(TameworkRideMountComponent existingNpcRide,
+                                             TameworkRideRiderComponent existingRider,
+                                             UUIDComponent npcUuid,
+                                             UUIDComponent riderUuid) {
+        if (existingNpcRide == null || existingRider == null || npcUuid == null || riderUuid == null) {
+            return false;
+        }
+        UUID npc = npcUuid.getUuid();
+        UUID rider = riderUuid.getUuid();
+        return npc != null
+                && rider != null
+                && rider.toString().equals(existingNpcRide.getRiderUuid())
+                && npc.toString().equals(existingRider.getMountUuid());
     }
 
     private void maybeLogTameworkRideMountDebug(Role role,
                                                 TameworkRideMountComponent rideMount,
+                                                PlayerRef playerRefComponent,
                                                 float anchorX,
                                                 float anchorY,
                                                 float anchorZ) {
@@ -202,7 +249,7 @@ final class InteractionMountEffects {
         }
         instance.getLogger().at(Level.INFO).log(
                 "TameworkRide debug: applyMount role=%s rideState=%s previousState=%s previousController=%s " +
-                        "groundController=%s flightController=%s anchor=%s/%s/%s riderUuid=%s",
+                        "groundController=%s flightController=%s anchor=%s/%s/%s riderUuid=%s playerUuid=%s",
                 role != null ? role.getRoleName() : "<null>",
                 rideMount.getRideState(),
                 rideMount.getPreviousState(),
@@ -212,7 +259,50 @@ final class InteractionMountEffects {
                 anchorX,
                 anchorY,
                 anchorZ,
-                rideMount.getRiderUuid()
+                rideMount.getRiderUuid(),
+                playerRefComponent == null ? "<none>" : playerRefComponent.getUuid()
+        );
+    }
+
+    private void maybeLogTameworkRideRefreshDebug(Role role,
+                                                  TameworkRideMountComponent existingNpcRide,
+                                                  TameworkRideRiderComponent existingRider,
+                                                  UUIDComponent npcUuid,
+                                                  UUIDComponent riderUuid) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkRide debug: refreshMount role=%s npcUuid=%s riderUuid=%s existingMountRider=%s existingRiderMount=%s",
+                role == null ? "<null>" : role.getRoleName(),
+                npcUuid == null ? "<none>" : npcUuid.getUuid(),
+                riderUuid == null ? "<none>" : riderUuid.getUuid(),
+                existingNpcRide == null ? "<none>" : existingNpcRide.getRiderUuid(),
+                existingRider == null ? "<none>" : existingRider.getMountUuid()
+        );
+    }
+
+    private void maybeLogTameworkRideExistingStateDebug(Role role,
+                                                        TameworkRideMountComponent existingNpcRide,
+                                                        TameworkRideRiderComponent existingRider,
+                                                        UUIDComponent npcUuid,
+                                                        UUIDComponent riderUuid) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkRide debug: existingRideState role=%s npcUuid=%s riderUuid=%s hasNpcRide=%s hasRiderRide=%s " +
+                        "existingMountRider=%s existingRiderMount=%s sameRide=%s",
+                role == null ? "<null>" : role.getRoleName(),
+                npcUuid == null ? "<none>" : npcUuid.getUuid(),
+                riderUuid == null ? "<none>" : riderUuid.getUuid(),
+                existingNpcRide != null,
+                existingRider != null,
+                existingNpcRide == null ? "<none>" : existingNpcRide.getRiderUuid(),
+                existingRider == null ? "<none>" : existingRider.getMountUuid(),
+                isSameActiveTameworkRide(existingNpcRide, existingRider, npcUuid, riderUuid)
         );
     }
 
@@ -227,20 +317,42 @@ final class InteractionMountEffects {
             return;
         }
         MountedComponent mounted = mountedType == null ? null : store.getComponent(playerRef, mountedType);
-        Ref<EntityStore> existingMountRef = mounted == null
-                ? resolveMountRefFromRider(rider, store)
-                : mounted.getMountedToEntity();
+        Ref<EntityStore> existingMountRef = resolveMountRefFromRider(rider, store);
+        if (existingMountRef == null && mounted != null) {
+            existingMountRef = mounted.getMountedToEntity();
+        }
         TameworkRideMountComponent existingMount = existingMountRef == null || !existingMountRef.isValid()
                 ? null
                 : store.getComponent(existingMountRef, rideMountType);
-        boolean stale = mounted == null
-                || existingMountRef == null
+        boolean stale = existingMountRef == null
                 || !existingMountRef.isValid()
                 || existingMount == null
                 || !rideRiderMatchesMount(rider, existingMountRef, store);
         if (!stale) {
             return;
         }
+        maybeLogTameworkRideStaleCleanupDebug(
+                rider,
+                existingMountRef,
+                existingMount,
+                existingMountRef == null,
+                existingMountRef != null && !existingMountRef.isValid(),
+                existingMount == null,
+                existingMountRef != null && existingMountRef.isValid()
+                        && existingMount != null
+                        && !rideRiderMatchesMount(rider, existingMountRef, store)
+        );
+        if (existingMountRef != null && existingMountRef.isValid() && existingMount != null) {
+            NPCEntity npc = store.getComponent(existingMountRef, NPCEntity.getComponentType());
+            if (npc != null) {
+                restoreTameworkRideNpc(existingMountRef, npc, existingMount, store);
+            }
+        }
+        UUIDComponent playerUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
+        if (playerUuid != null && playerUuid.getUuid() != null) {
+            MountedRidePacketHandler.unregisterRide(playerUuid.getUuid());
+        }
+        MountedRideClientAttachment.detach(store, playerRef);
         store.tryRemoveComponent(playerRef, rideRiderType);
         if (mountedType != null) {
             store.tryRemoveComponent(playerRef, mountedType);
@@ -248,6 +360,55 @@ final class InteractionMountEffects {
         if (existingMountRef != null && existingMountRef.isValid()) {
             store.tryRemoveComponent(existingMountRef, rideMountType);
         }
+    }
+
+    private void maybeLogTameworkRideStaleCleanupDebug(TameworkRideRiderComponent rider,
+                                                       Ref<EntityStore> existingMountRef,
+                                                       TameworkRideMountComponent existingMount,
+                                                       boolean mountMissing,
+                                                       boolean mountInvalid,
+                                                       boolean mountComponentMissing,
+                                                       boolean uuidMismatch) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkRide debug: staleRideCleanup riderMountUuid=%s mountRefValid=%s hasMountComponent=%s " +
+                        "mountMissing=%s mountInvalid=%s mountComponentMissing=%s uuidMismatch=%s existingMountRider=%s",
+                rider == null ? "<none>" : rider.getMountUuid(),
+                existingMountRef != null && existingMountRef.isValid(),
+                existingMount != null,
+                mountMissing,
+                mountInvalid,
+                mountComponentMissing,
+                uuidMismatch,
+                existingMount == null ? "<none>" : existingMount.getRiderUuid()
+        );
+    }
+
+    private void restoreTameworkRideNpc(@Nonnull Ref<EntityStore> mountRef,
+                                        @Nonnull NPCEntity npc,
+                                        @Nonnull TameworkRideMountComponent mount,
+                                        @Nonnull Store<EntityStore> store) {
+        clearStatusAnimation(mountRef, npc, store);
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
+        Role role = npc.getRole();
+        if (role == null) {
+            return;
+        }
+        if (!mount.getPreviousMotionController().isBlank()) {
+            role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
+        }
+        if (mount.getPreviousState().isBlank() || role.getStateSupport() == null) {
+            return;
+        }
+        StateSupport support = role.getStateSupport();
+        if (support.getStateHelper() != null
+                && support.getStateHelper().getStateIndex(mount.getPreviousState()) == StateSupport.NO_STATE) {
+            return;
+        }
+        support.setState(mountRef, mount.getPreviousState(), mount.getPreviousSubState(), store);
     }
 
     private Ref<EntityStore> resolveMountRefFromRider(TameworkRideRiderComponent rider, Store<EntityStore> store) {

@@ -7,13 +7,14 @@ import javax.annotation.Nonnull;
 
 /** Lightweight HUD used to display a single transient Tamework message. */
 public final class TameworkMessageHud extends CustomUIHud {
+    public static final String HUD_KEY = "alecstamework:message";
     public static final String UI_PATH = "TameworkMessageHud.ui";
     private static final int FADE_STEP_COUNT = 6;
 
     private final String message;
 
     public TameworkMessageHud(@Nonnull PlayerRef playerRef, String message) {
-        super(playerRef);
+        super(playerRef, HUD_KEY);
         this.message = message == null ? "" : message;
     }
 

@@ -83,7 +83,7 @@ import com.google.gson.JsonParser;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -107,7 +107,7 @@ import javax.annotation.Nullable;
 
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi {
-    static final String API_VERSION = "0.5.0";
+    static final String API_VERSION = "0.6.0";
     static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
@@ -260,6 +260,7 @@ public final class TameworkApiImpl
             TameworkApiCapability.TRAIT_EFFECTS,
             TameworkApiCapability.PROFILE_DATA,
             TameworkApiCapability.EVENTS,
+            TameworkApiCapability.COMPANION_XP_EVENTS,
             TameworkApiCapability.CONFIG_READ,
             TameworkApiCapability.DIAGNOSTICS
     );

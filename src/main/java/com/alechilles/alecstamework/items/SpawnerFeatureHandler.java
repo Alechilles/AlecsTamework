@@ -14,8 +14,8 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -393,7 +393,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         Ref<EntityStore> playerRef = player.getReference();
-        Vector3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
+        Rotation3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             logSpawnerFlowDebug("spawn denied reason=spawn-entity-failed player=" + playerUuid + " role=" + roleId);
@@ -524,6 +524,7 @@ public final class SpawnerFeatureHandler {
                 .spawnerIconDefault(baseConfig.getSpawnerIconDefault())
                 .spawnerIconOverrides(baseConfig.getSpawnerIconOverrides())
                 .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
+                .spawnerIconOverrideGroups(baseConfig.getSpawnerIconOverrideGroups())
                 .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
                 .build();
     }
@@ -590,6 +591,11 @@ public final class SpawnerFeatureHandler {
                 && !captureInfo.capturedName().name().isBlank())
                 ? captureInfo.capturedName().name()
                 : null;
+        if ((snapshotDisplayName == null || snapshotDisplayName.isBlank())
+                && captureInfo.tooltipDisplayName() != null
+                && !captureInfo.tooltipDisplayName().isBlank()) {
+            snapshotDisplayName = captureInfo.tooltipDisplayName();
+        }
         String snapshotRoleId = null;
         if (worldStore != null) {
             NPCEntity npc = worldStore.getComponent(targetRef, NPCEntity.getComponentType());
@@ -637,7 +643,9 @@ public final class SpawnerFeatureHandler {
         } else {
             updated = itemStackMetadataService.clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
         }
+        updated = captureMetadataService.applyCaptureNameKeyMetadata(updated, captureInfo);
         updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
+        updated = captureMetadataService.applyCapturedModelMetadata(updated, captureInfo);
         updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
         updated = captureMetadataService.applyTooltipDisplayNameMetadata(updated, captureInfo);
         if (worldStore != null) {

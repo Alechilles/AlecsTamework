@@ -14,6 +14,7 @@ $C = "Common.ui";
 @LinkedBreedingStateOnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedBreedingStateOffButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 220, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
+@LinkedProgressionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 360, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
 @TraitTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
 
@@ -929,55 +930,122 @@ Group {
         }
     }
 
-    Group #FutureStatAFrame {
-        Anchor: (Top: 124, Left: 0, Width: 360, Height: 10);
-        Background: #0a121b(0.95);
+    Group #TalentPointAction {
+        Anchor: (Top: 52, Left: 166, Width: 24, Height: 24);
         Visible: false;
 
-        Group #FutureStatAFill {
-            Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
+        Group #TalentPointIcon {
+            Anchor: (Top: 2, Left: 2, Width: 20, Height: 20);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png");
+        }
+
+        Group #TalentPointCountBadgeBorder {
+            Anchor: (Top: 0, Left: 10, Width: 14, Height: 12);
+            Background: #f6d56b;
+        }
+
+        Group #TalentPointCountBadgeFill {
+            Anchor: (Top: 1, Left: 11, Width: 12, Height: 10);
+            Background: #081220;
+        }
+
+        Label #TalentPointCountShadow {
+            Anchor: (Top: 1, Left: 12, Width: 12, Height: 10);
+            Text: "1";
+            Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        Label #TalentPointCount {
+            Anchor: (Top: 0, Left: 11, Width: 12, Height: 10);
+            Text: "1";
+            Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        TextButton #TalentPointButton {
+            Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+            Style: @TraitTooltipButtonStyle;
+            Text: "";
+            TooltipText: %server.tamework.ui.linkedPanel.futureAction.talents;
+            TextTooltipStyle: @LinkedActionTooltipStyle;
+        }
+    }
+
+    Group #XpProgressRing {
+        Anchor: (Top: 52, Left: 196, Width: 24, Height: 24);
+        Visible: false;
+
+        Group #RingTrackTopLeft {
+            Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+            Background: #23354a;
+        }
+
+        Group #RingTrackTopRight {
+            Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+            Background: #23354a;
+        }
+
+        Group #RingTrackLeft {
+            Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+            Background: #23354a;
+        }
+
+        Group #RingTrackBottom {
+            Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+            Background: #23354a;
+        }
+
+        Group #RingTrackRight {
+            Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+            Background: #23354a;
+        }
+
+        Group #RingFillBar1 {
+            Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
             Background: #7cc6f2;
         }
 
-        Label #FutureStatAText {
-            Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-            Text: %server.tamework.ui.linkedPanel.futureStat.a.default;
-            Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
-        }
-    }
-
-    Group #FutureStatBFrame {
-        Anchor: (Top: 138, Left: 0, Width: 360, Height: 10);
-        Background: #0a121b(0.95);
-        Visible: false;
-
-        Group #FutureStatBFill {
-            Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
-            Background: #f2c97c;
+        Group #RingFillBar2 {
+            Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+            Background: #7cc6f2;
         }
 
-        Label #FutureStatBText {
-            Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-            Text: %server.tamework.ui.linkedPanel.futureStat.b.default;
-            Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
-        }
-    }
-
-    Group #FutureActionBar {
-        Anchor: (Top: 152, Left: 0, Width: 360, Height: 24);
-        LayoutMode: Left;
-        Visible: false;
-
-        TextButton #TraitsButton {
-            Anchor: (Left: 0, Width: 108, Height: 22);
-            Text: %server.tamework.ui.linkedPanel.futureAction.traits;
-            Visible: false;
+        Group #RingFillBar3 {
+            Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+            Background: #7cc6f2;
         }
 
-        TextButton #TalentsButton {
-            Anchor: (Left: 6, Width: 108, Height: 22);
-            Text: %server.tamework.ui.linkedPanel.futureAction.talents;
-            Visible: false;
+        Group #RingFillBar4 {
+            Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+            Background: #7cc6f2;
+        }
+
+        Group #RingFillBar5 {
+            Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+            Background: #7cc6f2;
+        }
+
+        Group #CornerMaskOverlay {
+            Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+        }
+
+        Group {
+            Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+            Background: #081220;
+        }
+
+        Label #XpLevelText {
+            Anchor: (Top: 4, Left: 3, Width: 18, Height: 16);
+            Text: "1";
+            Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        TextButton #XpTooltip {
+            Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+            Style: @TraitTooltipButtonStyle;
+            Text: "";
+            TooltipText: "0/0 XP";
+            TextTooltipStyle: @LinkedProgressionTooltipStyle;
         }
     }
 }

@@ -73,6 +73,7 @@ public final class ItemFeatureConfig {
     private final String spawnerIconDefault;
     private final List<SpawnerIconOverride> spawnerIconOverrides;
     private final Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole;
+    private final List<SpawnerIconOverrideGroup> spawnerIconOverrideGroups;
     private final SpawnerTooltipMode spawnerTooltipMode;
 
     private ItemFeatureConfig(Builder builder) {
@@ -101,6 +102,7 @@ public final class ItemFeatureConfig {
         this.spawnerIconDefault = builder.spawnerIconDefault;
         this.spawnerIconOverrides = builder.spawnerIconOverrides;
         this.spawnerIconOverridesByRole = builder.spawnerIconOverridesByRole;
+        this.spawnerIconOverrideGroups = builder.spawnerIconOverrideGroups;
         this.spawnerTooltipMode = builder.spawnerTooltipMode;
     }
 
@@ -215,6 +217,10 @@ public final class ItemFeatureConfig {
         return spawnerIconOverridesByRole;
     }
 
+    public List<SpawnerIconOverrideGroup> getSpawnerIconOverrideGroups() {
+        return spawnerIconOverrideGroups;
+    }
+
     public SpawnerTooltipMode getSpawnerTooltipMode() {
         return spawnerTooltipMode;
     }
@@ -236,6 +242,46 @@ public final class ItemFeatureConfig {
 
         public String getIcon() {
             return icon;
+        }
+    }
+
+    public static final class SpawnerIconOverrideGroup {
+        private final List<String> roles;
+        private final List<SpawnerIconOverride> overrides;
+        private final String iconDefault;
+
+        public SpawnerIconOverrideGroup(List<String> roles, List<SpawnerIconOverride> overrides) {
+            this(roles, overrides, null);
+        }
+
+        public SpawnerIconOverrideGroup(List<String> roles, List<SpawnerIconOverride> overrides, String iconDefault) {
+            if (roles == null || roles.isEmpty()) {
+                this.roles = Collections.emptyList();
+            } else {
+                List<String> roleCopy = new java.util.ArrayList<>(roles.size());
+                for (String role : roles) {
+                    if (role != null && !role.isBlank()) {
+                        roleCopy.add(role);
+                    }
+                }
+                this.roles = roleCopy.isEmpty() ? Collections.emptyList() : List.copyOf(roleCopy);
+            }
+            this.overrides = overrides == null || overrides.isEmpty()
+                    ? Collections.emptyList()
+                    : List.copyOf(overrides);
+            this.iconDefault = iconDefault;
+        }
+
+        public List<String> getRoles() {
+            return roles;
+        }
+
+        public List<SpawnerIconOverride> getOverrides() {
+            return overrides;
+        }
+
+        public String getIconDefault() {
+            return iconDefault;
         }
     }
 
@@ -265,6 +311,7 @@ public final class ItemFeatureConfig {
         private String spawnerIconDefault;
         private List<SpawnerIconOverride> spawnerIconOverrides = Collections.emptyList();
         private Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole = Collections.emptyMap();
+        private List<SpawnerIconOverrideGroup> spawnerIconOverrideGroups = Collections.emptyList();
         private SpawnerTooltipMode spawnerTooltipMode = SpawnerTooltipMode.ADDITIVE;
 
         private Builder() {
@@ -435,6 +482,26 @@ public final class ItemFeatureConfig {
             return this;
         }
 
+        public Builder spawnerIconOverrideGroups(List<SpawnerIconOverrideGroup> spawnerIconOverrideGroups) {
+            if (spawnerIconOverrideGroups == null || spawnerIconOverrideGroups.isEmpty()) {
+                this.spawnerIconOverrideGroups = Collections.emptyList();
+                return this;
+            }
+            List<SpawnerIconOverrideGroup> copy = new java.util.ArrayList<>(spawnerIconOverrideGroups.size());
+            for (SpawnerIconOverrideGroup group : spawnerIconOverrideGroups) {
+                if (group == null || group.getRoles().isEmpty()) {
+                    continue;
+                }
+                String groupDefault = group.getIconDefault();
+                if (group.getOverrides().isEmpty() && (groupDefault == null || groupDefault.isBlank())) {
+                    continue;
+                }
+                copy.add(group);
+            }
+            this.spawnerIconOverrideGroups = copy.isEmpty() ? Collections.emptyList() : List.copyOf(copy);
+            return this;
+        }
+
         public Builder spawnerTooltipMode(SpawnerTooltipMode spawnerTooltipMode) {
             this.spawnerTooltipMode = spawnerTooltipMode != null ? spawnerTooltipMode : SpawnerTooltipMode.ADDITIVE;
             return this;
@@ -479,6 +546,7 @@ public final class ItemFeatureConfig {
                 && Objects.equals(spawnerIconDefault, other.spawnerIconDefault)
                 && Objects.equals(spawnerIconOverrides, other.spawnerIconOverrides)
                 && Objects.equals(spawnerIconOverridesByRole, other.spawnerIconOverridesByRole)
+                && Objects.equals(spawnerIconOverrideGroups, other.spawnerIconOverrideGroups)
                 && spawnerTooltipMode == other.spawnerTooltipMode;
     }
 
@@ -510,6 +578,7 @@ public final class ItemFeatureConfig {
                 spawnerIconDefault,
                 spawnerIconOverrides,
                 spawnerIconOverridesByRole,
+                spawnerIconOverrideGroups,
                 spawnerTooltipMode
         );
     }

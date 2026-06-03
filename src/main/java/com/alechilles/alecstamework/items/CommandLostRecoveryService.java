@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.localization.RoleNameResolver;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -7,8 +9,8 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -136,7 +138,7 @@ final class CommandLostRecoveryService {
             return Result.fail("Unable to find a safe recovery position.");
         }
 
-        Vector3f rotation = resolveSpawnRotation(store, playerRef, destination);
+        Rotation3f rotation = resolveSpawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             return Result.fail("Failed to spawn replacement companion.");
@@ -149,7 +151,7 @@ final class CommandLostRecoveryService {
                 : player.getUuid();
         String ownerName = recoverySnapshot != null && recoverySnapshot.ownerName() != null
                 ? recoverySnapshot.ownerName()
-                : player.getDisplayName();
+                : OwnerNameUtil.resolve(player);
         String[] toolIds = linkPolicyService.mergeToolIds(null, toolId);
 
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
@@ -302,24 +304,9 @@ final class CommandLostRecoveryService {
             return record.cachedRoleId;
         }
         if (record.cachedNameKey != null && !record.cachedNameKey.isBlank()) {
-            String nameKey = record.cachedNameKey.trim();
-            String[] prefixes = {
-                    "server.npcRole.",
-                    "npcRole.",
-                    "server.npcRoles.",
-                    "npcRoles."
-            };
-            for (String prefix : prefixes) {
-                if (!nameKey.startsWith(prefix)) {
-                    continue;
-                }
-                String remainder = nameKey.substring(prefix.length());
-                if (remainder.endsWith(".name")) {
-                    remainder = remainder.substring(0, remainder.length() - ".name".length());
-                }
-                if (!remainder.isBlank()) {
-                    return remainder;
-                }
+            String roleId = RoleNameResolver.extractRoleIdFromNameKey(record.cachedNameKey);
+            if (roleId != null && !roleId.isBlank()) {
+                return roleId;
             }
         }
         return null;
@@ -360,15 +347,15 @@ final class CommandLostRecoveryService {
         }
     }
 
-    private Vector3f resolveSpawnRotation(Store<EntityStore> store,
-                                          Ref<EntityStore> playerRef,
-                                          Vector3d spawnPosition) {
+    private Rotation3f resolveSpawnRotation(Store<EntityStore> store,
+                                            Ref<EntityStore> playerRef,
+                                            Vector3d spawnPosition) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         Vector3d playerPos = new Vector3d(transform.getPosition());
         if (spawnPosition != null) {
@@ -377,11 +364,11 @@ final class CommandLostRecoveryService {
                     0.0,
                     playerPos.z - spawnPosition.z
             );
-            if (relative.squaredLength() > 0.0001) {
-                return Vector3f.lookAt(relative);
+            if (relative.lengthSquared() > 0.0001) {
+                return Rotation3f.lookAt(relative);
             }
         }
-        return new Vector3f(transform.getRotation());
+        return new Rotation3f(transform.getRotation());
     }
 
     record Result(@Nullable ItemStack updatedStack,

@@ -9,49 +9,71 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Simple paged companion talent browser and purchase page.
+ * Branch/tier companion talent tree browser and purchase page.
  */
 public final class TameworkCompanionTalentsPage
         extends InteractiveCustomUIPage<TameworkCompanionTalentsPage.EventPayload> {
     public static final String UI_PATH = "TameworkCompanionTalentsPage.ui";
-    private static final int PAGE_SIZE = 8;
+    private static final String BRANCH_SLOT_UI_PATH = "TameworkCompanionTalentTreeBranch.ui";
+    private static final String NODE_SLOT_UI_PATH = "TameworkCompanionTalentTreeNode.ui";
+    private static final String CONNECTOR_SLOT_UI_PATH = "TameworkCompanionTalentTreeConnector.ui";
     private static final String KEY_ACTION = "Action";
-    private static final String KEY_TALENT_ID = "TalentId";
     private static final String ACTION_BACK = "Back";
-    private static final String ACTION_PREV = "Prev";
-    private static final String ACTION_NEXT = "Next";
-    private static final String ACTION_BUY_PREFIX = "Buy:";
+    private static final String ACTION_RESET = "Reset";
+    private static final String ACTION_SELECT_PREFIX = "Select:";
+    private static final String ACTION_BUY_SELECTED = "BuySelected";
+    private static final String ACTION_PAN_LEFT = "PanLeft";
+    private static final String ACTION_PAN_RIGHT = "PanRight";
+    private static final int HORIZONTAL_PAN_STEP = 260;
+    private static final int PAN_CONTROLS_TOP = 48;
+    private static final int PAN_CONTROLS_WIDTH = 112;
+    private static final int PAN_CONTROLS_HEIGHT = 28;
+    public static final String STATE_PURCHASED = "Purchased";
+    public static final String STATE_LOCKED = "Locked";
+    public static final String STATE_UNAFFORDABLE = "Unaffordable";
+    public static final String STATE_AVAILABLE = "Available";
 
     private final Supplier<PageData> dataSupplier;
     private final Function<String, String> purchaseCallback;
+    private final Supplier<String> resetCallback;
     private final Runnable backCallback;
+    private boolean navigationPending;
     private boolean handled;
-    private int pageIndex;
+    private String selectedTalentId;
     private String statusMessage;
+    private int horizontalOffset;
 
     public TameworkCompanionTalentsPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull Supplier<PageData> dataSupplier,
                                         @Nonnull Function<String, String> purchaseCallback,
+                                        @Nonnull Supplier<String> resetCallback,
                                         @Nonnull Runnable backCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
         this.dataSupplier = dataSupplier;
         this.purchaseCallback = purchaseCallback;
+        this.resetCallback = resetCallback;
         this.backCallback = backCallback;
+        this.navigationPending = false;
         this.handled = false;
-        this.pageIndex = 0;
+        this.selectedTalentId = null;
         this.statusMessage = null;
+        this.horizontalOffset = 0;
     }
 
     @Override
@@ -79,28 +101,42 @@ public final class TameworkCompanionTalentsPage
         if (data == null || data.action == null || data.action.isBlank()) {
             return;
         }
+        if (navigationPending) {
+            return;
+        }
         if (ACTION_BACK.equalsIgnoreCase(data.action)) {
             handled = true;
-            close();
-            if (backCallback != null) {
-                backCallback.run();
+            navigationPending = true;
+            navigateBackOnWorldThread();
+            return;
+        }
+        if (ACTION_RESET.equalsIgnoreCase(data.action) && resetCallback != null) {
+            statusMessage = resetCallback.get();
+            sendRefreshUpdate();
+            return;
+        }
+        if (ACTION_PAN_LEFT.equalsIgnoreCase(data.action)) {
+            horizontalOffset = Math.max(0, horizontalOffset - HORIZONTAL_PAN_STEP);
+            sendRefreshUpdate();
+            return;
+        }
+        if (ACTION_PAN_RIGHT.equalsIgnoreCase(data.action)) {
+            horizontalOffset += HORIZONTAL_PAN_STEP;
+            sendRefreshUpdate();
+            return;
+        }
+        if (data.action.startsWith(ACTION_SELECT_PREFIX)) {
+            selectedTalentId = data.action.substring(ACTION_SELECT_PREFIX.length());
+            sendRefreshUpdate();
+            return;
+        }
+        if (ACTION_BUY_SELECTED.equalsIgnoreCase(data.action) && purchaseCallback != null) {
+            String talentId = selectedTalentId;
+            if (talentId == null || talentId.isBlank()) {
+                statusMessage = "Choose a talent first.";
+            } else {
+                statusMessage = purchaseCallback.apply(talentId);
             }
-            return;
-        }
-        PageData currentData = getPageData();
-        if (ACTION_PREV.equalsIgnoreCase(data.action)) {
-            pageIndex = Math.max(0, pageIndex - 1);
-            sendRefreshUpdate();
-            return;
-        }
-        if (ACTION_NEXT.equalsIgnoreCase(data.action)) {
-            pageIndex = Math.min(Math.max(0, resolvePageCount(currentData) - 1), pageIndex + 1);
-            sendRefreshUpdate();
-            return;
-        }
-        if (data.action.startsWith(ACTION_BUY_PREFIX) && purchaseCallback != null) {
-            String talentId = data.action.substring(ACTION_BUY_PREFIX.length());
-            statusMessage = purchaseCallback.apply(talentId);
             sendRefreshUpdate();
         }
     }
@@ -111,26 +147,68 @@ public final class TameworkCompanionTalentsPage
             return;
         }
         handled = true;
-        if (backCallback != null) {
-            backCallback.run();
-        }
+        navigationPending = true;
+        navigateBackOnWorldThread();
     }
 
     private void sendRefreshUpdate() {
+        if (handled || navigationPending) {
+            return;
+        }
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
         bindPage(commandBuilder, eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
     }
 
+    private void navigateBackOnWorldThread() {
+        Ref<EntityStore> ref = playerRef.getReference();
+        if (ref == null || !ref.isValid()) {
+            navigationPending = false;
+            return;
+        }
+        Store<EntityStore> store = ref.getStore();
+        if (store == null || store.getExternalData() == null) {
+            navigationPending = false;
+            return;
+        }
+        World world = store.getExternalData().getWorld();
+        if (world == null) {
+            navigationPending = false;
+            return;
+        }
+        world.execute(() -> {
+            try {
+                Ref<EntityStore> activeRef = playerRef.getReference();
+                if (activeRef == null || !activeRef.isValid()) {
+                    return;
+                }
+                if (backCallback != null) {
+                    backCallback.run();
+                }
+            } finally {
+                navigationPending = false;
+            }
+        });
+    }
+
     private void bindPage(@Nonnull UICommandBuilder commandBuilder,
                           @Nonnull UIEventBuilder eventBuilder) {
         PageData data = getPageData();
-        int totalPages = resolvePageCount(data);
-        int clampedPageIndex = Math.max(0, Math.min(pageIndex, Math.max(0, totalPages - 1)));
-        pageIndex = clampedPageIndex;
-        int startIndex = clampedPageIndex * PAGE_SIZE;
+        TalentTreeViewModel.TreeCanvas canvas = TalentTreeLayoutService.layout(data.entries(), selectedTalentId);
+        selectedTalentId = canvas.selectedTalentId();
+        TreeNodeEntry selectedEntry = data.findEntry(selectedTalentId);
+        int viewportWidth = TalentTreeLayoutService.resolveViewportWidthForContent(canvas.width());
+        int maxHorizontalOffset = Math.max(canvas.width() - viewportWidth, 0);
+        horizontalOffset = Math.max(0, Math.min(horizontalOffset, maxHorizontalOffset));
 
+        commandBuilder.setObject(
+                "#TameworkCompanionTalentsRoot.Anchor",
+                TalentTreeLayoutService.buildSizeAnchor(
+                        TalentTreeLayoutService.resolveRootWidthForViewport(viewportWidth),
+                        TalentTreeLayoutService.ROOT_HEIGHT
+                )
+        );
         commandBuilder.set("#TameworkCompanionTalentsTitle.Text", data.companionName());
         commandBuilder.set("#TameworkCompanionTalentsLevelSummary.Text", data.levelSummary());
         commandBuilder.set("#TameworkCompanionTalentsPointsSummary.Text", data.pointsSummary());
@@ -138,15 +216,22 @@ public final class TameworkCompanionTalentsPage
                 "#TameworkCompanionTalentsStatus.Text",
                 statusMessage != null && !statusMessage.isBlank() ? statusMessage : data.statusText()
         );
-        commandBuilder.set(
-                "#TameworkCompanionTalentsPageIndicator.Text",
-                "Page " + (Math.max(0, clampedPageIndex) + 1) + "/" + Math.max(1, totalPages)
+        commandBuilder.set("#TameworkCompanionTalentsResetButton.Visible", data.canReset());
+        commandBuilder.set("#TalentTreePanControls.Visible", maxHorizontalOffset > 0);
+        commandBuilder.setObject("#TalentTreePanControls.Anchor", resolvePanControlsAnchor(viewportWidth));
+        commandBuilder.set("#TalentTreePanLeftButton.Visible", maxHorizontalOffset > 0);
+        commandBuilder.set("#TalentTreePanRightButton.Visible", maxHorizontalOffset > 0);
+        commandBuilder.setObject(
+                "#TalentTreeCanvas.Anchor",
+                TalentTreeLayoutService.buildAnchor(-horizontalOffset, 0, Math.max(canvas.width(), viewportWidth), canvas.height())
         );
-        commandBuilder.set("#TameworkCompanionTalentsPrevButton.Visible", totalPages > 1 && clampedPageIndex > 0);
-        commandBuilder.set(
-                "#TameworkCompanionTalentsNextButton.Visible",
-                totalPages > 1 && (clampedPageIndex + 1) < totalPages
+        commandBuilder.setObject(
+                "#TalentTreeViewport.Anchor",
+                TalentTreeLayoutService.buildAnchor(0, 0, viewportWidth, TalentTreeLayoutService.VIEWPORT_HEIGHT)
         );
+        commandBuilder.clear("#TalentConnectorLayer");
+        commandBuilder.clear("#TalentBranchLayer");
+        commandBuilder.clear("#TalentNodeLayer");
 
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
@@ -154,50 +239,48 @@ public final class TameworkCompanionTalentsPage
                 EventData.of(KEY_ACTION, ACTION_BACK),
                 false
         );
-        if (totalPages > 1 && clampedPageIndex > 0) {
+        if (data.canReset()) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
-                    "#TameworkCompanionTalentsPrevButton",
-                    EventData.of(KEY_ACTION, ACTION_PREV),
+                    "#TameworkCompanionTalentsResetButton",
+                    EventData.of(KEY_ACTION, ACTION_RESET),
                     false
             );
         }
-        if (totalPages > 1 && (clampedPageIndex + 1) < totalPages) {
+        if (maxHorizontalOffset > 0) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
-                    "#TameworkCompanionTalentsNextButton",
-                    EventData.of(KEY_ACTION, ACTION_NEXT),
+                    "#TalentTreePanLeftButton",
+                    EventData.of(KEY_ACTION, ACTION_PAN_LEFT),
                     false
             );
         }
+        if (maxHorizontalOffset > 0) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    "#TalentTreePanRightButton",
+                    EventData.of(KEY_ACTION, ACTION_PAN_RIGHT),
+                    false
+            );
+        }
+        bindBranchSlots(commandBuilder, canvas.branches());
+        bindConnectorSlots(commandBuilder, canvas.connectors());
+        bindNodeSlots(commandBuilder, eventBuilder, canvas.nodes());
+        bindSelectedTalent(commandBuilder, eventBuilder, selectedEntry);
+    }
 
-        List<TalentEntry> entries = data.entries();
-        for (int slot = 0; slot < PAGE_SIZE; slot++) {
-            int entryIndex = startIndex + slot;
-            TalentEntry entry = entryIndex < entries.size() ? entries.get(entryIndex) : null;
-            String rowSelector = "#TalentRow" + slot;
-            String nameSelector = rowSelector + " #TalentName" + slot;
-            String descriptionSelector = rowSelector + " #TalentDescription" + slot;
-            String statusSelector = rowSelector + " #TalentStatus" + slot;
-            String buyButtonSelector = rowSelector + " #TalentBuyButton" + slot;
-            boolean visible = entry != null;
-            commandBuilder.set(rowSelector + ".Visible", visible);
-            if (!visible) {
-                continue;
-            }
-            commandBuilder.set(nameSelector + ".Text", entry.displayName());
-            commandBuilder.set(descriptionSelector + ".Text", entry.description());
-            commandBuilder.set(statusSelector + ".Text", entry.status());
-            commandBuilder.set(buyButtonSelector + ".Visible", entry.canPurchase());
-            if (entry.canPurchase()) {
-                eventBuilder.addEventBinding(
-                        CustomUIEventBindingType.Activating,
-                        buyButtonSelector,
-                        EventData.of(KEY_ACTION, ACTION_BUY_PREFIX + entry.id()),
-                        false
-                );
-            }
-        }
+    @Nonnull
+    static Anchor resolvePanControlsAnchor(int viewportWidth) {
+        return TalentTreeLayoutService.buildAnchor(
+                resolvePanControlsLeft(viewportWidth),
+                PAN_CONTROLS_TOP,
+                PAN_CONTROLS_WIDTH,
+                PAN_CONTROLS_HEIGHT
+        );
+    }
+
+    static int resolvePanControlsLeft(int viewportWidth) {
+        return Math.max(0, (viewportWidth - PAN_CONTROLS_WIDTH) / 2);
     }
 
     @Nonnull
@@ -209,12 +292,98 @@ public final class TameworkCompanionTalentsPage
         return provided;
     }
 
-    private int resolvePageCount(@Nonnull PageData data) {
-        int entryCount = data.entries().size();
-        if (entryCount <= 0) {
-            return 1;
+    private void bindBranchSlots(@Nonnull UICommandBuilder commandBuilder,
+                                 @Nonnull List<TalentTreeViewModel.BranchSlot> branchSlots) {
+        for (TalentTreeViewModel.BranchSlot branch : branchSlots) {
+            commandBuilder.append("#TalentBranchLayer", BRANCH_SLOT_UI_PATH);
+            String selector = "#TalentBranchLayer[" + branch.slotIndex() + "]";
+            commandBuilder.setObject(selector + ".Anchor", branch.anchor());
+            commandBuilder.set(selector + " #TalentBranchName.Text", branch.name());
         }
-        return Math.max(1, (int) Math.ceil((double) entryCount / (double) PAGE_SIZE));
+    }
+
+    private void bindNodeSlots(@Nonnull UICommandBuilder commandBuilder,
+                               @Nonnull UIEventBuilder eventBuilder,
+                               @Nonnull List<TalentTreeViewModel.NodeSlot> nodeSlots) {
+        for (TalentTreeViewModel.NodeSlot node : nodeSlots) {
+            commandBuilder.append("#TalentNodeLayer", NODE_SLOT_UI_PATH);
+            String selector = "#TalentNodeLayer[" + node.slotIndex() + "]";
+            TreeNodeEntry entry = node.entry();
+            commandBuilder.setObject(selector + ".Anchor", node.anchor());
+            bindNodeState(commandBuilder, selector, entry.state());
+            commandBuilder.set(selector + " #TalentNodeSelected.Visible", node.selected());
+            commandBuilder.set(selector + " #TalentNodeName.Text", entry.displayName());
+            commandBuilder.set(selector + " #TalentNodeCost.Text", entry.pointCost() + " pt");
+            commandBuilder.set(selector + " #TalentNodeState.Text", entry.state());
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    selector + " #TalentNodeButton",
+                    EventData.of(KEY_ACTION, ACTION_SELECT_PREFIX + entry.id()),
+                    false
+            );
+        }
+    }
+
+    private void bindConnectorSlots(@Nonnull UICommandBuilder commandBuilder,
+                                    @Nonnull List<TalentTreeViewModel.ConnectorSlot> connectorSlots) {
+        for (TalentTreeViewModel.ConnectorSlot connector : connectorSlots) {
+            commandBuilder.append("#TalentConnectorLayer", CONNECTOR_SLOT_UI_PATH);
+            String selector = "#TalentConnectorLayer[" + connector.slotIndex() + "]";
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorStart", connector.startAnchor(), connector.startVisible());
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorMiddle", connector.middleAnchor(), connector.middleVisible());
+            bindConnectorSegment(commandBuilder, selector + " #TalentConnectorEnd", connector.endAnchor(), connector.endVisible());
+        }
+    }
+
+    private void bindConnectorSegment(@Nonnull UICommandBuilder commandBuilder,
+                                      @Nonnull String selector,
+                                      @Nonnull Anchor anchor,
+                                      boolean visible) {
+        commandBuilder.set(selector + ".Visible", visible);
+        commandBuilder.setObject(selector + ".Anchor", anchor);
+    }
+
+    private void bindSelectedTalent(@Nonnull UICommandBuilder commandBuilder,
+                                    @Nonnull UIEventBuilder eventBuilder,
+                                    @Nullable TreeNodeEntry selectedEntry) {
+        boolean hasSelection = selectedEntry != null;
+        commandBuilder.set("#TalentDetailEmpty.Visible", !hasSelection);
+        commandBuilder.set("#TalentDetailContent.Visible", hasSelection);
+        commandBuilder.set("#TalentDetailUnlockButton.Visible", hasSelection && selectedEntry.canPurchase());
+        if (!hasSelection) {
+            return;
+        }
+        commandBuilder.set("#TalentDetailName.Text", selectedEntry.displayName());
+        commandBuilder.set("#TalentDetailBranch.Text", selectedEntry.branchName() + " - Tier " + selectedEntry.tier());
+        commandBuilder.set("#TalentDetailDescription.Text", selectedEntry.description());
+        commandBuilder.set("#TalentDetailStatus.Text", selectedEntry.status());
+        commandBuilder.set("#TalentDetailRequirements.Text", resolveRequirementText(selectedEntry));
+        commandBuilder.set("#TalentDetailEffects.Text", selectedEntry.effectSummary());
+        if (selectedEntry.canPurchase()) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    "#TalentDetailUnlockButton",
+                    EventData.of(KEY_ACTION, ACTION_BUY_SELECTED),
+                    false
+            );
+        }
+    }
+
+    @Nonnull
+    private String resolveRequirementText(@Nonnull TreeNodeEntry entry) {
+        ArrayList<String> lines = new ArrayList<>();
+        lines.add("Level " + entry.minLevel());
+        lines.addAll(entry.requiredTalentNames());
+        return String.join("\n", lines);
+    }
+
+    private void bindNodeState(@Nonnull UICommandBuilder commandBuilder,
+                               @Nonnull String selector,
+                               @Nonnull String state) {
+        commandBuilder.set(selector + " #TalentNodeLockedBackground.Visible", STATE_LOCKED.equals(state));
+        commandBuilder.set(selector + " #TalentNodeUnaffordableBackground.Visible", STATE_UNAFFORDABLE.equals(state));
+        commandBuilder.set(selector + " #TalentNodeAvailableBackground.Visible", STATE_AVAILABLE.equals(state));
+        commandBuilder.set(selector + " #TalentNodePurchasedBackground.Visible", STATE_PURCHASED.equals(state));
     }
 
     /** Immutable page view model. */
@@ -222,7 +391,8 @@ public final class TameworkCompanionTalentsPage
                            @Nonnull String levelSummary,
                            @Nonnull String pointsSummary,
                            @Nonnull String statusText,
-                           @Nonnull List<TalentEntry> entries) {
+                           boolean canReset,
+                           @Nonnull List<TreeNodeEntry> entries) {
         public PageData {
             entries = List.copyOf(entries);
         }
@@ -233,17 +403,45 @@ public final class TameworkCompanionTalentsPage
                     "Companion unavailable",
                     "Talent Points: 0 available",
                     "No companion data is available.",
+                    false,
                     List.of()
             );
         }
+
+        @Nullable
+        TreeNodeEntry findEntry(@Nullable String talentId) {
+            if (talentId == null || talentId.isBlank()) {
+                return null;
+            }
+            String normalized = talentId.trim().toLowerCase(Locale.ROOT);
+            for (TreeNodeEntry entry : entries) {
+                if (entry != null && entry.id().toLowerCase(Locale.ROOT).equals(normalized)) {
+                    return entry;
+                }
+            }
+            return null;
+        }
     }
 
-    /** One row in the paged talent list. */
-    public record TalentEntry(@Nonnull String id,
-                              @Nonnull String displayName,
-                              @Nonnull String description,
-                              @Nonnull String status,
-                              boolean canPurchase) {
+    /** One node in the branch/tier talent tree. */
+    public record TreeNodeEntry(@Nonnull String id,
+                                @Nonnull String branchName,
+                                int tier,
+                                @Nonnull String state,
+                                @Nonnull String displayName,
+                                @Nonnull String description,
+                                @Nonnull String status,
+                                int pointCost,
+                                int minLevel,
+                                @Nonnull List<String> requiredTalentIds,
+                                @Nonnull List<String> requiredTalentNames,
+                                @Nonnull String effectSummary,
+                                boolean canPurchase) {
+        public TreeNodeEntry {
+            requiredTalentIds = requiredTalentIds == null ? List.of() : List.copyOf(requiredTalentIds);
+            requiredTalentNames = requiredTalentNames == null ? List.of() : List.copyOf(requiredTalentNames);
+            effectSummary = effectSummary == null || effectSummary.isBlank() ? "No passive effects" : effectSummary;
+        }
     }
 
     /** UI payload sent from the page. */

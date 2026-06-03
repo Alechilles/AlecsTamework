@@ -90,6 +90,8 @@ Behavior:
 - Uses role params named by `TwGlobalConfig.InteractionDefaults` for harvestability/context.
 - Uses alarm `TwGlobalConfig.InteractionDefaults.HarvestAlarmName` (default `Harvest_Ready`).
 - Runs `$Harvest` state when valid.
+- If the role has `HarvestAddItemBucket` or `HarvestAddItemDecoBucket`, optimized harvest atomically transforms a held `Container_Bucket` or `Deco_Bucket` into that filled item before entering `$Harvest`.
+- Role param `HarvestBonusMode` controls harvest luck. `DropDuplicate` duplicates loose drops. `CooldownPreserve` does not duplicate drops and can skip the next harvest cooldown, which is intended for container harvests such as milk.
 
 ### Mount
 Common fields:
@@ -118,12 +120,16 @@ Common fields:
 - `RequireTamed`
 - `MinHappiness`
 - `FertilityBonus`
+- `ManualSelectionSeconds`
 
 Behavior:
 - Ensures progression state exists.
 - Enforces `TwBreedingConfig.Eligibility` gates (`RequireTamed`, `RequireAdult`, `RequireNotSleeping`, `RequireNotInCombat`).
 - Uses effective fertility: `(sharedHappiness * FertilityMultiplier) + FertilityBonus`.
-- When ready pair found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
+- Manual breeding marks the interacted NPC for that player only. The same player must interact with both intended NPCs before `ManualSelectionSeconds` expires.
+- Manual breeding is independent from `TwBreedingConfig.PassiveBreeding.Enabled`, the `/tw settings` passive breeding toggle, and the per-NPC breeding enable toggle. Cooldowns and eligibility gates such as tame, adult, ownership, gender, and role compatibility still apply.
+- `MinHappiness` is ignored when the happiness system or breeding happiness requirement is disabled.
+- When a manually selected pair is found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
 - Pairing can require the same role, require different adult roles in one lifecycle family, allow any adult in one lifecycle family, or explicitly allow any role through `TwBreedingConfig.Pairing.RoleCompatibility`.
 - If `TwBreedingConfig.Gender.Enabled` and `RequireDifferentGender` are enabled, partner selection also requires one male and one female companion.
 - Offspring flow supports baby-role preference, persisted weighted adult-role selection, life-stage initialization, trait/attachment inheritance, and growth timing.

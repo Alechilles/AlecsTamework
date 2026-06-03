@@ -46,6 +46,10 @@ import javax.annotation.Nullable;
 
 /** Tamework interact effects. */
 final class TameworkInteractEffects {
+    private static final String CONTAINER_BUCKET_ITEM_ID = "Container_Bucket";
+    private static final String DECO_BUCKET_ITEM_ID = "Deco_Bucket";
+    private static final String HARVEST_ADD_ITEM_BUCKET_PARAM = "HarvestAddItemBucket";
+    private static final String HARVEST_ADD_ITEM_DECO_BUCKET_PARAM = "HarvestAddItemDecoBucket";
     private final ActionTameworkInteract owner;
     private final InteractionInventoryEffects inventoryEffects;
     private final InteractionPresentationEffects presentationEffects;
@@ -152,7 +156,7 @@ final class TameworkInteractEffects {
         }
         DropItemEffect dropItem = effects.getDropItem();
         if (dropItem != null) {
-            boolean dropped = inventoryEffects.applyDropItem(dropItem, npcRef, store, harvestInteraction);
+            boolean dropped = inventoryEffects.applyDropItem(dropItem, npcRef, role, store, harvestInteraction);
             applied |= dropped;
             if (dropped && harvestInteraction) {
                 CompanionLevelingService.awardHarvestXp(npcRef, store);
@@ -260,6 +264,34 @@ final class TameworkInteractEffects {
         return stateEffects.applyStartHarvest(npcRef, role, store);
     }
 
+    HarvestContainerResult applyHarvestContainerTransform(Ref<EntityStore> npcRef,
+                                                          Store<EntityStore> store,
+                                                          Role role,
+                                                          Player player,
+                                                          InteractionContextSnapshot ctx) {
+        String bucketOutput = owner.getRoleStringParam(role, ctx, HARVEST_ADD_ITEM_BUCKET_PARAM);
+        String decoBucketOutput = owner.getRoleStringParam(role, ctx, HARVEST_ADD_ITEM_DECO_BUCKET_PARAM);
+        boolean hasBucketOutput = bucketOutput != null && !bucketOutput.isBlank();
+        boolean hasDecoBucketOutput = decoBucketOutput != null && !decoBucketOutput.isBlank();
+        if (!hasBucketOutput && !hasDecoBucketOutput) {
+            return HarvestContainerResult.NOT_CONFIGURED;
+        }
+        String activeItem = ctx != null ? ctx.activeItemId : null;
+        boolean transformed = false;
+        if (hasBucketOutput && CONTAINER_BUCKET_ITEM_ID.equalsIgnoreCase(activeItem)) {
+            transformed = inventoryEffects.replaceHeldItem(player, ctx, CONTAINER_BUCKET_ITEM_ID, bucketOutput);
+        } else if (hasDecoBucketOutput && DECO_BUCKET_ITEM_ID.equalsIgnoreCase(activeItem)) {
+            transformed = inventoryEffects.replaceHeldItem(player, ctx, DECO_BUCKET_ITEM_ID, decoBucketOutput);
+        }
+        if (!transformed) {
+            return HarvestContainerResult.FAILED;
+        }
+        if (CompanionHarvestBonusService.shouldPreserveCooldown(npcRef, store, role)) {
+            CompanionHarvestBonusService.markCooldownSkip(npcRef, store);
+        }
+        return HarvestContainerResult.APPLIED;
+    }
+
     // Mounts the interacting player using the mount helper.
     boolean applyMount(Ref<EntityStore> npcRef,
                        Role role,
@@ -282,8 +314,9 @@ final class TameworkInteractEffects {
     boolean applyStartBreeding(BreedInteraction interaction,
                                Ref<EntityStore> npcRef,
                                Role role,
-                               Store<EntityStore> store) {
-        return breedingEffects.applyStartBreeding(interaction, npcRef, role, store);
+                               Store<EntityStore> store,
+                               Player player) {
+        return breedingEffects.applyStartBreeding(interaction, npcRef, role, store, player);
     }
 
     private boolean applyPresetEffects(@Nullable String interactionConfigId,
@@ -421,6 +454,12 @@ final class TameworkInteractEffects {
             return;
         }
         owner.logUnsupported(message);
+    }
+
+    enum HarvestContainerResult {
+        NOT_CONFIGURED,
+        APPLIED,
+        FAILED
     }
 
 }

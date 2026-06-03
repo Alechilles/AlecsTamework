@@ -18,11 +18,15 @@ import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
+import com.alechilles.alecstamework.assets.patches.AssetPatchService;
+import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -49,6 +53,7 @@ import com.alechilles.alecstamework.damage.TameworkLingeringHazardSystem;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
+import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
@@ -75,6 +80,7 @@ import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
+import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
@@ -126,12 +132,14 @@ import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideInputCaptureSystem;
-import com.alechilles.alecstamework.npc.systems.MountedRidePacketHandler;
+import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
+import com.hypixel.hytale.assetstore.AssetMap;
+import com.hypixel.hytale.assetstore.event.AssetStoreMonitorEvent;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -139,16 +147,19 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
+import com.hypixel.hytale.server.core.asset.common.events.CommonAssetMonitorEvent;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
+import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
-import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
@@ -181,6 +192,8 @@ public class Tamework extends JavaPlugin {
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetPackCoordinator assetPackCoordinator;
+    private AssetPatchService assetPatchService;
+    private AssetPatchSelfTestPack assetPatchSelfTestPack;
     private TwConfigOverrideManager configOverrideManager;
     private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
 
@@ -205,6 +218,7 @@ public class Tamework extends JavaPlugin {
     private TraitEffectRegistry traitEffectRegistry;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
+    private CompanionXpEventDebugLogService companionXpEventDebugLogService;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private CrashTelemetryService crashTelemetryService;
@@ -222,6 +236,8 @@ public class Tamework extends JavaPlugin {
     private boolean happinessAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
+    private boolean attachmentMigrationAssetsRegistered;
+    private boolean attachmentDisplayAssetsRegistered;
     private boolean levelingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private boolean talentAssetsRegistered;
@@ -353,12 +369,15 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
+        assetPatchSelfTestPack = new AssetPatchSelfTestPack(getDataDirectory(), getManifest(), getLogger());
+        assetPatchService = new AssetPatchService(this, assetPatchSelfTestPack);
         configOverrideManager = new TwConfigOverrideManager(this);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
+        assetPatchService.registerLoadHook();
         ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
@@ -390,12 +409,18 @@ public class Tamework extends JavaPlugin {
         registerHappinessAssets();
         registerNeedsAssets();
         registerBreedingAssets();
+        registerAttachmentMigrationAssets();
+        registerAttachmentDisplayAssets();
         registerLevelingAssets();
         registerTraitAssets();
         registerTalentAssets();
         registerDebugAssets();
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
+        getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
+        getEventRegistry().register(LoadedAssetsEvent.class, ParticleSystem.class, this::onParticleSystemAssetsLoaded);
+        getEventRegistry().register(AssetStoreMonitorEvent.class, this::onAssetStoreMonitor);
+        getEventRegistry().register(CommonAssetMonitorEvent.class, this::onCommonAssetMonitor);
         getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
@@ -680,6 +705,10 @@ public class Tamework extends JavaPlugin {
                 interactionExtensionRegistry,
                 traitEffectRegistry
         );
+        companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
+                () -> api,
+                message -> getLogger().at(Level.INFO).log(message)
+        );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(persistenceRuntime);
         apiSelfTestRunner = new ApiSelfTestRunner();
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
@@ -817,54 +846,84 @@ public class Tamework extends JavaPlugin {
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 PlayerInteractEvent.class,
-                ownerInteractionListener::onPlayerInteract
+                ownerInteractionListener::onPlayerInteract,
+                "owner interaction enforcement"
         );
         OwnerPresenceTimelineService ownerPresenceTimelineService = OwnerPresenceTimelineService.get();
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 PlayerConnectEvent.class,
-                ownerPresenceTimelineService::onPlayerConnect
+                ownerPresenceTimelineService::onPlayerConnect,
+                "owner presence connect tracking"
         );
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 PlayerDisconnectEvent.class,
-                ownerPresenceTimelineService::onPlayerDisconnect
+                ownerPresenceTimelineService::onPlayerDisconnect,
+                "owner presence disconnect tracking"
         );
         if (settingsAnnouncementService != null) {
-            getEventRegistry().registerGlobal(
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
                     PlayerConnectEvent.class,
-                    settingsAnnouncementService::onPlayerConnect
+                    settingsAnnouncementService::onPlayerConnect,
+                    "settings announcement connect reset"
             );
-            getEventRegistry().registerGlobal(
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
                     PlayerDisconnectEvent.class,
-                    settingsAnnouncementService::onPlayerDisconnect
+                    settingsAnnouncementService::onPlayerDisconnect,
+                    "settings announcement disconnect reset"
             );
-            getEventRegistry().registerGlobal(
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
                     PlayerReadyEvent.class,
-                    settingsAnnouncementService::onPlayerReady
+                    settingsAnnouncementService::onPlayerReady,
+                    "settings announcement ready prompt"
             );
         }
         if (namingFeatureHandler != null) {
-            getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
-            getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
-        }
-        if (commandItemFeatureHandler != null) {
-            getEventRegistry().registerGlobal(
-                    AddPlayerToWorldEvent.class,
-                    commandItemFeatureHandler::onAddPlayerToWorld
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    PlayerChatEvent.class,
+                    namingFeatureHandler::onPlayerChat,
+                    "name item chat capture"
+            );
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    PlayerDisconnectEvent.class,
+                    namingFeatureHandler::onPlayerDisconnect,
+                    "name item disconnect cleanup"
             );
         }
-        getEventRegistry().registerGlobal(
+        if (commandItemFeatureHandler != null) {
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    AddPlayerToWorldEvent.class,
+                    commandItemFeatureHandler::onAddPlayerToWorld,
+                    "command item relocation resume"
+            );
+        }
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 AddPlayerToWorldEvent.class,
-                this::onPlayerAddedToWorldForOverrides
+                this::onPlayerAddedToWorldForOverrides,
+                "loaded world override initialization"
         );
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 RemoveWorldEvent.class,
-                this::onWorldRemovedForCrashTelemetry
+                this::onWorldRemovedForCrashTelemetry,
+                "crash telemetry world cleanup"
         );
-        getEventRegistry().registerGlobal(
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
                 RemoveWorldEvent.class,
-                this::onWorldRemovedForProgressionTiming
+                this::onWorldRemovedForProgressionTiming,
+                "progression timing world cleanup"
         );
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(
@@ -976,6 +1035,10 @@ public class Tamework extends JavaPlugin {
         if (crashTelemetryService != null) {
             crashTelemetryService.shutdown();
         }
+        if (companionXpEventDebugLogService != null) {
+            companionXpEventDebugLogService.close();
+            companionXpEventDebugLogService = null;
+        }
         overrideInitializedScopeKeys.clear();
         if (spawnerTooltipBridge != null) {
             spawnerTooltipBridge.shutdown();
@@ -995,6 +1058,7 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
+        assetPatchService = null;
         crashTelemetryService = null;
         settingsAnnouncementService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
@@ -1122,6 +1186,16 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
+    public AssetPatchService getAssetPatchService() {
+        return assetPatchService;
+    }
+
+    @Nullable
+    public AssetPatchSelfTestPack getAssetPatchSelfTestPack() {
+        return assetPatchSelfTestPack;
+    }
+
+    @Nullable
     public Path getRuntimeDataDirectory() {
         return runtimeDataDirectory;
     }
@@ -1134,6 +1208,16 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkApi getApi() {
         return api;
+    }
+
+    @Nullable
+    public CompanionXpEventDebugLogService getCompanionXpEventDebugLogService() {
+        return companionXpEventDebugLogService;
+    }
+
+    @Nullable
+    public TameworkEventBus getApiEventBus() {
+        return apiEventBus;
     }
 
     @Nullable
@@ -1391,25 +1475,16 @@ public class Tamework extends JavaPlugin {
         if (commandAssetsRegistered) {
             return;
         }
-        try {
-            getAssetRegistry().register(
-                    HytaleAssetStore.builder(TwCommandItemConfig.class, new DefaultAssetMap<>())
-                            .setPath("Tamework/Items/Commands")
-                            .setCodec(TwCommandItemConfig.CODEC)
-                            .setKeyFunction(TwCommandItemConfig::getId)
-                            .build()
-            );
-            getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
-            getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
-            commandAssetsRegistered = true;
-        } catch (LinkageError error) {
-            if (!isMissingVector3d(error)) {
-                throw error;
-            }
-            getLogger().at(Level.WARNING).withCause(error).log(
-                    "Skipping command-item asset registration because Vector3d is unavailable in this runtime."
-            );
-        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwCommandItemConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Items/Commands")
+                        .setCodec(TwCommandItemConfig.CODEC)
+                        .setKeyFunction(TwCommandItemConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
+        commandAssetsRegistered = true;
     }
 
     private void registerOptionalCommandLinkedRevivableDropSuppressionSystem() {
@@ -1421,20 +1496,6 @@ public class Tamework extends JavaPlugin {
                             + "are unavailable during setup."
             );
         }
-    }
-
-    private static boolean isMissingVector3d(@Nullable Throwable throwable) {
-        Throwable cursor = throwable;
-        while (cursor != null) {
-            if (cursor instanceof NoClassDefFoundError || cursor instanceof ClassNotFoundException) {
-                String message = cursor.getMessage();
-                if (message != null && message.contains("com/hypixel/hytale/math/vector/Vector3d")) {
-                    return true;
-                }
-            }
-            cursor = cursor.getCause();
-        }
-        return false;
     }
 
     @Nullable
@@ -1575,6 +1636,54 @@ public class Tamework extends JavaPlugin {
         breedingAssetsRegistered = true;
     }
 
+    private void registerAttachmentMigrationAssets() {
+        if (attachmentMigrationAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwAttachmentMigrationConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/AttachmentMigrations")
+                        .setCodec(TwAttachmentMigrationConfig.CODEC)
+                        .setKeyFunction(TwAttachmentMigrationConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwAttachmentMigrationConfig.class,
+                this::onAttachmentMigrationAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwAttachmentMigrationConfig.class,
+                this::onAttachmentMigrationAssetsRemoved
+        );
+        attachmentMigrationAssetsRegistered = true;
+    }
+
+    private void registerAttachmentDisplayAssets() {
+        if (attachmentDisplayAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwAttachmentDisplayConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/AttachmentDisplays")
+                        .setCodec(TwAttachmentDisplayConfig.CODEC)
+                        .setKeyFunction(TwAttachmentDisplayConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwAttachmentDisplayConfig.class,
+                this::onAttachmentDisplayAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwAttachmentDisplayConfig.class,
+                this::onAttachmentDisplayAssetsRemoved
+        );
+        attachmentDisplayAssetsRegistered = true;
+    }
+
     private void registerLevelingAssets() {
         if (levelingAssetsRegistered) {
             return;
@@ -1688,6 +1797,7 @@ public class Tamework extends JavaPlugin {
     private void onCommandAssetsLoaded(
             LoadedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
+        recordAssetPatchHotReload(TwCommandItemConfig.class, event.getAssetMap(), event.getLoadedAssets().keySet());
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.COMMAND_ITEM, event.getLoadedAssets().keySet());
         }
@@ -1743,6 +1853,37 @@ public class Tamework extends JavaPlugin {
         reconcileFeedTroughWaterChargeDroplistCompat();
     }
 
+    private void onItemAssetsLoaded(
+            LoadedAssetsEvent<String, Item, DefaultAssetMap<String, Item>> event) {
+        recordAssetPatchHotReload(Item.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+    }
+
+    private void onParticleSystemAssetsLoaded(
+            LoadedAssetsEvent<String, ParticleSystem, DefaultAssetMap<String, ParticleSystem>> event) {
+        recordAssetPatchHotReload(ParticleSystem.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+    }
+
+    private void onAssetStoreMonitor(@Nonnull AssetStoreMonitorEvent event) {
+        if (assetPatchService == null || event.getAssetStore() == null) {
+            return;
+        }
+        assetPatchService.recordGeneratedAssetStoreMonitor(
+                event.getAssetStore().getAssetClass(),
+                event.getAssetPack(),
+                event.getCreatedOrModifiedFilesToLoad()
+        );
+    }
+
+    private void onCommonAssetMonitor(@Nonnull CommonAssetMonitorEvent event) {
+        if (assetPatchService == null) {
+            return;
+        }
+        assetPatchService.recordGeneratedCommonAssetMonitor(
+                event.getAssetPack(),
+                event.getCreatedOrModifiedFilesToLoad()
+        );
+    }
+
     private void onItemDropListAssetsLoaded(
             LoadedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
@@ -1751,6 +1892,14 @@ public class Tamework extends JavaPlugin {
     private void onItemDropListAssetsRemoved(
             RemovedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
+    }
+
+    private void recordAssetPatchHotReload(@Nonnull Class<?> assetClass,
+                                           @Nullable AssetMap<?, ?> assetMap,
+                                           @Nonnull Iterable<?> keys) {
+        if (assetPatchService != null) {
+            assetPatchService.recordHotReloadedAssets(assetClass, assetMap, keys);
+        }
     }
 
     private void reconcileTranquilizerRecipeVisibility() {
@@ -1871,6 +2020,42 @@ public class Tamework extends JavaPlugin {
         emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
     }
 
+    private void onAttachmentMigrationAssetsLoaded(
+            LoadedAssetsEvent<String, TwAttachmentMigrationConfig, DefaultAssetMap<String, TwAttachmentMigrationConfig>> event) {
+        TwAttachmentMigrationConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_MIGRATION, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onAttachmentMigrationAssetsRemoved(
+            RemovedAssetsEvent<String, TwAttachmentMigrationConfig, DefaultAssetMap<String, TwAttachmentMigrationConfig>> event) {
+        TwAttachmentMigrationConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_MIGRATION, event.getRemovedAssets());
+    }
+
+    private void onAttachmentDisplayAssetsLoaded(
+            LoadedAssetsEvent<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> event) {
+        TwAttachmentDisplayConfig.clearCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getLoadedAssets().keySet());
+            refreshSpawnerTooltipCache();
+        }
+    }
+
+    private void onAttachmentDisplayAssetsRemoved(
+            RemovedAssetsEvent<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> event) {
+        TwAttachmentDisplayConfig.clearCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getRemovedAssets());
+        refreshSpawnerTooltipCache();
+    }
+
+    private void refreshSpawnerTooltipCache() {
+        if (spawnerTooltipBridge != null) {
+            spawnerTooltipBridge.refreshFromItemConfigReload();
+        }
+    }
+
     private void onLevelingAssetsLoaded(
             LoadedAssetsEvent<String, TwLevelingConfig, DefaultAssetMap<String, TwLevelingConfig>> event) {
         TwLevelingConfig.clearRoleCache();
@@ -1979,18 +2164,7 @@ public class Tamework extends JavaPlugin {
         if (commandItemRegistry == null) {
             return 0;
         }
-        DefaultAssetMap<String, TwCommandItemConfig> assetMap;
-        try {
-            assetMap = TwCommandItemConfig.getAssetMap();
-        } catch (LinkageError error) {
-            if (!isMissingVector3d(error)) {
-                throw error;
-            }
-            getLogger().at(Level.WARNING).withCause(error).log(
-                    "Skipping command-item asset loading because Vector3d is unavailable in this runtime."
-            );
-            return 0;
-        }
+        DefaultAssetMap<String, TwCommandItemConfig> assetMap = TwCommandItemConfig.getAssetMap();
         if (assetMap == null) {
             return 0;
         }

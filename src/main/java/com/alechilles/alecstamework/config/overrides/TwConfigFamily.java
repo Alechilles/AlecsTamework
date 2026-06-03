@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.config.overrides;
 
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
+import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -35,6 +37,8 @@ public enum TwConfigFamily {
     HAPPINESS("happiness", "Happiness", "Tamework/Happiness", true, true),
     NEEDS("needs", "Needs", "Tamework/Needs", true, true),
     BREEDING("breeding", "Breeding", "Tamework/Breeding", true, true),
+    ATTACHMENT_MIGRATION("attachment-migration", "Attachment Migrations", "Tamework/AttachmentMigrations", true, true),
+    ATTACHMENT_DISPLAY("attachment-display", "Attachment Displays", "Tamework/AttachmentDisplays", true, true),
     LEVELING("leveling", "Leveling", "Tamework/Leveling", true, true),
     TRAIT("trait", "Traits", "Tamework/Traits", true, true),
     TALENT("talent", "Talents", "Tamework/Talents", true, true),
@@ -130,6 +134,10 @@ public enum TwConfigFamily {
             case HAPPINESS -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwHappinessConfig.getAssetStore();
             case NEEDS -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwNeedsConfig.getAssetStore();
             case BREEDING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwBreedingConfig.getAssetStore();
+            case ATTACHMENT_MIGRATION ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentMigrationConfig.getAssetStore();
+            case ATTACHMENT_DISPLAY ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentDisplayConfig.getAssetStore();
             case LEVELING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwLevelingConfig.getAssetStore();
             case TRAIT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTraitConfig.getAssetStore();
             case TALENT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTalentConfig.getAssetStore();

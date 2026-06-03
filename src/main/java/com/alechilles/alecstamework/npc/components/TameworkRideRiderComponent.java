@@ -23,6 +23,7 @@ public final class TameworkRideRiderComponent implements Component<EntityStore> 
 
     private String mountUuid = "";
     private boolean clientCameraApplied;
+    private double clientSpeedModifier = -1.0;
 
     public TameworkRideRiderComponent() {
     }
@@ -52,10 +53,21 @@ public final class TameworkRideRiderComponent implements Component<EntityStore> 
         this.clientCameraApplied = clientCameraApplied;
     }
 
+    public double getClientSpeedModifier() {
+        return clientSpeedModifier;
+    }
+
+    public void setClientSpeedModifier(double clientSpeedModifier) {
+        this.clientSpeedModifier = Double.isFinite(clientSpeedModifier) && clientSpeedModifier > 0.0
+                ? clientSpeedModifier
+                : -1.0;
+    }
+
     @Override
     public TameworkRideRiderComponent clone() {
         TameworkRideRiderComponent clone = new TameworkRideRiderComponent(mountUuid);
         clone.clientCameraApplied = clientCameraApplied;
+        clone.clientSpeedModifier = clientSpeedModifier;
         return clone;
     }
 

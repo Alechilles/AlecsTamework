@@ -600,6 +600,41 @@
     });
   }
 
+  function getOpenModelProjects() {
+    if (typeof ModelProject === "undefined" || !Array.isArray(ModelProject.all)) {
+      return [];
+    }
+    return ModelProject.all.filter((project) => project && typeof project === "object");
+  }
+
+  function getActiveModelProject() {
+    return typeof Project !== "undefined" && Project && typeof Project === "object" ? Project : null;
+  }
+
+  function getNewModelProject(beforeProjects, previousProject) {
+    const before = new Set(beforeProjects || []);
+    const currentProject = getActiveModelProject();
+    if (currentProject && currentProject !== previousProject && !before.has(currentProject)) {
+      return currentProject;
+    }
+    return getOpenModelProjects().find((project) => !before.has(project)) || null;
+  }
+
+  async function closeManagedModelProject(project) {
+    if (!project || typeof project.close !== "function") {
+      return false;
+    }
+    try {
+      project.saved = true;
+      await project.close(true);
+      await waitFrame();
+      return true;
+    } catch (error) {
+      console.warn(`[${PLUGIN_ID}] Failed to close temporary Blockbench project`, error);
+      return false;
+    }
+  }
+
   function getTextureByPath(texturePath) {
     if (typeof Texture === "undefined" || !Array.isArray(Texture.all)) {
       return null;
@@ -1279,7 +1314,10 @@
   function extractSetDefinitions(modelJson, includeEmptySets, excludeSets) {
     const randomSets = modelJson && modelJson.RandomAttachmentSets;
     if (!randomSets || typeof randomSets !== "object") {
-      throw new Error("Model JSON does not define RandomAttachmentSets.");
+      if ((includeEmptySets && includeEmptySets.length) || (excludeSets && excludeSets.length)) {
+        throw new Error("Model JSON does not define RandomAttachmentSets.");
+      }
+      return [];
     }
     const includeSet = new Set(includeEmptySets || []);
     const excludeSet = new Set(excludeSets || []);
@@ -1387,7 +1425,7 @@
     return allowed.Allowlist.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
   }
 
-  function mergeOverridesIntoSpawner(spawnerJson, roleOverrides, iconDefault) {
+  function mergeOverridesIntoSpawner(spawnerJson, roleOverrides, iconOverrideGroups, iconDefault) {
     const output = Object.assign({}, spawnerJson || {});
     const existing =
       output.IconOverridesByRole && typeof output.IconOverridesByRole === "object"
@@ -1397,11 +1435,54 @@
     Object.keys(roleOverrides).forEach((role) => {
       merged[role] = roleOverrides[role];
     });
-    output.IconOverridesByRole = merged;
+    if (Object.keys(merged).length) {
+      output.IconOverridesByRole = merged;
+    } else {
+      delete output.IconOverridesByRole;
+    }
+    const existingGroups = Array.isArray(output.IconOverrideGroups)
+      ? output.IconOverrideGroups.slice()
+      : [];
+    const generatedGroups = Array.isArray(iconOverrideGroups) ? iconOverrideGroups : [];
+    if (generatedGroups.length) {
+      generatedGroups.forEach((group) => {
+        replaceOrAppendIconOverrideGroup(existingGroups, group);
+      });
+      output.IconOverrideGroups = existingGroups;
+    } else if (!existingGroups.length) {
+      delete output.IconOverrideGroups;
+    }
     if (typeof iconDefault === "string" && iconDefault.trim().length) {
       output.IconDefault = iconDefault.trim();
     }
     return output;
+  }
+
+  function iconOverrideGroupRoleKey(group) {
+    if (!group || !Array.isArray(group.Roles)) {
+      return "";
+    }
+    return group.Roles
+      .filter((role) => typeof role === "string" && role.trim().length)
+      .map((role) => role.trim().toLowerCase())
+      .sort()
+      .join("\u0000");
+  }
+
+  function replaceOrAppendIconOverrideGroup(groups, group) {
+    const roleKey = iconOverrideGroupRoleKey(group);
+    if (!roleKey) {
+      return;
+    }
+    const replacement = Object.assign({}, group);
+    const existingIndex = groups.findIndex(
+      (existing) => iconOverrideGroupRoleKey(existing) === roleKey
+    );
+    if (existingIndex >= 0) {
+      groups[existingIndex] = replacement;
+      return;
+    }
+    groups.push(replacement);
   }
 
   function composeIconRelativePath(iconRelDir, filename) {
@@ -1423,6 +1504,8 @@
         ? config.assetRoots.slice()
         : [commonRoot];
     const roles = config.roles;
+    const sharedRoleGroup = config.sharedRoleGroup === true && roles.length > 0;
+    const sharedIconRole = roles[0];
     const setDefs = extractSetDefinitions(modelJson, config.includeEmptySets, config.excludeSets);
     const optionVisuals = extractOptionVisuals(modelJson);
     const baseModel = typeof modelJson.Model === "string" ? modelJson.Model : null;
@@ -1434,8 +1517,12 @@
       : cartesianProduct(optionSpace);
     const roleOverrides = {};
     roles.forEach((role) => {
-      roleOverrides[role] = [];
+      if (!sharedRoleGroup) {
+        roleOverrides[role] = [];
+      }
     });
+    const sharedOverrides = [];
+    let sharedIconDefault = null;
 
     const jobs = [];
     const jobsByOutputPath = new Map();
@@ -1456,7 +1543,7 @@
           attachments[setDef.name] = selected;
         }
       });
-      const comboSlug = slugParts.join("__");
+      const comboSlug = slugParts.length ? slugParts.join("__") : "base";
 
       const commonPlaceholders = {
         model: modelName,
@@ -1489,20 +1576,7 @@
       });
 
       const iconsByRole = {};
-      roles.forEach((role) => {
-        const placeholders = Object.assign({}, commonPlaceholders, { role });
-        const filename = formatTemplate(config.filenameTemplate, placeholders);
-        const iconRel = composeIconRelativePath(config.iconRelDir, filename);
-        const iconFile = resolveCommonAssetFile(commonRoot, iconRel);
-        iconsByRole[role] = iconRel;
-
-        if (Object.keys(attachments).length) {
-          roleOverrides[role].push({
-            Icon: iconRel,
-            Attachments: Object.assign({}, attachments)
-          });
-        }
-
+      const addRenderJob = (role, iconRel, iconFile) => {
         const outputKey = normalizeForCompare(iconFile || iconRel);
         if (!jobsByOutputPath.has(outputKey)) {
           const jobPayload = {
@@ -1523,7 +1597,43 @@
           jobs.push(jobPayload);
           jobsByOutputPath.set(outputKey, jobPayload);
         }
-      });
+      };
+
+      if (sharedRoleGroup) {
+        const placeholders = Object.assign({}, commonPlaceholders, { role: sharedIconRole });
+        const filename = formatTemplate(config.filenameTemplate, placeholders);
+        const iconRel = composeIconRelativePath(config.iconRelDir, filename);
+        const iconFile = resolveCommonAssetFile(commonRoot, iconRel);
+        roles.forEach((role) => {
+          iconsByRole[role] = iconRel;
+        });
+
+        if (Object.keys(attachments).length) {
+          sharedOverrides.push({
+            Icon: iconRel,
+            Attachments: Object.assign({}, attachments)
+          });
+        } else if (!sharedIconDefault) {
+          sharedIconDefault = iconRel;
+        }
+        addRenderJob(sharedIconRole, iconRel, iconFile);
+      } else {
+        roles.forEach((role) => {
+          const placeholders = Object.assign({}, commonPlaceholders, { role });
+          const filename = formatTemplate(config.filenameTemplate, placeholders);
+          const iconRel = composeIconRelativePath(config.iconRelDir, filename);
+          const iconFile = resolveCommonAssetFile(commonRoot, iconRel);
+          iconsByRole[role] = iconRel;
+
+          if (Object.keys(attachments).length) {
+            roleOverrides[role].push({
+              Icon: iconRel,
+              Attachments: Object.assign({}, attachments)
+            });
+          }
+          addRenderJob(role, iconRel, iconFile);
+        });
+      }
 
       manifestCombos.push({
         index: comboIndex,
@@ -1536,12 +1646,22 @@
 
     return {
       roleOverrides,
+      iconOverrideGroups:
+        sharedRoleGroup && (sharedOverrides.length || sharedIconDefault)
+          ? [
+              Object.assign(
+                { Roles: roles.slice(), Overrides: sharedOverrides },
+                sharedIconDefault ? { IconDefault: sharedIconDefault } : {}
+              )
+            ]
+          : [],
       manifest: {
         schema: "tamework.spawner-icon-manifest.v1",
         generatedAtUtc: new Date().toISOString(),
         modRoot,
         modelPath,
         roles,
+        iconOverrideMode: sharedRoleGroup ? "group" : "byRole",
         randomAttachmentSets: setDefs.map((def) => ({
           set: def.name,
           options: def.options.slice(),
@@ -1561,7 +1681,10 @@
           camera: {
             scale: config.cameraScale,
             rotation: config.cameraRotation,
-            translation: config.cameraTranslation
+            translation: config.cameraTranslation,
+            autoFrame: config.cameraAutoFrame === true,
+            autoFramePadding: Math.max(0, Math.floor(asNumber(config.cameraAutoFramePadding, 4))),
+            autoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(config.cameraAutoFrameMaxAttempts, 6)))
           }
         },
         model: {
@@ -1590,6 +1713,8 @@
     if (!fileExists(modelPath)) {
       throw new Error(`Base model file not found: ${modelPath}`);
     }
+    const beforeProjects = getOpenModelProjects();
+    const previousProject = getActiveModelProject();
     const modelJson = readJsonFromDisk(modelPath);
     codec.load(
       modelJson,
@@ -1615,6 +1740,7 @@
       ensureFacesTextured(texture);
       await waitFrame();
     }
+    return getNewModelProject(beforeProjects, previousProject);
   }
 
   function buildAttachmentCollection(name, content, modelPath, texturePath) {
@@ -2052,6 +2178,24 @@
     }
   }
 
+  function scalePreviewCamera(preview, factor) {
+    const scale = Math.max(0.01, asNumber(factor, 1));
+    if (
+      preview &&
+      preview.camera &&
+      preview.camera.position &&
+      typeof preview.camera.position.multiplyScalar === "function"
+    ) {
+      preview.camera.position.multiplyScalar(scale);
+    }
+    if (preview && preview.controls && typeof preview.controls.update === "function") {
+      preview.controls.update();
+    }
+    if (preview && preview.camera && typeof preview.camera.updateProjectionMatrix === "function") {
+      preview.camera.updateProjectionMatrix();
+    }
+  }
+
   function captureScreenshot(preview, iconSize) {
     return new Promise((resolve, reject) => {
       try {
@@ -2227,6 +2371,137 @@
     return canvas.toDataURL("image/png");
   }
 
+  async function analyzeImageAlphaBounds(dataUrl, iconSize) {
+    const image = await loadImage(dataUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = iconSize;
+    canvas.height = iconSize;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, iconSize, iconSize);
+    ctx.drawImage(image, 0, 0, iconSize, iconSize);
+    const pixelData = ctx.getImageData(0, 0, iconSize, iconSize).data;
+    let minX = iconSize;
+    let minY = iconSize;
+    let maxX = -1;
+    let maxY = -1;
+    let count = 0;
+    for (let y = 0; y < iconSize; y += 1) {
+      for (let x = 0; x < iconSize; x += 1) {
+        const alpha = pixelData[(y * iconSize + x) * 4 + 3];
+        if (alpha > 8) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+          count += 1;
+        }
+      }
+    }
+    if (count === 0) {
+      return null;
+    }
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+      count
+    };
+  }
+
+  function boundsTouchPadding(bounds, iconSize, padding) {
+    if (!bounds) {
+      return false;
+    }
+    const safePadding = Math.max(0, Math.floor(asNumber(padding, 0)));
+    return (
+      bounds.minX < safePadding ||
+      bounds.minY < safePadding ||
+      bounds.maxX >= iconSize - safePadding ||
+      bounds.maxY >= iconSize - safePadding
+    );
+  }
+
+  async function centerImageByAlphaBounds(dataUrl, iconSize, bounds, padding) {
+    if (!bounds) {
+      return dataUrl;
+    }
+    const safePadding = Math.max(0, Math.floor(asNumber(padding, 0)));
+    const padX = Math.min(safePadding, Math.max(0, Math.floor((iconSize - bounds.width) / 2)));
+    const padY = Math.min(safePadding, Math.max(0, Math.floor((iconSize - bounds.height) / 2)));
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    const desiredDx = Math.round(iconSize / 2 - centerX);
+    const desiredDy = Math.round(iconSize / 2 - centerY);
+    const minDx = padX - bounds.minX;
+    const maxDx = iconSize - 1 - padX - bounds.maxX;
+    const minDy = padY - bounds.minY;
+    const maxDy = iconSize - 1 - padY - bounds.maxY;
+    const dx = Math.max(minDx, Math.min(maxDx, desiredDx));
+    const dy = Math.max(minDy, Math.min(maxDy, desiredDy));
+    return applyScreenTranslation(dataUrl, iconSize, [dx, dy]);
+  }
+
+  function resolveAutoFrameSettings(payloadDefaults, job) {
+    const cameraDefaults = payloadDefaults && payloadDefaults.camera && typeof payloadDefaults.camera === "object"
+      ? payloadDefaults.camera
+      : {};
+    const jobCamera = job && job.camera && typeof job.camera === "object" ? job.camera : {};
+    const rawEnabled =
+      Object.prototype.hasOwnProperty.call(jobCamera, "autoFrame")
+        ? jobCamera.autoFrame
+        : cameraDefaults.autoFrame;
+    const enabled = rawEnabled === true || rawEnabled === "true";
+    const rawPadding = Object.prototype.hasOwnProperty.call(jobCamera, "autoFramePadding")
+      ? jobCamera.autoFramePadding
+      : cameraDefaults.autoFramePadding;
+    const rawMaxAttempts = Object.prototype.hasOwnProperty.call(jobCamera, "autoFrameMaxAttempts")
+      ? jobCamera.autoFrameMaxAttempts
+      : cameraDefaults.autoFrameMaxAttempts;
+    const padding = Math.max(
+      0,
+      Math.floor(asNumber(rawPadding, 4))
+    );
+    const maxAttempts = Math.max(
+      1,
+      Math.floor(asNumber(rawMaxAttempts, 6))
+    );
+    return {
+      enabled,
+      padding,
+      maxAttempts
+    };
+  }
+
+  async function captureAutoFramedScreenshot(preview, iconSize, settings) {
+    let imageDataUrl = await captureScreenshot(preview, iconSize);
+    if (!settings.enabled) {
+      return imageDataUrl;
+    }
+    let bounds = await analyzeImageAlphaBounds(imageDataUrl, iconSize);
+    if (!bounds) {
+      return imageDataUrl;
+    }
+    for (let attempt = 1; attempt < settings.maxAttempts; attempt += 1) {
+      if (!boundsTouchPadding(bounds, iconSize, settings.padding)) {
+        break;
+      }
+      scalePreviewCamera(preview, 1.15);
+      await waitFrame();
+      imageDataUrl = await captureScreenshot(preview, iconSize);
+      bounds = await analyzeImageAlphaBounds(imageDataUrl, iconSize);
+      if (!bounds) {
+        break;
+      }
+    }
+    if (bounds && !boundsTouchPadding(bounds, iconSize, 1)) {
+      imageDataUrl = await centerImageByAlphaBounds(imageDataUrl, iconSize, bounds, settings.padding);
+    }
+    return imageDataUrl;
+  }
+
   function buildSceneDiagnostics(preview) {
     const elementCount =
       typeof Outliner !== "undefined" && Array.isArray(Outliner.elements)
@@ -2303,70 +2578,75 @@
     );
 
     const effectiveBase = selectEffectiveBase(job, baseModelPath, baseTexturePath, jobsDir);
-    await loadBaseModel(codec, effectiveBase.modelPath, effectiveBase.texturePath);
-    const baseTextureRefPath = effectiveBase.texturePath || baseTexturePath;
-    const primaryTextureKey = detectPrimaryTextureKey(baseTextureRefPath);
-    const baseTextureBeforeOverride = getTextureByPath(baseTextureRefPath);
-    const baseAliasKeys = collectTextureAliasKeys(baseTextureBeforeOverride);
-    const normalizedPrimaryTextureKey = normalizeTextureKey(primaryTextureKey);
-    if (normalizedPrimaryTextureKey) {
-      baseAliasKeys.add(normalizedPrimaryTextureKey);
-    }
-    const baseTextureOverride = await applyAttachments(
-      codec,
-      job,
-      jobsDir,
-      effectiveBase.modelPath,
-      effectiveBase.texturePath,
-      effectiveBase.consumedAssetIndex
-    );
-    if (baseTextureOverride) {
-      const texture = setDefaultTexture(baseTextureOverride);
-      let remappedFaces = 0;
-      if (texture && texture.uuid) {
-        remappedFaces = remapFaceTextureKeys(Array.from(baseAliasKeys), texture.uuid);
+    const managedProject = await loadBaseModel(codec, effectiveBase.modelPath, effectiveBase.texturePath);
+    try {
+      const baseTextureRefPath = effectiveBase.texturePath || baseTexturePath;
+      const primaryTextureKey = detectPrimaryTextureKey(baseTextureRefPath);
+      const baseTextureBeforeOverride = getTextureByPath(baseTextureRefPath);
+      const baseAliasKeys = collectTextureAliasKeys(baseTextureBeforeOverride);
+      const normalizedPrimaryTextureKey = normalizeTextureKey(primaryTextureKey);
+      if (normalizedPrimaryTextureKey) {
+        baseAliasKeys.add(normalizedPrimaryTextureKey);
       }
-      if (remappedFaces === 0) {
-        ensureFacesTextured(texture);
+      const baseTextureOverride = await applyAttachments(
+        codec,
+        job,
+        jobsDir,
+        effectiveBase.modelPath,
+        effectiveBase.texturePath,
+        effectiveBase.consumedAssetIndex
+      );
+      if (baseTextureOverride) {
+        const texture = setDefaultTexture(baseTextureOverride);
+        let remappedFaces = 0;
+        if (texture && texture.uuid) {
+          remappedFaces = remapFaceTextureKeys(Array.from(baseAliasKeys), texture.uuid);
+        }
+        if (remappedFaces === 0) {
+          ensureFacesTextured(texture);
+        }
+        const debugRow = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
+        const jobId = typeof job.id === "string" ? job.id : job.comboSlug || "job";
+        if (debugRow && debugRow.id === jobId) {
+          debugRow.primaryTextureKey = primaryTextureKey;
+          debugRow.baseAliasKeysBeforeOverride = Array.from(baseAliasKeys);
+          debugRow.overrideTexturePath = baseTextureOverride;
+          debugRow.overrideTextureUuid = texture && texture.uuid ? texture.uuid : null;
+          debugRow.remappedFaces = remappedFaces;
+          debugRow.textureCatalogAfterBaseOverride = getTextureCatalog();
+          debugRow.faceTextureUsageAfterBaseOverride = summarizeFaceTextureUsage(null, 24);
+        }
+        await waitFrame();
       }
-      const debugRow = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
-      const jobId = typeof job.id === "string" ? job.id : job.comboSlug || "job";
-      if (debugRow && debugRow.id === jobId) {
-        debugRow.primaryTextureKey = primaryTextureKey;
-        debugRow.baseAliasKeysBeforeOverride = Array.from(baseAliasKeys);
-        debugRow.overrideTexturePath = baseTextureOverride;
-        debugRow.overrideTextureUuid = texture && texture.uuid ? texture.uuid : null;
-        debugRow.remappedFaces = remappedFaces;
-        debugRow.textureCatalogAfterBaseOverride = getTextureCatalog();
-        debugRow.faceTextureUsageAfterBaseOverride = summarizeFaceTextureUsage(null, 24);
+      const zeroUvCleanup = clearZeroAreaUvFaces();
+      const debugRowAfterCleanup = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
+      const debugJobIdAfterCleanup = typeof job.id === "string" ? job.id : job.comboSlug || "job";
+      if (debugRowAfterCleanup && debugRowAfterCleanup.id === debugJobIdAfterCleanup) {
+        debugRowAfterCleanup.zeroUvCleanup = zeroUvCleanup;
+        debugRowAfterCleanup.faceTextureUsageAfterZeroUvCleanup = summarizeFaceTextureUsage(null, 24);
       }
       await waitFrame();
-    }
-    const zeroUvCleanup = clearZeroAreaUvFaces();
-    const debugRowAfterCleanup = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
-    const debugJobIdAfterCleanup = typeof job.id === "string" ? job.id : job.comboSlug || "job";
-    if (debugRowAfterCleanup && debugRowAfterCleanup.id === debugJobIdAfterCleanup) {
-      debugRowAfterCleanup.zeroUvCleanup = zeroUvCleanup;
-      debugRowAfterCleanup.faceTextureUsageAfterZeroUvCleanup = summarizeFaceTextureUsage(null, 24);
-    }
-    await waitFrame();
-    const preview = choosePreview();
-    if (!preview) {
-      throw new Error("Could not resolve an active Blockbench preview.");
-    }
-    if (typeof preview.resize === "function") {
-      preview.resize(iconSize, iconSize);
-    }
-    applyCamera(preview, payloadDefaults, job);
-    await waitFrame();
+      const preview = choosePreview();
+      if (!preview) {
+        throw new Error("Could not resolve an active Blockbench preview.");
+      }
+      if (typeof preview.resize === "function") {
+        preview.resize(iconSize, iconSize);
+      }
+      applyCamera(preview, payloadDefaults, job);
+      await waitFrame();
 
-    let imageDataUrl = await captureScreenshot(preview, iconSize);
-    imageDataUrl = await applyScreenTranslation(imageDataUrl, iconSize, translation);
-    await assertImageNotFullyTransparent(imageDataUrl, iconSize, buildSceneDiagnostics(preview));
-    return {
-      imageDataUrl,
-      iconSize
-    };
+      const autoFrame = resolveAutoFrameSettings(payloadDefaults, job);
+      let imageDataUrl = await captureAutoFramedScreenshot(preview, iconSize, autoFrame);
+      imageDataUrl = await applyScreenTranslation(imageDataUrl, iconSize, translation);
+      await assertImageNotFullyTransparent(imageDataUrl, iconSize, buildSceneDiagnostics(preview));
+      return {
+        imageDataUrl,
+        iconSize
+      };
+    } finally {
+      await closeManagedModelProject(managedProject);
+    }
   }
 
   async function renderSingleJob(codec, payloadDefaults, job, jobsDir) {
@@ -2578,10 +2858,14 @@
       cameraRotationZ: 22.5,
       cameraPositionX: 0,
       cameraPositionY: 0,
+      cameraAutoFrame: false,
+      cameraAutoFramePadding: 4,
+      cameraAutoFrameMaxAttempts: 6,
       saveGeneratedJson: true,
       jobsOutPath: "",
       manifestOutPath: "",
       writeSpawnerOverrides: true,
+      sharedRoleGroup: false,
       writeSpawnerInPlace: true,
       spawnerOutPath: "",
       iconDefaultOverride: ""
@@ -2596,6 +2880,8 @@
     if (!Number.isFinite(Number(defaults.cameraRotationZ))) defaults.cameraRotationZ = legacyRotation[2];
     if (!Number.isFinite(Number(defaults.cameraPositionX))) defaults.cameraPositionX = legacyPosition[0];
     if (!Number.isFinite(Number(defaults.cameraPositionY))) defaults.cameraPositionY = legacyPosition[1];
+    if (!Number.isFinite(Number(defaults.cameraAutoFramePadding))) defaults.cameraAutoFramePadding = 4;
+    if (!Number.isFinite(Number(defaults.cameraAutoFrameMaxAttempts))) defaults.cameraAutoFrameMaxAttempts = 6;
     if (!defaults.modelPath) {
       const projectPath = getCurrentProjectPath();
       if (projectPath) {
@@ -3006,7 +3292,8 @@
     const filenameUsesRoleToken = filenameTemplate.includes("{role}");
     const templateContainsComboToken =
       filenameTemplate.includes("{combo_slug}") || filenameTemplate.includes("{combo_index}");
-    const roleMultiplier = filenameUsesRoleToken ? BigInt(roles.length) : 1n;
+    const sharedRoleGroup = values.sharedRoleGroup === true;
+    const roleMultiplier = filenameUsesRoleToken && !sharedRoleGroup ? BigInt(roles.length) : 1n;
     const estimatedIconCount = comboCount * roleMultiplier;
 
     return buildComboPreviewText({
@@ -3112,6 +3399,10 @@
       cameraScale,
       cameraRotation,
       cameraTranslation,
+      cameraAutoFrame: values.cameraAutoFrame === true,
+      cameraAutoFramePadding: Math.max(0, Math.floor(asNumber(values.cameraAutoFramePadding, 4))),
+      cameraAutoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(values.cameraAutoFrameMaxAttempts, 6))),
+      sharedRoleGroup: values.sharedRoleGroup === true,
       previewOnlyFirstCombo: true
     });
     const firstJob = generated.jobsPayload
@@ -3336,6 +3627,16 @@
                     <numeric-input v-model.number="values.cameraPositionY" :min="-256" :max="256" :step="1" />
                   </div>
                 </div>
+                <div class="tw-inline-pair">
+                  <div class="tw-check-row">
+                    <input type="checkbox" id="tw_camera_auto_frame" v-model="values.cameraAutoFrame" />
+                    <label for="tw_camera_auto_frame">Auto Frame</label>
+                  </div>
+                  <div class="tw-field">
+                    <label>Auto Frame Padding</label>
+                    <numeric-input v-model.number="values.cameraAutoFramePadding" :min="0" :max="32" :step="1" />
+                  </div>
+                </div>
                 <div class="tw-field">
                   <div class="tw-action-row">
                     <button type="button" class="tool" @click="previewFirstCombo" :disabled="previewBusy">
@@ -3360,6 +3661,10 @@
                   <div class="tw-check-row">
                     <input type="checkbox" id="tw_write_spawner" v-model="values.writeSpawnerOverrides" />
                     <label for="tw_write_spawner">Write Spawner Overrides</label>
+                  </div>
+                  <div class="tw-check-row">
+                    <input type="checkbox" id="tw_shared_role_group" v-model="values.sharedRoleGroup" />
+                    <label for="tw_shared_role_group">Shared Role Group</label>
                   </div>
                 </div>
 
@@ -3544,7 +3849,11 @@
       iconSize,
       cameraScale,
       cameraRotation,
-      cameraTranslation
+      cameraTranslation,
+      cameraAutoFrame: formResult.cameraAutoFrame === true,
+      cameraAutoFramePadding: Math.max(0, Math.floor(asNumber(formResult.cameraAutoFramePadding, 4))),
+      cameraAutoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(formResult.cameraAutoFrameMaxAttempts, 6))),
+      sharedRoleGroup: formResult.sharedRoleGroup === true
     });
     const resolvedBaseModelFile = generated.jobsPayload
       && generated.jobsPayload.model
@@ -3579,6 +3888,7 @@
       const mergedSpawner = mergeOverridesIntoSpawner(
         spawnerJson,
         generated.roleOverrides,
+        generated.iconOverrideGroups,
         String(formResult.iconDefaultOverride || "")
       );
       if (formResult.writeSpawnerInPlace !== false) {

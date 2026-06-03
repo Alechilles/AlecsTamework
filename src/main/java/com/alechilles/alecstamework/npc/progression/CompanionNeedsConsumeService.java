@@ -6,7 +6,7 @@ import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -168,6 +168,7 @@ public final class CompanionNeedsConsumeService {
         double hungerGain = 0.0;
         double thirstGain = 0.0;
         int consumedItems = 0;
+        boolean waterRefillApplied = false;
         Map<String, Integer> consumedItemCountsByItemId = null;
 
         if (mode.consumesFood()) {
@@ -231,6 +232,7 @@ public final class CompanionNeedsConsumeService {
                 }
                 if (nearWater) {
                     thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
+                    waterRefillApplied = true;
                 } else {
                     NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "not_near_water");
                 }
@@ -274,6 +276,9 @@ public final class CompanionNeedsConsumeService {
                 null,
                 consumedItemCountsByItemId
         );
+        if (shouldAwardFeedXpForResourceConsume(consumedItems, waterRefillApplied, updated, happinessChanged)) {
+            CompanionLevelingService.awardFeedXp(npcRef, store);
+        }
         if (updated) {
             NeedsConsumeDiagnostics.maybeLogConsume(
                     diagnostics,
@@ -317,6 +322,13 @@ public final class CompanionNeedsConsumeService {
                 thirstGain
         );
         return false;
+    }
+
+    static boolean shouldAwardFeedXpForResourceConsume(int consumedItems,
+                                                       boolean waterRefillApplied,
+                                                       boolean updated,
+                                                       boolean happinessChanged) {
+        return (updated || happinessChanged) && (consumedItems > 0 || waterRefillApplied);
     }
 
     @Nonnull

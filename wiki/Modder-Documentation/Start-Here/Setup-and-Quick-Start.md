@@ -36,6 +36,7 @@ Optional for captured-spawner tooltip lines:
 - Template: `Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json`
 - Simple template: `Template_Tamework_Example_Simple.json`
 - Matching role example: `Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example.json`
+- Optional patch fixture: `Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json` + `Server/Tamework/Patches/Examples/Tamework_Example_Patch.json`
 - Example configs: `src/main/resources/Server/Tamework/...`
 
 ## 4. Add an interaction config

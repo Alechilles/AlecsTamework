@@ -68,9 +68,12 @@ public final class MountedNpcTeleportSafetySystem extends RefSystem<EntityStore>
         }
 
         Player ownerPlayer = safeGetComponent(store, ownerRef, playerType);
-        if (ownerPlayer == null || ownerPlayer.getMountEntityId() == 0) {
+        if (ownerPlayer == null) {
             mountComponent.setOwnerPlayerRef(null);
             ensureInteractable(reference, commandBuffer);
+            return;
+        }
+        if (ownerPlayer.getMountEntityId() == 0) {
             return;
         }
 

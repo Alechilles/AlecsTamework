@@ -6,7 +6,7 @@
 
     <groupId>com.alechilles</groupId>
     <artifactId>alecstamework</artifactId>
-    <version>2.9.0</version>
+    <version>2.12.2</version>
     <packaging>jar</packaging>
 
     <name>.Alec's Tamework!</name>
@@ -17,14 +17,16 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <sqlite.jdbc.version>3.49.1.0</sqlite.jdbc.version>
-        <alecstelemetry.version>0.1.1</alecstelemetry.version>
+        <slf4j.version>1.7.36</slf4j.version>
+        <alecstelemetry.version>0.1.2</alecstelemetry.version>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
         <hytale.install.path>${hytale.install.path.release}</hytale.install.path>
-        <nameplatebuilder.jar.path>${hytale.install.path}/Server/mods/NameplateBuilder-4.260326.7.jar</nameplatebuilder.jar.path>
+        <nameplatebuilder.jar.path>C:/Users/22ale/AppData/Roaming/Hytale/Modding/_shared/libs/NameplateBuilder-4.260326.7.jar</nameplatebuilder.jar.path>
         <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/UserData</hytale.userdata.path>
         <hytale.toolkit.path>C:/Users/22ale/AppData/Local/Hytale-Toolkit</hytale.toolkit.path>
         <hytale.jdk.path>C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot</hytale.jdk.path>
+        <argLine></argLine>
         <hytale.server.jvm.args />
         <hytale.server.extra.args />
     </properties>
@@ -66,6 +68,11 @@
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>${sqlite.jdbc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -146,7 +153,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.1</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -162,8 +169,15 @@
                                 <includes>
                                     <include>com.alechilles:alecstelemetry-runtime</include>
                                     <include>org.xerial:sqlite-jdbc</include>
+                                    <include>org.slf4j:slf4j-api</include>
                                 </includes>
                             </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.slf4j</pattern>
+                                    <shadedPattern>com.alechilles.alecstamework.shadow.slf4j</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
@@ -174,6 +188,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
+                    <argLine>@{argLine} -Djava.util.logging.manager=com.hypixel.hytale.logger.backend.HytaleLogManager</argLine>
                     <useModulePath>false</useModulePath>
                 </configuration>
             </plugin>
@@ -192,6 +207,7 @@
             </activation>
             <properties>
                 <hytale.install.path>${hytale.install.path.prerelease}</hytale.install.path>
+                <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/data/pre-release</hytale.userdata.path>
             </properties>
         </profile>
         <!-- Run the Hytale server with the plugin installed -->

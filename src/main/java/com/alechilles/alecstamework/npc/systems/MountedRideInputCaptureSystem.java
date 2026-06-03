@@ -3,9 +3,11 @@ package com.alechilles.alecstamework.npc.systems;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.movement.TameworkRideVelocityIntent;
+import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountSystems;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -16,6 +18,7 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.Direction;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
@@ -36,14 +39,17 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Captures rider input for Tamework rides before vanilla mounted input mutates the target entity.
  */
 public final class MountedRideInputCaptureSystem extends EntityTickingSystem<EntityStore> {
-    private static final double FALLBACK_VERTICAL_SCALE = 20.0;
     private static final double MOUNT_TURN_STRAFE_SCALE = 12.0;
     private static final double MOUNT_TURN_STRAFE_DEAD_ZONE = 0.001;
+    private static final double VELOCITY_BRAKE_BACKWARD_DEAD_ZONE = -0.25;
+    private static final double VELOCITY_BRAKE_BACKWARD_DOMINANCE = 1.35;
+    private static final long PACKET_SNAPSHOT_GRACE_MS = 250L;
 
     private final ComponentType<EntityStore, MountedComponent> mountedComponentType;
     private final ComponentType<EntityStore, PlayerInput> playerInputComponentType;
@@ -91,25 +97,32 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         MountedComponent mounted = archetypeChunk.getComponent(index, mountedComponentType);
         Ref<EntityStore> mountRef = resolveMountRef(rider, mounted, store);
         if (mountRef == null || !mountRef.isValid()) {
-            clearStaleRideState(riderRef, null, commandBuffer);
+            clearStaleRideState(riderRef, null, null, commandBuffer);
             return;
         }
         TameworkRideMountComponent mount = commandBuffer.getComponent(mountRef, rideMountComponentType);
         if (mount == null || !matchesMountUuid(rider, mountRef, commandBuffer)) {
-            clearStaleRideState(riderRef, mountRef, commandBuffer);
+            clearStaleRideState(riderRef, mountRef, mount, commandBuffer);
             return;
         }
+        playerInput.setMountId(0);
         ensureRideState(mountRef, mount, commandBuffer);
-        captureCurrentRiderRotation(mount, index, archetypeChunk);
+        boolean hasRecentPacketSnapshot = hasRecentPacketSnapshot(mount);
+        if (!hasRecentPacketSnapshot) {
+            captureCurrentRiderRotation(mount, index, archetypeChunk);
+            captureCurrentRiderMovementStates(mount, index, archetypeChunk);
+        }
         List<PlayerInput.InputUpdate> queue = playerInput.getMovementUpdateQueue();
-        boolean capturedMountMovement = syncAuthoritativePose(mountRef, mount, commandBuffer, queue.isEmpty());
+        boolean capturedMountMovement = syncAuthoritativePose(mountRef, mount, commandBuffer, false);
         if (queue.isEmpty()) {
             boolean hadWishMovement = mount.hasWishMovement();
             if (!capturedMountMovement) {
-                mount.setHasWishMovement(false);
-                mount.setWishX(0.0);
-                mount.setWishY(0.0);
-                mount.setWishZ(0.0);
+                if (!hasRecentPacketSnapshot) {
+                    mount.setHasWishMovement(false);
+                    mount.setWishX(0.0);
+                    mount.setWishY(0.0);
+                    mount.setWishZ(0.0);
+                }
             }
             maybeLogDebug(mount, mountRef, 0, "<empty>", commandBuffer);
             if (capturedMountMovement || hadWishMovement) {
@@ -119,16 +132,22 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         }
         String queueSummary = summarizeQueue(queue);
 
-        mount.clearControlInputSnapshot();
+        mount.setHasBodyRotation(false);
+        mount.setHasHeadRotation(false);
+        boolean sawMovementIntent = false;
         for (PlayerInput.InputUpdate inputUpdate : queue) {
             if (inputUpdate instanceof PlayerInput.WishMovement wish) {
-                mount.captureWishMovement(wish.getX(), wish.getY(), wish.getZ());
+                captureWish(mount, wish.getX(), wish.getY(), wish.getZ());
+                sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.RelativeMovement relative) {
                 captureWorldMovement(mount, relative.getX(), relative.getY(), relative.getZ());
+                sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.AbsoluteMovement absolute) {
                 captureAbsoluteMovement(mount, mountRef, absolute, commandBuffer);
+                sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.SetClientVelocity velocity) {
                 captureVelocityFallback(mount, velocity);
+                sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.SetBody body) {
                 captureBody(mount, body.direction());
             } else if (inputUpdate instanceof PlayerInput.SetHead head) {
@@ -140,11 +159,23 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
             }
             applyRiderLocalInput(inputUpdate, index, archetypeChunk, commandBuffer);
         }
-        captureCurrentRiderRotation(mount, index, archetypeChunk);
-        mount.setLastInputAtMs(System.currentTimeMillis());
+        if (!sawMovementIntent && !hasRecentPacketSnapshot(mount)) {
+            mount.clearWishMovement();
+        }
+        if (!hasRecentPacketSnapshot) {
+            captureCurrentRiderRotation(mount, index, archetypeChunk);
+        }
+        if (sawMovementIntent) {
+            mount.setLastInputAtMs(System.currentTimeMillis());
+        }
         maybeLogDebug(mount, mountRef, queue.size(), queueSummary, commandBuffer);
         commandBuffer.putComponent(mountRef, rideMountComponentType, mount);
         queue.clear();
+    }
+
+    private boolean hasRecentPacketSnapshot(@Nonnull TameworkRideMountComponent mount) {
+        return mount.getLastInputAtMs() > 0L
+                && System.currentTimeMillis() - mount.getLastInputAtMs() <= PACKET_SNAPSHOT_GRACE_MS;
     }
 
     private boolean syncAuthoritativePose(@Nonnull Ref<EntityStore> mountRef,
@@ -160,9 +191,9 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                     transform.getPosition().x,
                     transform.getPosition().y,
                     transform.getPosition().z,
-                    transform.getRotation().getYaw(),
-                    transform.getRotation().getPitch(),
-                    transform.getRotation().getRoll()
+                    transform.getRotation().yaw(),
+                    transform.getRotation().pitch(),
+                    transform.getRotation().roll()
             );
             commandBuffer.putComponent(mountRef, rideMountComponentType, mount);
             return false;
@@ -170,9 +201,9 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         double dx = transform.getPosition().x - mount.getAuthoritativeX();
         double dy = transform.getPosition().y - mount.getAuthoritativeY();
         double dz = transform.getPosition().z - mount.getAuthoritativeZ();
-        float yawDelta = normalizeAngle(transform.getRotation().getYaw() - mount.getAuthoritativeYaw());
-        float pitchDelta = normalizeAngle(transform.getRotation().getPitch() - mount.getAuthoritativePitch());
-        float rollDelta = normalizeAngle(transform.getRotation().getRoll() - mount.getAuthoritativeRoll());
+        float yawDelta = normalizeAngle(transform.getRotation().yaw() - mount.getAuthoritativeYaw());
+        float pitchDelta = normalizeAngle(transform.getRotation().pitch() - mount.getAuthoritativePitch());
+        float rollDelta = normalizeAngle(transform.getRotation().roll() - mount.getAuthoritativeRoll());
         if (dx * dx + dy * dy + dz * dz < 1.0E-8
                 && yawDelta * yawDelta + pitchDelta * pitchDelta + rollDelta * rollDelta < 1.0E-8f) {
             return false;
@@ -197,18 +228,17 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
     private Ref<EntityStore> resolveMountRef(@Nonnull TameworkRideRiderComponent rider,
                                              MountedComponent mounted,
                                              @Nonnull Store<EntityStore> store) {
-        if (mounted != null && mounted.getMountedToEntity() != null && mounted.getMountedToEntity().isValid()) {
-            return mounted.getMountedToEntity();
-        }
         String mountUuid = rider.getMountUuid();
-        if (mountUuid.isBlank()) {
-            return null;
+        if (!mountUuid.isBlank()) {
+            try {
+                return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid));
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
         }
-        try {
-            return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid));
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
+        return mounted != null && mounted.getMountedToEntity() != null && mounted.getMountedToEntity().isValid()
+                ? mounted.getMountedToEntity()
+                : null;
     }
 
     private void ensureRideState(@Nonnull Ref<EntityStore> mountRef,
@@ -234,24 +264,71 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 return;
             }
         }
-        support.setState(mountRef, rideState, null, commandBuffer);
+        String subState = support.getStateHelper() == null ? "" : support.getStateHelper().getDefaultSubState();
+        support.setState(mountRef, rideState, subState == null ? "" : subState, commandBuffer);
     }
 
     private void clearStaleRideState(Ref<EntityStore> riderRef,
                                      Ref<EntityStore> mountRef,
+                                     TameworkRideMountComponent mount,
                                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         if (riderRef == null || !riderRef.isValid()) {
             return;
         }
         commandBuffer.run(bufferStore -> {
+            UUIDComponent riderUuid = bufferStore.getComponent(riderRef, uuidComponentType);
+            if (riderUuid != null && riderUuid.getUuid() != null) {
+                MountedRidePacketHandler.unregisterRide(riderUuid.getUuid());
+            }
             if (riderRef.isValid()) {
+                MountedRideClientAttachment.detach(bufferStore, riderRef);
                 bufferStore.tryRemoveComponent(riderRef, rideRiderComponentType);
                 bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
             }
             if (mountRef != null && mountRef.isValid()) {
+                TameworkRideMountComponent currentMount = mount == null
+                        ? bufferStore.getComponent(mountRef, rideMountComponentType)
+                        : mount;
+                if (currentMount != null) {
+                    MountedRidePacketHandler.unregisterRide(currentMount.getRiderUuid());
+                    NPCEntity npc = bufferStore.getComponent(mountRef, NPCEntity.getComponentType());
+                    if (npc != null) {
+                        restoreNpcState(mountRef, npc, currentMount, bufferStore);
+                    }
+                }
                 bufferStore.tryRemoveComponent(mountRef, rideMountComponentType);
             }
         });
+    }
+
+    private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,
+                                 @Nonnull NPCEntity npc,
+                                 @Nonnull TameworkRideMountComponent mount,
+                                 @Nonnull Store<EntityStore> store) {
+        Role role = npc.getRole();
+        if (role == null) {
+            return;
+        }
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
+        if (!mount.getPreviousMotionController().isBlank()) {
+            role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
+        }
+        applyState(role, mountRef, store, mount.getPreviousState(), mount.getPreviousSubState());
+    }
+
+    private void applyState(@Nonnull Role role,
+                            @Nonnull Ref<EntityStore> mountRef,
+                            @Nonnull Store<EntityStore> store,
+                            @Nonnull String state,
+                            @Nonnull String subState) {
+        if (state.isBlank() || role.getStateSupport() == null) {
+            return;
+        }
+        StateSupport support = role.getStateSupport();
+        if (support.getStateHelper() != null && support.getStateHelper().getStateIndex(state) == StateSupport.NO_STATE) {
+            return;
+        }
+        support.setState(mountRef, state, subState, store);
     }
 
     private boolean matchesMountUuid(@Nonnull TameworkRideRiderComponent rider,
@@ -269,6 +346,19 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         if (direction != null) {
             mount.captureBodyRotation(direction.yaw, direction.pitch, direction.roll);
         }
+    }
+
+    private void captureWish(@Nonnull TameworkRideMountComponent mount,
+                             double wishX,
+                             double wishY,
+                             double wishZ) {
+        double horizontalLength = Math.sqrt(wishX * wishX + wishZ * wishZ);
+        if (horizontalLength <= 0.0001) {
+            mount.clearWishMovement();
+            return;
+        }
+        double scale = horizontalLength > 1.0 ? 1.0 / horizontalLength : 1.0;
+        mount.captureWishMovement(wishX * scale, 0.0, wishZ * scale, wishZ < -0.0001);
     }
 
     private void captureHead(@Nonnull TameworkRideMountComponent mount, Direction direction) {
@@ -294,7 +384,8 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 mount,
                 absolute.getX() - position.x,
                 absolute.getY() - position.y,
-                absolute.getZ() - position.z
+                absolute.getZ() - position.z,
+                true
         );
     }
 
@@ -304,7 +395,7 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
             return;
         }
         Vector3d value = velocity.getVelocity();
-        captureWorldMovement(mount, value.x, value.y, value.z);
+        captureVelocityMovement(mount, value.x, value.y, value.z);
     }
 
     private void captureWorldMovement(@Nonnull TameworkRideMountComponent mount,
@@ -319,10 +410,50 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                                       double worldY,
                                       double worldZ,
                                       boolean normalizeIntent) {
-        double horizontalLength = Math.sqrt(worldX * worldX + worldZ * worldZ);
-        double vertical = normalizeIntent ? clamp(worldY * FALLBACK_VERTICAL_SCALE, -1.0, 1.0) : clamp(worldY, -1.0, 1.0);
-        if (horizontalLength <= 0.0001 && Math.abs(vertical) <= 0.0001) {
+        MovementIntent intent = projectWorldMovement(mount, worldX, worldZ, normalizeIntent);
+        if (intent == null) {
+            mount.clearWishMovement();
             return;
+        }
+        captureProjectedIntent(mount, intent);
+    }
+
+    private void captureVelocityMovement(@Nonnull TameworkRideMountComponent mount,
+                                         double worldX,
+                                         double worldY,
+                                         double worldZ) {
+        if (TameworkRideVelocityIntent.isVerticalDominant(worldX, worldY, worldZ)) {
+            mount.captureWishMovement(0.0, TameworkRideVelocityIntent.verticalInput(worldX, worldY, worldZ), 0.0);
+            return;
+        }
+        if (!TameworkRideVelocityIntent.hasUsableHorizontalIntent(worldX, worldZ)) {
+            mount.clearWishMovement();
+            return;
+        }
+        MovementIntent intent = projectWorldMovement(mount, worldX, worldZ, true);
+        if (intent == null) {
+            mount.clearWishMovement();
+            return;
+        }
+        if (isBackwardBrakeIntent(intent)) {
+            captureBackwardBrakeIntent(mount);
+            return;
+        }
+        if (shouldPreserveExistingForwardIntent(mount, intent)) {
+            mount.captureWishMovement(0.0, mount.getWishY(), Math.copySign(1.0, mount.getWishZ()));
+            return;
+        }
+        captureProjectedIntent(mount, intent);
+    }
+
+    @Nullable
+    private MovementIntent projectWorldMovement(@Nonnull TameworkRideMountComponent mount,
+                                                double worldX,
+                                                double worldZ,
+                                                boolean normalizeIntent) {
+        double horizontalLength = Math.sqrt(worldX * worldX + worldZ * worldZ);
+        if (horizontalLength <= 0.0001) {
+            return null;
         }
 
         double normalizedX;
@@ -343,7 +474,29 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         double rightZ = -Math.cos(yaw - Math.PI / 2.0);
         double strafe = clamp(normalizedX * rightX + normalizedZ * rightZ, -1.0, 1.0);
         double forward = clamp(normalizedX * forwardX + normalizedZ * forwardZ, -1.0, 1.0);
-        mount.captureWishMovement(strafe, vertical, forward);
+        return new MovementIntent(strafe, forward);
+    }
+
+    private void captureProjectedIntent(@Nonnull TameworkRideMountComponent mount,
+                                        @Nonnull MovementIntent intent) {
+        mount.captureWishMovement(intent.strafe(), 0.0, intent.forward());
+    }
+
+    private void captureBackwardBrakeIntent(@Nonnull TameworkRideMountComponent mount) {
+        mount.captureWishMovement(0.0, 0.0, 0.0, true);
+    }
+
+    private boolean isBackwardBrakeIntent(@Nonnull MovementIntent intent) {
+        return intent.forward() < VELOCITY_BRAKE_BACKWARD_DEAD_ZONE
+                && Math.abs(intent.forward()) >= Math.abs(intent.strafe()) * VELOCITY_BRAKE_BACKWARD_DOMINANCE;
+    }
+
+    private boolean shouldPreserveExistingForwardIntent(@Nonnull TameworkRideMountComponent mount,
+                                                        @Nonnull MovementIntent intent) {
+        if (!mount.hasWishMovement() || Math.abs(mount.getWishZ()) < 0.75) {
+            return false;
+        }
+        return Math.abs(intent.strafe()) > 0.65 && Math.abs(intent.forward()) < 0.35;
     }
 
     private void captureMountTurnAsStrafe(@Nonnull TameworkRideMountComponent mount, float yawDelta) {
@@ -353,8 +506,9 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         double existingStrafe = mount.hasWishMovement() ? mount.getWishX() : 0.0;
         double existingVertical = mount.hasWishMovement() ? mount.getWishY() : 0.0;
         double existingForward = mount.hasWishMovement() ? mount.getWishZ() : 0.0;
+        boolean existingBackwardBrakeInput = mount.isRiderBackwardBrakeInput();
         double strafe = clamp(existingStrafe - yawDelta * MOUNT_TURN_STRAFE_SCALE, -1.0, 1.0);
-        mount.captureWishMovement(strafe, existingVertical, existingForward);
+        mount.captureWishMovement(strafe, existingVertical, existingForward, existingBackwardBrakeInput);
     }
 
     private void applyRiderLocalInput(@Nonnull PlayerInput.InputUpdate inputUpdate,
@@ -383,19 +537,29 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 archetypeChunk.getComponent(index, TransformComponent.getComponentType());
         if (transform != null && transform.getRotation() != null) {
             mount.captureBodyRotation(
-                    transform.getRotation().getYaw(),
-                    transform.getRotation().getPitch(),
-                    transform.getRotation().getRoll()
+                    transform.getRotation().yaw(),
+                    transform.getRotation().pitch(),
+                    transform.getRotation().roll()
             );
         }
         HeadRotation headRotation =
                 archetypeChunk.getComponent(index, HeadRotation.getComponentType());
         if (headRotation != null && headRotation.getRotation() != null) {
             mount.captureHeadRotation(
-                    headRotation.getRotation().getYaw(),
-                    headRotation.getRotation().getPitch(),
-                    headRotation.getRotation().getRoll()
+                    headRotation.getRotation().yaw(),
+                    headRotation.getRotation().pitch(),
+                    headRotation.getRotation().roll()
             );
+        }
+    }
+
+    private void captureCurrentRiderMovementStates(@Nonnull TameworkRideMountComponent mount,
+                                                   int index,
+                                                   @Nonnull ArchetypeChunk<EntityStore> archetypeChunk) {
+        MovementStatesComponent movementStates =
+                archetypeChunk.getComponent(index, movementStatesComponentType);
+        if (movementStates != null) {
+            mount.captureRiderMovementStates(movementStates.getMovementStates());
         }
     }
 
@@ -439,7 +603,7 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         }
         instance.getLogger().at(Level.INFO).log(
                 "TameworkRide debug: inputCapture state=%s controller=%s bodyMotion=%s queueSize=%s queue=%s wish=%s/%s/%s hasWish=%s " +
-                        "body=%s/%s/%s hasBody=%s head=%s/%s/%s hasHead=%s jump=%s crouch=%s flying=%s",
+                        "body=%s/%s/%s hasBody=%s head=%s/%s/%s hasHead=%s jump=%s crouch=%s flying=%s sprinting=%s",
                 state,
                 controller,
                 bodyMotion,
@@ -459,7 +623,8 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 mount.hasHeadRotation(),
                 mount.isRiderJumping(),
                 mount.isRiderCrouching(),
-                mount.isRiderFlying()
+                mount.isRiderFlying(),
+                mount.isRiderSprinting()
         );
     }
 
@@ -475,6 +640,9 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
             angle += (float) (Math.PI * 2.0);
         }
         return angle;
+    }
+
+    private record MovementIntent(double strafe, double forward) {
     }
 
     @Nonnull

@@ -5,8 +5,8 @@ import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -20,13 +20,14 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /**
  * Suppresses normal AI body motion while mounted and steers from the latest rider input snapshot.
  */
 public final class BodyMotionTameworkRide extends BodyMotionBase {
     private static final double INPUT_DEAD_ZONE = 0.025;
-    private static final int GROUNDED_CROUCH_DISMOUNT_TICKS = 12;
+    private static final double GROUNDED_FLIGHT_ASSIST = 0.35;
     private long lastDebugMs;
 
     public BodyMotionTameworkRide(@Nonnull BuilderBodyMotionBase builderMotionBase) {
@@ -69,6 +70,7 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
 
         float yaw = resolveYaw(ref, ride, componentAccessor);
         Vector3d translation = resolveTranslation(ride, yaw, flyingControllerActive);
+        applyGroundedFlightAssist(ride, translation, grounded, flyingControllerActive);
         desiredSteering.setTranslation(translation);
         desiredSteering.setYaw(yaw);
         desiredSteering.setRelativeTurnSpeed(1.0);
@@ -79,17 +81,25 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         return true;
     }
 
-    private void updateGroundedCrouchDismount(@Nonnull TameworkRideMountComponent ride, boolean grounded) {
-        if (grounded && ride.isRiderCrouching()) {
-            ride.incrementGroundedCrouchTicks();
-            if (ride.getGroundedCrouchTicks() >= GROUNDED_CROUCH_DISMOUNT_TICKS) {
-                ride.setDismountRequested(true);
-            }
+    static void updateGroundedCrouchDismount(@Nonnull TameworkRideMountComponent ride, boolean grounded) {
+        if (!grounded) {
+            ride.resetGroundedCrouchTicks();
             return;
         }
-        if (!ride.isRiderCrouching() || !grounded) {
+        if (!ride.isRiderCrouching()) {
+            ride.setGroundedCrouchDismountArmed(true);
             ride.resetGroundedCrouchTicks();
+            return;
         }
+        if (ride.hasWishMovement()) {
+            ride.resetGroundedCrouchTicks();
+            return;
+        }
+        if (ride.isGroundedCrouchDismountArmed()) {
+            ride.incrementGroundedCrouchTicks();
+            return;
+        }
+        ride.resetGroundedCrouchTicks();
     }
 
     private boolean shouldUseFlight(@Nonnull TameworkRideMountComponent ride,
@@ -125,8 +135,10 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         }
         role.setActiveMotionController(ref, npc, controller, componentAccessor);
         MotionController active = role.getActiveMotionController();
-        if (active instanceof MotionControllerTameworkRideFly fly) {
+        if (active instanceof MotionControllerTameworkFly fly) {
             fly.takeOff(ref, Math.max(1.5, active.getMaximumSpeed() * 0.2), componentAccessor);
+        } else {
+            npc.playAnimation(ref, AnimationSlot.Movement, null, componentAccessor);
         }
     }
 
@@ -146,8 +158,8 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         TransformComponent transform = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         float fallbackYaw = 0.0f;
         if (transform != null) {
-            Vector3f rotation = transform.getRotation();
-            fallbackYaw = rotation.getYaw();
+            Rotation3f rotation = transform.getRotation();
+            fallbackYaw = rotation.yaw();
         }
         return resolveYawFromSnapshot(ride, fallbackYaw);
     }
@@ -208,9 +220,30 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         );
         double length = result.length();
         if (length > 1.0) {
-            result.scale(1.0 / length);
+            result.mul(1.0 / length);
         }
         return result;
+    }
+
+    static void applyGroundedFlightAssist(@Nonnull TameworkRideMountComponent ride,
+                                          @Nonnull Vector3d translation,
+                                          boolean grounded,
+                                          boolean flyingControllerActive) {
+        if (!grounded || !flyingControllerActive || ride.isRiderCrouching()) {
+            return;
+        }
+        double horizontal = Math.sqrt(translation.x * translation.x + translation.z * translation.z);
+        boolean takeoffIntent = ride.isRiderJumping()
+                || ride.isRiderFlying()
+                || horizontal > INPUT_DEAD_ZONE;
+        if (!takeoffIntent || translation.y >= GROUNDED_FLIGHT_ASSIST) {
+            return;
+        }
+        translation.y = GROUNDED_FLIGHT_ASSIST;
+        double length = translation.length();
+        if (length > 1.0) {
+            translation.mul(1.0 / length);
+        }
     }
 
     @Nonnull
@@ -241,7 +274,7 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         instance.getLogger().at(Level.INFO).log(
                 "TameworkRide debug: bodyMotion role=%s controller=%s grounded=%s flyingActive=%s yaw=%s " +
                         "translation=%s/%s/%s hasYaw=%s hasPitch=%s wish=%s/%s/%s hasWish=%s " +
-                        "body=%s/%s hasBody=%s head=%s/%s hasHead=%s jump=%s crouch=%s flying=%s",
+                        "body=%s/%s hasBody=%s head=%s/%s hasHead=%s jump=%s crouch=%s flying=%s sprinting=%s",
                 role.getRoleName(),
                 controller,
                 grounded,
@@ -264,7 +297,8 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
                 ride.hasHeadRotation(),
                 ride.isRiderJumping(),
                 ride.isRiderCrouching(),
-                ride.isRiderFlying()
+                ride.isRiderFlying(),
+                ride.isRiderSprinting()
         );
     }
 }

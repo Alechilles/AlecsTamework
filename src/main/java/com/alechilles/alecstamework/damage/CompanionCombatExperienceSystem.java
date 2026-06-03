@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.api.CompanionXpSource;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -22,7 +23,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Awards combat XP for linked companions based on final damage dealt and taken.
+ * Awards combat XP for eligible companions based on final damage dealt and taken.
  */
 public final class CompanionCombatExperienceSystem extends DamageEventSystem {
     @Override
@@ -49,15 +50,16 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
             return;
         }
         Ref<EntityStore> sourceRef = resolveNpcSourceRef(damage.getSource(), store);
-        awardTakenXp(sourceRef, targetRef, store, damage);
+        awardTakenXp(sourceRef, targetRef, store, commandBuffer, damage);
         if (sourceRef != null && sourceRef.isValid() && !sourceRef.equals(targetRef)) {
-            awardDealtXp(sourceRef, targetRef, store, damage);
+            awardDealtXp(sourceRef, targetRef, store, commandBuffer, damage);
         }
     }
 
     private void awardTakenXp(@Nullable Ref<EntityStore> sourceRef,
                               @Nonnull Ref<EntityStore> targetRef,
                               @Nonnull Store<EntityStore> store,
+                              @Nonnull CommandBuffer<EntityStore> commandBuffer,
                               @Nonnull Damage damage) {
         String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
         TwLevelingConfig config = roleId != null ? TwLevelingConfig.resolveForRole(roleId) : null;
@@ -77,13 +79,14 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         }
         double xp = finalDamage * combat.getDamageTakenXpPerPoint();
         if (xp > 0.0) {
-            CompanionLevelingService.awardXp(targetRef, store, roleId, xp);
+            CompanionLevelingService.awardXp(targetRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_TAKEN, xp);
         }
     }
 
     private void awardDealtXp(@Nonnull Ref<EntityStore> sourceRef,
                               @Nonnull Ref<EntityStore> targetRef,
                               @Nonnull Store<EntityStore> store,
+                              @Nonnull CommandBuffer<EntityStore> commandBuffer,
                               @Nonnull Damage damage) {
         String roleId = CompanionRoleIdResolver.resolveRoleId(sourceRef, store);
         TwLevelingConfig config = roleId != null ? TwLevelingConfig.resolveForRole(roleId) : null;
@@ -103,7 +106,7 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         }
         double xp = finalDamage * combat.getDamageDealtXpPerPoint();
         if (xp > 0.0) {
-            CompanionLevelingService.awardXp(sourceRef, store, roleId, xp);
+            CompanionLevelingService.awardXp(sourceRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_DEALT, xp);
         }
     }
 

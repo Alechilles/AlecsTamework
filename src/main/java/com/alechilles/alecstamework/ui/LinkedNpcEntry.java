@@ -721,11 +721,23 @@ public final class LinkedNpcEntry {
         private final String label;
         private final int current;
         private final int max;
+        private final String tooltipHeaderText;
+        private final String tooltipText;
 
         public FutureStat(String label, int current, int max) {
+            this(label, current, max, null, null);
+        }
+
+        public FutureStat(String label, int current, int max, String tooltipText) {
+            this(label, current, max, null, tooltipText);
+        }
+
+        public FutureStat(String label, int current, int max, String tooltipHeaderText, String tooltipText) {
             this.label = label;
             this.current = current;
             this.max = max;
+            this.tooltipHeaderText = tooltipHeaderText;
+            this.tooltipText = tooltipText;
         }
 
         public String label() {
@@ -740,6 +752,14 @@ public final class LinkedNpcEntry {
             return max;
         }
 
+        public String tooltipHeaderText() {
+            return tooltipHeaderText;
+        }
+
+        public String tooltipText() {
+            return tooltipText;
+        }
+
         @Override
         public boolean equals(Object obj) {
             if (this == obj) {
@@ -748,12 +768,16 @@ public final class LinkedNpcEntry {
             if (!(obj instanceof FutureStat other)) {
                 return false;
             }
-            return current == other.current && max == other.max && Objects.equals(label, other.label);
+            return current == other.current
+                    && max == other.max
+                    && Objects.equals(label, other.label)
+                    && Objects.equals(tooltipHeaderText, other.tooltipHeaderText)
+                    && Objects.equals(tooltipText, other.tooltipText);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(label, current, max);
+            return Objects.hash(label, current, max, tooltipHeaderText, tooltipText);
         }
     }
 }

@@ -16,6 +16,7 @@ This guide explains how the progression families fit together and how to roll th
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference): mood baseline, convergence, and modifiers
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference): hunger and thirst
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference): breeding readiness, cooldowns, inheritance, and lifecycle
+- [TwAttachmentMigrationConfig Reference](/mod/alecs-tamework/twattachmentmigrationconfig-reference): deterministic upgrades for newly split model attachment slots
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference): trait pools and inherited stat variation
 
 ## Recommended Rollout Order
@@ -29,6 +30,8 @@ Set the long-term progression baseline first:
 
 This gives you a shared advancement layer that combat, feed, harvest, and breeding hooks can all contribute to.
 
+Tamework ships `Server/Tamework/Leveling/TwLevelingExample.json` for the bundled example mobs. Use it as a small working baseline for enabled feed, harvest, breeding, and combat XP sources before tuning a real species.
+
 ### 2. Add talents when level-ups should unlock player choices
 Add `TwTalentConfig` after the level curve is stable.
 
@@ -37,6 +40,10 @@ Decide:
 - point costs and minimum levels
 - prerequisite chains
 - which shared effect keys each node grants
+
+Tamework ships `Server/Tamework/Talents/TwTalentsExample.json` for the bundled example mobs. It is intentionally passive-only and demonstrates health, movement, combat, toughness, and harvest-bonus effect keys.
+
+The in-game talent page presents these nodes as a scrollable branch/tier tree. Keep node names compact, put long explanations in `Description`, and use `RequiresTalentIds[]` for every visible dependency line you expect players to follow.
 
 ### 3. Start with happiness
 Set the baseline first:
@@ -92,7 +99,8 @@ Breeding depends on more than one family:
 ### Linked panel and UI
 The linked panel can surface:
 - level progress and unspent talent points
-- talent tree access when the current companion is loaded
+- talent tree access when the current companion is loaded, including a scrollable tree view with node state, prerequisites, effect summaries, and selected-node purchase details
+- a talent reset action for loaded companions that have spent points
 - happiness and needs state
 - breeding cooldown or readiness
 - traits and life-stage data

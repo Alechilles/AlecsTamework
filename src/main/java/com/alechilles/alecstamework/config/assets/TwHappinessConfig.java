@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -430,6 +431,49 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             }
         }
         return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public static boolean isEnabledForRole(@Nullable String roleId) {
+        DefaultAssetMap<String, TwHappinessConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null || assetMap.getAssetMap().isEmpty()) {
+            return TameworkRuntimeSettings.happinessEnabled(true);
+        }
+        TwHappinessConfig configured = resolveConfiguredForRole(roleId, assetMap);
+        boolean configEnabled = configured == null || configured.isConfiguredEnabled();
+        return TameworkRuntimeSettings.happinessEnabled(configEnabled);
+    }
+
+    @Nullable
+    private static TwHappinessConfig resolveConfiguredForRole(@Nullable String roleId,
+                                                              @Nonnull DefaultAssetMap<String, TwHappinessConfig> assetMap) {
+        TwHappinessConfig bestRoleMatch = null;
+        TwHappinessConfig bestRoleless = null;
+        String normalizedRoleId = roleId == null ? "" : roleId.trim().toLowerCase(Locale.ROOT);
+        for (TwHappinessConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate == null) {
+                continue;
+            }
+            String[] roleIds = candidate.getRoleIds();
+            if (roleIds.length == 0) {
+                if (shouldReplaceCandidate(candidate, bestRoleless)) {
+                    bestRoleless = candidate;
+                }
+                continue;
+            }
+            if (normalizedRoleId.isBlank()) {
+                continue;
+            }
+            for (String candidateRoleId : roleIds) {
+                if (candidateRoleId == null || candidateRoleId.isBlank()) {
+                    continue;
+                }
+                if (normalizedRoleId.equals(candidateRoleId.trim().toLowerCase(Locale.ROOT))
+                        && shouldReplaceCandidate(candidate, bestRoleMatch)) {
+                    bestRoleMatch = candidate;
+                }
+            }
+        }
+        return bestRoleMatch != null ? bestRoleMatch : bestRoleless;
     }
 
     @Nullable

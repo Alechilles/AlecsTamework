@@ -11,7 +11,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
@@ -285,7 +285,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         );
         double velocityY = -easedVerticalSpeed;
 
-        role.forceVelocity(new Vector3d(velocityX, velocityY, velocityZ), (VelocityConfig) null, true);
+        role.setVelocity(new Vector3d(velocityX, velocityY, velocityZ), (VelocityConfig) null, true);
     }
 
     @Nullable

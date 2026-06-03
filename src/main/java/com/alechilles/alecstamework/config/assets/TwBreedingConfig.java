@@ -28,6 +28,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         TwParentFallbackAsset<TwBreedingConfig> {
     private static final int SECONDS_PER_MINUTE = 60;
     private static final AdultRoleChoice[] EMPTY_ADULT_ROLE_CHOICES = new AdultRoleChoice[0];
+    private static final RoleLine[] EMPTY_ROLE_LINES = new RoleLine[0];
     private static final RoleFamily[] EMPTY_ROLE_FAMILIES = new RoleFamily[0];
     private static final RoleMaxNearbySameTypeOverride[] EMPTY_ROLE_MAX_NEARBY_OVERRIDES =
             new RoleMaxNearbySameTypeOverride[0];
@@ -372,10 +373,183 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     private static final ArrayCodec<AdultRoleChoice> ADULT_ROLE_CHOICE_ARRAY_CODEC =
             new ArrayCodec<>(ADULT_ROLE_CHOICE_CODEC, AdultRoleChoice[]::new);
 
+    private static final BuilderCodec<RoleInheritanceSettings> ROLE_INHERITANCE_CODEC = BuilderCodec.builder(
+            RoleInheritanceSettings.class,
+            RoleInheritanceSettings::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Mode", Codec.STRING),
+            (settings, value) -> settings.mode = RoleInheritanceMode.fromConfigValue(value, settings.mode),
+            settings -> settings.mode == null ? null : settings.mode.toConfigValue()
+        )
+        .documentation("Controls how lifecycle role lines are inherited. Use ParentLine to choose from either parent's resolved line.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("ParentWeight", Codec.DOUBLE),
+            (settings, value) -> settings.parentWeight = value,
+            settings -> settings.parentWeight
+        )
+        .documentation("Relative weight assigned to each parent line when Mode is ParentLine.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
+            (settings, value) -> settings.randomWeight = value,
+            settings -> settings.randomWeight
+        )
+        .documentation("Relative weight assigned to each selectable family line when Mode is ParentLine.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MutationChance", Codec.DOUBLE),
+            (settings, value) -> settings.mutationChance = value,
+            settings -> settings.mutationChance
+        )
+        .documentation("Chance from 0.0 to 1.0 to ignore parent weights and choose a non-parent line when possible.")
+        .add()
+        .build();
+
+    private static final BuilderCodec<RoleInheritanceSettingsOverride> ROLE_INHERITANCE_OVERRIDE_CODEC =
+            BuilderCodec.builder(
+                    RoleInheritanceSettingsOverride.class,
+                    RoleInheritanceSettingsOverride::new
+            )
+                .<String>append(
+                    new KeyedCodec<>("Mode", Codec.STRING),
+                    (settings, value) -> settings.mode = RoleInheritanceMode.fromConfigValue(value, settings.mode),
+                    settings -> settings.mode == null ? null : settings.mode.toConfigValue()
+                )
+                .documentation("Controls how lifecycle role lines are inherited. Use ParentLine to choose from either parent's resolved line.")
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("ParentWeight", Codec.DOUBLE),
+                    (settings, value) -> settings.parentWeight = value,
+                    settings -> settings.parentWeight
+                )
+                .documentation("Relative weight assigned to each parent line when Mode is ParentLine.")
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
+                    (settings, value) -> settings.randomWeight = value,
+                    settings -> settings.randomWeight
+                )
+                .documentation("Relative weight assigned to each selectable family line when Mode is ParentLine.")
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("MutationChance", Codec.DOUBLE),
+                    (settings, value) -> settings.mutationChance = value,
+                    settings -> settings.mutationChance
+                )
+                .documentation("Chance from 0.0 to 1.0 to ignore parent weights and choose a non-parent line when possible.")
+                .add()
+                .build();
+
+    private static final BuilderCodec<RoleLine> ROLE_LINE_CODEC = BuilderCodec.builder(
+            RoleLine.class,
+            RoleLine::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Id", Codec.STRING),
+            (line, value) -> line.id = value,
+            line -> line.id
+        )
+        .documentation("Stable lifecycle line ID for this inherited role variant.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("AdultRoleId", Codec.STRING),
+            (line, value) -> line.adultRoleId = value,
+            line -> line.adultRoleId
+        )
+        .documentation("Adult role ID assigned when offspring from this line reaches adult stage.")
+        .add()
+        .<AdultRoleChoice[]>append(
+            new KeyedCodec<>("AdultRoles", ADULT_ROLE_CHOICE_ARRAY_CODEC),
+            (line, value) -> line.adultRoles = value == null ? EMPTY_ADULT_ROLE_CHOICES : value,
+            line -> line.adultRoles
+        )
+        .documentation("Weighted adult roles for this line. Explicit array replaces the parent family entry.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("BabyRoleId", Codec.STRING),
+            (line, value) -> line.babyRoleId = value,
+            line -> line.babyRoleId
+        )
+        .documentation("Baby role ID assigned when offspring from this line is spawned.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("AdolescentRoleId", Codec.STRING),
+            (line, value) -> line.adolescentRoleId = value,
+            line -> line.adolescentRoleId
+        )
+        .documentation("Adolescent role ID assigned for this line during growth.")
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("TimeToFullGrownSeconds", Codec.INTEGER),
+            (line, value) -> line.timeToFullGrownSeconds = value,
+            line -> line.timeToFullGrownSeconds
+        )
+        .documentation("Time in seconds for this line to reach full-grown stage.")
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("TimeToFullGrownMinutes", Codec.INTEGER),
+            (line, value) -> {
+                if (value != null) {
+                    line.timeToFullGrownSeconds = minutesToSeconds(value, line.timeToFullGrownSeconds);
+                }
+            },
+            line -> null
+        )
+        .documentation("Legacy minute-based growth time for this line; converted to seconds when provided.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("BabyStartScale", Codec.DOUBLE),
+            (line, value) -> line.babyStartScale = value,
+            line -> line.babyStartScale
+        )
+        .documentation("Initial visual scale used for this line's baby stage.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdolescentStartScale", Codec.DOUBLE),
+            (line, value) -> line.adolescentStartScale = value,
+            line -> line.adolescentStartScale
+        )
+        .documentation("Initial visual scale used for this line's adolescent stage.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdultStartScale", Codec.DOUBLE),
+            (line, value) -> line.adultStartScale = value,
+            line -> line.adultStartScale
+        )
+        .documentation("Initial visual scale used for this line's adult stage.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdolescentSwitchScale", Codec.DOUBLE),
+            (line, value) -> line.adolescentSwitchScale = value,
+            line -> line.adolescentSwitchScale
+        )
+        .documentation("Scale threshold that switches this line from baby to adolescent stage.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdultSwitchScale", Codec.DOUBLE),
+            (line, value) -> line.adultSwitchScale = value,
+            line -> line.adultSwitchScale
+        )
+        .documentation("Scale threshold that switches this line from adolescent to adult stage.")
+        .add()
+        .build();
+
+    private static final ArrayCodec<RoleLine> ROLE_LINE_ARRAY_CODEC =
+            new ArrayCodec<>(ROLE_LINE_CODEC, RoleLine[]::new);
+
     private static final BuilderCodec<RoleFamily> ROLE_FAMILY_CODEC = BuilderCodec.builder(
             RoleFamily.class,
             RoleFamily::new
     )
+        .<String>append(
+            new KeyedCodec<>("Id", Codec.STRING),
+            (family, value) -> family.id = value,
+            family -> family.id
+        )
+        .documentation("Stable lifecycle family ID shared by all line variants.")
+        .add()
         .<String>append(
             new KeyedCodec<>("AdultRoleId", Codec.STRING),
             (family, value) -> family.adultRoleId = value,
@@ -389,6 +563,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             family -> family.adultRoles
         )
         .documentation("Weighted adult roles that this family can breed as and grow into. Explicit array replaces the parent family entry.")
+        .add()
+        .<RoleLine[]>append(
+            new KeyedCodec<>("Lines", ROLE_LINE_ARRAY_CODEC),
+            (family, value) -> family.lines = value == null ? EMPTY_ROLE_LINES : value,
+            family -> family.lines
+        )
+        .documentation("Lifecycle role lines for inherited body/model variants. Explicit array replaces the parent family entry.")
         .add()
         .<String>append(
             new KeyedCodec<>("BabyRoleId", Codec.STRING),
@@ -472,6 +653,15 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             settings -> settings.enabled
         )
         .documentation("Turns this section on or off.")
+        .add()
+        .<RoleInheritanceSettings>append(
+            new KeyedCodec<>("RoleInheritance", ROLE_INHERITANCE_CODEC),
+            (settings, value) -> settings.roleInheritance = value == null
+                    ? new RoleInheritanceSettings()
+                    : value,
+            settings -> settings.roleInheritance
+        )
+        .documentation("Role-line inheritance settings. Omitted object inherits; explicit nested keys override missing nested values from parent configs.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("DefaultTimeToFullGrownSeconds", Codec.INTEGER),
@@ -891,6 +1081,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     settings -> settings.enabled
                 )
                 .documentation("Turns this section on or off.")
+                .add()
+                .<RoleInheritanceSettingsOverride>append(
+                    new KeyedCodec<>("RoleInheritance", ROLE_INHERITANCE_OVERRIDE_CODEC),
+                    (settings, value) -> settings.roleInheritance = value,
+                    settings -> settings.roleInheritance
+                )
+                .documentation("Role-line inheritance settings. Omitted object inherits; explicit nested keys override missing nested values from parent configs.")
                 .add()
                 .<Integer>append(
                     new KeyedCodec<>("DefaultTimeToFullGrownSeconds", Codec.INTEGER),
@@ -1325,9 +1522,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     if (family == null) {
                         continue;
                     }
-                    registerRoleCacheEntry(cache, candidate, family.getAdultRoleId());
-                    registerRoleCacheEntry(cache, candidate, family.getBabyRoleId());
-                    registerRoleCacheEntry(cache, candidate, family.getAdolescentRoleId());
+                    registerRoleFamilyCacheEntries(cache, candidate, family);
                 }
             }
             OffspringLifecycleSettings lifecycle = candidate.getOffspringLifecycle();
@@ -1335,9 +1530,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 if (family == null) {
                     continue;
                 }
-                registerRoleCacheEntry(cache, candidate, family.getAdultRoleId());
-                registerRoleCacheEntry(cache, candidate, family.getBabyRoleId());
-                registerRoleCacheEntry(cache, candidate, family.getAdolescentRoleId());
+                registerRoleFamilyCacheEntries(cache, candidate, family);
             }
         }
         return cache;
@@ -1646,6 +1839,11 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         if (!nestedExplicitKeys.contains("Enabled")) {
             offspringLifecycle.enabled = parent.offspringLifecycle.enabled;
         }
+        if (!nestedExplicitKeys.contains("RoleInheritance")) {
+            offspringLifecycle.roleInheritance = parent.offspringLifecycle.roleInheritance;
+        } else {
+            inheritRoleInheritanceSection(parent, nestedExplicitKeys);
+        }
         if (!containsAny(
                 nestedExplicitKeys,
                 "DefaultTimeToFullGrownSeconds",
@@ -1672,6 +1870,32 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
         if (!nestedExplicitKeys.contains("Families")) {
             offspringLifecycle.families = parent.offspringLifecycle.families;
+        }
+    }
+
+    private void inheritRoleInheritanceSection(@Nonnull TwBreedingConfig parent,
+                                               @Nonnull Set<String> nestedExplicitKeys) {
+        if (offspringLifecycle == null || parent.offspringLifecycle == null) {
+            return;
+        }
+        if (offspringLifecycle.roleInheritance == null) {
+            offspringLifecycle.roleInheritance = parent.offspringLifecycle.roleInheritance;
+            return;
+        }
+        if (parent.offspringLifecycle.roleInheritance == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("RoleInheritance.Mode")) {
+            offspringLifecycle.roleInheritance.mode = parent.offspringLifecycle.roleInheritance.mode;
+        }
+        if (!nestedExplicitKeys.contains("RoleInheritance.ParentWeight")) {
+            offspringLifecycle.roleInheritance.parentWeight = parent.offspringLifecycle.roleInheritance.parentWeight;
+        }
+        if (!nestedExplicitKeys.contains("RoleInheritance.RandomWeight")) {
+            offspringLifecycle.roleInheritance.randomWeight = parent.offspringLifecycle.roleInheritance.randomWeight;
+        }
+        if (!nestedExplicitKeys.contains("RoleInheritance.MutationChance")) {
+            offspringLifecycle.roleInheritance.mutationChance = parent.offspringLifecycle.roleInheritance.mutationChance;
         }
     }
 
@@ -1703,6 +1927,40 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         TwBreedingConfig existing = cache.get(normalizedRole);
         if (shouldReplaceCandidate(candidate, existing)) {
             cache.put(normalizedRole, candidate);
+        }
+    }
+
+    private static void registerRoleFamilyCacheEntries(@Nonnull Map<String, TwBreedingConfig> cache,
+                                                       @Nullable TwBreedingConfig candidate,
+                                                       @Nullable RoleFamily family) {
+        if (family == null) {
+            return;
+        }
+        registerRoleCacheEntry(cache, candidate, family.getLegacyAdultRoleId());
+        registerAdultRoleChoices(cache, candidate, family.getAdultRoles());
+        registerRoleCacheEntry(cache, candidate, family.getBabyRoleId());
+        registerRoleCacheEntry(cache, candidate, family.getAdolescentRoleId());
+        for (RoleLine line : family.getLines()) {
+            if (line == null) {
+                continue;
+            }
+            registerRoleCacheEntry(cache, candidate, line.getLegacyAdultRoleId());
+            registerAdultRoleChoices(cache, candidate, line.getAdultRoles());
+            registerRoleCacheEntry(cache, candidate, line.getBabyRoleId());
+            registerRoleCacheEntry(cache, candidate, line.getAdolescentRoleId());
+        }
+    }
+
+    private static void registerAdultRoleChoices(@Nonnull Map<String, TwBreedingConfig> cache,
+                                                 @Nullable TwBreedingConfig candidate,
+                                                 @Nullable AdultRoleChoice[] choices) {
+        if (choices == null) {
+            return;
+        }
+        for (AdultRoleChoice choice : choices) {
+            if (choice != null) {
+                registerRoleCacheEntry(cache, candidate, choice.getRoleId());
+            }
         }
     }
 
@@ -1909,6 +2167,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     }
 
     @Nullable
+    public RoleFamily resolveLifecycleLineFamilyForRole(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        return resolveOffspringLifecycle(roleId).resolveLineFamilyForRole(roleId);
+    }
+
+    @Nullable
     private RoleOverrideSettings resolveRoleOverride(@Nullable String roleId) {
         if (roleId == null || roleId.isBlank()) {
             return null;
@@ -2054,6 +2320,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         OffspringLifecycleSettings base = source == null ? new OffspringLifecycleSettings() : source;
         OffspringLifecycleSettings copy = new OffspringLifecycleSettings();
         copy.enabled = base.enabled;
+        copy.roleInheritance = copyRoleInheritance(base.roleInheritance);
         copy.defaultTimeToFullGrownSeconds = base.defaultTimeToFullGrownSeconds;
         copy.defaultBabyStartScale = base.defaultBabyStartScale;
         copy.defaultAdolescentStartScale = base.defaultAdolescentStartScale;
@@ -2061,6 +2328,16 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         copy.defaultAdolescentSwitchScale = base.defaultAdolescentSwitchScale;
         copy.defaultAdultSwitchScale = base.defaultAdultSwitchScale;
         copy.families = base.families == null ? EMPTY_ROLE_FAMILIES : base.families.clone();
+        return copy;
+    }
+
+    private static RoleInheritanceSettings copyRoleInheritance(@Nullable RoleInheritanceSettings source) {
+        RoleInheritanceSettings base = source == null ? new RoleInheritanceSettings() : source;
+        RoleInheritanceSettings copy = new RoleInheritanceSettings();
+        copy.mode = base.mode;
+        copy.parentWeight = base.parentWeight;
+        copy.randomWeight = base.randomWeight;
+        copy.mutationChance = base.mutationChance;
         return copy;
     }
 
@@ -2270,6 +2547,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     /** Partial lifecycle override patch for a single role. */
     public static final class OffspringLifecycleSettingsOverride {
         private Boolean enabled;
+        private RoleInheritanceSettingsOverride roleInheritance;
         private Integer defaultTimeToFullGrownSeconds;
         private Double defaultBabyStartScale;
         private Double defaultAdolescentStartScale;
@@ -2281,6 +2559,12 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private void applyTo(@Nonnull OffspringLifecycleSettings target) {
             if (enabled != null) {
                 target.enabled = enabled;
+            }
+            if (roleInheritance != null) {
+                if (target.roleInheritance == null) {
+                    target.roleInheritance = new RoleInheritanceSettings();
+                }
+                roleInheritance.applyTo(target.roleInheritance);
             }
             if (defaultTimeToFullGrownSeconds != null) {
                 target.defaultTimeToFullGrownSeconds = defaultTimeToFullGrownSeconds;
@@ -2532,6 +2816,46 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
     }
 
+    /** Offspring lifecycle role inheritance modes. */
+    public enum RoleInheritanceMode {
+        FAMILY_WEIGHTED("FamilyWeighted"),
+        PARENT_LINE("ParentLine");
+
+        private final String configValue;
+
+        RoleInheritanceMode(String configValue) {
+            this.configValue = configValue;
+        }
+
+        @Nullable
+        public static RoleInheritanceMode fromConfigValue(@Nullable String value,
+                                                          @Nullable RoleInheritanceMode fallback) {
+            if (value == null || value.isBlank()) {
+                return fallback;
+            }
+            String normalized = normalizeEnumToken(value);
+            for (RoleInheritanceMode mode : values()) {
+                if (normalizeEnumToken(mode.name()).equals(normalized)
+                        || normalizeEnumToken(mode.configValue).equals(normalized)) {
+                    return mode;
+                }
+            }
+            return fallback;
+        }
+
+        public String toConfigValue() {
+            return configValue;
+        }
+    }
+
+    private static String normalizeEnumToken(@Nonnull String value) {
+        return value.trim()
+                .replace("_", "")
+                .replace("-", "")
+                .replace(" ", "")
+                .toLowerCase(Locale.ROOT);
+    }
+
     /** Offspring inheritance toggles for breeding outcomes. */
     public static final class InheritanceSettings {
         private boolean inheritOwner = true;
@@ -2594,6 +2918,63 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 return 1.0;
             }
             return mutationChance;
+        }
+    }
+
+    /** Role-line inheritance weighting and mutation settings for offspring lifecycle selection. */
+    public static final class RoleInheritanceSettings {
+        private RoleInheritanceMode mode = RoleInheritanceMode.FAMILY_WEIGHTED;
+        private double parentWeight = 1.0;
+        private double randomWeight;
+        private double mutationChance;
+
+        public RoleInheritanceMode getMode() {
+            return mode == null ? RoleInheritanceMode.FAMILY_WEIGHTED : mode;
+        }
+
+        public double getParentWeight() {
+            return sanitizeWeight(parentWeight);
+        }
+
+        public double getRandomWeight() {
+            return sanitizeWeight(randomWeight);
+        }
+
+        public double getMutationChance() {
+            if (!Double.isFinite(mutationChance) || mutationChance <= 0.0) {
+                return 0.0;
+            }
+            return Math.min(1.0, mutationChance);
+        }
+
+        private static double sanitizeWeight(double value) {
+            if (!Double.isFinite(value) || value <= 0.0) {
+                return 0.0;
+            }
+            return value;
+        }
+    }
+
+    /** Partial role-line inheritance override patch for a single role. */
+    public static final class RoleInheritanceSettingsOverride {
+        private RoleInheritanceMode mode;
+        private Double parentWeight;
+        private Double randomWeight;
+        private Double mutationChance;
+
+        private void applyTo(@Nonnull RoleInheritanceSettings target) {
+            if (mode != null) {
+                target.mode = mode;
+            }
+            if (parentWeight != null) {
+                target.parentWeight = parentWeight;
+            }
+            if (randomWeight != null) {
+                target.randomWeight = randomWeight;
+            }
+            if (mutationChance != null) {
+                target.mutationChance = mutationChance;
+            }
         }
     }
 
@@ -2678,6 +3059,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private static final double MIN_SCALE = 0.05;
 
         private boolean enabled = true;
+        private RoleInheritanceSettings roleInheritance = new RoleInheritanceSettings();
         private int defaultTimeToFullGrownSeconds = 420;
         private double defaultBabyStartScale = 0.55;
         private double defaultAdolescentStartScale = 0.80;
@@ -2688,6 +3070,12 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         public boolean isEnabled() {
             return enabled;
+        }
+
+        public RoleInheritanceSettings getRoleInheritance() {
+            return roleInheritance == null
+                    ? new RoleInheritanceSettings()
+                    : roleInheritance;
         }
 
         public int getDefaultTimeToFullGrownSeconds() {
@@ -2726,6 +3114,23 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             for (RoleFamily family : getFamilies()) {
                 if (family != null && family.matchesRole(roleId)) {
                     return family;
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        public RoleFamily resolveLineFamilyForRole(@Nullable String roleId) {
+            if (roleId == null || roleId.isBlank()) {
+                return null;
+            }
+            for (RoleFamily family : getFamilies()) {
+                if (family == null) {
+                    continue;
+                }
+                RoleFamily lineFamily = family.resolveLineFamilyForRole(roleId);
+                if (lineFamily != null) {
+                    return lineFamily;
                 }
             }
             return null;
@@ -2833,8 +3238,9 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
     }
 
-    /** Explicit role-family mapping for baby/adolescent/adult lifecycle transitions. */
-    public static final class RoleFamily {
+    /** A selectable lifecycle variant within a role family. */
+    public static final class RoleLine {
+        private String id;
         private String adultRoleId;
         private AdultRoleChoice[] adultRoles = EMPTY_ADULT_ROLE_CHOICES;
         private String babyRoleId;
@@ -2845,6 +3251,11 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private Double adultStartScale;
         private Double adolescentSwitchScale;
         private Double adultSwitchScale;
+
+        @Nullable
+        public String getId() {
+            return id;
+        }
 
         @Nullable
         public String getAdultRoleId() {
@@ -2910,8 +3321,8 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 return false;
             }
             return matchesAdultRole(roleId)
-                    || matchesRoleId(babyRoleId, roleId)
-                    || matchesRoleId(adolescentRoleId, roleId);
+                    || RoleFamily.matchesRoleId(babyRoleId, roleId)
+                    || RoleFamily.matchesRoleId(adolescentRoleId, roleId);
         }
 
         public boolean matchesAdultRole(@Nullable String roleId) {
@@ -2926,7 +3337,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 }
                 return false;
             }
-            return matchesRoleId(adultRoleId, roleId);
+            return RoleFamily.matchesRoleId(adultRoleId, roleId);
         }
 
         public boolean hasSelectableAdultRole() {
@@ -2945,6 +3356,192 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
 
         @Nullable
+        private String firstWeightedAdultRoleId() {
+            for (AdultRoleChoice choice : getAdultRoles()) {
+                if (choice == null || choice.getRoleId() == null || choice.getRoleId().isBlank()) {
+                    continue;
+                }
+                return choice.getRoleId();
+            }
+            return null;
+        }
+    }
+
+    /** Explicit role-family mapping for baby/adolescent/adult lifecycle transitions. */
+    public static final class RoleFamily {
+        private String id;
+        private String selectedLineId;
+        private String adultRoleId;
+        private AdultRoleChoice[] adultRoles = EMPTY_ADULT_ROLE_CHOICES;
+        private RoleLine[] lines = EMPTY_ROLE_LINES;
+        private String babyRoleId;
+        private String adolescentRoleId;
+        private Integer timeToFullGrownSeconds;
+        private Double babyStartScale;
+        private Double adolescentStartScale;
+        private Double adultStartScale;
+        private Double adolescentSwitchScale;
+        private Double adultSwitchScale;
+
+        @Nullable
+        public String getId() {
+            return id;
+        }
+
+        @Nullable
+        public String getSelectedLineId() {
+            return selectedLineId;
+        }
+
+        @Nullable
+        public String getAdultRoleId() {
+            String fromWeighted = firstWeightedAdultRoleId();
+            if (fromWeighted != null) {
+                return fromWeighted;
+            }
+            if (adultRoleId != null && !adultRoleId.isBlank()) {
+                return adultRoleId;
+            }
+            for (RoleLine line : getLines()) {
+                if (line == null) {
+                    continue;
+                }
+                String lineAdultRoleId = line.getAdultRoleId();
+                if (lineAdultRoleId != null && !lineAdultRoleId.isBlank()) {
+                    return lineAdultRoleId;
+                }
+            }
+            return null;
+        }
+
+        public AdultRoleChoice[] getAdultRoles() {
+            return adultRoles == null ? EMPTY_ADULT_ROLE_CHOICES : adultRoles;
+        }
+
+        public boolean hasWeightedAdultRoles() {
+            return getAdultRoles().length > 0;
+        }
+
+        public RoleLine[] getLines() {
+            return lines == null ? EMPTY_ROLE_LINES : lines;
+        }
+
+        public boolean hasLines() {
+            return getLines().length > 0;
+        }
+
+        @Nullable
+        public String getLegacyAdultRoleId() {
+            return adultRoleId;
+        }
+
+        @Nullable
+        public String getBabyRoleId() {
+            return babyRoleId;
+        }
+
+        @Nullable
+        public String getAdolescentRoleId() {
+            return adolescentRoleId;
+        }
+
+        @Nullable
+        public Integer getTimeToFullGrownSeconds() {
+            return timeToFullGrownSeconds;
+        }
+
+        @Nullable
+        public Double getBabyStartScale() {
+            return babyStartScale;
+        }
+
+        @Nullable
+        public Double getAdolescentStartScale() {
+            return adolescentStartScale;
+        }
+
+        @Nullable
+        public Double getAdultStartScale() {
+            return adultStartScale;
+        }
+
+        @Nullable
+        public Double getAdolescentSwitchScale() {
+            return adolescentSwitchScale;
+        }
+
+        @Nullable
+        public Double getAdultSwitchScale() {
+            return adultSwitchScale;
+        }
+
+        public boolean matchesRole(@Nullable String roleId) {
+            if (roleId == null || roleId.isBlank()) {
+                return false;
+            }
+            return matchesAdultRole(roleId)
+                    || matchesRoleId(babyRoleId, roleId)
+                    || matchesRoleId(adolescentRoleId, roleId)
+                    || resolveLineForRole(roleId) != null;
+        }
+
+        public boolean matchesAdultRole(@Nullable String roleId) {
+            if (roleId == null || roleId.isBlank()) {
+                return false;
+            }
+            if (hasWeightedAdultRoles()) {
+                for (AdultRoleChoice choice : getAdultRoles()) {
+                    if (choice != null && choice.matchesRole(roleId)) {
+                        return true;
+                    }
+                }
+                for (RoleLine line : getLines()) {
+                    if (line != null && line.matchesAdultRole(roleId)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            if (matchesRoleId(adultRoleId, roleId)) {
+                return true;
+            }
+            for (RoleLine line : getLines()) {
+                if (line != null && line.matchesAdultRole(roleId)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public boolean hasSelectableAdultRole() {
+            if (hasWeightedAdultRoles()) {
+                for (AdultRoleChoice choice : getAdultRoles()) {
+                    if (choice != null
+                            && choice.getRoleId() != null
+                            && !choice.getRoleId().isBlank()
+                            && choice.hasPositiveWeight()) {
+                        return true;
+                    }
+                }
+                for (RoleLine line : getLines()) {
+                    if (line != null && line.hasSelectableAdultRole()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            if (adultRoleId != null && !adultRoleId.isBlank()) {
+                return true;
+            }
+            for (RoleLine line : getLines()) {
+                if (line != null && line.hasSelectableAdultRole()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Nullable
         public Gender resolveGenderForAdultRole(@Nullable String roleId) {
             if (roleId == null || roleId.isBlank()) {
                 return null;
@@ -2955,6 +3552,68 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 }
             }
             return null;
+        }
+
+        @Nullable
+        public RoleLine resolveLineForRole(@Nullable String roleId) {
+            if (roleId == null || roleId.isBlank()) {
+                return null;
+            }
+            for (RoleLine line : getLines()) {
+                if (line != null && line.matchesRole(roleId)) {
+                    return line;
+                }
+            }
+            return null;
+        }
+
+        @Nullable
+        public RoleFamily resolveLineFamilyForRole(@Nullable String roleId) {
+            RoleLine line = resolveLineForRole(roleId);
+            return line == null ? null : copyForLine(line);
+        }
+
+        @Nullable
+        public RoleFamily copyForLine(@Nullable RoleLine line) {
+            if (line == null) {
+                return null;
+            }
+            RoleFamily copy = new RoleFamily();
+            copy.id = id;
+            copy.selectedLineId = line.id;
+            copy.adultRoleId = firstNonBlank(line.adultRoleId, adultRoleId);
+            copy.adultRoles = line.hasWeightedAdultRoles() ? line.getAdultRoles() : getAdultRoles();
+            copy.lines = EMPTY_ROLE_LINES;
+            copy.babyRoleId = firstNonBlank(line.babyRoleId, babyRoleId);
+            copy.adolescentRoleId = firstNonBlank(line.adolescentRoleId, adolescentRoleId);
+            copy.timeToFullGrownSeconds = line.timeToFullGrownSeconds != null
+                    ? line.timeToFullGrownSeconds
+                    : timeToFullGrownSeconds;
+            copy.babyStartScale = line.babyStartScale != null ? line.babyStartScale : babyStartScale;
+            copy.adolescentStartScale = line.adolescentStartScale != null
+                    ? line.adolescentStartScale
+                    : adolescentStartScale;
+            copy.adultStartScale = line.adultStartScale != null ? line.adultStartScale : adultStartScale;
+            copy.adolescentSwitchScale = line.adolescentSwitchScale != null
+                    ? line.adolescentSwitchScale
+                    : adolescentSwitchScale;
+            copy.adultSwitchScale = line.adultSwitchScale != null ? line.adultSwitchScale : adultSwitchScale;
+            return copy;
+        }
+
+        public boolean sameLifecycleFamily(@Nullable RoleFamily other) {
+            if (other == null) {
+                return false;
+            }
+            if (this == other) {
+                return true;
+            }
+            if (id != null && !id.isBlank() && other.id != null && !other.id.isBlank()) {
+                return matchesRoleId(id, other.id);
+            }
+            String adultRole = getAdultRoleId();
+            String otherAdultRole = other.getAdultRoleId();
+            return matchesRoleId(adultRole, otherAdultRole);
         }
 
         @Nullable
@@ -2984,6 +3643,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 return normalized.substring(separator + 1);
             }
             return normalized;
+        }
+
+        @Nullable
+        private static String firstNonBlank(@Nullable String left, @Nullable String right) {
+            if (left != null && !left.isBlank()) {
+                return left;
+            }
+            return right != null && !right.isBlank() ? right : null;
         }
     }
 }

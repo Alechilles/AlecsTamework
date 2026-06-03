@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
+import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -75,6 +76,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_BREEDING_REQUIRES_HAPPINESS = "@BreedingRequiresHappiness";
     private static final String KEY_BREEDING_GENDER_ENABLED = "@BreedingGenderEnabled";
     private static final String KEY_TRAITS_ENABLED = "@TraitsEnabled";
+    private static final String KEY_LEVELING_ENABLED = "@LevelingEnabled";
+    private static final String KEY_TALENTS_ENABLED = "@TalentsEnabled";
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
     private static final String KEY_RECALL_TELEPORTING_ENABLED = "@RecallTeleportingEnabled";
     private static final String KEY_TELEMETRY_ENABLED = "@TelemetryEnabled";
@@ -135,7 +138,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 refreshUi();
             }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
-            case ACTION_APPLY -> onApply(data);
+            case ACTION_APPLY -> onApply(data, store);
             default -> {
             }
         }
@@ -208,6 +211,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_BREEDING_REQUIRES_HAPPINESS, "#TwSettingsBreedingRequiresHappinessCheck.Value")
                 .append(KEY_BREEDING_GENDER_ENABLED, "#TwSettingsBreedingGenderEnabledCheck.Value")
                 .append(KEY_TRAITS_ENABLED, "#TwSettingsTraitsEnabledCheck.Value")
+                .append(KEY_LEVELING_ENABLED, "#TwSettingsLevelingEnabledCheck.Value")
+                .append(KEY_TALENTS_ENABLED, "#TwSettingsTalentsEnabledCheck.Value")
                 .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
                 .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value")
                 .append(KEY_TELEMETRY_ENABLED, "#TwSettingsTelemetryEnabledCheck.Value")
@@ -254,13 +259,15 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsBreedingRequiresHappinessCheck.Value", currentValues.breedingRequiresHappiness());
         commandBuilder.set("#TwSettingsBreedingGenderEnabledCheck.Value", currentValues.breedingGenderEnabled());
         commandBuilder.set("#TwSettingsTraitsEnabledCheck.Value", currentValues.traitsEnabled());
+        commandBuilder.set("#TwSettingsLevelingEnabledCheck.Value", currentValues.levelingEnabled());
+        commandBuilder.set("#TwSettingsTalentsEnabledCheck.Value", currentValues.talentsEnabled());
         commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
         commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
         commandBuilder.set("#TwSettingsTelemetryEnabledCheck.Value", currentValues.telemetryEnabled());
         commandBuilder.set("#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value", currentValues.telemetryBreadcrumbsEnabled());
     }
 
-    private void onApply(@Nonnull EventPayload payload) {
+    private void onApply(@Nonnull EventPayload payload, @Nonnull Store<EntityStore> store) {
         if (applyInProgress) {
             warningLine = "Apply already in progress.";
             statusLine = "";
@@ -298,9 +305,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         statusLine = "";
                         warningLine = "Failed to apply settings.";
                     } else if (outcome.partial()) {
+                        CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = outcome.warning();
                     } else if (outcome.success()) {
+                        CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
                         warningLine = "";
                     } else {
@@ -459,6 +468,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 boolOrDefault(payload.breedingRequiresHappiness, currentValues.breedingRequiresHappiness()),
                 boolOrDefault(payload.breedingGenderEnabled, currentValues.breedingGenderEnabled()),
                 boolOrDefault(payload.traitsEnabled, currentValues.traitsEnabled()),
+                boolOrDefault(payload.levelingEnabled, currentValues.levelingEnabled()),
+                boolOrDefault(payload.talentsEnabled, currentValues.talentsEnabled()),
                 boolOrDefault(payload.reviveSystemEnabled, currentValues.reviveSystemEnabled()),
                 boolOrDefault(payload.recallTeleportingEnabled, currentValues.recallTeleportingEnabled()),
                 boolOrDefault(payload.telemetryEnabled, currentValues.telemetryEnabled()),
@@ -624,6 +635,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_REQUIRES_HAPPINESS, Codec.BOOLEAN), (x, v) -> x.breedingRequiresHappiness = v, x -> x.breedingRequiresHappiness).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_GENDER_ENABLED, Codec.BOOLEAN), (x, v) -> x.breedingGenderEnabled = v, x -> x.breedingGenderEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_TRAITS_ENABLED, Codec.BOOLEAN), (x, v) -> x.traitsEnabled = v, x -> x.traitsEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_LEVELING_ENABLED, Codec.BOOLEAN), (x, v) -> x.levelingEnabled = v, x -> x.levelingEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_TALENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.talentsEnabled = v, x -> x.talentsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_TELEMETRY_ENABLED, Codec.BOOLEAN), (x, v) -> x.telemetryEnabled = v, x -> x.telemetryEnabled).add()
@@ -668,6 +681,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private Boolean breedingRequiresHappiness;
         private Boolean breedingGenderEnabled;
         private Boolean traitsEnabled;
+        private Boolean levelingEnabled;
+        private Boolean talentsEnabled;
         private Boolean reviveSystemEnabled;
         private Boolean recallTeleportingEnabled;
         private Boolean telemetryEnabled;

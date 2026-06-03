@@ -58,6 +58,8 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.breedingRequiresHappiness(), defaults.breedingRequiresHappiness()),
                 resolveBoolean(values.breedingGenderEnabled(), defaults.breedingGenderEnabled()),
                 resolveBoolean(values.traitsEnabled(), defaults.traitsEnabled()),
+                resolveBoolean(values.levelingEnabled(), defaults.levelingEnabled()),
+                resolveBoolean(values.talentsEnabled(), defaults.talentsEnabled()),
                 resolveBoolean(values.reviveSystemEnabled(), defaults.reviveSystemEnabled()),
                 resolveBoolean(values.recallTeleportingEnabled(), defaults.recallTeleportingEnabled()),
                 resolveBoolean(values.telemetryEnabled(), defaults.telemetryEnabled()),

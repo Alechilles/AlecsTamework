@@ -10,7 +10,7 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 
 Use this page to bootstrap against `TameworkApi`, verify capabilities, and choose the correct family reference page.
 
-> **Experimental API Contract (`0.5.0`)**
+> **Experimental API Contract (`0.6.0`)**
 > The API is named **Public API** in docs and packages, but the contract is still experimental. Keep capability checks and plan for additive changes.
 
 ## Dependency and access pattern
@@ -60,6 +60,7 @@ Current capability set:
 - `TRAIT_EFFECTS`
 - `PROFILE_DATA`
 - `EVENTS`
+- `COMPANION_XP_EVENTS`
 - `CONFIG_READ`
 - `DIAGNOSTICS`
 
@@ -89,6 +90,7 @@ Current capability set:
 - [Auto-Register Companion on Capture Event Recipe](/mod/alecs-tamework/auto-register-companion-on-capture-event-recipe)
 - [Pause Companion Jobs on Death or Lost Event Recipe](/mod/alecs-tamework/pause-companion-jobs-on-death-or-lost-event-recipe)
 - [Keep Companion Cache in Sync with Profile Changed Events Recipe](/mod/alecs-tamework/keep-companion-cache-in-sync-with-profile-changed-events-recipe)
+- [Credit External Skill XP from Companion XP Recipe](/mod/alecs-tamework/credit-external-skill-xp-from-companion-xp-recipe)
 - [Enforce Ownership before Custom Command or Effect Recipe](/mod/alecs-tamework/enforce-ownership-before-custom-command-or-effect-recipe)
 - [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
 - [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)
@@ -111,7 +113,7 @@ See:
 - Do not write directly to `tamework.sqlite`.
 - Do not depend on repository classes like `NpcProfileRepository` or `CaptureRepository`.
 - Do not mutate or cache internal `Tw*Config` instances.
-- Do not assume API version `0.5.0` will match the mod version.
+- Do not assume API version `0.6.0` will match the mod version.
 
 ## Related Pages
 - [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)

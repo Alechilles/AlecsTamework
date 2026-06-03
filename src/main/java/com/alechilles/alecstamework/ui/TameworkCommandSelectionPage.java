@@ -13,7 +13,6 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
-import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -25,7 +24,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -47,6 +48,7 @@ public final class TameworkCommandSelectionPage
     private static final String KEY_PANEL_SORT_VALUE = "@PanelSortValue";
     private static final String KEY_PANEL_FILTER_MODE_VALUE = "@PanelFilterModeValue";
     private static final String KEY_PANEL_FILTER_TEXT_INPUT = "@PanelFilterTextInput";
+    private static final String KEY_PANEL_GROUP_ACTIVE_VALUE = "@PanelGroupActiveValue";
     private static final String KEY_PANEL_GROUP_ASSIGN_VALUE = "@PanelGroupAssignValue";
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final String LINK_COMMAND_PREFIX = "__link__:";
@@ -68,7 +70,6 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
     private static final String PANEL_GROUP_ASSIGN_APPLY_COMMAND_ID = "__panel_group_assign_apply__";
     private static final String PANEL_GROUP_ASSIGN_CANCEL_COMMAND_ID = "__panel_group_assign_cancel__";
-    private static final String GROUP_NONE_VALUE = "None";
     static final String PANEL_MODE_LINKED = "LinkedMode";
     static final String PANEL_MODE_NEARBY = "NearbyMode";
     static final String PANEL_SORT_DEFAULT = "Default";
@@ -76,9 +77,14 @@ public final class TameworkCommandSelectionPage
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
+    private static final long PAGE_NAVIGATION_DRAIN_DELAY_MS = 100L;
+    private static final AtomicLong NEXT_LINKED_PANEL_GENERATION = new AtomicLong();
+    private static final ConcurrentHashMap<UUID, Long> ACTIVE_LINKED_PANEL_GENERATIONS = new ConcurrentHashMap<>();
     private final CommandOption[] options;
     private final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
     private final boolean requireUnlinkConfirm;
+    private final UUID playerUuid;
+    private final long linkedPanelGeneration;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcBaseEntriesSupplier;
     private final Supplier<String> panelModeValueSupplier;
@@ -87,6 +93,8 @@ public final class TameworkCommandSelectionPage
     private final Supplier<String> panelSortValueSupplier;
     private final Supplier<String> panelFilterModeValueSupplier;
     private final Supplier<String> panelFilterInputValueSupplier;
+    private final Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier;
+    private final Supplier<String> panelGroupActivationValueSupplier;
     private final Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier;
     private LinkedNpcEntry[] baseLinkedNpcEntries;
     private LinkedNpcEntry[] linkedNpcEntries;
@@ -117,12 +125,9 @@ public final class TameworkCommandSelectionPage
     private final Consumer<String> panelSetFilterModeCallback;
     private final Consumer<String> panelSetFilterTextCallback;
     private final Runnable panelClearFiltersCallback;
+    private final Consumer<String> panelSetGroupActivationCallback;
     private final BiConsumer<UUID, String> panelAssignGroupCallback;
-    private boolean groupAssignOverlayVisible;
-    private UUID groupAssignNpcUuid;
-    private String groupAssignNpcName;
-    private String groupAssignSelectedValue;
-    private List<DropdownEntryInfo> groupAssignEntries;
+    private final LinkedNpcPanelGroupAssignOverlayState groupAssignOverlay;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
     private volatile boolean navigationPending;
@@ -141,6 +146,8 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Supplier<String> panelSortValueSupplier,
                                         @Nonnull Supplier<String> panelFilterModeValueSupplier,
                                         @Nonnull Supplier<String> panelFilterInputValueSupplier,
+                                        @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupActivationEntriesSupplier,
+                                        @Nonnull Supplier<String> panelGroupActivationValueSupplier,
                                         @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier,
                                         @Nonnull Predicate<CommandEntry> commandOptionPredicate,
                                         boolean recallActionEnabled,
@@ -165,9 +172,13 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<String> panelSetFilterModeCallback,
                                         @Nonnull Consumer<String> panelSetFilterTextCallback,
                                         @Nonnull Runnable panelClearFiltersCallback,
+                                        @Nonnull Consumer<String> panelSetGroupActivationCallback,
                                         @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
+        this.playerUuid = playerRef.getUuid();
+        this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
+        markLinkedPanelOwner();
         this.options = buildOptions(config, commandOptionPredicate);
         this.cardBindingConfig = buildCardBindingConfig(recallActionEnabled);
         this.requireUnlinkConfirm = requireUnlinkConfirm;
@@ -179,6 +190,8 @@ public final class TameworkCommandSelectionPage
         this.panelSortValueSupplier = panelSortValueSupplier;
         this.panelFilterModeValueSupplier = panelFilterModeValueSupplier;
         this.panelFilterInputValueSupplier = panelFilterInputValueSupplier;
+        this.panelGroupActivationEntriesSupplier = panelGroupActivationEntriesSupplier;
+        this.panelGroupActivationValueSupplier = panelGroupActivationValueSupplier;
         this.panelGroupAssignEntriesSupplier = panelGroupAssignEntriesSupplier;
         this.baseLinkedNpcEntries = new LinkedNpcEntry[0];
         this.linkedNpcEntries = new LinkedNpcEntry[0];
@@ -208,16 +221,10 @@ public final class TameworkCommandSelectionPage
         this.panelSetFilterModeCallback = panelSetFilterModeCallback;
         this.panelSetFilterTextCallback = panelSetFilterTextCallback;
         this.panelClearFiltersCallback = panelClearFiltersCallback;
+        this.panelSetGroupActivationCallback = panelSetGroupActivationCallback;
         this.panelAssignGroupCallback = panelAssignGroupCallback;
         this.selectionCallback = selectionCallback;
-        this.groupAssignOverlayVisible = false;
-        this.groupAssignNpcUuid = null;
-        this.groupAssignNpcName = LocalizedText.resolve(playerRef, "tamework.ui.linkedPanel.subtitle.defaultNpcName");
-        this.groupAssignSelectedValue = GROUP_NONE_VALUE;
-        this.groupAssignEntries = List.of(new DropdownEntryInfo(
-                LocalizableString.fromString(LocalizedText.resolve(playerRef, "tamework.ui.linkedPanel.groupAssign.none")),
-                GROUP_NONE_VALUE
-        ));
+        this.groupAssignOverlay = new LinkedNpcPanelGroupAssignOverlayState(resolveLanguage());
         this.refreshLoopStarted = false;
         this.dismissed = false;
         this.navigationPending = false;
@@ -240,10 +247,8 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
             commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
             commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
-            commandBuilder.set(
-                    "#TameworkLinkedPanelSubtitle.Text",
-                    LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid, resolveLanguage())
-            );
+            commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", resolveGroupActivationDropdownEntries());
+            commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Value", resolveGroupActivationValue());
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", resolveModeDropdownEntries());
             commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
             commandBuilder.set("#TameworkLinkedPanelAutoLinkCheck.Value", resolvePanelAutoLinkEnabled());
@@ -277,11 +282,17 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
+        if (dismissed && !navigationPending) {
+            return;
+        }
         if (navigationPending) {
             return;
         }
+        if (!isCurrentLinkedPanelOwner()) {
+            return;
+        }
         if (data.panelGroupAssignValue != null) {
-            groupAssignSelectedValue = normalizeGroupAssignValue(data.panelGroupAssignValue);
+            groupAssignOverlay.updateSelectedValue(data.panelGroupAssignValue);
         }
         String commandId = data.commandId == null ? "" : data.commandId.trim();
         if (!commandId.isBlank() && commandId.startsWith(OPEN_GROUP_PICKER_COMMAND_PREFIX)) {
@@ -293,9 +304,9 @@ public final class TameworkCommandSelectionPage
             }
             return;
         }
-        if (groupAssignOverlayVisible) {
+        if (groupAssignOverlay.isVisible()) {
             if (PANEL_GROUP_ASSIGN_CANCEL_COMMAND_ID.equals(commandId)) {
-                clearGroupAssignOverlay();
+                groupAssignOverlay.clear(resolveLanguage());
                 sendCardRefreshUpdate();
                 return;
             }
@@ -309,6 +320,16 @@ public final class TameworkCommandSelectionPage
                 closePage();
                 return;
             }
+            return;
+        }
+        if (data.panelGroupActiveValue != null) {
+            cancelPendingFilterTextApply();
+            if (panelSetGroupActivationCallback != null) {
+                panelSetGroupActivationCallback.accept(data.panelGroupActiveValue);
+            }
+            pendingUnlinkNpcUuid = null;
+            refreshLinkedNpcEntries();
+            sendCardRefreshUpdate();
             return;
         }
         if (data.panelAutoLinkEnabled != null) {
@@ -384,11 +405,10 @@ public final class TameworkCommandSelectionPage
         }
         if (PANEL_MANAGE_GROUPS_COMMAND_ID.equals(commandId)) {
             if (panelManageGroupsCallback != null) {
-                if (navigationPending) {
+                if (!beginPageNavigation()) {
                     return;
                 }
                 pendingUnlinkNpcUuid = null;
-                navigationPending = true;
                 navigateAfterUiDrain(() -> {
                     try {
                         panelManageGroupsCallback.run();
@@ -568,9 +588,16 @@ public final class TameworkCommandSelectionPage
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_TALENTS_COMMAND_PREFIX);
             if (npcUuid != null) {
-                navigationPending = true;
-                closePage();
-                openTalentsCallback.accept(npcUuid);
+                if (!beginPageNavigation()) {
+                    return;
+                }
+                navigateAfterUiDrain(() -> {
+                    try {
+                        openTalentsCallback.accept(npcUuid);
+                    } finally {
+                        navigationPending = false;
+                    }
+                });
             }
             return;
         }
@@ -588,6 +615,7 @@ public final class TameworkCommandSelectionPage
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         dismissed = true;
         navigationPending = false;
+        clearLinkedPanelOwner();
     }
 
     private void buildCommandButtons(@Nonnull UICommandBuilder commandBuilder,
@@ -645,7 +673,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void dispatchRefreshTick() {
-        if (dismissed) {
+        if (dismissed || !isCurrentLinkedPanelOwner()) {
             return;
         }
         Ref<EntityStore> ref = playerRef.getReference();
@@ -672,7 +700,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void dispatchDebouncedFilterTextApply(long version) {
-        if (dismissed || version != pendingFilterTextApplyVersion) {
+        if (dismissed || !isCurrentLinkedPanelOwner() || version != pendingFilterTextApplyVersion) {
             return;
         }
         Ref<EntityStore> ref = playerRef.getReference();
@@ -691,7 +719,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void runDebouncedFilterTextApplyOnWorldThread(long version) {
-        if (dismissed || version != pendingFilterTextApplyVersion) {
+        if (dismissed || !isCurrentLinkedPanelOwner() || version != pendingFilterTextApplyVersion) {
             return;
         }
         if (panelSetFilterTextCallback != null) {
@@ -709,7 +737,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void runRefreshTickOnWorldThread() {
-        if (dismissed) {
+        if (dismissed || !isCurrentLinkedPanelOwner()) {
             return;
         }
         if (isFilterEditPending()) {
@@ -726,16 +754,14 @@ public final class TameworkCommandSelectionPage
     }
 
     private void sendCardRefreshUpdate() {
-        if (dismissed) {
+        if (dismissed || !isCurrentLinkedPanelOwner()) {
             return;
         }
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
         commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
-        commandBuilder.set(
-                "#TameworkLinkedPanelSubtitle.Text",
-                LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid, resolveLanguage())
-        );
+        commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Entries", resolveGroupActivationDropdownEntries());
+        commandBuilder.set("#TameworkLinkedPanelGroupSelectorDropdown.Value", resolveGroupActivationValue());
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", resolveModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
         commandBuilder.set("#TameworkLinkedPanelAutoLinkCheck.Value", resolvePanelAutoLinkEnabled());
@@ -795,11 +821,45 @@ public final class TameworkCommandSelectionPage
     private void closePage() {
         dismissed = true;
         navigationPending = false;
+        clearLinkedPanelOwner();
         close();
     }
 
+    private boolean beginPageNavigation() {
+        if (navigationPending) {
+            return false;
+        }
+        navigationPending = true;
+        dismissed = true;
+        clearLinkedPanelOwner();
+        cancelPendingFilterTextApply();
+        return true;
+    }
+
+    private void markLinkedPanelOwner() {
+        if (playerUuid != null) {
+            ACTIVE_LINKED_PANEL_GENERATIONS.put(playerUuid, linkedPanelGeneration);
+        }
+    }
+
+    private void clearLinkedPanelOwner() {
+        if (playerUuid != null) {
+            ACTIVE_LINKED_PANEL_GENERATIONS.remove(playerUuid, linkedPanelGeneration);
+        }
+    }
+
+    private boolean isCurrentLinkedPanelOwner() {
+        if (playerUuid == null) {
+            return true;
+        }
+        return Long.valueOf(linkedPanelGeneration).equals(ACTIVE_LINKED_PANEL_GENERATIONS.get(playerUuid));
+    }
+
     private void navigateAfterUiDrain(@Nonnull Runnable action) {
-        dispatchNavigationAction(action);
+        CompletableFuture.runAsync(
+                () -> dispatchNavigationAction(action),
+                CompletableFuture.delayedExecutor(PAGE_NAVIGATION_DRAIN_DELAY_MS, TimeUnit.MILLISECONDS)
+        );
     }
 
     private void dispatchNavigationAction(@Nonnull Runnable action) {
@@ -890,6 +950,12 @@ public final class TameworkCommandSelectionPage
         );
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.ValueChanged,
+                "#TameworkLinkedPanelGroupSelectorDropdown",
+                EventData.of(KEY_PANEL_GROUP_ACTIVE_VALUE, "#TameworkLinkedPanelGroupSelectorDropdown.Value"),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.ValueChanged,
                 "#TameworkLinkedPanelGroupAssignDropdown",
                 EventData.of(KEY_PANEL_GROUP_ASSIGN_VALUE, "#TameworkLinkedPanelGroupAssignDropdown.Value"),
                 false
@@ -937,20 +1003,7 @@ public final class TameworkCommandSelectionPage
     }
 
     private void applyGroupAssignOverlayState(@Nonnull UICommandBuilder commandBuilder) {
-        commandBuilder.set("#TameworkLinkedPanelGroupAssignOverlay.Visible", groupAssignOverlayVisible);
-        if (!groupAssignOverlayVisible) {
-            return;
-        }
-        commandBuilder.set(
-                "#TameworkLinkedPanelGroupAssignSubtitle.Text",
-                LocalizedText.format(
-                        resolveLanguage(),
-                        "tamework.ui.linkedPanel.groupAssign.subtitle",
-                        resolveGroupAssignNpcName()
-                )
-        );
-        commandBuilder.set("#TameworkLinkedPanelGroupAssignDropdown.Entries", groupAssignEntries);
-        commandBuilder.set("#TameworkLinkedPanelGroupAssignDropdown.Value", groupAssignSelectedValue);
+        groupAssignOverlay.applyTo(commandBuilder, resolveLanguage());
     }
 
     private void openGroupAssignOverlay(@Nonnull UUID npcUuid) {
@@ -962,78 +1015,25 @@ public final class TameworkCommandSelectionPage
         if (entry == null) {
             return;
         }
-        List<DropdownEntryInfo> dropdownEntries = resolveGroupAssignEntries();
-        String selectedValue = normalizeGroupAssignValue(entry.groupId());
-        groupAssignNpcUuid = npcUuid;
-        groupAssignNpcName = entry.displayName();
-        groupAssignEntries = dropdownEntries;
-        groupAssignSelectedValue = selectedValue;
-        groupAssignOverlayVisible = true;
-    }
-
-    private void clearGroupAssignOverlay() {
-        groupAssignOverlayVisible = false;
-        groupAssignNpcUuid = null;
-        groupAssignNpcName = LocalizedText.resolve(resolveLanguage(), "tamework.ui.linkedPanel.subtitle.defaultNpcName");
-        groupAssignSelectedValue = GROUP_NONE_VALUE;
-        groupAssignEntries = List.of(new DropdownEntryInfo(
-                LocalizableString.fromString(LocalizedText.resolve(resolveLanguage(), "tamework.ui.linkedPanel.groupAssign.none")),
-                GROUP_NONE_VALUE
-        ));
+        groupAssignOverlay.open(npcUuid, entry, resolveGroupAssignEntries(), resolveLanguage());
     }
 
     private void applyGroupAssignSelection() {
-        UUID npcUuid = groupAssignNpcUuid;
-        String groupId = normalizeGroupIdForAssignment(groupAssignSelectedValue);
-        clearGroupAssignOverlay();
-        if (npcUuid == null || panelAssignGroupCallback == null) {
+        LinkedNpcPanelGroupAssignOverlayState.AppliedSelection selection =
+                groupAssignOverlay.consumeSelection(resolveLanguage());
+        if (selection.npcUuid() == null || panelAssignGroupCallback == null) {
             return;
         }
-        panelAssignGroupCallback.accept(npcUuid, groupId);
+        panelAssignGroupCallback.accept(selection.npcUuid(), selection.groupId());
         pendingUnlinkNpcUuid = null;
         refreshLinkedNpcEntries();
-    }
-
-    private String resolveGroupAssignNpcName() {
-        if (groupAssignNpcName == null || groupAssignNpcName.isBlank()) {
-            return LocalizedText.resolve(resolveLanguage(), "tamework.ui.linkedPanel.subtitle.defaultNpcName");
-        }
-        return groupAssignNpcName;
     }
 
     private List<DropdownEntryInfo> resolveGroupAssignEntries() {
         List<DropdownEntryInfo> resolved = panelGroupAssignEntriesSupplier != null
                 ? panelGroupAssignEntriesSupplier.get()
                 : List.of();
-        if (resolved == null || resolved.isEmpty()) {
-            return List.of(new DropdownEntryInfo(
-                    LocalizableString.fromString(LocalizedText.resolve(resolveLanguage(), "tamework.ui.linkedPanel.groupAssign.none")),
-                    GROUP_NONE_VALUE
-            ));
-        }
-        return resolved;
-    }
-
-    private String normalizeGroupAssignValue(String value) {
-        if (value == null || value.isBlank()) {
-            return GROUP_NONE_VALUE;
-        }
-        String trimmed = value.trim();
-        if (trimmed.isBlank() || trimmed.equalsIgnoreCase(GROUP_NONE_VALUE)) {
-            return GROUP_NONE_VALUE;
-        }
-        return trimmed;
-    }
-
-    private String normalizeGroupIdForAssignment(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String trimmed = value.trim();
-        if (trimmed.isBlank() || trimmed.equalsIgnoreCase(GROUP_NONE_VALUE)) {
-            return null;
-        }
-        return trimmed;
+        return resolved != null ? resolved : List.of();
     }
 
     private LinkedNpcEntry resolveLinkedNpcEntry(@Nonnull UUID npcUuid) {
@@ -1059,8 +1059,7 @@ public final class TameworkCommandSelectionPage
                 LocalizedText.resolve(resolveLanguage(), "tamework.ui.linkedPanel.subtitle.defaultNpcName")
         );
         applyLocalFilterToLinkedNpcEntries();
-        if (pendingUnlinkNpcUuid != null
-                && !LinkedNpcPanelSubtitleService.containsEntry(linkedNpcEntries, pendingUnlinkNpcUuid)) {
+        if (pendingUnlinkNpcUuid != null && resolveLinkedNpcEntry(pendingUnlinkNpcUuid) == null) {
             pendingUnlinkNpcUuid = null;
         }
     }
@@ -1157,9 +1156,11 @@ public final class TameworkCommandSelectionPage
     }
 
     private String resolvePanelTitleText() {
-        return shouldShowNearbyRadiusControls()
+        String title = shouldShowNearbyRadiusControls()
                 ? LocalizedText.resolve(resolveLanguage(), "tamework.ui.linkedPanel.title.nearby")
                 : LocalizedText.resolve(resolveLanguage(), "tamework.ui.linkedPanel.title.linked");
+        int count = linkedNpcEntries != null ? linkedNpcEntries.length : 0;
+        return title + " (" + count + ")";
     }
 
     private boolean shouldShowNearbyRadiusControls() {
@@ -1213,6 +1214,21 @@ public final class TameworkCommandSelectionPage
         }
         String value = panelFilterInputValueSupplier.get();
         return value == null ? "" : value;
+    }
+
+    private List<DropdownEntryInfo> resolveGroupActivationDropdownEntries() {
+        List<DropdownEntryInfo> resolved = panelGroupActivationEntriesSupplier != null
+                ? panelGroupActivationEntriesSupplier.get()
+                : List.of();
+        return resolved != null ? resolved : List.of();
+    }
+
+    private String resolveGroupActivationValue() {
+        if (panelGroupActivationValueSupplier == null) {
+            return "";
+        }
+        String value = panelGroupActivationValueSupplier.get();
+        return value != null ? value : "";
     }
 
     private String resolveLanguage() {
@@ -1328,6 +1344,12 @@ public final class TameworkCommandSelectionPage
             )
             .add()
             .append(
+                new KeyedCodec<>(KEY_PANEL_GROUP_ACTIVE_VALUE, Codec.STRING),
+                (event, value) -> event.panelGroupActiveValue = value,
+                event -> event.panelGroupActiveValue
+            )
+            .add()
+            .append(
                 new KeyedCodec<>(KEY_PANEL_GROUP_ASSIGN_VALUE, Codec.STRING),
                 (event, value) -> event.panelGroupAssignValue = value,
                 event -> event.panelGroupAssignValue
@@ -1341,6 +1363,7 @@ public final class TameworkCommandSelectionPage
         private String panelSortValue;
         private String panelFilterModeValue;
         private String panelFilterTextInput;
+        private String panelGroupActiveValue;
         private String panelGroupAssignValue;
     }
 }

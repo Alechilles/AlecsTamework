@@ -8,6 +8,8 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Selects the first matching interaction entry, respecting cooldowns and requirements. */
 final class InteractionSelector {
@@ -16,6 +18,7 @@ final class InteractionSelector {
     private final InteractionCooldowns cooldowns;
     private final InteractionAlarmHelper alarmHelper;
     private final String harvestAlarmName;
+    private final InteractionPromptPlanCache promptPlanCache = new InteractionPromptPlanCache();
 
     // Builds the selector with requirement, cooldown, and alarm helpers.
     InteractionSelector(ActionTameworkInteract owner,
@@ -54,18 +57,19 @@ final class InteractionSelector {
         if (entries == null || entries.length == 0) {
             return null;
         }
+        InteractionPromptPlan promptPlan = promptPlanCache.getOrBuild(config, this::buildPromptPlan);
         ActionTameworkInteract.ResolvedInteraction[] blockedContext = new ActionTameworkInteract.ResolvedInteraction[1];
         ActionTameworkInteract.ResolvedInteraction contextual = findFirstPromptMatch(
                 config,
                 interactionConfigId,
                 entries,
+                promptPlan.contextualIndexes(),
                 npcRef,
                 role,
                 infoProvider,
                 store,
                 player,
                 ctx,
-                EntryPromptCategory.CONTEXTUAL,
                 blocked -> blockedContext[0] = blockedContext[0] == null ? blocked : blockedContext[0]
         );
         if (contextual != null) {
@@ -75,13 +79,13 @@ final class InteractionSelector {
                 config,
                 interactionConfigId,
                 entries,
+                promptPlan.conditionalIndexes(),
                 npcRef,
                 role,
                 infoProvider,
                 store,
                 player,
                 ctx,
-                EntryPromptCategory.CONDITIONAL,
                 blocked -> {
                 }
         );
@@ -92,13 +96,13 @@ final class InteractionSelector {
                 config,
                 interactionConfigId,
                 entries,
+                promptPlan.genericIndexes(),
                 npcRef,
                 role,
                 infoProvider,
                 store,
                 player,
                 ctx,
-                EntryPromptCategory.GENERIC,
                 blocked -> {
                 }
         );
@@ -108,17 +112,23 @@ final class InteractionSelector {
     private ActionTameworkInteract.ResolvedInteraction findFirstPromptMatch(TwInteractionConfig config,
                                                                             String interactionConfigId,
                                                                             InteractionEntry[] entries,
+                                                                            int[] indexes,
                                                                             Ref<EntityStore> npcRef,
                                                                             Role role,
                                                                             InfoProvider infoProvider,
                                                                             Store<EntityStore> store,
                                                                             Player player,
                                                                             InteractionContextSnapshot ctx,
-                                                                            EntryPromptCategory category,
                                                                             BlockedContextConsumer blockedContextConsumer) {
-        for (int index = 0; index < entries.length; index++) {
+        if (indexes == null || indexes.length == 0) {
+            return null;
+        }
+        for (int index : indexes) {
+            if (index < 0 || index >= entries.length) {
+                continue;
+            }
             InteractionEntry entry = entries[index];
-            if (entry == null || !entry.isEnabled() || classifyPromptEntry(entry) != category) {
+            if (entry == null || !entry.isEnabled()) {
                 continue;
             }
             int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
@@ -127,29 +137,25 @@ final class InteractionSelector {
                     : null;
             if (cooldownSeconds > 0
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
-                if (category == EntryPromptCategory.CONTEXTUAL) {
-                    blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
-                            interactionConfigId,
-                            entry,
-                            index,
-                            cooldownSeconds,
-                            cooldownAlarmName,
-                            true
-                    ));
-                }
+                blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
+                        interactionConfigId,
+                        entry,
+                        index,
+                        cooldownSeconds,
+                        cooldownAlarmName,
+                        true
+                ));
                 continue;
             }
             if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, true)) {
-                if (category == EntryPromptCategory.CONTEXTUAL) {
-                    blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
-                            interactionConfigId,
-                            entry,
-                            index,
-                            cooldownSeconds,
-                            cooldownAlarmName,
-                            true
-                    ));
-                }
+                blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
+                        interactionConfigId,
+                        entry,
+                        index,
+                        cooldownSeconds,
+                        cooldownAlarmName,
+                        true
+                ));
                 continue;
             }
             if (!requirements.requirementsMetForPrompt(
@@ -174,6 +180,45 @@ final class InteractionSelector {
             );
         }
         return null;
+    }
+
+    InteractionPromptPlan buildPromptPlan(InteractionEntry[] entries) {
+        if (entries == null || entries.length == 0) {
+            return new InteractionPromptPlan(null, null, null);
+        }
+        List<Integer> contextual = new ArrayList<>();
+        List<Integer> conditional = new ArrayList<>();
+        List<Integer> generic = new ArrayList<>();
+        for (int index = 0; index < entries.length; index++) {
+            InteractionEntry entry = entries[index];
+            if (entry == null || !entry.isEnabled()) {
+                continue;
+            }
+            EntryPromptCategory category = classifyPromptEntry(entry);
+            switch (category) {
+                case CONTEXTUAL -> contextual.add(index);
+                case CONDITIONAL -> conditional.add(index);
+                case GENERIC -> generic.add(index);
+                default -> {
+                }
+            }
+        }
+        return new InteractionPromptPlan(
+                toIntArray(contextual),
+                toIntArray(conditional),
+                toIntArray(generic)
+        );
+    }
+
+    private static int[] toIntArray(List<Integer> values) {
+        if (values == null || values.isEmpty()) {
+            return new int[0];
+        }
+        int[] out = new int[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            out[i] = values.get(i);
+        }
+        return out;
     }
 
     private EntryPromptCategory classifyPromptEntry(InteractionEntry entry) {

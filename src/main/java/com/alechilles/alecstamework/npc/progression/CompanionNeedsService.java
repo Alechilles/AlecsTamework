@@ -14,7 +14,7 @@ import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
@@ -46,6 +46,7 @@ public final class CompanionNeedsService {
     private static final double MAX_REGEN_SUPPRESSION_ALLOWED_HEAL = 10_000.0;
     private static final long REGEN_HARD_BLOCK_MIN_FUTURE_SECONDS = 30L;
     private static final long REGEN_HARD_BLOCK_TARGET_FUTURE_SECONDS = 120L;
+    private static final String NEEDS_DECAY_MULTIPLIER_EFFECT_KEY = "NeedsDecayMultiplier";
     public static final String NEEDS_DAMAGE_SOURCE_TYPE = "tamework.needs";
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
 
@@ -566,8 +567,9 @@ public final class CompanionNeedsService {
         if (effectiveElapsedMs > 0L) {
             double elapsedMinutes = effectiveElapsedMs / MILLIS_PER_MINUTE;
             TwNeedsConfig.DecaySettings decay = config.getDecay();
-            double hungerDecay = decay.getHungerPerMinute() * elapsedMinutes;
-            double thirstDecay = decay.getThirstPerMinute() * elapsedMinutes;
+            double needsDecayMultiplier = resolveNeedsDecayMultiplier(npcRef, store);
+            double hungerDecay = decay.getHungerPerMinute() * elapsedMinutes * needsDecayMultiplier;
+            double thirstDecay = decay.getThirstPerMinute() * elapsedMinutes * needsDecayMultiplier;
             hunger = clamp(hunger - hungerDecay, values.getHungerMin(), values.getHungerMax());
             thirst = clamp(thirst - thirstDecay, values.getThirstMin(), values.getThirstMax());
             componentChanged = true;
@@ -1290,6 +1292,20 @@ public final class CompanionNeedsService {
             return 0.0;
         }
         return Math.min(MAX_REGEN_SUPPRESSION_ALLOWED_HEAL, allowedExternalHeal);
+    }
+
+    private static double resolveNeedsDecayMultiplier(@Nullable Ref<EntityStore> npcRef,
+                                                      @Nullable Store<EntityStore> store) {
+        double value = CompanionProgressionModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                NEEDS_DECAY_MULTIPLIER_EFFECT_KEY,
+                1.0
+        );
+        if (!Double.isFinite(value) || value <= 0.0) {
+            return 1.0;
+        }
+        return value;
     }
 
     private static double normalizeManagedHealth(double managedHealth) {

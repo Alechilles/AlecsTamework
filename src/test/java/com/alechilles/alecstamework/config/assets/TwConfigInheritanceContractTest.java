@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -328,6 +330,44 @@ class TwConfigInheritanceContractTest {
     }
 
     @Test
+    void spawnerIconOverrideGroupsInheritWhenOmittedAndReplaceWhenExplicit() throws Exception {
+        TwSpawnerConfig parent = new TwSpawnerConfig();
+        TwSpawnerConfig childInherit = new TwSpawnerConfig();
+        TwSpawnerConfig childReplace = new TwSpawnerConfig();
+
+        TwSpawnerConfig.SpawnerIconOverrideGroup[] parentGroups =
+                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
+        TwSpawnerConfig.SpawnerIconOverrideGroup[] childGroups =
+                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
+        setField(parent, "iconOverrideGroups", parentGroups);
+        setField(childInherit, "iconOverrideGroups", childGroups);
+        setField(childReplace, "iconOverrideGroups", childGroups);
+
+        childInherit.inheritMissingTopLevelFrom(parent, Set.of());
+        childReplace.inheritMissingTopLevelFrom(parent, Set.of("IconOverrideGroups"));
+
+        assertSame(parentGroups, getField(childInherit, "iconOverrideGroups"));
+        assertSame(childGroups, getField(childReplace, "iconOverrideGroups"));
+    }
+
+    @Test
+    void spawnerIconOverrideGroupsMapGroupDefaultsWithoutOverrides() throws Exception {
+        TwSpawnerConfig config = new TwSpawnerConfig();
+        TwSpawnerConfig.SpawnerIconOverrideGroup group = new TwSpawnerConfig.SpawnerIconOverrideGroup();
+        setField(group, "roles", new String[] { "Cow", "Tamed_Cow" });
+        setField(group, "iconDefault", "Icons/Cow/base.png");
+        setField(config, "iconOverrideGroups", new TwSpawnerConfig.SpawnerIconOverrideGroup[] { group });
+
+        ItemFeatureConfig itemConfig = config.toItemFeatureConfig();
+
+        assertEquals(1, itemConfig.getSpawnerIconOverrideGroups().size());
+        ItemFeatureConfig.SpawnerIconOverrideGroup mapped = itemConfig.getSpawnerIconOverrideGroups().get(0);
+        assertEquals(List.of("Cow", "Tamed_Cow"), mapped.getRoles());
+        assertEquals("Icons/Cow/base.png", mapped.getIconDefault());
+        assertTrue(mapped.getOverrides().isEmpty());
+    }
+
+    @Test
     void traitSelectionNestedMergeAndTraitsReplacementWork() throws Exception {
         TwTraitConfig parent = new TwTraitConfig();
         TwTraitConfig child = new TwTraitConfig();
@@ -383,6 +423,7 @@ class TwConfigInheritanceContractTest {
         TwLevelingConfig.CombatXpSourceSettings childCombat = new TwLevelingConfig.CombatXpSourceSettings();
         setField(parentFeed, "enabled", false);
         setField(parentFeed, "flatXp", 8.0d);
+        setField(parentFeed, "awardCooldownSeconds", 900);
         setField(childFeed, "enabled", true);
         setField(parentCombat, "damageDealtXpPerPoint", 1.25d);
         setField(parentCombat, "awardVsPlayers", true);
@@ -413,6 +454,7 @@ class TwConfigInheritanceContractTest {
         assertEquals(1.4d, child.getLevels().getGrowthFactor(), 0.00001d);
         assertTrue(child.getXpSources().getFeed().isEnabled());
         assertEquals(8.0d, child.getXpSources().getFeed().getFlatXp(), 0.00001d);
+        assertEquals(900, child.getXpSources().getFeed().getAwardCooldownSeconds());
         assertEquals(1.25d, child.getXpSources().getCombat().getDamageDealtXpPerPoint(), 0.00001d);
         assertEquals(0.4d, child.getXpSources().getCombat().getDamageTakenXpPerPoint(), 0.00001d);
         assertTrue(child.getXpSources().getCombat().isAwardVsPlayers());

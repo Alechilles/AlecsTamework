@@ -15,7 +15,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

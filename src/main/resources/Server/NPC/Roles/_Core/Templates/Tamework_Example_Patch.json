@@ -1,0 +1,338 @@
+{
+  "$Comment": "Barebones AH-style livestock template used to demonstrate optional Tamework patches. This file intentionally avoids Tamework builders; Server/Tamework/Patches/Examples/Tamework_Example_Patch.json adds them when Tamework is installed.",
+  "Type": "Abstract",
+  "StartState": "Idle",
+  "Parameters": {
+    "Appearance": {
+      "Value": "Tamework_Example",
+      "Description": "The NPC's model."
+    },
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.Mob_Tamework_Example_Patch.name",
+      "Description": "Translation key for NPC name display."
+    },
+    "ParticleOffset": {
+      "Value": [0, 1, 0],
+      "Description": "The offset of spawned particle systems."
+    },
+    "MaxSpeed": {
+      "Value": 4,
+      "Description": "The maximum walking speed of the NPC."
+    },
+    "MaxHealth": {
+      "Value": 100,
+      "Description": "The maximum health of the NPC."
+    },
+    "MaxRotationSpeed": {
+      "Value": 360,
+      "Description": "The maximum rotation speed, in degrees per second."
+    },
+    "RunThreshold": {
+      "Value": 0.5,
+      "Description": "The speed ratio at which the NPC switches to run animation."
+    },
+    "ClimbHeight": {
+      "Value": 1,
+      "Description": "The maximum climb height, in blocks."
+    },
+    "WanderRadius": {
+      "Value": 8,
+      "Description": "The wander radius of the NPC."
+    },
+    "ViewRange": {
+      "Value": 16,
+      "Description": "The view distance of the NPC, in blocks."
+    },
+    "ViewSector": {
+      "Value": 180,
+      "Description": "The view sector of the NPC, in degrees."
+    },
+    "HearingRange": {
+      "Value": 8,
+      "Description": "The hearing distance of the NPC, in blocks."
+    },
+    "AbsoluteDetectionRange": {
+      "Value": 4,
+      "Description": "The range at which a target is guaranteed to be detected."
+    },
+    "AttitudeGroup": {
+      "Value": "PreyBig",
+      "Description": "The attitude group this NPC belongs to."
+    },
+    "PlayerDefaultAttitude": {
+      "Value": "Neutral",
+      "Description": "The default attitude towards the player."
+    },
+    "DropList": {
+      "Value": "Empty",
+      "Description": "The NPC's drop list."
+    },
+    "FlockArray": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "The set of NPCs belonging to this flock type."
+    },
+    "LovedItems": {
+      "Value": ["Plant_Fruit_Apple"],
+      "TypeHint": "String",
+      "Description": "Food items accepted by Tamework interactions after patching."
+    },
+    "FoodItemIDs": {
+      "Value": ["Plant_Fruit_Apple"],
+      "TypeHint": "String",
+      "Description": "Food items used by needs-seek food behavior after patching."
+    },
+    "DayTimePeriod": {
+      "Value": [6.01, 17.99],
+      "Description": "The hour range considered daytime."
+    },
+    "DayTimeNapWeight": {
+      "Value": 1,
+      "Description": "Weight for daytime naps. Set to 0 to disable."
+    },
+    "DayTimeNapTimeRange": {
+      "Value": [10, 20],
+      "Description": "Duration range for daytime naps."
+    },
+    "DayFlavorAnimation": {
+      "Value": "Idle",
+      "Description": "Daytime flavor animation. Empty to disable."
+    },
+    "NightFlavorAnimation": {
+      "Value": "Idle",
+      "Description": "Nighttime flavor animation. Empty to disable."
+    },
+    "IsHarvestable": {
+      "Value": false,
+      "Description": "Whether this NPC can be harvested after patching."
+    },
+    "HarvestInteractionContext": {
+      "Value": "",
+      "Description": "The interaction context of the harvest tool."
+    },
+    "HarvestDropList": {
+      "Value": "",
+      "Description": "The drop list executed when the NPC is harvested."
+    },
+    "HarvestParticles": {
+      "Value": "Alerted",
+      "Description": "The particle system spawned when the NPC is harvested."
+    },
+    "HarvestSound": {
+      "Value": "SFX_Sheep_Sheared",
+      "Description": "The sound that plays when the NPC is harvested."
+    },
+    "IsMountable": {
+      "Value": false,
+      "Description": "Whether this NPC can be mounted after patching."
+    },
+    "MountAnchorX": {
+      "Value": 0
+    },
+    "MountAnchorY": {
+      "Value": 0.8
+    },
+    "MountAnchorZ": {
+      "Value": 0.3
+    },
+    "MountMovementConfig": {
+      "Value": "Mount"
+    },
+    "BreathesInWater": {
+      "Value": true,
+      "Description": "Whether this NPC can breathe underwater."
+    },
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to store the owner/master after patching."
+    },
+    "SpawnerEmptyItemID": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Item IDs that can pick up this NPC after patching."
+    },
+    "CanFollow": {
+      "Value": false,
+      "Description": "Whether command-driven Follow behavior is enabled after patching."
+    },
+    "CanHold": {
+      "Value": false,
+      "Description": "Whether command-driven Hold behavior is enabled after patching."
+    },
+    "CanDefend": {
+      "Value": false,
+      "Description": "Whether Defend behavior is enabled after patching."
+    },
+    "CanAttackTarget": {
+      "Value": false,
+      "Description": "Whether Attack Target commands are allowed after patching."
+    },
+    "CanMoveToLocation": {
+      "Value": false,
+      "Description": "Whether Move To Location command behavior is enabled after patching."
+    },
+    "CanReturnHome": {
+      "Value": false,
+      "Description": "Whether Return Home command behavior is enabled after patching."
+    },
+    "CanRecall": {
+      "Value": false,
+      "Description": "Whether Recall command behavior is enabled after patching."
+    },
+    "CanSetHome": {
+      "Value": false,
+      "Description": "Whether Set Home commands are available after patching."
+    },
+    "CanBreedPair": {
+      "Value": false,
+      "Description": "Whether breeding pair approach behavior is enabled after patching."
+    },
+    "TestTameItemsParam": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Items accepted by the example Tame interaction after patching."
+    },
+    "TestFeedItemsParam": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Items accepted by the example Feed interaction after patching."
+    }
+  },
+  "IsMemory": false,
+  "DropList": {
+    "Compute": "DropList"
+  },
+  "FlockSpawnTypes": {
+    "Compute": "FlockArray"
+  },
+  "FlockAllowedNPC": {
+    "Compute": "FlockArray"
+  },
+  "FlockSpawnTypesRandom": false,
+  "DisableDamageGroups": ["Self"],
+  "Appearance": {
+    "Compute": "Appearance"
+  },
+  "DefaultPlayerAttitude": {
+    "Compute": "PlayerDefaultAttitude"
+  },
+  "DefaultNPCAttitude": "Ignore",
+  "AttitudeGroup": {
+    "Compute": "AttitudeGroup"
+  },
+  "ApplySeparation": true,
+  "SeparationDistance": 1,
+  "SeparationWeight": 1,
+  "BreathesInWater": {
+    "Compute": "BreathesInWater"
+  },
+  "KnockbackScale": 0.5,
+  "MotionControllerList": [
+    {
+      "Type": "Walk",
+      "MaxWalkSpeed": {
+        "Compute": "MaxSpeed"
+      },
+      "Gravity": 15,
+      "MaxFallSpeed": 15,
+      "JumpHeight": 0.1,
+      "MaxRotationSpeed": {
+        "Compute": "MaxRotationSpeed"
+      },
+      "Acceleration": 100,
+      "RunThreshold": {
+        "Compute": "RunThreshold"
+      },
+      "DescentAnimationType": "Fall",
+      "DescentSteepness": 2.5,
+      "DescentBlending": 1,
+      "JumpDescentSteepness": 8,
+      "MaxClimbHeight": {
+        "Compute": "ClimbHeight"
+      }
+    }
+  ],
+  "StateTransitions": [
+    {
+      "$Comment": "Patch anchor: state transitions",
+      "States": [
+        {
+          "To": ["Idle"],
+          "From": []
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "ReleaseTarget"
+        },
+        {
+          "Type": "ResetInstructions"
+        },
+        {
+          "Type": "PlayAnimation",
+          "Slot": "Status"
+        }
+      ]
+    }
+  ],
+  "MaxHealth": {
+    "Compute": "MaxHealth"
+  },
+  "Instructions": [
+    {
+      "$Comment": "Patch anchor: global behaviors",
+      "Continue": true,
+      "Instructions": []
+    },
+    {
+      "$Comment": "Patch anchor: command behaviors",
+      "Continue": true,
+      "Instructions": []
+    },
+    {
+      "$Comment": "Patch anchor: state behaviors",
+      "Continue": true,
+      "Instructions": []
+    },
+    {
+      "$Comment": "Barebones idle wander behavior.",
+      "Sensor": {
+        "Type": "State",
+        "State": "Idle"
+      },
+      "Instructions": [
+        {
+          "BodyMotion": {
+            "Type": "WanderInCircle",
+            "Radius": {
+              "Compute": "WanderRadius"
+            },
+            "MaxHeadingChange": 90,
+            "RelativeSpeed": 0.4,
+            "RelaxedMoveConstraints": true
+          }
+        }
+      ]
+    }
+  ],
+  "InteractionInstruction": {
+    "Instructions": [
+      {
+        "$Comment": "Patch anchor: interaction bridge",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any"
+        },
+        "Actions": [
+          {
+            "Type": "SetInteractable",
+            "Interactable": false
+          }
+        ]
+      }
+    ]
+  },
+  "NameTranslationKey": {
+    "Compute": "NameTranslationKey"
+  }
+}

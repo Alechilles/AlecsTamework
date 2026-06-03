@@ -21,7 +21,41 @@ class TameworkRuntimeSettingsTest {
         assertFalse(disabledSettings.breedingGenderEnabledForConfig(false));
     }
 
+    @Test
+    void levelingAndTalentSettingsUseResolvedSettings() {
+        TameworkRuntimeSettings disabledSettings =
+                TameworkRuntimeSettings.from(settingsWithProgressionToggles(false, false));
+        assertFalse(disabledSettings.levelingEnabled());
+        assertFalse(disabledSettings.talentsEnabled());
+
+        TameworkRuntimeSettings enabledSettings =
+                TameworkRuntimeSettings.from(settingsWithProgressionToggles(true, true));
+        assertTrue(enabledSettings.levelingEnabled());
+        assertTrue(enabledSettings.talentsEnabled());
+    }
+
     private static ResolvedTameworkSettings settingsWithBreedingGenderEnabled(boolean enabled) {
+        ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
+        return settingsWithProgressionSettings(
+                enabled,
+                defaults.levelingEnabled(),
+                defaults.talentsEnabled()
+        );
+    }
+
+    private static ResolvedTameworkSettings settingsWithProgressionToggles(boolean levelingEnabled,
+                                                                          boolean talentsEnabled) {
+        ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
+        return settingsWithProgressionSettings(
+                defaults.breedingGenderEnabled(),
+                levelingEnabled,
+                talentsEnabled
+        );
+    }
+
+    private static ResolvedTameworkSettings settingsWithProgressionSettings(boolean breedingGenderEnabled,
+                                                                           boolean levelingEnabled,
+                                                                           boolean talentsEnabled) {
         ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
         return new ResolvedTameworkSettings(
                 defaults.populationLimitPerPlayerOwnedTotal(),
@@ -53,8 +87,10 @@ class TameworkRuntimeSettingsTest {
                 defaults.happinessEnabled(),
                 defaults.passiveBreedingEnabled(),
                 defaults.breedingRequiresHappiness(),
-                enabled,
+                breedingGenderEnabled,
                 defaults.traitsEnabled(),
+                levelingEnabled,
+                talentsEnabled,
                 defaults.reviveSystemEnabled(),
                 defaults.recallTeleportingEnabled(),
                 defaults.telemetryEnabled(),

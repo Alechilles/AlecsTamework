@@ -15,8 +15,8 @@ import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -110,6 +110,44 @@ final class BreedingOffspringService {
                                @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations,
                                @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> pendingPlayerReservations,
                                @Nullable CommandBuffer<EntityStore> commandBuffer) {
+        long now = store != null ? BreedingTimeService.resolveCurrentTimeMs(store) : 0L;
+        return tryCompletePairing(
+                sourceRef,
+                store,
+                sourceBreeding,
+                config,
+                pendingClaimReservations,
+                pendingPlayerReservations,
+                commandBuffer,
+                BreedingReadinessPolicy.passive(now)
+        );
+    }
+
+    boolean tryCompleteManualPairing(Ref<EntityStore> sourceRef,
+                                     Store<EntityStore> store,
+                                     TameworkBreedingComponent sourceBreeding,
+                                     @Nullable TwBreedingConfig config,
+                                     UUID playerUuid) {
+        return tryCompletePairing(
+                sourceRef,
+                store,
+                sourceBreeding,
+                config,
+                null,
+                null,
+                null,
+                BreedingReadinessPolicy.manual(playerUuid, ManualBreedingClock.nowMs())
+        );
+    }
+
+    private boolean tryCompletePairing(Ref<EntityStore> sourceRef,
+                                       Store<EntityStore> store,
+                                       TameworkBreedingComponent sourceBreeding,
+                                       @Nullable TwBreedingConfig config,
+                                       @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations,
+                                       @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> pendingPlayerReservations,
+                                       @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                       BreedingReadinessPolicy readinessPolicy) {
         if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
             return false;
         }
@@ -117,7 +155,8 @@ final class BreedingOffspringService {
                 sourceRef,
                 store,
                 sourceBreeding,
-                config
+                config,
+                readinessPolicy
         );
         if (partner == null || partner.ref == null || !partner.ref.isValid()) {
             return false;
@@ -129,7 +168,7 @@ final class BreedingOffspringService {
             return false;
         }
         TameworkBreedingComponent livePartnerBreeding = getBreedingComponent(partner.ref, store);
-        if (livePartnerBreeding == null || !livePartnerBreeding.isReady()) {
+        if (!acceptsPartnerReadiness(readinessPolicy, livePartnerBreeding)) {
             return false;
         }
         Vector3d spawnAnchor = resolveSpawnAnchor(sourceRef, partner.ref, store);
@@ -224,6 +263,17 @@ final class BreedingOffspringService {
         return true;
     }
 
+    static boolean acceptsPartnerReadiness(@Nullable BreedingReadinessPolicy readinessPolicy,
+                                           @Nullable TameworkBreedingComponent breeding) {
+        if (breeding == null) {
+            return false;
+        }
+        if (readinessPolicy != null) {
+            return readinessPolicy.accepts(breeding);
+        }
+        return breeding.isReady();
+    }
+
     @Nullable
     private TameworkBreedingComponent getBreedingComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
@@ -252,6 +302,7 @@ final class BreedingOffspringService {
         breeding.setCooldownDurationMs(durationMs);
         breeding.setLastPartnerUuid(partnerUuid);
         breeding.setLastHappinessUpdateMs(now);
+        breeding.clearManualBreedingReady();
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
         if (type != null) {
             putComponent(npcRef, store, commandBuffer, type, breeding);
@@ -399,8 +450,8 @@ final class BreedingOffspringService {
             Vector3d b = parentBTransform.getPosition();
             double targetY = Math.max(a.y, b.y);
             Vector3d midpoint = new Vector3d((a.x + b.x) * 0.5, targetY, (a.z + b.z) * 0.5);
-            Vector3d axis = new Vector3d(b).subtract(a);
-            if (axis.squaredLength() > 0.00001) {
+            Vector3d axis = new Vector3d(b).sub(a);
+            if (axis.lengthSquared() > 0.00001) {
                 axis.normalize();
                 Vector3d targetA = new Vector3d(
                         midpoint.x - axis.x * APPROACH_SPACING,
@@ -600,7 +651,7 @@ final class BreedingOffspringService {
         if (parentATransform == null || parentBTransform == null) {
             return false;
         }
-        double distance = parentATransform.getPosition().distanceTo(parentBTransform.getPosition());
+        double distance = parentATransform.getPosition().distance(parentBTransform.getPosition());
         return Double.isFinite(distance) && distance <= PAIRING_READY_DISTANCE;
     }
 
@@ -679,13 +730,21 @@ final class BreedingOffspringService {
             return;
         }
         String baseRoleId = resolveBaseRoleId(context, parentARef, parentBRef, store);
+        String parentARoleId = firstNonBlank(context.parentARoleId(), resolveRoleId(parentARef, store));
+        String parentBRoleId = firstNonBlank(context.parentBRoleId(), resolveRoleId(parentBRef, store));
+        if (parentARoleId == null || parentARoleId.isBlank()) {
+            parentARoleId = baseRoleId;
+        }
         TwBreedingConfig childBreedingConfig = resolveBreedingConfig(context.breedingConfigId());
         BreedingOffspringSpawnService.ResolvedSpawnRole spawnRole = spawnService.resolveSpawnRole(
-                baseRoleId,
+                parentARoleId,
+                parentBRoleId,
                 childBreedingConfig,
                 context.parentARoleIndex(),
                 context.parentBRoleIndex(),
-                npcPlugin
+                npcPlugin,
+                Math.random(),
+                Math.random()
         );
         if (spawnRole == null) {
             logWarn(String.format(
@@ -752,17 +811,20 @@ final class BreedingOffspringService {
                 ));
             }
         }
-        Vector3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
+        Rotation3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
         int spawnedCount = 0;
         for (int i = 0; i < targetSpawnCount; i++) {
             BreedingOffspringSpawnService.ResolvedSpawnRole childSpawnRole = i == 0
                     ? spawnRole
                     : spawnService.resolveSpawnRole(
-                            baseRoleId,
+                            parentARoleId,
+                            parentBRoleId,
                             childBreedingConfig,
                             context.parentARoleIndex(),
                             context.parentBRoleIndex(),
-                            npcPlugin
+                            npcPlugin,
+                            Math.random(),
+                            Math.random()
                     );
             if (childSpawnRole == null) {
                 logWarn(String.format(
@@ -879,6 +941,14 @@ final class BreedingOffspringService {
     }
 
     @Nullable
+    private static String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second != null && !second.isBlank() ? second : null;
+    }
+
+    @Nullable
     private Vector3d resolveSpawnPosition(@Nullable TransformComponent parentATransform,
                                           @Nullable TransformComponent parentBTransform,
                                           @Nullable Vector3d fallbackAnchor) {
@@ -904,19 +974,19 @@ final class BreedingOffspringService {
         return new Vector3d(fallbackAnchor.x, fallbackAnchor.y + OFFSPRING_SPAWN_HEIGHT_OFFSET, fallbackAnchor.z);
     }
 
-    private Vector3f resolveSpawnRotation(@Nullable TransformComponent parentATransform,
-                                          @Nullable TransformComponent parentBTransform) {
+    private Rotation3f resolveSpawnRotation(@Nullable TransformComponent parentATransform,
+                                            @Nullable TransformComponent parentBTransform) {
         if (parentATransform == null && parentBTransform == null) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         if (parentATransform != null && parentBTransform != null) {
-            Vector3d delta = new Vector3d(parentBTransform.getPosition()).subtract(parentATransform.getPosition());
-            if (delta.squaredLength() > 0.00001) {
-                return Vector3f.lookAt(delta);
+            Vector3d delta = new Vector3d(parentBTransform.getPosition()).sub(parentATransform.getPosition());
+            if (delta.lengthSquared() > 0.00001) {
+                return Rotation3f.lookAt(delta);
             }
         }
         TransformComponent fallback = parentATransform != null ? parentATransform : parentBTransform;
-        return new Vector3f(fallback.getRotation());
+        return new Rotation3f(fallback.getRotation());
     }
 
     @Nullable

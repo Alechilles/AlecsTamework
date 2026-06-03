@@ -49,10 +49,11 @@ Use a hook only when the behavior would otherwise force you back into a large be
 ### DynamicTooltipsLib
 Relevant family:
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
+- [TwAttachmentDisplayConfig Reference](/mod/alecs-tamework/twattachmentdisplayconfig-reference)
 
 What it enables:
 - additive or replace-style tooltip output for filled spawners
-- Tamework tooltip lines such as captured name and role
+- Tamework tooltip lines such as captured name, role, gender, and friendly attachment names
 
 Fallback behavior:
 - if the library is missing, the spawner still works and the tooltip bridge is simply absent

@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 
@@ -47,7 +47,7 @@ class TameworkApiImplTest {
                     new TraitEffectRegistry(null, runtime.getNpcProfileRepository())
             );
 
-            assertEquals("0.5.0", api.getApiVersion());
+            assertEquals("0.6.0", api.getApiVersion());
             assertEquals(
                     EnumSet.of(
                             TameworkApiCapability.PROFILES,
@@ -59,6 +59,7 @@ class TameworkApiImplTest {
                             TameworkApiCapability.TRAIT_EFFECTS,
                             TameworkApiCapability.PROFILE_DATA,
                             TameworkApiCapability.EVENTS,
+                            TameworkApiCapability.COMPANION_XP_EVENTS,
                             TameworkApiCapability.CONFIG_READ,
                             TameworkApiCapability.DIAGNOSTICS
                     ),

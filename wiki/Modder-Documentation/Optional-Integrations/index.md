@@ -12,5 +12,10 @@ This subsection documents optional hooks and cross-mod bridges that build on top
 
 ## Child Pages
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+- [Asset Patches](/mod/alecs-tamework/asset-patches)
+- [Asset Patch Operations](/mod/alecs-tamework/asset-patch-operations)
+- [Asset Patch Macros](/mod/alecs-tamework/asset-patch-macros)
+- [Asset Patch Workflow](/mod/alecs-tamework/asset-patch-workflow)
+- [Asset Patch Troubleshooting](/mod/alecs-tamework/asset-patch-troubleshooting)
 
 

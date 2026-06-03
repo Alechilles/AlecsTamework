@@ -102,6 +102,11 @@ final class InteractionExecutor {
             );
         }
         if (entry instanceof HarvestInteraction) {
+            TameworkInteractEffects.HarvestContainerResult containerResult =
+                    effects.applyHarvestContainerTransform(npcRef, store, role, player, ctx);
+            if (containerResult == TameworkInteractEffects.HarvestContainerResult.FAILED) {
+                return false;
+            }
             boolean applied = effects.applyStartHarvest(npcRef, role, store);
             return applied
                     | effects.applyCustomEffects(
@@ -163,7 +168,7 @@ final class InteractionExecutor {
         }
         if (entry instanceof BreedInteraction) {
             BreedInteraction breeding = (BreedInteraction) entry;
-            boolean applied = effects.applyStartBreeding(breeding, npcRef, role, store);
+            boolean applied = effects.applyStartBreeding(breeding, npcRef, role, store, player);
             if (!applied) {
                 return false;
             }

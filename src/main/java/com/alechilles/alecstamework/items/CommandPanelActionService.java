@@ -513,6 +513,10 @@ final class CommandPanelActionService {
             breeding.setReady(false);
             changed = true;
         }
+        if (!enabled && breeding.getManualBreedingUntilMs() != 0L) {
+            breeding.clearManualBreedingReady();
+            changed = true;
+        }
         if (changed) {
             store.putComponent(npcRef, breedingType, breeding);
         }

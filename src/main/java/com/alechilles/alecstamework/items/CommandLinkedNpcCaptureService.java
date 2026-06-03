@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;

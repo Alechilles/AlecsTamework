@@ -24,6 +24,9 @@ class DamageExecutionWriteSafetyGuardTest {
     private static final Path NEEDS_SYSTEM = MAIN_JAVA.resolve(Paths.get(
             "com", "alechilles", "alecstamework", "npc", "systems", "CompanionNeedsSystem.java"
     ));
+    private static final Path COMBAT_XP_SYSTEM = MAIN_JAVA.resolve(Paths.get(
+            "com", "alechilles", "alecstamework", "damage", "CompanionCombatExperienceSystem.java"
+    ));
 
     private static final Pattern STORE_DAMAGE_EXECUTION_PATTERN = Pattern.compile(
             "DamageSystems\\.executeDamage\\s*\\(\\s*[^,]+,\\s*store\\s*,",
@@ -65,6 +68,20 @@ class DamageExecutionWriteSafetyGuardTest {
         assertTrue(
                 needsServiceContent.contains("DamageSystems.executeDamage(npcRef, commandBuffer, damage);"),
                 "CompanionNeedsService must use command-buffer damage execution when available."
+        );
+    }
+
+    @Test
+    void companionCombatExperienceSystemUsesCommandBufferForXpWrites() throws IOException {
+        String combatXpContent = Files.readString(COMBAT_XP_SYSTEM, StandardCharsets.UTF_8);
+
+        assertTrue(
+                combatXpContent.contains("CompanionLevelingService.awardXp(targetRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_TAKEN, xp);"),
+                "Combat XP taken awards must pass CommandBuffer into CompanionLevelingService."
+        );
+        assertTrue(
+                combatXpContent.contains("CompanionLevelingService.awardXp(sourceRef, store, commandBuffer, roleId, CompanionXpSource.COMBAT_DAMAGE_DEALT, xp);"),
+                "Combat XP dealt awards must pass CommandBuffer into CompanionLevelingService."
         );
     }
 

@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.Rotation;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
 import org.junit.jupiter.api.Test;

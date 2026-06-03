@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc;
 
 import java.util.logging.Level;
 
+import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDebugCombat
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDebugMessage;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCaptureUntamed;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyInteract;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestAlarm;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestDrop;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPrompt;
@@ -20,7 +22,8 @@ import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTame
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
-import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkRideFly;
+import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFly;
+import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkRideWalk;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
@@ -62,12 +65,12 @@ public final class TameworkNpcBuilderRegistrar {
             return;
         }
         plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: NPCPlugin not ready, waiting for PluginSetupEvent.");
-        if (plugin.getEventRegistry() != null) {
-            plugin.getEventRegistry().registerGlobal(
-                    PluginSetupEvent.class,
-                    this::onPluginSetup
-            );
-        }
+        TameworkEventRegistrationSupport.registerGlobal(
+                plugin,
+                PluginSetupEvent.class,
+                this::onPluginSetup,
+                "NPC builder plugin setup listener"
+        );
     }
 
     // Called when plugins are set up; used to detect NPCPlugin availability.
@@ -98,6 +101,7 @@ public final class TameworkNpcBuilderRegistrar {
             actionFactory.add(BuilderActionTameworkDebugMessage.BUILDER_ID, BuilderActionTameworkDebugMessage::new);
             actionFactory.add(BuilderActionTameworkDenyInteract.BUILDER_ID, BuilderActionTameworkDenyInteract::new);
             actionFactory.add(BuilderActionTameworkDenyCaptureUntamed.BUILDER_ID, BuilderActionTameworkDenyCaptureUntamed::new);
+            actionFactory.add(BuilderActionTameworkHarvestAlarm.BUILDER_ID, BuilderActionTameworkHarvestAlarm::new);
             actionFactory.add(BuilderActionTameworkHarvestDrop.BUILDER_ID, BuilderActionTameworkHarvestDrop::new);
             actionFactory.add(BuilderActionTameworkInteract.BUILDER_ID, BuilderActionTameworkInteract::new);
             actionFactory.add(BuilderActionTameworkInteractPrompt.BUILDER_ID, BuilderActionTameworkInteractPrompt::new);
@@ -156,8 +160,12 @@ public final class TameworkNpcBuilderRegistrar {
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Motion controller factory ready.");
             motionControllerFactory.add(
-                    BuilderMotionControllerTameworkRideFly.BUILDER_ID,
-                    BuilderMotionControllerTameworkRideFly::new
+                    BuilderMotionControllerTameworkFly.BUILDER_ID,
+                    BuilderMotionControllerTameworkFly::new
+            );
+            motionControllerFactory.add(
+                    BuilderMotionControllerTameworkRideWalk.BUILDER_ID,
+                    BuilderMotionControllerTameworkRideWalk::new
             );
         }
 

@@ -6,14 +6,19 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
  * Root /tw command dispatcher.
  */
 public final class TameworkCommandRoot extends AbstractCommandCollection {
+    public static final String ROOT_PERMISSION = "tamework.command.tw";
+
     public TameworkCommandRoot() {
         super("tw", "Tamework commands.");
+        requirePermission(ROOT_PERMISSION);
+        setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         addSubCommand(new TameworkSetOwnerCommand());
         addSubCommand(new TameworkGetOwnerCommand());
         addSubCommand(new TameworkGetHappinessCommand());
         addSubCommand(new TameworkGetNeedsCommand());
         addSubCommand(new TameworkGetLifeStageCommand());
         addSubCommand(new TameworkSetHappinessCommand());
+        addSubCommand(new TameworkSetLevelCommand());
         addSubCommand(new TameworkSetNeedsCommand());
         addSubCommand(new TameworkSetHungerCommand());
         addSubCommand(new TameworkSetThirstCommand());
@@ -30,6 +35,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkGetFlockDebugCommand());
         addSubCommand(new TameworkApiCommandCollection());
         addSubCommand(new TameworkConfigCommand());
+        addSubCommand(new TameworkPatchesCommand());
         addSubCommand(new TameworkSettingsCommand());
         addSubCommand(new TameworkNewsCommand());
         addSubCommand(new TameworkReloadConfigCommand());
@@ -45,6 +51,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugNeedsDamageCommand());
         addSubCommand(new TameworkDebugNeedsSeekCommand());
         addSubCommand(new TameworkDebugFlyingCompanionCommand());
+        addSubCommand(new TameworkDebugXpEventsCommand());
         addSubCommand(new TameworkShowHitboxesCommand());
         addSubCommand(new TameworkShowSpawnMarkersCommand());
         addSubCommand(new TameworkDeleteSpawnMarkerCommand());

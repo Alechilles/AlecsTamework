@@ -38,7 +38,7 @@ final class BreedingRoleCompatibilityService {
         if (!sourceFamily.matchesAdultRole(sourceRoleId) || !candidateFamily.matchesAdultRole(candidateRoleId)) {
             return false;
         }
-        return rolesMatch(sourceFamily.getAdultRoleId(), candidateFamily.getAdultRoleId());
+        return sourceFamily.sameLifecycleFamily(candidateFamily);
     }
 
     private boolean differentFamilyRole(@Nullable String sourceRoleId,

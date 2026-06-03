@@ -90,9 +90,10 @@
     "Output": [
       {
         "ItemId": "Tw_Plant_Seeds_Mushroom_Glowing_Purple",
-        "Quantity": 1
+        "Quantity": 2
       }
-    ]
+    ],
+    "OutputQuantity": 2
   },
   "ItemLevel": 12
 }

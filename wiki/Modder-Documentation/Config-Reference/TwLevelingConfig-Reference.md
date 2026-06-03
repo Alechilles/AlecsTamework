@@ -38,8 +38,11 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 
 ## `XpSources`
 - `Feed.FlatXp`: flat XP for successful feed interactions
+- `Feed.AwardCooldownSeconds`: minimum seconds between feed XP awards for the same companion; `0` disables the cooldown
 - `Harvest.FlatXp`: flat XP for successful harvest drops
+- `Harvest.AwardCooldownSeconds`: reserved for cooldown-aware simple harvest XP behavior; currently `0` is typical
 - `Breeding.FlatXp`: flat XP awarded to each parent when breeding produces offspring
+- `Breeding.AwardCooldownSeconds`: reserved for cooldown-aware simple breeding XP behavior; currently `0` is typical
 - `Combat.DamageDealtXpPerPoint`: XP per point of final damage dealt
 - `Combat.DamageTakenXpPerPoint`: XP per point of final damage taken
 - `Combat.MinimumDamageEvent`: minimum final damage before the event awards combat XP

@@ -1,0 +1,87 @@
+{
+  "Enabled": true,
+  "RoleIds": [
+    "Mob_Tamework_Example_Patch"
+  ],
+  "Interactions": [
+    {
+      "Type": "Tame",
+      "ItemsParam": "TestTameItemsParam",
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "Tamed"
+        }
+      }
+    },
+    {
+      "Type": "Feed",
+      "UseLovedItems": false,
+      "Heal": 10,
+      "ItemsParam": "TestFeedItemsParam"
+    },
+    {
+      "Type": "Harvest",
+      "RequireTamed": false
+    },
+    {
+      "Type": "Mount",
+      "Requires": {
+        "All": {
+          "ItemsEquipped": [
+            {
+              "Slots": [
+                "Legs"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "Type": "Breed",
+      "MinHappiness": 70.0,
+      "ManualSelectionSeconds": 120,
+      "Requires": {
+        "All": {
+          "PlayerIsOwner": true,
+          "PlayerCrouching": true
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "Breeding Ready"
+        }
+      }
+    },
+    {
+      "Type": "ModeCycle",
+      "Enabled": true,
+      "Cycle": [
+        {
+          "State": "Follow",
+          "Message": "Following"
+        },
+        {
+          "State": "Idle",
+          "Message": "Wandering"
+        },
+        {
+          "State": "Hold",
+          "Message": "Staying"
+        },
+        {
+          "State": "Defend",
+          "Message": "Defending"
+        }
+      ],
+      "ShowFloatingText": true,
+      "CooldownSeconds": 0,
+      "Effects": {
+        "PlaySound": {
+          "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+          "PlayerOnly": true
+        }
+      }
+    }
+  ]
+}

@@ -71,7 +71,10 @@ public final class TameworkAttachmentsComponent implements Component<EntityStore
 
     @Override
     public TameworkAttachmentsComponent clone() {
-        return new TameworkAttachmentsComponent(configId, getAttachmentIds());
+        TameworkAttachmentsComponent copy = new TameworkAttachmentsComponent();
+        copy.configId = configId;
+        copy.attachmentIds = getAttachmentIds();
+        return copy;
     }
 
     private static Map<String, String> sanitizeAttachmentIds(@Nullable Map<String, String> raw) {

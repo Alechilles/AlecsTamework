@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -13,7 +15,7 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
-import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
@@ -24,6 +26,7 @@ import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleSystems;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -31,8 +34,6 @@ import javax.annotation.Nullable;
  * Tears down Tamework ride links and restores the NPC when the rider dismounts or either side becomes invalid.
  */
 public final class MountedRideCleanupSystem extends EntityTickingSystem<EntityStore> {
-    private static final double MAX_RIDE_DISTANCE_SQUARED = 128.0 * 128.0;
-
     private final ComponentType<EntityStore, MountedComponent> mountedComponentType;
     private final ComponentType<EntityStore, TameworkRideRiderComponent> rideRiderComponentType;
     private final ComponentType<EntityStore, TameworkRideMountComponent> rideMountComponentType;
@@ -76,16 +77,35 @@ public final class MountedRideCleanupSystem extends EntityTickingSystem<EntitySt
             return;
         }
         Ref<EntityStore> riderRef = resolveRiderRef(mount, store);
-        boolean invalid = mount.isDismountRequested()
-                || store.getComponent(mountRef, deathComponentType) != null
-                || riderRef == null
-                || !riderRef.isValid()
-                || store.getComponent(riderRef, deathComponentType) != null
-                || !riderStillLinkedTo(riderRef, mountRef, store)
-                || exceedsSanityDistance(mountRef, riderRef, store);
+        boolean dismountRequested = mount.isDismountRequested();
+        boolean mountDead = store.getComponent(mountRef, deathComponentType) != null;
+        boolean riderMissing = riderRef == null;
+        boolean riderInvalid = riderRef != null && !riderRef.isValid();
+        boolean riderDead = riderRef != null
+                && riderRef.isValid()
+                && store.getComponent(riderRef, deathComponentType) != null;
+        boolean linkMismatch = riderRef != null
+                && riderRef.isValid()
+                && !riderStillLinkedTo(riderRef, mountRef, store);
+        boolean invalid = dismountRequested
+                || mountDead
+                || riderMissing
+                || riderInvalid
+                || riderDead
+                || linkMismatch;
         if (!invalid) {
             return;
         }
+        logCleanupReason(
+                "mountCleanup",
+                mount,
+                dismountRequested,
+                mountDead,
+                riderMissing,
+                riderInvalid,
+                riderDead,
+                linkMismatch
+        );
         cleanupRide(mountRef, riderRef, npc, mount, commandBuffer);
     }
 
@@ -114,38 +134,52 @@ public final class MountedRideCleanupSystem extends EntityTickingSystem<EntitySt
         return mountUuid != null && rider.getMountUuid().equals(mountUuid.getUuid().toString());
     }
 
-    private boolean exceedsSanityDistance(@Nonnull Ref<EntityStore> mountRef,
-                                          @Nonnull Ref<EntityStore> riderRef,
-                                          @Nonnull Store<EntityStore> store) {
-        TransformComponent mountTransform = store.getComponent(mountRef, transformComponentType);
-        TransformComponent riderTransform = store.getComponent(riderRef, transformComponentType);
-        if (mountTransform == null || riderTransform == null) {
-            return false;
-        }
-        Vector3d mountPos = mountTransform.getPosition();
-        Vector3d riderPos = riderTransform.getPosition();
-        double dx = mountPos.x - riderPos.x;
-        double dy = mountPos.y - riderPos.y;
-        double dz = mountPos.z - riderPos.z;
-        return dx * dx + dy * dy + dz * dz > MAX_RIDE_DISTANCE_SQUARED;
-    }
-
     private void cleanupRide(@Nonnull Ref<EntityStore> mountRef,
                              @Nullable Ref<EntityStore> riderRef,
                              @Nonnull NPCEntity npc,
                              @Nonnull TameworkRideMountComponent mount,
                              @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         commandBuffer.run(bufferStore -> {
+            MountedRidePacketHandler.unregisterRide(mount.getRiderUuid());
             if (mountRef.isValid()) {
                 restoreNpcState(mountRef, npc, mount, bufferStore);
                 bufferStore.tryRemoveComponent(mountRef, rideMountComponentType);
             }
             if (riderRef != null && riderRef.isValid()) {
+                if (mountRef.isValid()) {
+                    MountedRideClientAttachment.placeRiderAtMountAnchor(bufferStore, riderRef, mountRef, mount);
+                }
                 MountedRideClientAttachment.detach(bufferStore, riderRef);
                 bufferStore.tryRemoveComponent(riderRef, rideRiderComponentType);
                 bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
             }
         });
+    }
+
+    private void logCleanupReason(@Nonnull String source,
+                                  @Nonnull TameworkRideMountComponent mount,
+                                  boolean dismountRequested,
+                                  boolean mountDead,
+                                  boolean riderMissing,
+                                  boolean riderInvalid,
+                                  boolean riderDead,
+                                  boolean linkMismatch) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkRide debug: cleanup source=%s riderUuid=%s dismountRequested=%s mountDead=%s " +
+                        "riderMissing=%s riderInvalid=%s riderDead=%s linkMismatch=%s",
+                source,
+                mount.getRiderUuid(),
+                dismountRequested,
+                mountDead,
+                riderMissing,
+                riderInvalid,
+                riderDead,
+                linkMismatch
+        );
     }
 
     private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,
@@ -156,6 +190,7 @@ public final class MountedRideCleanupSystem extends EntityTickingSystem<EntitySt
         if (role == null) {
             return;
         }
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
         if (!mount.getPreviousMotionController().isBlank()) {
             role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
         }

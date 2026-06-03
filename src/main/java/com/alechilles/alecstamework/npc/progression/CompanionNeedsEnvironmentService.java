@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -36,7 +36,7 @@ public final class CompanionNeedsEnvironmentService {
     private static final int DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS = 2;
     private static final int DEFAULT_WATER_VERTICAL_SCAN_RADIUS = 1;
     private static final long SEARCH_CACHE_HIT_TTL_MS = 1_500L;
-    private static final long SEARCH_CACHE_MISS_TTL_MS = 500L;
+    private static final long SEARCH_CACHE_MISS_TTL_MS = 1_000L;
     private static final int SEARCH_CACHE_MAX_ENTRIES = 8192;
     private static final int[][] HORIZONTAL_NEIGHBOR_OFFSETS = {
             {1, 0},

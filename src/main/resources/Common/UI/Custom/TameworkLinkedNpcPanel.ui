@@ -45,10 +45,11 @@ Group #TameworkLinkedPanelRoot {
             Group #TameworkLinkedPanelSubtitleRow {
                 Anchor: (Height: 24);
 
-                Label #TameworkLinkedPanelSubtitle {
-                    Anchor: (Left: 2, Width: 138, Height: 20);
-                    Text: %server.tamework.ui.linkedPanel.subtitle.none;
-                    Style: (FontSize: 14, TextColor: #c4d2e1, HorizontalAlignment: Start, VerticalAlignment: Center);
+                DropdownBox #TameworkLinkedPanelGroupSelectorDropdown {
+                    Anchor: (Left: 2, Width: 138, Height: 24);
+                    Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 11));
+                    MaxSelection: 1;
+                    NoItemsText: %server.tamework.ui.linkedPanel.groupSelector.noneGroups;
                 }
 
                 Group #TameworkLinkedPanelSubtitleRadiusSlot {

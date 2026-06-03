@@ -3,7 +3,169 @@
 ## Unreleased
 
 ### Added
+- Added multi-target and conditional optional asset patches so integration authors can apply the same patch to several assets and gate patches on installed mods.
+
+## 2.12.2 - Simplified Preset Hotfix - 2026-06-01
+
+### Changed
+- Updated Modtale release metadata to target Hytale `0.5.3`.
+- Updated the simplified Minecraft-like settings preset to turn companion genders off by default.
+
+### Fixed
+- Fixed Hytale `0.5.3` setup crashes when Hytale reports a player-event registry as already shut down during startup; affected optional listeners now warn and Tamework continues loading.
+- Fixed simplified Minecraft-like settings leaving juvenile lifecycle roles without growth state, preventing baby animals from growing into breedable adults.
+
+## 2.12.1 - SQLite Startup Hotfix - 2026-05-30
+
+### Fixed
+- Fixed Hytale `0.5.3` setup crashes caused by SQLite JDBC seeing another mod's SLF4J classes first, keeping persistence driver failures recoverable instead of setup-fatal.
+
+## 2.12.0 - Companion Talent Trees and Progression Utilities - 2026-05-30
+
+### Added
+- Added a scrollable branch/tier companion talent tree UI with prerequisite connectors, selected-node detail panels, horizontal panning for wide trees, dynamic panel sizing, and centered pan controls that adapt to the active tree width.
+- Added companion talent reset support so purchased talents can be refunded and re-spent while the companion is loaded.
+- Added progression modifier breakdowns for linked-panel tooltips so level, talent, and trait effects are easier to inspect.
+- Added `/tw setlevel <level>` to set the companion level for the NPC in front of the player, intended for testing and balance verification.
+- Added a linked-panel group selector that can show all linked companions, no linked companions, or one configured command group.
+- Added utility talent effect support for needs decay, revive cooldown, trait mutation chance, appearance mutation chance, harvest cooldown, happiness gain, breed cooldown, and fertility.
+- Added `TameworkHarvestAlarm` so harvest-ready timers can be scaled by progression effects instead of hard-coded raw alarm durations.
+- Added harvest-luck cooldown preservation support for container-style harvests, such as filling a bucket, so luck can avoid consuming the harvest cooldown without duplicating containers.
+- Added `Feed.AwardCooldownSeconds` to `TwLevelingConfig` and per-companion feed XP cooldown state so repeated feed interactions cannot spam XP.
+- Added `/tw settings` toggles for the alpha companion leveling and talents systems, enabled by default for existing worlds.
+
+### Changed
+- Updated progression tooltips and linked-panel layout to fit the expanded level, XP, talent, trait, and modifier information.
+- Updated example mobs and config documentation to exercise the newer progression and talent utility hooks.
+- Moved the linked companion count into the panel header and replaced the subtitle count row with the group selector.
+
+### Fixed
+- Fixed `/tw settings` and `/tw news` permission checks so OPs/admins are evaluated through the live `PlayerRef` permission holder instead of the player component after Hytale Update 5.
+- Fixed compatibility with summoned mounts from other mods by preserving valid mount owner references until vanilla mount setup finishes.
+
+## 2.11.5 - Companion XP Events and Persistence Path Fixes - 2026-05-28
+
+### Added
+- Added public alpha companion XP award events through `TameworkApi.events()` so external mods can subscribe and credit owner-facing skills from successful companion XP activity.
+- Added `/tw debugxpevents [on|off]` to subscribe to Tamework's own public companion XP events and log event hits for in-game verification, with extra harvest-drop diagnostics for XP attempts that are rejected before an API event is emitted.
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to `0.1.2`.
+
+### Fixed
+- Fixed state-driven `TameworkHarvestDrop` harvest flows so successful harvest drops award companion harvest XP and emit companion XP events.
+- Fixed companion XP awards so unlinked tamed or owned companions can gain XP and emit XP events; command links now only provide optional event tool-id context.
+- Fixed Tamework data directory discovery so startup and migrations stay anchored to the active server/userdata layout instead of drifting into unrelated temp `universe` folders.
+
+## 2.11.4 - Alpha Companion Progression and Server Version Metadata - 2026-05-27
+
+### Added
+- Added alpha companion XP and talent systems for Tamework example mobs. These systems are available for early testing and may change before they are treated as stable.
+
+### Changed
+- Carried forward the corrected Hytale `0.5.x` target server version metadata so the release is not pinned to a single `0.5` patch version.
+- Reworked the linked companion panel progression UI to show level and XP in the compact progress circle, with spendable talent points shown as a talent button only when points are available.
+
+### Fixed
+- Fixed automatic food, storage water, and natural water consumption so eligible linked companions gain progression XP from the same survival flows as manual feeding.
+- Fixed talent page navigation and stale linked-panel refresh commands that could disconnect players when opening, closing, or reopening the talents menu.
+
+## 2.11.3 - Hytale 0.5.1 Command Registration Hotfix - 2026-05-26
+
+### Added
+- Added a first-run "Welcome to Alec's Tamework" settings announcement with a Review Settings button so new eligible players see setup guidance instead of an old version-specific update notice.
+- Added bundled alpha example leveling and talent configs so the Tamework example mobs can gain XP, level up, and exercise the talent page out of the box.
+
+### Changed
+- Updated release metadata for Hytale `0.5.1`.
+- Settings announcements now use per-player Tamework version history: first-time users see the welcome message, while version-specific notices appear only after that player has used an older Tamework version.
+- The local build now references a stable shared NameplateBuilder jar copy under the Hytale Modding directory instead of depending on whichever server mods folder is active.
+- Replaced the alpha linked companion XP and talent point rows with a compact level progress ring and spendable talent point button.
+
+### Fixed
+- Fixed the Hytale `0.5.x` manifest version range so the packaged `2.11.3` jar loads on compatible `0.5` patch releases instead of being rejected while an older jar remains active.
+- Fixed `/tw` failing to register on Hytale `0.5.1` servers because stricter permission validation rejected the display-name-derived permission node, restoring startup for affected servers.
+- Fixed combat XP writes so damage-system leveling updates route through `CommandBuffer` instead of mutating the entity store directly during damage event handling.
+- Fixed linked companion cards clipping the new level, XP, talent point, and talent-button rows before they could be seen.
+- Fixed the talents button reopening the linked panel or disconnecting the player by deferring the page swap instead of closing the linked panel first.
+- Fixed stale linked-panel refresh callbacks and already-queued UI commands disconnecting players after opening another command page, including when unlocking talents.
+
+## 2.11.2 - Hytale 0.5.0 Compatibility - 2026-05-26
+
+### Changed
+- Updated Tamework for Hytale `0.5.0` release compatibility, including the newer motion, rotation, projectile/event, custom HUD, hotbar, and display-name APIs used by companion commands, spawners, naming, interactions, needs, breeding, damage, and persistence flows.
+- Updated release metadata for Hytale `0.5.0` and promoted the package configuration from prerelease/beta to a stable release.
+- Renamed the optional asset patch wiki source page to the final asset-patches guide path and refreshed related wiki links.
+
+### Fixed
+- Fixed startup failures from stricter runtime asset-pack ID parsing by using parseable generated/self-test pack IDs and only registering the writable self-test pack when `/tw patches selftest` runs.
+- Fixed Update 5 compatibility guard coverage for removed velocity APIs and unkeyed custom HUD construction.
+- Fixed the `Glowing Purple Mushroom Spores` crafting output display so it matches the two-spore recipe output.
+
+## 2.11.1 - Universal Asset Patches, Live Self-Test, and German Localization - 2026-05-22
+
+### Added
+- Expanded optional patching from NPC templates into a generic JSON and JSON-like asset overlay system for server-side assets, including item assets, root/item interactions, Tamework config assets, particles, projectiles, entity effects, drops, and NPC roles/templates.
+- Added generated-patch hot-reload observation so `/tw patches reload` can report generated targets, hot-reloaded targets, and targets that require a restart instead of assuming every asset family reloaded safely.
+- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can validate patch generation and reload classification in-game with isolated fixtures for NPC role/template, item action, Tamework config, `.particlesystem`, and common asset targets.
+- Added German localization.
+
+### Changed
+- Updated the README and wiki to describe asset patches as a generic optional-dependency system rather than an NPC-template-only workflow.
+- Renamed the optional patch wiki pages from NPC template patch pages to asset patch pages.
+
+### Fixed
+- Optional asset patches now generate before server JSON asset validation so vanilla-safe downstream assets can receive Tamework-only actions and configs when Tamework is installed.
+- Non-`.json` JSON-like targets such as `.particlesystem` assets are now published safely into the generated patch pack.
+
+## 2.11.0 - Optional Template Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
+
+### Added
+- Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
+- Added optional NPC template patches so third-party mods can ship Tamework role/template integrations without making Tamework a required dependency.
+- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional template patch results and refresh generated patch packs without restarting the server.
+- Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
+- Added spawner icon batch manifests and generator support for shared override groups, group defaults, replacement runs, excluded attachment options, and auto-framed Blockbench renders.
+
+### Fixed
+- Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
+- Fixed spawner icon generation merging duplicate groups incorrectly and missing batch source assets in larger render sets.
+- Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
+
+### Removed
+- Removed the outdated Hytalor patch example assets from the bundled examples now that Tamework has its own optional template patch system.
+
+## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
+
+### Changed
+- Updated `Glowing Purple Mushroom Spores` crafting to produce two spores per craft, letting one mushroom create two plantable seeds.
+
+## 2.10.0 - Flying Mounts (Beta), Role-Line Breeding, and Attachment Migrations - 2026-05-13
+
+### Added
+- (beta) Added a custom mounted flight controller
+- Added role-line inheritance to `TwBreedingConfig` so offspring can inherit parent body/model variants, use weighted family lines, and optionally mutate into non-parent lines.
+- Added role-scoped `TwAttachmentMigrationConfig` assets so mods can backfill newly split attachment slots from legacy stored selections without overwriting already-randomized values.
 - Added a public Trait Effects API so integrations can register custom `TwTraitConfig` effect keys and execute them during Tamework's existing trait-effect resyncs.
+- Added `Breed.ManualSelectionSeconds` for manual breeding interactions; players now manually select both intended parents, and manual breeding remains available even when passive breeding or the per-NPC breeding toggle is disabled.
+- Skipped breeding happiness thresholds for both manual and passive breeding when the happiness system or breeding happiness requirement is disabled.
+
+### Fixed
+- Fixed Tamework-managed attachment sync restoring harvestable fur/wool visuals while a harvested NPC is still on cooldown.
+- Fixed linked companion panels showing generic base-species labels when a role-specific translation exists, such as body-type cat variants.
+
+## 2.10.0-Update5-Prerelease - Update 5 Pre-Release Compatibility - 2026-05-07
+
+### Changed
+- Updated Tamework for Hytale Update 5 pre-release APIs, including the renamed vector package, quaternion rotation helpers, projectile/event signatures, and NPC/component access changes used by companion commands, spawners, naming, interactions, needs, breeding, damage, and persistence flows.
+- Updated player hotbar access to read the Update 5 hotbar component, restoring contextual prompts, item-sensitive interactions, command tools, naming items, and spawner item behavior.
+- Updated custom NPC display-name handling to write both persistent and runtime display-name components required by Update 5.
+- Updated release metadata for the 2026.05.07 Update 5 pre-release server build and marked this build as a beta/prerelease release for platform publishing.
+
+### Fixed
+- Fixed startup failure on Update 5 caused by removed `com.hypixel.hytale.math.vector.Vector3d` / `Vector3f` / `Vector3i` classes.
+- Fixed Update 5 command/interaction targeting paths that depended on older inventory, rotation, and display-name APIs.
+- Fixed Maven test configuration so caller-provided Surefire `argLine` values are preserved while still installing the Hytale log manager for tests.
 
 ### Changed
 - Made `/tw settings` the primary owner for common server runtime policy and hid duplicated legacy fields from `/tw config` and shipped example assets.
@@ -683,12 +845,10 @@
 ### Removed
 - Legacy Server/Tamework/Tamework_Items_Config.json item config system and per-world overrides.
 
-## 1.1.1 - Hytalor Example + Follow Component Split - 2026-02-06
+## 1.1.1 - Follow Component Split - 2026-02-06
 ### Added
-- Hytalor patch example assets (Template/Mob + patch) showing non-destructive Tamework integration.
 - New follow components split: Follow_Simple_TP (teleport/seek), Follow_Simple (basic follow), and Follow_Advanced (old IdleFollow behavior).
 - /tw gettamed and /tw settamed commands to read/flip tamed state.
-- Mount gating for tamed/owner state with crouch-based interaction (Hytalor example).
 
 ## 1.1.0 - Core Systems Update - 2026-02-03
 ### Added

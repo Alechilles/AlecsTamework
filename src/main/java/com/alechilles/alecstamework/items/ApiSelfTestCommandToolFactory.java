@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.TameworkIds;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.hypixel.hytale.codec.Codec;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import java.util.ArrayList;
 import java.util.List;

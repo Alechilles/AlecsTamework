@@ -606,6 +606,10 @@
       "Value": "",
       "Description": "Item to add when player holds Deco_Bucket (e.g., milk bucket for milking)."
     },
+    "HarvestBonusMode": {
+      "Value": "DropDuplicate",
+      "Description": "How harvest luck is applied. DropDuplicate duplicates loose drops; CooldownPreserve can skip the harvest cooldown for container harvests."
+    },
     "LovedItems": {
       "Value": [
         "Plant_Fruit_Apple"

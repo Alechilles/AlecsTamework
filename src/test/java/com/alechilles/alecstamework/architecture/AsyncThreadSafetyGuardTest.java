@@ -33,6 +33,11 @@ class AsyncThreadSafetyGuardTest {
             "getWorld().getPlayerRefs("
     );
 
+    private static final List<String> DIRECT_PLAYER_COMPONENT_TOKENS = List.of(
+            "PlayerRef.getComponent(Player",
+            ".getHolder().getComponent(Player.getComponentType())"
+    );
+
     @Test
     void asyncSystemWorkMarshalsBackToWorldThread() throws IOException {
         List<String> violations = new ArrayList<>();
@@ -77,6 +82,27 @@ class AsyncThreadSafetyGuardTest {
         );
     }
 
+    @Test
+    void runtimeCodeAvoidsDirectPlayerComponentHolderLookups() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path sourceFile : listJavaFiles()) {
+            List<String> lines = Files.readAllLines(sourceFile, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i).trim();
+                if (containsAny(line, DIRECT_PLAYER_COMPONENT_TOKENS)) {
+                    violations.add(toUnixRelativePath(sourceFile) + ":" + (i + 1) + " -> " + line);
+                }
+            }
+        }
+
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Runtime code must not read Player components directly from PlayerRef/Holder. "
+                        + "Use PlayerRef for identity or resolve Player through the active world/store.\nViolations:\n"
+                        + String.join("\n", violations)
+        );
+    }
+
     private static boolean containsAny(String content, List<String> tokens) {
         for (String token : tokens) {
             if (content.contains(token)) {
@@ -87,10 +113,16 @@ class AsyncThreadSafetyGuardTest {
     }
 
     private static List<Path> listSystemFiles() throws IOException {
+        return listJavaFiles().stream()
+                .filter(path -> path.getFileName().toString().endsWith("System.java"))
+                .toList();
+    }
+
+    private static List<Path> listJavaFiles() throws IOException {
         try (Stream<Path> stream = Files.walk(MAIN_JAVA)) {
             return stream
                     .filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().endsWith("System.java"))
+                    .filter(path -> path.getFileName().toString().endsWith(".java"))
                     .sorted()
                     .toList();
         }

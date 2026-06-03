@@ -22,7 +22,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -310,7 +310,7 @@ final class CommandStepExecutionService {
             );
             if (CommandTravelSettings.isRecallTeleportingEnabled()
                     && start != null
-                    && start.distanceTo(targetPosition) > returnHomeTeleportDistance) {
+                    && start.distance(targetPosition) > returnHomeTeleportDistance) {
                 Vector3d intermediate = computeIntermediatePoint(start, targetPosition, returnHomePathDistanceBeforeTeleport);
                 RelocationState postRelocationState = resolveRelocationState(context.command, true, false);
                 World world = context.player != null ? context.player.getWorld() : null;

@@ -1,15 +1,16 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
-import com.hypixel.hytale.math.vector.Vector3i;
+import org.joml.Vector3d;
+import org.joml.Vector3i;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
@@ -154,15 +155,11 @@ public final class TameworkDeleteSpawnMarkerCommand extends AbstractPlayerComman
     private static Vector3d resolveForward(@Nonnull Store<EntityStore> store,
                                            @Nonnull Ref<EntityStore> playerRef,
                                            @Nonnull TransformComponent playerTransform) {
-        Vector3f rotation = new Vector3f(playerTransform.getRotation());
+        Rotation3f rotation = TameworkRotationUtil.copyOrDefault(playerTransform.getRotation());
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
-        Vector3f headRot = headRotation != null ? headRotation.getRotation() : rotation;
+        Rotation3f headRot = headRotation != null ? headRotation.getRotation() : rotation;
 
-        Vector3f forward = new Vector3f(Vector3f.FORWARD);
-        forward.rotateY(headRot.getYaw());
-        forward.rotateX(headRot.getPitch());
-        forward.normalize();
-        return new Vector3d(forward.x, forward.y, forward.z);
+        return TameworkRotationUtil.directionFrom(headRot).normalize();
     }
 
     private static String describeNpcOptions(SpawnMarker spawnMarker) {

@@ -12,7 +12,7 @@ import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -20,6 +20,7 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,7 +33,7 @@ import javax.annotation.Nullable;
 public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase {
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
-    private static final long TARGET_CACHE_MISS_TTL_MS = 500L;
+    private static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
     private static final double EPSILON = 0.000001;
 
     private final ResourceType resourceType;
@@ -41,10 +42,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private final double gatedRatioBelow;
     private final double range;
     private final String[] itemIds;
+    private final boolean hasConfiguredItemIds;
     private final TameworkTargetPositionInfo positionInfo = new TameworkTargetPositionInfo();
     private final TameworkTargetPositionInfoProvider infoProvider =
             new TameworkTargetPositionInfoProvider(null, positionInfo);
     private final ConcurrentHashMap<UUID, CachedTargetResult> cachedTargetsByNpcId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<FoodItemIdsCacheKey, String[]> foodItemIdsByConfig = new ConcurrentHashMap<>();
 
     public SensorTameworkNeedsResourceTarget(@Nonnull BuilderSensorTameworkNeedsResourceTarget builder,
                                              @Nonnull BuilderSupport support) {
@@ -53,7 +56,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         this.gatedNeed = NeedType.from(builder.getNeed(support));
         this.gatedRatioBelow = clamp01(builder.getRatioBelow(support));
         this.range = sanitizeRange(builder.getRange(support));
-        this.itemIds = builder.getItemIds(support);
+        this.itemIds = sanitizeItemIds(builder.getItemIds(support));
+        this.hasConfiguredItemIds = this.itemIds.length > 0;
     }
 
     @Override
@@ -118,7 +122,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             );
             return true;
         }
-        TwNeedsConfig needsConfig = resolveNeedsConfig(ref, store);
+        TwNeedsConfig needsConfig = eligibility.needsConfig();
+        if (needsConfig == null) {
+            needsConfig = resolveNeedsConfig(ref, store);
+        }
         TargetResolution resolution = switch (resourceType) {
             case WATER -> resolveWaterTarget(ref, store, needsConfig);
             case FOOD_CONTAINER -> resolveFoodTarget(ref, store, needsConfig);
@@ -272,11 +279,19 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     }
 
     @Nullable
-    private String[] resolveFoodItemIds(@Nullable TwNeedsConfig needsConfig) {
+    String[] resolveFoodItemIds(@Nullable TwNeedsConfig needsConfig) {
         if (needsConfig == null) {
             return itemIds;
         }
-        return mergeItemIds(itemIds, needsConfig.getPassiveRefill().getContainerFoodItemIds());
+        String[] passiveItemIds = needsConfig.getPassiveRefill().getContainerFoodItemIds();
+        String[] sanitizedPassiveItemIds = sanitizeItemIds(passiveItemIds);
+        if (hasConfiguredItemIds && sanitizedPassiveItemIds.length == 0) {
+            return itemIds;
+        }
+        FoodItemIdsCacheKey key = FoodItemIdsCacheKey.from(needsConfig, sanitizedPassiveItemIds, hasConfiguredItemIds);
+        return foodItemIdsByConfig.computeIfAbsent(key, ignored -> hasConfiguredItemIds
+                ? mergeItemIds(itemIds, sanitizedPassiveItemIds)
+                : sanitizedPassiveItemIds);
     }
 
     private static boolean hasAnyItemId(@Nullable String[] ids) {
@@ -292,12 +307,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     }
 
     @Nonnull
-    private static String[] mergeItemIds(@Nullable String[] primary, @Nullable String[] secondary) {
+    static String[] mergeItemIds(@Nullable String[] primary, @Nullable String[] secondary) {
         if (!hasAnyItemId(primary)) {
-            return hasAnyItemId(secondary) ? secondary : new String[0];
+            return sanitizeItemIds(secondary);
         }
         if (!hasAnyItemId(secondary)) {
-            return primary;
+            return sanitizeItemIds(primary);
         }
         LinkedHashMap<String, String> merged = new LinkedHashMap<>();
         appendItemIds(merged, primary);
@@ -316,6 +331,16 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             String normalized = itemId.trim().toLowerCase(Locale.ROOT);
             merged.putIfAbsent(normalized, itemId.trim());
         }
+    }
+
+    @Nonnull
+    private static String[] sanitizeItemIds(@Nullable String[] ids) {
+        if (!hasAnyItemId(ids)) {
+            return new String[0];
+        }
+        LinkedHashMap<String, String> sanitized = new LinkedHashMap<>();
+        appendItemIds(sanitized, ids);
+        return sanitized.values().toArray(new String[0]);
     }
 
     @Nullable
@@ -355,19 +380,19 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private SearchEligibility resolveSearchEligibility(@Nonnull Ref<EntityStore> ref,
                                                        @Nonnull Store<EntityStore> store) {
         if (gatedNeed == null || !Double.isFinite(gatedRatioBelow)) {
-            return SearchEligibility.allowed(Double.NaN);
+            return SearchEligibility.allowed(Double.NaN, null);
         }
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         if (needsType == null) {
-            return SearchEligibility.blocked("needs_component_type_missing", Double.NaN);
+            return SearchEligibility.blocked("needs_component_type_missing", Double.NaN, null);
         }
         TameworkNeedsComponent needs = store.getComponent(ref, needsType);
         if (needs == null) {
-            return SearchEligibility.blocked("needs_component_missing", Double.NaN);
+            return SearchEligibility.blocked("needs_component_missing", Double.NaN, null);
         }
         TwNeedsConfig needsConfig = resolveNeedsConfig(ref, store);
         if (needsConfig == null || !TameworkRuntimeSettings.needsEnabled(needsConfig.isEnabled())) {
-            return SearchEligibility.blocked("needs_config_missing_or_disabled", Double.NaN);
+            return SearchEligibility.blocked("needs_config_missing_or_disabled", Double.NaN, needsConfig);
         }
         TwNeedsConfig.ValueSettings values = needsConfig.getValues();
         double min = gatedNeed == NeedType.THIRST ? values.getThirstMin() : values.getHungerMin();
@@ -375,9 +400,9 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         double current = gatedNeed == NeedType.THIRST ? needs.getThirst() : needs.getHunger();
         double currentRatio = resolveRatio(current, min, max);
         if (currentRatio <= gatedRatioBelow + EPSILON) {
-            return SearchEligibility.allowed(currentRatio);
+            return SearchEligibility.allowed(currentRatio, needsConfig);
         }
-        return SearchEligibility.blocked("need_ratio_above_threshold", currentRatio);
+        return SearchEligibility.blocked("need_ratio_above_threshold", currentRatio, needsConfig);
     }
 
     @Nonnull
@@ -485,15 +510,34 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     private record SearchEligibility(boolean allowed,
                                      @Nonnull String reason,
-                                     double currentRatio) {
+                                     double currentRatio,
+                                     @Nullable TwNeedsConfig needsConfig) {
         @Nonnull
-        private static SearchEligibility allowed(double currentRatio) {
-            return new SearchEligibility(true, "eligible", currentRatio);
+        private static SearchEligibility allowed(double currentRatio, @Nullable TwNeedsConfig needsConfig) {
+            return new SearchEligibility(true, "eligible", currentRatio, needsConfig);
         }
 
         @Nonnull
-        private static SearchEligibility blocked(@Nonnull String reason, double currentRatio) {
-            return new SearchEligibility(false, reason, currentRatio);
+        private static SearchEligibility blocked(@Nonnull String reason,
+                                                 double currentRatio,
+                                                 @Nullable TwNeedsConfig needsConfig) {
+            return new SearchEligibility(false, reason, currentRatio, needsConfig);
+        }
+    }
+
+    private record FoodItemIdsCacheKey(@Nonnull String configId,
+                                       @Nonnull List<String> passiveItemIds,
+                                       boolean hasConfiguredItemIds) {
+        @Nonnull
+        private static FoodItemIdsCacheKey from(@Nonnull TwNeedsConfig config,
+                                                @Nonnull String[] passiveItemIds,
+                                                boolean hasConfiguredItemIds) {
+            String configId = config.getId();
+            return new FoodItemIdsCacheKey(
+                    configId == null || configId.isBlank() ? "<default>" : configId.trim().toLowerCase(Locale.ROOT),
+                    List.of(passiveItemIds),
+                    hasConfiguredItemIds
+            );
         }
     }
 

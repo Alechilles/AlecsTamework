@@ -40,21 +40,33 @@ public final class TameworkLevelingComponent implements Component<EntityStore> {
                     TameworkLevelingComponent::getTotalXp
             )
             .add()
+            .append(
+                    new KeyedCodec<>("LastFeedXpAwardedAtMs", Codec.LONG),
+                    TameworkLevelingComponent::setLastFeedXpAwardedAtMs,
+                    TameworkLevelingComponent::getLastFeedXpAwardedAtMs
+            )
+            .add()
             .build();
 
     private String configId;
     private int level = 1;
     private double currentXp;
     private double totalXp;
+    private long lastFeedXpAwardedAtMs;
 
     public TameworkLevelingComponent() {
     }
 
     public TameworkLevelingComponent(String configId, int level, double currentXp, double totalXp) {
+        this(configId, level, currentXp, totalXp, 0L);
+    }
+
+    public TameworkLevelingComponent(String configId, int level, double currentXp, double totalXp, long lastFeedXpAwardedAtMs) {
         this.configId = configId;
         setLevel(level);
         setCurrentXp(currentXp);
         setTotalXp(totalXp);
+        setLastFeedXpAwardedAtMs(lastFeedXpAwardedAtMs);
     }
 
     public static ComponentType<EntityStore, TameworkLevelingComponent> getComponentType() {
@@ -94,9 +106,17 @@ public final class TameworkLevelingComponent implements Component<EntityStore> {
         this.totalXp = sanitizeXp(totalXp);
     }
 
+    public long getLastFeedXpAwardedAtMs() {
+        return lastFeedXpAwardedAtMs;
+    }
+
+    public void setLastFeedXpAwardedAtMs(long lastFeedXpAwardedAtMs) {
+        this.lastFeedXpAwardedAtMs = Math.max(0L, lastFeedXpAwardedAtMs);
+    }
+
     @Override
     public TameworkLevelingComponent clone() {
-        return new TameworkLevelingComponent(configId, level, currentXp, totalXp);
+        return new TameworkLevelingComponent(configId, level, currentXp, totalXp, lastFeedXpAwardedAtMs);
     }
 
     private static double sanitizeXp(double value) {

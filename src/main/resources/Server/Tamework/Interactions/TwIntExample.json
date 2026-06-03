@@ -5,37 +5,9 @@
     "Mob_Tamework_Example_Baby",
     "Mob_Tamework_Example_Vanilla",
     "Mob_Tamework_Example_Simple",
-    "Mob_Tamework_Example_Simple_Vanilla",
-    "Mob_Tamework_Example_Hytalor"
+    "Mob_Tamework_Example_Simple_Vanilla"
   ],
   "Interactions": [
-    {
-      "Type": "Custom",
-      "Requires": {
-        "All": {
-          "ItemsInHand": [
-            {
-              "Items": [
-                "Container_Bucket"
-              ]
-            }
-          ]
-        }
-      },
-      "Effects": {
-        "AddItemsHand": {
-          "ItemsParam": "HarvestAddItemBucket"
-        },
-        "RemoveItemsHand": {
-          "Items": [
-            "Container_Bucket"
-          ]
-        },
-        "PlaySound": {
-          "SoundEvent": "SFX_Water_MoveIn"
-        }
-      }
-    },
     {
       "Type": "Tame",
       "ItemsParam": "TestTameItemsParam",
@@ -72,6 +44,7 @@
     {
       "Type": "Breed",
       "MinHappiness": 70.0,
+      "ManualSelectionSeconds": 120,
       "Requires": {
         "All": {
           "PlayerIsOwner": true,

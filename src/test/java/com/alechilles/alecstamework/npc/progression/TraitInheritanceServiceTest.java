@@ -263,6 +263,15 @@ class TraitInheritanceServiceTest {
         assertTrue(inherited[0].getValue() > 1.05);
     }
 
+    @Test
+    void mutationChanceMultiplierScalesAndClampsBaseChance() {
+        assertEquals(0.18, TraitInheritanceService.resolveEffectiveMutationChance(0.10, 1.8), 0.000001);
+        assertEquals(1.0, TraitInheritanceService.resolveEffectiveMutationChance(0.75, 2.0), 0.000001);
+        assertEquals(0.10, TraitInheritanceService.resolveEffectiveMutationChance(0.10, 0.0), 0.000001);
+        assertEquals(0.10, TraitInheritanceService.resolveEffectiveMutationChance(0.10, Double.NaN), 0.000001);
+        assertEquals(0.0, TraitInheritanceService.resolveEffectiveMutationChance(-1.0, 1.8), 0.000001);
+    }
+
     private TwTraitConfig createConfig(boolean allowInheritance,
                                        double inheritanceChance,
                                        double mutationChance,

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -42,15 +43,33 @@ final class CapturedNpcMetadataCompat {
         }
         String roleId = readStringGetter(metadata,
                 "getRoleId",
-                "getRoleKey",
-                "getRoleNameKey",
-                "getRoleName",
-                "getNpcNameKey"
+                "getRoleKey"
         );
-        if (roleId != null && !roleId.isBlank()) {
+        if (roleId != null && !roleId.isBlank() && !RoleNameResolver.looksLikeTranslationKey(roleId)) {
             return roleId;
         }
 
+        String indexedRoleId = resolveRoleIdFromIndex(metadata);
+        if (indexedRoleId != null && !indexedRoleId.isBlank()) {
+            return indexedRoleId;
+        }
+
+        String legacyRoleId = readStringGetter(metadata,
+                "getRoleName",
+                "getNpcNameKey",
+                "getRoleNameKey"
+        );
+        if (legacyRoleId == null || legacyRoleId.isBlank()) {
+            return null;
+        }
+        if (!RoleNameResolver.looksLikeTranslationKey(legacyRoleId)) {
+            return legacyRoleId;
+        }
+        return RoleNameResolver.extractRoleIdFromNameKey(legacyRoleId);
+    }
+
+    @Nullable
+    private static String resolveRoleIdFromIndex(@Nullable CapturedNPCMetadata metadata) {
         Integer roleIndex = readIntGetter(metadata, "getRoleIndex");
         if (roleIndex == null || roleIndex < 0) {
             return null;

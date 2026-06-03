@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService.AwardResult;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.ItemUtils;
@@ -15,8 +18,8 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.InventoryHelper;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Drop-item action for harvest flows that supports trait-driven bonus drops.
@@ -25,8 +28,6 @@ import javax.annotation.Nonnull;
  * one additional identical drop pass when the Bounty trait proc succeeds.
  */
 public final class ActionTameworkHarvestDrop extends ActionDropItem {
-    private static final String HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY = "HarvestDoubleDropChanceMultiplier";
-
     public ActionTameworkHarvestDrop(@Nonnull BuilderActionTameworkHarvestDrop builder, @Nonnull BuilderSupport support) {
         super(builder, support);
     }
@@ -43,19 +44,36 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
 
         List<ItemStack> baseDrops = resolveDrops();
         if (baseDrops.isEmpty()) {
+            logHarvestDropAttempt("skipped reason=no-resolved-drops item=" + valueOrNull(this.item)
+                    + " dropList=" + valueOrNull(this.dropList));
             return true;
         }
-        List<ItemStack> drops = shouldDoubleDrops(ref, store) ? duplicateDrops(baseDrops) : baseDrops;
+        List<ItemStack> drops = CompanionHarvestBonusService.shouldDuplicateDrops(ref, store, role)
+                ? duplicateDrops(baseDrops)
+                : baseDrops;
 
         ModelComponent modelComponent = store.getComponent(ref, ModelComponent.getComponentType());
         float eyeHeight = modelComponent != null ? modelComponent.getModel().getEyeHeight(ref, store) : 0.0F;
         float height = -eyeHeight;
+        boolean dropped = false;
+        int droppedCount = 0;
         for (ItemStack drop : drops) {
             if (drop == null || drop.isEmpty()) {
                 continue;
             }
             newDirection(ref, pickDistance(), height, store);
             ItemUtils.throwItem(ref, store, drop, this.dropDirection, this.throwSpeed);
+            dropped = true;
+            droppedCount++;
+        }
+        if (dropped) {
+            AwardResult result = CompanionLevelingService.awardHarvestXp(ref, store);
+            logHarvestDropAward(ref, store, baseDrops.size(), drops.size(), droppedCount, result);
+        } else {
+            logHarvestDropAttempt("skipped reason=resolved-drops-empty baseDrops=" + baseDrops.size()
+                    + " attemptedDrops=" + drops.size()
+                    + " item=" + valueOrNull(this.item)
+                    + " dropList=" + valueOrNull(this.dropList));
         }
         return true;
     }
@@ -81,20 +99,6 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
             drops.add(randomItem);
         }
         return drops;
-    }
-
-    private boolean shouldDoubleDrops(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
-        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
-                npcRef,
-                store,
-                HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY,
-                1.0
-        );
-        if (!Double.isFinite(multiplier)) {
-            return false;
-        }
-        double chance = clamp(multiplier - 1.0, 0.0, 1.0);
-        return chance > 0.0 && ThreadLocalRandom.current().nextDouble() < chance;
     }
 
     private List<ItemStack> duplicateDrops(List<ItemStack> drops) {
@@ -133,10 +137,50 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
         );
     }
 
-    private double clamp(double value, double min, double max) {
-        if (!Double.isFinite(value)) {
-            return min;
+    private void logHarvestDropAward(@Nonnull Ref<EntityStore> ref,
+                                     @Nonnull Store<EntityStore> store,
+                                     int baseDropCount,
+                                     int attemptedDropCount,
+                                     int droppedCount,
+                                     @Nonnull AwardResult result) {
+        if (!isXpEventDebugEnabled()) {
+            return;
         }
-        return Math.max(min, Math.min(max, value));
+        String readiness = result.applied()
+                ? "reason=awarded"
+                : CompanionLevelingService.describeHarvestXpReadiness(ref, store);
+        logHarvestDropAttempt("award applied=" + result.applied()
+                + " awardedXp=" + result.awardedXp()
+                + " level=" + result.previousLevel() + "->" + result.currentLevel()
+                + " totalXp=" + result.totalXp()
+                + " baseDrops=" + baseDropCount
+                + " attemptedDrops=" + attemptedDropCount
+                + " dropped=" + droppedCount
+                + " item=" + valueOrNull(this.item)
+                + " dropList=" + valueOrNull(this.dropList)
+                + " " + readiness);
+    }
+
+    private void logHarvestDropAttempt(@Nonnull String message) {
+        CompanionXpEventDebugLogService debugLog = resolveXpEventDebugLogService();
+        if (debugLog != null) {
+            debugLog.logHarvestDropAttempt(message);
+        }
+    }
+
+    private boolean isXpEventDebugEnabled() {
+        CompanionXpEventDebugLogService debugLog = resolveXpEventDebugLogService();
+        return debugLog != null && debugLog.isEnabled();
+    }
+
+    @Nullable
+    private CompanionXpEventDebugLogService resolveXpEventDebugLogService() {
+        Tamework instance = Tamework.getInstance();
+        return instance != null ? instance.getCompanionXpEventDebugLogService() : null;
+    }
+
+    @Nonnull
+    private static String valueOrNull(@Nullable Object value) {
+        return value == null ? "<null>" : value.toString();
     }
 }

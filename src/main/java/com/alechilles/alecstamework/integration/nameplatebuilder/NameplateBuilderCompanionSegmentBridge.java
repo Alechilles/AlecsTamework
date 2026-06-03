@@ -225,8 +225,12 @@ public final class NameplateBuilderCompanionSegmentBridge {
         if (rolledValues.isEmpty()) {
             return null;
         }
-        ArrayList<String> segments = new ArrayList<>();
-        for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
+        TwTraitConfig.TraitDefinition[] definitions = config.getTraits();
+        if (definitions.length == 0) {
+            return null;
+        }
+        ArrayList<String> segments = null;
+        for (TwTraitConfig.TraitDefinition definition : definitions) {
             if (definition == null) {
                 continue;
             }
@@ -240,10 +244,13 @@ public final class NameplateBuilderCompanionSegmentBridge {
             }
             String text = formatTraitSegment(definition, value, variantIndex);
             if (text != null && !text.isBlank()) {
+                if (segments == null) {
+                    segments = new ArrayList<>(Math.min(definitions.length, rolledValues.size()));
+                }
                 segments.add(text);
             }
         }
-        return segments.isEmpty() ? null : String.join(", ", segments);
+        return segments == null || segments.isEmpty() ? null : String.join(", ", segments);
     }
 
     @Nullable

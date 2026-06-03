@@ -23,6 +23,9 @@ public final class CompanionTalentService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return 0;
         }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return 0;
+        }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         if (roleId == null || roleId.isBlank()) {
             return 0;
@@ -48,6 +51,9 @@ public final class CompanionTalentService {
                                                 @Nullable String talentId) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return PurchaseResult.invalid("Companion is not available.");
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return PurchaseResult.invalid("Companion talents are disabled in Tamework settings.");
         }
         if (talentId == null || talentId.isBlank()) {
             return PurchaseResult.invalid("No talent was selected.");
@@ -102,11 +108,44 @@ public final class CompanionTalentService {
         return PurchaseResult.applied(component, resolveAvailablePoints(npcRef, store));
     }
 
+    @Nonnull
+    public static ResetResult resetTalents(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return ResetResult.invalid("Companion is not available.");
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return ResetResult.invalid("Companion talents are disabled in Tamework settings.");
+        }
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        if (type == null) {
+            return ResetResult.invalid("Talent storage is unavailable.");
+        }
+        TameworkTalentsComponent existing = store.getComponent(npcRef, type);
+        if (existing == null || (existing.getSpentPoints() <= 0 && existing.getPurchasedTalentIds().length == 0)) {
+            return ResetResult.invalid("No talent points are spent.");
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        TwTalentConfig config = resolveConfig(existing, roleId);
+        TameworkTalentsComponent component = existing.clone();
+        if (config != null) {
+            component.setConfigId(config.getId());
+        }
+        component.setSpentPoints(0);
+        component.setPurchasedTalentIds(new String[0]);
+        store.putComponent(npcRef, type, component);
+        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
+        return ResetResult.applied(component, resolveAvailablePoints(npcRef, store));
+    }
+
     public static double resolvePurchasedEffectMultiplier(@Nullable Ref<EntityStore> npcRef,
                                                           @Nullable Store<EntityStore> store,
                                                           @Nullable String effectKey,
                                                           double defaultMultiplier) {
         if (npcRef == null || !npcRef.isValid() || store == null || effectKey == null || effectKey.isBlank()) {
+            return defaultMultiplier;
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
             return defaultMultiplier;
         }
         ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
@@ -137,10 +176,42 @@ public final class CompanionTalentService {
         return matched ? multiplier : defaultMultiplier;
     }
 
+    public static double resolvePurchasedEffectMultiplier(@Nullable TwTalentConfig config,
+                                                          @Nullable String[] purchasedTalentIds,
+                                                          @Nullable String effectKey,
+                                                          double defaultMultiplier) {
+        if (config == null || !config.isEnabled()
+                || purchasedTalentIds == null
+                || purchasedTalentIds.length == 0
+                || effectKey == null
+                || effectKey.isBlank()) {
+            return defaultMultiplier;
+        }
+        double multiplier = defaultMultiplier;
+        boolean matched = false;
+        for (String talentId : purchasedTalentIds) {
+            TwTalentConfig.TalentDefinition talent = config.findTalent(talentId);
+            if (talent == null) {
+                continue;
+            }
+            for (TwTalentConfig.PassiveEffect effect : talent.getEffects()) {
+                if (effect == null || effect.getEffectKey() == null || !effect.getEffectKey().equalsIgnoreCase(effectKey)) {
+                    continue;
+                }
+                matched = true;
+                multiplier *= effect.getMultiplier();
+            }
+        }
+        return matched ? multiplier : defaultMultiplier;
+    }
+
     @Nullable
     public static TwTalentConfig resolveTalentConfig(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
             return null;
         }
         ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
@@ -184,6 +255,19 @@ public final class CompanionTalentService {
 
         static PurchaseResult invalid(@Nonnull String message) {
             return new PurchaseResult(false, message, null, 0);
+        }
+    }
+
+    public record ResetResult(boolean applied,
+                              @Nonnull String message,
+                              @Nullable TameworkTalentsComponent component,
+                              int availablePoints) {
+        static ResetResult applied(@Nonnull TameworkTalentsComponent component, int availablePoints) {
+            return new ResetResult(true, "Talent points refunded.", component, availablePoints);
+        }
+
+        static ResetResult invalid(@Nonnull String message) {
+            return new ResetResult(false, message, null, 0);
         }
     }
 }

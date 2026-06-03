@@ -71,6 +71,13 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
             )
             .documentation("Flat XP awarded when this source succeeds.")
             .add()
+            .<Integer>append(
+                    new KeyedCodec<>("AwardCooldownSeconds", Codec.INTEGER),
+                    (settings, value) -> settings.awardCooldownSeconds = value == null ? 0 : value,
+                    settings -> settings.awardCooldownSeconds
+            )
+            .documentation("Minimum seconds between XP awards for cooldown-aware simple sources. Feed XP uses this to prevent interaction spam; 0 disables the cooldown.")
+            .add()
             .build();
 
     private static final BuilderCodec<CombatXpSourceSettings> COMBAT_XP_SOURCE_CODEC = BuilderCodec.builder(
@@ -520,6 +527,9 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
         if (!nestedExplicitKeys.contains(prefix + ".FlatXp")) {
             child.flatXp = parent.flatXp;
         }
+        if (!nestedExplicitKeys.contains(prefix + ".AwardCooldownSeconds")) {
+            child.awardCooldownSeconds = parent.awardCooldownSeconds;
+        }
     }
 
     private void inheritCombatSourceSection(@Nonnull TwLevelingConfig parent,
@@ -677,6 +687,7 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
     public static class SimpleXpSourceSettings {
         private boolean enabled;
         private double flatXp;
+        private int awardCooldownSeconds;
 
         public boolean isEnabled() {
             return enabled;
@@ -684,6 +695,10 @@ public final class TwLevelingConfig implements JsonAssetWithMap<String, DefaultA
 
         public double getFlatXp() {
             return Double.isFinite(flatXp) && flatXp > 0.0 ? flatXp : 0.0;
+        }
+
+        public int getAwardCooldownSeconds() {
+            return Math.max(0, awardCooldownSeconds);
         }
     }
 

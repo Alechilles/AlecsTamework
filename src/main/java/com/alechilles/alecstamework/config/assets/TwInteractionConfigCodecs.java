@@ -15,7 +15,7 @@ import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import com.hypixel.hytale.math.codec.Vector3dArrayCodec;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.Color;
 import com.hypixel.hytale.server.core.codec.protocol.ColorCodec;
 import java.util.ArrayList;
@@ -1775,6 +1775,13 @@ public final class TwInteractionConfigCodecs {
             entry -> entry.fertilityBonus
         )
         .documentation("Additive fertility bonus. Default: none.")
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("ManualSelectionSeconds", Codec.INTEGER),
+            (entry, value) -> entry.manualSelectionSeconds = value,
+            entry -> entry.manualSelectionSeconds
+        )
+        .documentation("How long a manual Breed interaction marks this NPC as selected for that player. Default: 120 seconds.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),

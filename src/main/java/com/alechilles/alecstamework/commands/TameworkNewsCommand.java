@@ -24,7 +24,7 @@ public final class TameworkNewsCommand extends AbstractPlayerCommand {
     public TameworkNewsCommand() {
         super("news", "Open the current Tamework settings announcement.");
         requirePermission(TameworkConfigPermission.NODE);
-        setPermissionGroups("OP", "Admin", "Operator");
+        setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
         setAllowsExtraArguments(true);
     }
 
@@ -44,7 +44,7 @@ public final class TameworkNewsCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw("Tamework news is not available."));
             return;
         }
-        if (!TameworkConfigPermission.hasAccess(commandContext.sender())) {
+        if (!TameworkSettingsPageService.hasAccess(playerRef, commandContext.sender())) {
             commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw news."));
             return;
         }

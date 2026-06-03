@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -15,6 +16,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionAttachmentMigrationService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -29,8 +31,8 @@ import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -42,6 +44,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -111,7 +114,7 @@ final class CommandRespawnService {
         if (destination == null) {
             return recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId);
         }
-        Vector3f rotation = resolveRespawnRotation(store, playerRef, destination);
+        Rotation3f rotation = resolveRespawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             return recordRespawnFailure("spawn_entity_failed", deadSnapshot, roleId);
@@ -270,6 +273,15 @@ final class CommandRespawnService {
         }
         Map<String, String> attachmentSelections =
                 CommandLinkedNpcDeathService.decodeAttachmentSelections(snapshot.attachmentsValues());
+        if (attachmentSelections.isEmpty()) {
+            return;
+        }
+        Map<String, Set<String>> attachmentOptions = CompanionModelAttachmentService.resolveAttachmentOptionIds(
+                CompanionModelAttachmentService.resolveModelAsset(spawnedRef, store)
+        );
+        String roleId = firstNonBlank(snapshot.roleId(), CompanionRoleIdResolver.resolveRoleId(spawnedRef, store));
+        TwAttachmentMigrationConfig migrationConfig = TwAttachmentMigrationConfig.resolveForRole(roleId);
+        attachmentSelections = resolveRespawnAttachmentSelections(migrationConfig, attachmentSelections, attachmentOptions);
         if (!attachmentSelections.isEmpty()) {
             CompanionModelAttachmentService.applyAttachments(spawnedRef, spawnedNpc, store, attachmentSelections);
         }
@@ -283,6 +295,25 @@ final class CommandRespawnService {
                 attachmentsType,
                 new TameworkAttachmentsComponent(snapshot.attachmentsConfigId(), attachmentSelections)
         );
+    }
+
+    static Map<String, String> resolveRespawnAttachmentSelections(
+            @Nullable TwAttachmentMigrationConfig migrationConfig,
+            @Nullable Map<String, String> snapshotSelections,
+            @Nullable Map<String, Set<String>> attachmentOptions) {
+        Map<String, String> filtered = CompanionModelAttachmentService.filterAttachmentSelections(
+                snapshotSelections,
+                attachmentOptions
+        );
+        if (filtered.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> migrated = CompanionAttachmentMigrationService.applyConfiguredMigrations(
+                migrationConfig,
+                filtered,
+                attachmentOptions
+        );
+        return CompanionModelAttachmentService.filterAttachmentSelections(migrated, attachmentOptions);
     }
 
     private void applyRespawnHappinessState(Ref<EntityStore> spawnedRef,
@@ -516,6 +547,17 @@ final class CommandRespawnService {
         return happiness != null ? happiness.getLastUpdateMs() : 0L;
     }
 
+    @Nullable
+    private String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
+    }
+
     private void applyRespawnFollowBootstrap(Ref<EntityStore> npcRef,
                                              NPCEntity npc,
                                              Ref<EntityStore> playerRef,
@@ -564,15 +606,15 @@ final class CommandRespawnService {
         );
     }
 
-    private Vector3f resolveRespawnRotation(Store<EntityStore> store,
-                                            Ref<EntityStore> playerRef,
-                                            Vector3d spawnPosition) {
+    private Rotation3f resolveRespawnRotation(Store<EntityStore> store,
+                                              Ref<EntityStore> playerRef,
+                                              Vector3d spawnPosition) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         Vector3d playerPos = new Vector3d(transform.getPosition());
         if (spawnPosition != null) {
@@ -581,10 +623,10 @@ final class CommandRespawnService {
                     0.0,
                     playerPos.z - spawnPosition.z
             );
-            if (relative.squaredLength() > 0.0001) {
-                return Vector3f.lookAt(relative);
+            if (relative.lengthSquared() > 0.0001) {
+                return Rotation3f.lookAt(relative);
             }
         }
-        return new Vector3f(transform.getRotation());
+        return new Rotation3f(transform.getRotation());
     }
 }

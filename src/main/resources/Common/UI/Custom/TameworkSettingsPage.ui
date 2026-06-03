@@ -313,6 +313,56 @@ $C.@PageOverlay {
 
               Label {
                 Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Leveling System";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsLevelingEnabledTooltip {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "";
+                TooltipText: "Allows companions to gain XP, level up, and apply level-based stat growth.";
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsLevelingEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Talents System";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsTalentsEnabledTooltip {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "";
+                TooltipText: "Allows companion talent points, talent spending, and purchased passive talent effects.";
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsTalentsEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Breeding Genders";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
               }

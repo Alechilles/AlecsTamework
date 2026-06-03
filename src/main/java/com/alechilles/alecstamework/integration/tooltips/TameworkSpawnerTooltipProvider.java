@@ -3,8 +3,15 @@ package com.alechilles.alecstamework.integration.tooltips;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.attachments.AttachmentDisplayResolver;
+import com.alechilles.alecstamework.npc.attachments.ResolvedAttachmentDisplay;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.modules.i18n.I18nModule;
+import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
@@ -20,16 +27,27 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     private static final String CAPTURED_ENTITY_NPC_NAME_KEY = "NpcNameKey";
     private static final String GENERIC_CAPTURE_CRATE_NAME = "Capture Crate";
     private static final String GENERIC_CAPTURE_CRATE_KEY = "server.items.captureCrate.name";
-    private static final String NAME_LINE_PREFIX = "Name: ";
-    private static final String ROLE_LINE_PREFIX = "Role: ";
+    private static final String ROLE_LINE_PREFIX = "Species: ";
     private static final String GENDER_LINE_PREFIX = "Gender: ";
+    private static final Gson GSON = new Gson();
+    private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() { }.getType();
 
     private final ItemFeatureRegistry itemFeatureRegistry;
     private final TranslationRegistry translationRegistry;
+    private final AttachmentDisplayResolver attachmentDisplayResolver;
 
     TameworkSpawnerTooltipProvider(ItemFeatureRegistry itemFeatureRegistry, TranslationRegistry translationRegistry) {
+        this(itemFeatureRegistry, translationRegistry, AttachmentDisplayResolver.ASSET_BACKED);
+    }
+
+    TameworkSpawnerTooltipProvider(ItemFeatureRegistry itemFeatureRegistry,
+                                   TranslationRegistry translationRegistry,
+                                   AttachmentDisplayResolver attachmentDisplayResolver) {
         this.itemFeatureRegistry = itemFeatureRegistry;
         this.translationRegistry = translationRegistry;
+        this.attachmentDisplayResolver = attachmentDisplayResolver == null
+                ? AttachmentDisplayResolver.ASSET_BACKED
+                : attachmentDisplayResolver;
     }
 
     @Override
@@ -61,11 +79,17 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
                 readString(metadataDoc, TameworkMetadataKeys.CAPTURE_ROLE_ID),
                 readCapturedEntityNpcNameKey(metadataDoc)
         );
-        String roleDisplay = resolveRoleDisplay(roleId, normalizeLanguage(language));
+        String roleNameKey = firstNonBlank(
+                readString(metadataDoc, TameworkMetadataKeys.CAPTURE_NAME_KEY),
+                readCapturedEntityRoleNameKey(metadataDoc),
+                RoleNameResolver.resolveRoleNameKey(roleId)
+        );
+        String roleDisplay = resolveRoleDisplay(roleId, roleNameKey, normalizeLanguage(language));
         String tooltipDisplayName = sanitizeTooltipDisplayName(
                 readString(metadataDoc, TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME),
                 roleDisplay,
-                roleId
+                roleId,
+                roleNameKey
         );
         String displayName = firstNonBlank(tooltipDisplayName, roleDisplay);
         if (displayName == null || displayName.isBlank()) {
@@ -82,16 +106,20 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         }
 
         String gender = readString(metadataDoc, TameworkMetadataKeys.LIFE_STAGE_GENDER);
+        List<ResolvedAttachmentDisplay> attachmentDisplays = resolveAttachmentDisplays(metadataDoc, roleId);
         TooltipData.Builder builder = TooltipData.builder()
                 .nameOverride(itemName)
                 .hashInput((mode.name()) + "|" + itemName + "|" + displayName + "|"
-                        + (roleDisplay == null ? "" : roleDisplay) + "|" + (gender == null ? "" : gender));
-        appendLine(builder, mode, NAME_LINE_PREFIX + displayName);
+                        + (roleDisplay == null ? "" : roleDisplay) + "|" + (gender == null ? "" : gender)
+                        + "|" + attachmentDisplays);
         if (roleDisplay != null && !roleDisplay.isBlank()) {
             appendLine(builder, mode, ROLE_LINE_PREFIX + roleDisplay);
         }
         if (gender != null && !gender.isBlank()) {
             appendLine(builder, mode, GENDER_LINE_PREFIX + gender);
+        }
+        for (ResolvedAttachmentDisplay display : attachmentDisplays) {
+            appendLine(builder, mode, display.toTooltipLine());
         }
         TooltipData data = builder.build();
         return data.isEmpty() ? null : data;
@@ -177,6 +205,23 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         return readString(capturedEntity.asDocument(), CAPTURED_ENTITY_NPC_NAME_KEY);
     }
 
+    @Nullable
+    private static String readCapturedEntityRoleNameKey(@Nullable BsonDocument metadataDoc) {
+        if (metadataDoc == null || !metadataDoc.containsKey(CAPTURED_ENTITY_KEY)) {
+            return null;
+        }
+        BsonValue capturedEntity = metadataDoc.get(CAPTURED_ENTITY_KEY);
+        if (capturedEntity == null || !capturedEntity.isDocument()) {
+            return null;
+        }
+        BsonDocument capturedDoc = capturedEntity.asDocument();
+        return firstNonBlank(
+                readString(capturedDoc, "RoleNameKey"),
+                readString(capturedDoc, "NameTranslationKey"),
+                readString(capturedDoc, "RoleNameTranslationKey")
+        );
+    }
+
     private void appendLine(TooltipData.Builder builder,
                             ItemFeatureConfig.SpawnerTooltipMode mode,
                             @Nullable String line) {
@@ -190,9 +235,31 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         }
     }
 
+    private List<ResolvedAttachmentDisplay> resolveAttachmentDisplays(BsonDocument metadataDoc, @Nullable String roleId) {
+        Map<String, String> attachments = readAttachmentMap(metadataDoc);
+        if (attachments.isEmpty()) {
+            return List.of();
+        }
+        String modelId = readString(metadataDoc, TameworkMetadataKeys.CAPTURE_MODEL_ID);
+        return attachmentDisplayResolver.resolveAll(roleId, modelId, attachments);
+    }
+
+    private static Map<String, String> readAttachmentMap(@Nullable BsonDocument metadataDoc) {
+        String attachmentsJson = readString(metadataDoc, TameworkMetadataKeys.ATTACHMENTS);
+        if (attachmentsJson == null || attachmentsJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, String> parsed = GSON.fromJson(attachmentsJson, ATTACHMENT_MAP_TYPE);
+            return parsed == null ? Map.of() : parsed;
+        } catch (Exception ex) {
+            return Map.of();
+        }
+    }
+
     @Nullable
-    private String resolveRoleDisplay(@Nullable String roleId, String language) {
-        if (roleId == null || roleId.isBlank()) {
+    private String resolveRoleDisplay(@Nullable String roleId, @Nullable String roleNameKey, String language) {
+        if ((roleId == null || roleId.isBlank()) && (roleNameKey == null || roleNameKey.isBlank())) {
             return null;
         }
         I18nModule i18n = null;
@@ -201,26 +268,18 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         } catch (Throwable ignored) {
             // Unit tests and some startup windows may not have i18n initialized yet.
         }
-        String translated = resolveI18nMessage(i18n, language, roleId);
-        if (translated != null) {
-            return translated;
-        }
-        String derivedKey = "npcRoles." + roleId + ".name";
-        translated = resolveI18nMessage(i18n, language, derivedKey);
-        if (translated != null) {
-            return translated;
-        }
-        if (translationRegistry != null) {
-            translated = translationRegistry.get(roleId);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-            translated = translationRegistry.get(derivedKey);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-        }
-        return roleId;
+        I18nModule resolvedI18n = i18n;
+        return RoleNameResolver.resolveDisplayName(
+                roleId,
+                roleNameKey,
+                key -> {
+                    String translated = resolveI18nMessage(resolvedI18n, language, key);
+                    if (translated != null && !translated.isBlank()) {
+                        return translated;
+                    }
+                    return translationRegistry != null ? translationRegistry.get(key) : null;
+                }
+        );
     }
 
     @Nullable
@@ -258,7 +317,8 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     @Nullable
     private static String sanitizeTooltipDisplayName(@Nullable String tooltipDisplayName,
                                                      @Nullable String roleDisplay,
-                                                     @Nullable String roleId) {
+                                                     @Nullable String roleId,
+                                                     @Nullable String roleNameKey) {
         if (tooltipDisplayName == null) {
             return null;
         }
@@ -273,6 +333,9 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
             return null;
         }
         if (roleId != null && !roleId.isBlank() && trimmed.equalsIgnoreCase(roleId)) {
+            return null;
+        }
+        if (roleNameKey != null && !roleNameKey.isBlank() && trimmed.equalsIgnoreCase(roleNameKey)) {
             return null;
         }
         return trimmed;

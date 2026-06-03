@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import java.util.List;
 import java.util.UUID;
@@ -13,11 +14,16 @@ import java.util.UUID;
 final class CommandGroupAssignPageService {
     private final CommandPanelActionService panelActionService;
     private final CommandToolInventoryService toolInventoryService;
+    private final CommandGroupActivationService groupActivationService;
 
     CommandGroupAssignPageService(CommandPanelActionService panelActionService,
-                                  CommandToolInventoryService toolInventoryService) {
+                                  CommandToolInventoryService toolInventoryService,
+                                  CommandGroupActivationService groupActivationService) {
         this.panelActionService = panelActionService;
         this.toolInventoryService = toolInventoryService;
+        this.groupActivationService = groupActivationService != null
+                ? groupActivationService
+                : new CommandGroupActivationService(null, null);
     }
 
     List<DropdownEntryInfo> resolveGroupDropdownEntries(Player player, String toolId) {
@@ -25,6 +31,27 @@ final class CommandGroupAssignPageService {
             return List.of();
         }
         return toolInventoryService.resolveGroupDropdownEntriesForTool(player, toolId);
+    }
+
+    List<DropdownEntryInfo> resolveGroupActivationDropdownEntries(Player player, String toolId) {
+        ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
+        return groupActivationService.resolveDropdownEntries(stack, resolveLanguage(player));
+    }
+
+    String resolveGroupActivationValue(Player player, String toolId) {
+        ItemStack stack = toolInventoryService != null ? toolInventoryService.findToolStack(player, toolId) : null;
+        return groupActivationService.resolveSelectionValue(stack);
+    }
+
+    void applyGroupActivation(Player player, String toolId, String selectorValue) {
+        if (player == null || toolId == null || toolId.isBlank() || toolInventoryService == null) {
+            return;
+        }
+        toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> groupActivationService.applySelection(stack, selectorValue)
+        );
     }
 
     void applyGroupAssignment(Player player,
@@ -64,5 +91,9 @@ final class CommandGroupAssignPageService {
             }
         }
         return false;
+    }
+
+    private String resolveLanguage(Player player) {
+        return player != null && player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
     }
 }

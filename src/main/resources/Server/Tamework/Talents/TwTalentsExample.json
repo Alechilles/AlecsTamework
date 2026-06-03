@@ -1,0 +1,103 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "RoleIds": [
+    "Mob_Tamework_Example",
+    "Mob_Tamework_Example_Baby",
+    "Mob_Tamework_Example_Vanilla",
+    "Mob_Tamework_Example_Simple",
+    "Mob_Tamework_Example_Simple_Vanilla",
+    "Mob_Tamework_Example_Patch"
+  ],
+  "Talents": [
+    {
+      "Id": "Example_Healthy",
+      "DisplayName": "Healthy",
+      "Description": "Raises maximum health.",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Health.png",
+      "Tier": 1,
+      "Branch": "Survival",
+      "PointCost": 1,
+      "MinLevel": 2,
+      "Effects": [
+        {
+          "EffectKey": "MaxHealthMultiplier",
+          "Multiplier": 1.08
+        }
+      ]
+    },
+    {
+      "Id": "Example_Quick",
+      "DisplayName": "Quick",
+      "Description": "Improves movement speed.",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Swiftness.png",
+      "Tier": 1,
+      "Branch": "Utility",
+      "PointCost": 1,
+      "MinLevel": 2,
+      "Effects": [
+        {
+          "EffectKey": "MoveSpeedMultiplier",
+          "Multiplier": 1.06
+        }
+      ]
+    },
+    {
+      "Id": "Example_Strong",
+      "DisplayName": "Strong",
+      "Description": "Increases outgoing damage.",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Strength.png",
+      "Tier": 2,
+      "Branch": "Combat",
+      "PointCost": 1,
+      "MinLevel": 4,
+      "RequiresTalentIds": [
+        "Example_Healthy"
+      ],
+      "Effects": [
+        {
+          "EffectKey": "DamageDealtMultiplier",
+          "Multiplier": 1.10
+        }
+      ]
+    },
+    {
+      "Id": "Example_Tough",
+      "DisplayName": "Tough",
+      "Description": "Reduces incoming damage.",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Toughness.png",
+      "Tier": 2,
+      "Branch": "Survival",
+      "PointCost": 1,
+      "MinLevel": 4,
+      "RequiresTalentIds": [
+        "Example_Healthy"
+      ],
+      "Effects": [
+        {
+          "EffectKey": "DamageTakenMultiplier",
+          "Multiplier": 0.92
+        }
+      ]
+    },
+    {
+      "Id": "Example_Bountiful",
+      "DisplayName": "Bountiful",
+      "Description": "Improves harvest bonus chances.",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Bounty.png",
+      "Tier": 2,
+      "Branch": "Utility",
+      "PointCost": 1,
+      "MinLevel": 4,
+      "RequiresTalentIds": [
+        "Example_Quick"
+      ],
+      "Effects": [
+        {
+          "EffectKey": "HarvestDoubleDropChanceMultiplier",
+          "Multiplier": 1.15
+        }
+      ]
+    }
+  ]
+}

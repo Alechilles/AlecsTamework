@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.ResolvedAnnouncement;
+import com.hypixel.hytale.common.plugin.PluginManifest;
+import com.hypixel.hytale.common.semver.Semver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -90,13 +92,36 @@ public final class TameworkSettingsAnnouncementService {
         if (respectEnabled && !announcement.enabled()) {
             return null;
         }
+        String currentTameworkVersion = resolveCurrentTameworkVersion();
         if (!ignoreOptOutState) {
             AnnouncementOptOutState state = TameworkSettingsAnnouncementStore.loadAnnouncementState(
                     resolveAnnouncementStateFile(),
                     plugin.getLogger()
             );
-            if (!TameworkSettingsAnnouncementStore.shouldShowAnnouncement(announcement, state, playerUuid)) {
+            announcement = TameworkSettingsAnnouncementStore.selectAnnouncementForPlayer(
+                    announcement,
+                    state,
+                    playerUuid,
+                    currentTameworkVersion,
+                    false
+            );
+            if (announcement == null) {
                 return null;
+            }
+        } else {
+            AnnouncementOptOutState state = TameworkSettingsAnnouncementStore.loadAnnouncementState(
+                    resolveAnnouncementStateFile(),
+                    plugin.getLogger()
+            );
+            ResolvedAnnouncement selected = TameworkSettingsAnnouncementStore.selectAnnouncementForPlayer(
+                    announcement,
+                    state,
+                    playerUuid,
+                    currentTameworkVersion,
+                    true
+            );
+            if (selected != null) {
+                announcement = selected;
             }
         }
 
@@ -104,11 +129,12 @@ public final class TameworkSettingsAnnouncementService {
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return respectEnabled ? null : "Unable to open Tamework news right now.";
         }
-        if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, player)) {
+        if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, uiPlayerRef)) {
             return respectEnabled ? null : "You do not have permission to use /tw news.";
         }
 
-        AnnouncementCopy copy = resolveCopy(uiPlayerRef, announcement);
+        ResolvedAnnouncement selectedAnnouncement = announcement;
+        AnnouncementCopy copy = resolveCopy(uiPlayerRef, selectedAnnouncement);
 
         TameworkSettingsAnnouncementPage page = new TameworkSettingsAnnouncementPage(
                 uiPlayerRef,
@@ -116,11 +142,12 @@ public final class TameworkSettingsAnnouncementService {
                 copy.subtitle(),
                 copy.bodyText(),
                 copy.optOutLabel(),
-                suppress -> onReviewSettings(playerRef, store, uiPlayerRef, playerUuid, announcement.announcementId(), suppress),
-                suppress -> onDismissAnnouncement(playerUuid, announcement.announcementId(), suppress)
+                suppress -> onReviewSettings(playerRef, store, uiPlayerRef, playerUuid, selectedAnnouncement.announcementId(), suppress),
+                suppress -> onDismissAnnouncement(playerUuid, selectedAnnouncement.announcementId(), suppress)
         );
         try {
             player.getPageManager().openCustomPage(playerRef, store, page);
+            recordAnnouncementSeen(playerUuid, selectedAnnouncement.announcementId(), currentTameworkVersion);
             plugin.getTelemetryEvents().recordUsage(
                     "settings_announcement_opened",
                     TameworkTelemetryEvents.featureContext("settings", "settings_announcement", "settings_announcement")
@@ -155,18 +182,10 @@ public final class TameworkSettingsAnnouncementService {
                     announcement.optOutLabel()
             );
         }
-        String title = resolveBuiltIn(playerRef, TameworkSettingsAnnouncementStore.BUILT_IN_TITLE_KEY, announcement.title());
-        String subtitle = resolveBuiltIn(
-                playerRef,
-                TameworkSettingsAnnouncementStore.BUILT_IN_SUBTITLE_KEY,
-                announcement.subtitle()
-        );
-        String optOutLabel = resolveBuiltIn(
-                playerRef,
-                TameworkSettingsAnnouncementStore.BUILT_IN_OPT_OUT_LABEL_KEY,
-                announcement.optOutLabel()
-        );
-        String bodyText = resolveBodyText(playerRef, announcement.bodyLines());
+        String title = resolveBuiltIn(playerRef, titleKey(announcement), announcement.title());
+        String subtitle = resolveBuiltIn(playerRef, subtitleKey(announcement), announcement.subtitle());
+        String optOutLabel = resolveBuiltIn(playerRef, optOutKey(announcement), announcement.optOutLabel());
+        String bodyText = resolveBodyText(playerRef, bodyLineKeys(announcement), announcement.bodyLines());
         return new AnnouncementCopy(title, subtitle, bodyText, optOutLabel);
     }
 
@@ -177,16 +196,46 @@ public final class TameworkSettingsAnnouncementService {
     }
 
     @Nonnull
-    private static String resolveBodyText(@Nonnull PlayerRef playerRef, @Nonnull java.util.List<String> fallbackBodyLines) {
+    private static String resolveBodyText(@Nonnull PlayerRef playerRef,
+                                          @Nonnull String[] bodyLineKeys,
+                                          @Nonnull java.util.List<String> fallbackBodyLines) {
         StringBuilder body = new StringBuilder();
-        for (int index = 0; index < TameworkSettingsAnnouncementStore.BUILT_IN_BODY_LINE_KEYS.length; index++) {
+        for (int index = 0; index < bodyLineKeys.length; index++) {
             if (index > 0) {
                 body.append("\n\n");
             }
             String fallback = index < fallbackBodyLines.size() ? fallbackBodyLines.get(index) : "";
-            body.append(resolveBuiltIn(playerRef, TameworkSettingsAnnouncementStore.BUILT_IN_BODY_LINE_KEYS[index], fallback));
+            body.append(resolveBuiltIn(playerRef, bodyLineKeys[index], fallback));
         }
         return body.toString();
+    }
+
+    @Nonnull
+    private static String titleKey(@Nonnull ResolvedAnnouncement announcement) {
+        return TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID.equals(announcement.announcementId())
+                ? TameworkSettingsAnnouncementStore.WELCOME_TITLE_KEY
+                : TameworkSettingsAnnouncementStore.BUILT_IN_TITLE_KEY;
+    }
+
+    @Nonnull
+    private static String subtitleKey(@Nonnull ResolvedAnnouncement announcement) {
+        return TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID.equals(announcement.announcementId())
+                ? TameworkSettingsAnnouncementStore.WELCOME_SUBTITLE_KEY
+                : TameworkSettingsAnnouncementStore.BUILT_IN_SUBTITLE_KEY;
+    }
+
+    @Nonnull
+    private static String optOutKey(@Nonnull ResolvedAnnouncement announcement) {
+        return TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID.equals(announcement.announcementId())
+                ? TameworkSettingsAnnouncementStore.WELCOME_OPT_OUT_LABEL_KEY
+                : TameworkSettingsAnnouncementStore.BUILT_IN_OPT_OUT_LABEL_KEY;
+    }
+
+    @Nonnull
+    private static String[] bodyLineKeys(@Nonnull ResolvedAnnouncement announcement) {
+        return TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID.equals(announcement.announcementId())
+                ? TameworkSettingsAnnouncementStore.WELCOME_BODY_LINE_KEYS
+                : TameworkSettingsAnnouncementStore.BUILT_IN_BODY_LINE_KEYS;
     }
 
     private void onDismissAnnouncement(@Nonnull UUID playerUuid,
@@ -254,6 +303,23 @@ public final class TameworkSettingsAnnouncementService {
         );
     }
 
+    private void recordAnnouncementSeen(@Nonnull UUID playerUuid,
+                                        @Nonnull String announcementId,
+                                        @Nonnull String currentTameworkVersion) {
+        if (TameworkSettingsAnnouncementStore.recordAnnouncementSeen(
+                resolveAnnouncementStateFile(),
+                playerUuid,
+                announcementId,
+                currentTameworkVersion,
+                plugin.getLogger()
+        )) {
+            return;
+        }
+        plugin.getLogger().at(Level.WARNING).log(
+                "Failed to persist Tamework settings announcement seen state for player " + playerUuid + "."
+        );
+    }
+
     private void clearSessionState(@Nullable UUID playerUuid) {
         if (playerUuid == null) {
             return;
@@ -269,6 +335,16 @@ public final class TameworkSettingsAnnouncementService {
     @Nonnull
     private Path resolveAnnouncementStateFile() {
         return TameworkSettingsAnnouncementStore.resolveAnnouncementStateFile(plugin);
+    }
+
+    @Nonnull
+    private String resolveCurrentTameworkVersion() {
+        PluginManifest manifest = plugin.getManifest();
+        if (manifest == null) {
+            return "Unknown";
+        }
+        Semver version = manifest.getVersion();
+        return version == null ? "Unknown" : version.toString();
     }
 
     private record AnnouncementCopy(@Nonnull String title,

@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
-import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -22,16 +22,15 @@ import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.role.Role;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
-import com.hypixel.hytale.server.npc.role.Role;
 
 /** Applies inventory-related interaction effects and item drops. */
 final class InteractionInventoryEffects {
-    private static final String HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY = "HarvestDoubleDropChanceMultiplier";
     private final ActionTameworkInteract owner;
 
     // Builds inventory effects for interaction entries.
@@ -71,9 +70,12 @@ final class InteractionInventoryEffects {
         if (inventory == null) {
             return false;
         }
-        ItemContainer hotbar = inventory.getHotbar();
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
         CombinedItemContainer combined = resolveInventoryContainer(player);
-        byte activeSlot = inventory.getActiveHotbarSlot();
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (activeSlot < 0) {
+            return false;
+        }
         boolean applied = false;
         for (ItemQuantity item : items) {
             if (item == null || item.getItem() == null || item.getItem().isBlank()) {
@@ -170,9 +172,49 @@ final class InteractionInventoryEffects {
         return applied;
     }
 
+    boolean replaceHeldItem(Player player,
+                            InteractionContextSnapshot ctx,
+                            String expectedItemId,
+                            String replacementItemId) {
+        if (player == null
+                || ctx == null
+                || expectedItemId == null
+                || expectedItemId.isBlank()
+                || replacementItemId == null
+                || replacementItemId.isBlank()) {
+            return false;
+        }
+        ItemStack active = ctx.activeItem;
+        String activeItemId = active != null && !active.isEmpty() ? active.getItemId() : ctx.activeItemId;
+        if (active == null
+                || active.isEmpty()
+                || activeItemId == null
+                || !expectedItemId.equalsIgnoreCase(activeItemId)) {
+            return false;
+        }
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (hotbar == null || activeSlot < 0) {
+            return false;
+        }
+        int activeQuantity = active.getQuantity();
+        if (activeQuantity <= 1) {
+            hotbar.setItemStackForSlot((short) activeSlot, new ItemStack(replacementItemId, 1));
+            return true;
+        }
+        short remainderSlot = findEmptyHotbarSlot(hotbar, activeSlot);
+        if (remainderSlot < 0) {
+            return false;
+        }
+        hotbar.setItemStackForSlot(remainderSlot, cloneWithQuantity(active, activeQuantity - 1));
+        hotbar.setItemStackForSlot((short) activeSlot, new ItemStack(replacementItemId, 1));
+        return true;
+    }
+
     // Drops items from the NPC into the world based on drop config.
     boolean applyDropItem(DropItemEffect effect,
                           Ref<EntityStore> npcRef,
+                          Role role,
                           Store<EntityStore> store,
                           boolean harvestInteraction) {
         if (effect == null || npcRef == null || store == null) {
@@ -182,7 +224,7 @@ final class InteractionInventoryEffects {
         if (drops.isEmpty()) {
             return false;
         }
-        if (harvestInteraction && shouldDoubleHarvestDrops(npcRef, store)) {
+        if (harvestInteraction && shouldDoubleHarvestDrops(npcRef, role, store)) {
             drops = duplicateDrops(drops);
         }
         float throwSpeed = effect.getThrowSpeed() != null ? effect.getThrowSpeed().floatValue() : 0.0f;
@@ -201,21 +243,11 @@ final class InteractionInventoryEffects {
         return applied;
     }
 
-    private boolean shouldDoubleHarvestDrops(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+    private boolean shouldDoubleHarvestDrops(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return false;
         }
-        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
-                npcRef,
-                store,
-                HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY,
-                1.0
-        );
-        if (!Double.isFinite(multiplier)) {
-            return false;
-        }
-        double chance = clamp(multiplier - 1.0, 0.0, 1.0);
-        return chance > 0.0 && ThreadLocalRandom.current().nextDouble() < chance;
+        return CompanionHarvestBonusService.shouldDuplicateDrops(npcRef, store, role);
     }
 
     private List<ItemStack> duplicateDrops(List<ItemStack> drops) {
@@ -250,6 +282,19 @@ final class InteractionInventoryEffects {
         }
         return new ItemStack(
                 itemId,
+                quantity,
+                stack.getDurability(),
+                stack.getMaxDurability(),
+                stack.getMetadata()
+        );
+    }
+
+    private ItemStack cloneWithQuantity(ItemStack stack, int quantity) {
+        if (stack == null || stack.isEmpty() || quantity <= 0) {
+            return null;
+        }
+        return new ItemStack(
+                stack.getItemId(),
                 quantity,
                 stack.getDurability(),
                 stack.getMaxDurability(),
@@ -296,6 +341,23 @@ final class InteractionInventoryEffects {
             return true;
         }
         return false;
+    }
+
+    private short findEmptyHotbarSlot(ItemContainer hotbar, byte activeSlot) {
+        if (hotbar == null) {
+            return -1;
+        }
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            if (slot == activeSlot) {
+                continue;
+            }
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                return slot;
+            }
+        }
+        return -1;
     }
 
     private String[] resolveHandItems(RemoveItemsHandEffect effect,
@@ -392,13 +454,6 @@ final class InteractionInventoryEffects {
             return min;
         }
         return min + random.nextInt(max - min + 1);
-    }
-
-    private double clamp(double value, double min, double max) {
-        if (!Double.isFinite(value)) {
-            return min;
-        }
-        return Math.max(min, Math.min(max, value));
     }
 
     // Emits a debug log entry when available.

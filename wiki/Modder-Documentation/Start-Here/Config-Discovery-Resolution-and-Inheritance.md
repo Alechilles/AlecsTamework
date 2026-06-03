@@ -21,6 +21,7 @@ This page is the working mental model for how Tamework finds config assets, choo
 - `TwHappinessConfig`: `<ModRoot>/Server/Tamework/Happiness/*.json`
 - `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
 - `TwBreedingConfig`: `<ModRoot>/Server/Tamework/Breeding/*.json`
+- `TwAttachmentMigrationConfig`: `<ModRoot>/Server/Tamework/AttachmentMigrations/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
 - `TwDebugConfig`: `<ModRoot>/Server/Tamework/Debug/*.json`
@@ -31,7 +32,7 @@ This page is the working mental model for how Tamework finds config assets, choo
 - Use `TwInteractionConfig` for optimized interaction authoring.
 - Use `TwSpawnerConfig`, `TwNameItemConfig`, and `TwCommandItemConfig` when the behavior is bound to an item.
 - Use `TwNamesConfig` when naming UI randomization should resolve from reusable name pools.
-- Use `TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, and `TwTraitConfig` for progression state.
+- Use `TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, `TwAttachmentMigrationConfig`, and `TwTraitConfig` for progression state.
 - Use `TwCoopConfig` when runtime behavior is keyed to a coop id.
 - Use `TwDebugConfig` for dev-only default debug toggles.
 
@@ -51,6 +52,7 @@ These families match by NPC role:
 - `TwHappinessConfig`
 - `TwNeedsConfig`
 - `TwBreedingConfig`
+- `TwAttachmentMigrationConfig`
 - `TwTraitConfig`
 
 Rule:
@@ -129,6 +131,7 @@ Everything else refreshes through normal asset loaded and removed events:
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
+- [TwAttachmentMigrationConfig Reference](/mod/alecs-tamework/twattachmentmigrationconfig-reference)
 
 
 

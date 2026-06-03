@@ -13,6 +13,8 @@ This document explains where Tamework config assets live and how each family res
 - `TwHappinessConfig`: `<ModRoot>/Server/Tamework/Happiness/*.json`
 - `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
 - `TwBreedingConfig`: `<ModRoot>/Server/Tamework/Breeding/*.json`
+- `TwAttachmentMigrationConfig`: `<ModRoot>/Server/Tamework/AttachmentMigrations/*.json`
+- `TwAttachmentDisplayConfig`: `<ModRoot>/Server/Tamework/AttachmentDisplays/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
 
@@ -27,7 +29,13 @@ Resolved by role id + `Priority`:
 - `TwHappinessConfig`
 - `TwNeedsConfig`
 - `TwBreedingConfig`
+- `TwAttachmentMigrationConfig`
 - `TwTraitConfig`
+
+### Attachment display family
+- `TwAttachmentDisplayConfig` resolves friendly attachment names from all enabled configs and entries.
+- Exact role/model matches take precedence over namespace matches, which take precedence over global fallback entries.
+- Higher `Priority` wins when multiple entries can label the same attachment.
 
 ### Item-scoped families
 Resolved by bound item ids:

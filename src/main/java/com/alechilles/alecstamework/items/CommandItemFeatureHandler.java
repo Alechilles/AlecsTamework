@@ -26,12 +26,11 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
-import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
@@ -44,8 +43,8 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import org.joml.Vector3d;
+import org.joml.Vector3f;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -128,6 +127,8 @@ public final class CommandItemFeatureHandler {
     private final CommandPanelActionService panelActionService;
     private final CommandGroupManagerPageService groupManagerPageService;
     private final CommandGroupAssignPageService groupAssignPageService;
+    private final CommandGroupActivationService groupActivationService;
+    private final CommandTalentPageService talentPageService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -177,6 +178,12 @@ public final class CommandItemFeatureHandler {
                 panelEntrySourceService,
                 panelPreferenceService,
                 this.groupService
+        );
+        this.talentPageService = new CommandTalentPageService(
+                linkMutationService,
+                toolInventoryService,
+                feedbackService,
+                npcNameResolver
         );
         this.companionPlacementService = new CommandCompanionPlacementService();
         this.recipientService = new CommandRecipientService(
@@ -251,9 +258,14 @@ public final class CommandItemFeatureHandler {
                 panelActionService,
                 this.groupService
         );
+        this.groupActivationService = new CommandGroupActivationService(
+                linkedNpcRecordStore,
+                this.groupService
+        );
         this.groupAssignPageService = new CommandGroupAssignPageService(
                 panelActionService,
-                toolInventoryService
+                toolInventoryService,
+                groupActivationService
         );
     }
 
@@ -261,12 +273,12 @@ public final class CommandItemFeatureHandler {
         if (event == null || event.getWorld() == null || event.getHolder() == null || relocationService == null) {
             return;
         }
-        Player player = event.getHolder().getComponent(Player.getComponentType());
-        if (player == null) {
+        PlayerRef playerRef = event.getHolder().getComponent(PlayerRef.getComponentType());
+        if (playerRef == null) {
             return;
         }
         World world = event.getWorld();
-        UUID playerUuid = player.getUuid();
+        UUID playerUuid = playerRef.getUuid();
         if (playerUuid == null) {
             return;
         }
@@ -738,6 +750,8 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
+                () -> groupAssignPageService.resolveGroupActivationDropdownEntries(player, toolId),
+                () -> groupAssignPageService.resolveGroupActivationValue(player, toolId),
                 () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId),
                 entry -> recallTeleportingEnabled || !resolutionService.isRecallCommand(entry),
                 recallTeleportingEnabled,
@@ -752,7 +766,12 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, npcUuid),
-                npcUuid -> openTalentPageFromSelection(player, config, toolId, npcUuid),
+                npcUuid -> talentPageService.openTalentPage(
+                        player,
+                        toolId,
+                        npcUuid,
+                        () -> reopenSelectionMenu(player, config, toolId)
+                ),
                 value -> panelActionService.applySetPanelMode(player, toolId, value),
                 enabled -> panelActionService.applySetAutoLinkEnabled(player, toolId, enabled),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
@@ -762,6 +781,7 @@ public final class CommandItemFeatureHandler {
                 value -> panelActionService.applySetFilterMode(player, toolId, value),
                 value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
                 () -> panelActionService.applyClearFilters(player, toolId),
+                value -> groupAssignPageService.applyGroupActivation(player, toolId, value),
                 (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
                         player,
                         toolId,
@@ -819,228 +839,6 @@ public final class CommandItemFeatureHandler {
         if (!opened) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.reopenFailed");
         }
-    }
-
-    private void openTalentPageFromSelection(Player player,
-                                             TwCommandItemConfig config,
-                                             String toolId,
-                                             UUID npcUuid) {
-        if (player == null || config == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null || player.getPageManager() == null) {
-            feedbackService.showWarning(player, "Talent page is unavailable right now.");
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        PlayerRef uiPlayerRef = player.getPlayerRef();
-        if (store == null || playerRef == null || !playerRef.isValid() || uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            feedbackService.showWarning(player, "Talent page is unavailable right now.");
-            return;
-        }
-        TameworkCompanionTalentsPage page = new TameworkCompanionTalentsPage(
-                uiPlayerRef,
-                () -> buildTalentPageData(player, toolId, npcUuid),
-                talentId -> applyTalentPurchase(player, toolId, npcUuid, talentId),
-                () -> reopenSelectionMenu(player, config, toolId)
-        );
-        try {
-            player.getPageManager().openCustomPage(playerRef, store, page);
-        } catch (Throwable throwable) {
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    "ui_page_open_failed",
-                    throwable,
-                    "page=TameworkCompanionTalentsPage npc=" + npcUuid
-            );
-            feedbackService.showWarning(player, "Talent page is unavailable right now.");
-        }
-    }
-
-    @Nonnull
-    private TameworkCompanionTalentsPage.PageData buildTalentPageData(@Nonnull Player player,
-                                                                      @Nonnull String toolId,
-                                                                      @Nonnull UUID npcUuid) {
-        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
-        if (context == null) {
-            return TameworkCompanionTalentsPage.PageData.empty();
-        }
-        CompanionLevelingService.LevelingSnapshot leveling = CompanionLevelingService.resolveSnapshot(
-                context.npcRef(),
-                context.store(),
-                context.roleId()
-        );
-        int availablePoints = CompanionTalentService.resolveAvailablePoints(context.npcRef(), context.store());
-        String levelSummary;
-        if (leveling == null) {
-            levelSummary = "Level data unavailable";
-        } else if (leveling.atMaxLevel()) {
-            levelSummary = "Level " + leveling.level() + " (MAX)";
-        } else {
-            levelSummary = "Level "
-                    + leveling.level()
-                    + " - XP "
-                    + Math.max(0, Math.round(leveling.currentXp()))
-                    + "/"
-                    + Math.max(1, Math.round(leveling.nextLevelDeltaXp()));
-        }
-        String pointsSummary = "Talent Points: " + availablePoints + " available";
-        TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(context.npcRef(), context.store());
-        if (talentConfig == null || !talentConfig.isEnabled() || talentConfig.getTalents().length == 0) {
-            return new TameworkCompanionTalentsPage.PageData(
-                    context.displayName(),
-                    levelSummary,
-                    pointsSummary,
-                    "No talent tree is configured for this companion.",
-                    List.of()
-            );
-        }
-        ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
-        TameworkTalentsComponent talents = talentsType != null ? context.store().getComponent(context.npcRef(), talentsType) : null;
-        ArrayList<TameworkCompanionTalentsPage.TalentEntry> entries = new ArrayList<>();
-        for (TwTalentConfig.TalentDefinition talent : talentConfig.getTalents()) {
-            if (talent == null || talent.getId() == null) {
-                continue;
-            }
-            boolean purchased = talents != null && talents.hasPurchasedTalent(talent.getId());
-            boolean levelMet = leveling != null && leveling.level() >= talent.getMinLevel();
-            String missingPrerequisite = resolveMissingPrerequisiteName(talents, talentConfig, talent);
-            boolean prerequisitesMet = missingPrerequisite == null;
-            boolean canPurchase = !purchased && levelMet && prerequisitesMet && availablePoints >= talent.getPointCost();
-            String status;
-            if (purchased) {
-                status = "Unlocked";
-            } else if (!levelMet) {
-                status = "Requires Level " + talent.getMinLevel();
-            } else if (!prerequisitesMet) {
-                status = "Requires " + missingPrerequisite;
-            } else if (availablePoints < talent.getPointCost()) {
-                status = "Costs " + talent.getPointCost() + " points";
-            } else {
-                status = "Cost " + talent.getPointCost() + " points";
-            }
-            entries.add(new TameworkCompanionTalentsPage.TalentEntry(
-                    talent.getId(),
-                    "Tier " + talent.getTier() + " - " + talent.getDisplayName(),
-                    talent.getDescription() != null ? talent.getDescription() : "Passive talent",
-                    status,
-                    canPurchase
-            ));
-        }
-        entries.sort((left, right) -> {
-            if (left == null && right == null) {
-                return 0;
-            }
-            if (left == null) {
-                return 1;
-            }
-            if (right == null) {
-                return -1;
-            }
-            return left.displayName().compareToIgnoreCase(right.displayName());
-        });
-        return new TameworkCompanionTalentsPage.PageData(
-                context.displayName(),
-                levelSummary,
-                pointsSummary,
-                entries.isEmpty() ? "No talents are configured for this companion." : "Choose a talent to inspect or unlock.",
-                entries
-        );
-    }
-
-    @Nonnull
-    private String applyTalentPurchase(@Nonnull Player player,
-                                       @Nonnull String toolId,
-                                       @Nonnull UUID npcUuid,
-                                       @Nullable String talentId) {
-        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
-        if (context == null) {
-            String message = "Companion is no longer loaded.";
-            feedbackService.showWarning(player, message);
-            return message;
-        }
-        CompanionTalentService.PurchaseResult result = CompanionTalentService.purchaseTalent(
-                context.npcRef(),
-                context.store(),
-                talentId
-        );
-        if (result.applied()) {
-            feedbackService.showSuccess(player, result.message());
-        } else {
-            feedbackService.showWarning(player, result.message());
-        }
-        return result.message();
-    }
-
-    @Nullable
-    private String resolveMissingPrerequisiteName(@Nullable TameworkTalentsComponent talents,
-                                                  @Nonnull TwTalentConfig talentConfig,
-                                                  @Nonnull TwTalentConfig.TalentDefinition talent) {
-        for (String requiredTalentId : talent.getRequiresTalentIds()) {
-            if (requiredTalentId == null || requiredTalentId.isBlank()) {
-                continue;
-            }
-            if (talents != null && talents.hasPurchasedTalent(requiredTalentId)) {
-                continue;
-            }
-            TwTalentConfig.TalentDefinition prerequisite = talentConfig.findTalent(requiredTalentId);
-            return prerequisite != null ? prerequisite.getDisplayName() : requiredTalentId;
-        }
-        return null;
-    }
-
-    @Nullable
-    private LoadedCompanionTalentContext resolveLoadedCompanionTalentContext(@Nonnull Player player,
-                                                                             @Nonnull String toolId,
-                                                                             @Nonnull UUID npcUuid) {
-        if (toolId == null || toolId.isBlank()) {
-            return null;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return null;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        if (store == null) {
-            return null;
-        }
-        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-        if (npcRef == null || !npcRef.isValid()) {
-            return null;
-        }
-        ItemStack toolStack = findCommandToolStack(player, toolId);
-        if (toolStack == null || toolStack.isEmpty()) {
-            return null;
-        }
-        LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(
-                linkMutationService.readLinkedNpcRecords(toolStack),
-                npcUuid
-        );
-        if (record == null) {
-            return null;
-        }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            return null;
-        }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        if (links == null || !links.containsToolId(toolId)) {
-            return null;
-        }
-        UUID ownerId = links.getOwnerId();
-        if (ownerId != null && !ownerId.equals(player.getUuid())) {
-            return null;
-        }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        if (roleId == null || roleId.isBlank()) {
-            roleId = npcNameResolver.resolveNpcRoleId(npc);
-        }
-        String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
-        if (displayName == null || displayName.isBlank()) {
-            displayName = "Companion";
-        }
-        return new LoadedCompanionTalentContext(npcRef, store, npc, displayName, roleId);
     }
 
     private void applyMenuSelection(Player player,

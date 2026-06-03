@@ -34,6 +34,7 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - Active companions stay part of normal bulk command dispatch.
 - Inactive companions remain linked to the tool but are excluded from bulk commands.
 - Inactive rows can still appear in the panel so you can manage them individually.
+- The group selector can quickly set all linked companions active, set all inactive, or activate one group while deactivating the rest.
 
 ## Per-row actions
 - `Recall`

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.Archetype;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -207,14 +208,7 @@ public final class NpcMountedNameplateVisibilitySystem extends TickingSystem<Ent
                 return text;
             }
         }
-        DisplayNameComponent displayName = store.getComponent(reference, DisplayNameComponent.getComponentType());
-        if (displayName != null && displayName.getDisplayName() != null) {
-            String ansi = displayName.getDisplayName().getAnsiMessage();
-            if (ansi != null && !ansi.isBlank()) {
-                return ansi;
-            }
-        }
-        return null;
+        return NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(reference, store);
     }
 
     private void setVisibleName(Ref<EntityStore> reference,

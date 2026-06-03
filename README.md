@@ -3,13 +3,21 @@
 [![Nametags](https://img.shields.io/curseforge/dt/1464844?label=Nametags&style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-nametags)
 [![Animal Husbandry](https://img.shields.io/curseforge/dt/1480275?label=Animal%20Husbandry&style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-animal-husbandry)
 
-[![Discord](https://img.shields.io/discord/1468261809739005996?style=for-the-badge&logo=discord&logoColor=white&label=Join%20Discord&color=rgb(88,101,242))](https://discord.gg/E8n8RgTTdq)
-[![Buy me a coffee](https://img.shields.io/badge/ko--fi-Support%20Me-ff5f5f?logo=ko-fi&style=for-the-badge)](https://ko-fi.com/alechilles) [![Creator Code](https://img.shields.io/badge/Creator%20Code-Alec-00AEEF?style=for-the-badge)](https://hytale.com/)
+[![Discord](https://img.shields.io/discord/1468261809739005996?style=for-the-badge&logo=discord&logoColor=white&label=Discord&color=rgb(88,101,242))](https://discord.gg/E8n8RgTTdq)
+[![Buy me a coffee](https://img.shields.io/badge/ko--fi-Support%20Me-ff5f5f?logo=ko-fi&style=for-the-badge)](https://ko-fi.com/alechilles) [![Creator Code](https://img.shields.io/badge/Creator%20Code-Alec-00AEEF?style=for-the-badge)](https://hytale.com/) ![X (Formerly Twitter)](https://img.shields.io/badge/Follow-%40Alec-White?style=for-the-badge&logo=x&logoColor=%23ffffff&logoSize=auto&label=Follow&labelColor=%23555555&color=%23939393&link=https%3A%2F%2Ftwitter.com%2Fintent%2Fuser%3Fscreen_name%3DAlechilles)
 
 [![Sponsored By HytaleModding Grant Program](https://github.com/user-attachments/assets/a03709e3-445a-4e58-8ec5-591688490c5d)](https://hytalemodding.dev/en/grants)
 
+## Now Includes a Universal, Non-Destructive Asset Patcher!
+- Add, merge, and insert JSON into *any* Hytale asset at runtime
+- Apply one patch file across multiple target assets
+- Gate optional integrations on installed mods
+- Supports hot-reloading
+- Inspired by Hytalor
+- [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/asset-patches)
+
 # Alec's Tamework!
-Alec's Tamework is a modular taming framework for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It is designed to empower artists, designers, and less technical modders who want advanced companion behavior without first building their own framework.
+Alec's Tamework is a modular NPC framework and asset patcher for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It is designed to empower artists, designers, and less technical modders who want advanced companion behavior without first building their own framework.
 
 Tamework also aims to establish a shared standard for tameable NPCs in Hytale so different mods can work on top of similar ownership, naming, command, progression, and companion-management systems instead of forcing players to learn a different workflow for every mod.
 
@@ -20,6 +28,7 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 
 ## Why Tamework
 - **No Java required for most integrations**: the main integration path is built around JSON assets, templates, role wiring, and `Tw*Config` files rather than custom Java systems.
+- **Non-destructive asset patching**: Add, merge, and insert JSON into one or many Hytale assets at runtime, with installed-mod conditions and hot-reload support.
 - **A shared standard for tameable NPCs**: mods built on Tamework can present familiar ownership, naming, command, linked-panel, breeding, and progression behavior instead of inventing incompatible one-off systems.
 - **Optimized interactions**: build taming, feeding, mounting, harvesting, breeding, and custom interactions with `TwInteractionConfig` and `TameworkInteract`.
 - **Ownership and tame-state systems**: use reusable builders and role-scoped policy for owner checks, protection rules, and companion behavior.
@@ -29,43 +38,25 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
 
 ## What Integration Looks Like
-Integrating Tamework is usually a content-authoring workflow, not a programming workflow. In practice, modders typically:
+Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:
 
-1. Add Tamework as a dependency and include its asset pack.
-2. Copy and adapt example templates, roles, items, and config assets.
-3. Wire Tamework builders and interactions into their NPC roles and item assets.
-4. Enable the systems they want through `TwInteractionConfig`, companion policy, item configs, and progression configs.
-5. Add prompts, translations, and polish, then test the resulting NPC behavior in-game.
+### Required Dependency
+- Wire your desired Tamework behavior directly into your NPC, item, config, and other server-side assets.
+- Add configs for the Tamework systems you want to support.
+- Add Alec's Tamework as a required dependency when deploying to CurseForge.
 
-For many mods, that work can stay entirely in JSON and asset authoring. The full setup and implementation details live in the modder wiki.
+### Optional Dependency
+- Keep your base assets clean of any references to Tamework functionality.
+- Create asset patches under `Server/Tamework/Patches` that add Tamework actions, interactions, configs, and other JSON-based behavior at runtime only when Tamework is installed. Use `Targets` for shared operations across several assets and `When.ModInstalled` for optional cross-mod gates.
+- Add configs for the Tamework systems you want to support.
+- Add Alec's Tamework as an optional dependency when deploying to CurseForge.
+
+In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details can be found in the wiki.
 
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)
 - [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides)
-- [Getting Started](https://wiki.hytalemodding.dev/mod/alecs-tamework/getting-started)
-- [Companion Controls](https://wiki.hytalemodding.dev/mod/alecs-tamework/companion-controls)
-- [Systems](https://wiki.hytalemodding.dev/mod/alecs-tamework/systems)
-- [Troubleshooting and Glossary](https://wiki.hytalemodding.dev/mod/alecs-tamework/troubleshooting-and-glossary)
 - [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation)
-- [Start Here](https://wiki.hytalemodding.dev/mod/alecs-tamework/start-here)
-- [Public API Overview](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-overview)
-- [Public API](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api)
-- [API Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-reference)
-- [API Recipes](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-recipes)
-- [System Integration](https://wiki.hytalemodding.dev/mod/alecs-tamework/system-integration)
-- [Config Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/config-reference)
-- [Testing and Diagnostics](https://wiki.hytalemodding.dev/mod/alecs-tamework/testing-and-diagnostics)
-- [Optional Integrations](https://wiki.hytalemodding.dev/mod/alecs-tamework/optional-integrations)
-- [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
-- [Core Architecture](https://wiki.hytalemodding.dev/mod/alecs-tamework/core-architecture)
-- [Runtime Subsystems](https://wiki.hytalemodding.dev/mod/alecs-tamework/runtime-subsystems)
-- [Data and Persistence](https://wiki.hytalemodding.dev/mod/alecs-tamework/data-and-persistence)
-- [Tooling and Contribution](https://wiki.hytalemodding.dev/mod/alecs-tamework/tooling-and-contribution)
-
-## For Contributors
-- [Source Repository](https://github.com/Alechilles/AlecsTamework)
-- [Contributing Guide](https://github.com/Alechilles/AlecsTamework/blob/main/CONTRIBUTING.md)
-- [Architecture Doc](https://github.com/Alechilles/AlecsTamework/blob/main/docs/Architecture.md)
 - [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
 
 ## Roadmap

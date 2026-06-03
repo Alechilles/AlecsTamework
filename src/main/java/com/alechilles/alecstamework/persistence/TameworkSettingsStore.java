@@ -226,6 +226,10 @@ public final class TameworkSettingsStore {
         document.traits = new TraitsSection();
         document.traits.enabled = snapshot.traitsEnabled();
 
+        document.progression = new ProgressionSection();
+        document.progression.levelingEnabled = snapshot.levelingEnabled();
+        document.progression.talentsEnabled = snapshot.talentsEnabled();
+
         document.revive = new ReviveSection();
         document.revive.enabled = snapshot.reviveSystemEnabled();
 
@@ -429,6 +433,10 @@ public final class TameworkSettingsStore {
         document.traits = new TraitsSection();
         document.traits.enabled = true;
 
+        document.progression = new ProgressionSection();
+        document.progression.levelingEnabled = true;
+        document.progression.talentsEnabled = true;
+
         document.revive = new ReviveSection();
         document.revive.enabled = true;
 
@@ -556,6 +564,7 @@ public final class TameworkSettingsStore {
         HappinessSection happiness = document.happiness;
         BreedingSection breeding = document.breeding;
         TraitsSection traits = document.traits;
+        ProgressionSection progression = document.progression;
         ReviveSection revive = document.revive;
         TravelSection travel = document.travel;
         TelemetrySection telemetry = document.telemetry;
@@ -610,6 +619,8 @@ public final class TameworkSettingsStore {
                 breeding != null ? breeding.requiresHappiness : null,
                 breeding != null ? breeding.genderEnabled : null,
                 traits != null ? traits.enabled : null,
+                progression != null ? progression.levelingEnabled : null,
+                progression != null ? progression.talentsEnabled : null,
                 revive != null ? revive.enabled : null,
                 travel != null ? travel.recallTeleportingEnabled : null,
                 telemetry != null ? telemetry.enabled : null,
@@ -760,6 +771,8 @@ public final class TameworkSettingsStore {
                                           boolean breedingRequiresHappiness,
                                           boolean breedingGenderEnabled,
                                           boolean traitsEnabled,
+                                          boolean levelingEnabled,
+                                          boolean talentsEnabled,
                                           boolean reviveSystemEnabled,
                                           boolean recallTeleportingEnabled,
                                           boolean telemetryEnabled,
@@ -800,6 +813,8 @@ public final class TameworkSettingsStore {
                                    @Nullable Boolean breedingRequiresHappiness,
                                    @Nullable Boolean breedingGenderEnabled,
                                    @Nullable Boolean traitsEnabled,
+                                   @Nullable Boolean levelingEnabled,
+                                   @Nullable Boolean talentsEnabled,
                                    @Nullable Boolean reviveSystemEnabled,
                                    @Nullable Boolean recallTeleportingEnabled,
                                    @Nullable Boolean telemetryEnabled,
@@ -834,6 +849,7 @@ public final class TameworkSettingsStore {
         private HappinessSection happiness;
         private BreedingSection breeding;
         private TraitsSection traits;
+        private ProgressionSection progression;
         private ReviveSection revive;
         private TravelSection travel;
         private TelemetrySection telemetry;
@@ -891,6 +907,11 @@ public final class TameworkSettingsStore {
 
     private static final class TraitsSection {
         private Boolean enabled;
+    }
+
+    private static final class ProgressionSection {
+        private Boolean levelingEnabled;
+        private Boolean talentsEnabled;
     }
 
     private static final class NeedsTickPolicySection {

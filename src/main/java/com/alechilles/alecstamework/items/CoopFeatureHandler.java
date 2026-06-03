@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
 import com.hypixel.hytale.codec.Codec;
@@ -9,15 +11,16 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3i;
+import org.joml.Vector3d;
+import org.joml.Vector3i;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
-import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -106,7 +109,7 @@ public final class CoopFeatureHandler {
             event.setCancelled(true);
             notifyDenied(player, policyDecision);
             logger.at(Level.FINE).log(
-                    "Coop intake denied by policy: player=" + player.getDisplayName()
+                    "Coop intake denied by policy: player=" + OwnerNameUtil.resolve(player)
                             + " coop=" + coopTarget.coopId()
                             + " reason=" + policyDecision.getDenyReason()
             );
@@ -146,7 +149,7 @@ public final class CoopFeatureHandler {
                 world,
                 world.getEntityStore().getStore(),
                 new Vector3d(block.x, block.y, block.z),
-                new Vector3d().assign(Vector3d.FORWARD)
+                new Vector3d(0.0, 0.0, -1.0)
         ));
         UUID capturedNpcUuid = heldItem.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING);
         String itemRoleId = heldItem.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING);
@@ -200,7 +203,7 @@ public final class CoopFeatureHandler {
                 config.getCapturePolicy()
         );
         logger.at(Level.FINE).log(
-                "Coop intake success: player=" + player.getDisplayName()
+                "Coop intake success: player=" + OwnerNameUtil.resolve(player)
                         + " coop=" + coopTarget.coopId()
                         + " config=" + config.getId()
         );
@@ -208,13 +211,16 @@ public final class CoopFeatureHandler {
     }
 
     private void clearCapturedMetadataFromHeldItem(@Nonnull Player player, @Nonnull ItemStack heldItem) {
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
+        if (hotbar == null) {
             return;
         }
-        byte activeHotbarSlot = inventory.getActiveHotbarSlot();
+        byte activeHotbarSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (activeHotbarSlot < 0) {
+            return;
+        }
         ItemStack noMetadata = heldItem.withMetadata(null);
-        inventory.getHotbar().replaceItemStackInSlot(activeHotbarSlot, heldItem, noMetadata);
+        hotbar.replaceItemStackInSlot(activeHotbarSlot, heldItem, noMetadata);
     }
 
     private void notifyDenied(@Nonnull Player player, @Nonnull CoopCapturePolicyService.Decision decision) {
@@ -223,17 +229,18 @@ public final class CoopFeatureHandler {
             return;
         }
         switch (reason) {
-            case REQUIRE_TAMED -> player.sendMessage(
-                    Message.raw("This coop only accepts captured companions marked as tamed.")
-            );
-            case REQUIRE_OWNER -> player.sendMessage(
-                    Message.raw("This coop only accepts captured companions that have an owner.")
-            );
-            case OWNER_RESTRICTED -> player.sendMessage(
-                    Message.raw("This coop only accepts captured companions owned by you.")
-            );
+            case REQUIRE_TAMED -> send(player, "This coop only accepts captured companions marked as tamed.");
+            case REQUIRE_OWNER -> send(player, "This coop only accepts captured companions that have an owner.");
+            case OWNER_RESTRICTED -> send(player, "This coop only accepts captured companions owned by you.");
             default -> {
             }
+        }
+    }
+
+    private void send(@Nonnull Player player, @Nonnull String message) {
+        PlayerRef playerRef = player.getPlayerRef();
+        if (playerRef != null) {
+            playerRef.sendMessage(Message.raw(message));
         }
     }
 

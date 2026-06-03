@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.npc.components;
 
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

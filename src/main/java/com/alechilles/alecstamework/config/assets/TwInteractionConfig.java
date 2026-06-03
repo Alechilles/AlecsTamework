@@ -11,7 +11,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.Color;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -519,6 +519,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         Boolean requireTamed;
         Double minHappiness;
         Double fertilityBonus;
+        Integer manualSelectionSeconds;
 
         public Boolean getRequireTamed() {
             return requireTamed;
@@ -530,6 +531,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public Double getFertilityBonus() {
             return fertilityBonus;
+        }
+
+        public Integer getManualSelectionSeconds() {
+            return manualSelectionSeconds;
         }
     }
 

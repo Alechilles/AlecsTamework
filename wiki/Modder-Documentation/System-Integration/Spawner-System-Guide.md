@@ -36,7 +36,8 @@ Spawner items are the Tamework item family that captures an NPC into an item and
 - Whether icon overrides should reflect captured role or attachments
 
 ## Tooling support
-- `scripts/tools/generate_spawner_icon_overrides.py` can help generate `IconOverridesByRole`
+- [Spawner Icon Generation](/mod/alecs-tamework/spawner-icon-generation) covers the Blockbench wizard, jobs JSON renderer, Python generator, and batch manifest workflow.
+- `scripts/tools/generate_spawner_icon_overrides.py` can generate `IconOverridesByRole` and shared `IconOverrideGroups`.
 - DynamicTooltipsLib integration can surface captured-spawner metadata in tooltips
 
 ## Reloading
@@ -44,6 +45,7 @@ Spawner configs participate in `/tw reloadconfig`.
 
 ## Related Pages
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
+- [Spawner Icon Generation](/mod/alecs-tamework/spawner-icon-generation)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
 

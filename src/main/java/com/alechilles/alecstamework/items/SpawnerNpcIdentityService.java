@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -57,16 +58,16 @@ public final class SpawnerNpcIdentityService {
         }
         TranslationRegistry registry = resolveTranslationRegistry();
         int roleIndex = npc.getRoleIndex();
+        String roleNameKey = RoleNameResolver.resolveRoleNameKey(npc.getRole());
         if (roleIndex >= 0) {
             String nameKey = NPCPlugin.get().getName(roleIndex);
             if (nameKey != null && !nameKey.isBlank()) {
-                String translated = registry != null ? registry.get(nameKey) : null;
-                if (translated != null && !translated.isBlank()) {
-                    return translated;
-                }
-                if (registry != null && !nameKey.contains(".")) {
-                    String derivedKey = "npcRoles." + nameKey + ".name";
-                    translated = registry.get(derivedKey);
+                if (registry != null) {
+                    String translated = RoleNameResolver.resolveDisplayName(
+                            nameKey,
+                            roleNameKey,
+                            registry::get
+                    );
                     if (translated != null && !translated.isBlank()) {
                         return translated;
                     }
@@ -77,8 +78,11 @@ public final class SpawnerNpcIdentityService {
         String roleName = npc.getRoleName();
         if (roleName != null && !roleName.isBlank()) {
             if (registry != null) {
-                String derivedKey = "npcRoles." + roleName + ".name";
-                String translated = registry.get(derivedKey);
+                String translated = RoleNameResolver.resolveDisplayName(
+                        roleName,
+                        roleNameKey,
+                        registry::get
+                );
                 if (translated != null && !translated.isBlank()) {
                     return translated;
                 }
