@@ -40,6 +40,52 @@ Operations support `Add`, `Merge`, `Replace`, `Remove`, and `Insert`. Paths use 
 
 `Insert` can use `Find` anchors, `Before`/`After` placement, `Existing` idempotency matchers, and `Required: false` for optional anchors.
 
+Use `Targets` when one patch should apply the same operations to several assets:
+
+```json
+{
+  "Id": "MyMod_Shared_Tamework",
+  "Targets": [
+    "Server/NPC/Roles/Creature/Mammal/Cow.json",
+    "Server/NPC/Roles/Creature/Mammal/Sheep.json"
+  ],
+  "Operations": []
+}
+```
+
+## Conditions
+
+Add `When` to skip a patch unless the current server state matches the condition. Composite conditions support `All`, `Any`, and `Not`.
+
+```json
+{
+  "When": {
+    "All": [
+      { "ModInstalled": "alec:animal_husbandry" },
+      { "TargetExists": true },
+      {
+        "TameworkSetting": {
+          "Path": "traits.enabled",
+          "Equals": true
+        }
+      }
+    ]
+  }
+}
+```
+
+Supported conditions:
+
+- `ModInstalled`: matches a loaded asset pack id.
+- `AssetExists`: matches when the configured asset path exists in any loaded non-generated pack.
+- `AssetMissing`: matches when the configured asset path does not exist.
+- `TargetExists`: matches when the current `Target` or expanded `Targets` entry exists.
+- `ModVersion`: compares the loaded pack's `manifest.json` `Version`; supports `Equals`, `AtLeast`, `AtMost`, `Above`, and `Below`.
+- `GameVersion` or `ServerVersion`: compares the runtime version value from `hytale.server.version` or `hytale.game.version`, with the same version operators.
+- `JsonPathExists`: matches when a JSON pointer exists in an asset. Omit `Asset` or use `"$Target"` to inspect the current target.
+- `JsonPathEquals`: compares a JSON pointer value with `Value` or `Equals`.
+- `TameworkSetting`: compares a resolved `/tw settings` value with `Value` or `Equals`, such as `traits.enabled`, `progression.levelingEnabled`, or `telemetry.enabled`.
+
 ## Macros
 
 Macros are convenience expansions, not automatic placement. They still require explicit paths and anchors.

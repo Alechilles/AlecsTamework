@@ -173,6 +173,49 @@ final class AssetPatchScannerTest {
     }
 
     @Test
+    void targetExistsConditionFiltersExpandedTargetsIndividually() throws Exception {
+        Path packRoot = tempDir.resolve("target-conditional-pack");
+        Path contentRoot = tempDir.resolve("content-pack");
+        Path patchDir = packRoot.resolve(AssetPatchScanner.PATCH_DIRECTORY).resolve("Shared");
+        Files.createDirectories(patchDir);
+        writeTemplate(contentRoot, "Server/NPC/Roles/_Core/Templates/Cow.json", "Cow");
+        Files.writeString(
+                patchDir.resolve("SharedPatch.json"),
+                """
+                        {
+                          "Id": "SharedPatch",
+                          "Targets": [
+                            "Server/NPC/Roles/_Core/Templates/Cow.json",
+                            "Server/NPC/Roles/_Core/Templates/Missing.json"
+                          ],
+                          "When": {
+                            "TargetExists": true
+                          },
+                          "Operations": [
+                            {
+                              "Id": "flag",
+                              "Op": "Add",
+                              "Path": "/Patched",
+                              "Value": true
+                            }
+                          ]
+                        }
+                        """,
+                StandardCharsets.UTF_8
+        );
+
+        AssetPatchStatus status = new AssetPatchStatus();
+        List<AssetPatchDefinition> definitions = new AssetPatchScanner(null)
+                .scan(List.of(pack("ModPack", packRoot), pack("ContentPack", contentRoot)), "GeneratedPack", status);
+
+        assertEquals(1, definitions.size());
+        assertEquals("Server/NPC/Roles/_Core/Templates/Cow.json", definitions.getFirst().getTarget());
+        assertEquals(1, status.getSkipped().size());
+        assertTrue(status.getSkipped().getFirst().contains("Missing.json"));
+        assertEquals(0, status.getFailed().size());
+    }
+
+    @Test
     void targetResolverUsesLastRegisteredPackAsWinningSource() throws Exception {
         Path baseRoot = tempDir.resolve("base-pack");
         Path overrideRoot = tempDir.resolve("override-pack");

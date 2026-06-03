@@ -95,14 +95,12 @@ public final class AssetPatchScanner {
             }
             JsonObject root = element.getAsJsonObject();
             AssetPatchCondition condition = AssetPatchCondition.parseOptional(root);
-            if (!condition.matches(conditionContext)) {
-                String id = AssetPatchDefinition.readString(root, "Id", pack.getName() + ":" + sourcePath);
-                status.addSkipped(id + " condition not met: " + condition.describe());
-                return;
-            }
             List<AssetPatchDefinition> parsed = AssetPatchDefinition.parseAll(root, pack.getName(), sourcePath);
             for (AssetPatchDefinition definition : parsed) {
-                if (definition.isEnabled()) {
+                if (!condition.matches(conditionContext, definition.getTarget())) {
+                    status.addSkipped(definition.getId() + " skipped for " + definition.getTarget()
+                            + " because condition not met: " + condition.describe());
+                } else if (definition.isEnabled()) {
                     definitions.add(definition);
                 } else {
                     status.addSkipped(definition.getId() + " disabled");
@@ -118,13 +116,18 @@ public final class AssetPatchScanner {
     @Nonnull
     private static AssetPatchConditionContext conditionContext(@Nonnull List<AssetPack> packs,
                                                                @Nonnull String generatedPackId) {
-        List<String> packIds = new ArrayList<>();
+        List<AssetPatchConditionContext.PackInfo> packInfos = new ArrayList<>();
         for (AssetPack pack : packs) {
             if (pack != null && pack.getName() != null) {
-                packIds.add(pack.getName());
+                packInfos.add(AssetPatchConditionContext.packInfo(pack.getName(), pack.getRoot()));
             }
         }
-        return new AssetPatchConditionContext(generatedPackId, packIds);
+        return new AssetPatchConditionContext(
+                generatedPackId,
+                packInfos,
+                AssetPatchConditionContext.runtimeSettings(),
+                AssetPatchConditionContext.runtimeServerVersion()
+        );
     }
 
     private void logWarning(@Nonnull String message, @Nullable Throwable throwable) {
