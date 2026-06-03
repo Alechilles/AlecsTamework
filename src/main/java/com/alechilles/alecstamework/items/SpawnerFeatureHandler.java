@@ -497,7 +497,9 @@ public final class SpawnerFeatureHandler {
         }
         TameworkRuntimeSettings settings = TameworkRuntimeSettings.current();
         boolean captureClearsOwner = settings.captureClearsOwner();
-        boolean spawnAssignsOwner = settings.spawnSetsOwner();
+        boolean spawnAssignsOwner = spawnAssignsOwnerOverride != null
+                ? spawnAssignsOwnerOverride
+                : settings.spawnSetsOwner();
         return ItemFeatureConfig.builder()
                 .spawnerEnabled(baseConfig.isSpawnerEnabled())
                 .whistleEnabled(baseConfig.isWhistleEnabled())

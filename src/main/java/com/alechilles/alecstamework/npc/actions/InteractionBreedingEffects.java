@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -174,7 +175,7 @@ final class InteractionBreedingEffects {
         return BreedingEligibilityService.resolveThreshold(
                 interaction != null ? interaction.getMinHappiness() : null,
                 fallback,
-                TameworkRuntimeSettings.breedingRequiresHappiness(true)
+                TameworkRuntimeSettings.breedingHappinessRequirementEnabled(TwHappinessConfig.isEnabledForRole(roleId))
         );
     }
 }

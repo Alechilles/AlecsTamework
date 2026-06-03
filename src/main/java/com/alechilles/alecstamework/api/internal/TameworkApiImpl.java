@@ -1120,7 +1120,8 @@ public final class TameworkApiImpl
             if (breedingConfig != null) {
                 breeding.setReady(breeding.isEnabled()
                         && appliedValue >= TameworkRuntimeSettings.breedingHappinessThreshold(
-                                breedingConfig.resolveHappiness(roleId).getThreshold()
+                                breedingConfig.resolveHappiness(roleId).getThreshold(),
+                                TwHappinessConfig.isEnabledForRole(roleId)
                         ));
             }
             target.store().putComponent(target.reference(), breedingType, breeding);
@@ -1700,7 +1701,10 @@ public final class TameworkApiImpl
 
         Double threshold = null;
         if (config != null) {
-            threshold = config.resolveHappiness(roleId).getThreshold();
+            threshold = TameworkRuntimeSettings.breedingHappinessThreshold(
+                    config.resolveHappiness(roleId).getThreshold(),
+                    TwHappinessConfig.isEnabledForRole(roleId)
+            );
         }
         double fertilityMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,

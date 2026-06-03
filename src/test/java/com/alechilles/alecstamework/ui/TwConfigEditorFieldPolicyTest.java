@@ -183,13 +183,16 @@ class TwConfigEditorFieldPolicyTest {
     void settingsOwnedFieldMatrixNormalizesConfiguredPaths() {
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "OwnershipProtection.BlockOwnerDamage"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "SimpleClaims.Breeding.LimitPerClaimChunk"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Enabled"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Damage.StarvationDamagePerMinute"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.HAPPINESS, "Enabled"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.BREEDING, "PassiveBreeding.Enabled"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(
                 TwConfigFamily.BREEDING,
                 "RoleOverrides.Deer_Stag.PassiveBreeding.Enabled"
         ));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.SPAWNER, "Spawn.AssignsOwner"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.TRAIT, "Enabled"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.COMPANION, "Command.DeadRespawnEnabled"));
 
         assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.BREEDING, "PassiveBreeding.SweepIntervalSeconds"));
@@ -199,6 +202,8 @@ class TwConfigEditorFieldPolicyTest {
         ));
         assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.SPAWNER, "Capture.OwnerRestricted"));
         assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Values.HungerMin"));
+        assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.LEVELING, "Enabled"));
+        assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.TALENT, "Enabled"));
     }
 
     @Test
@@ -220,6 +225,7 @@ class TwConfigEditorFieldPolicyTest {
         assertNotNull(TwConfigEditorFieldPolicy.findField(globalFields, "InteractionDefaults.HarvestAlarmName"));
 
         JsonObject needs = new JsonObject();
+        needs.addProperty("Enabled", true);
         JsonObject damage = new JsonObject();
         damage.addProperty("Enabled", true);
         needs.add("Damage", damage);
@@ -232,8 +238,31 @@ class TwConfigEditorFieldPolicyTest {
                 null,
                 needs
         );
+        assertNull(TwConfigEditorFieldPolicy.findField(needsFields, "Enabled"));
         assertNull(TwConfigEditorFieldPolicy.findField(needsFields, "Damage.Enabled"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(needsFields, "Values.HungerMin"));
+
+        JsonObject happiness = new JsonObject();
+        happiness.addProperty("Enabled", true);
+        happiness.addProperty("Priority", 5);
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> happinessFields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.HAPPINESS, true, true),
+                null,
+                happiness
+        );
+        assertNull(TwConfigEditorFieldPolicy.findField(happinessFields, "Enabled"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(happinessFields, "Priority"));
+
+        JsonObject trait = new JsonObject();
+        trait.addProperty("Enabled", true);
+        trait.addProperty("Priority", 5);
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> traitFields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.TRAIT, true, true),
+                null,
+                trait
+        );
+        assertNull(TwConfigEditorFieldPolicy.findField(traitFields, "Enabled"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(traitFields, "Priority"));
     }
 
     @Test

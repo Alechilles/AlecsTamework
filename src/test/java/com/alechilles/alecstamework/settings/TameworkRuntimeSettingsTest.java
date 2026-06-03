@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.settings;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,6 +35,27 @@ class TameworkRuntimeSettingsTest {
         assertTrue(enabledSettings.talentsEnabled());
     }
 
+    @Test
+    void breedingHappinessRequirementRequiresBothHappinessAndBreedingGate() {
+        TameworkRuntimeSettings disabledHappiness =
+                TameworkRuntimeSettings.from(settingsWithHappinessRequirement(false, true));
+        assertFalse(disabledHappiness.breedingHappinessRequirementEnabled());
+
+        TameworkRuntimeSettings disabledRequirement =
+                TameworkRuntimeSettings.from(settingsWithHappinessRequirement(true, false));
+        assertFalse(disabledRequirement.breedingHappinessRequirementEnabled());
+
+        TameworkRuntimeSettings enabledRequirement =
+                TameworkRuntimeSettings.from(settingsWithHappinessRequirement(true, true));
+        assertTrue(enabledRequirement.breedingHappinessRequirementEnabled());
+    }
+
+    @Test
+    void breedingHappinessThresholdUsesConfigFallbackWhenRuntimeSettingsUnavailable() {
+        assertEquals(75.0, TameworkRuntimeSettings.breedingHappinessThreshold(75.0, true));
+        assertEquals(0.0, TameworkRuntimeSettings.breedingHappinessThreshold(75.0, false));
+    }
+
     private static ResolvedTameworkSettings settingsWithBreedingGenderEnabled(boolean enabled) {
         ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
         return settingsWithProgressionSettings(
@@ -47,13 +69,42 @@ class TameworkRuntimeSettingsTest {
                                                                           boolean talentsEnabled) {
         ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
         return settingsWithProgressionSettings(
+                defaults.happinessEnabled(),
+                defaults.breedingRequiresHappiness(),
                 defaults.breedingGenderEnabled(),
                 levelingEnabled,
                 talentsEnabled
         );
     }
 
+    private static ResolvedTameworkSettings settingsWithHappinessRequirement(boolean happinessEnabled,
+                                                                            boolean breedingRequiresHappiness) {
+        ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
+        return settingsWithProgressionSettings(
+                happinessEnabled,
+                breedingRequiresHappiness,
+                defaults.breedingGenderEnabled(),
+                defaults.levelingEnabled(),
+                defaults.talentsEnabled()
+        );
+    }
+
     private static ResolvedTameworkSettings settingsWithProgressionSettings(boolean breedingGenderEnabled,
+                                                                           boolean levelingEnabled,
+                                                                           boolean talentsEnabled) {
+        ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
+        return settingsWithProgressionSettings(
+                defaults.happinessEnabled(),
+                defaults.breedingRequiresHappiness(),
+                breedingGenderEnabled,
+                levelingEnabled,
+                talentsEnabled
+        );
+    }
+
+    private static ResolvedTameworkSettings settingsWithProgressionSettings(boolean happinessEnabled,
+                                                                           boolean breedingRequiresHappiness,
+                                                                           boolean breedingGenderEnabled,
                                                                            boolean levelingEnabled,
                                                                            boolean talentsEnabled) {
         ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
@@ -84,9 +135,9 @@ class TameworkRuntimeSettingsTest {
                 defaults.needsStarvationDamagePerMinute(),
                 defaults.needsDehydrationDamagePerMinute(),
                 defaults.needsDamageLethal(),
-                defaults.happinessEnabled(),
+                happinessEnabled,
                 defaults.passiveBreedingEnabled(),
-                defaults.breedingRequiresHappiness(),
+                breedingRequiresHappiness,
                 breedingGenderEnabled,
                 defaults.traitsEnabled(),
                 levelingEnabled,

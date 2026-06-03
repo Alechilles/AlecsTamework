@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
@@ -521,7 +522,8 @@ final class CommandRespawnService {
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         return happiness >= TameworkRuntimeSettings.breedingHappinessThreshold(
-                config.resolveHappiness(roleId).getThreshold()
+                config.resolveHappiness(roleId).getThreshold(),
+                TwHappinessConfig.isEnabledForRole(roleId)
         );
     }
 

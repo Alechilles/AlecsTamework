@@ -25,6 +25,9 @@ public final class TameworkSettingsOwnedField {
             "tickpolicy.",
             "damage."
     );
+    private static final Set<String> MASTER_ENABLED_EXACT_PATHS = Set.of(
+            "enabled"
+    );
     private static final Set<String> BREEDING_EXACT_PATHS = Set.of(
             "passivebreeding.enabled"
     );
@@ -52,10 +55,11 @@ public final class TameworkSettingsOwnedField {
         }
         return switch (family) {
             case GLOBAL -> matches(normalized, GLOBAL_EXACT_PATHS, GLOBAL_PREFIX_PATHS);
-            case NEEDS -> matches(normalized, Set.of(), NEEDS_PREFIX_PATHS);
+            case NEEDS -> matches(normalized, MASTER_ENABLED_EXACT_PATHS, NEEDS_PREFIX_PATHS);
             case BREEDING -> matches(normalized, BREEDING_EXACT_PATHS, Set.of())
                     || roleOverridePassiveBreedingEnabled(normalized);
             case SPAWNER -> matches(normalized, SPAWNER_EXACT_PATHS, Set.of());
+            case HAPPINESS, TRAIT -> matches(normalized, MASTER_ENABLED_EXACT_PATHS, Set.of());
             case COMPANION -> matches(normalized, COMPANION_EXACT_PATHS, COMPANION_PREFIX_PATHS);
             default -> false;
         };

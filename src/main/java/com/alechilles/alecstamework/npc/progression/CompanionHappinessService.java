@@ -363,7 +363,8 @@ public final class CompanionHappinessService {
             if (breedingConfig != null) {
                 String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
                 boolean ready = breeding.isEnabled() && next >= TameworkRuntimeSettings.breedingHappinessThreshold(
-                        breedingConfig.resolveHappiness(roleId).getThreshold()
+                        breedingConfig.resolveHappiness(roleId).getThreshold(),
+                        TwHappinessConfig.isEnabledForRole(roleId)
                 );
                 if (breeding.isReady() != ready) {
                     breeding.setReady(ready);

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
@@ -17,6 +18,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -471,7 +473,10 @@ final class SpawnerNpcProgressionMetadataService {
             TwBreedingConfig config = TwBreedingConfig.resolveById(resolvedConfigId);
             if (config != null) {
                 String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-                ready = value >= config.resolveHappiness(roleId).getThreshold();
+                ready = value >= TameworkRuntimeSettings.breedingHappinessThreshold(
+                        config.resolveHappiness(roleId).getThreshold(),
+                        TwHappinessConfig.isEnabledForRole(roleId)
+                );
             }
         }
         TameworkBreedingComponent component = new TameworkBreedingComponent(

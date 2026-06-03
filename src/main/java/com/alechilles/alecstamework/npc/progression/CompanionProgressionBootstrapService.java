@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -177,7 +178,10 @@ public final class CompanionProgressionBootstrapService {
                 ? happiness.getLastUpdateMs()
                 : now;
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        boolean ready = happinessValue >= config.resolveHappiness(roleId).getThreshold();
+        boolean ready = happinessValue >= TameworkRuntimeSettings.breedingHappinessThreshold(
+                config.resolveHappiness(roleId).getThreshold(),
+                TwHappinessConfig.isEnabledForRole(roleId)
+        );
         TameworkBreedingComponent existing = store.getComponent(npcRef, breedingType);
         if (existing != null) {
             boolean changed = false;

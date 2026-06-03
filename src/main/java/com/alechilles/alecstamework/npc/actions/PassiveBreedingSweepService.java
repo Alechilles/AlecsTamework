@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
@@ -156,7 +157,8 @@ public final class PassiveBreedingSweepService {
         double threshold = BreedingEligibilityService.resolveThreshold(
                 null,
                 TameworkRuntimeSettings.breedingHappinessThreshold(
-                        candidate.config().resolveHappiness(candidate.roleId()).getThreshold()
+                        candidate.config().resolveHappiness(candidate.roleId()).getThreshold(),
+                        TwHappinessConfig.isEnabledForRole(candidate.roleId())
                 )
         );
         double effectiveHappiness = BreedingEligibilityService.resolveEffectiveHappiness(happiness, 1.0, null);

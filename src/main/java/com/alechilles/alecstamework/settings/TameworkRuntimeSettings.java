@@ -185,6 +185,10 @@ public final class TameworkRuntimeSettings {
         return values.breedingRequiresHappiness();
     }
 
+    public boolean breedingHappinessRequirementEnabled() {
+        return values.happinessEnabled() && values.breedingRequiresHappiness();
+    }
+
     public boolean breedingGenderEnabled() {
         return values.breedingGenderEnabled();
     }
@@ -336,16 +340,23 @@ public final class TameworkRuntimeSettings {
         return settings != null ? settings.breedingRequiresHappiness() : configEnabled;
     }
 
+    public static boolean breedingHappinessRequirementEnabled(boolean configHappinessEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null
+                ? settings.breedingHappinessRequirementEnabled()
+                : configHappinessEnabled;
+    }
+
     public static boolean breedingGenderEnabled(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.breedingGenderEnabledForConfig(configEnabled) : configEnabled;
     }
 
     public static double breedingHappinessThreshold(double configThreshold) {
-        TameworkRuntimeSettings settings = currentOrNull();
-        if (settings == null || (settings.happinessEnabled() && settings.breedingRequiresHappiness())) {
-            return configThreshold;
-        }
-        return 0.0;
+        return breedingHappinessThreshold(configThreshold, true);
+    }
+
+    public static double breedingHappinessThreshold(double configThreshold, boolean configHappinessEnabled) {
+        return breedingHappinessRequirementEnabled(configHappinessEnabled) ? configThreshold : 0.0;
     }
 }
