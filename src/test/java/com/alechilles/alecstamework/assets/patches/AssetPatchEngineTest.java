@@ -21,6 +21,47 @@ final class AssetPatchEngineTest {
     private final AssetPatchEngine engine = new AssetPatchEngine();
 
     @Test
+    void appliesExpandedMultiTargetDefinitionsIndependently() {
+        JsonObject cowTemplate = object("""
+                {
+                  "Name": "Cow"
+                }
+                """);
+        JsonObject sheepTemplate = object("""
+                {
+                  "Name": "Sheep"
+                }
+                """);
+        List<AssetPatchDefinition> definitions = AssetPatchDefinition.parseAll(object("""
+                {
+                  "Id": "SharedLivestockPatch",
+                  "Targets": [
+                    "Server/NPC/Roles/_Core/Templates/Cow.json",
+                    "Server/NPC/Roles/_Core/Templates/Sheep.json"
+                  ],
+                  "Operations": [
+                    {
+                      "Id": "flag",
+                      "Op": "Add",
+                      "Path": "/Patched",
+                      "Value": true
+                    }
+                  ]
+                }
+                """), "TestPack", "Server/Tamework/Patches/Shared.json");
+
+        AssetPatchEngine.PatchResult cowResult = engine.apply(cowTemplate, List.of(definitions.get(0)));
+        AssetPatchEngine.PatchResult sheepResult = engine.apply(sheepTemplate, List.of(definitions.get(1)));
+
+        assertTrue(cowResult.patched().get("Patched").getAsBoolean());
+        assertTrue(sheepResult.patched().get("Patched").getAsBoolean());
+        assertEquals("Server/NPC/Roles/_Core/Templates/Cow.json", definitions.get(0).getTarget());
+        assertEquals("Server/NPC/Roles/_Core/Templates/Sheep.json", definitions.get(1).getTarget());
+        assertEquals(1, cowResult.status().getApplied().size());
+        assertEquals(1, sheepResult.status().getApplied().size());
+    }
+
+    @Test
     void appliesRawObjectAndArrayOperations() {
         JsonObject template = object("""
                 {
