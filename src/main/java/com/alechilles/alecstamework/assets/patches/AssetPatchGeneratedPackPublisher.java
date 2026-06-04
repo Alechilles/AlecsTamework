@@ -88,7 +88,7 @@ public final class AssetPatchGeneratedPackPublisher {
                 return new PublicationResult(true, action, existingPackPresent, Set.of(), mutation.removedTargets());
             }
             case REFRESH_EXISTING_PACK -> {
-                moveGeneratedPackToHighestPriority(assetModule, root);
+                moveGeneratedPackToLastWinningPriority(assetModule, root);
                 return new PublicationResult(
                         true,
                         action,
@@ -99,7 +99,7 @@ public final class AssetPatchGeneratedPackPublisher {
             }
             case REGISTER_PACK -> {
                 assetModule.registerPack(generatedPackId, root, plugin.getManifest(), AssetPack.PackSource.RUNTIME);
-                moveGeneratedPackToHighestPriority(assetModule, root);
+                moveGeneratedPackToLastWinningPriority(assetModule, root);
                 return new PublicationResult(
                         true,
                         action,
@@ -276,13 +276,13 @@ public final class AssetPatchGeneratedPackPublisher {
         return root.relativize(file).toString().replace('\\', '/');
     }
 
-    private void moveGeneratedPackToHighestPriority(@Nonnull AssetModule assetModule, @Nonnull Path root) {
-        moveGeneratedPackToHighestPriority(assetModule.getAssetPacks(), generatedPackId, root);
+    private void moveGeneratedPackToLastWinningPriority(@Nonnull AssetModule assetModule, @Nonnull Path root) {
+        moveGeneratedPackToLastWinningPriority(assetModule.getAssetPacks(), generatedPackId, root);
     }
 
-    static void moveGeneratedPackToHighestPriority(@Nonnull java.util.List<AssetPack> packs,
-                                                   @Nonnull String generatedPackId,
-                                                   @Nonnull Path root) {
+    static void moveGeneratedPackToLastWinningPriority(@Nonnull java.util.List<AssetPack> packs,
+                                                       @Nonnull String generatedPackId,
+                                                       @Nonnull Path root) {
         int currentIndex = -1;
         for (int i = 0; i < packs.size(); i++) {
             AssetPack pack = packs.get(i);
@@ -291,11 +291,11 @@ public final class AssetPatchGeneratedPackPublisher {
                 break;
             }
         }
-        if (currentIndex <= 0) {
+        if (currentIndex < 0 || currentIndex == packs.size() - 1) {
             return;
         }
         AssetPack generated = packs.remove(currentIndex);
-        packs.add(0, generated);
+        packs.add(generated);
     }
 
     @Nullable

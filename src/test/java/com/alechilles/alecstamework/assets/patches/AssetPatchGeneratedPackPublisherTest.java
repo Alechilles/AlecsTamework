@@ -233,20 +233,20 @@ final class AssetPatchGeneratedPackPublisherTest {
     }
 
     @Test
-    void movesGeneratedPackToHighestPriorityByCacheRoot(@TempDir Path tempDir) {
+    void movesGeneratedPackToLastWinningPriorityByCacheRoot(@TempDir Path tempDir) {
         Path generatedRoot = tempDir.resolve("GeneratedPatches");
         AssetPack contentPack = pack("Ceraph:Chocobo Tales", tempDir.resolve("Chocobo"));
         AssetPack generatedPack = pack("Alechilles:Alec's Tamework!", generatedRoot);
         List<AssetPack> packs = new ArrayList<>(List.of(contentPack, generatedPack));
 
-        AssetPatchGeneratedPackPublisher.moveGeneratedPackToHighestPriority(
+        AssetPatchGeneratedPackPublisher.moveGeneratedPackToLastWinningPriority(
                 packs,
                 "Alechilles:Alec's Tamework!_GeneratedPatches",
                 generatedRoot
         );
 
-        assertEquals(generatedPack, packs.getFirst());
-        assertEquals(contentPack, packs.get(1));
+        assertEquals(contentPack, packs.getFirst());
+        assertEquals(generatedPack, packs.get(1));
     }
 
     private static AssetPack pack(String name, Path root) {
