@@ -7,10 +7,12 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -66,7 +68,8 @@ public final class AssetPatchGeneratedPackPublisher {
             throw new IOException("AssetModule unavailable.");
         }
 
-        AssetPack existingPack = assetModule.getAssetPack(generatedPackId);
+        Path root = cacheRoot();
+        AssetPack existingPack = findGeneratedPack(assetModule.getAssetPacks(), generatedPackId, root);
         boolean existingPackPresent = existingPack != null;
 
         PublicationAction action = publicationAction(
@@ -74,7 +77,6 @@ public final class AssetPatchGeneratedPackPublisher {
                 !generatedAssets.isEmpty(),
                 registrationMode
         );
-        Path root = cacheRoot();
         CacheMutationResult mutation = mutateCacheForPublication(action, root, generatedAssets, status);
         if (!mutation.succeeded()) {
             return new PublicationResult(false, action, existingPackPresent, Set.of(), Set.of());
@@ -86,7 +88,7 @@ public final class AssetPatchGeneratedPackPublisher {
                 return new PublicationResult(true, action, existingPackPresent, Set.of(), mutation.removedTargets());
             }
             case REFRESH_EXISTING_PACK -> {
-                moveGeneratedPackToEnd(assetModule);
+                moveGeneratedPackToHighestPriority(assetModule, root);
                 return new PublicationResult(
                         true,
                         action,
@@ -97,7 +99,7 @@ public final class AssetPatchGeneratedPackPublisher {
             }
             case REGISTER_PACK -> {
                 assetModule.registerPack(generatedPackId, root, plugin.getManifest(), AssetPack.PackSource.RUNTIME);
-                moveGeneratedPackToEnd(assetModule);
+                moveGeneratedPackToHighestPriority(assetModule, root);
                 return new PublicationResult(
                         true,
                         action,
@@ -209,7 +211,7 @@ public final class AssetPatchGeneratedPackPublisher {
         if (assetModule == null) {
             throw new IOException("AssetModule unavailable.");
         }
-        AssetPack generatedPack = assetModule.getAssetPack(generatedPackId);
+        AssetPack generatedPack = findGeneratedPack(assetModule.getAssetPacks(), generatedPackId, cacheRoot());
         if (generatedPack == null) {
             throw new IOException("Generated Tamework patch pack is not registered.");
         }
@@ -247,7 +249,15 @@ public final class AssetPatchGeneratedPackPublisher {
             throw new IOException("Generated target escapes cache root: " + target);
         }
         Files.createDirectories(output.getParent());
-        Files.writeString(output, GSON.toJson(asset), StandardCharsets.UTF_8);
+        String json = GSON.toJson(asset);
+        if (isExistingContentSame(output, json)) {
+            return;
+        }
+        Files.writeString(output, json, StandardCharsets.UTF_8);
+    }
+
+    static boolean isExistingContentSame(@Nonnull Path output, @Nonnull String json) throws IOException {
+        return Files.isRegularFile(output) && Files.readString(output, StandardCharsets.UTF_8).equals(json);
     }
 
     static boolean isGeneratedPatchTargetFile(@Nonnull Path path) {
@@ -266,21 +276,54 @@ public final class AssetPatchGeneratedPackPublisher {
         return root.relativize(file).toString().replace('\\', '/');
     }
 
-    private void moveGeneratedPackToEnd(@Nonnull AssetModule assetModule) {
-        var packs = assetModule.getAssetPacks();
+    private void moveGeneratedPackToHighestPriority(@Nonnull AssetModule assetModule, @Nonnull Path root) {
+        moveGeneratedPackToHighestPriority(assetModule.getAssetPacks(), generatedPackId, root);
+    }
+
+    static void moveGeneratedPackToHighestPriority(@Nonnull java.util.List<AssetPack> packs,
+                                                   @Nonnull String generatedPackId,
+                                                   @Nonnull Path root) {
         int currentIndex = -1;
         for (int i = 0; i < packs.size(); i++) {
             AssetPack pack = packs.get(i);
-            if (pack != null && generatedPackId.equals(pack.getName())) {
+            if (isGeneratedPack(pack, generatedPackId, root)) {
                 currentIndex = i;
                 break;
             }
         }
-        if (currentIndex < 0 || currentIndex == packs.size() - 1) {
+        if (currentIndex <= 0) {
             return;
         }
         AssetPack generated = packs.remove(currentIndex);
-        packs.add(generated);
+        packs.add(0, generated);
+    }
+
+    @Nullable
+    static AssetPack findGeneratedPack(@Nonnull java.util.List<AssetPack> packs,
+                                       @Nonnull String generatedPackId,
+                                       @Nonnull Path root) {
+        for (AssetPack pack : packs) {
+            if (isGeneratedPack(pack, generatedPackId, root)) {
+                return pack;
+            }
+        }
+        return null;
+    }
+
+    static boolean isGeneratedPack(@Nullable AssetPack pack,
+                                   @Nonnull String generatedPackId,
+                                   @Nonnull Path root) {
+        if (pack == null) {
+            return false;
+        }
+        if (generatedPackId.equals(pack.getName())) {
+            return true;
+        }
+        Path packRoot = pack.getRoot();
+        if (packRoot == null) {
+            return false;
+        }
+        return Objects.equals(packRoot.toAbsolutePath().normalize(), root.toAbsolutePath().normalize());
     }
 
     record PublicationResult(boolean cacheMutationSucceeded,

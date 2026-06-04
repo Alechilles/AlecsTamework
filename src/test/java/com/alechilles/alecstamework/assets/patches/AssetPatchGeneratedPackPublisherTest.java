@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
+import com.hypixel.hytale.assetstore.AssetPack;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -150,6 +153,22 @@ final class AssetPatchGeneratedPackPublisherTest {
     }
 
     @Test
+    void detectsUnchangedGeneratedContent(@TempDir Path tempDir) throws Exception {
+        Path output = tempDir.resolve("Server/Item/Items/Tool_Crate.json");
+        Files.createDirectories(output.getParent());
+        Files.writeString(output, "{\n  \"Patched\": true\n}");
+
+        assertTrue(AssetPatchGeneratedPackPublisher.isExistingContentSame(
+                output,
+                "{\n  \"Patched\": true\n}"
+        ));
+        assertFalse(AssetPatchGeneratedPackPublisher.isExistingContentSame(
+                output,
+                "{\n  \"Patched\": false\n}"
+        ));
+    }
+
+    @Test
     void emptyRuntimeRefreshPrunesAllGeneratedJsonWithoutNpcBuilderUnload(@TempDir Path tempDir)
             throws Exception {
         Path staleTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Stale.json");
@@ -199,5 +218,38 @@ final class AssetPatchGeneratedPackPublisherTest {
                 AssetPatchGeneratedPackPublisher.PublicationAction.MISSING_RUNTIME_PACK,
                 false
         ));
+    }
+
+    @Test
+    void findsGeneratedPackByCacheRootWhenRuntimeNameDiffers(@TempDir Path tempDir) {
+        Path generatedRoot = tempDir.resolve("GeneratedPatches");
+        AssetPack generatedPack = pack("Alechilles:Alec's Tamework!", generatedRoot);
+
+        assertEquals(generatedPack, AssetPatchGeneratedPackPublisher.findGeneratedPack(
+                List.of(pack("Ceraph:Chocobo Tales", tempDir.resolve("Chocobo")), generatedPack),
+                "Alechilles:Alec's Tamework!_GeneratedPatches",
+                generatedRoot
+        ));
+    }
+
+    @Test
+    void movesGeneratedPackToHighestPriorityByCacheRoot(@TempDir Path tempDir) {
+        Path generatedRoot = tempDir.resolve("GeneratedPatches");
+        AssetPack contentPack = pack("Ceraph:Chocobo Tales", tempDir.resolve("Chocobo"));
+        AssetPack generatedPack = pack("Alechilles:Alec's Tamework!", generatedRoot);
+        List<AssetPack> packs = new ArrayList<>(List.of(contentPack, generatedPack));
+
+        AssetPatchGeneratedPackPublisher.moveGeneratedPackToHighestPriority(
+                packs,
+                "Alechilles:Alec's Tamework!_GeneratedPatches",
+                generatedRoot
+        );
+
+        assertEquals(generatedPack, packs.getFirst());
+        assertEquals(contentPack, packs.get(1));
+    }
+
+    private static AssetPack pack(String name, Path root) {
+        return new AssetPack(root, name, root, FileSystems.getDefault(), false, null, AssetPack.PackSource.RUNTIME);
     }
 }
