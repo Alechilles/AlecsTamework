@@ -6,6 +6,8 @@
 - Captured spawner tooltip text now uses Hytale's built-in item display metadata instead of an optional tooltip bridge.
 
 ### Fixed
+- Fixed generated asset patch pack ordering so patch overlays load after the source pack they target.
+- Stabilized generated asset patch publication so repeated regeneration preserves pack ordering and avoids stale patch-pack placement.
 - Cached optional integration reflection fallbacks so missing SimpleClaims, feed-trough container APIs, and legacy combat-text protocol paths no longer rebuild missing-class exceptions in repeated runtime flows.
 - Fixed a multi-world attachment sync crash caused by fail-fast shared cache pruning on concurrent world ticks.
 
