@@ -15,9 +15,7 @@
     "releaseType": "release",
     "changelogType": "html",
     "gameVersionTypeIds": [65437],
-    "requiredProjects": [
-      { "id": 1459711, "slug": "dynamictooltipslib", "type": "optionalDependency" }
-    ]
+    "requiredProjects": []
   },
   "modtale": {
     "projectId": "3145c0f3-a890-49b3-bc87-0648b8bd736c",

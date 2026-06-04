@@ -9,6 +9,8 @@ import javax.annotation.Nullable;
  * Reflective bridge to SimpleClaims for optional Tamework claim integrations.
  */
 public final class SimpleClaimsBreedingBridge {
+    @Nullable
+    private static volatile SimpleClaimsBreedingBridge cachedBridge;
 
     public enum LookupStatus {
         CLAIM_FOUND,
@@ -84,6 +86,21 @@ public final class SimpleClaimsBreedingBridge {
     }
 
     public static SimpleClaimsBreedingBridge initialize() {
+        SimpleClaimsBreedingBridge bridge = cachedBridge;
+        if (bridge != null) {
+            return bridge;
+        }
+        synchronized (SimpleClaimsBreedingBridge.class) {
+            bridge = cachedBridge;
+            if (bridge == null) {
+                bridge = createBridge();
+                cachedBridge = bridge;
+            }
+            return bridge;
+        }
+    }
+
+    private static SimpleClaimsBreedingBridge createBridge() {
         try {
             Class<?> claimManagerClass = Class.forName("com.buuz135.simpleclaims.claim.ClaimManager");
             Class<?> chunkInfoClass = Class.forName("com.buuz135.simpleclaims.claim.chunk.ChunkInfo");
@@ -320,6 +337,12 @@ public final class SimpleClaimsBreedingBridge {
 
     private static SimpleClaimsBreedingBridge unavailable(@Nullable String reason) {
         return new SimpleClaimsBreedingBridge(false, reason, null, null, null, null, null, null, null, null, null);
+    }
+
+    static void clearCachedBridgeForTests() {
+        synchronized (SimpleClaimsBreedingBridge.class) {
+            cachedBridge = null;
+        }
     }
 
     @Nullable

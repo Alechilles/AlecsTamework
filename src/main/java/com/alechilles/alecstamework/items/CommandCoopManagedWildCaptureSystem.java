@@ -53,6 +53,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -101,14 +102,14 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private final CoopEffectService coopEffectService;
     private final CoopResidentReleasePositionService releasePositionService;
 
-    private final HashMap<String, Long> nextCaptureAtByCoopKey = new HashMap<>();
-    private final HashMap<String, Long> nextReleaseAtByCoopKey = new HashMap<>();
-    private final HashMap<String, Long> nextProduceCheckAtByCoopKey = new HashMap<>();
-    private final HashMap<String, Long> lastProduceAtGameMsBySlotKey = new HashMap<>();
-    private final HashMap<String, Boolean> lastRoamingStateByCoopKey = new HashMap<>();
-    private final HashMap<String, Long> debugThrottleNextLogAtByKey = new HashMap<>();
-    private final HashMap<String, Integer> debugThrottleSuppressedCountByKey = new HashMap<>();
-    private final HashSet<String> inFlightSlots = new HashSet<>();
+    private final Map<String, Long> nextCaptureAtByCoopKey = new ConcurrentHashMap<>();
+    private final Map<String, Long> nextReleaseAtByCoopKey = new ConcurrentHashMap<>();
+    private final Map<String, Long> nextProduceCheckAtByCoopKey = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastProduceAtGameMsBySlotKey = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> lastRoamingStateByCoopKey = new ConcurrentHashMap<>();
+    private final Map<String, Long> debugThrottleNextLogAtByKey = new ConcurrentHashMap<>();
+    private final Map<String, Integer> debugThrottleSuppressedCountByKey = new ConcurrentHashMap<>();
+    private final Set<String> inFlightSlots = ConcurrentHashMap.newKeySet();
 
     private long nextSweepAtMs;
     private long nextRemovedCoopReleaseCheckAtMs;
@@ -266,12 +267,29 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private void pruneRuntimeState(@Nonnull Set<String> activeCoopKeys) {
-        nextCaptureAtByCoopKey.keySet().retainAll(activeCoopKeys);
-        nextReleaseAtByCoopKey.keySet().retainAll(activeCoopKeys);
-        nextProduceCheckAtByCoopKey.keySet().retainAll(activeCoopKeys);
-        lastRoamingStateByCoopKey.keySet().retainAll(activeCoopKeys);
+        pruneInactiveKeys(nextCaptureAtByCoopKey, activeCoopKeys);
+        pruneInactiveKeys(nextReleaseAtByCoopKey, activeCoopKeys);
+        pruneInactiveKeys(nextProduceCheckAtByCoopKey, activeCoopKeys);
+        pruneInactiveKeys(lastRoamingStateByCoopKey, activeCoopKeys);
         inFlightSlots.removeIf(slotKey -> !isActiveSlotKey(slotKey, activeCoopKeys));
         lastProduceAtGameMsBySlotKey.keySet().removeIf(slotKey -> !isActiveSlotKey(slotKey, activeCoopKeys));
+    }
+
+    private static <T> void pruneInactiveKeys(@Nonnull Map<String, T> valuesByKey,
+                                              @Nonnull Set<String> activeKeys) {
+        if (valuesByKey.isEmpty()) {
+            return;
+        }
+        if (activeKeys.isEmpty()) {
+            valuesByKey.clear();
+            return;
+        }
+        for (String key : new ArrayList<>(valuesByKey.keySet())) {
+            if (key != null && activeKeys.contains(key)) {
+                continue;
+            }
+            valuesByKey.remove(key);
+        }
     }
 
     private boolean isActiveSlotKey(@Nullable String slotKey, @Nonnull Set<String> activeCoopKeys) {

@@ -32,9 +32,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 
 /** Handles presentation-facing effects like UI messages, sounds, particles, and combat text. */
 final class InteractionPresentationEffects {
+    private static final Map<QueueUpdateKey, Method> QUEUE_UPDATE_METHOD_CACHE = new ConcurrentHashMap<>();
+    private static final Set<QueueUpdateKey> MISSING_QUEUE_UPDATE_METHOD_CACHE = ConcurrentHashMap.newKeySet();
+
     private final InteractionUiMessageService uiMessageService = new InteractionUiMessageService();
     private final InteractionParticleSpawnResolver particleSpawnResolver;
 
@@ -469,31 +476,15 @@ final class InteractionPresentationEffects {
     private static boolean invokeLegacyCombatTextUpdate(EntityTrackerSystems.EntityViewer viewer,
                                                         Ref<EntityStore> npcRef,
                                                         CombatTextUpdate combatTextUpdate) {
-        try {
-            Class<?> componentUpdateClass = Class.forName("com.hypixel.hytale.protocol.ComponentUpdate");
-            if (Modifier.isAbstract(componentUpdateClass.getModifiers())) {
-                return false;
-            }
-            Object legacyUpdate = componentUpdateClass.getDeclaredConstructor().newInstance();
-
-            Class<?> componentUpdateTypeClass = Class.forName("com.hypixel.hytale.protocol.ComponentUpdateType");
-            if (!componentUpdateTypeClass.isEnum()) {
-                return false;
-            }
-            Object combatTextType = Enum.valueOf(
-                    (Class<? extends Enum>) componentUpdateTypeClass.asSubclass(Enum.class),
-                    "CombatText"
-            );
-
-            Field typeField = componentUpdateClass.getField("type");
-            typeField.set(legacyUpdate, combatTextType);
-            Field combatTextField = componentUpdateClass.getField("combatTextUpdate");
-            combatTextField.set(legacyUpdate, combatTextUpdate);
-
-            return invokeQueueUpdate(viewer, npcRef, legacyUpdate);
-        } catch (Exception | LinkageError ex) {
+        LegacyCombatTextUpdateSupport support = LegacyCombatTextUpdateSupportHolder.INSTANCE;
+        if (!support.available()) {
             return false;
         }
+        Object legacyUpdate = support.createUpdate(combatTextUpdate);
+        if (legacyUpdate == null) {
+            return false;
+        }
+        return invokeQueueUpdate(viewer, npcRef, legacyUpdate);
     }
 
     private static boolean invokeQueueUpdate(EntityTrackerSystems.EntityViewer viewer,
@@ -502,33 +493,135 @@ final class InteractionPresentationEffects {
         if (viewer == null || npcRef == null || update == null) {
             return false;
         }
+        Method method = resolveQueueUpdateMethod(viewer.getClass(), update.getClass());
+        if (method == null) {
+            return false;
+        }
         try {
-            Method method = viewer.getClass().getMethod("queueUpdate", Ref.class, update.getClass());
             method.invoke(viewer, npcRef, update);
             return true;
-        } catch (NoSuchMethodException ignored) {
-            // Fallback: find any compatible queueUpdate overload.
-            for (Method method : viewer.getClass().getMethods()) {
-                if (!"queueUpdate".equals(method.getName()) || method.getParameterCount() != 2) {
-                    continue;
-                }
-                Class<?>[] params = method.getParameterTypes();
-                if (!params[0].isInstance(npcRef)) {
-                    continue;
-                }
-                if (!params[1].isInstance(update)) {
-                    continue;
-                }
-                try {
-                    method.invoke(viewer, npcRef, update);
-                    return true;
-                } catch (Exception | LinkageError ex) {
-                    return false;
-                }
-            }
-            return false;
         } catch (Exception | LinkageError ex) {
             return false;
+        }
+    }
+
+    static void clearReflectionCachesForTests() {
+        QUEUE_UPDATE_METHOD_CACHE.clear();
+        MISSING_QUEUE_UPDATE_METHOD_CACHE.clear();
+    }
+
+    static int cachedQueueUpdateMethodCountForTests() {
+        return QUEUE_UPDATE_METHOD_CACHE.size();
+    }
+
+    static int missingQueueUpdateMethodCountForTests() {
+        return MISSING_QUEUE_UPDATE_METHOD_CACHE.size();
+    }
+
+    @Nullable
+    static Method resolveQueueUpdateMethodForTests(Class<?> viewerClass, Class<?> updateClass) {
+        return resolveQueueUpdateMethod(viewerClass, updateClass);
+    }
+
+    @Nullable
+    private static Method resolveQueueUpdateMethod(Class<?> viewerClass, Class<?> updateClass) {
+        QueueUpdateKey key = new QueueUpdateKey(viewerClass, updateClass);
+        Method cached = QUEUE_UPDATE_METHOD_CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        if (MISSING_QUEUE_UPDATE_METHOD_CACHE.contains(key)) {
+            return null;
+        }
+        Method resolved = findQueueUpdateMethod(viewerClass, updateClass);
+        if (resolved == null) {
+            MISSING_QUEUE_UPDATE_METHOD_CACHE.add(key);
+            return null;
+        }
+        Method existing = QUEUE_UPDATE_METHOD_CACHE.putIfAbsent(key, resolved);
+        return existing != null ? existing : resolved;
+    }
+
+    @Nullable
+    private static Method findQueueUpdateMethod(Class<?> viewerClass, Class<?> updateClass) {
+        if (viewerClass == null || updateClass == null) {
+            return null;
+        }
+        for (Method method : viewerClass.getMethods()) {
+            if (!"queueUpdate".equals(method.getName()) || method.getParameterCount() != 2) {
+                continue;
+            }
+            Class<?>[] params = method.getParameterTypes();
+            if (!params[0].isAssignableFrom(Ref.class)) {
+                continue;
+            }
+            if (!params[1].isAssignableFrom(updateClass)) {
+                continue;
+            }
+            return method;
+        }
+        return null;
+    }
+
+    private record QueueUpdateKey(Class<?> viewerClass, Class<?> updateClass) {
+    }
+
+    private record LegacyCombatTextUpdateSupport(boolean available,
+                                                 @Nullable java.lang.reflect.Constructor<?> constructor,
+                                                 @Nullable Field typeField,
+                                                 @Nullable Field combatTextField,
+                                                 @Nullable Object combatTextType) {
+        static LegacyCombatTextUpdateSupport unavailable() {
+            return new LegacyCombatTextUpdateSupport(false, null, null, null, null);
+        }
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        static LegacyCombatTextUpdateSupport resolve() {
+            try {
+                Class<?> componentUpdateClass = Class.forName("com.hypixel.hytale.protocol.ComponentUpdate");
+                if (Modifier.isAbstract(componentUpdateClass.getModifiers())) {
+                    return unavailable();
+                }
+                Class<?> componentUpdateTypeClass = Class.forName("com.hypixel.hytale.protocol.ComponentUpdateType");
+                if (!componentUpdateTypeClass.isEnum()) {
+                    return unavailable();
+                }
+                Object combatTextType = Enum.valueOf(
+                        (Class<? extends Enum>) componentUpdateTypeClass.asSubclass(Enum.class),
+                        "CombatText"
+                );
+                return new LegacyCombatTextUpdateSupport(
+                        true,
+                        componentUpdateClass.getDeclaredConstructor(),
+                        componentUpdateClass.getField("type"),
+                        componentUpdateClass.getField("combatTextUpdate"),
+                        combatTextType
+                );
+            } catch (Exception | LinkageError ex) {
+                return unavailable();
+            }
+        }
+
+        @Nullable
+        Object createUpdate(CombatTextUpdate combatTextUpdate) {
+            if (!available || constructor == null || typeField == null || combatTextField == null) {
+                return null;
+            }
+            try {
+                Object legacyUpdate = constructor.newInstance();
+                typeField.set(legacyUpdate, combatTextType);
+                combatTextField.set(legacyUpdate, combatTextUpdate);
+                return legacyUpdate;
+            } catch (Exception | LinkageError ex) {
+                return null;
+            }
+        }
+    }
+
+    private static final class LegacyCombatTextUpdateSupportHolder {
+        private static final LegacyCombatTextUpdateSupport INSTANCE = LegacyCombatTextUpdateSupport.resolve();
+
+        private LegacyCombatTextUpdateSupportHolder() {
         }
     }
 

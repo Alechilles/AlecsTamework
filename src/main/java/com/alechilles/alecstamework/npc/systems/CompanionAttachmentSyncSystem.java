@@ -14,12 +14,12 @@ import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -30,7 +30,7 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
     private static final long SWEEP_INTERVAL_MS = 750L;
 
     private long nextSweepAtMs;
-    private final HashMap<UUID, AttachmentSyncFingerprint> lastSyncedFingerprintByNpc = new HashMap<>();
+    private final Map<UUID, AttachmentSyncFingerprint> lastSyncedFingerprintByNpc = new ConcurrentHashMap<>();
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
@@ -67,7 +67,7 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
                     }
                 }
         );
-        lastSyncedFingerprintByNpc.keySet().retainAll(activeNpcIds);
+        pruneInactiveKeys(lastSyncedFingerprintByNpc, activeNpcIds);
         for (Ref<EntityStore> ref : candidates) {
             if (ref == null || !ref.isValid()) {
                 continue;
@@ -120,6 +120,23 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
 
     private static int stableMapHash(@Nullable Map<?, ?> values) {
         return values == null || values.isEmpty() ? 0 : values.hashCode();
+    }
+
+    static <T> void pruneInactiveKeys(@Nonnull Map<UUID, T> valuesByNpc,
+                                      @Nonnull HashSet<UUID> activeNpcIds) {
+        if (valuesByNpc.isEmpty()) {
+            return;
+        }
+        if (activeNpcIds.isEmpty()) {
+            valuesByNpc.clear();
+            return;
+        }
+        for (UUID npcUuid : new ArrayList<>(valuesByNpc.keySet())) {
+            if (npcUuid == null || activeNpcIds.contains(npcUuid)) {
+                continue;
+            }
+            valuesByNpc.remove(npcUuid);
+        }
     }
 
     @Nullable

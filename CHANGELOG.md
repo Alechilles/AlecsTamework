@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased
+## 2.13.1 - Native Spawner Tooltips and Runtime Cache Fixes - 2026-06-04
 
 ### Changed
 - Captured spawner tooltip text now uses Hytale's built-in item display metadata instead of an optional tooltip bridge.
+
+### Fixed
+- Cached optional integration reflection fallbacks so missing SimpleClaims, feed-trough container APIs, and legacy combat-text protocol paths no longer rebuild missing-class exceptions in repeated runtime flows.
+- Fixed a multi-world attachment sync crash caused by fail-fast shared cache pruning on concurrent world ticks.
 
 ## 2.13.0 - Conditional Asset Patches and Settings Cleanup - 2026-06-03
 
