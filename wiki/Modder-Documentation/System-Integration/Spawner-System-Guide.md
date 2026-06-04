@@ -32,13 +32,13 @@ Spawner items are the Tamework item family that captures an NPC into an item and
 - Whether ownership is cleared on capture
 - Whether ownership is re-assigned on spawn
 - Whether the item is owner-restricted
-- Whether you want tooltip lines for captured `Name` and `Role`
+- Whether you want additive or replacement captured-spawner item descriptions
 - Whether icon overrides should reflect captured role or attachments
 
 ## Tooling support
 - [Spawner Icon Generation](/mod/alecs-tamework/spawner-icon-generation) covers the Blockbench wizard, jobs JSON renderer, Python generator, and batch manifest workflow.
 - `scripts/tools/generate_spawner_icon_overrides.py` can generate `IconOverridesByRole` and shared `IconOverrideGroups`.
-- DynamicTooltipsLib integration can surface captured-spawner metadata in tooltips
+- Captured-spawner names and detail lines are written into base Hytale item display metadata.
 
 ## Reloading
 Spawner configs participate in `/tw reloadconfig`.

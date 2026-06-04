@@ -406,7 +406,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
                     value == null ? ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE : value,
             asset -> asset.tooltipMode
         )
-        .documentation("Tooltip composition mode for DynamicTooltipsLib integrations (Additive or Replace).")
+        .documentation("Tooltip composition mode for captured spawner item display metadata (Additive or Replace).")
         .add()
         .build();
 

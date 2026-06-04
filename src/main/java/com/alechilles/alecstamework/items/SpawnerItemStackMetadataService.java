@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.server.core.asset.type.item.config.metadata.ItemDisplayMetadata;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
 import java.util.Map;
@@ -97,6 +98,7 @@ final class SpawnerItemStackMetadataService {
         }
         updated = captureMetadataService.clearNameMetadata(updated);
         updated = updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, null);
+        updated = updated.withMetadata(ItemDisplayMetadata.KEYED_CODEC, null);
         return updated;
     }
 

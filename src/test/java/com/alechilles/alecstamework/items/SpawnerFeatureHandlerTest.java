@@ -36,7 +36,7 @@ class SpawnerFeatureHandlerTest {
     private static ItemFeatureConfig buildSpawnerConfigForInteraction(ItemFeatureConfig baseConfig,
                                                                       Boolean spawnAssignsOwnerOverride)
             throws Exception {
-        SpawnerFeatureHandler handler = new SpawnerFeatureHandler(null, null, null, null, null, null);
+        SpawnerFeatureHandler handler = new SpawnerFeatureHandler(null, null, null, null, null, null, null);
         Method method = SpawnerFeatureHandler.class.getDeclaredMethod(
                 "buildSpawnerConfigForInteraction",
                 ItemFeatureConfig.class,

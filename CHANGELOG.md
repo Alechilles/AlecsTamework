@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- Captured spawner tooltip text now uses Hytale's built-in item display metadata instead of an optional tooltip bridge.
+
 ## 2.13.0 - Conditional Asset Patches and Settings Cleanup - 2026-06-03
 
 ### Added

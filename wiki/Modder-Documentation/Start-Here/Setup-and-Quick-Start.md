@@ -20,14 +20,6 @@ Add Tamework in your `manifest.json`:
 "IncludesAssetPack": true
 ```
 
-Optional for captured-spawner tooltip lines:
-
-```json
-"OptionalDependencies": {
-  "org.herolias:DynamicTooltipsLib": "1.5.x"
-}
-```
-
 ## 2. Pick your interaction path
 - Use the optimized path for most content: `TameworkInteract` plus `TwInteractionConfig`
 - Use the vanilla path when you need full manual control and are willing to author more JSON

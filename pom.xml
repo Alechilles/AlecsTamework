@@ -31,13 +31,6 @@
         <hytale.server.extra.args />
     </properties>
 
-    <repositories>
-        <repository>
-            <id>curse-maven</id>
-            <url>https://cursemaven.com</url>
-        </repository>
-    </repositories>
-
     <dependencies>
         <dependency>
             <groupId>com.hypixel.hytale</groupId>
@@ -52,12 +45,6 @@
             <version>4.260326.7</version>
             <scope>system</scope>
             <systemPath>${nameplatebuilder.jar.path}</systemPath>
-        </dependency>
-        <dependency>
-            <groupId>curse.maven</groupId>
-            <artifactId>dynamictooltipslib-1459711</artifactId>
-            <version>7690478</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.alechilles</groupId>

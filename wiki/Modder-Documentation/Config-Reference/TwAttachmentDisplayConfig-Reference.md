@@ -8,7 +8,7 @@ draft: false
 
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
 
-`TwAttachmentDisplayConfig` gives raw model attachment selections player-friendly labels. Captured spawner tooltips use these labels automatically when DynamicTooltipsLib is installed, and other UI surfaces can reuse the same config.
+`TwAttachmentDisplayConfig` gives raw model attachment selections player-friendly labels. Captured spawner item descriptions use these labels automatically through base Hytale item display metadata, and other UI surfaces can reuse the same config.
 
 ## Location
 

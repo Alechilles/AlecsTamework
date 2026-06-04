@@ -104,11 +104,11 @@ Each group supports:
 Runtime icon lookup checks exact role overrides first, then the first matching shared role group, then that group's `IconDefault`, then global overrides, then top-level `IconDefault`.
 
 ### `TooltipMode`
-Controls DynamicTooltipsLib composition when that optional integration is present.
+Controls how captured-spawner item display metadata composes the base item description and Tamework detail lines.
 
 Accepted values:
-- `Additive`: append Tamework lines such as `Name`, `Role`, `Gender`, and friendly attachment names from `TwAttachmentDisplayConfig`
-- `Replace`: replace the base description text with Tamework tooltip output
+- `Additive`: append Tamework lines such as `Species`, `Gender`, and friendly attachment names from `TwAttachmentDisplayConfig`
+- `Replace`: replace the base description text with Tamework captured-spawner output
 
 ## Defaults and Cross-System Notes
 - The shipped example asset is `src/main/resources/Server/Tamework/Items/Spawners/Spawner_Tamework_Example.json`.

@@ -60,8 +60,6 @@ import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInterac
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
-import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
-import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CommandCoopManagedWildCaptureSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
@@ -224,7 +222,6 @@ public class Tamework extends JavaPlugin {
     private CrashTelemetryService crashTelemetryService;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
-    private SpawnerTooltipBridge spawnerTooltipBridge;
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -804,11 +801,6 @@ public class Tamework extends JavaPlugin {
         translationRegistry = new TranslationRegistry();
         int langLoaded = ModLanguageDiscovery.loadAll(translationRegistry, getLogger(), getDataDirectory());
         getLogger().at(Level.INFO).log("Tamework language entries loaded: " + langLoaded);
-        spawnerTooltipBridge = SpawnerTooltipBridgeLoader.initialize(
-                getLogger(),
-                itemFeatureRegistry,
-                translationRegistry
-        );
         NameplateBuilderBridgeLoader.initialize(this);
 
         // Core handler for capture/spawn flows.
@@ -818,7 +810,8 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcCaptureService,
                 commandLinkedNpcCoopService,
                 commandNpcRelocationService,
-                commandLinkedNpcLostService
+                commandLinkedNpcLostService,
+                translationRegistry
         );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
@@ -1040,9 +1033,6 @@ public class Tamework extends JavaPlugin {
             companionXpEventDebugLogService = null;
         }
         overrideInitializedScopeKeys.clear();
-        if (spawnerTooltipBridge != null) {
-            spawnerTooltipBridge.shutdown();
-        }
         api = null;
         if (persistenceRuntime != null) {
             persistenceRuntime.getNpcProfileRepository().setChangeObserver(null);
@@ -1417,9 +1407,6 @@ public class Tamework extends JavaPlugin {
                         + loadedCommands
                         + (commandItemRegistry != null ? " (total: " + commandItemRegistry.snapshot().size() + ")" : "")
         );
-        if (spawnerTooltipBridge != null) {
-            spawnerTooltipBridge.refreshFromItemConfigReload();
-        }
         return loadedSpawner + loadedNaming + loadedCommands;
     }
 
@@ -2039,7 +2026,6 @@ public class Tamework extends JavaPlugin {
         TwAttachmentDisplayConfig.clearCache();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getLoadedAssets().keySet());
-            refreshSpawnerTooltipCache();
         }
     }
 
@@ -2047,13 +2033,6 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> event) {
         TwAttachmentDisplayConfig.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getRemovedAssets());
-        refreshSpawnerTooltipCache();
-    }
-
-    private void refreshSpawnerTooltipCache() {
-        if (spawnerTooltipBridge != null) {
-            spawnerTooltipBridge.refreshFromItemConfigReload();
-        }
     }
 
     private void onLevelingAssetsLoaded(

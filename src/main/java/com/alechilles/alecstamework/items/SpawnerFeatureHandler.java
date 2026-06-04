@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
@@ -45,6 +46,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerNpcProgressionMetadataService progressionMetadataService;
     private final SpawnerRolePolicyService rolePolicyService;
     private final SpawnerItemStackMetadataService itemStackMetadataService;
+    private final SpawnerItemDisplayMetadataService itemDisplayMetadataService;
     private final SpawnerNpcStateService npcStateService;
     private final SpawnerPlayerInventoryService playerInventoryService;
     private final SpawnerAttachmentService attachmentService;
@@ -64,7 +66,8 @@ public final class SpawnerFeatureHandler {
                                  CommandLinkedNpcCaptureService captureService,
                                  @Nullable CommandLinkedNpcCoopService coopService,
                                  @Nullable CommandNpcRelocationService relocationService,
-                                 @Nullable CommandLinkedNpcLostService lostService) {
+                                 @Nullable CommandLinkedNpcLostService lostService,
+                                 @Nullable TranslationRegistry translationRegistry) {
         this.logger = logger;
         this.registry = registry;
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
@@ -78,6 +81,7 @@ public final class SpawnerFeatureHandler {
                 captureMetadataService,
                 progressionMetadataService
         );
+        this.itemDisplayMetadataService = new SpawnerItemDisplayMetadataService(translationRegistry);
         this.npcStateService = new SpawnerNpcStateService();
         this.playerInventoryService = new SpawnerPlayerInventoryService();
         this.attachmentService = new SpawnerAttachmentService(logger);
@@ -653,6 +657,7 @@ public final class SpawnerFeatureHandler {
         if (worldStore != null) {
             updated = progressionMetadataService.applyNpcProgressionMetadata(updated, targetRef, worldStore);
         }
+        updated = itemDisplayMetadataService.applyCapturedDisplayMetadata(updated, config);
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
 
         if (!playerInventoryService.updateHeldItem(player, updated)) {

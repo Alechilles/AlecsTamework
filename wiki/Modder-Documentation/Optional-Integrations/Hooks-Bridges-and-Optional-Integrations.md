@@ -46,18 +46,6 @@ Stay in the config layer when:
 Use a hook only when the behavior would otherwise force you back into a large bespoke instruction tree.
 
 ## Optional Integrations
-### DynamicTooltipsLib
-Relevant family:
-- [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
-- [TwAttachmentDisplayConfig Reference](/mod/alecs-tamework/twattachmentdisplayconfig-reference)
-
-What it enables:
-- additive or replace-style tooltip output for filled spawners
-- Tamework tooltip lines such as captured name, role, gender, and friendly attachment names
-
-Fallback behavior:
-- if the library is missing, the spawner still works and the tooltip bridge is simply absent
-
 ### NameplateBuilder
 What it enables:
 - overrides NameplateBuilder's built-in `entity-name` segment for NPCs that have a `TameworkNpcNameComponent`

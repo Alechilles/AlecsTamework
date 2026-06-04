@@ -16,7 +16,6 @@
     "ServerVersion": "0.5.x",
     "Dependencies": {},
     "OptionalDependencies": {
-        "org.herolias:DynamicTooltipsLib": "1.5.x",
         "Frotty27:NameplateBuilder": ">=4.260326.7",
         "Buuz135:SimpleClaims": "1.0.x"
     },

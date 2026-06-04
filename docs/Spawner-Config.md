@@ -20,9 +20,9 @@ When extending spawner behavior, add logic to these service domains instead of c
 - `EmptyItemId` (required). The empty spawner item id to bind this config to.
 - `FilledItemId` (optional). The filled variant item id, if used.
 - `IconDefault` (optional). Default icon override used for filled items.
-- `TooltipMode` (optional, default `Additive`). Controls DynamicTooltipsLib composition for captured-spawner tooltip lines.
-  - `Additive`: appends Tamework lines (`Name`, `Role`, `Gender`, and resolved attachments) to the base tooltip.
-  - `Replace`: writes Tamework lines as override description text.
+- `TooltipMode` (optional, default `Additive`). Controls captured-spawner item description composition.
+  - `Additive`: appends Tamework lines (`Species`, `Gender`, and resolved attachments) to the base item description.
+  - `Replace`: writes only Tamework lines as the captured item description.
 
 ## AllowedRoles
 Controls which NPC roles can be captured or spawned.
@@ -103,4 +103,4 @@ The current spawner icon tooling guide lives in the wiki:
 
 ## Reloading
 Use `/tw reloadconfig` to reload spawner, naming, and command item configs into the item feature registries.
-When DynamicTooltipsLib is present, Tamework also invalidates and refreshes tooltip caches on reload.
+Captured spawner display text is written into base Hytale `ItemDisplay` metadata when the NPC is captured.
