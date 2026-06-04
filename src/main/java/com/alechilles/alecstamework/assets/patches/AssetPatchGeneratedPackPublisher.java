@@ -18,6 +18,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetPack;
+import com.hypixel.hytale.common.plugin.PluginIdentifier;
+import com.hypixel.hytale.common.plugin.PluginManifest;
+import com.hypixel.hytale.common.semver.SemverRange;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 
@@ -98,7 +101,12 @@ public final class AssetPatchGeneratedPackPublisher {
                 );
             }
             case REGISTER_PACK -> {
-                assetModule.registerPack(generatedPackId, root, plugin.getManifest(), AssetPack.PackSource.RUNTIME);
+                assetModule.registerPack(
+                        generatedPackId,
+                        root,
+                        createGeneratedPatchManifest(plugin.getManifest(), assetModule.getAssetPacks(), generatedPackId, root),
+                        AssetPack.PackSource.RUNTIME
+                );
                 moveGeneratedPackToLastWinningPriority(assetModule, root);
                 return new PublicationResult(
                         true,
@@ -144,6 +152,30 @@ public final class AssetPatchGeneratedPackPublisher {
 
     static boolean shouldRecreateCache(@Nonnull PublicationAction action) {
         return action == PublicationAction.REGISTER_PACK;
+    }
+
+    @Nonnull
+    static PluginManifest createGeneratedPatchManifest(@Nonnull PluginManifest sourceManifest,
+                                                       @Nonnull java.util.List<AssetPack> assetPacks,
+                                                       @Nonnull String generatedPackId,
+                                                       @Nonnull Path root) {
+        PluginIdentifier generatedId = PluginIdentifier.fromString(generatedPackId);
+        PluginManifest manifest = new PluginManifest();
+        manifest.setGroup(generatedId.getGroup());
+        manifest.setName(generatedId.getName());
+        manifest.setVersion(sourceManifest.getVersion());
+        manifest.setDescription("Generated Tamework asset patch pack.");
+        manifest.setAuthors(sourceManifest.getAuthors());
+        manifest.setWebsite(sourceManifest.getWebsite());
+        manifest.setServerVersion(sourceManifest.getServerVersion());
+
+        for (AssetPack pack : assetPacks) {
+            if (pack == null || isGeneratedPack(pack, generatedPackId, root)) {
+                continue;
+            }
+            manifest.injectDependency(PluginIdentifier.fromString(pack.getName()), SemverRange.WILDCARD);
+        }
+        return manifest;
     }
 
     static boolean shouldReloadRuntimeTargetsAfterPublication(boolean cacheMutationSucceeded,

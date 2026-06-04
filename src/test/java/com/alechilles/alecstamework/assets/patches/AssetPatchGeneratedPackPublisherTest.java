@@ -6,10 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetPack;
+import com.hypixel.hytale.common.plugin.Mod;
+import com.hypixel.hytale.common.plugin.PluginIdentifier;
+import com.hypixel.hytale.common.plugin.PluginManifest;
+import com.hypixel.hytale.common.semver.Semver;
+import com.hypixel.hytale.common.semver.SemverRange;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -249,7 +255,50 @@ final class AssetPatchGeneratedPackPublisherTest {
         assertEquals(generatedPack, packs.get(1));
     }
 
+    @Test
+    void generatedPatchManifestSortsAfterCurrentAssetPacks(@TempDir Path tempDir) throws Exception {
+        Path generatedRoot = tempDir.resolve("GeneratedPatches");
+        AssetPack tameworkPack = pack("Alechilles:Alec's Tamework!", tempDir.resolve("Tamework"));
+        AssetPack chocoboPack = pack("Ceraph:Chocobo Tales", tempDir.resolve("Chocobo"));
+        PluginManifest generatedManifest = AssetPatchGeneratedPackPublisher.createGeneratedPatchManifest(
+                manifest("Alechilles:Alec's Tamework!"),
+                List.of(tameworkPack, chocoboPack),
+                "Alechilles:Alec's Tamework!_GeneratedPatches",
+                generatedRoot
+        );
+        AssetPack generatedPack = pack(
+                "Alechilles:Alec's Tamework!_GeneratedPatches",
+                generatedRoot,
+                generatedManifest
+        );
+
+        Map<PluginIdentifier, AssetPack> pending = new HashMap<>();
+        pending.put(PluginIdentifier.fromString(tameworkPack.getName()), tameworkPack);
+        pending.put(PluginIdentifier.fromString(chocoboPack.getName()), chocoboPack);
+        pending.put(PluginIdentifier.fromString(generatedPack.getName()), generatedPack);
+
+        List<AssetPack> loadOrder = Mod.calculateLoadOrder(pending);
+
+        assertEquals(generatedPack, loadOrder.getLast());
+        assertTrue(loadOrder.indexOf(generatedPack) > loadOrder.indexOf(chocoboPack));
+        assertTrue(loadOrder.indexOf(generatedPack) > loadOrder.indexOf(tameworkPack));
+    }
+
     private static AssetPack pack(String name, Path root) {
-        return new AssetPack(root, name, root, FileSystems.getDefault(), false, null, AssetPack.PackSource.RUNTIME);
+        return pack(name, root, manifest(name));
+    }
+
+    private static AssetPack pack(String name, Path root, PluginManifest manifest) {
+        return new AssetPack(root, name, root, FileSystems.getDefault(), false, manifest, AssetPack.PackSource.RUNTIME);
+    }
+
+    private static PluginManifest manifest(String id) {
+        PluginIdentifier identifier = PluginIdentifier.fromString(id);
+        PluginManifest manifest = new PluginManifest();
+        manifest.setGroup(identifier.getGroup());
+        manifest.setName(identifier.getName());
+        manifest.setVersion(Semver.fromString("1.0.0"));
+        manifest.setServerVersion(SemverRange.WILDCARD);
+        return manifest;
     }
 }
