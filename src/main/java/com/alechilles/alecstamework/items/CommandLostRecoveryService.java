@@ -82,6 +82,13 @@ final class CommandLostRecoveryService {
 
         CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot recoverySnapshot = lostService.getRecoverySnapshot(record.npcUuid);
         CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot = lostService.getLostSnapshot(record.npcUuid);
+        RespawnTraceLogSupport.log(
+                null,
+                "lost_recovery_start original=" + record.npcUuid
+                        + " hasRecoverySnapshot=" + (recoverySnapshot != null)
+                        + " hasLostSnapshot=" + (lostSnapshot != null)
+                        + " tool=" + toolId
+        );
         Vector3d sourceHint = record.lastKnownPosition != null
                 ? record.lastKnownPosition
                 : lostSnapshot != null && lostSnapshot.lastKnownPosition() != null
@@ -111,8 +118,21 @@ final class CommandLostRecoveryService {
                 safeSpawnDistance
         );
         if (snapshotRecovery != null && snapshotRecovery.isSuccess()) {
+            RespawnTraceLogSupport.log(
+                    null,
+                    "lost_recovery_snapshot_success original=" + record.npcUuid
+                            + " sourceHint=" + sourceHint
+                            + " home=" + homePosition
+            );
             return snapshotRecovery;
         }
+        RespawnTraceLogSupport.log(
+                null,
+                "lost_recovery_fallback_start original=" + record.npcUuid
+                        + " snapshotResult=" + (snapshotRecovery == null ? "<none>" : snapshotRecovery.errorMessage())
+                        + " sourceHint=" + sourceHint
+                        + " home=" + homePosition
+        );
 
         String roleId = resolveRoleId(record, recoverySnapshot);
         if (roleId == null || roleId.isBlank()) {
@@ -126,6 +146,13 @@ final class CommandLostRecoveryService {
         if (roleIndex < 0) {
             return Result.fail("Unable to recover: unknown role '" + roleId + "'.");
         }
+        RecentRespawnTraceService.Trace respawnTrace = RespawnTraceLogSupport.startTrace(
+                "lost_fallback_recovery",
+                record.npcUuid,
+                recoverySnapshot != null ? recoverySnapshot.ownerId() : player.getUuid(),
+                roleId,
+                toolId
+        );
 
         Vector3d destination = companionPlacementService.computeSafeRespawnPosition(
                 playerRef,
@@ -135,17 +162,32 @@ final class CommandLostRecoveryService {
                 sourceHint
         );
         if (destination == null) {
+            RespawnTraceLogSupport.warn(respawnTrace, "failed stage=safe_position reason=safe_position_not_found");
             return Result.fail("Unable to find a safe recovery position.");
         }
 
         Rotation3f rotation = resolveSpawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
+            RespawnTraceLogSupport.warn(respawnTrace, "failed stage=spawn reason=spawn_entity_failed destination=" + destination);
             return Result.fail("Failed to spawn replacement companion.");
         }
 
         Ref<EntityStore> spawnedRef = spawned.first();
         NPCEntity spawnedNpc = spawned.second();
+        String physicsReset = CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
+                spawnedRef,
+                spawnedNpc,
+                store
+        );
+        respawnTrace = RespawnTraceLogSupport.recordReplacement(respawnTrace, spawnedNpc.getUuid());
+        RespawnTraceLogSupport.log(respawnTrace, "spawn_physics_reset " + physicsReset);
+        RespawnTraceLogSupport.log(
+                respawnTrace,
+                "spawned destination=" + destination
+                        + " recoveryStateApplied=false "
+                        + RespawnTraceLogSupport.describeNpcState(spawnedRef, store)
+        );
         UUID ownerId = recoverySnapshot != null && recoverySnapshot.ownerId() != null
                 ? recoverySnapshot.ownerId()
                 : player.getUuid();
@@ -185,6 +227,12 @@ final class CommandLostRecoveryService {
         }
 
         applyFollowBootstrap(spawnedRef, spawnedNpc, playerRef, store);
+        RespawnTraceLogSupport.log(
+                respawnTrace,
+                "post_components recoveryStateApplied=false " + RespawnTraceLogSupport.describeNpcState(spawnedRef, store)
+        );
+        RespawnTraceLogSupport.scheduleProbe(player.getWorld(), spawnedNpc.getUuid(), respawnTrace, 250L, "lost_after_250ms");
+        RespawnTraceLogSupport.scheduleProbe(player.getWorld(), spawnedNpc.getUuid(), respawnTrace, 1000L, "lost_after_1000ms");
 
         ItemStack updatedStack = linkMutationService.removeLinkedNpcRecord(stack, record.npcUuid);
         updatedStack = linkMutationService.upsertLinkedNpcRecord(
@@ -205,6 +253,8 @@ final class CommandLostRecoveryService {
 
         lostService.markRecovered(record.npcUuid, spawnedNpc.getUuid(), sourceHint, homePosition);
         existenceService.despawnIfPresent(record.npcUuid);
+        RespawnTraceLogSupport.log(respawnTrace, "lost_recovery_linked_record_updated oldNpc=" + record.npcUuid
+                + " newNpc=" + spawnedNpc.getUuid());
 
         String recoveredName = npcNameResolver.resolveNpcDisplayName(spawnedRef, store, spawnedNpc);
         return Result.success(updatedStack, recoveredName);
@@ -240,7 +290,8 @@ final class CommandLostRecoveryService {
                 record,
                 recoverySnapshot,
                 safeSpawnDistance,
-                LOST_RECOVERY_FOLLOW_RETRY_DELAY_MS
+                LOST_RECOVERY_FOLLOW_RETRY_DELAY_MS,
+                "lost_snapshot_recovery"
         );
         if (updatedStack == null || updatedStack.isEmpty()) {
             return null;

@@ -88,6 +88,30 @@ final class CommandRespawnService {
                                    CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot,
                                    double safeSpawnDistance,
                                    long followRetryDelayMs) {
+        return respawnDeadLinkedNpc(
+                player,
+                playerRef,
+                store,
+                toolId,
+                stack,
+                record,
+                deadSnapshot,
+                safeSpawnDistance,
+                followRetryDelayMs,
+                "dead_respawn"
+        );
+    }
+
+    ItemStack respawnDeadLinkedNpc(Player player,
+                                   Ref<EntityStore> playerRef,
+                                   Store<EntityStore> store,
+                                   String toolId,
+                                   ItemStack stack,
+                                   LinkedNpcRecord record,
+                                   CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot,
+                                   double safeSpawnDistance,
+                                   long followRetryDelayMs,
+                                   String traceBranch) {
         if (player == null || playerRef == null || !playerRef.isValid() || store == null || stack == null
                 || stack.isEmpty() || record == null || deadSnapshot == null) {
             return recordRespawnFailure("invalid_input", deadSnapshot, null);
@@ -104,7 +128,17 @@ final class CommandRespawnService {
         if (roleIndex < 0) {
             return recordRespawnFailure("unknown_role_id", deadSnapshot, roleId);
         }
+        RecentRespawnTraceService.Trace respawnTrace =
+                RespawnTraceLogSupport.startTrace(traceBranch, record.npcUuid, deadSnapshot.ownerId(), roleId, toolId);
         Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
+        RespawnTraceLogSupport.log(
+                respawnTrace,
+                "start source=dead_snapshot"
+                        + " sourceHint=" + sourceHint
+                        + " safeSpawnDistance=" + safeSpawnDistance
+                        + " cooldownUntil=" + deadSnapshot.respawnAvailableAtMs()
+                        + " displayName=" + deadSnapshot.displayName()
+        );
         Vector3d destination = companionPlacementService.computeSafeRespawnPosition(
                 playerRef,
                 store,
@@ -113,15 +147,28 @@ final class CommandRespawnService {
                 sourceHint
         );
         if (destination == null) {
+            RespawnTraceLogSupport.warn(respawnTrace, "failed stage=safe_position reason=safe_position_not_found");
             return recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId);
         }
         Rotation3f rotation = resolveRespawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
+            RespawnTraceLogSupport.warn(respawnTrace, "failed stage=spawn reason=spawn_entity_failed destination=" + destination);
             return recordRespawnFailure("spawn_entity_failed", deadSnapshot, roleId);
         }
         Ref<EntityStore> spawnedRef = spawned.first();
         NPCEntity spawnedNpc = spawned.second();
+        String physicsReset = CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
+                spawnedRef,
+                spawnedNpc,
+                store
+        );
+        respawnTrace = RespawnTraceLogSupport.recordReplacement(respawnTrace, spawnedNpc.getUuid());
+        RespawnTraceLogSupport.log(respawnTrace, "spawn_physics_reset " + physicsReset);
+        RespawnTraceLogSupport.log(
+                respawnTrace,
+                "spawned destination=" + destination + " " + RespawnTraceLogSupport.describeNpcState(spawnedRef, store)
+        );
         UUID ownerId = deadSnapshot.ownerId() != null ? deadSnapshot.ownerId() : player.getUuid();
         Vector3d homePosition = record.homePosition != null ? record.homePosition : deadSnapshot.homePosition();
         String[] toolIds = linkPolicyService.mergeToolIds(deadSnapshot.toolIds(), toolId);
@@ -152,6 +199,10 @@ final class CommandRespawnService {
         applyRespawnAttachmentState(spawnedRef, spawnedNpc, store, deadSnapshot);
         applyRespawnProgressionState(spawnedRef, store, deadSnapshot);
         applyRespawnRecoveryState(spawnedRef, store, deadSnapshot);
+        RespawnTraceLogSupport.log(
+                respawnTrace,
+                "post_restore recoveryStateApplied=true " + RespawnTraceLogSupport.describeNpcState(spawnedRef, store)
+        );
         if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
             ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
             if (nameType != null) {
@@ -170,6 +221,8 @@ final class CommandRespawnService {
         }
         applyRespawnFollowBootstrap(spawnedRef, spawnedNpc, playerRef, store);
         scheduleRespawnFollowRetry(player.getWorld(), spawnedNpc.getUuid(), playerRef, followRetryDelayMs);
+        RespawnTraceLogSupport.scheduleProbe(player.getWorld(), spawnedNpc.getUuid(), respawnTrace, 250L, "after_250ms");
+        RespawnTraceLogSupport.scheduleProbe(player.getWorld(), spawnedNpc.getUuid(), respawnTrace, 1000L, "after_1000ms");
         ItemStack updated = linkMutationService.removeLinkedNpcRecord(stack, record.npcUuid);
         updated = linkMutationService.upsertLinkedNpcRecord(
                 updated,
@@ -189,6 +242,8 @@ final class CommandRespawnService {
         if (deathService != null) {
             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
         }
+        RespawnTraceLogSupport.log(respawnTrace, "linked_record_updated oldNpc=" + record.npcUuid
+                + " newNpc=" + spawnedNpc.getUuid());
         return updated;
     }
 

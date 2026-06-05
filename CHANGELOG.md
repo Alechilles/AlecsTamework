@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added `/tw debugrespawntrace` to log linked companion revive and lost-recovery spawn, restore, damage, and death-removal correlation for instant-death investigations.
+- Added `/tw debugneedstelemetry` to control rate-limited Alec's Telemetry context events for needs seek and consume failures.
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to `0.1.3`.
+
+### Fixed
+- Protected revived and lost-recovered linked companions from invalid spawn-time fall damage so they no longer instantly die after replacement spawning.
+- Protected breeding offspring from invalid spawn-time fall damage so newborn companions no longer instantly die after spawning.
+
 ## 2.13.1 - Native Spawner Tooltips and Runtime Cache Fixes - 2026-06-04
 
 ### Changed

@@ -11,6 +11,9 @@
     "Coop": false,
     "Breeding": false,
     "NeedsConsume": false,
-    "NeedsDamage": false
+    "NeedsDamage": false,
+    "NeedsSeek": false,
+    "NeedsTelemetry": true,
+    "RespawnTrace": false
   }
 }

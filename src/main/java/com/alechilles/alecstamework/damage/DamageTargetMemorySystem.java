@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.items.RecentRespawnTraceService;
+import com.alechilles.alecstamework.items.RespawnTraceLogSupport;
 import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -17,6 +19,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -48,12 +51,19 @@ public final class DamageTargetMemorySystem extends DamageEventSystem {
             return;
         }
         Damage.Source source = damage.getSource();
+        Ref<EntityStore> victimRef = chunk.getReferenceTo(index);
+        if (victimRef == null || !victimRef.isValid()) {
+            return;
+        }
+        UUID victimUuid = resolveNpcUuid(victimRef, store);
         if (!(source instanceof Damage.EntitySource entitySource)) {
+            if (victimUuid != null) {
+                recordRespawnTraceDamage(victimUuid, victimRef, store, null, damage);
+            }
             return;
         }
         Ref<EntityStore> attackerRef = entitySource.getRef();
-        Ref<EntityStore> victimRef = chunk.getReferenceTo(index);
-        if (attackerRef == null || victimRef == null || !attackerRef.isValid() || !victimRef.isValid()) {
+        if (attackerRef == null || !attackerRef.isValid()) {
             return;
         }
         if (attackerRef.equals(victimRef)) {
@@ -61,11 +71,61 @@ public final class DamageTargetMemorySystem extends DamageEventSystem {
         }
         long nowMs = resolveCurrentTimeMs(store);
         memoryService.recordHit(attackerRef, victimRef, nowMs);
-        UUID victimUuid = resolveNpcUuid(victimRef, store);
         DamageTargetMemoryService.RecentAttackerSnapshot attackerSnapshot = resolveAttackerSnapshot(attackerRef, store, nowMs);
         if (victimUuid != null && attackerSnapshot != null) {
             memoryService.recordAttacker(victimUuid, attackerSnapshot, nowMs);
         }
+        if (victimUuid != null) {
+            recordRespawnTraceDamage(victimUuid, victimRef, store, attackerSnapshot, damage);
+        }
+    }
+
+    private void recordRespawnTraceDamage(@Nonnull UUID victimUuid,
+                                          @Nonnull Ref<EntityStore> victimRef,
+                                          @Nonnull Store<EntityStore> store,
+                                          @Nullable DamageTargetMemoryService.RecentAttackerSnapshot attackerSnapshot,
+                                          @Nonnull Damage damage) {
+        if (!RespawnTraceLogSupport.isEnabled()) {
+            return;
+        }
+        long traceNowMs = System.currentTimeMillis();
+        RecentRespawnTraceService service = RecentRespawnTraceService.getInstance();
+        RecentRespawnTraceService.Trace trace = service.getRecentTrace(victimUuid, traceNowMs);
+        if (trace == null || trace.firstDamage() != null) {
+            return;
+        }
+        RecentRespawnTraceService.DamageEvent event = new RecentRespawnTraceService.DamageEvent(
+                describeAttacker(attackerSnapshot),
+                describeDamageSource(damage),
+                String.format(Locale.ROOT, "%.3f", damage.getAmount()),
+                RespawnTraceLogSupport.readHealth(victimRef, store)
+        );
+        if (service.recordFirstDamage(victimUuid, event, traceNowMs)) {
+            RecentRespawnTraceService.Trace updated = service.getRecentTrace(victimUuid, traceNowMs);
+            RespawnTraceLogSupport.warn(
+                    updated,
+                    "first_damage " + event.describe()
+                            + " " + RespawnTraceLogSupport.describeNpcState(victimRef, store)
+            );
+        }
+    }
+
+    @Nonnull
+    private String describeAttacker(@Nullable DamageTargetMemoryService.RecentAttackerSnapshot attackerSnapshot) {
+        if (attackerSnapshot == null) {
+            return "ENTITY:<unknown>";
+        }
+        String name = isBlank(attackerSnapshot.attackerName()) ? "<unnamed>" : attackerSnapshot.attackerName();
+        return attackerSnapshot.attackerKind() + ":" + name + ":" + attackerSnapshot.attackerUuid();
+    }
+
+    @Nonnull
+    private String describeDamageSource(@Nonnull Damage damage) {
+        String sourceType = damage.getSource() != null
+                ? damage.getSource().getClass().getSimpleName()
+                : "<null-source>";
+        String cause = damage.getCause() != null ? String.valueOf(damage.getCause().getId()) : "<null-cause>";
+        return sourceType + "/" + cause;
     }
 
     private long resolveCurrentTimeMs(@Nonnull Store<EntityStore> store) {

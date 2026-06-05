@@ -140,6 +140,9 @@ For needs-damage diagnostics, use:
 For needs seek/targeting diagnostics, use:
 - `/tw debugneedsseek [on|off]`
 
+For telemetry-backed needs failure aggregation, use:
+- `/tw debugneedstelemetry [on|off]`
+
 ## Related Pages
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 - [TwLevelingConfig Reference](/mod/alecs-tamework/twlevelingconfig-reference)

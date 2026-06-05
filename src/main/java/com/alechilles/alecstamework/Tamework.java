@@ -46,6 +46,7 @@ import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
 import com.alechilles.alecstamework.damage.CompanionCombatExperienceSystem;
+import com.alechilles.alecstamework.damage.RespawnFallDamageGraceSystem;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -282,6 +283,8 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugNeedsConsumeDiagnosticsLogs;
     private volatile boolean debugNeedsDamageDiagnosticsLogs;
     private volatile boolean debugNeedsSeekDiagnosticsLogs;
+    private volatile boolean debugNeedsTelemetryDiagnostics;
+    private volatile boolean debugRespawnTraceLogs;
     private volatile boolean debugFlyingCompanionLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
@@ -764,6 +767,7 @@ public class Tamework extends JavaPlugin {
 
         // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(new DamageTargetMemorySystem());
+        getEntityStoreRegistry().registerSystem(new RespawnFallDamageGraceSystem());
         getEntityStoreRegistry().registerSystem(
                 new OwnerDamageFilterSystem(getLogger())
         );
@@ -1345,6 +1349,8 @@ public class Tamework extends JavaPlugin {
         setDebugNeedsConsumeDiagnosticsEnabled(commands.isNeedsConsumeDiagnostics());
         setDebugNeedsDamageDiagnosticsEnabled(commands.isNeedsDamageDiagnostics());
         setDebugNeedsSeekDiagnosticsEnabled(commands.isNeedsSeekDiagnostics());
+        setDebugNeedsTelemetryDiagnosticsEnabled(commands.isNeedsTelemetryDiagnostics());
+        setDebugRespawnTraceEnabled(commands.isRespawnTrace());
         setDebugFlyingCompanionEnabled(commands.isFlyingCompanion());
         String roleFilter = commands.getDespawnRoleFilter();
         if (roleFilter == null || roleFilter.isBlank()) {
@@ -1367,6 +1373,8 @@ public class Tamework extends JavaPlugin {
                         + ", needsConsumeDiagnostics=" + isDebugNeedsConsumeDiagnosticsEnabled()
                         + ", needsDamageDiagnostics=" + isDebugNeedsDamageDiagnosticsEnabled()
                         + ", needsSeekDiagnostics=" + isDebugNeedsSeekDiagnosticsEnabled()
+                        + ", needsTelemetryDiagnostics=" + isDebugNeedsTelemetryDiagnosticsEnabled()
+                        + ", respawnTrace=" + isDebugRespawnTraceEnabled()
                         + ", flyingCompanion=" + isDebugFlyingCompanionEnabled()
                         + ", despawnRoleFilter="
                         + (getDebugDespawnRoleFilter() == null ? "<none>" : getDebugDespawnRoleFilter())
@@ -2482,6 +2490,34 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugNeedsSeekDiagnosticsEnabled() {
         debugNeedsSeekDiagnosticsLogs = !debugNeedsSeekDiagnosticsLogs;
         return debugNeedsSeekDiagnosticsLogs;
+    }
+
+    public boolean isDebugNeedsTelemetryDiagnosticsEnabled() {
+        return debugNeedsTelemetryDiagnostics;
+    }
+
+    public boolean setDebugNeedsTelemetryDiagnosticsEnabled(boolean enabled) {
+        debugNeedsTelemetryDiagnostics = enabled;
+        return debugNeedsTelemetryDiagnostics;
+    }
+
+    public boolean toggleDebugNeedsTelemetryDiagnosticsEnabled() {
+        debugNeedsTelemetryDiagnostics = !debugNeedsTelemetryDiagnostics;
+        return debugNeedsTelemetryDiagnostics;
+    }
+
+    public boolean isDebugRespawnTraceEnabled() {
+        return debugRespawnTraceLogs;
+    }
+
+    public boolean setDebugRespawnTraceEnabled(boolean enabled) {
+        debugRespawnTraceLogs = enabled;
+        return debugRespawnTraceLogs;
+    }
+
+    public boolean toggleDebugRespawnTraceEnabled() {
+        debugRespawnTraceLogs = !debugRespawnTraceLogs;
+        return debugRespawnTraceLogs;
     }
 
     public boolean isDebugFlyingCompanionEnabled() {

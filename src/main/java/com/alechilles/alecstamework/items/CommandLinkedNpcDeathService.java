@@ -222,6 +222,7 @@ public final class CommandLinkedNpcDeathService {
                 DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
                 enqueueProfileUpdate(persisted, null, null);
                 persistSnapshot(persisted);
+                logRespawnTraceDeath(npcUuid, diedAtMs, deathDetails, reference, store, reason);
                 return;
             }
         }
@@ -379,6 +380,7 @@ public final class CommandLinkedNpcDeathService {
         DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
         enqueueProfileUpdate(persisted, null, null);
         persistSnapshot(persisted);
+        logRespawnTraceDeath(npcUuid, diedAtMs, deathDetails, reference, store, reason);
     }
 
     @Nullable
@@ -1145,6 +1147,51 @@ public final class CommandLinkedNpcDeathService {
             return new DeathDetails(attackerCause, attacker.attackerName());
         }
         return new DeathDetails(DeathCauseKind.UNKNOWN, null);
+    }
+
+    private void logRespawnTraceDeath(@Nonnull UUID npcUuid,
+                                      long diedAtMs,
+                                      @Nonnull DeathDetails deathDetails,
+                                      @Nullable Ref<EntityStore> reference,
+                                      @Nullable Store<EntityStore> store,
+                                      @Nullable RemoveReason reason) {
+        RecentRespawnTraceService.Trace trace = RecentRespawnTraceService.getInstance().getRecentTrace(npcUuid, diedAtMs);
+        if (trace == null) {
+            return;
+        }
+        RespawnTraceLogSupport.warn(
+                trace,
+                "death_removal"
+                        + " reason=" + reason
+                        + " deathCause=" + deathDetails.causeKind()
+                        + " source=" + deathDetails.sourceName()
+                        + " deathInfo=" + describeDeathComponent(reference, store)
+                        + " " + RespawnTraceLogSupport.describeNpcState(reference, store)
+        );
+    }
+
+    @Nonnull
+    private String describeDeathComponent(@Nullable Ref<EntityStore> reference,
+                                          @Nullable Store<EntityStore> store) {
+        if (reference == null || !reference.isValid() || store == null) {
+            return "<unavailable>";
+        }
+        DeathComponent component;
+        try {
+            component = store.getComponent(reference, DeathComponent.getComponentType());
+        } catch (Exception ignored) {
+            return "<unavailable>";
+        }
+        if (component == null || component.getDeathInfo() == null) {
+            return "<none>";
+        }
+        return "source=" + (component.getDeathInfo().getSource() == null
+                ? "<null>"
+                : component.getDeathInfo().getSource().getClass().getSimpleName())
+                + ",cause=" + (component.getDeathInfo().getCause() == null
+                ? "<null>"
+                : component.getDeathInfo().getCause().getId())
+                + ",amount=" + component.getDeathInfo().getAmount();
     }
 
     private String resolveRoleId(NPCEntity npc) {

@@ -46,6 +46,8 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw debugneedsconsume [on|off]`
 - `/tw debugneedsdamage [on|off]`
 - `/tw debugneedsseek [on|off]`
+- `/tw debugneedstelemetry [on|off]`
+- `/tw debugrespawntrace [on|off]`
 - `/tw debugxpevents [on|off]`
 
 `TwDebugConfig` can supply default values for those debug toggles, including `DespawnRoleFilter`.
@@ -56,6 +58,15 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 `CompanionXpAwardedEvent` hit, including source, owner UUID, tool ids, XP, and level delta.
 It also logs `TameworkHarvestDrop` award attempts while enabled, including rejected attempts that do not
 emit a public XP event.
+
+`/tw debugrespawntrace` logs linked companion revive and lost-recovery spawn boundaries, post-restore state,
+short delayed probes, first damage correlation, and death-removal correlation for instant-death investigations.
+
+`/tw debugneedstelemetry` emits rate-limited Alec's Telemetry error events for needs seek and consume failures.
+Those events use descriptor-approved `details` fields so the telemetry portal can group failures by reason,
+resource, role, and bucketed need context without turning on local per-event log spam.
+This diagnostics channel is enabled by default for now, but it only records events when Tamework telemetry is
+enabled in `/tw settings`. Use `/tw debugneedstelemetry off` as the local kill switch.
 
 ## Log patterns to watch
 - Missing builder ids

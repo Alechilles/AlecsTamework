@@ -58,6 +58,9 @@ final class NeedsConsumeDiagnostics {
                                 int consumedItems,
                                 double hungerGain,
                                 double thirstGain) {
+        if (level == LogLevel.INFO) {
+            NeedsTelemetryDiagnostics.recordConsumeFailure(roleId, mode, reason, consumedItems, hungerGain, thirstGain);
+        }
         if (!diagnostics || !isRuntimeEnabled() || !LOGGER.isLoggable(level.javaLevel)) {
             return;
         }

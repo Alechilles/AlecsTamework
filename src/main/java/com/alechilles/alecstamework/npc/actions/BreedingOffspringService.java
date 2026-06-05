@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
+import com.alechilles.alecstamework.items.CommandCompanionSpawnPhysicsResetService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -864,6 +866,17 @@ final class BreedingOffspringService {
             }
             Ref<EntityStore> childRef = spawned.first();
             NPCEntity childNpc = spawned.second();
+            String physicsReset = CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
+                    childRef,
+                    childNpc,
+                    store
+            );
+            RecentSpawnProtectionService.getInstance().record(
+                    childNpc.getUuid(),
+                    "breeding_offspring",
+                    childSpawnRole.roleId(),
+                    System.currentTimeMillis()
+            );
             CooldownResolution childCooldown = resolveCooldown(childBreedingConfig, childRef, store);
             progressionService.applyOffspringState(
                     childRef,
@@ -886,12 +899,13 @@ final class BreedingOffspringService {
             BreedingOffspringProgressionService.OwnerSnapshot childOwner = resolveOwnerSnapshot(childRef, store);
             logCooldownApplied(childNpc, childOwner, childCooldown);
             logInfo(String.format(
-                    "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s offspringOwner=%s.",
+                    "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s offspringOwner=%s spawnPhysicsReset={%s}.",
                     childNpc.getUuid(),
                     childSpawnRole.roleId(),
                     context.parentAUuid(),
                     context.parentBUuid(),
-                    describeOwner(childOwner)
+                    describeOwner(childOwner),
+                    physicsReset
             ));
             spawnedCount++;
         }

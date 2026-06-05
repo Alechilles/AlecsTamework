@@ -5,7 +5,30 @@
   "runtimeMode": "embedded",
   "events": {
     "errors": {
-      "enabled": true
+      "enabled": true,
+      "details": {
+        "needs_seek_failed": {
+          "allowedFields": {
+            "reason": { "type": "string", "maxLength": 120 },
+            "resource": { "type": "enum", "values": ["food", "water", "both", "unknown"] },
+            "roleId": { "type": "string", "maxLength": 160 },
+            "result": { "type": "string", "maxLength": 120 },
+            "cacheHit": { "type": "boolean" },
+            "needBucket": { "type": "enum", "values": ["0-25", "26-50", "51-75", "76-100", "unknown"] },
+            "searchRangeBucket": { "type": "enum", "values": ["0-8", "9-16", "17-32", "33+", "unknown"] }
+          }
+        },
+        "needs_consume_failed": {
+          "allowedFields": {
+            "reason": { "type": "string", "maxLength": 120 },
+            "resource": { "type": "enum", "values": ["food", "water", "both", "unknown"] },
+            "roleId": { "type": "string", "maxLength": 160 },
+            "consumedItemsBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+"] },
+            "hungerGainBucket": { "type": "enum", "values": ["0", "1-5", "6-15", "16+"] },
+            "thirstGainBucket": { "type": "enum", "values": ["0", "1-5", "6-15", "16+"] }
+          }
+        }
+      }
     },
     "lifecycle": {
       "enabled": true

@@ -109,11 +109,25 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             .documentation("Debug setting for needs seek target resolution diagnostics.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("NeedsTelemetry", Codec.BOOLEAN),
+                    (section, value) -> section.needsTelemetryDiagnostics = value,
+                    section -> section.needsTelemetryDiagnostics
+            )
+            .documentation("Debug setting for needs telemetry context events.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("FlyingCompanion", Codec.BOOLEAN),
                     (section, value) -> section.flyingCompanion = value,
                     section -> section.flyingCompanion
             )
             .documentation("Debug setting for flying companion landing and grounded handoff diagnostics.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("RespawnTrace", Codec.BOOLEAN),
+                    (section, value) -> section.respawnTrace = value,
+                    section -> section.respawnTrace
+            )
+            .documentation("Debug setting for linked companion respawn, lost recovery, damage, and death correlation diagnostics.")
             .add()
             .build();
 
@@ -349,8 +363,14 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!nestedExplicitKeys.contains("NeedsSeek")) {
             debugCommands.needsSeekDiagnostics = parent.debugCommands.needsSeekDiagnostics;
         }
+        if (!nestedExplicitKeys.contains("NeedsTelemetry")) {
+            debugCommands.needsTelemetryDiagnostics = parent.debugCommands.needsTelemetryDiagnostics;
+        }
         if (!nestedExplicitKeys.contains("FlyingCompanion")) {
             debugCommands.flyingCompanion = parent.debugCommands.flyingCompanion;
+        }
+        if (!nestedExplicitKeys.contains("RespawnTrace")) {
+            debugCommands.respawnTrace = parent.debugCommands.respawnTrace;
         }
     }
 
@@ -390,7 +410,9 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean needsConsumeDiagnostics;
         private boolean needsDamageDiagnostics;
         private boolean needsSeekDiagnostics;
+        private boolean needsTelemetryDiagnostics;
         private boolean flyingCompanion;
+        private boolean respawnTrace;
 
         public boolean isHook() {
             return hook;
@@ -441,8 +463,16 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             return needsSeekDiagnostics;
         }
 
+        public boolean isNeedsTelemetryDiagnostics() {
+            return needsTelemetryDiagnostics;
+        }
+
         public boolean isFlyingCompanion() {
             return flyingCompanion;
+        }
+
+        public boolean isRespawnTrace() {
+            return respawnTrace;
         }
     }
 }

@@ -31,6 +31,15 @@ public final class NeedsSeekDiagnostics {
                                 boolean cacheHit,
                                 @Nullable Vector3d target) {
         Level level = resolveLevel(result);
+        NeedsTelemetryDiagnostics.recordSeekFailure(
+                roleId,
+                resourceType,
+                result,
+                detail,
+                searchRange,
+                currentRatio,
+                cacheHit
+        );
         if (!isRuntimeEnabled() || !LOGGER.isLoggable(level)) {
             return;
         }
