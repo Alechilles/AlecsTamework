@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
@@ -69,6 +70,7 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
                         false,
                         reloadContext("Async " + COMMAND_NAME + " failed.")
                                 .detail("source", "command")
+                                .detail("reason", "async_failed")
                                 .detail("result", "failed")
                                 .build()
                 );
@@ -116,7 +118,12 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
                                 "Reloaded with " + summary.reloadResult().getErrors().size() + " override error(s).",
                                 summary,
                                 "partial"
-                        ).build()
+                        )
+                                .detail(
+                                        "overrideErrorCountBucket",
+                                        TameworkTelemetryContext.countBucket(summary.reloadResult().getErrors().size())
+                                )
+                                .build()
                 );
             }
             commandContext.sender().sendMessage(Message.raw(

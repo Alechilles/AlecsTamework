@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
@@ -161,12 +162,12 @@ public final class TameworkSettingsAnnouncementService {
             plugin.getTelemetryEvents().recordError(
                     "ui_page_open_failed",
                     throwable,
-                    TameworkTelemetryEvents.featureContext("settings", "settings_announcement", "settings_announcement")
-                            .operation("open")
-                            .target("TameworkSettingsAnnouncementPage")
-                            .detail("Failed to open Tamework settings announcement.")
-                            .detail("source", "announcement")
-                            .build()
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkSettingsAnnouncementPage",
+                            "announcement",
+                            "open",
+                            "Failed to open Tamework settings announcement."
+                    ).build()
             );
             return respectEnabled ? null : "Unable to open Tamework news right now.";
         }

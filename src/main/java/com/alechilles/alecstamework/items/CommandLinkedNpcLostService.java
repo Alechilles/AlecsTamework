@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.LostRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
@@ -421,7 +422,12 @@ public final class CommandLinkedNpcLostService {
                 TameworkTelemetryEvents.recordErrorIfAvailable(
                         "lost_snapshot_load_failed",
                         ex,
-                        "Failed to load lost linked-NPC snapshots from " + persistencePath + "."
+                        TameworkTelemetryContext.persistence(
+                                "lost",
+                                "snapshot_load",
+                                "read_failed",
+                                "Failed to load lost linked-NPC snapshots."
+                        ).build()
                 );
                 // Ignore persistence read issues; runtime updates still track new lost companions.
             }
@@ -460,7 +466,12 @@ public final class CommandLinkedNpcLostService {
                 TameworkTelemetryEvents.recordErrorIfAvailable(
                         "lost_snapshot_persist_failed",
                         ex,
-                        "Failed to persist lost linked-NPC snapshots to " + persistencePath + "."
+                        TameworkTelemetryContext.persistence(
+                                "lost",
+                                "snapshot_persist",
+                                "write_failed",
+                                "Failed to persist lost linked-NPC snapshots."
+                        ).build()
                 );
                 // Ignore persistence write issues; runtime tracking remains available.
             }
@@ -499,9 +510,12 @@ public final class CommandLinkedNpcLostService {
         TameworkTelemetryEvents.recordErrorIfAvailable(
                 "lost_transition_blocked",
                 null,
-                "Persistence blocked lost transition: "
-                        + (state.reason() != null ? state.reason() : "unknown")
-                        + "."
+                TameworkTelemetryContext.persistence(
+                        "lost",
+                        "transition_blocked",
+                        state.reason(),
+                        "Persistence blocked lost transition."
+                ).build()
         );
         if (logger != null) {
             logger.at(Level.WARNING).log(

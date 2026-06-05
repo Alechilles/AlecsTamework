@@ -54,4 +54,22 @@ class NeedsTelemetryDiagnosticsWiringTest {
         assertTrue(content.contains("\"resource\""), "Needs telemetry must retain resource breakdowns.");
         assertTrue(content.contains("\"needBucket\""), "Needs seek telemetry must retain bucketed need context.");
     }
+
+    @Test
+    void telemetryProjectAllowsDiagnosticBreakdownDetails() throws IOException {
+        String content = Files.readString(TELEMETRY_PROJECT, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("\"linked_respawn_failed\""), "Respawn failures must retain breakdown context.");
+        assertTrue(content.contains("\"branch\""), "Respawn failures must expose dead/lost recovery branch.");
+        assertTrue(content.contains("\"ui_page_open_failed\""), "UI open failures must retain page breakdown context.");
+        assertTrue(content.contains("\"ui_page_build_failed\""), "UI build failures must retain page breakdown context.");
+        assertTrue(content.contains("\"page\""), "UI failures must expose page names.");
+        assertTrue(content.contains("\"config_editor_apply_failed\""), "Config editor failures must retain apply context.");
+        assertTrue(content.contains("\"failureType\""), "Config editor failures must expose failure type.");
+        assertTrue(content.contains("\"reload_config_override_errors\""), "Reload override errors must retain summary context.");
+        assertTrue(content.contains("\"overrideErrorCountBucket\""), "Reload override errors must expose bucketed counts.");
+        assertTrue(content.contains("\"persistence_write_failed\""), "Persistence failures must retain service context.");
+        assertTrue(content.contains("\"service\""), "Persistence failures must expose service breakdowns.");
+        assertTrue(content.contains("\"operation\""), "Diagnostic failures must expose operation breakdowns.");
+    }
 }

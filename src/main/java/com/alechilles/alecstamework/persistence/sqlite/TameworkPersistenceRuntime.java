@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
@@ -122,7 +123,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_schema_bootstrap_failed",
                     ex,
-                    "SQLite schema bootstrap failed for " + sqlitePath + "."
+                    TameworkTelemetryContext.persistence(
+                            "runtime",
+                            "schema_bootstrap",
+                            healthReason,
+                            "SQLite schema bootstrap failed."
+                    ).build()
             );
             if (logger != null) {
                 logger.at(Level.SEVERE).log("SQLite schema bootstrap failed: " + ex.getMessage());
@@ -270,7 +276,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_legacy_import_failed",
                     ex,
-                    "Legacy .dat migration failed for " + runtimeDataDirectory + "."
+                    TameworkTelemetryContext.persistence(
+                            "runtime",
+                            "legacy_import",
+                            "legacy_dat_import_failed",
+                            "Legacy .dat migration failed."
+                    ).build()
             );
             if (logger != null) {
                 logger.at(Level.SEVERE).log("Legacy .dat migration failed: " + ex.getMessage());
@@ -321,7 +332,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_wal_checkpoint_failed",
                     ex,
-                    "SQLite WAL checkpoint failed for " + sqlitePath + "."
+                    TameworkTelemetryContext.persistence(
+                            "maintenance",
+                            "wal_checkpoint",
+                            "wal_checkpoint_failed",
+                            "SQLite WAL checkpoint failed."
+                    ).build()
             );
             logWarning("SQLite WAL checkpoint failed: " + ex.getMessage());
         }
@@ -336,7 +352,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_vacuum_failed",
                     ex,
-                    "SQLite VACUUM failed for " + sqlitePath + "."
+                    TameworkTelemetryContext.persistence(
+                            "maintenance",
+                            "vacuum",
+                            "vacuum_failed",
+                            "SQLite VACUUM failed."
+                    ).build()
             );
             logWarning("SQLite VACUUM failed: " + ex.getMessage());
         }
@@ -350,7 +371,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_maintenance_rejected",
                     ex,
-                    "SQLite maintenance task rejected: " + rejectedReason + "."
+                    TameworkTelemetryContext.persistence(
+                            "maintenance",
+                            "schedule_task",
+                            rejectedReason,
+                            "SQLite maintenance task rejected."
+                    ).build()
             );
             logWarning("SQLite maintenance task rejected: " + rejectedReason);
             return false;

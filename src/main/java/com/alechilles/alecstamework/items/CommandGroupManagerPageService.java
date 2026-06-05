@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.ui.TameworkCommandGroupManagerPage;
@@ -62,7 +63,12 @@ final class CommandGroupManagerPageService {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_open_failed",
                     throwable,
-                    "page=TameworkCommandGroupManagerPage toolId=" + toolId
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkCommandGroupManagerPage",
+                            "command_item",
+                            "open",
+                            "Failed to open command group manager page."
+                    ).build()
             );
         }
     }

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.commands.TameworkConfigPermission;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -137,12 +138,12 @@ public final class TameworkSettingsPageService {
             plugin.getTelemetryEvents().recordError(
                     "ui_page_open_failed",
                     throwable,
-                    TameworkTelemetryEvents.featureContext("settings", "settings_page", entryPoint)
-                            .operation("open")
-                            .target("TameworkSettingsPage")
-                            .detail("Failed to open Tamework settings page.")
-                            .detail("source", telemetrySource)
-                            .build()
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkSettingsPage",
+                            telemetrySource,
+                            "open",
+                            "Failed to open Tamework settings page."
+                    ).build()
             );
             return "Unable to open settings right now.";
         }

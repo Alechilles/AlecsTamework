@@ -27,6 +27,172 @@
             "hungerGainBucket": { "type": "enum", "values": ["0", "1-5", "6-15", "16+"] },
             "thirstGainBucket": { "type": "enum", "values": ["0", "1-5", "6-15", "16+"] }
           }
+        },
+        "linked_respawn_failed": {
+          "allowedFields": {
+            "reason": { "type": "string", "maxLength": 120 },
+            "roleId": { "type": "string", "maxLength": 160 },
+            "branch": { "type": "enum", "values": ["dead_respawn", "lost_snapshot_recovery", "unknown"] },
+            "snapshotPresent": { "type": "boolean" },
+            "ownerState": { "type": "enum", "values": ["present", "missing"] },
+            "toolState": { "type": "enum", "values": ["present", "missing"] },
+            "snapshotToolCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] }
+          }
+        },
+        "ui_page_open_failed": {
+          "allowedFields": {
+            "page": { "type": "string", "maxLength": 120 },
+            "source": { "type": "enum", "values": ["announcement", "command", "command_item", "name_item", "settings_ui", "unknown"] },
+            "operation": { "type": "enum", "values": ["open"] }
+          }
+        },
+        "ui_page_build_failed": {
+          "allowedFields": {
+            "page": { "type": "string", "maxLength": 120 },
+            "source": { "type": "enum", "values": ["announcement", "command", "command_item", "name_item", "settings_ui", "unknown"] },
+            "operation": { "type": "enum", "values": ["build"] }
+          }
+        },
+        "config_editor_apply_failed": {
+          "allowedFields": {
+            "source": { "type": "enum", "values": ["settings_ui"] },
+            "changedFileCount": { "type": "number" },
+            "changedFileCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "failureType": { "type": "enum", "values": ["async", "stale", "apply_failed"] },
+            "result": { "type": "enum", "values": ["failed", "stale"] }
+          }
+        },
+        "reload_config_failed": {
+          "allowedFields": {
+            "source": { "type": "enum", "values": ["command"] },
+            "reason": { "type": "string", "maxLength": 120 },
+            "result": { "type": "enum", "values": ["failed"] }
+          }
+        },
+        "reload_config_override_errors": {
+          "allowedFields": {
+            "result": { "type": "enum", "values": ["partial"] },
+            "itemConfigCount": { "type": "number" },
+            "totalSpawners": { "type": "number" },
+            "totalNaming": { "type": "number" },
+            "overridePacks": { "type": "number" },
+            "overrideDirectories": { "type": "number" },
+            "overrideErrorCount": { "type": "number" },
+            "overrideErrorCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] }
+          }
+        },
+        "capture_snapshot_load_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["capture"] },
+            "operation": { "type": "enum", "values": ["snapshot_load"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "capture_snapshot_persist_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["capture"] },
+            "operation": { "type": "enum", "values": ["snapshot_persist"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "capture_transition_blocked": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["capture"] },
+            "operation": { "type": "enum", "values": ["transition_blocked"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "death_snapshot_load_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["death"] },
+            "operation": { "type": "enum", "values": ["snapshot_load"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "death_snapshot_persist_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["death"] },
+            "operation": { "type": "enum", "values": ["snapshot_persist"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "death_transition_blocked": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["death"] },
+            "operation": { "type": "enum", "values": ["transition_blocked"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "lost_snapshot_load_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["lost"] },
+            "operation": { "type": "enum", "values": ["snapshot_load"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "lost_snapshot_persist_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["lost"] },
+            "operation": { "type": "enum", "values": ["snapshot_persist"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "lost_transition_blocked": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["lost"] },
+            "operation": { "type": "enum", "values": ["transition_blocked"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "persistence_schema_bootstrap_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["runtime"] },
+            "operation": { "type": "enum", "values": ["schema_bootstrap"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "persistence_legacy_import_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["runtime"] },
+            "operation": { "type": "enum", "values": ["legacy_import"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "persistence_wal_checkpoint_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["maintenance"] },
+            "operation": { "type": "enum", "values": ["wal_checkpoint"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "persistence_vacuum_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["maintenance"] },
+            "operation": { "type": "enum", "values": ["vacuum"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "persistence_maintenance_rejected": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["maintenance"] },
+            "operation": { "type": "enum", "values": ["schedule_task"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
+        },
+        "persistence_after_commit_callback_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["write_queue"] },
+            "operation": { "type": "enum", "values": ["after_commit_callback"] },
+            "reason": { "type": "string", "maxLength": 120 },
+            "writeOperation": { "type": "string", "maxLength": 80 }
+          }
+        },
+        "persistence_write_failed": {
+          "allowedFields": {
+            "service": { "type": "enum", "values": ["write_queue"] },
+            "operation": { "type": "enum", "values": ["write_batch"] },
+            "reason": { "type": "string", "maxLength": 120 }
+          }
         }
       }
     },

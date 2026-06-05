@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -88,7 +89,12 @@ public final class TameworkCompanionTalentsPage
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_build_failed",
                     throwable,
-                    "page=TameworkCompanionTalentsPage"
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkCompanionTalentsPage",
+                            "command_item",
+                            "build",
+                            "Failed to build companion talents page."
+                    ).build()
             );
             throw throwable;
         }

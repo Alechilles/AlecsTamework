@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
@@ -113,12 +114,12 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             plugin.getTelemetryEvents().recordError(
                     "ui_page_build_failed",
                     throwable,
-                    TameworkTelemetryEvents.featureContext("settings", "settings_page", "/tw settings")
-                            .operation("build")
-                            .target("TameworkSettingsPage")
-                            .detail("Failed to build Tamework settings page.")
-                            .detail("source", "settings_ui")
-                            .build()
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkSettingsPage",
+                            "settings_ui",
+                            "build",
+                            "Failed to build Tamework settings page."
+                    ).build()
             );
             throw throwable;
         }

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
@@ -76,7 +77,12 @@ final class CommandTalentPageService {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_open_failed",
                     throwable,
-                    "page=TameworkCompanionTalentsPage npc=" + npcUuid
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkCompanionTalentsPage",
+                            "command_item",
+                            "open",
+                            "Failed to open companion talents page."
+                    ).build()
             );
             feedbackService.showWarning(player, "Talent page is unavailable right now.");
         }

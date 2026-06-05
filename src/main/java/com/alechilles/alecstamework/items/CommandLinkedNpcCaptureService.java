@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
@@ -205,7 +206,12 @@ public final class CommandLinkedNpcCaptureService {
                 TameworkTelemetryEvents.recordErrorIfAvailable(
                         "capture_snapshot_load_failed",
                         ex,
-                        "Failed to load captured linked-NPC snapshots from " + persistencePath + "."
+                        TameworkTelemetryContext.persistence(
+                                "capture",
+                                "snapshot_load",
+                                "read_failed",
+                                "Failed to load captured linked-NPC snapshots."
+                        ).build()
                 );
                 // Ignore persistence read issues; runtime updates still keep data current.
             }
@@ -244,7 +250,12 @@ public final class CommandLinkedNpcCaptureService {
                 TameworkTelemetryEvents.recordErrorIfAvailable(
                         "capture_snapshot_persist_failed",
                         ex,
-                        "Failed to persist captured linked-NPC snapshots to " + persistencePath + "."
+                        TameworkTelemetryContext.persistence(
+                                "capture",
+                                "snapshot_persist",
+                                "write_failed",
+                                "Failed to persist captured linked-NPC snapshots."
+                        ).build()
                 );
                 // Ignore persistence write issues; runtime tracking remains available.
             }
@@ -281,9 +292,12 @@ public final class CommandLinkedNpcCaptureService {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "capture_transition_blocked",
                     null,
-                    "Persistence blocked capture transition: "
-                            + (state.reason() != null ? state.reason() : "unknown")
-                            + "."
+                    TameworkTelemetryContext.persistence(
+                            "capture",
+                            "transition_blocked",
+                            state.reason(),
+                            "Persistence blocked capture transition."
+                    ).build()
             );
         }
         CoopDebugLogger.log(

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.ExtraInfo;
@@ -111,7 +112,12 @@ public final class TameworkCommandGroupManagerPage
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_build_failed",
                     throwable,
-                    "page=TameworkCommandGroupManagerPage"
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkCommandGroupManagerPage",
+                            "command_item",
+                            "build",
+                            "Failed to build command group manager page."
+                    ).build()
             );
             throw throwable;
         }

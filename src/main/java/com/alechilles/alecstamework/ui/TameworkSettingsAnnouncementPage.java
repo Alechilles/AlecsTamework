@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -88,7 +89,12 @@ public final class TameworkSettingsAnnouncementPage
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_build_failed",
                     throwable,
-                    "page=TameworkSettingsAnnouncementPage"
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkSettingsAnnouncementPage",
+                            "announcement",
+                            "build",
+                            "Failed to build Tamework settings announcement page."
+                    ).build()
             );
             throw throwable;
         }

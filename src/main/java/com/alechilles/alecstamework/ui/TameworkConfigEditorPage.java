@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.overrides.TwConfigJsonUtil;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.overrides.TwConfigSnapshot;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.google.gson.JsonArray;
@@ -129,9 +130,12 @@ public final class TameworkConfigEditorPage
             plugin.getTelemetryEvents().recordError(
                     "ui_page_build_failed",
                     throwable,
-                    configEditorContext("build", "Failed to build Tamework config editor page.")
-                            .target("TameworkConfigEditorPage")
-                            .build()
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkConfigEditorPage",
+                            "settings_ui",
+                            "build",
+                            "Failed to build Tamework config editor page."
+                    ).build()
             );
             throw throwable;
         }
@@ -313,6 +317,8 @@ public final class TameworkConfigEditorPage
                                 throwable,
                                 configEditorContext("apply", "Async /tw config apply failed.")
                                         .detail("changedFileCount", changedFileCountAtSubmit)
+                                        .detail("changedFileCountBucket", TameworkTelemetryContext.countBucket(changedFileCountAtSubmit))
+                                        .detail("failureType", "async")
                                         .detail("result", "failed")
                                         .build()
                         );
@@ -340,6 +346,8 @@ public final class TameworkConfigEditorPage
                             null,
                             configEditorContext("apply", result.getMessage())
                                     .detail("changedFileCount", changedFileCountAtSubmit)
+                                    .detail("changedFileCountBucket", TameworkTelemetryContext.countBucket(changedFileCountAtSubmit))
+                                    .detail("failureType", result.isStale() ? "stale" : "apply_failed")
                                     .detail("result", result.isStale() ? "stale" : "failed")
                                     .build()
                     );

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.ui.TameworkConfigEditorPage;
 import com.hypixel.hytale.component.Ref;
@@ -68,12 +69,12 @@ public final class TameworkConfigCommand extends AbstractPlayerCommand {
             plugin.getTelemetryEvents().recordError(
                     "ui_page_open_failed",
                     throwable,
-                    TameworkTelemetryEvents.commandContext("/tw config", "config_editor", "config_editor")
-                            .operation("open")
-                            .target("TameworkConfigEditorPage")
-                            .detail("Failed to open Tamework config editor page.")
-                            .detail("source", "command")
-                            .build()
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkConfigEditorPage",
+                            "command",
+                            "open",
+                            "Failed to open Tamework config editor page."
+                    ).build()
             );
             commandContext.sender().sendMessage(Message.raw("Unable to open the config editor right now."));
         }

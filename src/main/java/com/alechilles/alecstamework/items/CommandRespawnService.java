@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -17,18 +18,19 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentMigrationService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
-import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
-import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -114,19 +116,19 @@ final class CommandRespawnService {
                                    String traceBranch) {
         if (player == null || playerRef == null || !playerRef.isValid() || store == null || stack == null
                 || stack.isEmpty() || record == null || deadSnapshot == null) {
-            return recordRespawnFailure("invalid_input", deadSnapshot, null);
+            return recordRespawnFailure("invalid_input", deadSnapshot, null, traceBranch, toolId);
         }
         String roleId = deadSnapshot.roleId();
         if (roleId == null || roleId.isBlank()) {
-            return recordRespawnFailure("missing_role_id", deadSnapshot, null);
+            return recordRespawnFailure("missing_role_id", deadSnapshot, null, traceBranch, toolId);
         }
         NPCPlugin npcPlugin = NPCPlugin.get();
         if (npcPlugin == null) {
-            return recordRespawnFailure("npc_plugin_unavailable", deadSnapshot, roleId);
+            return recordRespawnFailure("npc_plugin_unavailable", deadSnapshot, roleId, traceBranch, toolId);
         }
         int roleIndex = npcPlugin.getIndex(roleId);
         if (roleIndex < 0) {
-            return recordRespawnFailure("unknown_role_id", deadSnapshot, roleId);
+            return recordRespawnFailure("unknown_role_id", deadSnapshot, roleId, traceBranch, toolId);
         }
         RecentRespawnTraceService.Trace respawnTrace =
                 RespawnTraceLogSupport.startTrace(traceBranch, record.npcUuid, deadSnapshot.ownerId(), roleId, toolId);
@@ -148,13 +150,13 @@ final class CommandRespawnService {
         );
         if (destination == null) {
             RespawnTraceLogSupport.warn(respawnTrace, "failed stage=safe_position reason=safe_position_not_found");
-            return recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId);
+            return recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId, traceBranch, toolId);
         }
         Rotation3f rotation = resolveRespawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             RespawnTraceLogSupport.warn(respawnTrace, "failed stage=spawn reason=spawn_entity_failed destination=" + destination);
-            return recordRespawnFailure("spawn_entity_failed", deadSnapshot, roleId);
+            return recordRespawnFailure("spawn_entity_failed", deadSnapshot, roleId, traceBranch, toolId);
         }
         Ref<EntityStore> spawnedRef = spawned.first();
         NPCEntity spawnedNpc = spawned.second();
@@ -250,17 +252,32 @@ final class CommandRespawnService {
     @Nullable
     private ItemStack recordRespawnFailure(@Nonnull String reason,
                                            @Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
-                                           @Nullable String roleId) {
-        String npcId = snapshot != null && snapshot.npcUuid() != null ? snapshot.npcUuid().toString() : "unknown";
+                                           @Nullable String roleId,
+                                           @Nullable String branch,
+                                           @Nullable String toolId) {
         String resolvedRoleId = roleId != null && !roleId.isBlank()
                 ? roleId
                 : snapshot != null && snapshot.roleId() != null && !snapshot.roleId().isBlank()
                 ? snapshot.roleId()
                 : "unknown";
+        String[] toolIds = snapshot != null ? snapshot.toolIds() : null;
+        TelemetryEventContext context = TameworkTelemetryContext.linkedCompanion(
+                        "linked_respawn",
+                        "respawn",
+                        "Linked companion respawn failed."
+                )
+                .detail("reason", TameworkTelemetryContext.normalizeReason(reason))
+                .detail("roleId", TameworkTelemetryContext.bounded(resolvedRoleId, 160))
+                .detail("branch", TameworkTelemetryContext.normalizeToken(branch))
+                .detail("snapshotPresent", snapshot != null)
+                .detail("ownerState", TameworkTelemetryContext.idState(snapshot != null ? snapshot.ownerId() : null))
+                .detail("toolState", TameworkTelemetryContext.idState(toolId))
+                .detail("snapshotToolCountBucket", TameworkTelemetryContext.countBucket(toolIds == null ? 0 : toolIds.length))
+                .build();
         TameworkTelemetryEvents.recordErrorIfAvailable(
                 "linked_respawn_failed",
                 null,
-                "reason=" + reason + " npc=" + npcId + " role=" + resolvedRoleId
+                context
         );
         return null;
     }

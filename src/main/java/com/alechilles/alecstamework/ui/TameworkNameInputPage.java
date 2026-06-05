@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -86,7 +87,12 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_build_failed",
                     throwable,
-                    "page=TameworkNameInputPage"
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkNameInputPage",
+                            "name_item",
+                            "build",
+                            "Failed to build Tamework name input page."
+                    ).build()
             );
             throw throwable;
         }

@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSourc
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -798,7 +799,12 @@ public final class CommandItemFeatureHandler {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_open_failed",
                     throwable,
-                    "page=TameworkCommandSelectionPage toolId=" + toolId
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkCommandSelectionPage",
+                            "command_item",
+                            "open",
+                            "Failed to open command selection page."
+                    ).build()
             );
             return false;
         }

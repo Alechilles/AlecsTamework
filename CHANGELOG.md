@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.13.2 - Companion Instant-Death and Diagnostics Fixes - 2026-06-05
 
 ### Added
 - Added `/tw debugrespawntrace` to log linked companion revive and lost-recovery spawn, restore, damage, and death-removal correlation for instant-death investigations.
@@ -8,6 +8,7 @@
 
 ### Changed
 - Updated the embedded Alec's Telemetry runtime to `0.1.3`.
+- Expanded Alec's Telemetry context for linked companion respawn, persistence, UI page, and config reload/apply failures.
 
 ### Fixed
 - Protected revived and lost-recovered linked companions from invalid spawn-time fall damage so they no longer instantly die after replacement spawning.

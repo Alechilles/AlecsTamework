@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.DeathRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
@@ -528,7 +529,12 @@ public final class CommandLinkedNpcDeathService {
                 TameworkTelemetryEvents.recordErrorIfAvailable(
                         "death_snapshot_load_failed",
                         ex,
-                        "Failed to load dead linked-NPC snapshots from " + persistencePath + "."
+                        TameworkTelemetryContext.persistence(
+                                "death",
+                                "snapshot_load",
+                                "read_failed",
+                                "Failed to load dead linked-NPC snapshots."
+                        ).build()
                 );
                 // Ignore persistence read issues; runtime tracking still works for newly dead NPCs.
             }
@@ -567,7 +573,12 @@ public final class CommandLinkedNpcDeathService {
                 TameworkTelemetryEvents.recordErrorIfAvailable(
                         "death_snapshot_persist_failed",
                         ex,
-                        "Failed to persist dead linked-NPC snapshots to " + persistencePath + "."
+                        TameworkTelemetryContext.persistence(
+                                "death",
+                                "snapshot_persist",
+                                "write_failed",
+                                "Failed to persist dead linked-NPC snapshots."
+                        ).build()
                 );
                 // Ignore persistence write issues; runtime tracking remains available.
             }
@@ -604,9 +615,12 @@ public final class CommandLinkedNpcDeathService {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "death_transition_blocked",
                     null,
-                    "Persistence blocked death transition: "
-                            + (state.reason() != null ? state.reason() : "unknown")
-                            + "."
+                    TameworkTelemetryContext.persistence(
+                            "death",
+                            "transition_blocked",
+                            state.reason(),
+                            "Persistence blocked death transition."
+                    ).build()
             );
         }
         CoopDebugLogger.log(

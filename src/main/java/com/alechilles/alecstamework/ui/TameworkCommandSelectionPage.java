@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -272,7 +273,12 @@ public final class TameworkCommandSelectionPage
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_build_failed",
                     throwable,
-                    "page=TameworkCommandSelectionPage"
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkCommandSelectionPage",
+                            "command_item",
+                            "build",
+                            "Failed to build command selection page."
+                    ).build()
             );
             throw throwable;
         }

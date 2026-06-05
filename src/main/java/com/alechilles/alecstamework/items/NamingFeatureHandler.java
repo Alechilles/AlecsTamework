@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
@@ -259,7 +260,12 @@ public final class NamingFeatureHandler {
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "ui_page_open_failed",
                     throwable,
-                    "page=TameworkNameInputPage"
+                    TameworkTelemetryContext.uiPage(
+                            "TameworkNameInputPage",
+                            "name_item",
+                            "open",
+                            "Failed to open Tamework name input page."
+                    ).build()
             );
             return false;
         }
