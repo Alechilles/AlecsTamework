@@ -60,6 +60,7 @@ import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInt
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
+import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CommandCoopManagedWildCaptureSystem;
@@ -415,6 +416,7 @@ public class Tamework extends JavaPlugin {
         registerTraitAssets();
         registerTalentAssets();
         registerDebugAssets();
+        CreditorIntegration.setup(this);
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
         getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
@@ -1014,6 +1016,7 @@ public class Tamework extends JavaPlugin {
 
     private void startInternal() {
         OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
+        CreditorIntegration.start(this);
         initializeOverridesForLoadedWorlds();
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (hStatsIntegration != null) {

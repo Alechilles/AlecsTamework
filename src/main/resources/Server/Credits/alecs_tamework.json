@@ -1,0 +1,11 @@
+{
+  "Plugin": "Alechilles:Alec's Tamework!",
+  "Description": {
+    "MessageId": "tamework.credits.description",
+    "RawText": "Alec's Tamework is a modular NPC framework for taming, ownership, capture items, command tools, companion progression, and asset-driven behavior integrations."
+  },
+  "License": {
+    "MessageId": "tamework.credits.license",
+    "RawText": "Alec's Tamework is licensed under GPL-3.0 with additional attribution terms."
+  }
+}

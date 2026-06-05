@@ -3,6 +3,7 @@
 ## 2.13.2 - Companion Instant-Death and Diagnostics Fixes - 2026-06-05
 
 ### Added
+- Embedded Creditor so `/credits` is available from the Tamework jar and includes richer Tamework credit metadata.
 - Added `/tw debugrespawntrace` to log linked companion revive and lost-recovery spawn, restore, damage, and death-removal correlation for instant-death investigations.
 - Added `/tw debugneedstelemetry` to control rate-limited Alec's Telemetry context events for needs seek and consume failures.
 

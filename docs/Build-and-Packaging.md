@@ -11,6 +11,8 @@ Built via Maven. The jar includes:
 ## Packaging model
 - Tamework is shipped as jar-only.
 - No standalone `(Assets)` zip is produced by current build profiles.
+- The release jar embeds Creditor through Cursemaven and Maven Shade so `/credits` is available without a separate Creditor install.
+- Creditor's dependency `manifest.json` is excluded during shading so the packaged jar keeps Tamework's root manifest.
 - Runtime asset-pack ordering keeps Tamework directly after `Hytale:Hytale` before the main load pass.
 - Legacy standalone `Alec's Tamework! (Assets)` packs/zips are removed/replaced when detected in the same mods directory.
 

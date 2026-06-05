@@ -11,6 +11,7 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 ## Integrations
 - Tooltip bridge loading under `integration/tooltips/`
 - SimpleClaims breeding and damage bridge under `integration/simpleclaims/`
+- Creditor is embedded under `integration/creditor/`; Tamework calls Creditor during plugin setup/start and ships `Server/Credits` metadata for the credits page.
 - Asset pack ordering through `TameworkAssetPackCoordinator`
 
 ## Telemetry
@@ -38,6 +39,7 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - Maven produces a jar-only plugin artifact
 - Resources include Java code plus `src/main/resources`
 - Manifest versioning is filtered from Maven properties
+- Maven Shade includes Creditor from Cursemaven and filters Creditor's root `manifest.json` so it cannot replace Tamework's plugin manifest.
 - `install-plugin`, `run-server`, and `prerelease` are the main build profiles called out in the repo docs
 
 ## Dev workflow notes

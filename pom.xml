@@ -19,6 +19,7 @@
         <sqlite.jdbc.version>3.49.1.0</sqlite.jdbc.version>
         <slf4j.version>1.7.36</slf4j.version>
         <alecstelemetry.version>0.1.3</alecstelemetry.version>
+        <creditor.file.id>8195970</creditor.file.id>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
         <hytale.install.path>${hytale.install.path.release}</hytale.install.path>
@@ -30,6 +31,13 @@
         <hytale.server.jvm.args />
         <hytale.server.extra.args />
     </properties>
+
+    <repositories>
+        <repository>
+            <id>cursemaven</id>
+            <url>https://www.cursemaven.com</url>
+        </repository>
+    </repositories>
 
     <dependencies>
         <dependency>
@@ -50,6 +58,11 @@
             <groupId>com.alechilles</groupId>
             <artifactId>alecstelemetry-runtime</artifactId>
             <version>${alecstelemetry.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>curse.maven</groupId>
+            <artifactId>creditor-1560961</artifactId>
+            <version>${creditor.file.id}</version>
         </dependency>
         <dependency>
             <groupId>org.xerial</groupId>
@@ -155,10 +168,19 @@
                                 </excludes>
                                 <includes>
                                     <include>com.alechilles:alecstelemetry-runtime</include>
+                                    <include>curse.maven:creditor-1560961</include>
                                     <include>org.xerial:sqlite-jdbc</include>
                                     <include>org.slf4j:slf4j-api</include>
                                 </includes>
                             </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>curse.maven:creditor-1560961</artifact>
+                                    <excludes>
+                                        <exclude>manifest.json</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <relocations>
                                 <relocation>
                                     <pattern>org.slf4j</pattern>
