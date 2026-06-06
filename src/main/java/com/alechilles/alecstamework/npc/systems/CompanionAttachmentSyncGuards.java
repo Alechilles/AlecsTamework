@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.npc.actions.HarvestAlarmTimeBasis;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -24,12 +25,20 @@ final class CompanionAttachmentSyncGuards {
         if (npc == null) {
             return false;
         }
-        Alarm alarm = resolveAlarm(npc, resolveHarvestAlarmName());
-        return isAlarmActive(alarm, resolveGameTime(store));
+        String alarmName = resolveHarvestAlarmName();
+        Alarm alarm = resolveAlarm(npc, alarmName);
+        return isAlarmActive(alarmName, alarm, resolveGameTime(store));
     }
 
     static boolean isAlarmActive(@Nullable Alarm alarm, @Nullable Instant now) {
+        return isAlarmActive(DEFAULT_HARVEST_ALARM_NAME, alarm, now);
+    }
+
+    static boolean isAlarmActive(@Nullable String alarmName, @Nullable Alarm alarm, @Nullable Instant now) {
         if (alarm == null || !alarm.isSet()) {
+            return false;
+        }
+        if (HarvestAlarmTimeBasis.isLegacyWallClockHarvestAlarm(alarmName, alarm, now)) {
             return false;
         }
         return now == null || !alarm.hasPassed(now);

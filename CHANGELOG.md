@@ -14,7 +14,7 @@
 ### Fixed
 - Protected revived and lost-recovered linked companions from invalid spawn-time fall damage so they no longer instantly die after replacement spawning.
 - Protected breeding offspring from invalid spawn-time fall damage so newborn companions no longer instantly die after spawning.
-- Fixed progression-scaled harvest cooldowns using wall-clock timestamps, which could leave milk and other harvestable animal interactions stuck on cooldown after the first collection.
+- Fixed progression-scaled harvest cooldowns so milk and other harvestable animal interactions use vanilla-style world-time durations, honor temporal `HarvestTimeout` values like `P1D`, and recover animals already stuck with legacy wall-clock cooldowns.
 
 ## 2.13.1 - Native Spawner Tooltips and Runtime Cache Fixes - 2026-06-04
 

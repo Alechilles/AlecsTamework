@@ -28,9 +28,16 @@ class ActionTameworkHarvestAlarmTest {
     void harvestCooldownUsesWorldTimeBasisEvenWhenEpochIsEarly() {
         Instant worldTime = Instant.parse("0001-01-01T00:00:00Z");
 
-        Instant until = ActionTameworkHarvestAlarm.resolveCooldownUntil(worldTime, 90.0);
+        Instant until = HarvestAlarmTimeBasis.resolveCooldownUntil(worldTime, 90.0);
 
         assertEquals(Instant.parse("0001-01-01T00:01:30Z"), until);
+    }
+
+    @Test
+    void harvestTimeoutSupportsVanillaTemporalRangeStrings() {
+        double seconds = HarvestAlarmTimeBasis.resolveTemporalRangeSeconds(new String[] {"P1D", "P1D"}, () -> 0.0);
+
+        assertEquals(86400.0, seconds, 0.000001);
     }
 
     @Test

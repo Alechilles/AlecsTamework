@@ -14,8 +14,8 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
-import com.hypixel.hytale.server.npc.util.expression.ValueType;
 import java.time.Instant;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -54,7 +54,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (npc == null) {
             return false;
         }
-        double baseSeconds = resolveHarvestTimeoutSeconds(npc);
+        double baseSeconds = resolveHarvestTimeoutSeconds(npc, ThreadLocalRandom.current()::nextDouble);
         double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
@@ -73,7 +73,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (CompanionHarvestBonusService.consumeCooldownSkip(npcRef, store)) {
             return true;
         }
-        alarm.set(npcRef, resolveCooldownUntil(resolveGameTime(store), cooldownSeconds), store);
+        alarm.set(npcRef, HarvestAlarmTimeBasis.resolveCooldownUntil(resolveGameTime(store), cooldownSeconds), store);
         return true;
     }
 
@@ -86,11 +86,6 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         return Double.isFinite(scaled) ? Math.max(0.0, scaled) : base;
     }
 
-    static Instant resolveCooldownUntil(@Nullable Instant now, double cooldownSeconds) {
-        Instant base = now != null ? now : Instant.now();
-        return base.plusMillis(Math.max(0L, Math.round(cooldownSeconds * 1000.0)));
-    }
-
     @Nullable
     private static Instant resolveGameTime(@Nullable Store<EntityStore> store) {
         if (store == null) {
@@ -100,7 +95,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         return time != null ? time.getGameTime() : null;
     }
 
-    private static double resolveHarvestTimeoutSeconds(@Nonnull NPCEntity npc) {
+    static double resolveHarvestTimeoutSeconds(@Nonnull NPCEntity npc, @Nonnull DoubleSupplier random) {
         int roleIndex = npc.getRoleIndex();
         if (roleIndex < 0) {
             return 0.0;
@@ -119,12 +114,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         }
         try {
             StdScope scope = builderParameters.createScope();
-            if (scope.getType(HARVEST_TIMEOUT_PARAMETER) != ValueType.NUMBER) {
-                return 0.0;
-            }
-            DoubleSupplier supplier = scope.getNumberSupplier(HARVEST_TIMEOUT_PARAMETER);
-            double value = supplier != null ? supplier.getAsDouble() : 0.0;
-            return Double.isFinite(value) ? Math.max(0.0, value) : 0.0;
+            return HarvestAlarmTimeBasis.resolveHarvestTimeoutSeconds(scope, HARVEST_TIMEOUT_PARAMETER, random);
         } catch (Exception ignored) {
             return 0.0;
         }

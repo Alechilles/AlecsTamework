@@ -37,6 +37,17 @@ class CompanionAttachmentSyncGuardsTest {
         assertFalse(CompanionAttachmentSyncGuards.isAlarmActive(alarm, Instant.parse("2026-05-11T12:10:00Z")));
     }
 
+    @Test
+    void allowsSyncForLegacyWallClockHarvestAlarmWrittenAgainstEarlyWorldTime() throws Exception {
+        Alarm alarm = alarmSetTo(Instant.parse("2026-06-06T12:00:00Z"));
+
+        assertFalse(CompanionAttachmentSyncGuards.isAlarmActive(
+                "Harvest_Ready",
+                alarm,
+                Instant.parse("0001-01-01T12:00:00Z")
+        ));
+    }
+
     private static Alarm alarmSetTo(Instant instant) throws Exception {
         Alarm alarm = new Alarm();
         Field instantField = Alarm.class.getDeclaredField("alarmInstant");

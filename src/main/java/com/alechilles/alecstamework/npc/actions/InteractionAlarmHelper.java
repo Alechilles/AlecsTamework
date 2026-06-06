@@ -103,6 +103,9 @@ final class InteractionAlarmHelper {
             return AlarmSnapshot.missingAlarm(alarmName);
         }
         Instant now = resolveGameTime(store);
+        if (HarvestAlarmTimeBasis.isLegacyWallClockHarvestAlarm(alarmName, alarm, now)) {
+            alarm.set(npcRef, null, store);
+        }
         boolean set = alarm.isSet();
         boolean passed = set && now != null && alarm.hasPassed(now);
         boolean unset = !set;
