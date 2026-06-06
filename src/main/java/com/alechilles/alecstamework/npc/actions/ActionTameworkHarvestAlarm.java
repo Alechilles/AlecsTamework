@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
@@ -72,7 +73,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (CompanionHarvestBonusService.consumeCooldownSkip(npcRef, store)) {
             return true;
         }
-        alarm.set(npcRef, Instant.now().plusMillis(Math.max(0L, Math.round(cooldownSeconds * 1000.0))), store);
+        alarm.set(npcRef, resolveCooldownUntil(resolveGameTime(store), cooldownSeconds), store);
         return true;
     }
 
@@ -83,6 +84,20 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         }
         double scaled = base * multiplier;
         return Double.isFinite(scaled) ? Math.max(0.0, scaled) : base;
+    }
+
+    static Instant resolveCooldownUntil(@Nullable Instant now, double cooldownSeconds) {
+        Instant base = now != null ? now : Instant.now();
+        return base.plusMillis(Math.max(0L, Math.round(cooldownSeconds * 1000.0)));
+    }
+
+    @Nullable
+    private static Instant resolveGameTime(@Nullable Store<EntityStore> store) {
+        if (store == null) {
+            return null;
+        }
+        WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
+        return time != null ? time.getGameTime() : null;
     }
 
     private static double resolveHarvestTimeoutSeconds(@Nonnull NPCEntity npc) {

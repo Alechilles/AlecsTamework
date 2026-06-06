@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +22,15 @@ class ActionTameworkHarvestAlarmTest {
         assertEquals(60.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(60.0, 0.0), 0.000001);
         assertEquals(60.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(60.0, Double.NaN), 0.000001);
         assertEquals(0.0, ActionTameworkHarvestAlarm.scaleHarvestCooldownSeconds(-10.0, 0.75), 0.000001);
+    }
+
+    @Test
+    void harvestCooldownUsesWorldTimeBasisEvenWhenEpochIsEarly() {
+        Instant worldTime = Instant.parse("0001-01-01T00:00:00Z");
+
+        Instant until = ActionTameworkHarvestAlarm.resolveCooldownUntil(worldTime, 90.0);
+
+        assertEquals(Instant.parse("0001-01-01T00:01:30Z"), until);
     }
 
     @Test
