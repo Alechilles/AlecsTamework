@@ -37,6 +37,32 @@ class NeedsTelemetryDiagnosticsTest {
     }
 
     @Test
+    void keepsConsumeReasonLowCardinalityWhenContainerSummaryIsPresent() {
+        NeedsTelemetryDiagnostics.ConsumeFailureContext context = NeedsTelemetryDiagnostics.consumeFailureContext(
+                "no_container_food_consumed(status=NO_ALLOWED_FOOD_IN_RANGE,containers=2,"
+                        + "allowedContainers=0,matchingStacks=0,attempts=0,failures=0,maxItems=1,"
+                        + "radius=2.00,vScan=2,scanSource=TARGET,scanBlock=[1,2,3])"
+        );
+
+        assertEquals("no_container_food_consumed", context.reason());
+        assertEquals("NO_ALLOWED_FOOD_IN_RANGE", context.detail("status"));
+        assertEquals("2", context.detail("containers"));
+        assertEquals("0", context.detail("matchingStacks"));
+        assertEquals("TARGET", context.detail("scanSource"));
+    }
+
+    @Test
+    void combinesFoodAndWaterConsumeFailureIntoStableReason() {
+        NeedsTelemetryDiagnostics.ConsumeFailureContext context = NeedsTelemetryDiagnostics.consumeFailureContext(
+                "no_container_food_consumed(status=NO_ALLOWED_FOOD_IN_RANGE,containers=1,"
+                        + "allowedContainers=0,matchingStacks=0,attempts=0,failures=0,maxItems=1),not_near_water"
+        );
+
+        assertEquals("food_and_water_unavailable", context.reason());
+        assertEquals("NO_ALLOWED_FOOD_IN_RANGE", context.detail("status"));
+    }
+
+    @Test
     void reportsOnlyActionableSeekFailureReasons() {
         assertFalse(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("food_target_not_found"));
         assertFalse(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("water_target_not_found"));

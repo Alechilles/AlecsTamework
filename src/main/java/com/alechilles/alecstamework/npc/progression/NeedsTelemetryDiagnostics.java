@@ -3,7 +3,9 @@ package com.alechilles.alecstamework.npc.progression;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -81,22 +83,30 @@ public final class NeedsTelemetryDiagnostics {
             return;
         }
         String resource = normalizeResource(mode);
-        String normalizedReason = normalizeReason(reason);
+        ConsumeFailureContext failureContext = consumeFailureContext(reason);
+        String normalizedReason = failureContext.reason();
         String role = normalizeRole(roleId);
         if (isThrottled(EventNames.NEEDS_CONSUME_FAILED, role, resource, normalizedReason)) {
             return;
         }
+        TelemetryEventContext.Builder context = needsContext(
+                        "needs_consume",
+                        "consume_resource",
+                        Fingerprints.NEEDS_CONSUME_FAILED,
+                        resource,
+                        role
+                )
+                .detail("reason", normalizedReason)
+                .detail("resource", resource)
+                .detail("roleId", role)
+                .detail("consumedItemsBucket", countBucket(consumedItems))
+                .detail("hungerGainBucket", gainBucket(hungerGain))
+                .detail("thirstGainBucket", gainBucket(thirstGain));
+        failureContext.addDetails(context);
         TameworkTelemetryEvents.recordErrorIfAvailable(
                 EventNames.NEEDS_CONSUME_FAILED,
                 null,
-                needsContext("needs_consume", "consume_resource", Fingerprints.NEEDS_CONSUME_FAILED, resource, role)
-                        .detail("reason", normalizedReason)
-                        .detail("resource", resource)
-                        .detail("roleId", role)
-                        .detail("consumedItemsBucket", countBucket(consumedItems))
-                        .detail("hungerGainBucket", gainBucket(hungerGain))
-                        .detail("thirstGainBucket", gainBucket(thirstGain))
-                        .build()
+                context.build()
         );
     }
 
@@ -161,6 +171,48 @@ public final class NeedsTelemetryDiagnostics {
                 || "needs_component_type_missing".equals(reason)
                 || "needs_component_missing".equals(reason)
                 || "needs_config_missing_or_disabled".equals(reason);
+    }
+
+    @Nonnull
+    static ConsumeFailureContext consumeFailureContext(@Nullable String reason) {
+        String rawReason = reason == null ? "" : reason.trim();
+        Map<String, String> containerSummary = parseContainerSummary(rawReason);
+        boolean containerFoodFailed = rawReason.contains("no_container_food_consumed(");
+        boolean waterFailed = rawReason.contains("not_near_water");
+        String telemetryReason;
+        if (containerFoodFailed && waterFailed) {
+            telemetryReason = "food_and_water_unavailable";
+        } else if (containerFoodFailed) {
+            telemetryReason = "no_container_food_consumed";
+        } else if (waterFailed) {
+            telemetryReason = "not_near_water";
+        } else {
+            telemetryReason = normalizeReason(rawReason);
+        }
+        return new ConsumeFailureContext(telemetryReason, containerSummary);
+    }
+
+    @Nonnull
+    private static Map<String, String> parseContainerSummary(@Nonnull String reason) {
+        int start = reason.indexOf("no_container_food_consumed(");
+        if (start < 0) {
+            return Map.of();
+        }
+        start += "no_container_food_consumed(".length();
+        int end = reason.indexOf(')', start);
+        if (end <= start) {
+            return Map.of();
+        }
+        String summary = reason.substring(start, end);
+        Map<String, String> values = new HashMap<>();
+        for (String token : summary.split(",")) {
+            int separator = token.indexOf('=');
+            if (separator <= 0 || separator >= token.length() - 1) {
+                continue;
+            }
+            values.put(token.substring(0, separator).trim(), token.substring(separator + 1).trim());
+        }
+        return values;
     }
 
     @Nonnull
@@ -244,5 +296,49 @@ public final class NeedsTelemetryDiagnostics {
             return "6-15";
         }
         return "16+";
+    }
+
+    static final class ConsumeFailureContext {
+        private final String reason;
+        @Nonnull
+        private final Map<String, String> containerSummary;
+
+        ConsumeFailureContext(@Nonnull String reason, @Nonnull Map<String, String> containerSummary) {
+            this.reason = normalizeReason(reason);
+            this.containerSummary = containerSummary.isEmpty() ? Map.of() : Map.copyOf(containerSummary);
+        }
+
+        @Nonnull
+        String reason() {
+            return reason;
+        }
+
+        @Nonnull
+        String detail(@Nonnull String key) {
+            return containerSummary.getOrDefault(key, "unknown");
+        }
+
+        void addDetails(@Nonnull TelemetryEventContext.Builder context) {
+            if (containerSummary.isEmpty()) {
+                return;
+            }
+            context.detail("containerStatus", normalizeReason(detail("status")).toLowerCase(Locale.ROOT))
+                    .detail("scannedContainerCountBucket", countBucketOrUnknown(detail("containers")))
+                    .detail("allowedContainerCountBucket", countBucketOrUnknown(detail("allowedContainers")))
+                    .detail("matchingStackCountBucket", countBucketOrUnknown(detail("matchingStacks")))
+                    .detail("consumeAttemptBucket", countBucketOrUnknown(detail("attempts")))
+                    .detail("consumeFailureBucket", countBucketOrUnknown(detail("failures")))
+                    .detail("maxItemsBucket", countBucketOrUnknown(detail("maxItems")))
+                    .detail("scanSource", normalizeReason(detail("scanSource")).toLowerCase(Locale.ROOT));
+        }
+
+        @Nonnull
+        private static String countBucketOrUnknown(@Nonnull String value) {
+            try {
+                return countBucket(Integer.parseInt(value));
+            } catch (NumberFormatException ex) {
+                return "unknown";
+            }
+        }
     }
 }

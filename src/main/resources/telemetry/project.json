@@ -25,7 +25,31 @@
             "roleId": { "type": "string", "maxLength": 160 },
             "consumedItemsBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+"] },
             "hungerGainBucket": { "type": "enum", "values": ["0", "1-5", "6-15", "16+"] },
-            "thirstGainBucket": { "type": "enum", "values": ["0", "1-5", "6-15", "16+"] }
+            "thirstGainBucket": { "type": "enum", "values": ["0", "1-5", "6-15", "16+"] },
+            "containerStatus": {
+              "type": "enum",
+              "values": [
+                "success",
+                "invalid_context",
+                "max_items_non_positive",
+                "allowed_foods_empty",
+                "world_context_missing",
+                "invalid_radius",
+                "chunk_store_unavailable",
+                "no_container_in_range",
+                "no_allowed_food_in_range",
+                "remove_transaction_failed",
+                "no_items_consumed",
+                "unknown"
+              ]
+            },
+            "scannedContainerCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "allowedContainerCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "matchingStackCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "consumeAttemptBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "consumeFailureBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "maxItemsBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "scanSource": { "type": "enum", "values": ["npc", "target", "unknown"] }
           }
         },
         "linked_respawn_failed": {

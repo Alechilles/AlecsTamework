@@ -53,6 +53,9 @@ class NeedsTelemetryDiagnosticsWiringTest {
         assertTrue(content.contains("\"reason\""), "Needs telemetry must retain low-cardinality failure reasons.");
         assertTrue(content.contains("\"resource\""), "Needs telemetry must retain resource breakdowns.");
         assertTrue(content.contains("\"needBucket\""), "Needs seek telemetry must retain bucketed need context.");
+        assertTrue(content.contains("\"containerStatus\""), "Consume failures must expose container failure status.");
+        assertTrue(content.contains("\"matchingStackCountBucket\""), "Consume failures must expose matching stack buckets.");
+        assertTrue(content.contains("\"scanSource\""), "Consume failures must expose container scan source.");
     }
 
     @Test
