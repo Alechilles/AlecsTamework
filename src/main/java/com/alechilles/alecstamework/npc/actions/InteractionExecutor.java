@@ -103,24 +103,36 @@ final class InteractionExecutor {
         }
         if (entry instanceof HarvestInteraction) {
             effects.logHarvestExecution("selected", interactionConfigId, interactionIndex, role, ctx);
-            if (!effects.applyHarvestCooldown(npcRef, role, store, ctx)) {
+            if (!effects.isHarvestCooldownReady(npcRef, role, store, ctx)) {
                 effects.logHarvestExecution("cooldown-blocked", interactionConfigId, interactionIndex, role, ctx);
                 return false;
             }
-            effects.logHarvestExecution("cooldown-applied", interactionConfigId, interactionIndex, role, ctx);
-            TameworkInteractEffects.HarvestContainerResult containerResult =
+            effects.logHarvestExecution("cooldown-ready", interactionConfigId, interactionIndex, role, ctx);
+            TameworkInteractEffects.HarvestContainerOutcome containerOutcome =
                     effects.applyHarvestContainerTransform(npcRef, store, role, player, ctx);
-            if (containerResult == TameworkInteractEffects.HarvestContainerResult.FAILED) {
+            if (containerOutcome.result == TameworkInteractEffects.HarvestContainerResult.FAILED) {
                 effects.logHarvestExecution("container-failed", interactionConfigId, interactionIndex, role, ctx);
                 return false;
             }
-            effects.logHarvestExecution("container-" + containerResult, interactionConfigId, interactionIndex, role, ctx);
+            effects.logHarvestExecution("container-" + containerOutcome.result, interactionConfigId, interactionIndex, role, ctx);
             boolean applied = effects.applyStartHarvest(npcRef, role, store);
             if (!applied) {
                 effects.logHarvestExecution("state-blocked", interactionConfigId, interactionIndex, role, ctx);
                 return false;
             }
             effects.logHarvestExecution("state-applied", interactionConfigId, interactionIndex, role, ctx);
+            if (!containerOutcome.preserveCooldown
+                    && !effects.ensureHarvestCooldownAfterState(npcRef, role, store, ctx)) {
+                effects.logHarvestExecution("cooldown-ensure-blocked", interactionConfigId, interactionIndex, role, ctx);
+                return false;
+            }
+            effects.logHarvestExecution(
+                    containerOutcome.preserveCooldown ? "cooldown-preserved" : "cooldown-ensured",
+                    interactionConfigId,
+                    interactionIndex,
+                    role,
+                    ctx
+            );
             return true
                     | effects.applyCustomEffects(
                     interactionConfigId,

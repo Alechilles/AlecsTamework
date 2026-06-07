@@ -99,4 +99,18 @@ class ActionTameworkHarvestAlarmTest {
         assertTrue(content.contains("untilAfter="),
                 "Harvest cooldown diagnostics should show the persisted alarm target time.");
     }
+
+    @Test
+    void optimizedHarvestCanCheckReadinessWithoutWritingCooldownFirst() throws Exception {
+        String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
+
+        int readyMethod = content.indexOf("static boolean isHarvestCooldownReady");
+        int ensureMethod = content.indexOf("static boolean ensureHarvestCooldownActive");
+        int readyWrite = content.indexOf("applyHarvestCooldown(npcRef, store", readyMethod);
+
+        assertTrue(readyMethod >= 0, "Optimized harvest should have a no-write cooldown readiness check.");
+        assertTrue(ensureMethod > readyMethod, "Optimized harvest should confirm cooldown after state transition.");
+        assertTrue(readyWrite < 0 || readyWrite > ensureMethod,
+                "Readiness check should not write the alarm before rewards/state transition.");
+    }
 }

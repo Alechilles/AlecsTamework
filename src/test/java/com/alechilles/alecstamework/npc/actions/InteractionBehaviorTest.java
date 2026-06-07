@@ -207,31 +207,33 @@ class InteractionBehaviorTest {
     }
 
     @Test
-    void optimizedHarvestAppliesCooldownBeforeContainerRewardsAndHarvestState() throws Exception {
+    void optimizedHarvestChecksCooldownBeforeRewardsAndEnsuresAfterState() throws Exception {
         String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
 
         int startHarvest = content.indexOf("effects.applyStartHarvest");
-        int applyCooldown = content.indexOf("effects.applyHarvestCooldown(npcRef, role, store, ctx)");
+        int checkCooldown = content.indexOf("effects.isHarvestCooldownReady(npcRef, role, store, ctx)");
         int containerTransform = content.indexOf("effects.applyHarvestContainerTransform");
+        int ensureCooldown = content.indexOf("effects.ensureHarvestCooldownAfterState(npcRef, role, store, ctx)");
         int customEffects = content.indexOf("effects.applyCustomEffects", startHarvest);
 
         assertTrue(startHarvest >= 0, "Optimized harvest should start the harvest state.");
-        assertTrue(applyCooldown >= 0, "Optimized harvest must set Harvest_Ready.");
-        assertTrue(containerTransform > applyCooldown, "Harvest cooldown should be applied before milk/container rewards.");
+        assertTrue(checkCooldown >= 0, "Optimized harvest must check Harvest_Ready before rewards.");
+        assertTrue(containerTransform > checkCooldown, "Container rewards should only run after cooldown readiness passes.");
         assertTrue(startHarvest > containerTransform, "Optimized harvest should only start the harvest state after rewards are applied.");
-        assertTrue(customEffects > startHarvest, "Harvest cooldown and state should be handled before later custom effects run.");
+        assertTrue(ensureCooldown > startHarvest, "Optimized harvest should repair/confirm the cooldown after state transition.");
+        assertTrue(customEffects > ensureCooldown, "Harvest cooldown and state should be handled before later custom effects run.");
     }
 
     @Test
     void optimizedHarvestFailsClosedWhenCooldownCannotBeApplied() throws Exception {
         String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
 
-        int applyCooldown = content.indexOf("if (!effects.applyHarvestCooldown(npcRef, role, store, ctx))");
-        int returnFalse = content.indexOf("return false;", applyCooldown);
-        int containerTransform = content.indexOf("effects.applyHarvestContainerTransform", applyCooldown);
+        int checkCooldown = content.indexOf("if (!effects.isHarvestCooldownReady(npcRef, role, store, ctx))");
+        int returnFalse = content.indexOf("return false;", checkCooldown);
+        int containerTransform = content.indexOf("effects.applyHarvestContainerTransform", checkCooldown);
 
-        assertTrue(applyCooldown >= 0, "Optimized harvest must check whether the harvest cooldown was applied.");
-        assertTrue(returnFalse > applyCooldown, "Cooldown failure should stop the optimized harvest.");
+        assertTrue(checkCooldown >= 0, "Optimized harvest must check whether the harvest cooldown is ready.");
+        assertTrue(returnFalse > checkCooldown, "Cooldown failure should stop the optimized harvest.");
         assertTrue(containerTransform > returnFalse, "Container rewards should not run before cooldown failure is handled.");
     }
 
@@ -243,6 +245,8 @@ class InteractionBehaviorTest {
                 "Optimized harvest should log when the harvest path is selected.");
         assertTrue(content.contains("effects.logHarvestExecution(\"cooldown-blocked\""),
                 "Optimized harvest should log when active cooldown blocks rewards.");
+        assertTrue(content.contains("\"cooldown-ensured\""),
+                "Optimized harvest should log after post-state cooldown confirmation.");
         assertTrue(content.contains("effects.logHarvestExecution(\"state-applied\""),
                 "Optimized harvest should log after the harvest state starts.");
     }
@@ -254,22 +258,28 @@ class InteractionBehaviorTest {
         int stringArrayLookup = content.indexOf(
                 "owner.getRoleStringArrayParam(role, ctx, HARVEST_TIMEOUT_PARAMETER)"
         );
-        int cooldownApply = content.indexOf(
-                "ActionTameworkHarvestAlarm.applyHarvestCooldownIfReady(npcRef, role, store, baseSeconds, true)"
+        int cooldownReadyCheck = content.indexOf(
+                "ActionTameworkHarvestAlarm.isHarvestCooldownReady(npcRef, role, store, baseSeconds)"
+        );
+        int cooldownEnsure = content.indexOf(
+                "ActionTameworkHarvestAlarm.ensureHarvestCooldownActive(npcRef, role, store, baseSeconds)"
         );
 
         assertTrue(stringArrayLookup >= 0, "Optimized harvest should resolve HarvestTimeout from interaction params.");
-        assertTrue(cooldownApply >= 0, "Resolved HarvestTimeout should be passed into the alarm writer.");
+        assertTrue(cooldownReadyCheck >= 0, "Resolved HarvestTimeout should be passed into the readiness check.");
+        assertTrue(cooldownEnsure >= 0, "Resolved HarvestTimeout should be passed into the post-state cooldown check.");
     }
 
     @Test
     void optimizedHarvestLogsContainerAndCooldownDiagnostics() throws Exception {
         String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
 
-        assertTrue(content.contains("TameworkHarvestDebug: cooldown-request"),
+        assertTrue(content.contains("TameworkHarvestDebug: cooldown-ready-request"),
                 "Optimized harvest should log the resolved cooldown duration before applying it.");
         assertTrue(content.contains("TameworkHarvestDebug: container"),
                 "Optimized harvest should log bucket/container transform decisions.");
+        assertTrue(content.contains("TameworkHarvestDebug: cooldown-ensure-request"),
+                "Optimized harvest should log the post-state cooldown confirmation.");
         assertTrue(content.contains("preserveCooldown="),
                 "Optimized harvest should log whether a cooldown-preserve bonus was applied.");
     }
