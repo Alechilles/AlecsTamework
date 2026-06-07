@@ -108,6 +108,9 @@ final class InteractionExecutor {
                 return false;
             }
             boolean applied = effects.applyStartHarvest(npcRef, role, store);
+            if (applied) {
+                effects.applyHarvestCooldown(npcRef, role, store);
+            }
             return applied
                     | effects.applyCustomEffects(
                     interactionConfigId,

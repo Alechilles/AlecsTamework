@@ -25,6 +25,7 @@ final class CompanionHarvestBonusService {
     private static final String MODE_COOLDOWN_PRESERVE = "CooldownPreserve";
     private static final String MODE_DISABLED = "Disabled";
     private static final ConcurrentMap<UUID, Long> COOLDOWN_SKIP_TOKENS = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<UUID, Long> COOLDOWN_HANDLED_TOKENS = new ConcurrentHashMap<>();
     private static final StdScopeLookupCache SCOPE_LOOKUP = new StdScopeLookupCache();
 
     private CompanionHarvestBonusService() {
@@ -75,6 +76,18 @@ final class CompanionHarvestBonusService {
     static boolean consumeCooldownSkip(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
         UUID npcUuid = resolveNpcUuid(npcRef, store);
         return npcUuid != null && COOLDOWN_SKIP_TOKENS.remove(npcUuid) != null;
+    }
+
+    static void markCooldownHandled(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        if (npcUuid != null) {
+            COOLDOWN_HANDLED_TOKENS.put(npcUuid, System.nanoTime());
+        }
+    }
+
+    static boolean consumeCooldownHandled(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        return npcUuid != null && COOLDOWN_HANDLED_TOKENS.remove(npcUuid) != null;
     }
 
     @Nonnull

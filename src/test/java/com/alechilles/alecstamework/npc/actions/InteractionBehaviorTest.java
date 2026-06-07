@@ -10,6 +10,10 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
@@ -20,6 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests for Interaction behavior. */
 class InteractionBehaviorTest {
+    private static final Path INTERACTION_EXECUTOR = Paths.get(
+            "src", "main", "java",
+            "com", "alechilles", "alecstamework", "npc", "actions", "InteractionExecutor.java"
+    );
 
     @Test
     void roleParamResolutionUsesFirstScopeWithValue() throws Exception {
@@ -192,6 +200,19 @@ class InteractionBehaviorTest {
         assertTrue(TameworkInteractRequirements.resolveInteractionRequireOwner(Boolean.FALSE, true));
         assertFalse(TameworkInteractRequirements.resolveInteractionRequireOwner(null, false));
         assertFalse(TameworkInteractRequirements.resolveInteractionRequireOwner(Boolean.TRUE, false));
+    }
+
+    @Test
+    void optimizedHarvestAppliesHarvestCooldownImmediatelyAfterStartingHarvestState() throws Exception {
+        String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
+
+        int startHarvest = content.indexOf("effects.applyStartHarvest");
+        int applyCooldown = content.indexOf("effects.applyHarvestCooldown");
+        int customEffects = content.indexOf("effects.applyCustomEffects", startHarvest);
+
+        assertTrue(startHarvest >= 0, "Optimized harvest should start the harvest state.");
+        assertTrue(applyCooldown > startHarvest, "Optimized harvest must set Harvest_Ready immediately after starting harvest.");
+        assertTrue(customEffects > applyCooldown, "Harvest cooldown should be set before later custom effects run.");
     }
 
     private static ActionTameworkInteract newInteract() throws Exception {

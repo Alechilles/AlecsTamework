@@ -71,10 +71,57 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (alarm == null) {
             return false;
         }
+        return applyHarvestCooldown(npcRef, store, alarm, cooldownSeconds, false);
+    }
+
+    static boolean applyHarvestCooldown(@Nullable Ref<EntityStore> npcRef,
+                                        @Nullable Role role,
+                                        @Nullable Store<EntityStore> store,
+                                        boolean markHandled) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            return false;
+        }
+        double baseSeconds = resolveHarvestTimeoutSeconds(npc, role, ThreadLocalRandom.current()::nextDouble);
+        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                HARVEST_COOLDOWN_MULTIPLIER_EFFECT_KEY,
+                1.0
+        );
+        double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier);
+        AlarmStore alarmStore = npc.getAlarmStore();
+        if (alarmStore == null) {
+            return false;
+        }
+        Alarm alarm = alarmStore.get(npc, HARVEST_ALARM_NAME);
+        if (alarm == null) {
+            return false;
+        }
+        return applyHarvestCooldown(npcRef, store, alarm, cooldownSeconds, markHandled);
+    }
+
+    private static boolean applyHarvestCooldown(@Nullable Ref<EntityStore> npcRef,
+                                                @Nullable Store<EntityStore> store,
+                                                @Nonnull Alarm alarm,
+                                                double cooldownSeconds,
+                                                boolean markHandled) {
+        if (CompanionHarvestBonusService.consumeCooldownHandled(npcRef, store)) {
+            return true;
+        }
         if (CompanionHarvestBonusService.consumeCooldownSkip(npcRef, store)) {
+            if (markHandled) {
+                CompanionHarvestBonusService.markCooldownHandled(npcRef, store);
+            }
             return true;
         }
         alarm.set(npcRef, HarvestAlarmTimeBasis.resolveCooldownUntil(resolveGameTime(store), cooldownSeconds), store);
+        if (markHandled) {
+            CompanionHarvestBonusService.markCooldownHandled(npcRef, store);
+        }
         return true;
     }
 

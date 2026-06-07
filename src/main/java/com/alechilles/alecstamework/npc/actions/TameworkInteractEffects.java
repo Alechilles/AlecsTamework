@@ -264,6 +264,10 @@ final class TameworkInteractEffects {
         return stateEffects.applyStartHarvest(npcRef, role, store);
     }
 
+    boolean applyHarvestCooldown(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+        return ActionTameworkHarvestAlarm.applyHarvestCooldown(npcRef, role, store, true);
+    }
+
     HarvestContainerResult applyHarvestContainerTransform(Ref<EntityStore> npcRef,
                                                           Store<EntityStore> store,
                                                           Role role,

@@ -50,4 +50,17 @@ class ActionTameworkHarvestAlarmTest {
         assertTrue(skipCheck >= 0, "Harvest alarm should consume cooldown-preserve skip tokens.");
         assertTrue(setAlarm > skipCheck, "Cooldown skip must happen before the harvest alarm is set.");
     }
+
+    @Test
+    void stateHarvestAlarmSkipsWhenOptimizedHarvestAlreadyHandledCooldown() throws Exception {
+        String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
+
+        int handledCheck = content.indexOf("CompanionHarvestBonusService.consumeCooldownHandled");
+        int skipCheck = content.indexOf("CompanionHarvestBonusService.consumeCooldownSkip");
+        int setAlarm = content.indexOf("alarm.set");
+
+        assertTrue(handledCheck >= 0, "State harvest alarm should honor optimized harvest cooldown handling.");
+        assertTrue(skipCheck > handledCheck, "Handled cooldown marker must be checked before cooldown-preserve skip.");
+        assertTrue(setAlarm > skipCheck, "State action should only write the alarm after both handoff checks.");
+    }
 }
