@@ -91,6 +91,7 @@ import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHarvestCooldownComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
@@ -257,6 +258,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkHappinessComponent> happinessComponentType;
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
+    private ComponentType<EntityStore, TameworkHarvestCooldownComponent> harvestCooldownComponentType;
     private ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingCompanionComponentType;
     private ComponentType<EntityStore, TameworkRideMountComponent> rideMountComponentType;
     private ComponentType<EntityStore, TameworkRideRiderComponent> rideRiderComponentType;
@@ -479,6 +481,12 @@ public class Tamework extends JavaPlugin {
                 TameworkBreedingComponent.class,
                 "TameworkBreeding",
                 TameworkBreedingComponent.CODEC
+        );
+
+        harvestCooldownComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkHarvestCooldownComponent.class,
+                "TameworkHarvestCooldown",
+                TameworkHarvestCooldownComponent.CODEC
         );
 
         flyingCompanionComponentType = getEntityStoreRegistry().registerComponent(
@@ -2229,6 +2237,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkBreedingComponent> getBreedingComponentType() {
         return breedingComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkHarvestCooldownComponent> getHarvestCooldownComponentType() {
+        return harvestCooldownComponentType;
     }
 
     public ComponentType<EntityStore, TameworkFlyingCompanionComponent> getFlyingCompanionComponentType() {

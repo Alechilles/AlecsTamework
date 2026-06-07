@@ -172,7 +172,9 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (context == null) {
             return false;
         }
-        boolean ready = context.cooldownSeconds > 0.0 && isAlarmReady(context.alarm, store);
+        HarvestCooldownStateService.Snapshot durable = HarvestCooldownStateService.snapshot(npcRef, store);
+        boolean alarmReady = isAlarmReady(context.alarm, store);
+        boolean ready = context.cooldownSeconds > 0.0 && durable.ready && alarmReady;
         logHarvestCooldownDiagnostic(
                 "ready-check",
                 role,
@@ -181,15 +183,16 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                 context.multiplier,
                 context.cooldownSeconds,
                 context.alarm.isSet(),
-                ready,
+                alarmReady,
                 resolveGameTime(store),
                 HarvestAlarmTimeBasis.readAlarmInstant(context.alarm),
                 context.alarm.isSet(),
-                ready,
+                alarmReady,
                 resolveGameTime(store),
                 HarvestAlarmTimeBasis.readAlarmInstant(context.alarm),
                 ready
         );
+        logHarvestDurableDiagnostic("ready-check", durable, durable, context.cooldownSeconds, ready);
         return ready;
     }
 
@@ -208,14 +211,19 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
             return false;
         }
         boolean setBefore = context.alarm.isSet();
-        boolean readyBefore = isAlarmReady(context.alarm, store);
+        boolean alarmReadyBefore = isAlarmReady(context.alarm, store);
+        HarvestCooldownStateService.Snapshot durableBefore = HarvestCooldownStateService.snapshot(npcRef, store);
+        boolean readyBefore = durableBefore.ready && alarmReadyBefore;
         Instant nowBefore = resolveGameTime(store);
         Instant untilBefore = HarvestAlarmTimeBasis.readAlarmInstant(context.alarm);
         boolean applied = true;
-        if (readyBefore) {
+        if (durableBefore.ready && alarmReadyBefore) {
             applied = context.cooldownSeconds > 0.0
                     && applyHarvestCooldown(npcRef, store, context.alarm, context.cooldownSeconds, false, true);
+        } else if (durableBefore.ready) {
+            applied = false;
         }
+        HarvestCooldownStateService.Snapshot durableAfter = HarvestCooldownStateService.snapshot(npcRef, store);
         logHarvestCooldownDiagnostic(
                 "ensure-active",
                 role,
@@ -233,6 +241,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                 HarvestAlarmTimeBasis.readAlarmInstant(context.alarm),
                 applied
         );
+        logHarvestDurableDiagnostic("ensure-active", durableBefore, durableAfter, context.cooldownSeconds, applied);
         return applied;
     }
 
@@ -256,6 +265,9 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                 CompanionHarvestBonusService.markCooldownHandled(npcRef, store);
             }
             return true;
+        }
+        if (!HarvestCooldownStateService.applyCooldown(npcRef, store, cooldownSeconds)) {
+            return false;
         }
         alarm.set(npcRef, HarvestAlarmTimeBasis.resolveCooldownUntil(resolveGameTime(store), cooldownSeconds), store);
         if (markHandled) {
@@ -461,6 +473,33 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                         + " readyAfter=" + readyAfter
                         + " nowAfter=" + instantText(nowAfter)
                         + " untilAfter=" + instantText(untilAfter)
+                        + " applied=" + applied
+        );
+    }
+
+    private static void logHarvestDurableDiagnostic(String stage,
+                                                    @Nonnull HarvestCooldownStateService.Snapshot before,
+                                                    @Nonnull HarvestCooldownStateService.Snapshot after,
+                                                    double cooldownSeconds,
+                                                    boolean applied) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkHarvestDebug: durable-cooldown"
+                        + " stage=" + stage
+                        + " cooldownSeconds=" + cooldownSeconds
+                        + " validBefore=" + before.valid
+                        + " activeBefore=" + before.active
+                        + " readyBefore=" + before.ready
+                        + " nowBeforeMs=" + before.nowMs
+                        + " untilBeforeMs=" + before.cooldownUntilMs
+                        + " validAfter=" + after.valid
+                        + " activeAfter=" + after.active
+                        + " readyAfter=" + after.ready
+                        + " nowAfterMs=" + after.nowMs
+                        + " untilAfterMs=" + after.cooldownUntilMs
                         + " applied=" + applied
         );
     }

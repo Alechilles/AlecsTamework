@@ -271,6 +271,38 @@ class InteractionBehaviorTest {
     }
 
     @Test
+    void harvestReadinessUsesDurableCooldownBeforeBaseAlarm() throws Exception {
+        String content = Files.readString(Paths.get(
+                "src", "main", "java",
+                "com", "alechilles", "alecstamework", "npc", "actions", "ActionTameworkInteract.java"
+        ), StandardCharsets.UTF_8);
+
+        int durableReady = content.indexOf("HarvestCooldownStateService.isReady(npcRef, store)");
+        int alarmReady = content.indexOf("alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx)");
+
+        assertTrue(durableReady >= 0, "Harvest readiness should consult durable Tamework cooldown state.");
+        assertTrue(alarmReady > durableReady, "Base Harvest_Ready alarm should be secondary to durable cooldown state.");
+    }
+
+    @Test
+    void harvestSelectionDoesNotBypassDurableCooldownForExecution() throws Exception {
+        String selector = Files.readString(Paths.get(
+                "src", "main", "java",
+                "com", "alechilles", "alecstamework", "npc", "actions", "InteractionSelector.java"
+        ), StandardCharsets.UTF_8);
+        String requirements = Files.readString(Paths.get(
+                "src", "main", "java",
+                "com", "alechilles", "alecstamework", "npc", "actions", "TameworkInteractRequirements.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(selector.contains(": !owner.isHarvestAlarmReady(npcRef, store, ctx);"),
+                "Selection should use the component-aware harvest readiness helper.");
+        assertFalse(requirements.contains("? owner.isHarvestAlarmReady(npcRef, store, ctx)")
+                        || requirements.contains(": alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx)"),
+                "Harvest requirements should not bypass durable cooldown state on execution.");
+    }
+
+    @Test
     void optimizedHarvestLogsContainerAndCooldownDiagnostics() throws Exception {
         String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
 

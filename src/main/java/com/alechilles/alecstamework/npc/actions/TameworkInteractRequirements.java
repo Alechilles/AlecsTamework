@@ -271,9 +271,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isHarvestAlarmReady()
-                && !(forPrompt
-                ? owner.isHarvestAlarmReady(npcRef, store, ctx)
-                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx))) {
+                && !owner.isHarvestAlarmReady(npcRef, store, ctx)) {
             return false;
         }
         if (bucket.isHarvestInteractionContext()
@@ -380,9 +378,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isHarvestAlarmReady()
-                && (forPrompt
-                ? owner.isHarvestAlarmReady(npcRef, store, ctx)
-                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx))) {
+                && owner.isHarvestAlarmReady(npcRef, store, ctx)) {
             return true;
         }
         if (bucket.isHarvestInteractionContext()
@@ -656,9 +652,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (requireAlarm
-                && !(forPrompt
-                ? owner.isHarvestAlarmReady(npcRef, store, ctx)
-                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx))) {
+                && !owner.isHarvestAlarmReady(npcRef, store, ctx)) {
             return false;
         }
         if (requireContext && !matchesHarvestContext(role, infoProvider, ctx, forPrompt)) {

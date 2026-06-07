@@ -469,7 +469,8 @@ public class ActionTameworkInteract extends TameworkActionBase {
     boolean isHarvestAlarmReady(Ref<EntityStore> npcRef,
                                 Store<EntityStore> store,
                                 InteractionContextSnapshot ctx) {
-        return alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
+        return HarvestCooldownStateService.isReady(npcRef, store)
+                && alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
     }
 
     boolean isHarvestAlarmPassed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
