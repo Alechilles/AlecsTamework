@@ -40,6 +40,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -50,6 +51,7 @@ final class TameworkInteractEffects {
     private static final String DECO_BUCKET_ITEM_ID = "Deco_Bucket";
     private static final String HARVEST_ADD_ITEM_BUCKET_PARAM = "HarvestAddItemBucket";
     private static final String HARVEST_ADD_ITEM_DECO_BUCKET_PARAM = "HarvestAddItemDecoBucket";
+    private static final String HARVEST_TIMEOUT_PARAMETER = "HarvestTimeout";
     private final ActionTameworkInteract owner;
     private final InteractionInventoryEffects inventoryEffects;
     private final InteractionPresentationEffects presentationEffects;
@@ -264,8 +266,24 @@ final class TameworkInteractEffects {
         return stateEffects.applyStartHarvest(npcRef, role, store);
     }
 
-    boolean applyHarvestCooldown(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
-        return ActionTameworkHarvestAlarm.applyHarvestCooldown(npcRef, role, store, true);
+    boolean applyHarvestCooldown(Ref<EntityStore> npcRef,
+                                 Role role,
+                                 Store<EntityStore> store,
+                                 InteractionContextSnapshot ctx) {
+        double baseSeconds = resolveHarvestTimeoutSeconds(role, ctx);
+        return ActionTameworkHarvestAlarm.applyHarvestCooldown(npcRef, role, store, baseSeconds, true);
+    }
+
+    private double resolveHarvestTimeoutSeconds(Role role, InteractionContextSnapshot ctx) {
+        String[] timeoutRange = owner.getRoleStringArrayParam(role, ctx, HARVEST_TIMEOUT_PARAMETER);
+        double rangeSeconds = HarvestAlarmTimeBasis.resolveTemporalRangeSeconds(
+                timeoutRange,
+                ThreadLocalRandom.current()::nextDouble
+        );
+        if (rangeSeconds > 0.0) {
+            return rangeSeconds;
+        }
+        return owner.getRoleNumberParam(role, ctx, HARVEST_TIMEOUT_PARAMETER, 0.0);
     }
 
     HarvestContainerResult applyHarvestContainerTransform(Ref<EntityStore> npcRef,

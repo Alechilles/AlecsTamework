@@ -78,6 +78,14 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                                         @Nullable Role role,
                                         @Nullable Store<EntityStore> store,
                                         boolean markHandled) {
+        return applyHarvestCooldown(npcRef, role, store, 0.0, markHandled);
+    }
+
+    static boolean applyHarvestCooldown(@Nullable Ref<EntityStore> npcRef,
+                                        @Nullable Role role,
+                                        @Nullable Store<EntityStore> store,
+                                        double resolvedBaseSeconds,
+                                        boolean markHandled) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return false;
         }
@@ -85,7 +93,9 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (npc == null) {
             return false;
         }
-        double baseSeconds = resolveHarvestTimeoutSeconds(npc, role, ThreadLocalRandom.current()::nextDouble);
+        double baseSeconds = resolvedBaseSeconds > 0.0
+                ? resolvedBaseSeconds
+                : resolveHarvestTimeoutSeconds(npc, role, ThreadLocalRandom.current()::nextDouble);
         double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,

@@ -28,6 +28,10 @@ class InteractionBehaviorTest {
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "npc", "actions", "InteractionExecutor.java"
     );
+    private static final Path TAMEWORK_INTERACT_EFFECTS = Paths.get(
+            "src", "main", "java",
+            "com", "alechilles", "alecstamework", "npc", "actions", "TameworkInteractEffects.java"
+    );
 
     @Test
     void roleParamResolutionUsesFirstScopeWithValue() throws Exception {
@@ -207,12 +211,40 @@ class InteractionBehaviorTest {
         String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
 
         int startHarvest = content.indexOf("effects.applyStartHarvest");
-        int applyCooldown = content.indexOf("effects.applyHarvestCooldown");
+        int applyCooldown = content.indexOf("effects.applyHarvestCooldown(npcRef, role, store, ctx)");
         int customEffects = content.indexOf("effects.applyCustomEffects", startHarvest);
 
         assertTrue(startHarvest >= 0, "Optimized harvest should start the harvest state.");
         assertTrue(applyCooldown > startHarvest, "Optimized harvest must set Harvest_Ready immediately after starting harvest.");
         assertTrue(customEffects > applyCooldown, "Harvest cooldown should be set before later custom effects run.");
+    }
+
+    @Test
+    void optimizedHarvestFailsClosedWhenCooldownCannotBeApplied() throws Exception {
+        String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
+
+        int applyCooldown = content.indexOf("if (!effects.applyHarvestCooldown(npcRef, role, store, ctx))");
+        int returnFalse = content.indexOf("return false;", applyCooldown);
+        int customEffects = content.indexOf("effects.applyCustomEffects", applyCooldown);
+
+        assertTrue(applyCooldown >= 0, "Optimized harvest must check whether the harvest cooldown was applied.");
+        assertTrue(returnFalse > applyCooldown, "Cooldown failure should stop the optimized harvest.");
+        assertTrue(customEffects > returnFalse, "Custom harvest effects should not run before cooldown failure is handled.");
+    }
+
+    @Test
+    void optimizedHarvestResolvesCooldownDurationFromInteractionContext() throws Exception {
+        String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
+
+        int stringArrayLookup = content.indexOf(
+                "owner.getRoleStringArrayParam(role, ctx, HARVEST_TIMEOUT_PARAMETER)"
+        );
+        int cooldownApply = content.indexOf(
+                "ActionTameworkHarvestAlarm.applyHarvestCooldown(npcRef, role, store, baseSeconds, true)"
+        );
+
+        assertTrue(stringArrayLookup >= 0, "Optimized harvest should resolve HarvestTimeout from interaction params.");
+        assertTrue(cooldownApply >= 0, "Resolved HarvestTimeout should be passed into the alarm writer.");
     }
 
     private static ActionTameworkInteract newInteract() throws Exception {
