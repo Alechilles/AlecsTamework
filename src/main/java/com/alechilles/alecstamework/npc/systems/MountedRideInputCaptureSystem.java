@@ -124,6 +124,16 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                     mount.setWishZ(0.0);
                 }
             }
+            MountedRideInputProbeLogger.logPlayerInputQueue(
+                    mount,
+                    0,
+                    "<empty>",
+                    false,
+                    0.0,
+                    0.0,
+                    0.0,
+                    capturedMountMovement ? "authoritativePose" : ""
+            );
             maybeLogDebug(mount, mountRef, 0, "<empty>", commandBuffer);
             if (capturedMountMovement || hadWishMovement) {
                 commandBuffer.putComponent(mountRef, rideMountComponentType, mount);
@@ -135,17 +145,29 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         mount.setHasBodyRotation(false);
         mount.setHasHeadRotation(false);
         boolean sawMovementIntent = false;
+        boolean sawRawWish = false;
+        double rawWishX = 0.0;
+        double rawWishY = 0.0;
+        double rawWishZ = 0.0;
+        StringBuilder inferredSources = new StringBuilder();
         for (PlayerInput.InputUpdate inputUpdate : queue) {
             if (inputUpdate instanceof PlayerInput.WishMovement wish) {
+                sawRawWish = true;
+                rawWishX = wish.getX();
+                rawWishY = wish.getY();
+                rawWishZ = wish.getZ();
                 captureWish(mount, wish.getX(), wish.getY(), wish.getZ());
                 sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.RelativeMovement relative) {
+                appendInferredSource(inferredSources, "relative");
                 captureWorldMovement(mount, relative.getX(), relative.getY(), relative.getZ());
                 sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.AbsoluteMovement absolute) {
+                appendInferredSource(inferredSources, "absolute");
                 captureAbsoluteMovement(mount, mountRef, absolute, commandBuffer);
                 sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.SetClientVelocity velocity) {
+                appendInferredSource(inferredSources, "velocity");
                 captureVelocityFallback(mount, velocity);
                 sawMovementIntent = true;
             } else if (inputUpdate instanceof PlayerInput.SetBody body) {
@@ -168,6 +190,16 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         if (sawMovementIntent) {
             mount.setLastInputAtMs(System.currentTimeMillis());
         }
+        MountedRideInputProbeLogger.logPlayerInputQueue(
+                mount,
+                queue.size(),
+                queueSummary,
+                sawRawWish,
+                rawWishX,
+                rawWishY,
+                rawWishZ,
+                inferredSources.toString()
+        );
         maybeLogDebug(mount, mountRef, queue.size(), queueSummary, commandBuffer);
         commandBuffer.putComponent(mountRef, rideMountComponentType, mount);
         queue.clear();
@@ -480,6 +512,16 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
     private void captureProjectedIntent(@Nonnull TameworkRideMountComponent mount,
                                         @Nonnull MovementIntent intent) {
         mount.captureWishMovement(intent.strafe(), 0.0, intent.forward());
+    }
+
+    private void appendInferredSource(@Nonnull StringBuilder sources, @Nonnull String source) {
+        if (sources.indexOf(source) >= 0) {
+            return;
+        }
+        if (sources.length() > 0) {
+            sources.append(',');
+        }
+        sources.append(source);
     }
 
     private void captureBackwardBrakeIntent(@Nonnull TameworkRideMountComponent mount) {

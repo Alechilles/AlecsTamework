@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
 import com.alechilles.alecstamework.npc.movement.TameworkRideVelocityIntent;
 import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
+import com.alechilles.alecstamework.npc.systems.MountedRideInputProbeLogger;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -167,6 +168,14 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
             if (capturedPacketInput) {
                 mount.setLastInputAtMs(System.currentTimeMillis());
             }
+            MountedRideInputProbeLogger.logClientMovement(
+                    mount,
+                    packet.wishMovement,
+                    packet.velocity,
+                    packet.movementStates,
+                    packet.riderMovementStates,
+                    capturedMovementIntent
+            );
             logClientMovementDebug(packet, mount, capturedMovementIntent);
             current.store.putComponent(current.mountRef, current.mountType, mount);
         });
