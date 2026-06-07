@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
@@ -54,7 +55,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (npc == null) {
             return false;
         }
-        double baseSeconds = resolveHarvestTimeoutSeconds(npc, ThreadLocalRandom.current()::nextDouble);
+        double baseSeconds = resolveHarvestTimeoutSeconds(npc, role, ThreadLocalRandom.current()::nextDouble);
         double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
@@ -95,7 +96,13 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         return time != null ? time.getGameTime() : null;
     }
 
-    static double resolveHarvestTimeoutSeconds(@Nonnull NPCEntity npc, @Nonnull DoubleSupplier random) {
+    static double resolveHarvestTimeoutSeconds(@Nonnull NPCEntity npc,
+                                               @Nullable Role role,
+                                               @Nonnull DoubleSupplier random) {
+        double roleSeconds = resolveHarvestTimeoutSeconds(role, random);
+        if (roleSeconds > 0.0) {
+            return roleSeconds;
+        }
         int roleIndex = npc.getRoleIndex();
         if (roleIndex < 0) {
             return 0.0;
@@ -118,5 +125,14 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         } catch (Exception ignored) {
             return 0.0;
         }
+    }
+
+    private static double resolveHarvestTimeoutSeconds(@Nullable Role role, @Nonnull DoubleSupplier random) {
+        if (role == null) {
+            return 0.0;
+        }
+        EntitySupport support = role.getEntitySupport();
+        StdScope scope = support != null ? support.getSensorScope() : null;
+        return HarvestAlarmTimeBasis.resolveHarvestTimeoutSeconds(scope, HARVEST_TIMEOUT_PARAMETER, random);
     }
 }
