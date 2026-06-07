@@ -12,6 +12,7 @@
 - Updated the embedded Alec's Telemetry runtime to `0.1.3`.
 - Expanded Alec's Telemetry context for linked companion respawn, persistence, UI page, and config reload/apply failures.
 - Moved feed-trough water refill bucket integration from full bucket item overrides into targeted asset patches, improving compatibility with other mods that edit bucket assets.
+- Added an optional AlanDeco Stackable Bucket patch so its water bucket can refill Tamework feed troughs when AlanDeco is installed.
 
 ### Fixed
 - Protected revived and lost-recovered linked companions from invalid spawn-time fall damage so they no longer instantly die after replacement spawning.
