@@ -66,6 +66,16 @@ final class CompanionHarvestBonusService {
         );
     }
 
+    static boolean shouldPreserveCooldown(@Nullable String mode,
+                                          @Nullable Ref<EntityStore> npcRef,
+                                          @Nullable Store<EntityStore> store) {
+        return shouldPreserveCooldown(
+                mode,
+                resolveHarvestMultiplier(npcRef, store),
+                ThreadLocalRandom.current()::nextDouble
+        );
+    }
+
     static void markCooldownSkip(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
         UUID npcUuid = resolveNpcUuid(npcRef, store);
         if (npcUuid != null) {

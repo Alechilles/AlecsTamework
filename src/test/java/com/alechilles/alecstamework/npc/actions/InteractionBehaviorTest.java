@@ -271,6 +271,26 @@ class InteractionBehaviorTest {
     }
 
     @Test
+    void containerHarvestBonusModeUsesInteractionContextParams() throws Exception {
+        String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
+
+        int modeResolution = content.indexOf("String harvestBonusMode = owner.getRoleStringParam(");
+        int modeParam = content.indexOf(
+                "CompanionHarvestBonusService.HARVEST_BONUS_MODE_PARAM",
+                modeResolution
+        );
+        int preserveCheck = content.indexOf(
+                "CompanionHarvestBonusService.shouldPreserveCooldown(harvestBonusMode, npcRef, store)",
+                modeParam
+        );
+
+        assertTrue(modeResolution >= 0, "Container harvest should resolve HarvestBonusMode from interaction params.");
+        assertTrue(modeParam > modeResolution, "Container harvest should request the HarvestBonusMode param.");
+        assertTrue(preserveCheck > modeParam,
+                "Cooldown preserve roll should use the resolved HarvestBonusMode, not raw role-scope fallback.");
+    }
+
+    @Test
     void harvestReadinessUsesTameworkAlarmWithoutBaseAlarmFallback() throws Exception {
         String content = Files.readString(Paths.get(
                 "src", "main", "java",

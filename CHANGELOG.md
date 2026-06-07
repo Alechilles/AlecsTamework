@@ -18,6 +18,7 @@
 - Fixed progression-scaled harvest cooldowns so milk and other harvestable animal interactions use vanilla-style world-time durations, honor temporal `HarvestTimeout` values like `P1D`, and recover animals already stuck with legacy wall-clock cooldowns.
 - Fixed harvest cooldown setup so optimized milk and container harvest interactions resolve the animal's configured `HarvestTimeout`, refuse to overwrite an active harvest cooldown, reject missing or zero-length harvest timers, and apply the cooldown gate before handing out milk or other harvest rewards.
 - Fixed optimized milk and container harvests so their cooldown survives harvest state transitions and prevents repeated immediate milking until the configured world-time cooldown expires.
+- Fixed milk and container harvest bonus procs so `CooldownPreserve` resolves role-specific `HarvestBonusMode` settings before deciding whether to skip the harvest cooldown.
 
 ## 2.13.1 - Native Spawner Tooltips and Runtime Cache Fixes - 2026-06-04
 

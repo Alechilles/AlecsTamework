@@ -351,11 +351,25 @@ final class TameworkInteractEffects {
             logHarvestContainerDiagnostic(role, ctx, HarvestContainerResult.FAILED, bucketOutput, decoBucketOutput, false);
             return new HarvestContainerOutcome(HarvestContainerResult.FAILED, false);
         }
-        boolean preserveCooldown = CompanionHarvestBonusService.shouldPreserveCooldown(npcRef, store, role);
+        String harvestBonusMode = owner.getRoleStringParam(
+                role,
+                ctx,
+                CompanionHarvestBonusService.HARVEST_BONUS_MODE_PARAM
+        );
+        boolean preserveCooldown =
+                CompanionHarvestBonusService.shouldPreserveCooldown(harvestBonusMode, npcRef, store);
         if (preserveCooldown) {
             CompanionHarvestBonusService.markCooldownSkip(npcRef, store);
         }
-        logHarvestContainerDiagnostic(role, ctx, HarvestContainerResult.APPLIED, bucketOutput, decoBucketOutput, preserveCooldown);
+        logHarvestContainerDiagnostic(
+                role,
+                ctx,
+                HarvestContainerResult.APPLIED,
+                bucketOutput,
+                decoBucketOutput,
+                harvestBonusMode,
+                preserveCooldown
+        );
         return new HarvestContainerOutcome(HarvestContainerResult.APPLIED, preserveCooldown);
     }
 
@@ -529,11 +543,22 @@ final class TameworkInteractEffects {
                                                @Nullable String bucketOutput,
                                                @Nullable String decoBucketOutput,
                                                boolean preserveCooldown) {
+        logHarvestContainerDiagnostic(role, ctx, result, bucketOutput, decoBucketOutput, null, preserveCooldown);
+    }
+
+    private void logHarvestContainerDiagnostic(Role role,
+                                               InteractionContextSnapshot ctx,
+                                               HarvestContainerResult result,
+                                               @Nullable String bucketOutput,
+                                               @Nullable String decoBucketOutput,
+                                               @Nullable String harvestBonusMode,
+                                               boolean preserveCooldown) {
         logHarvestDebug("TameworkHarvestDebug: container"
                 + " role=" + roleName(role)
                 + " held=" + heldItem(ctx)
                 + " bucketOutput=" + text(bucketOutput)
                 + " decoBucketOutput=" + text(decoBucketOutput)
+                + " harvestBonusMode=" + text(harvestBonusMode)
                 + " result=" + result
                 + " preserveCooldown=" + preserveCooldown);
     }
