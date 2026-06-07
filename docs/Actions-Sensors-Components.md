@@ -21,6 +21,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkHasOwner`
 - `TameworkIsTamed`
 - `TameworkLifeStage`
+- `TameworkAlarm` (mirrors base `Alarm` sensor syntax for Tamework alarms: `Name`, `State`, optional `Clear`)
 - `TameworkHook`
 - `TameworkEffectActive` (checks active `EntityEffect` with optional `MinRemainingSeconds`)
 - `TameworkNeedBelow`
@@ -92,5 +93,6 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 ## Notes
 - Components persist across reloads.
 - `TriggerNpcHook` + `TameworkHook` is the primary bridge from optimized interactions into instruction branches.
+- `TameworkAlarm` is the instruction-side reset bridge for durable Tamework alarm state.
 - `TameworkEffectActive` is useful for gating behavior while status effects (for example tranquilizer) are active.
 - `/tw reloadconfig` only reloads item-feature assets (`TwSpawnerConfig`, `TwNameItemConfig`, `TwCommandItemConfig`).

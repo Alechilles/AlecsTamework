@@ -6,6 +6,7 @@
 - Embedded Creditor so `/credits` is available from the Tamework jar and includes richer Tamework credit metadata.
 - Added `/tw debugrespawntrace` to log linked companion revive and lost-recovery spawn, restore, damage, and death-removal correlation for instant-death investigations.
 - Added `/tw debugneedstelemetry` to control rate-limited Alec's Telemetry context events for needs seek and consume failures.
+- Added a generic `TameworkAlarm` NPC sensor so assets can listen for durable Tamework alarm states without relying on base-game alarms.
 
 ### Changed
 - Updated the embedded Alec's Telemetry runtime to `0.1.3`.

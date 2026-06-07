@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTame
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFly;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkRideWalk;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkAlarm;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
@@ -123,6 +124,7 @@ public final class TameworkNpcBuilderRegistrar {
             sensorFactory.add(BuilderSensorTameworkHasOwner.BUILDER_ID, BuilderSensorTameworkHasOwner::new);
             sensorFactory.add(BuilderSensorTameworkIsTamed.BUILDER_ID, BuilderSensorTameworkIsTamed::new);
             sensorFactory.add(BuilderSensorTameworkLifeStage.BUILDER_ID, BuilderSensorTameworkLifeStage::new);
+            sensorFactory.add(BuilderSensorTameworkAlarm.BUILDER_ID, BuilderSensorTameworkAlarm::new);
             sensorFactory.add(BuilderSensorTameworkHook.BUILDER_ID, BuilderSensorTameworkHook::new);
             sensorFactory.add(BuilderSensorTameworkEffectActive.BUILDER_ID, BuilderSensorTameworkEffectActive::new);
             sensorFactory.add(BuilderSensorTameworkNeedBelow.BUILDER_ID, BuilderSensorTameworkNeedBelow::new);
