@@ -85,4 +85,18 @@ class ActionTameworkHarvestAlarmTest {
         assertTrue(durationCheck >= 0, "Guarded optimized harvest cooldown should reject missing/zero duration.");
         assertTrue(setAlarm > durationCheck, "Guarded optimized harvest cooldown must validate duration before writing.");
     }
+
+    @Test
+    void guardedHarvestCooldownLogsResolvedAlarmState() throws Exception {
+        String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("TameworkHarvestDebug: cooldown"),
+                "Harvest cooldown diagnostics should be easy to filter in logs.");
+        assertTrue(content.contains("resolvedBaseSeconds="),
+                "Harvest cooldown diagnostics should show the configured interaction duration.");
+        assertTrue(content.contains("readyBefore="),
+                "Harvest cooldown diagnostics should show whether the alarm was ready before writing.");
+        assertTrue(content.contains("untilAfter="),
+                "Harvest cooldown diagnostics should show the persisted alarm target time.");
+    }
 }

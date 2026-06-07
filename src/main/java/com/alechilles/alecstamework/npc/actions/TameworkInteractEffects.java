@@ -271,7 +271,30 @@ final class TameworkInteractEffects {
                                  Store<EntityStore> store,
                                  InteractionContextSnapshot ctx) {
         double baseSeconds = resolveHarvestTimeoutSeconds(role, ctx);
-        return ActionTameworkHarvestAlarm.applyHarvestCooldownIfReady(npcRef, role, store, baseSeconds, true);
+        logHarvestDebug("TameworkHarvestDebug: cooldown-request"
+                + " role=" + roleName(role)
+                + " held=" + heldItem(ctx)
+                + " baseSeconds=" + baseSeconds);
+        boolean applied = ActionTameworkHarvestAlarm.applyHarvestCooldownIfReady(npcRef, role, store, baseSeconds, true);
+        logHarvestDebug("TameworkHarvestDebug: cooldown-response"
+                + " role=" + roleName(role)
+                + " held=" + heldItem(ctx)
+                + " baseSeconds=" + baseSeconds
+                + " applied=" + applied);
+        return applied;
+    }
+
+    void logHarvestExecution(String stage,
+                             @Nullable String interactionConfigId,
+                             int interactionIndex,
+                             Role role,
+                             InteractionContextSnapshot ctx) {
+        logHarvestDebug("TameworkHarvestDebug: execution"
+                + " stage=" + stage
+                + " config=" + text(interactionConfigId)
+                + " index=" + interactionIndex
+                + " role=" + roleName(role)
+                + " held=" + heldItem(ctx));
     }
 
     private double resolveHarvestTimeoutSeconds(Role role, InteractionContextSnapshot ctx) {
@@ -296,6 +319,7 @@ final class TameworkInteractEffects {
         boolean hasBucketOutput = bucketOutput != null && !bucketOutput.isBlank();
         boolean hasDecoBucketOutput = decoBucketOutput != null && !decoBucketOutput.isBlank();
         if (!hasBucketOutput && !hasDecoBucketOutput) {
+            logHarvestContainerDiagnostic(role, ctx, HarvestContainerResult.NOT_CONFIGURED, bucketOutput, decoBucketOutput, false);
             return HarvestContainerResult.NOT_CONFIGURED;
         }
         String activeItem = ctx != null ? ctx.activeItemId : null;
@@ -306,11 +330,14 @@ final class TameworkInteractEffects {
             transformed = inventoryEffects.replaceHeldItem(player, ctx, DECO_BUCKET_ITEM_ID, decoBucketOutput);
         }
         if (!transformed) {
+            logHarvestContainerDiagnostic(role, ctx, HarvestContainerResult.FAILED, bucketOutput, decoBucketOutput, false);
             return HarvestContainerResult.FAILED;
         }
-        if (CompanionHarvestBonusService.shouldPreserveCooldown(npcRef, store, role)) {
+        boolean preserveCooldown = CompanionHarvestBonusService.shouldPreserveCooldown(npcRef, store, role);
+        if (preserveCooldown) {
             CompanionHarvestBonusService.markCooldownSkip(npcRef, store);
         }
+        logHarvestContainerDiagnostic(role, ctx, HarvestContainerResult.APPLIED, bucketOutput, decoBucketOutput, preserveCooldown);
         return HarvestContainerResult.APPLIED;
     }
 
@@ -476,6 +503,41 @@ final class TameworkInteractEffects {
             return;
         }
         owner.logUnsupported(message);
+    }
+
+    private void logHarvestContainerDiagnostic(Role role,
+                                               InteractionContextSnapshot ctx,
+                                               HarvestContainerResult result,
+                                               @Nullable String bucketOutput,
+                                               @Nullable String decoBucketOutput,
+                                               boolean preserveCooldown) {
+        logHarvestDebug("TameworkHarvestDebug: container"
+                + " role=" + roleName(role)
+                + " held=" + heldItem(ctx)
+                + " bucketOutput=" + text(bucketOutput)
+                + " decoBucketOutput=" + text(decoBucketOutput)
+                + " result=" + result
+                + " preserveCooldown=" + preserveCooldown);
+    }
+
+    private void logHarvestDebug(String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance != null && instance.getLogger() != null) {
+            instance.getLogger().at(Level.INFO).log(message);
+        }
+    }
+
+    private static String roleName(@Nullable Role role) {
+        String roleName = role != null ? role.getRoleName() : null;
+        return roleName != null && !roleName.isBlank() ? roleName : "<null>";
+    }
+
+    private static String heldItem(@Nullable InteractionContextSnapshot ctx) {
+        return text(ctx != null ? ctx.activeItemId : null);
+    }
+
+    private static String text(@Nullable String value) {
+        return value != null && !value.isBlank() ? value : "<null>";
     }
 
     enum HarvestContainerResult {

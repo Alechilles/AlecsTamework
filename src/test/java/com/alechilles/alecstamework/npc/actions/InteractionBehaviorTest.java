@@ -236,6 +236,18 @@ class InteractionBehaviorTest {
     }
 
     @Test
+    void optimizedHarvestLogsEachExecutionStage() throws Exception {
+        String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("effects.logHarvestExecution(\"selected\""),
+                "Optimized harvest should log when the harvest path is selected.");
+        assertTrue(content.contains("effects.logHarvestExecution(\"cooldown-blocked\""),
+                "Optimized harvest should log when active cooldown blocks rewards.");
+        assertTrue(content.contains("effects.logHarvestExecution(\"state-applied\""),
+                "Optimized harvest should log after the harvest state starts.");
+    }
+
+    @Test
     void optimizedHarvestResolvesCooldownDurationFromInteractionContext() throws Exception {
         String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
 
@@ -248,6 +260,18 @@ class InteractionBehaviorTest {
 
         assertTrue(stringArrayLookup >= 0, "Optimized harvest should resolve HarvestTimeout from interaction params.");
         assertTrue(cooldownApply >= 0, "Resolved HarvestTimeout should be passed into the alarm writer.");
+    }
+
+    @Test
+    void optimizedHarvestLogsContainerAndCooldownDiagnostics() throws Exception {
+        String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("TameworkHarvestDebug: cooldown-request"),
+                "Optimized harvest should log the resolved cooldown duration before applying it.");
+        assertTrue(content.contains("TameworkHarvestDebug: container"),
+                "Optimized harvest should log bucket/container transform decisions.");
+        assertTrue(content.contains("preserveCooldown="),
+                "Optimized harvest should log whether a cooldown-preserve bonus was applied.");
     }
 
     private static ActionTameworkInteract newInteract() throws Exception {
