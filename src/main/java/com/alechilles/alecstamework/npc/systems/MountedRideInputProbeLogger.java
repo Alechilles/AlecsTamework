@@ -81,7 +81,7 @@ public final class MountedRideInputProbeLogger {
     private static void log(@Nonnull String message, Object... args) {
         Tamework instance = Tamework.getInstance();
         if (instance != null && instance.getLogger() != null) {
-            instance.getLogger().at(Level.INFO).log(message, args);
+            instance.getLogger().at(Level.INFO).log(String.format(message, args));
         }
     }
 
