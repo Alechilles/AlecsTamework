@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import com.google.gson.JsonArray;
@@ -177,6 +179,29 @@ final class AssetPatchEngineTest {
         assertEquals("TameworkCommand", commandAction.get("Type").getAsString());
         assertEquals("TwCommandItem_CommandWhistle", commandAction.get("ConfigId").getAsString());
         assertEquals(1, result.status().getApplied().size());
+    }
+
+    @Test
+    void bundledBucketTroughIntegrationUsesPatchesInsteadOfBucketOverrides() throws Exception {
+        assertFalse(
+                Files.exists(Path.of("src/main/resources/Server/Item/Items/Container/Container_Bucket.json")),
+                "Tamework should not ship a full Container_Bucket item override."
+        );
+        assertFalse(
+                Files.exists(Path.of("src/main/resources/Server/Item/Items/Deco/Deco_Bucket.json")),
+                "Tamework should not ship a full Deco_Bucket item override."
+        );
+
+        assertBucketPatch(
+                "Server/Tamework/Patches/Items/Tamework_Container_Bucket_Water_Trough_Patch.json",
+                "Server/Item/Items/Container/Container_Bucket.json",
+                "Container_Bucket"
+        );
+        assertBucketPatch(
+                "Server/Tamework/Patches/Items/Tamework_Deco_Bucket_Water_Trough_Patch.json",
+                "Server/Item/Items/Deco/Deco_Bucket.json",
+                "Deco_Bucket"
+        );
     }
 
     @Test
@@ -527,6 +552,74 @@ final class AssetPatchEngineTest {
 
     private static AssetPatchDefinition patch(String json) {
         return AssetPatchDefinition.parse(object(json), "TestPack", "Server/Tamework/Patches/Test.json");
+    }
+
+    private void assertBucketPatch(String patchPath, String target, String emptyBucketItemId) throws Exception {
+        JsonObject bucket = object("""
+                {
+                  "State": {
+                    "Filled_Water": {
+                      "Interactions": {
+                        "Secondary": {
+                          "Interactions": [
+                            {
+                              "Type": "PlaceFluid",
+                              "RemoveItemInHand": false,
+                              "FluidToPlace": "Water_Source"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "TameworkCompatibilitySentinel": true
+                }
+                """);
+        AssetPatchDefinition patch = AssetPatchDefinition.parse(
+                object(readResource(patchPath)),
+                "Alec's Tamework!",
+                patchPath
+        );
+
+        AssetPatchEngine.PatchResult result = engine.apply(bucket, List.of(patch));
+        JsonObject filledWater = result.patched()
+                .getAsJsonObject("State")
+                .getAsJsonObject("Filled_Water");
+        JsonArray interactions = filledWater
+                .getAsJsonObject("Interactions")
+                .getAsJsonObject("Secondary")
+                .getAsJsonArray("Interactions");
+        JsonObject troughBranch = interactions.get(0).getAsJsonObject();
+        JsonObject changeBlock = troughBranch.getAsJsonObject("Next");
+        JsonObject consumeBucket = changeBlock.getAsJsonObject("Next");
+        JsonObject fallback = troughBranch.getAsJsonObject("Failed");
+
+        assertEquals(target, patch.getTarget());
+        assertEquals(-100, patch.getPriority());
+        assertTrue(result.patched().get("TameworkCompatibilitySentinel").getAsBoolean());
+        assertEquals(1, interactions.size());
+        assertEquals("BlockCondition", troughBranch.get("Type").getAsString());
+        assertEquals(11, troughBranch.getAsJsonArray("Matchers").size());
+        assertEquals("Tw_Feed_Trough", troughBranch.getAsJsonArray("Matchers")
+                .get(0)
+                .getAsJsonObject()
+                .getAsJsonObject("Block")
+                .get("Id")
+                .getAsString());
+        assertEquals("ChangeBlock", changeBlock.get("Type").getAsString());
+        assertEquals(
+                "**Tw_Feed_Trough_State_Water_State_Full",
+                changeBlock.getAsJsonObject("Changes").get("Tw_Feed_Trough").getAsString()
+        );
+        assertEquals("ModifyInventory", consumeBucket.get("Type").getAsString());
+        assertEquals(emptyBucketItemId, consumeBucket.get("BrokenItem").getAsString());
+        assertEquals("PlaceFluid", fallback.get("Type").getAsString());
+        assertEquals("Water_Source", fallback.get("FluidToPlace").getAsString());
+        assertEquals(
+                emptyBucketItemId,
+                fallback.getAsJsonObject("Next").get("BrokenItem").getAsString()
+        );
+        assertEquals(1, result.status().getApplied().size());
     }
 
     private static JsonObject instructionByComment(JsonObject root, String comment) {
