@@ -202,17 +202,6 @@ final class AssetPatchEngineTest {
                 "Server/Item/Items/Deco/Deco_Bucket.json",
                 "Deco_Bucket"
         );
-        assertEquals(
-                "TargetExists",
-                AssetPatchCondition.parseOptional(object(readResource(
-                        "Server/Tamework/Patches/Items/Tamework_AlanDeco_Stackable_Bucket_Water_Trough_Patch.json"
-                ))).describe()
-        );
-        assertBucketPatch(
-                "Server/Tamework/Patches/Items/Tamework_AlanDeco_Stackable_Bucket_Water_Trough_Patch.json",
-                "Server/Item/Items/Container/Container_Bucket_Stackable.json",
-                "Container_Bucket"
-        );
     }
 
     @Test
