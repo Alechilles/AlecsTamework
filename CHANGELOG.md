@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added a 256x256 in-game icon for the Tamework asset pack.
+
 ## 2.13.2 - Companion Instant-Death and Diagnostics Fixes - 2026-06-05
 
 ### Added

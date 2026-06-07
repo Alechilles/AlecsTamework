@@ -178,6 +178,7 @@
                                     <artifact>curse.maven:creditor-1560961</artifact>
                                     <excludes>
                                         <exclude>manifest.json</exclude>
+                                        <exclude>icon-256.png</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
