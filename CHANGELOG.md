@@ -1,31 +1,35 @@
 # Changelog
 
-## Unreleased
+## 2.13.3 - Harvest Timer and Asset Pack Hotfix - 2026-06-07
 
 ### Added
 - Added a 256x256 in-game icon for the Tamework asset pack.
-
-## 2.13.2 - Companion Instant-Death and Diagnostics Fixes - 2026-06-05
-
-### Added
 - Embedded Creditor so `/credits` is available from the Tamework jar and includes richer Tamework credit metadata.
-- Added `/tw debugrespawntrace` to log linked companion revive and lost-recovery spawn, restore, damage, and death-removal correlation for instant-death investigations.
-- Added `/tw debugneedstelemetry` to control rate-limited Alec's Telemetry context events for needs seek and consume failures.
 - Added a generic `TameworkAlarm` NPC sensor so assets can listen for durable Tamework alarm states without relying on base-game alarms.
+- Added `debugride`-gated mounted ride input diagnostics for tracing rider packet and fallback movement intent.
 
 ### Changed
-- Updated the embedded Alec's Telemetry runtime to `0.1.3`.
-- Expanded Alec's Telemetry context for linked companion respawn, persistence, UI page, and config reload/apply failures.
 - Moved feed-trough water refill bucket integration from full bucket item overrides into targeted asset patches, improving compatibility with other mods that edit bucket assets.
-- Added an optional AlanDeco Stackable Bucket patch so its water bucket can refill Tamework feed troughs when AlanDeco is installed.
 
 ### Fixed
-- Protected revived and lost-recovered linked companions from invalid spawn-time fall damage so they no longer instantly die after replacement spawning.
-- Protected breeding offspring from invalid spawn-time fall damage so newborn companions no longer instantly die after spawning.
 - Fixed progression-scaled harvest cooldowns so milk and other harvestable animal interactions use vanilla-style world-time durations, honor temporal `HarvestTimeout` values like `P1D`, and recover animals already stuck with legacy wall-clock cooldowns.
 - Fixed harvest cooldown setup so optimized milk and container harvest interactions resolve the animal's configured `HarvestTimeout`, refuse to overwrite an active harvest cooldown, reject missing or zero-length harvest timers, and apply the cooldown gate before handing out milk or other harvest rewards.
 - Fixed optimized milk and container harvests so their cooldown survives harvest state transitions and prevents repeated immediate milking until the configured world-time cooldown expires.
 - Fixed milk and container harvest bonus procs so `CooldownPreserve` resolves role-specific `HarvestBonusMode` settings before deciding whether to skip the harvest cooldown.
+
+## 2.13.2 - Companion Instant-Death and Diagnostics Fixes - 2026-06-05
+
+### Added
+- Added `/tw debugrespawntrace` to log linked companion revive and lost-recovery spawn, restore, damage, and death-removal correlation for instant-death investigations.
+- Added `/tw debugneedstelemetry` to control rate-limited Alec's Telemetry context events for needs seek and consume failures.
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to `0.1.3`.
+- Expanded Alec's Telemetry context for linked companion respawn, persistence, UI page, and config reload/apply failures.
+
+### Fixed
+- Protected revived and lost-recovered linked companions from invalid spawn-time fall damage so they no longer instantly die after replacement spawning.
+- Protected breeding offspring from invalid spawn-time fall damage so newborn companions no longer instantly die after spawning.
 
 ## 2.13.1 - Native Spawner Tooltips and Runtime Cache Fixes - 2026-06-04
 
