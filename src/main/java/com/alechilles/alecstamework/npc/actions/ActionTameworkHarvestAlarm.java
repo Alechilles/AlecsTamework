@@ -153,10 +153,13 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                                                 double cooldownSeconds,
                                                 boolean markHandled,
                                                 boolean requireReady) {
-        if (CompanionHarvestBonusService.consumeCooldownHandled(npcRef, store)) {
+        if (!requireReady && CompanionHarvestBonusService.consumeCooldownHandled(npcRef, store)) {
             return true;
         }
         if (requireReady && !isAlarmReady(alarm, store)) {
+            return false;
+        }
+        if (requireReady && cooldownSeconds <= 0.0) {
             return false;
         }
         if (CompanionHarvestBonusService.consumeCooldownSkip(npcRef, store)) {

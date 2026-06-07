@@ -55,7 +55,7 @@ class ActionTameworkHarvestAlarmTest {
     void stateHarvestAlarmSkipsWhenOptimizedHarvestAlreadyHandledCooldown() throws Exception {
         String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
 
-        int handledCheck = content.indexOf("CompanionHarvestBonusService.consumeCooldownHandled");
+        int handledCheck = content.indexOf("!requireReady && CompanionHarvestBonusService.consumeCooldownHandled");
         int skipCheck = content.indexOf("CompanionHarvestBonusService.consumeCooldownSkip");
         int setAlarm = content.indexOf("alarm.set");
 
@@ -73,5 +73,16 @@ class ActionTameworkHarvestAlarmTest {
 
         assertTrue(readyCheck >= 0, "Guarded optimized harvest cooldown should reject active alarms.");
         assertTrue(setAlarm > readyCheck, "Guarded optimized harvest cooldown must check readiness before writing.");
+    }
+
+    @Test
+    void guardedHarvestCooldownRequiresPositiveDurationBeforeWriting() throws Exception {
+        String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
+
+        int durationCheck = content.indexOf("if (requireReady && cooldownSeconds <= 0.0)");
+        int setAlarm = content.indexOf("alarm.set", durationCheck);
+
+        assertTrue(durationCheck >= 0, "Guarded optimized harvest cooldown should reject missing/zero duration.");
+        assertTrue(setAlarm > durationCheck, "Guarded optimized harvest cooldown must validate duration before writing.");
     }
 }
