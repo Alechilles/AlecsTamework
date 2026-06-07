@@ -102,6 +102,9 @@ final class InteractionExecutor {
             );
         }
         if (entry instanceof HarvestInteraction) {
+            if (!effects.applyHarvestCooldown(npcRef, role, store, ctx)) {
+                return false;
+            }
             TameworkInteractEffects.HarvestContainerResult containerResult =
                     effects.applyHarvestContainerTransform(npcRef, store, role, player, ctx);
             if (containerResult == TameworkInteractEffects.HarvestContainerResult.FAILED) {
@@ -109,9 +112,6 @@ final class InteractionExecutor {
             }
             boolean applied = effects.applyStartHarvest(npcRef, role, store);
             if (!applied) {
-                return false;
-            }
-            if (!effects.applyHarvestCooldown(npcRef, role, store, ctx)) {
                 return false;
             }
             return true

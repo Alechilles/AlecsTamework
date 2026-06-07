@@ -207,16 +207,19 @@ class InteractionBehaviorTest {
     }
 
     @Test
-    void optimizedHarvestAppliesHarvestCooldownImmediatelyAfterStartingHarvestState() throws Exception {
+    void optimizedHarvestAppliesCooldownBeforeContainerRewardsAndHarvestState() throws Exception {
         String content = Files.readString(INTERACTION_EXECUTOR, StandardCharsets.UTF_8);
 
         int startHarvest = content.indexOf("effects.applyStartHarvest");
         int applyCooldown = content.indexOf("effects.applyHarvestCooldown(npcRef, role, store, ctx)");
+        int containerTransform = content.indexOf("effects.applyHarvestContainerTransform");
         int customEffects = content.indexOf("effects.applyCustomEffects", startHarvest);
 
         assertTrue(startHarvest >= 0, "Optimized harvest should start the harvest state.");
-        assertTrue(applyCooldown > startHarvest, "Optimized harvest must set Harvest_Ready immediately after starting harvest.");
-        assertTrue(customEffects > applyCooldown, "Harvest cooldown should be set before later custom effects run.");
+        assertTrue(applyCooldown >= 0, "Optimized harvest must set Harvest_Ready.");
+        assertTrue(containerTransform > applyCooldown, "Harvest cooldown should be applied before milk/container rewards.");
+        assertTrue(startHarvest > containerTransform, "Optimized harvest should only start the harvest state after rewards are applied.");
+        assertTrue(customEffects > startHarvest, "Harvest cooldown and state should be handled before later custom effects run.");
     }
 
     @Test
@@ -225,11 +228,11 @@ class InteractionBehaviorTest {
 
         int applyCooldown = content.indexOf("if (!effects.applyHarvestCooldown(npcRef, role, store, ctx))");
         int returnFalse = content.indexOf("return false;", applyCooldown);
-        int customEffects = content.indexOf("effects.applyCustomEffects", applyCooldown);
+        int containerTransform = content.indexOf("effects.applyHarvestContainerTransform", applyCooldown);
 
         assertTrue(applyCooldown >= 0, "Optimized harvest must check whether the harvest cooldown was applied.");
         assertTrue(returnFalse > applyCooldown, "Cooldown failure should stop the optimized harvest.");
-        assertTrue(customEffects > returnFalse, "Custom harvest effects should not run before cooldown failure is handled.");
+        assertTrue(containerTransform > returnFalse, "Container rewards should not run before cooldown failure is handled.");
     }
 
     @Test
@@ -240,7 +243,7 @@ class InteractionBehaviorTest {
                 "owner.getRoleStringArrayParam(role, ctx, HARVEST_TIMEOUT_PARAMETER)"
         );
         int cooldownApply = content.indexOf(
-                "ActionTameworkHarvestAlarm.applyHarvestCooldown(npcRef, role, store, baseSeconds, true)"
+                "ActionTameworkHarvestAlarm.applyHarvestCooldownIfReady(npcRef, role, store, baseSeconds, true)"
         );
 
         assertTrue(stringArrayLookup >= 0, "Optimized harvest should resolve HarvestTimeout from interaction params.");

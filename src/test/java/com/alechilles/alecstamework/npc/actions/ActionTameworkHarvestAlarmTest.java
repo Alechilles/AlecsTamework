@@ -63,4 +63,15 @@ class ActionTameworkHarvestAlarmTest {
         assertTrue(skipCheck > handledCheck, "Handled cooldown marker must be checked before cooldown-preserve skip.");
         assertTrue(setAlarm > skipCheck, "State action should only write the alarm after both handoff checks.");
     }
+
+    @Test
+    void guardedHarvestCooldownRequiresReadyAlarmBeforeWriting() throws Exception {
+        String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
+
+        int readyCheck = content.indexOf("if (requireReady && !isAlarmReady(alarm, store))");
+        int setAlarm = content.indexOf("alarm.set", readyCheck);
+
+        assertTrue(readyCheck >= 0, "Guarded optimized harvest cooldown should reject active alarms.");
+        assertTrue(setAlarm > readyCheck, "Guarded optimized harvest cooldown must check readiness before writing.");
+    }
 }

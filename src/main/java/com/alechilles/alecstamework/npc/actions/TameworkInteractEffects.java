@@ -271,7 +271,7 @@ final class TameworkInteractEffects {
                                  Store<EntityStore> store,
                                  InteractionContextSnapshot ctx) {
         double baseSeconds = resolveHarvestTimeoutSeconds(role, ctx);
-        return ActionTameworkHarvestAlarm.applyHarvestCooldown(npcRef, role, store, baseSeconds, true);
+        return ActionTameworkHarvestAlarm.applyHarvestCooldownIfReady(npcRef, role, store, baseSeconds, true);
     }
 
     private double resolveHarvestTimeoutSeconds(Role role, InteractionContextSnapshot ctx) {
