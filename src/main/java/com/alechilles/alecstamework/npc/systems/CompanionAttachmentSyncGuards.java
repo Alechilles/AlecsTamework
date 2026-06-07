@@ -1,12 +1,12 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.npc.actions.HarvestAlarmTimeBasis;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 import javax.annotation.Nullable;
@@ -20,14 +20,15 @@ final class CompanionAttachmentSyncGuards {
     private CompanionAttachmentSyncGuards() {
     }
 
-    static boolean shouldDeferForHarvestCooldown(@Nullable NPCEntity npc,
+    static boolean shouldDeferForHarvestCooldown(@Nullable Ref<EntityStore> npcRef,
+                                                 @Nullable NPCEntity npc,
                                                  @Nullable Store<EntityStore> store) {
-        if (npc == null) {
+        if (npcRef == null || !npcRef.isValid() || npc == null) {
             return false;
         }
         String alarmName = resolveHarvestAlarmName();
-        Alarm alarm = resolveAlarm(npc, alarmName);
-        return isAlarmActive(alarmName, alarm, resolveGameTime(store));
+        TameworkAlarmService.Snapshot alarm = TameworkAlarmService.snapshot(npcRef, store, alarmName);
+        return alarm.active;
     }
 
     static boolean isAlarmActive(@Nullable Alarm alarm, @Nullable Instant now) {
@@ -42,25 +43,6 @@ final class CompanionAttachmentSyncGuards {
             return false;
         }
         return now == null || !alarm.hasPassed(now);
-    }
-
-    private static Alarm resolveAlarm(NPCEntity npc, String alarmName) {
-        if (alarmName == null || alarmName.isBlank()) {
-            return null;
-        }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return null;
-        }
-        return alarmStore.get(npc, alarmName);
-    }
-
-    private static Instant resolveGameTime(@Nullable Store<EntityStore> store) {
-        if (store == null) {
-            return null;
-        }
-        WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
-        return time != null ? time.getGameTime() : null;
     }
 
     private static String resolveHarvestAlarmName() {

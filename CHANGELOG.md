@@ -67,6 +67,7 @@
 - Added a linked-panel group selector that can show all linked companions, no linked companions, or one configured command group.
 - Added utility talent effect support for needs decay, revive cooldown, trait mutation chance, appearance mutation chance, harvest cooldown, happiness gain, breed cooldown, and fertility.
 - Added `TameworkHarvestAlarm` so harvest-ready timers can be scaled by progression effects instead of hard-coded raw alarm durations.
+- Added generic durable `TameworkAlarm` state for harvest cooldowns, with configurable `HarvestCooldownMultiplierEffectKey` support for choosing which progression effect scales harvest timing.
 - Added harvest-luck cooldown preservation support for container-style harvests, such as filling a bucket, so luck can avoid consuming the harvest cooldown without duplicating containers.
 - Added `Feed.AwardCooldownSeconds` to `TwLevelingConfig` and per-companion feed XP cooldown state so repeated feed interactions cannot spam XP.
 - Added `/tw settings` toggles for the alpha companion leveling and talents systems, enabled by default for existing worlds.

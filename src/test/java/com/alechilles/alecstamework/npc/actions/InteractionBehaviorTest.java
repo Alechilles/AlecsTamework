@@ -271,17 +271,17 @@ class InteractionBehaviorTest {
     }
 
     @Test
-    void harvestReadinessUsesDurableCooldownBeforeBaseAlarm() throws Exception {
+    void harvestReadinessUsesTameworkAlarmWithoutBaseAlarmFallback() throws Exception {
         String content = Files.readString(Paths.get(
                 "src", "main", "java",
                 "com", "alechilles", "alecstamework", "npc", "actions", "ActionTameworkInteract.java"
         ), StandardCharsets.UTF_8);
 
-        int durableReady = content.indexOf("HarvestCooldownStateService.isReady(npcRef, store)");
+        int durableReady = content.indexOf("TameworkAlarmService.isReady(npcRef, store, harvestAlarmName)");
         int alarmReady = content.indexOf("alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx)");
 
-        assertTrue(durableReady >= 0, "Harvest readiness should consult durable Tamework cooldown state.");
-        assertTrue(alarmReady > durableReady, "Base Harvest_Ready alarm should be secondary to durable cooldown state.");
+        assertTrue(durableReady >= 0, "Harvest readiness should consult named Tamework alarm state.");
+        assertEquals(-1, alarmReady, "Harvest readiness should not require base-game alarm state.");
     }
 
     @Test

@@ -10,6 +10,7 @@
     "IsMountableParam": "IsMountable",
     "HarvestContextParam": "HarvestInteractionContext",
     "HarvestAlarmName": "Harvest_Ready",
+    "HarvestCooldownMultiplierEffectKey": "HarvestCooldownMultiplier",
     "InteractionCooldownAlarmPrefix": "TameworkInteract_Cooldown"
   },
   "Command": {

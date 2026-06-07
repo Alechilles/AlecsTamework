@@ -66,7 +66,7 @@ final class InteractionDiagnostics {
         boolean isOwner = owner.isOwner(npcRef, store, player, ctx);
         boolean hasLoved = owner.isHeldItemInList(owner.resolveLovedItems(role, ctx), ctx);
         boolean isHarvestable = owner.resolveIsHarvestable(role, ctx);
-        boolean harvestReady = alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
+        boolean harvestReady = owner.isHarvestAlarmReady(npcRef, store, ctx);
         boolean harvestContext = owner.matchesHarvestContext(role, infoProvider, ctx);
         boolean isMountable = owner.resolveIsMountable(role, ctx);
         boolean crouching = owner.isPlayerCrouching(role, infoProvider, store, ctx);

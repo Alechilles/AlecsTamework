@@ -88,7 +88,8 @@ Common fields:
 
 Behavior:
 - Uses role params named by `TwGlobalConfig.InteractionDefaults` for harvestability/context.
-- Uses a durable Tamework harvest cooldown component for optimized interactions, with alarm `TwGlobalConfig.InteractionDefaults.HarvestAlarmName` (default `Harvest_Ready`) mirrored for base-game compatibility.
+- Uses the durable `TameworkAlarm` component for optimized harvest cooldowns. The alarm name comes from `TwGlobalConfig.InteractionDefaults.HarvestAlarmName` (default `Harvest_Ready`), but readiness no longer depends on the base-game `Alarm` store.
+- Scales the harvest alarm duration with the progression effect key from `TwGlobalConfig.InteractionDefaults.HarvestCooldownMultiplierEffectKey` (default `HarvestCooldownMultiplier`), so packs can decide which trait/talent/level effect modifies harvest timing.
 - Runs `$Harvest` state when valid.
 - If the role has `HarvestAddItemBucket` or `HarvestAddItemDecoBucket`, optimized harvest atomically transforms a held `Container_Bucket` or `Deco_Bucket` into that filled item before entering `$Harvest`.
 - Role param `HarvestBonusMode` controls harvest luck. `DropDuplicate` duplicates loose drops. `CooldownPreserve` does not duplicate drops and can skip the next harvest cooldown, which is intended for container harvests such as milk.

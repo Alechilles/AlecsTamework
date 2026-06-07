@@ -45,7 +45,7 @@ class ActionTameworkHarvestAlarmTest {
         String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
 
         int skipCheck = content.indexOf("CompanionHarvestBonusService.consumeCooldownSkip");
-        int setAlarm = content.indexOf("alarm.set");
+        int setAlarm = content.indexOf("TameworkAlarmService.applyAlarm");
 
         assertTrue(skipCheck >= 0, "Harvest alarm should consume cooldown-preserve skip tokens.");
         assertTrue(setAlarm > skipCheck, "Cooldown skip must happen before the harvest alarm is set.");
@@ -57,7 +57,7 @@ class ActionTameworkHarvestAlarmTest {
 
         int handledCheck = content.indexOf("!requireReady && CompanionHarvestBonusService.consumeCooldownHandled");
         int skipCheck = content.indexOf("CompanionHarvestBonusService.consumeCooldownSkip");
-        int setAlarm = content.indexOf("alarm.set");
+        int setAlarm = content.indexOf("TameworkAlarmService.applyAlarm");
 
         assertTrue(handledCheck >= 0, "State harvest alarm should honor optimized harvest cooldown handling.");
         assertTrue(skipCheck > handledCheck, "Handled cooldown marker must be checked before cooldown-preserve skip.");
@@ -68,8 +68,8 @@ class ActionTameworkHarvestAlarmTest {
     void guardedHarvestCooldownRequiresReadyAlarmBeforeWriting() throws Exception {
         String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
 
-        int readyCheck = content.indexOf("if (requireReady && !isAlarmReady(alarm, store))");
-        int setAlarm = content.indexOf("alarm.set", readyCheck);
+        int readyCheck = content.indexOf("if (requireReady && !snapshot.ready)");
+        int setAlarm = content.indexOf("TameworkAlarmService.applyAlarm", readyCheck);
 
         assertTrue(readyCheck >= 0, "Guarded optimized harvest cooldown should reject active alarms.");
         assertTrue(setAlarm > readyCheck, "Guarded optimized harvest cooldown must check readiness before writing.");
@@ -80,7 +80,7 @@ class ActionTameworkHarvestAlarmTest {
         String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
 
         int durationCheck = content.indexOf("if (requireReady && cooldownSeconds <= 0.0)");
-        int setAlarm = content.indexOf("alarm.set", durationCheck);
+        int setAlarm = content.indexOf("TameworkAlarmService.applyAlarm", durationCheck);
 
         assertTrue(durationCheck >= 0, "Guarded optimized harvest cooldown should reject missing/zero duration.");
         assertTrue(setAlarm > durationCheck, "Guarded optimized harvest cooldown must validate duration before writing.");
@@ -98,6 +98,16 @@ class ActionTameworkHarvestAlarmTest {
                 "Harvest cooldown diagnostics should show whether the alarm was ready before writing.");
         assertTrue(content.contains("untilAfter="),
                 "Harvest cooldown diagnostics should show the persisted alarm target time.");
+    }
+
+    @Test
+    void harvestCooldownMultiplierEffectKeyIsConfigurable() throws Exception {
+        String content = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("TwGlobalConfig.resolveActive()"),
+                "Harvest alarm should resolve the active global config for cooldown effect-key defaults.");
+        assertTrue(content.contains("getHarvestCooldownMultiplierEffectKey()"),
+                "Harvest alarm should not hardcode the progression effect key as the only option.");
     }
 
     @Test

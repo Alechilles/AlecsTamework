@@ -1,10 +1,11 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
@@ -13,10 +14,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
-import com.hypixel.hytale.server.npc.util.Alarm;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
-import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleSupplier;
 import java.util.logging.Level;
@@ -58,22 +56,15 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
             return false;
         }
         double baseSeconds = resolveHarvestTimeoutSeconds(npc, role, ThreadLocalRandom.current()::nextDouble);
+        String multiplierEffectKey = resolveHarvestCooldownMultiplierEffectKey();
         double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
-                HARVEST_COOLDOWN_MULTIPLIER_EFFECT_KEY,
+                multiplierEffectKey,
                 1.0
         );
         double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier);
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return false;
-        }
-        Alarm alarm = alarmStore.get(npc, HARVEST_ALARM_NAME);
-        if (alarm == null) {
-            return false;
-        }
-        return applyHarvestCooldown(npcRef, store, alarm, cooldownSeconds, false, false);
+        return applyHarvestCooldown(npcRef, store, resolveHarvestAlarmName(), cooldownSeconds, false, false);
     }
 
     static boolean applyHarvestCooldown(@Nullable Ref<EntityStore> npcRef,
@@ -98,22 +89,15 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         double baseSeconds = resolvedBaseSeconds > 0.0
                 ? resolvedBaseSeconds
                 : resolveHarvestTimeoutSeconds(npc, role, ThreadLocalRandom.current()::nextDouble);
+        String multiplierEffectKey = resolveHarvestCooldownMultiplierEffectKey();
         double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
-                HARVEST_COOLDOWN_MULTIPLIER_EFFECT_KEY,
+                multiplierEffectKey,
                 1.0
         );
         double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier);
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return false;
-        }
-        Alarm alarm = alarmStore.get(npc, HARVEST_ALARM_NAME);
-        if (alarm == null) {
-            return false;
-        }
-        return applyHarvestCooldown(npcRef, store, alarm, cooldownSeconds, markHandled, false);
+        return applyHarvestCooldown(npcRef, store, resolveHarvestAlarmName(), cooldownSeconds, markHandled, false);
     }
 
     static boolean applyHarvestCooldownIfReady(@Nullable Ref<EntityStore> npcRef,
@@ -131,28 +115,28 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (context == null) {
             return false;
         }
-        boolean setBefore = context.alarm.isSet();
-        boolean readyBefore = isAlarmReady(context.alarm, store);
-        Instant nowBefore = resolveGameTime(store);
-        Instant untilBefore = HarvestAlarmTimeBasis.readAlarmInstant(context.alarm);
+        TameworkAlarmService.Snapshot before = TameworkAlarmService.snapshot(npcRef, store, context.alarmName);
 
-        boolean applied = applyHarvestCooldown(npcRef, store, context.alarm, context.cooldownSeconds, markHandled, true);
+        boolean applied = applyHarvestCooldown(
+                npcRef,
+                store,
+                context.alarmName,
+                context.cooldownSeconds,
+                markHandled,
+                true
+        );
+        TameworkAlarmService.Snapshot after = TameworkAlarmService.snapshot(npcRef, store, context.alarmName);
 
         logHarvestCooldownDiagnostic(
                 "apply-if-ready",
                 role,
                 resolvedBaseSeconds,
                 context.baseSeconds,
+                context.multiplierEffectKey,
                 context.multiplier,
                 context.cooldownSeconds,
-                setBefore,
-                readyBefore,
-                nowBefore,
-                untilBefore,
-                context.alarm.isSet(),
-                isAlarmReady(context.alarm, store),
-                resolveGameTime(store),
-                HarvestAlarmTimeBasis.readAlarmInstant(context.alarm),
+                before,
+                after,
                 applied
         );
         return applied;
@@ -172,27 +156,20 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (context == null) {
             return false;
         }
-        HarvestCooldownStateService.Snapshot durable = HarvestCooldownStateService.snapshot(npcRef, store);
-        boolean alarmReady = isAlarmReady(context.alarm, store);
-        boolean ready = context.cooldownSeconds > 0.0 && durable.ready && alarmReady;
+        TameworkAlarmService.Snapshot alarm = TameworkAlarmService.snapshot(npcRef, store, context.alarmName);
+        boolean ready = context.cooldownSeconds > 0.0 && alarm.ready;
         logHarvestCooldownDiagnostic(
                 "ready-check",
                 role,
                 resolvedBaseSeconds,
                 context.baseSeconds,
+                context.multiplierEffectKey,
                 context.multiplier,
                 context.cooldownSeconds,
-                context.alarm.isSet(),
-                alarmReady,
-                resolveGameTime(store),
-                HarvestAlarmTimeBasis.readAlarmInstant(context.alarm),
-                context.alarm.isSet(),
-                alarmReady,
-                resolveGameTime(store),
-                HarvestAlarmTimeBasis.readAlarmInstant(context.alarm),
+                alarm,
+                alarm,
                 ready
         );
-        logHarvestDurableDiagnostic("ready-check", durable, durable, context.cooldownSeconds, ready);
         return ready;
     }
 
@@ -210,51 +187,39 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         if (context == null) {
             return false;
         }
-        boolean setBefore = context.alarm.isSet();
-        boolean alarmReadyBefore = isAlarmReady(context.alarm, store);
-        HarvestCooldownStateService.Snapshot durableBefore = HarvestCooldownStateService.snapshot(npcRef, store);
-        boolean readyBefore = durableBefore.ready && alarmReadyBefore;
-        Instant nowBefore = resolveGameTime(store);
-        Instant untilBefore = HarvestAlarmTimeBasis.readAlarmInstant(context.alarm);
-        boolean applied = true;
-        if (durableBefore.ready && alarmReadyBefore) {
+        TameworkAlarmService.Snapshot before = TameworkAlarmService.snapshot(npcRef, store, context.alarmName);
+        boolean applied = before.valid && !before.ready;
+        if (before.ready) {
             applied = context.cooldownSeconds > 0.0
-                    && applyHarvestCooldown(npcRef, store, context.alarm, context.cooldownSeconds, false, true);
-        } else if (durableBefore.ready) {
-            applied = false;
+                    && applyHarvestCooldown(npcRef, store, context.alarmName, context.cooldownSeconds, false, true);
         }
-        HarvestCooldownStateService.Snapshot durableAfter = HarvestCooldownStateService.snapshot(npcRef, store);
+        TameworkAlarmService.Snapshot after = TameworkAlarmService.snapshot(npcRef, store, context.alarmName);
         logHarvestCooldownDiagnostic(
                 "ensure-active",
                 role,
                 resolvedBaseSeconds,
                 context.baseSeconds,
+                context.multiplierEffectKey,
                 context.multiplier,
                 context.cooldownSeconds,
-                setBefore,
-                readyBefore,
-                nowBefore,
-                untilBefore,
-                context.alarm.isSet(),
-                isAlarmReady(context.alarm, store),
-                resolveGameTime(store),
-                HarvestAlarmTimeBasis.readAlarmInstant(context.alarm),
+                before,
+                after,
                 applied
         );
-        logHarvestDurableDiagnostic("ensure-active", durableBefore, durableAfter, context.cooldownSeconds, applied);
         return applied;
     }
 
     private static boolean applyHarvestCooldown(@Nullable Ref<EntityStore> npcRef,
                                                 @Nullable Store<EntityStore> store,
-                                                @Nonnull Alarm alarm,
+                                                @Nonnull String alarmName,
                                                 double cooldownSeconds,
                                                 boolean markHandled,
                                                 boolean requireReady) {
         if (!requireReady && CompanionHarvestBonusService.consumeCooldownHandled(npcRef, store)) {
             return true;
         }
-        if (requireReady && !isAlarmReady(alarm, store)) {
+        TameworkAlarmService.Snapshot snapshot = TameworkAlarmService.snapshot(npcRef, store, alarmName);
+        if (requireReady && !snapshot.ready) {
             return false;
         }
         if (requireReady && cooldownSeconds <= 0.0) {
@@ -266,22 +231,13 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
             }
             return true;
         }
-        if (!HarvestCooldownStateService.applyCooldown(npcRef, store, cooldownSeconds)) {
+        if (!TameworkAlarmService.applyAlarm(npcRef, store, alarmName, cooldownSeconds)) {
             return false;
         }
-        alarm.set(npcRef, HarvestAlarmTimeBasis.resolveCooldownUntil(resolveGameTime(store), cooldownSeconds), store);
         if (markHandled) {
             CompanionHarvestBonusService.markCooldownHandled(npcRef, store);
         }
         return true;
-    }
-
-    private static boolean isAlarmReady(@Nonnull Alarm alarm, @Nullable Store<EntityStore> store) {
-        if (!alarm.isSet()) {
-            return true;
-        }
-        Instant now = resolveGameTime(store);
-        return now != null && alarm.hasPassed(now);
     }
 
     static double scaleHarvestCooldownSeconds(double baseSeconds, double multiplier) {
@@ -327,40 +283,16 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         double baseSeconds = resolvedBaseSeconds > 0.0
                 ? resolvedBaseSeconds
                 : resolveHarvestTimeoutSeconds(npc, role, ThreadLocalRandom.current()::nextDouble);
+        String multiplierEffectKey = resolveHarvestCooldownMultiplierEffectKey();
         double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
-                HARVEST_COOLDOWN_MULTIPLIER_EFFECT_KEY,
+                multiplierEffectKey,
                 1.0
         );
         double cooldownSeconds = scaleHarvestCooldownSeconds(baseSeconds, multiplier);
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            logMissingHarvestCooldownContext(
-                    missingStage + "-missing-alarm-store",
-                    role,
-                    resolvedBaseSeconds,
-                    baseSeconds,
-                    multiplier,
-                    cooldownSeconds,
-                    resolveGameTime(store)
-            );
-            return null;
-        }
-        Alarm alarm = alarmStore.get(npc, HARVEST_ALARM_NAME);
-        if (alarm == null) {
-            logMissingHarvestCooldownContext(
-                    missingStage + "-missing-alarm",
-                    role,
-                    resolvedBaseSeconds,
-                    baseSeconds,
-                    multiplier,
-                    cooldownSeconds,
-                    resolveGameTime(store)
-            );
-            return null;
-        }
-        return new HarvestCooldownContext(baseSeconds, multiplier, cooldownSeconds, alarm);
+        String alarmName = resolveHarvestAlarmName();
+        return new HarvestCooldownContext(baseSeconds, multiplierEffectKey, multiplier, cooldownSeconds, alarmName);
     }
 
     private static void logMissingHarvestCooldownContext(String stage,
@@ -369,33 +301,20 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                                                         double baseSeconds,
                                                         double multiplier,
                                                         double cooldownSeconds,
-                                                        @Nullable Instant now) {
+                                                        @Nullable Object unused) {
+        TameworkAlarmService.Snapshot snapshot = TameworkAlarmService.snapshot(null, null, resolveHarvestAlarmName());
         logHarvestCooldownDiagnostic(
                 stage,
                 role,
                 resolvedBaseSeconds,
                 baseSeconds,
+                resolveHarvestCooldownMultiplierEffectKey(),
                 multiplier,
                 cooldownSeconds,
-                false,
-                false,
-                now,
-                null,
-                false,
-                false,
-                now,
-                null,
+                snapshot,
+                snapshot,
                 false
         );
-    }
-
-    @Nullable
-    private static Instant resolveGameTime(@Nullable Store<EntityStore> store) {
-        if (store == null) {
-            return null;
-        }
-        WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
-        return time != null ? time.getGameTime() : null;
     }
 
     static double resolveHarvestTimeoutSeconds(@Nonnull NPCEntity npc,
@@ -442,16 +361,11 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                                                      @Nullable Role role,
                                                      double resolvedBaseSeconds,
                                                      double baseSeconds,
+                                                     String multiplierEffectKey,
                                                      double multiplier,
                                                      double cooldownSeconds,
-                                                     boolean setBefore,
-                                                     boolean readyBefore,
-                                                     @Nullable Instant nowBefore,
-                                                     @Nullable Instant untilBefore,
-                                                     boolean setAfter,
-                                                     boolean readyAfter,
-                                                     @Nullable Instant nowAfter,
-                                                     @Nullable Instant untilAfter,
+                                                     @Nonnull TameworkAlarmService.Snapshot before,
+                                                     @Nonnull TameworkAlarmService.Snapshot after,
                                                      boolean applied) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || instance.getLogger() == null) {
@@ -461,45 +375,20 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                 "TameworkHarvestDebug: cooldown"
                         + " stage=" + stage
                         + " role=" + roleName(role)
+                        + " alarmName=" + before.name
                         + " resolvedBaseSeconds=" + resolvedBaseSeconds
                         + " baseSeconds=" + baseSeconds
+                        + " multiplierEffectKey=" + multiplierEffectKey
                         + " multiplier=" + multiplier
                         + " cooldownSeconds=" + cooldownSeconds
-                        + " setBefore=" + setBefore
-                        + " readyBefore=" + readyBefore
-                        + " nowBefore=" + instantText(nowBefore)
-                        + " untilBefore=" + instantText(untilBefore)
-                        + " setAfter=" + setAfter
-                        + " readyAfter=" + readyAfter
-                        + " nowAfter=" + instantText(nowAfter)
-                        + " untilAfter=" + instantText(untilAfter)
-                        + " applied=" + applied
-        );
-    }
-
-    private static void logHarvestDurableDiagnostic(String stage,
-                                                    @Nonnull HarvestCooldownStateService.Snapshot before,
-                                                    @Nonnull HarvestCooldownStateService.Snapshot after,
-                                                    double cooldownSeconds,
-                                                    boolean applied) {
-        Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
-            return;
-        }
-        instance.getLogger().at(Level.INFO).log(
-                "TameworkHarvestDebug: durable-cooldown"
-                        + " stage=" + stage
-                        + " cooldownSeconds=" + cooldownSeconds
-                        + " validBefore=" + before.valid
-                        + " activeBefore=" + before.active
+                        + " setBefore=" + before.exists
                         + " readyBefore=" + before.ready
-                        + " nowBeforeMs=" + before.nowMs
-                        + " untilBeforeMs=" + before.cooldownUntilMs
-                        + " validAfter=" + after.valid
-                        + " activeAfter=" + after.active
+                        + " nowBefore=" + before.nowMs
+                        + " untilBefore=" + before.untilMs
+                        + " setAfter=" + after.exists
                         + " readyAfter=" + after.ready
-                        + " nowAfterMs=" + after.nowMs
-                        + " untilAfterMs=" + after.cooldownUntilMs
+                        + " nowAfter=" + after.nowMs
+                        + " untilAfter=" + after.untilMs
                         + " applied=" + applied
         );
     }
@@ -509,24 +398,37 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
         return name != null && !name.isBlank() ? name : "<null>";
     }
 
-    private static String instantText(@Nullable Instant instant) {
-        return instant != null ? instant.toString() : "<null>";
+    private static String resolveHarvestAlarmName() {
+        TwGlobalConfig config = TwGlobalConfig.resolveActive();
+        String configured = config != null ? config.getHarvestAlarmName() : null;
+        return configured != null && !configured.isBlank() ? configured : HARVEST_ALARM_NAME;
+    }
+
+    private static String resolveHarvestCooldownMultiplierEffectKey() {
+        TwGlobalConfig config = TwGlobalConfig.resolveActive();
+        String configured = config != null ? config.getHarvestCooldownMultiplierEffectKey() : null;
+        return configured != null && !configured.isBlank()
+                ? configured
+                : HARVEST_COOLDOWN_MULTIPLIER_EFFECT_KEY;
     }
 
     private static final class HarvestCooldownContext {
         private final double baseSeconds;
+        private final String multiplierEffectKey;
         private final double multiplier;
         private final double cooldownSeconds;
-        private final Alarm alarm;
+        private final String alarmName;
 
         private HarvestCooldownContext(double baseSeconds,
+                                       @Nonnull String multiplierEffectKey,
                                        double multiplier,
                                        double cooldownSeconds,
-                                       @Nonnull Alarm alarm) {
+                                       @Nonnull String alarmName) {
             this.baseSeconds = baseSeconds;
+            this.multiplierEffectKey = multiplierEffectKey;
             this.multiplier = multiplier;
             this.cooldownSeconds = cooldownSeconds;
-            this.alarm = alarm;
+            this.alarmName = alarmName;
         }
     }
 }

@@ -150,6 +150,13 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .documentation("Alarm name used for harvest-ready timing.")
             .add()
             .<String>append(
+                    new KeyedCodec<>("HarvestCooldownMultiplierEffectKey", Codec.STRING),
+                    (section, value) -> section.harvestCooldownMultiplierEffectKey = value,
+                    section -> section.harvestCooldownMultiplierEffectKey
+            )
+            .documentation("Progression modifier effect key used to scale harvest Tamework alarm cooldowns.")
+            .add()
+            .<String>append(
                     new KeyedCodec<>("InteractionCooldownAlarmPrefix", Codec.STRING),
                     (section, value) -> section.interactionCooldownAlarmPrefix = value,
                     section -> section.interactionCooldownAlarmPrefix
@@ -532,6 +539,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private String isMountableParam = "IsMountable";
     private String harvestContextParam = "HarvestInteractionContext";
     private String harvestAlarmName = "Harvest_Ready";
+    private String harvestCooldownMultiplierEffectKey = "HarvestCooldownMultiplier";
     private String interactionCooldownAlarmPrefix = "TameworkInteract_Cooldown";
     private double commandReturnHomeTeleportDistance = 96.0;
     private double commandReturnHomePathDistanceBeforeTeleport = 24.0;
@@ -868,6 +876,10 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return harvestAlarmName;
     }
 
+    public String getHarvestCooldownMultiplierEffectKey() {
+        return harvestCooldownMultiplierEffectKey;
+    }
+
     public String getInteractionCooldownAlarmPrefix() {
         return interactionCooldownAlarmPrefix;
     }
@@ -1117,6 +1129,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.harvestAlarmName != null) {
             harvestAlarmName = section.harvestAlarmName;
         }
+        if (section.harvestCooldownMultiplierEffectKey != null) {
+            harvestCooldownMultiplierEffectKey = section.harvestCooldownMultiplierEffectKey;
+        }
         if (section.interactionCooldownAlarmPrefix != null) {
             interactionCooldownAlarmPrefix = section.interactionCooldownAlarmPrefix;
         }
@@ -1130,6 +1145,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.isMountableParam = isMountableParam;
         section.harvestContextParam = harvestContextParam;
         section.harvestAlarmName = harvestAlarmName;
+        section.harvestCooldownMultiplierEffectKey = harvestCooldownMultiplierEffectKey;
         section.interactionCooldownAlarmPrefix = interactionCooldownAlarmPrefix;
         return section;
     }
@@ -1329,6 +1345,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         collectMissing(missing, "IsMountableParam", isMountableParam);
         collectMissing(missing, "HarvestContextParam", harvestContextParam);
         collectMissing(missing, "HarvestAlarmName", harvestAlarmName);
+        collectMissing(missing, "HarvestCooldownMultiplierEffectKey", harvestCooldownMultiplierEffectKey);
         collectMissing(missing, "InteractionCooldownAlarmPrefix", interactionCooldownAlarmPrefix);
         return missing.isEmpty() ? new String[0] : missing.toArray(new String[0]);
     }
@@ -1427,6 +1444,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             isMountableParam = parent.isMountableParam;
             harvestContextParam = parent.harvestContextParam;
             harvestAlarmName = parent.harvestAlarmName;
+            harvestCooldownMultiplierEffectKey = parent.harvestCooldownMultiplierEffectKey;
             interactionCooldownAlarmPrefix = parent.interactionCooldownAlarmPrefix;
             return;
         }
@@ -1453,6 +1471,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("HarvestAlarmName")) {
             harvestAlarmName = parent.harvestAlarmName;
+        }
+        if (!nestedExplicit.contains("HarvestCooldownMultiplierEffectKey")) {
+            harvestCooldownMultiplierEffectKey = parent.harvestCooldownMultiplierEffectKey;
         }
         if (!nestedExplicit.contains("InteractionCooldownAlarmPrefix")) {
             interactionCooldownAlarmPrefix = parent.interactionCooldownAlarmPrefix;
@@ -1715,6 +1736,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private String isMountableParam;
         private String harvestContextParam;
         private String harvestAlarmName;
+        private String harvestCooldownMultiplierEffectKey;
         private String interactionCooldownAlarmPrefix;
     }
 

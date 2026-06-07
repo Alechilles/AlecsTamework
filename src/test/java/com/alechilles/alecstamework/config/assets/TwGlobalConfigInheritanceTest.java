@@ -101,6 +101,7 @@ class TwGlobalConfigInheritanceTest {
         assertEquals("IsMountable", config.getIsMountableParam());
         assertEquals("HarvestInteractionContext", config.getHarvestContextParam());
         assertEquals("Harvest_Ready", config.getHarvestAlarmName());
+        assertEquals("HarvestCooldownMultiplier", config.getHarvestCooldownMultiplierEffectKey());
         assertEquals("TameworkInteract_Cooldown", config.getInteractionCooldownAlarmPrefix());
     }
 

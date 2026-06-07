@@ -73,7 +73,7 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
                 continue;
             }
             NPCEntity npc = store.getComponent(ref, npcType);
-            if (CompanionAttachmentSyncGuards.shouldDeferForHarvestCooldown(npc, store)) {
+            if (CompanionAttachmentSyncGuards.shouldDeferForHarvestCooldown(ref, npc, store)) {
                 continue;
             }
             TameworkAttachmentsComponent attachments = store.getComponent(ref, attachmentsType);

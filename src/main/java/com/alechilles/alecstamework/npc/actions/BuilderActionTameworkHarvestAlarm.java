@@ -30,6 +30,6 @@ public final class BuilderActionTameworkHarvestAlarm extends TameworkActionBuild
     @Nonnull
     @Override
     public String getLongDescription() {
-        return "Sets Harvest_Ready using the role's HarvestTimeout parameter, scaled by HarvestCooldownMultiplier.";
+        return "Sets the configured harvest Tamework alarm using HarvestTimeout, scaled by the configured effect key.";
     }
 }

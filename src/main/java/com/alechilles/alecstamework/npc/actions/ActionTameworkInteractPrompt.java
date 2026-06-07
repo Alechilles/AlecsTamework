@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInter
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HarvestInteraction;
+import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
@@ -306,7 +307,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         String noMatchSummary = resolved == null && config != null
                 ? buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx)
                 : "";
-        InteractionAlarmHelper.AlarmSnapshot alarm = getHarvestAlarmSnapshot(npcRef, store, ctx);
+        TameworkAlarmService.Snapshot alarm = getHarvestAlarmSnapshot(npcRef, store, ctx);
         boolean requireAlarm = false;
         boolean requireContext = false;
         if (resolved != null && resolved.entry instanceof HarvestInteraction) {
@@ -331,13 +332,13 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 isMountable,
                 crouching,
                 getHarvestAlarmName(),
-                alarm.validName,
-                alarm.npcResolved,
-                alarm.storeResolved,
+                alarm.valid,
+                alarm.valid,
+                alarm.componentTypeAvailable,
                 alarm.exists,
-                alarm.nowAvailable,
-                alarm.set,
-                alarm.unset,
+                true,
+                alarm.exists,
+                !alarm.exists,
                 alarm.active,
                 alarm.passed,
                 alarm.ready,

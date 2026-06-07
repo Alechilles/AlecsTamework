@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementSt
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthPercentRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
+import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
@@ -469,30 +470,29 @@ public class ActionTameworkInteract extends TameworkActionBase {
     boolean isHarvestAlarmReady(Ref<EntityStore> npcRef,
                                 Store<EntityStore> store,
                                 InteractionContextSnapshot ctx) {
-        return HarvestCooldownStateService.isReady(npcRef, store)
-                && alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
+        return TameworkAlarmService.isReady(npcRef, store, harvestAlarmName);
     }
 
     boolean isHarvestAlarmPassed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "passed", null);
+        return TameworkAlarmService.snapshot(npcRef, store, harvestAlarmName).passed;
     }
 
     boolean isHarvestAlarmActive(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "active", null);
+        return TameworkAlarmService.snapshot(npcRef, store, harvestAlarmName).active;
     }
 
     boolean isHarvestAlarmUnset(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "unset", null);
+        return !TameworkAlarmService.snapshot(npcRef, store, harvestAlarmName).exists;
     }
 
-    InteractionAlarmHelper.AlarmSnapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+    TameworkAlarmService.Snapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         return getHarvestAlarmSnapshot(npcRef, store, null);
     }
 
-    InteractionAlarmHelper.AlarmSnapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef,
-                                                                 Store<EntityStore> store,
-                                                                 InteractionContextSnapshot ctx) {
-        return alarmHelper.snapshot(npcRef, store, harvestAlarmName, ctx);
+    TameworkAlarmService.Snapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef,
+                                                          Store<EntityStore> store,
+                                                          InteractionContextSnapshot ctx) {
+        return TameworkAlarmService.snapshot(npcRef, store, harvestAlarmName);
     }
 
     String getHarvestAlarmName() {
