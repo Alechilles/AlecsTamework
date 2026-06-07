@@ -65,12 +65,17 @@
 - `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debuglag [on|off]`
+- `/tw debugharvest [on|off]`
 - `/tw debugxpevents [on|off]`
 
 `/tw debugdespawn` notes:
 - Default (no role filter) tracks all tamed companions.
 - You can target a role by name (for example `Rat` or `Tamed_Rat`).
 - Use `all` or `clear` to remove a role filter without disabling the toggle.
+
+`/tw debugharvest` logs optimized harvest cooldown checks, cooldown writes, harvest execution stages,
+and container harvest results. It is disabled by default because milk and other harvest interactions
+can produce several lines per player attempt.
 
 `/tw debugxpevents` subscribes through `TameworkApi.events()` and logs each `CompanionXpAwardedEvent`
 hit, including source, owner UUID, tool ids, XP, and level delta.

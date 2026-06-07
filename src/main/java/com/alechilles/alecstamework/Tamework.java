@@ -287,6 +287,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugNeedsDamageDiagnosticsLogs;
     private volatile boolean debugNeedsSeekDiagnosticsLogs;
     private volatile boolean debugNeedsTelemetryDiagnostics;
+    private volatile boolean debugHarvestLogs;
     private volatile boolean debugRespawnTraceLogs;
     private volatile boolean debugFlyingCompanionLogs;
 
@@ -1361,6 +1362,7 @@ public class Tamework extends JavaPlugin {
         setDebugNeedsDamageDiagnosticsEnabled(commands.isNeedsDamageDiagnostics());
         setDebugNeedsSeekDiagnosticsEnabled(commands.isNeedsSeekDiagnostics());
         setDebugNeedsTelemetryDiagnosticsEnabled(commands.isNeedsTelemetryDiagnostics());
+        setDebugHarvestEnabled(commands.isHarvest());
         setDebugRespawnTraceEnabled(commands.isRespawnTrace());
         setDebugFlyingCompanionEnabled(commands.isFlyingCompanion());
         String roleFilter = commands.getDespawnRoleFilter();
@@ -1385,6 +1387,7 @@ public class Tamework extends JavaPlugin {
                         + ", needsDamageDiagnostics=" + isDebugNeedsDamageDiagnosticsEnabled()
                         + ", needsSeekDiagnostics=" + isDebugNeedsSeekDiagnosticsEnabled()
                         + ", needsTelemetryDiagnostics=" + isDebugNeedsTelemetryDiagnosticsEnabled()
+                        + ", harvest=" + isDebugHarvestEnabled()
                         + ", respawnTrace=" + isDebugRespawnTraceEnabled()
                         + ", flyingCompanion=" + isDebugFlyingCompanionEnabled()
                         + ", despawnRoleFilter="
@@ -2519,6 +2522,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugNeedsTelemetryDiagnosticsEnabled() {
         debugNeedsTelemetryDiagnostics = !debugNeedsTelemetryDiagnostics;
         return debugNeedsTelemetryDiagnostics;
+    }
+
+    public boolean isDebugHarvestEnabled() {
+        return debugHarvestLogs;
+    }
+
+    public boolean setDebugHarvestEnabled(boolean enabled) {
+        debugHarvestLogs = enabled;
+        return debugHarvestLogs;
+    }
+
+    public boolean toggleDebugHarvestEnabled() {
+        debugHarvestLogs = !debugHarvestLogs;
+        return debugHarvestLogs;
     }
 
     public boolean isDebugRespawnTraceEnabled() {

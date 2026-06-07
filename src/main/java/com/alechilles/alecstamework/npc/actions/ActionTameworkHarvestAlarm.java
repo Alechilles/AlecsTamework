@@ -368,7 +368,7 @@ public final class ActionTameworkHarvestAlarm extends TameworkActionBase {
                                                      @Nonnull TameworkAlarmService.Snapshot after,
                                                      boolean applied) {
         Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
+        if (instance == null || !instance.isDebugHarvestEnabled() || instance.getLogger() == null) {
             return;
         }
         instance.getLogger().at(Level.INFO).log(

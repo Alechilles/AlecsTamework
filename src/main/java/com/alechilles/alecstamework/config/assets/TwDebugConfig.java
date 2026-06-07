@@ -116,6 +116,13 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             .documentation("Debug setting for needs telemetry context events.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("Harvest", Codec.BOOLEAN),
+                    (section, value) -> section.harvest = value,
+                    section -> section.harvest
+            )
+            .documentation("Debug setting for optimized harvest cooldown and container diagnostics.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("FlyingCompanion", Codec.BOOLEAN),
                     (section, value) -> section.flyingCompanion = value,
                     section -> section.flyingCompanion
@@ -366,6 +373,9 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!nestedExplicitKeys.contains("NeedsTelemetry")) {
             debugCommands.needsTelemetryDiagnostics = parent.debugCommands.needsTelemetryDiagnostics;
         }
+        if (!nestedExplicitKeys.contains("Harvest")) {
+            debugCommands.harvest = parent.debugCommands.harvest;
+        }
         if (!nestedExplicitKeys.contains("FlyingCompanion")) {
             debugCommands.flyingCompanion = parent.debugCommands.flyingCompanion;
         }
@@ -411,6 +421,7 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean needsDamageDiagnostics;
         private boolean needsSeekDiagnostics;
         private boolean needsTelemetryDiagnostics;
+        private boolean harvest;
         private boolean flyingCompanion;
         private boolean respawnTrace;
 
@@ -465,6 +476,10 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isNeedsTelemetryDiagnostics() {
             return needsTelemetryDiagnostics;
+        }
+
+        public boolean isHarvest() {
+            return harvest;
         }
 
         public boolean isFlyingCompanion() {

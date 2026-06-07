@@ -565,7 +565,7 @@ final class TameworkInteractEffects {
 
     private void logHarvestDebug(String message) {
         Tamework instance = Tamework.getInstance();
-        if (instance != null && instance.getLogger() != null) {
+        if (instance != null && instance.isDebugHarvestEnabled() && instance.getLogger() != null) {
             instance.getLogger().at(Level.INFO).log(message);
         }
     }
