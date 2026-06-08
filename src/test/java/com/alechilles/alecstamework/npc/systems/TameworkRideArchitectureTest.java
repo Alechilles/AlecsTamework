@@ -357,9 +357,12 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("boolean brakingFromBackwardInput = hasBackwardInput(ride)"));
         assertTrue(content.contains("inputLength <= INPUT_DEAD_ZONE && !brakingFromBackwardInput"));
         assertTrue(content.contains("RiddenBackwardBrake.apply(targetVelocity, lastVelocity, riddenBackwardBrakeState, brakingFromBackwardInput, dt)"));
+        assertTrue(content.contains("MountedFlightCollisionRecovery.apply(ride, translation, mountedCollisionRecoveryState)"));
+        assertTrue(content.contains("MountedFlightCollisionRecovery.recordMoveResult("));
         assertTrue(content.contains("ride.isRiderBackwardBrakeInput()"));
         assertTrue(content.contains("lastRiddenBackwardBraking"));
         assertTrue(content.contains("backwardAirbrake=%s"));
+        assertTrue(content.contains("collisionRecovery=%s"));
         assertTrue(content.contains("if (!lastRidden)"));
         assertTrue(content.contains("targetVelocity.mul(effectHorizontalSpeedMultiplier)"));
         assertFalse(content.contains("collisionResult.disableCharacterCollisions()"));

@@ -51,6 +51,8 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     private float lastTargetPitch;
     private float lastVisualPitch;
     private final RiddenBackwardBrake.State riddenBackwardBrakeState = new RiddenBackwardBrake.State();
+    private final MountedFlightCollisionRecovery.State mountedCollisionRecoveryState =
+            new MountedFlightCollisionRecovery.State();
     private boolean lastRiddenBackwardBraking;
     private String lastFlightMovementAnimation = NO_FORCED_MOVEMENT_ANIMATION;
 
@@ -136,6 +138,9 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         if (lastRidden) {
             targetYaw = approachAngle(getYaw(), targetYaw, maxTurnSpeed * (float) dt);
             resolveRiddenTranslation(ride, targetYaw, targetPitch, translation);
+            MountedFlightCollisionRecovery.apply(ride, translation, mountedCollisionRecoveryState);
+        } else {
+            mountedCollisionRecoveryState.reset();
         }
         lastTargetYaw = targetYaw;
         lastTargetPitch = targetPitch;
@@ -219,6 +224,16 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                                  @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         Vector3d requestedMove = new Vector3d(translation);
         double remaining = super.executeMove(ref, role, dt, translation, componentAccessor);
+        if (MountedFlightCollisionRecovery.recordMoveResult(
+                requestedMove,
+                isObstructed(),
+                lastRidden,
+                !onGround(),
+                lastVelocity,
+                mountedCollisionRecoveryState
+        )) {
+            lastSpeed = lastVelocity.length();
+        }
         maybeLogDebug(requestedMove, remaining);
         return remaining;
     }
@@ -454,7 +469,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                         "targetVelocity=%s/%s/%s input=%s/%s/%s yaw=%s pitch=%s onGround=%s inWater=%s " +
                         "motionKind=%s remaining=%s ridden=%s sprinting=%s horizontalLimit=%s climbLimit=%s " +
                         "sinkLimit=%s acceleration=%s deceleration=%s backwardAirbrake=%s effectHorizontalSpeedMultiplier=%s " +
-                        "movementAnimation=%s",
+                        "movementAnimation=%s collisionRecovery=%s collisionRecoveryTicks=%s",
                 position.x,
                 position.y,
                 position.z,
@@ -485,7 +500,9 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                 lastDecelerationRate,
                 lastRiddenBackwardBraking,
                 effectHorizontalSpeedMultiplier,
-                lastFlightMovementAnimation
+                lastFlightMovementAnimation,
+                mountedCollisionRecoveryState.isActive(),
+                mountedCollisionRecoveryState.getTicks()
         );
     }
 }
