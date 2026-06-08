@@ -79,7 +79,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsExperiencePresetsLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Experience Presets";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -97,7 +97,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsLoadPresetLabel {
                 Anchor: (Left: 0, Width: 120, Height: 24);
                 Text: "Load Preset";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -128,7 +128,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 18);
 
-              Label {
+              Label #TwSettingsPresetNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Presets only change the experience toggles below. Review everything else before applying.";
                 Style: (FontSize: 11, TextColor: #9fb5ce, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
@@ -148,7 +148,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsRecallSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Recall / Return Home";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -166,7 +166,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsRecallTeleportingLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Recall Teleporting";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -193,7 +193,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsCompanionSystemsLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Companion Systems";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -211,7 +211,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Needs System";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -236,7 +236,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsHappinessEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Happiness System";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -261,7 +261,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsPassiveBreedingEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Passive Breeding";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -286,7 +286,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsBreedingRequiresHappinessLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Breeding Requires Happiness";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -311,7 +311,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsLevelingEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Leveling System";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -336,7 +336,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsTalentsEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Talents System";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -361,7 +361,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsBreedingGenderEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Breeding Genders";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -386,7 +386,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsTraitsEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Traits System";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -413,7 +413,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsNeedsSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Needs (Hunger/Thirst)";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -431,7 +431,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsDamageEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Hunger/Thirst Damage";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -456,7 +456,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsTickPolicyModeLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Needs Tick Policy";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -481,7 +481,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsOwnerOfflineGraceHoursLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Owner Offline Grace Hours";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -509,7 +509,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsOwnerOfflineDecayMultiplierLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Owner Offline Decay Multiplier";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -537,7 +537,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsDamageModelLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Needs Damage Model";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -562,7 +562,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsDamageDualNeedRuleLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Dual Need Rule";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -587,7 +587,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsStarvationDamagePerMinuteLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Starvation Damage Per Minute";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -615,7 +615,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsDehydrationDamagePerMinuteLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Dehydration Damage Per Minute";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -643,7 +643,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsNeedsDamageLethalLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Needs Damage Is Lethal";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -670,7 +670,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsOwnershipSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Ownership";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -688,7 +688,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 18);
 
-              Label {
+              Label #TwSettingsDamageProtectionSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Damage Protection";
                 Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -706,7 +706,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsBlockOwnerDamageLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Block Owner Damage";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -731,7 +731,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsBlockAllDamageIfOwnedLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Block All Player Damage If Owned";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -756,7 +756,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsInvulnerableIfOwnedLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Invulnerable If Owned";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -781,7 +781,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Top: 4, Height: 18);
 
-              Label {
+              Label #TwSettingsCaptureSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Capture";
                 Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -799,7 +799,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsCaptureRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Capture Requires Owner";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -824,7 +824,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsSpawnRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Spawn Requires Owner";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -849,7 +849,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsCaptureClearsOwnerLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Capture Clears Owner";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -874,7 +874,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsSpawnSetsOwnerLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Spawn Sets Owner";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -899,7 +899,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 18);
 
-              Label {
+              Label #TwSettingsCaptureTradeNoteLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "Note: Enabling both allows trading captured mobs between players.";
                 Style: (FontSize: 11, TextColor: #9fb5ce, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -917,7 +917,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Top: 4, Height: 18);
 
-              Label {
+              Label #TwSettingsGeneralSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "General";
                 Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -935,7 +935,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsInteractionRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Interaction Requires Owner";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -960,7 +960,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsLinkingRequiresOwnerLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Linking Requires Owner";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -987,7 +987,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsReviveSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Revive System";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1005,7 +1005,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsReviveSystemEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Revive System";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1032,7 +1032,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsPopulationSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Population";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1050,7 +1050,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsPopulationLimitLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Limit Per Player Owned Total";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1078,7 +1078,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsPopulationScopeLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Per Player Limit Scope";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1105,7 +1105,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsSimpleClaimsSectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Simple Claims";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1123,7 +1123,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsSimpleClaimsEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Simple Claims Integration";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1148,7 +1148,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsClaimLimitChunkLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Breeding Limit Per Claim Chunk";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1176,7 +1176,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsClaimLimitTotalLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Breeding Limit Per Claim Total";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1204,7 +1204,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsBreedingRequiresClaimLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Breeding Requires Claim";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1229,7 +1229,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsSimpleClaimsProtectLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Protect Tamed From Non-Members";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1256,7 +1256,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 24);
 
-              Label {
+              Label #TwSettingsTelemetrySectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Crash Telemetry (Server)";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1274,7 +1274,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsTelemetryEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Crash Telemetry Uploads";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -1299,7 +1299,7 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
-              Label {
+              Label #TwSettingsTelemetryBreadcrumbsEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Crash Telemetry Breadcrumbs";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);

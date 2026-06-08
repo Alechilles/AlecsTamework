@@ -222,6 +222,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
+        TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef);
         commandBuilder.set("#TwSettingsStatusLine.Text", warningLine.isBlank() ? statusLine : warningLine);
         commandBuilder.set(
                 "#TwSettingsApplyButton.Text",
