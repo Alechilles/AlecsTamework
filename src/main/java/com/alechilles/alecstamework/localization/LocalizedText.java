@@ -11,7 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -21,8 +23,10 @@ import javax.annotation.Nullable;
 public final class LocalizedText {
     private static final String SERVER_PREFIX = "server.";
     private static final String DEFAULT_LANGUAGE = "en-US";
-    private static final String FALLBACK_LANGUAGE_RESOURCE = "/Server/Languages/en-US/server.lang";
-    private static volatile Map<String, String> bundledFallbackEntries;
+    private static final String LANGUAGE_RESOURCE_ROOT = "/Server/Languages/";
+    private static final String LANGUAGE_RESOURCE_FILE = "/server.lang";
+    private static final ConcurrentHashMap<String, Map<String, String>> bundledEntriesByLanguage =
+            new ConcurrentHashMap<>();
 
     private LocalizedText() {
     }
@@ -48,16 +52,16 @@ public final class LocalizedText {
         if (normalizedKey.isEmpty()) {
             return "";
         }
-        String normalizedLanguage = language == null || language.isBlank() ? DEFAULT_LANGUAGE : language;
+        String normalizedLanguage = normalizeLanguage(language);
         String i18nValue = resolveFromI18n(normalizedLanguage, normalizedKey);
         if (i18nValue != null && !i18nValue.isBlank()) {
             return i18nValue;
         }
-        String registryValue = resolveFromRegistry(normalizedKey);
+        String registryValue = resolveFromRegistry(normalizedLanguage, normalizedKey);
         if (registryValue != null && !registryValue.isBlank()) {
             return registryValue;
         }
-        String bundledValue = resolveFromBundledResource(normalizedKey);
+        String bundledValue = resolveFromBundledResource(normalizedLanguage, normalizedKey);
         if (bundledValue != null && !bundledValue.isBlank()) {
             return bundledValue;
         }
@@ -141,7 +145,7 @@ public final class LocalizedText {
     }
 
     @Nullable
-    private static String resolveFromRegistry(@Nonnull String key) {
+    private static String resolveFromRegistry(@Nonnull String language, @Nonnull String key) {
         Tamework instance;
         try {
             instance = Tamework.getInstance();
@@ -155,13 +159,23 @@ public final class LocalizedText {
         for (String candidate : lookupCandidates(key)) {
             String translated;
             try {
-                translated = registry.get(candidate);
+                translated = registry.get(language, candidate);
             } catch (LinkageError | RuntimeException ex) {
                 return null;
             }
             if ((translated == null || translated.isBlank()) && candidate.startsWith(SERVER_PREFIX)) {
                 try {
-                    translated = registry.get(candidate.substring(SERVER_PREFIX.length()));
+                    translated = registry.get(language, candidate.substring(SERVER_PREFIX.length()));
+                } catch (LinkageError | RuntimeException ex) {
+                    return null;
+                }
+            }
+            if ((translated == null || translated.isBlank()) && !DEFAULT_LANGUAGE.equals(language)) {
+                try {
+                    translated = registry.get(DEFAULT_LANGUAGE, candidate);
+                    if ((translated == null || translated.isBlank()) && candidate.startsWith(SERVER_PREFIX)) {
+                        translated = registry.get(DEFAULT_LANGUAGE, candidate.substring(SERVER_PREFIX.length()));
+                    }
                 } catch (LinkageError | RuntimeException ex) {
                     return null;
                 }
@@ -174,30 +188,37 @@ public final class LocalizedText {
     }
 
     @Nullable
-    private static String resolveFromBundledResource(@Nonnull String key) {
-        Map<String, String> entries = bundledFallbackEntries;
-        if (entries == null) {
-            synchronized (LocalizedText.class) {
-                entries = bundledFallbackEntries;
-                if (entries == null) {
-                    entries = loadBundledFallbackEntries();
-                    bundledFallbackEntries = entries;
-                }
-            }
+    private static String resolveFromBundledResource(@Nonnull String language, @Nonnull String key) {
+        String translated = resolveFromBundledResourceLanguage(language, key);
+        if (translated != null && !translated.isBlank()) {
+            return translated;
         }
+        if (!DEFAULT_LANGUAGE.equals(language)) {
+            return resolveFromBundledResourceLanguage(DEFAULT_LANGUAGE, key);
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String resolveFromBundledResourceLanguage(@Nonnull String language, @Nonnull String key) {
+        Map<String, String> entries = bundledEntriesByLanguage.computeIfAbsent(
+                language,
+                LocalizedText::loadBundledEntries
+        );
         for (String candidate : lookupCandidates(key)) {
-            String translated = entries.get(candidate);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
+            String value = entries.get(candidate);
+            if (value != null && !value.isBlank()) {
+                return value;
             }
         }
         return null;
     }
 
     @Nonnull
-    private static Map<String, String> loadBundledFallbackEntries() {
+    private static Map<String, String> loadBundledEntries(@Nonnull String language) {
         HashMap<String, String> entries = new HashMap<>();
-        try (InputStream stream = LocalizedText.class.getResourceAsStream(FALLBACK_LANGUAGE_RESOURCE)) {
+        String resourcePath = LANGUAGE_RESOURCE_ROOT + language + LANGUAGE_RESOURCE_FILE;
+        try (InputStream stream = LocalizedText.class.getResourceAsStream(resourcePath)) {
             if (stream == null) {
                 return entries;
             }
@@ -224,6 +245,19 @@ public final class LocalizedText {
             return entries;
         }
         return entries;
+    }
+
+    @Nonnull
+    private static String normalizeLanguage(@Nullable String language) {
+        if (language == null || language.isBlank()) {
+            return DEFAULT_LANGUAGE;
+        }
+        String normalized = language.trim().replace('_', '-');
+        String[] parts = normalized.split("-", -1);
+        if (parts.length == 2 && parts[0].length() == 2 && parts[1].length() == 2) {
+            return parts[0].toLowerCase(Locale.ROOT) + "-" + parts[1].toUpperCase(Locale.ROOT);
+        }
+        return normalized;
     }
 
     private static boolean isResolvedTranslation(@Nullable String translated, @Nonnull String candidate) {

@@ -10,6 +10,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.zip.ZipEntry;
@@ -19,7 +20,8 @@ import java.util.zip.ZipFile;
  * Discovers and loads language files from mods and per-world overrides.
  */
 public final class ModLanguageDiscovery {
-    private static final String LANGUAGE_PATH = "Server/Languages/en-US/server.lang";
+    private static final String LANGUAGE_ROOT = "Server/Languages";
+    private static final String SERVER_LANG_FILE = "server.lang";
 
     private ModLanguageDiscovery() {
     }
@@ -62,46 +64,71 @@ public final class ModLanguageDiscovery {
     private static int loadFromModFolder(TranslationRegistry registry,
                                          HytaleLogger logger,
                                          Path modPath) {
-        Path langPath = modPath.resolve(LANGUAGE_PATH);
-        if (!Files.exists(langPath)) {
+        Path languageRoot = modPath.resolve(LANGUAGE_ROOT);
+        if (!Files.isDirectory(languageRoot)) {
             return 0;
         }
-        try (Reader reader = Files.newBufferedReader(langPath, StandardCharsets.UTF_8)) {
-            int loaded = loadFromReader(registry, reader);
-            if (loaded > 0) {
-                logger.at(Level.INFO).log("Loaded Tamework language entries from mod: " + langPath);
+        int loaded = 0;
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(languageRoot)) {
+            for (Path languageDir : stream) {
+                if (!Files.isDirectory(languageDir) || languageDir.getFileName() == null) {
+                    continue;
+                }
+                Path langPath = languageDir.resolve(SERVER_LANG_FILE);
+                if (!Files.exists(langPath)) {
+                    continue;
+                }
+                String language = languageDir.getFileName().toString();
+                try (Reader reader = Files.newBufferedReader(langPath, StandardCharsets.UTF_8)) {
+                    int fileLoaded = loadFromReader(registry, language, reader);
+                    loaded += fileLoaded;
+                    if (fileLoaded > 0) {
+                        logger.at(Level.INFO).log("Loaded Tamework language entries from mod: " + langPath);
+                    }
+                } catch (Exception ex) {
+                    logger.at(Level.WARNING).withCause(ex).log("Failed to read language file: " + langPath);
+                }
             }
-            return loaded;
         } catch (Exception ex) {
-            logger.at(Level.WARNING).withCause(ex).log("Failed to read language file: " + langPath);
-            return 0;
+            logger.at(Level.WARNING).withCause(ex).log("Failed to scan language files in mod: " + languageRoot);
         }
+        return loaded;
     }
 
     private static int loadFromModArchive(TranslationRegistry registry,
                                           HytaleLogger logger,
                                           Path modArchive) {
         try (ZipFile zipFile = new ZipFile(modArchive.toFile())) {
-            ZipEntry entry = zipFile.getEntry(LANGUAGE_PATH);
-            if (entry == null) {
-                return 0;
-            }
-            try (InputStream stream = zipFile.getInputStream(entry);
-                 Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                String label = (modArchive.getFileName() != null ? modArchive.getFileName().toString() : modArchive.toString()) + "!" + LANGUAGE_PATH;
-                int loaded = loadFromReader(registry, reader);
-                if (loaded > 0) {
-                    logger.at(Level.INFO).log("Loaded Tamework language entries from archive: " + label);
+            int loaded = 0;
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry == null || entry.isDirectory()) {
+                    continue;
                 }
-                return loaded;
+                String language = languageFromArchiveEntry(entry.getName());
+                if (language == null) {
+                    continue;
+                }
+                try (InputStream stream = zipFile.getInputStream(entry);
+                     Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                    String label = (modArchive.getFileName() != null ? modArchive.getFileName().toString() : modArchive.toString())
+                            + "!" + entry.getName();
+                    int fileLoaded = loadFromReader(registry, language, reader);
+                    loaded += fileLoaded;
+                    if (fileLoaded > 0) {
+                        logger.at(Level.INFO).log("Loaded Tamework language entries from archive: " + label);
+                    }
+                }
             }
+            return loaded;
         } catch (Exception ex) {
             logger.at(Level.WARNING).withCause(ex).log("Failed to read language file from archive: " + modArchive);
             return 0;
         }
     }
 
-    private static int loadFromReader(TranslationRegistry registry, Reader reader) throws Exception {
+    private static int loadFromReader(TranslationRegistry registry, String language, Reader reader) throws Exception {
         int loaded = 0;
         try (BufferedReader buffered = new BufferedReader(reader)) {
             String line;
@@ -120,11 +147,25 @@ public final class ModLanguageDiscovery {
                 if (key.isEmpty() || value.isEmpty()) {
                     continue;
                 }
-                registry.put(key, value);
+                registry.put(language, key, value);
                 loaded++;
             }
         }
         return loaded;
+    }
+
+    private static String languageFromArchiveEntry(String entryName) {
+        if (entryName == null || entryName.isBlank()) {
+            return null;
+        }
+        String normalized = entryName.replace('\\', '/');
+        String prefix = LANGUAGE_ROOT + "/";
+        String suffix = "/" + SERVER_LANG_FILE;
+        if (!normalized.startsWith(prefix) || !normalized.endsWith(suffix)) {
+            return null;
+        }
+        String language = normalized.substring(prefix.length(), normalized.length() - suffix.length());
+        return language.isBlank() || language.contains("/") ? null : language;
     }
 
     // Match .jar/.zip mod archives; guard against null file names.
