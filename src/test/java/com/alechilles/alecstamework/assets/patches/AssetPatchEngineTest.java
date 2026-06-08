@@ -540,9 +540,15 @@ final class AssetPatchEngineTest {
         JsonObject patchConfig = object(readResource("Server/Tamework/Interactions/TwIntExamplePatch.json"));
         JsonObject modeCycle = interactionByType(patchConfig, "ModeCycle");
         assertEquals("Follow", modeCycle.getAsJsonArray("Cycle").get(0).getAsJsonObject().get("State").getAsString());
-        assertEquals("Following", modeCycle.getAsJsonArray("Cycle").get(0).getAsJsonObject().get("Message").getAsString());
+        assertEquals(
+                "tamework.interactions.message.following",
+                modeCycle.getAsJsonArray("Cycle").get(0).getAsJsonObject().get("Message").getAsString()
+        );
         assertEquals("Idle", modeCycle.getAsJsonArray("Cycle").get(1).getAsJsonObject().get("State").getAsString());
-        assertEquals("Wandering", modeCycle.getAsJsonArray("Cycle").get(1).getAsJsonObject().get("Message").getAsString());
+        assertEquals(
+                "tamework.interactions.message.wandering",
+                modeCycle.getAsJsonArray("Cycle").get(1).getAsJsonObject().get("Message").getAsString()
+        );
 
         JsonObject sharedConfig = object(readResource("Server/Tamework/Interactions/TwIntExample.json"));
         for (JsonElement roleId : sharedConfig.getAsJsonArray("RoleIds")) {
