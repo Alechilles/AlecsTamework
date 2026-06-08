@@ -228,6 +228,7 @@ public final class TameworkCompanionTalentsPage
         commandBuilder.setObject("#TalentTreePanControls.Anchor", resolvePanControlsAnchor(viewportWidth));
         commandBuilder.set("#TalentTreePanLeftButton.Visible", maxHorizontalOffset > 0);
         commandBuilder.set("#TalentTreePanRightButton.Visible", maxHorizontalOffset > 0);
+        bindStaticText(commandBuilder);
         commandBuilder.setObject(
                 "#TalentTreeCanvas.Anchor",
                 TalentTreeLayoutService.buildAnchor(-horizontalOffset, 0, Math.max(canvas.width(), viewportWidth), canvas.height())
@@ -324,7 +325,7 @@ public final class TameworkCompanionTalentsPage
                     selector + " #TalentNodeCost.Text",
                     LocalizedText.format(resolveLanguage(), "tamework.ui.talents.node.cost", entry.pointCost())
             );
-            commandBuilder.set(selector + " #TalentNodeState.Text", entry.state());
+            commandBuilder.set(selector + " #TalentNodeState.Text", resolveStateLabel(entry.state()));
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     selector + " #TalentNodeButton",
@@ -387,12 +388,28 @@ public final class TameworkCompanionTalentsPage
         }
     }
 
+    private void bindStaticText(@Nonnull UICommandBuilder commandBuilder) {
+        String language = resolveLanguage();
+        commandBuilder.set("#TalentTreePanLabel.Text", LocalizedText.resolve(language, "tamework.ui.talents.pan.label"));
+        commandBuilder.set("#TalentDetailEmpty.Text", LocalizedText.resolve(language, "tamework.ui.talents.detail.empty"));
+        commandBuilder.set(
+                "#TalentDetailRequirementsLabel.Text",
+                LocalizedText.resolve(language, "tamework.ui.talents.detail.requirements")
+        );
+        commandBuilder.set("#TalentDetailEffectsLabel.Text", LocalizedText.resolve(language, "tamework.ui.talents.detail.effects"));
+    }
+
     @Nonnull
     private String resolveRequirementText(@Nonnull TreeNodeEntry entry) {
         ArrayList<String> lines = new ArrayList<>();
         lines.add(LocalizedText.format(resolveLanguage(), "tamework.ui.talents.requirement.level", entry.minLevel()));
         lines.addAll(entry.requiredTalentNames());
         return String.join("\n", lines);
+    }
+
+    @Nonnull
+    private String resolveStateLabel(@Nonnull String state) {
+        return LocalizedText.resolveConfigValue(resolveLanguage(), "tamework.ui.talents.state." + state, state);
     }
 
     @Nullable

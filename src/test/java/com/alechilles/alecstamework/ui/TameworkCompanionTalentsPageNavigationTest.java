@@ -168,6 +168,10 @@ class TameworkCompanionTalentsPageNavigationTest {
         assertTrue(content.contains("LocalizedText.resolve((String) null, \"tamework.ui.talents.empty.title\")"));
         assertTrue(content.contains("LocalizedText.format(resolveLanguage(), \"tamework.ui.talents.node.cost\""));
         assertTrue(content.contains("LocalizedText.format(resolveLanguage(), \"tamework.ui.talents.requirement.level\""));
+        assertTrue(content.contains("bindStaticText(commandBuilder)"));
+        assertTrue(content.contains("\"tamework.ui.talents.detail.effects\""));
+        assertTrue(content.contains("\"tamework.ui.talents.detail.requirements\""));
+        assertTrue(content.contains("\"tamework.ui.talents.state.\" + state"));
         assertFalse(content.contains("Choose a talent first."));
         assertFalse(content.contains("entry.pointCost() + \" pt\""));
     }

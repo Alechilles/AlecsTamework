@@ -179,7 +179,12 @@ final class CommandTalentPageService {
                     state,
                     talentName,
                     talentDescription,
-                    state + " - " + status,
+                    LocalizedText.format(
+                            language,
+                            "tamework.ui.talents.status.stateDetail",
+                            formatStateLabel(language, state),
+                            status
+                    ),
                     talent.getPointCost(),
                     talent.getMinLevel(),
                     Arrays.stream(talent.getRequiresTalentIds())
@@ -264,6 +269,15 @@ final class CommandTalentPageService {
                 language,
                 "tamework.ui.talents.effect." + effectKey,
                 spaced.isBlank() ? effectKey : spaced
+        );
+    }
+
+    @Nonnull
+    private String formatStateLabel(@Nullable String language, @Nonnull String state) {
+        return LocalizedText.resolveConfigValue(
+                language,
+                "tamework.ui.talents.state." + state,
+                state
         );
     }
 
