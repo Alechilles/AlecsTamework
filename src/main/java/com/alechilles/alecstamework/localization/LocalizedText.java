@@ -80,6 +80,29 @@ public final class LocalizedText {
     }
 
     @Nonnull
+    public static String resolveConfigValue(@Nullable String language,
+                                            @Nullable String configuredValue,
+                                            @Nullable String fallbackValue) {
+        String trimmed = configuredValue == null ? "" : configuredValue.trim();
+        if (trimmed.isEmpty()) {
+            return fallbackValue == null ? "" : fallbackValue;
+        }
+        String resolved = resolve(language, trimmed);
+        if (resolved == null || resolved.isBlank() || resolved.equals(trimmed)) {
+            return looksLikeTranslationKey(trimmed) ? fallbackOrKey(fallbackValue, trimmed) : trimmed;
+        }
+        return resolved;
+    }
+
+    @Nonnull
+    public static String formatConfigValue(@Nullable String language,
+                                           @Nullable String configuredValue,
+                                           @Nullable String fallbackTemplate,
+                                           Object... args) {
+        return formatTemplate(resolveConfigValue(language, configuredValue, fallbackTemplate), args);
+    }
+
+    @Nonnull
     public static String formatTemplate(@Nullable String template, Object... args) {
         String out = template == null ? "" : template;
         if (args == null || args.length == 0 || out.isEmpty()) {
@@ -208,6 +231,15 @@ public final class LocalizedText {
             return false;
         }
         return !translated.equals(candidate);
+    }
+
+    private static boolean looksLikeTranslationKey(@Nonnull String value) {
+        return value.indexOf('.') > 0 && value.indexOf(' ') < 0;
+    }
+
+    @Nonnull
+    private static String fallbackOrKey(@Nullable String fallbackValue, @Nonnull String key) {
+        return fallbackValue == null || fallbackValue.isBlank() ? key : fallbackValue;
     }
 
     @Nonnull
