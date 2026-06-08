@@ -31,28 +31,28 @@
       "Bands": [
         {
           "Id": "well_fed",
-          "Label": "Well-fed",
+          "Label": "tamework.happiness.hunger.wellFed",
           "MinPercent": 80.0,
           "MaxPercent": 100.0,
           "Offset": 10.0
         },
         {
           "Id": "sated",
-          "Label": "Sated",
+          "Label": "tamework.happiness.hunger.sated",
           "MinPercent": 40.0,
           "MaxPercent": 80.0,
           "Offset": 0.0
         },
         {
           "Id": "hungry",
-          "Label": "Hungry",
+          "Label": "tamework.happiness.hunger.hungry",
           "MinPercent": 10.0,
           "MaxPercent": 40.0,
           "Offset": -15.0
         },
         {
           "Id": "starving",
-          "Label": "Starving",
+          "Label": "tamework.happiness.hunger.starving",
           "MinPercent": 0.0,
           "MaxPercent": 10.0,
           "Offset": -30.0
@@ -64,28 +64,28 @@
       "Bands": [
         {
           "Id": "quenched",
-          "Label": "Quenched",
+          "Label": "tamework.happiness.thirst.quenched",
           "MinPercent": 80.0,
           "MaxPercent": 100.0,
           "Offset": 8.0
         },
         {
           "Id": "hydrated",
-          "Label": "Hydrated",
+          "Label": "tamework.happiness.thirst.hydrated",
           "MinPercent": 40.0,
           "MaxPercent": 80.0,
           "Offset": 0.0
         },
         {
           "Id": "thirsty",
-          "Label": "Thirsty",
+          "Label": "tamework.happiness.thirst.thirsty",
           "MinPercent": 10.0,
           "MaxPercent": 40.0,
           "Offset": -18.0
         },
         {
           "Id": "dehydrated",
-          "Label": "Dehydrated",
+          "Label": "tamework.happiness.thirst.dehydrated",
           "MinPercent": 0.0,
           "MaxPercent": 10.0,
           "Offset": -35.0
@@ -98,21 +98,21 @@
       "Bands": [
         {
           "Id": "lonely",
-          "Label": "Lonely",
+          "Label": "tamework.happiness.population.lonely",
           "MinCount": 0,
           "MaxCount": 0,
           "Offset": -12.0
         },
         {
           "Id": "social",
-          "Label": "Social",
+          "Label": "tamework.happiness.population.social",
           "MinCount": 1,
           "MaxCount": 8,
           "Offset": 8.0
         },
         {
           "Id": "crowded",
-          "Label": "Crowded",
+          "Label": "tamework.happiness.population.crowded",
           "MinCount": 9,
           "MaxCount": -1,
           "Offset": -15.0

@@ -12,11 +12,11 @@
   "Talents": [
     {
       "Id": "Example_Healthy",
-      "DisplayName": "Healthy",
-      "Description": "Raises maximum health.",
+      "DisplayName": "tamework.talents.healthy.name",
+      "Description": "tamework.talents.healthy.description",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Health.png",
       "Tier": 1,
-      "Branch": "Survival",
+      "Branch": "tamework.talents.branch.survival",
       "PointCost": 1,
       "MinLevel": 2,
       "Effects": [
@@ -28,11 +28,11 @@
     },
     {
       "Id": "Example_Quick",
-      "DisplayName": "Quick",
-      "Description": "Improves movement speed.",
+      "DisplayName": "tamework.talents.quick.name",
+      "Description": "tamework.talents.quick.description",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Swiftness.png",
       "Tier": 1,
-      "Branch": "Utility",
+      "Branch": "tamework.talents.branch.utility",
       "PointCost": 1,
       "MinLevel": 2,
       "Effects": [
@@ -44,11 +44,11 @@
     },
     {
       "Id": "Example_Strong",
-      "DisplayName": "Strong",
-      "Description": "Increases outgoing damage.",
+      "DisplayName": "tamework.talents.strong.name",
+      "Description": "tamework.talents.strong.description",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Strength.png",
       "Tier": 2,
-      "Branch": "Combat",
+      "Branch": "tamework.talents.branch.combat",
       "PointCost": 1,
       "MinLevel": 4,
       "RequiresTalentIds": [
@@ -63,11 +63,11 @@
     },
     {
       "Id": "Example_Tough",
-      "DisplayName": "Tough",
-      "Description": "Reduces incoming damage.",
+      "DisplayName": "tamework.talents.tough.name",
+      "Description": "tamework.talents.tough.description",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Toughness.png",
       "Tier": 2,
-      "Branch": "Survival",
+      "Branch": "tamework.talents.branch.survival",
       "PointCost": 1,
       "MinLevel": 4,
       "RequiresTalentIds": [
@@ -82,11 +82,11 @@
     },
     {
       "Id": "Example_Bountiful",
-      "DisplayName": "Bountiful",
-      "Description": "Improves harvest bonus chances.",
+      "DisplayName": "tamework.talents.bountiful.name",
+      "Description": "tamework.talents.bountiful.description",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Bounty.png",
       "Tier": 2,
-      "Branch": "Utility",
+      "Branch": "tamework.talents.branch.utility",
       "PointCost": 1,
       "MinLevel": 4,
       "RequiresTalentIds": [

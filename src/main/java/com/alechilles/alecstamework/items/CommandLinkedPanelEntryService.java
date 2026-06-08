@@ -493,7 +493,8 @@ final class CommandLinkedPanelEntryService {
         if (label == null || label.isBlank()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.modifier.generic");
         }
-        return stripModifierPrefix(label);
+        String stripped = stripModifierPrefix(label);
+        return LocalizedText.resolveConfigValue(language, stripped, stripped);
     }
 
     private String resolveImpulseLabel(CompanionHappinessService.ActiveImpulseSnapshot activeImpulse,
@@ -520,11 +521,12 @@ final class CommandLinkedPanelEntryService {
         if (label == null || label.isBlank()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.generic");
         }
+        String resolvedLabel = LocalizedText.resolveConfigValue(language, label, label);
         String itemId = activeImpulse.itemId();
         if (itemId != null && !itemId.isBlank()) {
-            return label + " " + resolveItemDisplayName(language, itemId);
+            return resolvedLabel + " " + resolveItemDisplayName(language, itemId);
         }
-        return label;
+        return resolvedLabel;
     }
 
     private String resolveItemDisplayName(String language, String itemId) {

@@ -31,7 +31,7 @@
   "Traits": [
     {
       "Id": "Trait_Disposition",
-      "DisplayName": "Disposition",
+      "DisplayName": "tamework.traits.disposition.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Disposition.png",
       "EffectKey": "HappinessGainMultiplier",
       "Weight": 1.0,
@@ -44,7 +44,7 @@
     },
     {
       "Id": "Trait_Fertility",
-      "DisplayName": "Fertility",
+      "DisplayName": "tamework.traits.fertility.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Fertility.png",
       "EffectKey": "FertilityMultiplier",
       "Weight": 0.8,
@@ -57,7 +57,7 @@
     },
     {
       "Id": "Trait_Health",
-      "DisplayName": "Health",
+      "DisplayName": "tamework.traits.health.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Health.png",
       "EffectKey": "MaxHealthMultiplier",
       "Weight": 0.9,
@@ -70,7 +70,7 @@
     },
     {
       "Id": "Trait_Size",
-      "DisplayName": "Size",
+      "DisplayName": "tamework.traits.size.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Size.png",
       "EffectKey": "SizeMultiplier",
       "Weight": 0.8,
@@ -83,7 +83,7 @@
     },
     {
       "Id": "Trait_Swiftness",
-      "DisplayName": "Swiftness",
+      "DisplayName": "tamework.traits.swiftness.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Swiftness.png",
       "EffectKey": "MoveSpeedMultiplier",
       "Weight": 0.75,
@@ -96,7 +96,7 @@
     },
     {
       "Id": "Trait_Toughness",
-      "DisplayName": "Toughness",
+      "DisplayName": "tamework.traits.toughness.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Toughness.png",
       "EffectKey": "DamageTakenMultiplier",
       "Weight": 0.85,
@@ -109,7 +109,7 @@
     },
     {
       "Id": "Trait_Strength",
-      "DisplayName": "Strength",
+      "DisplayName": "tamework.traits.strength.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Strength.png",
       "EffectKey": "DamageDealtMultiplier",
       "Weight": 0.85,
@@ -122,7 +122,7 @@
     },
     {
       "Id": "Trait_Bounty",
-      "DisplayName": "Bounty",
+      "DisplayName": "tamework.traits.bounty.name",
       "IconPath": "Tamework/LinkedPanelIcons/Trait_Bounty.png",
       "EffectKey": "HarvestDoubleDropChanceMultiplier",
       "Weight": 0.65,

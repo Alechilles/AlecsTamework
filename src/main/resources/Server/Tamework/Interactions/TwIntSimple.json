@@ -19,15 +19,15 @@
       "Cycle": [
         {
           "State": "Idle",
-          "Message": "Following"
+          "Message": "tamework.interactions.message.following"
         },
         {
           "State": "Hold",
-          "Message": "Staying"
+          "Message": "tamework.interactions.message.staying"
         },
         {
           "State": "Defend",
-          "Message": "Defending"
+          "Message": "tamework.interactions.message.defending"
         }
       ],
       "ShowFloatingText": true

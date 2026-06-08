@@ -19,10 +19,10 @@
   "CommandList": [
     {
       "Id": "Follow",
-      "DisplayName": "Follow",
+      "DisplayName": "tamework.commands.follow.name",
       "Default": true,
       "Feedback": {
-        "HudMessage": "Follow: {count}",
+        "HudMessage": "tamework.commands.follow.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Follow"
       },
@@ -44,9 +44,9 @@
     },
     {
       "Id": "Hold",
-      "DisplayName": "Hold",
+      "DisplayName": "tamework.commands.hold.name",
       "Feedback": {
-        "HudMessage": "Hold: {count}",
+        "HudMessage": "tamework.commands.hold.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Hold"
       },
@@ -63,9 +63,9 @@
     },
     {
       "Id": "Recall",
-      "DisplayName": "Recall",
+      "DisplayName": "tamework.commands.recall.name",
       "Feedback": {
-        "HudMessage": "Recall: {count}",
+        "HudMessage": "tamework.commands.recall.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Poof_Small"
       },
@@ -82,9 +82,9 @@
     },
     {
       "Id": "MoveToPing",
-      "DisplayName": "Move To Ping",
+      "DisplayName": "tamework.commands.moveToPing.name",
       "Feedback": {
-        "HudMessage": "Move To Ping: {count}",
+        "HudMessage": "tamework.commands.moveToPing.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Alerted"
       },
@@ -97,10 +97,10 @@
     },
     {
       "Id": "SetHome",
-      "DisplayName": "Set Home",
+      "DisplayName": "tamework.commands.setHome.name",
       "Feedback": {
-        "ChatMessage": "Home set for linked NPC(s).",
-        "HudMessage": "Home Set",
+        "ChatMessage": "tamework.commands.setHome.chat",
+        "HudMessage": "tamework.commands.setHome.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Poof_Small"
       },
@@ -114,9 +114,9 @@
     },
     {
       "Id": "ReturnHome",
-      "DisplayName": "Return Home",
+      "DisplayName": "tamework.commands.returnHome.name",
       "Feedback": {
-        "HudMessage": "Return Home: {count}",
+        "HudMessage": "tamework.commands.returnHome.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Follow"
       },
@@ -130,9 +130,9 @@
     },
     {
       "Id": "AttackTarget",
-      "DisplayName": "Attack Target",
+      "DisplayName": "tamework.commands.attackTarget.name",
       "Feedback": {
-        "HudMessage": "Attack Target: {count}",
+        "HudMessage": "tamework.commands.attackTarget.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Defend"
       },
@@ -151,9 +151,9 @@
     },
     {
       "Id": "Idle",
-      "DisplayName": "Idle",
+      "DisplayName": "tamework.commands.idle.name",
       "Feedback": {
-        "HudMessage": "Idle: {count}",
+        "HudMessage": "tamework.commands.idle.hud",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Idle"
       },

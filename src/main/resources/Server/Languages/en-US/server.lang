@@ -312,6 +312,71 @@ tamework.ui.talents.effect.OutgoingDamageMultiplier=Outgoing Damage
 tamework.ui.talents.effect.IncomingDamageMultiplier=Incoming Damage
 tamework.ui.talents.effect.HarvestBonusMultiplier=Harvest Bonus
 tamework.ui.talents.effect.ReviveCooldownMultiplier=Revive Cooldown
+
+# ===== Tamework Config Text: Talents =====
+tamework.talents.branch.survival=Survival
+tamework.talents.branch.utility=Utility
+tamework.talents.branch.combat=Combat
+tamework.talents.healthy.name=Healthy
+tamework.talents.healthy.description=Raises maximum health.
+tamework.talents.quick.name=Quick
+tamework.talents.quick.description=Improves movement speed.
+tamework.talents.strong.name=Strong
+tamework.talents.strong.description=Increases outgoing damage.
+tamework.talents.tough.name=Tough
+tamework.talents.tough.description=Reduces incoming damage.
+tamework.talents.bountiful.name=Bountiful
+tamework.talents.bountiful.description=Improves harvest bonus chances.
+
+# ===== Tamework Config Text: Traits =====
+tamework.traits.disposition.name=Disposition
+tamework.traits.fertility.name=Fertility
+tamework.traits.health.name=Health
+tamework.traits.size.name=Size
+tamework.traits.swiftness.name=Swiftness
+tamework.traits.toughness.name=Toughness
+tamework.traits.strength.name=Strength
+tamework.traits.bounty.name=Bounty
+
+# ===== Tamework Config Text: Command Example =====
+tamework.commands.follow.name=Follow
+tamework.commands.follow.hud=Follow: {count}
+tamework.commands.hold.name=Hold
+tamework.commands.hold.hud=Hold: {count}
+tamework.commands.recall.name=Recall
+tamework.commands.recall.hud=Recall: {count}
+tamework.commands.moveToPing.name=Move To Ping
+tamework.commands.moveToPing.hud=Move To Ping: {count}
+tamework.commands.setHome.name=Set Home
+tamework.commands.setHome.chat=Home set for linked NPC(s).
+tamework.commands.setHome.hud=Home Set
+tamework.commands.returnHome.name=Return Home
+tamework.commands.returnHome.hud=Return Home: {count}
+tamework.commands.attackTarget.name=Attack Target
+tamework.commands.attackTarget.hud=Attack Target: {count}
+tamework.commands.idle.name=Idle
+tamework.commands.idle.hud=Idle: {count}
+
+# ===== Tamework Config Text: Interactions =====
+tamework.interactions.message.tamed=Tamed
+tamework.interactions.message.breedingReady=Breeding Ready
+tamework.interactions.message.following=Following
+tamework.interactions.message.staying=Staying
+tamework.interactions.message.defending=Defending
+tamework.interactions.message.wandering=Wandering
+
+# ===== Tamework Config Text: Happiness =====
+tamework.happiness.hunger.wellFed=Well-fed
+tamework.happiness.hunger.sated=Sated
+tamework.happiness.hunger.hungry=Hungry
+tamework.happiness.hunger.starving=Starving
+tamework.happiness.thirst.quenched=Quenched
+tamework.happiness.thirst.hydrated=Hydrated
+tamework.happiness.thirst.thirsty=Thirsty
+tamework.happiness.thirst.dehydrated=Dehydrated
+tamework.happiness.population.lonely=Lonely
+tamework.happiness.population.social=Social
+tamework.happiness.population.crowded=Crowded
 tamework.ui.linkedPanel.groupAssign.none=None
 tamework.ui.linkedPanel.groupAssign.noneGroups=No groups
 tamework.ui.linkedPanel.groupAssign.prompt=Choose a group.

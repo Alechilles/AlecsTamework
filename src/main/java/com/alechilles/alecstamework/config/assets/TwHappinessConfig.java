@@ -152,7 +152,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.label = value,
             settings -> settings.label
         )
-        .documentation("UI label shown for this entry.")
+        .documentation("UI label shown for this entry. May be raw text or a server.lang key.")
         .add()
         .<Double>append(
             new KeyedCodec<>("MinPercent", Codec.DOUBLE),
@@ -216,7 +216,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.label = value,
             settings -> settings.label
         )
-        .documentation("UI label shown for this entry.")
+        .documentation("UI label shown for this entry. May be raw text or a server.lang key.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MinCount", Codec.INTEGER),

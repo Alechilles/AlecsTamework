@@ -778,7 +778,7 @@ public final class TwInteractionConfigCodecs {
             (effect, value) -> effect.message = value,
             effect -> effect.message
         )
-        .documentation("Message shown as floating combat text.")
+        .documentation("Message shown as floating combat text. May be raw text or a server.lang key.")
         .add()
         .build();
 
@@ -791,7 +791,7 @@ public final class TwInteractionConfigCodecs {
             (effect, value) -> effect.message = value,
             effect -> effect.message
         )
-        .documentation("Message shown in the on-screen UI overlay.")
+        .documentation("Message shown in the on-screen UI overlay. May be raw text or a server.lang key.")
         .add()
         .build();
 
@@ -1358,7 +1358,7 @@ public final class TwInteractionConfigCodecs {
             (step, value) -> step.message = value,
             step -> step.message
         )
-        .documentation("Optional UI message for this mode.")
+        .documentation("Optional UI message for this mode. May be raw text or a server.lang key.")
         .add()
         .build();
 

@@ -1685,13 +1685,13 @@ public final class CommandItemFeatureHandler {
         if (command == null) {
             return LocalizedText.resolve(player, "tamework.ui.notifications.command.unknown");
         }
-        if (command.getDisplayName() != null && !command.getDisplayName().isBlank()) {
-            return command.getDisplayName();
-        }
-        if (command.getId() != null && !command.getId().isBlank()) {
-            return command.getId();
-        }
-        return LocalizedText.resolve(player, "tamework.ui.notifications.command.unknown");
+        String fallback = command.getId() != null && !command.getId().isBlank()
+                ? command.getId()
+                : LocalizedText.resolve(player, "tamework.ui.notifications.command.unknown");
+        String language = player != null && player.getPlayerRef() != null
+                ? player.getPlayerRef().getLanguage()
+                : null;
+        return LocalizedText.resolveConfigValue(language, command.getDisplayName(), fallback);
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {

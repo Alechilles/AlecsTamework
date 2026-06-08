@@ -21,4 +21,14 @@ class CommandFeedbackServiceLocalizationTest {
         assertTrue(content.contains("LocalizedText.resolveConfigValue(language"));
         assertFalse(content.contains("looksLikeLanguageKey"));
     }
+
+    @Test
+    void commandItemFeatureResolvesCommandDisplayNamesAsConfigLanguageKeys() throws Exception {
+        String content = Files.readString(
+                Path.of("src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"),
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(content.contains("LocalizedText.resolveConfigValue(language, command.getDisplayName(), fallback)"));
+    }
 }

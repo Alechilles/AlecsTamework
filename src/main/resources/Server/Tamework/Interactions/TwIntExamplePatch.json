@@ -9,7 +9,7 @@
       "ItemsParam": "TestTameItemsParam",
       "Effects": {
         "ShowFloatingText": {
-          "Message": "Tamed"
+          "Message": "tamework.interactions.message.tamed"
         }
       }
     },
@@ -49,7 +49,7 @@
       },
       "Effects": {
         "ShowFloatingText": {
-          "Message": "Breeding Ready"
+          "Message": "tamework.interactions.message.breedingReady"
         }
       }
     },
@@ -59,19 +59,19 @@
       "Cycle": [
         {
           "State": "Follow",
-          "Message": "Following"
+          "Message": "tamework.interactions.message.following"
         },
         {
           "State": "Idle",
-          "Message": "Wandering"
+          "Message": "tamework.interactions.message.wandering"
         },
         {
           "State": "Hold",
-          "Message": "Staying"
+          "Message": "tamework.interactions.message.staying"
         },
         {
           "State": "Defend",
-          "Message": "Defending"
+          "Message": "tamework.interactions.message.defending"
         }
       ],
       "ShowFloatingText": true,

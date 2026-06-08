@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeStep;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -55,15 +56,16 @@ final class InteractionModeCycleEffects {
         ResolvedModeStep next = resolved[nextIndex];
         role.getStateSupport().setState(npcRef, next.state, resolveSetSubState(next.subState, defaultSub), store);
         if (next.message != null && !next.message.isBlank()) {
+            String message = resolveMessage(next.message, player);
             boolean emitted = false;
             if (showFloatingText) {
-                emitted |= presentationEffects.showFloatingTextMessage(next.message, npcRef, store, player);
+                emitted |= presentationEffects.showFloatingTextMessage(message, npcRef, store, player);
             }
             if (showUiMessage) {
-                emitted |= presentationEffects.applyUiMessage(next.message, player);
+                emitted |= presentationEffects.applyUiMessage(message, player);
             }
             if (emitted) {
-                owner.logDebug("ModeToggle: message=" + next.message);
+                owner.logDebug("ModeToggle: message=" + message);
             }
         }
         return true;
@@ -140,6 +142,13 @@ final class InteractionModeCycleEffects {
             return normalized;
         }
         return normalizeSubState(defaultSub);
+    }
+
+    private String resolveMessage(String configuredMessage, Player player) {
+        String language = player != null && player.getPlayerRef() != null
+                ? player.getPlayerRef().getLanguage()
+                : null;
+        return LocalizedText.resolveConfigValue(language, configuredMessage, configuredMessage);
     }
 
     private String resolveCurrentStateName(StateSupport stateSupport) {
