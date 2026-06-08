@@ -132,16 +132,10 @@ final class CommandFeedbackService {
                                        String commandLabel,
                                        int affected,
                                        String fallback) {
-        String value;
-        if (template != null && !template.isBlank()) {
-            if (looksLikeLanguageKey(template)) {
-                value = LocalizedText.resolve(player, template.trim());
-            } else {
-                value = template;
-            }
-        } else {
-            value = fallback;
-        }
+        String language = player != null && player.getPlayerRef() != null
+                ? player.getPlayerRef().getLanguage()
+                : null;
+        String value = LocalizedText.resolveConfigValue(language, template, fallback);
         if (value == null || value.isBlank()) {
             return null;
         }
@@ -150,14 +144,6 @@ final class CommandFeedbackService {
                 .replace("%command%", commandLabel)
                 .replace("{count}", Integer.toString(affected))
                 .replace("{command}", commandLabel);
-    }
-
-    private static boolean looksLikeLanguageKey(String value) {
-        if (value == null) {
-            return false;
-        }
-        String trimmed = value.trim();
-        return trimmed.startsWith("server.") || trimmed.startsWith("tamework.ui.");
     }
 
     private void emitFeedbackSound(String soundEventId,

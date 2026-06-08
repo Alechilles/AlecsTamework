@@ -67,6 +67,14 @@ final class CommandLinkedPanelProgressionPresentationService {
     String buildModifierTooltip(@Nullable Ref<EntityStore> npcRef,
                                 @Nullable Store<EntityStore> store,
                                 @Nullable NPCEntity npc) {
+        return buildModifierTooltip(npcRef, store, npc, null);
+    }
+
+    @Nullable
+    String buildModifierTooltip(@Nullable Ref<EntityStore> npcRef,
+                                @Nullable Store<EntityStore> store,
+                                @Nullable NPCEntity npc,
+                                @Nullable String language) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
@@ -82,7 +90,8 @@ final class CommandLinkedPanelProgressionPresentationService {
         return buildModifierTooltip(
                 breakdowns,
                 resolveBaseHealth(npc),
-                resolveBaseSpeed(npc)
+                resolveBaseSpeed(npc),
+                language
         );
     }
 
@@ -91,28 +100,44 @@ final class CommandLinkedPanelProgressionPresentationService {
             @Nonnull List<CompanionProgressionModifierBreakdownService.ModifierBreakdown> breakdowns,
             double baseHealth,
             double baseSpeed) {
+        return buildModifierTooltip(breakdowns, baseHealth, baseSpeed, null);
+    }
+
+    @Nullable
+    static String buildModifierTooltip(
+            @Nonnull List<CompanionProgressionModifierBreakdownService.ModifierBreakdown> breakdowns,
+            double baseHealth,
+            double baseSpeed,
+            @Nullable String language) {
         if (breakdowns.isEmpty()) {
             return null;
         }
         ArrayList<String> lines = new ArrayList<>(breakdowns.size() + 1);
-        lines.add("Modifiers: Total - [Level - Talents - Traits]");
+        lines.add(LocalizedText.resolve(language, "tamework.ui.linkedPanel.progression.modifiersBreakdown"));
         for (CompanionProgressionModifierBreakdownService.ModifierBreakdown breakdown : breakdowns) {
             if (breakdown == null) {
                 continue;
             }
-            lines.add(formatModifierLine(breakdown, baseHealth, baseSpeed));
+            lines.add(formatModifierLine(breakdown, baseHealth, baseSpeed, language));
         }
         return lines.size() == 1 ? null : String.join("\n", lines);
     }
 
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
                                                         Store<EntityStore> store) {
-        return readTraitIndicators(npcRef, store, TameworkTraitsComponent.getComponentType());
+        return readLoadedTraitIndicators(npcRef, store, null);
+    }
+
+    LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
+                                                        Store<EntityStore> store,
+                                                        @Nullable String language) {
+        return readTraitIndicators(npcRef, store, TameworkTraitsComponent.getComponentType(), language);
     }
 
     private LinkedNpcTraitIndicator[] readTraitIndicators(Ref<EntityStore> npcRef,
                                                           Store<EntityStore> store,
-                                                          ComponentType<EntityStore, TameworkTraitsComponent> traitType) {
+                                                          ComponentType<EntityStore, TameworkTraitsComponent> traitType,
+                                                          @Nullable String language) {
         if (npcRef == null || !npcRef.isValid() || store == null || traitType == null) {
             return LinkedNpcTraitIndicator.EMPTY;
         }
@@ -148,9 +173,9 @@ final class CommandLinkedPanelProgressionPresentationService {
             double fillRatio = belowDefault
                     ? ratioToLowerBound(value, min, defaultValue)
                     : ratioToUpperBound(value, defaultValue, max);
-            String label = resolveLabel(definition);
+            String label = resolveLabel(definition, language);
             indicators.add(new LinkedNpcTraitIndicator(
-                    resolveIconGlyph(definition),
+                    resolveIconGlyph(label),
                     resolveIconTexturePath(definition),
                     label,
                     buildTraitTooltip(label, value, min, defaultValue, max),
@@ -170,9 +195,10 @@ final class CommandLinkedPanelProgressionPresentationService {
     private static String formatModifierLine(
             CompanionProgressionModifierBreakdownService.ModifierBreakdown breakdown,
             double baseHealth,
-            double baseSpeed) {
+            double baseSpeed,
+            @Nullable String language) {
         String absolute = formatAbsoluteBonus(breakdown.effectKey(), breakdown.totalMultiplier(), baseHealth, baseSpeed);
-        return labelForEffectKey(breakdown.effectKey())
+        return labelForEffectKey(breakdown.effectKey(), language)
                 + ": "
                 + formatSignedPercent(breakdown.totalMultiplier())
                 + absolute
@@ -210,7 +236,15 @@ final class CommandLinkedPanelProgressionPresentationService {
         return String.format(Locale.ROOT, "%+d%%", rounded);
     }
 
-    private static String labelForEffectKey(String effectKey) {
+    private static String labelForEffectKey(String effectKey, @Nullable String language) {
+        String normalizedKey = effectKey == null ? "" : effectKey.trim();
+        if (!normalizedKey.isBlank()) {
+            String languageKey = "tamework.ui.linkedPanel.progression.effect." + normalizedKey;
+            String localized = LocalizedText.resolve(language, languageKey);
+            if (!localized.equals(languageKey)) {
+                return localized;
+            }
+        }
         if (HEALTH_EFFECT_KEY.equalsIgnoreCase(effectKey)) {
             return "Health";
         }
@@ -350,8 +384,8 @@ final class CommandLinkedPanelProgressionPresentationService {
         return values;
     }
 
-    private String resolveIconGlyph(TwTraitConfig.TraitDefinition definition) {
-        String source = resolveLabel(definition);
+    private String resolveIconGlyph(String label) {
+        String source = label == null ? "" : label;
         for (int i = 0; i < source.length(); i++) {
             char c = source.charAt(i);
             if (Character.isLetterOrDigit(c)) {
@@ -372,16 +406,11 @@ final class CommandLinkedPanelProgressionPresentationService {
         return iconPath;
     }
 
-    private String resolveLabel(TwTraitConfig.TraitDefinition definition) {
-        String displayName = definition.getDisplayName();
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName;
-        }
-        String id = definition.getId();
-        if (id != null && !id.isBlank()) {
-            return id;
-        }
-        return "Trait";
+    private String resolveLabel(TwTraitConfig.TraitDefinition definition, @Nullable String language) {
+        String fallback = definition.getId() != null && !definition.getId().isBlank()
+                ? definition.getId()
+                : LocalizedText.resolve(language, "tamework.ui.linkedPanel.trait.fallback");
+        return LocalizedText.resolveConfigValue(language, definition.getDisplayName(), fallback);
     }
 
     private double ratioToUpperBound(double value, double defaultValue, double max) {

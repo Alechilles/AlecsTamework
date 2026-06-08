@@ -180,7 +180,7 @@ public final class TameworkCommandSelectionPage
         this.playerUuid = playerRef.getUuid();
         this.linkedPanelGeneration = NEXT_LINKED_PANEL_GENERATION.incrementAndGet();
         markLinkedPanelOwner();
-        this.options = buildOptions(config, commandOptionPredicate);
+        this.options = buildOptions(config, commandOptionPredicate, resolveLanguage());
         this.cardBindingConfig = buildCardBindingConfig(recallActionEnabled);
         this.requireUnlinkConfirm = requireUnlinkConfirm;
         this.linkedNpcEntriesSupplier = linkedNpcEntriesSupplier;
@@ -1274,7 +1274,9 @@ public final class TameworkCommandSelectionPage
         );
     }
 
-    private static CommandOption[] buildOptions(TwCommandItemConfig config, Predicate<CommandEntry> predicate) {
+    private static CommandOption[] buildOptions(TwCommandItemConfig config,
+                                                Predicate<CommandEntry> predicate,
+                                                String language) {
         if (config == null || config.getCommandList() == null || config.getCommandList().length == 0) {
             return new CommandOption[0];
         }
@@ -1286,7 +1288,7 @@ public final class TameworkCommandSelectionPage
             if (predicate != null && !predicate.test(entry)) {
                 continue;
             }
-            out.add(new CommandOption(entry.getId(), resolveLabel(entry)));
+            out.add(new CommandOption(entry.getId(), resolveLabel(entry, language)));
             if (out.size() >= MAX_COMMAND_BUTTONS) {
                 break;
             }
@@ -1294,11 +1296,8 @@ public final class TameworkCommandSelectionPage
         return out.toArray(new CommandOption[0]);
     }
 
-    private static String resolveLabel(CommandEntry entry) {
-        if (entry.getDisplayName() != null && !entry.getDisplayName().isBlank()) {
-            return entry.getDisplayName();
-        }
-        return entry.getId();
+    private static String resolveLabel(CommandEntry entry, String language) {
+        return LocalizedText.resolveConfigValue(language, entry.getDisplayName(), entry.getId());
     }
 
     private boolean isPendingUnlink(UUID npcUuid) {

@@ -197,7 +197,7 @@ final class CommandLinkedPanelEntryService {
                             futureStatA = progressionPresentationService.buildLevelFutureStat(
                                     levelingSnapshot,
                                     playerLanguage,
-                                    progressionPresentationService.buildModifierTooltip(npcRef, store, npc)
+                                    progressionPresentationService.buildModifierTooltip(npcRef, store, npc, playerLanguage)
                             );
                         }
                         TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(npcRef, store);
@@ -217,7 +217,7 @@ final class CommandLinkedPanelEntryService {
                             talentsActionVisible = true;
                             talentsActionEnabled = true;
                         }
-                        traitIndicators = progressionPresentationService.readLoadedTraitIndicators(npcRef, store);
+                        traitIndicators = progressionPresentationService.readLoadedTraitIndicators(npcRef, store, playerLanguage);
                     }
                 }
             }
@@ -382,6 +382,12 @@ final class CommandLinkedPanelEntryService {
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
                                                         Store<EntityStore> store) {
         return progressionPresentationService.readLoadedTraitIndicators(npcRef, store);
+    }
+
+    LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
+                                                        Store<EntityStore> store,
+                                                        String language) {
+        return progressionPresentationService.readLoadedTraitIndicators(npcRef, store, language);
     }
 
     private HealthSnapshot readNpcHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {

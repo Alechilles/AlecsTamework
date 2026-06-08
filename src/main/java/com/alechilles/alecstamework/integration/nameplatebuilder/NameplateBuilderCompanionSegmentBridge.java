@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.integration.nameplatebuilder;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
@@ -433,13 +434,12 @@ public final class NameplateBuilderCompanionSegmentBridge {
         if (definition == null) {
             return "Trait";
         }
-        String displayName = definition.getDisplayName();
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName;
-        }
-        String id = definition.getId();
-        if (id != null && !id.isBlank()) {
-            return id;
+        return LocalizedText.resolveConfigValue(null, definition.getDisplayName(), resolveTraitFallbackLabel(definition));
+    }
+
+    private static String resolveTraitFallbackLabel(@Nullable TwTraitConfig.TraitDefinition definition) {
+        if (definition != null && definition.getId() != null && !definition.getId().isBlank()) {
+            return definition.getId();
         }
         return "Trait";
     }

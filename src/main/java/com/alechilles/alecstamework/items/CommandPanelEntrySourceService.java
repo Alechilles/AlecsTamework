@@ -66,6 +66,7 @@ final class CommandPanelEntrySourceService {
             return applyFiltersAndSort(linkedEntries, stack);
         }
         UUID playerUuid = player.getUuid();
+        String playerLanguage = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         Ref<EntityStore> playerRef = player.getReference();
         if (playerUuid == null || playerRef == null || !playerRef.isValid()) {
             return applyFiltersAndSort(linkedEntries, stack);
@@ -132,7 +133,7 @@ final class CommandPanelEntrySourceService {
                         store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
                 boolean hasHome = links != null && links.hasHome();
                 LinkedNpcTraitIndicator[] traitIndicators =
-                        linkedPanelEntryService.readLoadedTraitIndicators(npcRef, store);
+                        linkedPanelEntryService.readLoadedTraitIndicators(npcRef, store, playerLanguage);
                 out.add(new LinkedNpcEntry(
                         npc.getUuid(),
                         npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),

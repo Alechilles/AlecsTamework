@@ -158,7 +158,7 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             (definition, value) -> definition.displayName = value,
             definition -> definition.displayName
         )
-        .documentation("Display name shown to players.")
+        .documentation("Display name shown to players. May be raw text or a server.lang key.")
         .add()
         .<String>append(
             new KeyedCodec<>("EffectKey", Codec.STRING),

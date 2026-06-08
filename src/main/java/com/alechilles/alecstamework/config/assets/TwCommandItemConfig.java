@@ -427,14 +427,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (feedback, value) -> feedback.chatMessage = value,
             feedback -> feedback.chatMessage
         )
-        .documentation("Chat message sent when this step executes.")
+        .documentation("Chat message sent when this step executes. May be raw text or a server.lang key.")
         .add()
         .<String>append(
             new KeyedCodec<>("HudMessage", Codec.STRING),
             (feedback, value) -> feedback.hudMessage = value,
             feedback -> feedback.hudMessage
         )
-        .documentation("HUD message shown when this step executes.")
+        .documentation("HUD message shown when this step executes. May be raw text or a server.lang key.")
         .add()
         .<String>append(
             new KeyedCodec<>("SoundEvent", SOUND_EVENT_CODEC),
@@ -474,7 +474,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (entry, value) -> entry.displayName = value,
             entry -> entry.displayName
         )
-        .documentation("Display name shown to players.")
+        .documentation("Display name shown to players. May be raw text or a server.lang key.")
         .add()
         .<String>append(
             new KeyedCodec<>("Icon", Codec.STRING),
