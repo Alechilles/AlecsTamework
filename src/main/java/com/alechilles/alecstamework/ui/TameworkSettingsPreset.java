@@ -1,25 +1,27 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
 import java.util.List;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Preset profiles that can be loaded into the `/tw settings` form before applying changes.
  */
 public enum TameworkSettingsPreset {
-    CUSTOM("Custom", "Custom"),
-    SIMPLIFIED("Simplified", "Simplified (Minecraft-like)"),
-    EASIER("Easier", "Easier"),
-    FULL_EXPERIENCE("FullExperience", "Full Experience");
+    CUSTOM("Custom", "tamework.ui.settings.preset.custom"),
+    SIMPLIFIED("Simplified", "tamework.ui.settings.preset.simplified"),
+    EASIER("Easier", "tamework.ui.settings.preset.easier"),
+    FULL_EXPERIENCE("FullExperience", "tamework.ui.settings.preset.fullExperience");
 
     private final String value;
-    private final String displayName;
+    private final String displayKey;
 
-    TameworkSettingsPreset(@Nonnull String value, @Nonnull String displayName) {
+    TameworkSettingsPreset(@Nonnull String value, @Nonnull String displayKey) {
         this.value = value;
-        this.displayName = displayName;
+        this.displayKey = displayKey;
     }
 
     @Nonnull
@@ -29,7 +31,17 @@ public enum TameworkSettingsPreset {
 
     @Nonnull
     public String displayName() {
-        return displayName;
+        return displayName(null);
+    }
+
+    @Nonnull
+    public String displayName(@Nullable String language) {
+        return LocalizedText.resolve(language, displayKey);
+    }
+
+    @Nonnull
+    public String displayKey() {
+        return displayKey;
     }
 
     public boolean isLoadable() {
@@ -75,11 +87,16 @@ public enum TameworkSettingsPreset {
 
     @Nonnull
     public static List<DropdownEntryInfo> dropdownEntries() {
+        return dropdownEntries(null);
+    }
+
+    @Nonnull
+    public static List<DropdownEntryInfo> dropdownEntries(@Nullable String language) {
         return List.of(
-                new DropdownEntryInfo(LocalizableString.fromString(SIMPLIFIED.displayName), SIMPLIFIED.value),
-                new DropdownEntryInfo(LocalizableString.fromString(EASIER.displayName), EASIER.value),
-                new DropdownEntryInfo(LocalizableString.fromString(FULL_EXPERIENCE.displayName), FULL_EXPERIENCE.value),
-                new DropdownEntryInfo(LocalizableString.fromString(CUSTOM.displayName), CUSTOM.value)
+                new DropdownEntryInfo(LocalizableString.fromString(SIMPLIFIED.displayName(language)), SIMPLIFIED.value),
+                new DropdownEntryInfo(LocalizableString.fromString(EASIER.displayName(language)), EASIER.value),
+                new DropdownEntryInfo(LocalizableString.fromString(FULL_EXPERIENCE.displayName(language)), FULL_EXPERIENCE.value),
+                new DropdownEntryInfo(LocalizableString.fromString(CUSTOM.displayName(language)), CUSTOM.value)
         );
     }
 

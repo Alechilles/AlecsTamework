@@ -175,6 +175,42 @@ tamework.ui.settingsAnnouncement.body.defaults=This includes things like "Hunger
 tamework.ui.settingsAnnouncement.body.scope=These popups are only shown to OPs and players with the permissions to use /tw settings, and will only appear after major changes that have been deemed important enough to require your immediate attention.
 tamework.ui.settingsAnnouncement.optOut=Don't show again until next announcement
 
+# ===== Tamework UI: Settings =====
+tamework.ui.settings.preset.custom=Custom
+tamework.ui.settings.preset.simplified=Simplified (Minecraft-like)
+tamework.ui.settings.preset.easier=Easier
+tamework.ui.settings.preset.fullExperience=Full Experience
+tamework.ui.settings.status.refreshed=Settings refreshed.
+tamework.ui.settings.dismissReminder=You can change these settings again any time with /tw settings.
+tamework.ui.settings.button.applying=Applying...
+tamework.ui.settings.warning.applyInProgress=Apply already in progress.
+tamework.ui.settings.status.applying=Applying settings...
+tamework.ui.settings.warning.applyFailed=Failed to apply settings.
+tamework.ui.settings.status.selectPreset=Select a preset to load.
+tamework.ui.settings.status.loadedPreset=Loaded {0} preset. Review and click Apply to save.
+tamework.ui.settings.status.loadedPresetDiscardedInvalid=Loaded {0} preset. Invalid unsaved numeric inputs were discarded.
+tamework.ui.settings.warning.saveFailed=Failed to save universe settings.
+tamework.ui.settings.status.appliedUniverse=Applied universe settings.
+tamework.ui.settings.status.applied=Applied settings.
+tamework.ui.settings.warning.telemetryApplyFailed=Universe settings applied, but crash telemetry setting failed to apply at runtime.
+tamework.ui.settings.field.populationLimit=Population limit
+tamework.ui.settings.field.simpleClaimsClaimChunkLimit=SimpleClaims claim-chunk limit
+tamework.ui.settings.field.simpleClaimsClaimTotalLimit=SimpleClaims claim-total limit
+tamework.ui.settings.field.needsOwnerOfflineGraceHours=Needs owner-offline grace hours
+tamework.ui.settings.field.needsOwnerOfflineDecayMultiplier=Needs owner-offline decay multiplier
+tamework.ui.settings.field.needsStarvationDamagePerMinute=Needs starvation damage per minute
+tamework.ui.settings.field.needsDehydrationDamagePerMinute=Needs dehydration damage per minute
+tamework.ui.settings.validation.nonNegativeInteger={0} must be a non-negative integer.
+tamework.ui.settings.validation.nonNegativeNumber={0} must be a non-negative number.
+tamework.ui.settings.populationScope.perWorld=Per World
+tamework.ui.settings.populationScope.global=Global
+tamework.ui.settings.needsTickPolicy.ownerGraceThenDecay=Owner Online Grace Then Decay
+tamework.ui.settings.needsTickPolicy.anyLoadedPlayer=Any Loaded Player
+tamework.ui.settings.needsDamageModel.minOnlyPercent=Min Only Percent
+tamework.ui.settings.needsDamageModel.minOnlyFlat=Min Only Flat
+tamework.ui.settings.dualNeedRule.useHigherOnly=Use Higher Only
+tamework.ui.settings.dualNeedRule.sumBoth=Sum Both
+
 # ===== Tamework UI: Linked NPC Panel =====
 tamework.ui.linkedPanel.breedingCooldown.ready=Breeding ready
 tamework.ui.linkedPanel.breedingCooldown.remaining=Breeding cooldown: {0}

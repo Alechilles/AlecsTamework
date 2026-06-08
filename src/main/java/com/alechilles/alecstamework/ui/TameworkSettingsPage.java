@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -134,7 +135,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             case ACTION_CLOSE -> close();
             case ACTION_REFRESH -> {
                 currentValues = TameworkSettingsValues.fromRuntime();
-                statusLine = "Settings refreshed.";
+                statusLine = resolveText("tamework.ui.settings.status.refreshed");
                 warningLine = "";
                 refreshUi();
             }
@@ -147,7 +148,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
-        playerRef.sendMessage(Message.raw("You can change these settings again any time with /tw settings."));
+        playerRef.sendMessage(Message.raw(resolveText("tamework.ui.settings.dismissReminder")));
     }
 
     private void bindStaticEvents(@Nonnull UIEventBuilder eventBuilder) {
@@ -222,8 +223,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
         commandBuilder.set("#TwSettingsStatusLine.Text", warningLine.isBlank() ? statusLine : warningLine);
-        commandBuilder.set("#TwSettingsApplyButton.Text", applyInProgress ? "Applying..." : "Apply");
-        commandBuilder.set("#TwSettingsPresetDropdown.Entries", TameworkSettingsPreset.dropdownEntries());
+        commandBuilder.set(
+                "#TwSettingsApplyButton.Text",
+                applyInProgress
+                        ? resolveText("tamework.ui.settings.button.applying")
+                        : resolveText("tamework.ui.shared.button.apply")
+        );
+        commandBuilder.set("#TwSettingsPresetDropdown.Entries", TameworkSettingsPreset.dropdownEntries(resolveLanguage()));
         commandBuilder.set("#TwSettingsPresetDropdown.Value", TameworkSettingsPreset.match(currentValues).value());
         commandBuilder.set("#TwSettingsPopulationLimitInput.Value", String.valueOf(currentValues.populationLimitPerPlayerOwnedTotal()));
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Entries", populationScopeEntries());
@@ -270,7 +276,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private void onApply(@Nonnull EventPayload payload, @Nonnull Store<EntityStore> store) {
         if (applyInProgress) {
-            warningLine = "Apply already in progress.";
+            warningLine = resolveText("tamework.ui.settings.warning.applyInProgress");
             statusLine = "";
             refreshUi();
             return;
@@ -286,7 +292,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
         TameworkSettingsValues requested = parseResult.values();
         applyInProgress = true;
-        statusLine = "Applying settings...";
+        statusLine = resolveText("tamework.ui.settings.status.applying");
         warningLine = "";
         refreshUi();
 
@@ -297,14 +303,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                     if (throwable != null) {
                         plugin.getLogger().at(Level.WARNING).withCause(throwable).log("Tamework settings apply failed.");
                         statusLine = "";
-                        warningLine = "Failed to apply settings.";
+                        warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
                         refreshUi();
                         return;
                     }
                     currentValues = TameworkSettingsValues.fromRuntime();
                     if (outcome == null) {
                         statusLine = "";
-                        warningLine = "Failed to apply settings.";
+                        warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
                     } else if (outcome.partial()) {
                         CompanionStatModifierRefreshService.refreshLoadedNpcStatModifiers(store);
                         statusLine = outcome.message();
@@ -324,7 +330,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private void onLoadPreset(@Nonnull EventPayload payload) {
         TameworkSettingsPreset preset = TameworkSettingsPreset.fromConfigValue(payload.preset);
         if (!preset.isLoadable()) {
-            statusLine = "Select a preset to load.";
+            statusLine = resolveText("tamework.ui.settings.status.selectPreset");
             warningLine = "";
             refreshUi();
             return;
@@ -335,8 +341,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 : currentValues;
         currentValues = preset.applyTo(baseValues);
         statusLine = parseResult.success()
-                ? "Loaded " + preset.displayName() + " preset. Review and click Apply to save."
-                : "Loaded " + preset.displayName() + " preset. Invalid unsaved numeric inputs were discarded.";
+                ? formatText("tamework.ui.settings.status.loadedPreset", preset.displayName(resolveLanguage()))
+                : formatText("tamework.ui.settings.status.loadedPresetDiscardedInvalid", preset.displayName(resolveLanguage()));
         warningLine = "";
         refreshUi();
     }
@@ -346,14 +352,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         Path globalSettingsPath = resolveSettingsDirectory().resolve(TameworkSettingsStore.GLOBAL_SETTINGS_FILE_NAME);
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = values.toGlobalSettingsSnapshot();
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
-            return ApplyOutcome.failure("Failed to save universe settings.");
+            return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
         }
 
         String telemetryWarning = saveTelemetrySettings(values.telemetryEnabled(), values.telemetryBreadcrumbsEnabled());
         if (!telemetryWarning.isBlank()) {
-            return ApplyOutcome.partial("Applied universe settings.", telemetryWarning);
+            return ApplyOutcome.partial(resolveText("tamework.ui.settings.status.appliedUniverse"), telemetryWarning);
         }
-        return ApplyOutcome.success("Applied settings.");
+        return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));
     }
 
     @Nonnull
@@ -366,7 +372,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             }
         } catch (Exception ex) {
             plugin.getLogger().at(Level.WARNING).withCause(ex).log("Failed applying crash telemetry setting at runtime.");
-            return "Universe settings applied, but crash telemetry setting failed to apply at runtime.";
+            return resolveText("tamework.ui.settings.warning.telemetryApplyFailed");
         }
         return "";
     }
@@ -378,45 +384,75 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     @Nonnull
     private ParseResult parseValues(@Nonnull EventPayload payload) {
-        Integer populationLimit = parseNonNegativeInt(payload.populationLimit, "Population limit");
+        Integer populationLimit = parseNonNegativeInt(
+                payload.populationLimit,
+                resolveText("tamework.ui.settings.field.populationLimit")
+        );
         if (populationLimit == null) {
-            return ParseResult.failure("Population limit must be a non-negative integer.");
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.nonNegativeInteger",
+                    resolveText("tamework.ui.settings.field.populationLimit")
+            ));
         }
-        Integer claimLimitChunk = parseNonNegativeInt(payload.claimLimitChunk, "SimpleClaims claim-chunk limit");
+        Integer claimLimitChunk = parseNonNegativeInt(
+                payload.claimLimitChunk,
+                resolveText("tamework.ui.settings.field.simpleClaimsClaimChunkLimit")
+        );
         if (claimLimitChunk == null) {
-            return ParseResult.failure("SimpleClaims claim-chunk limit must be a non-negative integer.");
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.nonNegativeInteger",
+                    resolveText("tamework.ui.settings.field.simpleClaimsClaimChunkLimit")
+            ));
         }
-        Integer claimLimitTotal = parseNonNegativeInt(payload.claimLimitTotal, "SimpleClaims claim-total limit");
+        Integer claimLimitTotal = parseNonNegativeInt(
+                payload.claimLimitTotal,
+                resolveText("tamework.ui.settings.field.simpleClaimsClaimTotalLimit")
+        );
         if (claimLimitTotal == null) {
-            return ParseResult.failure("SimpleClaims claim-total limit must be a non-negative integer.");
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.nonNegativeInteger",
+                    resolveText("tamework.ui.settings.field.simpleClaimsClaimTotalLimit")
+            ));
         }
         Double needsOwnerOfflineGraceHours = parseNonNegativeDouble(
                 payload.needsOwnerOfflineGraceHours,
-                "Needs owner-offline grace hours"
+                resolveText("tamework.ui.settings.field.needsOwnerOfflineGraceHours")
         );
         if (needsOwnerOfflineGraceHours == null) {
-            return ParseResult.failure("Needs owner-offline grace hours must be a non-negative number.");
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.nonNegativeNumber",
+                    resolveText("tamework.ui.settings.field.needsOwnerOfflineGraceHours")
+            ));
         }
         Double needsOwnerOfflineDecayMultiplier = parseNonNegativeDouble(
                 payload.needsOwnerOfflineDecayMultiplier,
-                "Needs owner-offline decay multiplier"
+                resolveText("tamework.ui.settings.field.needsOwnerOfflineDecayMultiplier")
         );
         if (needsOwnerOfflineDecayMultiplier == null) {
-            return ParseResult.failure("Needs owner-offline decay multiplier must be a non-negative number.");
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.nonNegativeNumber",
+                    resolveText("tamework.ui.settings.field.needsOwnerOfflineDecayMultiplier")
+            ));
         }
         Double needsStarvationDamagePerMinute = parseNonNegativeDouble(
                 payload.needsStarvationDamagePerMinute,
-                "Needs starvation damage per minute"
+                resolveText("tamework.ui.settings.field.needsStarvationDamagePerMinute")
         );
         if (needsStarvationDamagePerMinute == null) {
-            return ParseResult.failure("Needs starvation damage per minute must be a non-negative number.");
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.nonNegativeNumber",
+                    resolveText("tamework.ui.settings.field.needsStarvationDamagePerMinute")
+            ));
         }
         Double needsDehydrationDamagePerMinute = parseNonNegativeDouble(
                 payload.needsDehydrationDamagePerMinute,
-                "Needs dehydration damage per minute"
+                resolveText("tamework.ui.settings.field.needsDehydrationDamagePerMinute")
         );
         if (needsDehydrationDamagePerMinute == null) {
-            return ParseResult.failure("Needs dehydration damage per minute must be a non-negative number.");
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.nonNegativeNumber",
+                    resolveText("tamework.ui.settings.field.needsDehydrationDamagePerMinute")
+            ));
         }
 
         TwGlobalConfig.PerPlayerLimitScope scope = TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(payload.populationScope);
@@ -527,19 +563,25 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private List<DropdownEntryInfo> populationScopeEntries() {
         return List.of(
-                new DropdownEntryInfo(LocalizableString.fromString("Per World"), TwGlobalConfig.PerPlayerLimitScope.PER_WORLD.configValue()),
-                new DropdownEntryInfo(LocalizableString.fromString("Global"), TwGlobalConfig.PerPlayerLimitScope.GLOBAL.configValue())
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.populationScope.perWorld")),
+                        TwGlobalConfig.PerPlayerLimitScope.PER_WORLD.configValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.populationScope.global")),
+                        TwGlobalConfig.PerPlayerLimitScope.GLOBAL.configValue()
+                )
         );
     }
 
     private List<DropdownEntryInfo> needsTickPolicyModeEntries() {
         return List.of(
                 new DropdownEntryInfo(
-                        LocalizableString.fromString("Owner Online Grace Then Decay"),
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.needsTickPolicy.ownerGraceThenDecay")),
                         TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY.toConfigValue()
                 ),
                 new DropdownEntryInfo(
-                        LocalizableString.fromString("Any Loaded Player"),
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.needsTickPolicy.anyLoadedPlayer")),
                         TwNeedsConfig.TickPolicyMode.ANY_LOADED_PLAYER.toConfigValue()
                 )
         );
@@ -548,11 +590,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private List<DropdownEntryInfo> needsDamageModelEntries() {
         return List.of(
                 new DropdownEntryInfo(
-                        LocalizableString.fromString("Min Only Percent"),
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.needsDamageModel.minOnlyPercent")),
                         TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT.toConfigValue()
                 ),
                 new DropdownEntryInfo(
-                        LocalizableString.fromString("Min Only Flat"),
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.needsDamageModel.minOnlyFlat")),
                         TwNeedsConfig.DamageModel.MIN_ONLY_FLAT.toConfigValue()
                 )
         );
@@ -561,14 +603,29 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private List<DropdownEntryInfo> needsDamageDualNeedRuleEntries() {
         return List.of(
                 new DropdownEntryInfo(
-                        LocalizableString.fromString("Use Higher Only"),
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.dualNeedRule.useHigherOnly")),
                         TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY.toConfigValue()
                 ),
                 new DropdownEntryInfo(
-                        LocalizableString.fromString("Sum Both"),
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.dualNeedRule.sumBoth")),
                         TwNeedsConfig.DualNeedRule.SUM_BOTH.toConfigValue()
                 )
         );
+    }
+
+    @Nullable
+    private String resolveLanguage() {
+        return playerRef != null ? playerRef.getLanguage() : null;
+    }
+
+    @Nonnull
+    private String resolveText(@Nonnull String key) {
+        return LocalizedText.resolve(playerRef, key);
+    }
+
+    @Nonnull
+    private String formatText(@Nonnull String key, Object... args) {
+        return LocalizedText.format(playerRef, key, args);
     }
 
     @Nonnull
