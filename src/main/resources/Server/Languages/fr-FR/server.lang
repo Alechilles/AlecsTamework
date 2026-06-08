@@ -174,6 +174,8 @@ tamework.ui.settingsAnnouncement.body.intro=Depuis Alec's Tamework v2.8.0+, de n
 tamework.ui.settingsAnnouncement.body.defaults=Cela inclut des éléments comme les "dégâts de faim/soif" activés par défaut et les "limites d'apprivoisement/reproduction par joueur/par claim", qui peuvent être essentielles pour les propriétaires de serveur.
 tamework.ui.settingsAnnouncement.body.scope=Ces fenêtres ne sont affichées qu'aux OPs et aux joueurs ayant les permissions d'utiliser /tw settings, et n'apparaissent qu'après des changements majeurs jugés assez importants pour demander votre attention immédiate.
 tamework.ui.settingsAnnouncement.optOut=Ne plus afficher jusqu'à la prochaine annonce
+tamework.ui.settingsAnnouncement.button.later=Plus tard
+tamework.ui.settingsAnnouncement.button.review=Vérifier les paramètres
 
 # ===== Tamework UI: Settings =====
 tamework.ui.settings.preset.custom=Personnalisé

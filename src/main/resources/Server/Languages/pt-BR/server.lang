@@ -174,6 +174,8 @@ tamework.ui.settingsAnnouncement.body.intro=A partir do Alec's Tamework v2.8.0+,
 tamework.ui.settingsAnnouncement.body.defaults=Isso inclui coisas como "dano de Fome/Sede" ativado por padrão e "limites de domesticação/reprodução por jogador/por claim", que podem ser muito importantes para donos de servidor.
 tamework.ui.settingsAnnouncement.body.scope=Esses pop-ups são mostrados apenas a OPs e jogadores com permissão para usar /tw settings, e só aparecem após grandes mudanças consideradas importantes o bastante para exigir sua atenção imediata.
 tamework.ui.settingsAnnouncement.optOut=Não mostrar novamente até o próximo anúncio
+tamework.ui.settingsAnnouncement.button.later=Mais tarde
+tamework.ui.settingsAnnouncement.button.review=Revisar Configurações
 
 # ===== Tamework UI: Settings =====
 tamework.ui.settings.preset.custom=Personalizado

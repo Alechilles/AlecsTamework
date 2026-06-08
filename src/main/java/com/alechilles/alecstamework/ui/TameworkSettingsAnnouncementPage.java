@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
@@ -31,6 +32,12 @@ public final class TameworkSettingsAnnouncementPage
     private static final String KEY_SUPPRESS = "@SuppressUntilNextAnnouncement";
     private static final String ACTION_REVIEW = "Review";
     private static final String ACTION_LATER = "Later";
+    private static final String TITLE_KEY = "tamework.ui.settingsAnnouncement.title";
+    private static final String SUBTITLE_KEY = "tamework.ui.settingsAnnouncement.subtitle";
+    private static final String BODY_KEY = "tamework.ui.settingsAnnouncement.body.intro";
+    private static final String OPT_OUT_KEY = "tamework.ui.settingsAnnouncement.optOut";
+    private static final String LATER_BUTTON_KEY = "tamework.ui.settingsAnnouncement.button.later";
+    private static final String REVIEW_BUTTON_KEY = "tamework.ui.settingsAnnouncement.button.review";
 
     private final String title;
     private final String subtitle;
@@ -51,19 +58,10 @@ public final class TameworkSettingsAnnouncementPage
                                             @Nullable Consumer<Boolean> reviewCallback,
                                             @Nullable Consumer<Boolean> dismissCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
-        this.title = normalize(title, "Important Alec's Tamework Update");
-        this.subtitle = normalize(
-                subtitle,
-                "New features, settings, or updates have been added to Tamework that require your attention."
-        );
-        this.bodyText = normalize(
-                bodyText,
-                "As of Alec's Tamework v2.8.0+, many important settings were migrated to the \"/tw settings\" menu."
-        );
-        this.optOutLabel = normalize(
-                optOutLabel,
-                "Don't show again until next announcement"
-        );
+        this.title = normalize(playerRef, title, TITLE_KEY);
+        this.subtitle = normalize(playerRef, subtitle, SUBTITLE_KEY);
+        this.bodyText = normalize(playerRef, bodyText, BODY_KEY);
+        this.optOutLabel = normalize(playerRef, optOutLabel, OPT_OUT_KEY);
         this.reviewCallback = reviewCallback;
         this.dismissCallback = dismissCallback;
         this.suppressUntilNextAnnouncement = false;
@@ -84,6 +82,14 @@ public final class TameworkSettingsAnnouncementPage
             commandBuilder.set("#TwSettingsAnnouncementBody.Text", bodyText);
             commandBuilder.set("#TwSettingsAnnouncementOptOutLabel.Text", optOutLabel);
             commandBuilder.set("#TwSettingsAnnouncementOptOutCheck.Value", suppressUntilNextAnnouncement);
+            commandBuilder.set(
+                    "#TwSettingsAnnouncementLaterButton.Text",
+                    LocalizedText.resolve(playerRef, LATER_BUTTON_KEY)
+            );
+            commandBuilder.set(
+                    "#TwSettingsAnnouncementReviewButton.Text",
+                    LocalizedText.resolve(playerRef, REVIEW_BUTTON_KEY)
+            );
             bindEvents(eventBuilder);
         } catch (Throwable throwable) {
             TameworkTelemetryEvents.recordErrorIfAvailable(
@@ -199,8 +205,8 @@ public final class TameworkSettingsAnnouncementPage
     }
 
     @Nonnull
-    private static String normalize(@Nullable String value, @Nonnull String fallback) {
-        return value == null || value.isBlank() ? fallback : value;
+    private static String normalize(@Nonnull PlayerRef playerRef, @Nullable String value, @Nonnull String fallbackKey) {
+        return value == null || value.isBlank() ? LocalizedText.resolve(playerRef, fallbackKey) : value;
     }
 
     /** Event payload for settings announcement page actions. */

@@ -174,6 +174,8 @@ tamework.ui.settingsAnnouncement.body.intro=Ab Alec's Tamework v2.8.0+ wurden vi
 tamework.ui.settingsAnnouncement.body.defaults=Dies beinhaltet Dinge wie standardmäßig aktivierten „Hunger-/Durstschaden“ und „pro-Spieler/pro-Claim Zähmungs-/Zuchtlimits“, die für Serverbesitzer äußerst wichtig sein können.
 tamework.ui.settingsAnnouncement.body.scope=Diese Popups werden nur OPs und Spielern mit Berechtigung für /tw settings angezeigt und erscheinen nur nach größeren Änderungen, die wichtig genug sind, um sofortige Aufmerksamkeit zu erfordern.
 tamework.ui.settingsAnnouncement.optOut=Bis zur nächsten Ankündigung nicht mehr anzeigen
+tamework.ui.settingsAnnouncement.button.later=Später
+tamework.ui.settingsAnnouncement.button.review=Einstellungen überprüfen
 
 # ===== Tamework UI: Einstellungen =====
 tamework.ui.settings.preset.custom=Benutzerdefiniert
