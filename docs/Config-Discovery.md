@@ -87,3 +87,6 @@ Recipe visibility reconciliation removes disabled gated tranquilizer recipes fro
 - `TwCommandItemConfig`
 
 Other families are asset-registry driven and update through normal loaded/removed asset events.
+
+## Player-facing text
+Player-facing string fields such as talent names/descriptions/branches, trait display names, command labels/messages, interaction messages, and happiness labels may be raw text or `server.lang` keys. Prefer language keys for built-in packs and public integrations so translations can be provided under `Server/Languages/*/server.lang` without editing behavior assets.

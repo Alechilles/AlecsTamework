@@ -116,6 +116,8 @@ Common fields:
 
 Default cycle when empty: `Hold -> Idle -> Defend`.
 
+Presentation strings such as mode-cycle `Message`, `ShowFloatingText.Message`, and `ShowUiMessage.Message` may be raw text or `server.lang` keys. Use language keys for player-facing copy whenever the text should be translatable.
+
 ### Breed
 Common fields:
 - `RequireTamed`

@@ -53,6 +53,8 @@ Integrating Tamework is usually a content-authoring workflow, not a programming 
 
 In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details can be found in the wiki.
 
+Player-facing Tamework config strings support `server.lang` keys. Built-in talents, traits, command labels, interaction messages, happiness labels, and major UI labels use language keys so translation packs can override copy without changing behavior assets.
+
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)
 - [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides)
@@ -66,5 +68,4 @@ In both cases, no Java is required: copy and adapt examples, enable the systems 
 If you run into a bug, integration issue, or behavior problem, report it in the Discord server:
 
 https://discord.gg/E8n8RgTTdq
-
 

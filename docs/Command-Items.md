@@ -74,6 +74,8 @@ Each `CommandList` entry supports:
 - `ModeMapping`
 - `Steps`
 
+`DisplayName`, `Feedback.HudMessage`, and `Feedback.ChatMessage` may be raw text or `server.lang` keys. Prefer keys such as `tamework.commands.follow.name` for built-in packs and downstream mods that plan to support multiple languages.
+
 Step types:
 - `SetState`
 - `SetTarget`

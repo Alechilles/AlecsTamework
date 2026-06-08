@@ -7,6 +7,7 @@
 - Embedded Creditor so `/credits` is available from the Tamework jar and includes richer Tamework credit metadata.
 - Added a generic `TameworkAlarm` NPC sensor so assets can listen for durable Tamework alarm states without relying on base-game alarms.
 - Added `debugride`-gated mounted ride input diagnostics for tracing rider packet and fallback movement intent.
+- Added language-key support for Tamework talent, trait, command, settings, progression, interaction, and happiness UI text so translations can be provided through `Server/Languages/*/server.lang`.
 
 ### Changed
 - Moved feed-trough water refill bucket integration from full bucket item overrides into targeted asset patches, improving compatibility with other mods that edit bucket assets.
