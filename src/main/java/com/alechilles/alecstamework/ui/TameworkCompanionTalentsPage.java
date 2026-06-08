@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
@@ -139,7 +140,7 @@ public final class TameworkCompanionTalentsPage
         if (ACTION_BUY_SELECTED.equalsIgnoreCase(data.action) && purchaseCallback != null) {
             String talentId = selectedTalentId;
             if (talentId == null || talentId.isBlank()) {
-                statusMessage = "Choose a talent first.";
+                statusMessage = LocalizedText.resolve(resolveLanguage(), "tamework.ui.talents.status.chooseFirst");
             } else {
                 statusMessage = purchaseCallback.apply(talentId);
             }
@@ -319,7 +320,10 @@ public final class TameworkCompanionTalentsPage
             bindNodeState(commandBuilder, selector, entry.state());
             commandBuilder.set(selector + " #TalentNodeSelected.Visible", node.selected());
             commandBuilder.set(selector + " #TalentNodeName.Text", entry.displayName());
-            commandBuilder.set(selector + " #TalentNodeCost.Text", entry.pointCost() + " pt");
+            commandBuilder.set(
+                    selector + " #TalentNodeCost.Text",
+                    LocalizedText.format(resolveLanguage(), "tamework.ui.talents.node.cost", entry.pointCost())
+            );
             commandBuilder.set(selector + " #TalentNodeState.Text", entry.state());
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -360,7 +364,15 @@ public final class TameworkCompanionTalentsPage
             return;
         }
         commandBuilder.set("#TalentDetailName.Text", selectedEntry.displayName());
-        commandBuilder.set("#TalentDetailBranch.Text", selectedEntry.branchName() + " - Tier " + selectedEntry.tier());
+        commandBuilder.set(
+                "#TalentDetailBranch.Text",
+                LocalizedText.format(
+                        resolveLanguage(),
+                        "tamework.ui.talents.detail.branchTier",
+                        selectedEntry.branchName(),
+                        selectedEntry.tier()
+                )
+        );
         commandBuilder.set("#TalentDetailDescription.Text", selectedEntry.description());
         commandBuilder.set("#TalentDetailStatus.Text", selectedEntry.status());
         commandBuilder.set("#TalentDetailRequirements.Text", resolveRequirementText(selectedEntry));
@@ -378,9 +390,14 @@ public final class TameworkCompanionTalentsPage
     @Nonnull
     private String resolveRequirementText(@Nonnull TreeNodeEntry entry) {
         ArrayList<String> lines = new ArrayList<>();
-        lines.add("Level " + entry.minLevel());
+        lines.add(LocalizedText.format(resolveLanguage(), "tamework.ui.talents.requirement.level", entry.minLevel()));
         lines.addAll(entry.requiredTalentNames());
         return String.join("\n", lines);
+    }
+
+    @Nullable
+    private String resolveLanguage() {
+        return playerRef != null ? playerRef.getLanguage() : null;
     }
 
     private void bindNodeState(@Nonnull UICommandBuilder commandBuilder,
@@ -405,10 +422,10 @@ public final class TameworkCompanionTalentsPage
 
         public static PageData empty() {
             return new PageData(
-                    "Companion Talents",
-                    "Companion unavailable",
-                    "Talent Points: 0 available",
-                    "No companion data is available.",
+                    LocalizedText.resolve((String) null, "tamework.ui.talents.empty.title"),
+                    LocalizedText.resolve((String) null, "tamework.ui.talents.levelSummary.unavailable"),
+                    LocalizedText.format((String) null, "tamework.ui.talents.points.available", 0),
+                    LocalizedText.resolve((String) null, "tamework.ui.talents.empty.status"),
                     false,
                     List.of()
             );
@@ -446,7 +463,9 @@ public final class TameworkCompanionTalentsPage
         public TreeNodeEntry {
             requiredTalentIds = requiredTalentIds == null ? List.of() : List.copyOf(requiredTalentIds);
             requiredTalentNames = requiredTalentNames == null ? List.of() : List.copyOf(requiredTalentNames);
-            effectSummary = effectSummary == null || effectSummary.isBlank() ? "No passive effects" : effectSummary;
+            effectSummary = effectSummary == null || effectSummary.isBlank()
+                    ? LocalizedText.resolve((String) null, "tamework.ui.talents.effects.none")
+                    : effectSummary;
         }
     }
 

@@ -153,9 +153,23 @@ class TameworkCompanionTalentsPageNavigationTest {
         int end = content.indexOf("private void bindNodeState", start);
         String method = content.substring(start, end);
 
-        assertTrue(method.contains("\"Level \" + entry.minLevel()"), "Requirements should show level without extra prose.");
+        assertTrue(
+                method.contains("LocalizedText.format(resolveLanguage(), \"tamework.ui.talents.requirement.level\""),
+                "Requirements should show localized level text without extra prose."
+        );
         assertTrue(method.contains("entry.requiredTalentNames()"), "Requirements should use prerequisite display names.");
         assertTrue(method.contains("String.join(\"\\n\", lines)"), "Requirements should render one line per requirement.");
+    }
+
+    @Test
+    void talentPageOwnedTextUsesLanguageKeys() throws IOException {
+        String content = Files.readString(TALENTS_PAGE, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("LocalizedText.resolve((String) null, \"tamework.ui.talents.empty.title\")"));
+        assertTrue(content.contains("LocalizedText.format(resolveLanguage(), \"tamework.ui.talents.node.cost\""));
+        assertTrue(content.contains("LocalizedText.format(resolveLanguage(), \"tamework.ui.talents.requirement.level\""));
+        assertFalse(content.contains("Choose a talent first."));
+        assertFalse(content.contains("entry.pointCost() + \" pt\""));
     }
 
     @Test

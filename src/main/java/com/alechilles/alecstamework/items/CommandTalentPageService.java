@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -92,6 +93,7 @@ final class CommandTalentPageService {
     private TameworkCompanionTalentsPage.PageData buildTalentPageData(@Nonnull Player player,
                                                                       @Nonnull String toolId,
                                                                       @Nonnull UUID npcUuid) {
+        String language = resolveLanguage(player);
         LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
         if (context == null) {
             return TameworkCompanionTalentsPage.PageData.empty();
@@ -104,25 +106,26 @@ final class CommandTalentPageService {
         int availablePoints = CompanionTalentService.resolveAvailablePoints(context.npcRef(), context.store());
         String levelSummary;
         if (leveling == null) {
-            levelSummary = "Level data unavailable";
+            levelSummary = LocalizedText.resolve(language, "tamework.ui.talents.levelSummary.unavailable");
         } else if (leveling.atMaxLevel()) {
-            levelSummary = "Level " + leveling.level() + " (MAX)";
+            levelSummary = LocalizedText.format(language, "tamework.ui.talents.levelSummary.max", leveling.level());
         } else {
-            levelSummary = "Level "
-                    + leveling.level()
-                    + " - XP "
-                    + Math.max(0, Math.round(leveling.currentXp()))
-                    + "/"
-                    + Math.max(1, Math.round(leveling.nextLevelDeltaXp()));
+            levelSummary = LocalizedText.format(
+                    language,
+                    "tamework.ui.talents.levelSummary.xp",
+                    leveling.level(),
+                    Math.max(0, Math.round(leveling.currentXp())),
+                    Math.max(1, Math.round(leveling.nextLevelDeltaXp()))
+            );
         }
-        String pointsSummary = "Talent Points: " + availablePoints + " available";
+        String pointsSummary = LocalizedText.format(language, "tamework.ui.talents.points.available", availablePoints);
         TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(context.npcRef(), context.store());
         if (talentConfig == null || !talentConfig.isEnabled() || talentConfig.getTalents().length == 0) {
             return new TameworkCompanionTalentsPage.PageData(
                     context.displayName(),
                     levelSummary,
                     pointsSummary,
-                    "No talent tree is configured for this companion.",
+                    LocalizedText.resolve(language, "tamework.ui.talents.status.noTree"),
                     false,
                     List.of()
             );
@@ -137,43 +140,53 @@ final class CommandTalentPageService {
             }
             boolean purchased = talents != null && talents.hasPurchasedTalent(talent.getId());
             boolean levelMet = leveling != null && leveling.level() >= talent.getMinLevel();
-            String missingPrerequisite = resolveMissingPrerequisiteName(talents, talentConfig, talent);
+            String missingPrerequisite = resolveMissingPrerequisiteName(language, talents, talentConfig, talent);
             boolean prerequisitesMet = missingPrerequisite == null;
             boolean canPurchase = !purchased && levelMet && prerequisitesMet && availablePoints >= talent.getPointCost();
             String state;
             String status;
             if (purchased) {
                 state = TameworkCompanionTalentsPage.STATE_PURCHASED;
-                status = "Unlocked";
+                status = LocalizedText.resolve(language, "tamework.ui.talents.status.unlocked");
             } else if (!levelMet) {
                 state = TameworkCompanionTalentsPage.STATE_LOCKED;
-                status = "Requires Level " + talent.getMinLevel();
+                status = LocalizedText.format(language, "tamework.ui.talents.status.requiresLevel", talent.getMinLevel());
             } else if (!prerequisitesMet) {
                 state = TameworkCompanionTalentsPage.STATE_LOCKED;
-                status = "Requires " + missingPrerequisite;
+                status = LocalizedText.format(language, "tamework.ui.talents.status.requiresTalent", missingPrerequisite);
             } else if (availablePoints < talent.getPointCost()) {
                 state = TameworkCompanionTalentsPage.STATE_UNAFFORDABLE;
-                status = "Costs " + talent.getPointCost() + " points";
+                status = LocalizedText.format(language, "tamework.ui.talents.status.costsPoints", talent.getPointCost());
             } else {
                 state = TameworkCompanionTalentsPage.STATE_AVAILABLE;
-                status = "Cost " + talent.getPointCost() + " points";
+                status = LocalizedText.format(language, "tamework.ui.talents.status.costPoints", talent.getPointCost());
             }
-            String branchName = talent.getBranch() != null ? talent.getBranch() : "General";
+            String talentName = LocalizedText.resolveConfigValue(language, talent.getDisplayName(), talent.getId());
+            String talentDescription = LocalizedText.resolveConfigValue(
+                    language,
+                    talent.getDescription(),
+                    LocalizedText.resolve(language, "tamework.ui.talents.description.default")
+            );
+            String branchName = LocalizedText.resolveConfigValue(
+                    language,
+                    talent.getBranch(),
+                    LocalizedText.resolve(language, "tamework.ui.talents.branch.general")
+            );
             entries.add(new TameworkCompanionTalentsPage.TreeNodeEntry(
                     talent.getId(),
                     branchName,
                     talent.getTier(),
                     state,
-                    talent.getDisplayName(),
-                    talent.getDescription() != null ? talent.getDescription() : "Passive talent",
+                    talentName,
+                    talentDescription,
                     state + " - " + status,
                     talent.getPointCost(),
                     talent.getMinLevel(),
                     Arrays.stream(talent.getRequiresTalentIds())
                             .filter(requiredId -> requiredId != null && !requiredId.isBlank())
                             .toList(),
-                    resolvePrerequisiteNames(talentConfig, talent),
-                    summarizeEffects(talent.getEffects()),
+                    resolvePrerequisiteNames(language, talentConfig, talent),
+                    summarizeEffects(language, talent.getEffects()),
                     canPurchase
             ));
         }
@@ -201,7 +214,9 @@ final class CommandTalentPageService {
                 context.displayName(),
                 levelSummary,
                 pointsSummary,
-                entries.isEmpty() ? "No talents are configured for this companion." : "Choose a talent to inspect or unlock.",
+                entries.isEmpty()
+                        ? LocalizedText.resolve(language, "tamework.ui.talents.status.noTalentsConfigured")
+                        : LocalizedText.resolve(language, "tamework.ui.talents.status.chooseTalent"),
                 canReset,
                 entries
         );
@@ -209,26 +224,47 @@ final class CommandTalentPageService {
 
     @Nonnull
     private String summarizeEffects(@Nullable TwTalentConfig.PassiveEffect[] effects) {
+        return summarizeEffects(null, effects);
+    }
+
+    @Nonnull
+    private String summarizeEffects(@Nullable String language, @Nullable TwTalentConfig.PassiveEffect[] effects) {
         if (effects == null || effects.length == 0) {
-            return "No passive effects";
+            return LocalizedText.resolve(language, "tamework.ui.talents.effects.none");
         }
         ArrayList<String> summaries = new ArrayList<>();
         for (TwTalentConfig.PassiveEffect effect : effects) {
             if (effect == null || effect.getEffectKey() == null) {
                 continue;
             }
-            summaries.add(formatEffectKey(effect.getEffectKey()) + " " + formatMultiplierChange(effect.getMultiplier()));
+            summaries.add(LocalizedText.format(
+                    language,
+                    "tamework.ui.talents.effects.line",
+                    formatEffectKey(language, effect.getEffectKey()),
+                    formatMultiplierChange(effect.getMultiplier())
+            ));
         }
-        return summaries.isEmpty() ? "No passive effects" : String.join("\n", summaries);
+        return summaries.isEmpty()
+                ? LocalizedText.resolve(language, "tamework.ui.talents.effects.none")
+                : String.join("\n", summaries);
     }
 
     @Nonnull
     private String formatEffectKey(@Nonnull String effectKey) {
+        return formatEffectKey(null, effectKey);
+    }
+
+    @Nonnull
+    private String formatEffectKey(@Nullable String language, @Nonnull String effectKey) {
         String spaced = effectKey
                 .replace("Multiplier", "")
                 .replaceAll("([a-z])([A-Z])", "$1 $2")
                 .trim();
-        return spaced.isBlank() ? effectKey : spaced;
+        return LocalizedText.resolveConfigValue(
+                language,
+                "tamework.ui.talents.effect." + effectKey,
+                spaced.isBlank() ? effectKey : spaced
+        );
     }
 
     @Nonnull
@@ -250,7 +286,8 @@ final class CommandTalentPageService {
     }
 
     @Nonnull
-    private List<String> resolvePrerequisiteNames(@Nonnull TwTalentConfig talentConfig,
+    private List<String> resolvePrerequisiteNames(@Nullable String language,
+                                                  @Nonnull TwTalentConfig talentConfig,
                                                   @Nonnull TwTalentConfig.TalentDefinition talent) {
         ArrayList<String> names = new ArrayList<>();
         for (String requiredTalentId : talent.getRequiresTalentIds()) {
@@ -258,7 +295,9 @@ final class CommandTalentPageService {
                 continue;
             }
             TwTalentConfig.TalentDefinition prerequisite = talentConfig.findTalent(requiredTalentId);
-            names.add(prerequisite != null ? prerequisite.getDisplayName() : requiredTalentId.trim());
+            names.add(prerequisite != null
+                    ? LocalizedText.resolveConfigValue(language, prerequisite.getDisplayName(), requiredTalentId.trim())
+                    : requiredTalentId.trim());
         }
         return names;
     }
@@ -315,7 +354,8 @@ final class CommandTalentPageService {
     }
 
     @Nullable
-    private String resolveMissingPrerequisiteName(@Nullable TameworkTalentsComponent talents,
+    private String resolveMissingPrerequisiteName(@Nullable String language,
+                                                  @Nullable TameworkTalentsComponent talents,
                                                   @Nonnull TwTalentConfig talentConfig,
                                                   @Nonnull TwTalentConfig.TalentDefinition talent) {
         for (String requiredTalentId : talent.getRequiresTalentIds()) {
@@ -326,9 +366,17 @@ final class CommandTalentPageService {
                 continue;
             }
             TwTalentConfig.TalentDefinition prerequisite = talentConfig.findTalent(requiredTalentId);
-            return prerequisite != null ? prerequisite.getDisplayName() : requiredTalentId;
+            return prerequisite != null
+                    ? LocalizedText.resolveConfigValue(language, prerequisite.getDisplayName(), requiredTalentId)
+                    : requiredTalentId;
         }
         return null;
+    }
+
+    @Nullable
+    private static String resolveLanguage(@Nonnull Player player) {
+        PlayerRef playerRef = player.getPlayerRef();
+        return playerRef != null ? playerRef.getLanguage() : null;
     }
 
     @Nullable

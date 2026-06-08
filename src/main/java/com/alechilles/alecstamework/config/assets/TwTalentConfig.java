@@ -65,14 +65,14 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
                     (definition, value) -> definition.displayName = value,
                     definition -> definition.displayName
             )
-            .documentation("Player-facing talent name.")
+            .documentation("Player-facing talent name. May be raw text or a server.lang key.")
             .add()
             .<String>append(
                     new KeyedCodec<>("Description", Codec.STRING),
                     (definition, value) -> definition.description = value,
                     definition -> definition.description
             )
-            .documentation("Player-facing talent description.")
+            .documentation("Player-facing talent description. May be raw text or a server.lang key.")
             .add()
             .<String>append(
                     new KeyedCodec<>("IconPath", Codec.STRING),
@@ -93,7 +93,7 @@ public final class TwTalentConfig implements JsonAssetWithMap<String, DefaultAss
                     (definition, value) -> definition.branch = value,
                     definition -> definition.branch
             )
-            .documentation("Optional branch label used by the talent UI.")
+            .documentation("Optional branch label used by the talent UI. May be raw text or a server.lang key.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("PointCost", Codec.INTEGER),

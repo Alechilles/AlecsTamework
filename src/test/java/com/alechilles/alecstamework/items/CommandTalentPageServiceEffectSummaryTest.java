@@ -5,8 +5,13 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandTalentPageServiceEffectSummaryTest {
 
@@ -29,6 +34,19 @@ class CommandTalentPageServiceEffectSummaryTest {
         );
 
         assertEquals("Max Health +4%\nRevive Cooldown -15%\nMove Speed +3.5%", summary);
+    }
+
+    @Test
+    void serviceUsesLocalizedTextForTalentPresentation() throws Exception {
+        String content = Files.readString(
+                Path.of("src/main/java/com/alechilles/alecstamework/items/CommandTalentPageService.java"),
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(content.contains("LocalizedText.resolveConfigValue(language"));
+        assertTrue(content.contains("LocalizedText.format(language, \"tamework.ui.talents.levelSummary"));
+        assertTrue(content.contains("LocalizedText.format(language, \"tamework.ui.talents.status"));
+        assertFalse(content.contains("\"Passive talent\""));
     }
 
     private static TwTalentConfig.PassiveEffect effect(String effectKey, double multiplier) throws Exception {
