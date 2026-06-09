@@ -3,9 +3,11 @@ package com.alechilles.alecstamework.npc.actions;
 import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.asset.builder.InstructionType;
 import com.hypixel.hytale.server.npc.asset.builder.holder.BooleanHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringArrayHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
+import java.util.EnumSet;
 
 /**
  * Builder for ActionTameworkInteract.
@@ -92,6 +94,7 @@ public class BuilderActionTameworkInteract extends TameworkActionBuilderBase {
                 "Optional debug label describing which asset branch invoked the interaction.",
                 "Used for runtime diagnostics when multiple sensors route into TameworkInteract."
         );
+        requireInstructionType(EnumSet.of(InstructionType.Interaction));
         return this;
     }
 
