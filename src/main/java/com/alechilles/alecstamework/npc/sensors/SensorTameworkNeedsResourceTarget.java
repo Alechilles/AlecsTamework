@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.WaterTargetSearchResult;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
@@ -33,7 +34,7 @@ import javax.annotation.Nullable;
 public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase {
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
-    private static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
+    private static final long TARGET_CACHE_MISS_TTL_MS = 3_000L;
     private static final double EPSILON = 0.000001;
 
     private final ResourceType resourceType;
@@ -190,43 +191,66 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
         int verticalScanRadius = passiveRefill.getWaterVerticalScanRadius();
         double consumeRadius = passiveRefill.getWaterConsumeRadius();
-        Vector3d target = ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(
+        WaterTargetSearchResult primaryResult = ENVIRONMENT_SERVICE.findNearestWaterDrinkingTarget(
                 ref,
                 store,
                 range,
                 verticalScanRadius,
                 consumeRadius
         );
-        if (target != null) {
-            return TargetResolution.of(target, "water_target_search_primary");
-        }
-        if (ENVIRONMENT_SERVICE.isNearWater(ref, store, needsConfig)) {
-            return TargetResolution.of(resolveCurrentPosition(ref, store), "water_already_in_consume_range");
-        }
-        if (ENVIRONMENT_SERVICE.hasConsumableWaterSourceInRange(ref, store, range, verticalScanRadius)) {
-            return TargetResolution.none("water_source_found_but_no_stand_target");
+        TargetResolution primaryResolution = resolveWaterSearchResult(
+                primaryResult,
+                "water_target_search_primary",
+                "water_already_in_consume_range",
+                "water_source_found_but_no_stand_target",
+                ref,
+                store
+        );
+        if (primaryResolution.isResolved()) {
+            return primaryResolution;
         }
         double fallbackRange = passiveRefill.getWaterSearchRadius();
-        if (fallbackRange <= 0.0 || approximatelyEqual(fallbackRange, range)) {
+        if (!shouldRunFallbackWaterSearch(range, fallbackRange)) {
             return TargetResolution.none("water_target_not_found");
         }
-        target = ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(
+        WaterTargetSearchResult fallbackResult = ENVIRONMENT_SERVICE.findNearestWaterDrinkingTarget(
                 ref,
                 store,
                 fallbackRange,
                 verticalScanRadius,
                 consumeRadius
         );
-        if (target != null) {
-            return TargetResolution.of(target, "water_target_search_fallback");
-        }
-        if (ENVIRONMENT_SERVICE.isNearWater(ref, store, needsConfig)) {
-            return TargetResolution.of(resolveCurrentPosition(ref, store), "water_in_consume_range_after_fallback");
-        }
-        if (ENVIRONMENT_SERVICE.hasConsumableWaterSourceInRange(ref, store, fallbackRange, verticalScanRadius)) {
-            return TargetResolution.none("water_source_found_but_no_stand_target_fallback");
+        TargetResolution fallbackResolution = resolveWaterSearchResult(
+                fallbackResult,
+                "water_target_search_fallback",
+                "water_in_consume_range_after_fallback",
+                "water_source_found_but_no_stand_target_fallback",
+                ref,
+                store
+        );
+        if (fallbackResolution.isResolved()) {
+            return fallbackResolution;
         }
         return TargetResolution.none("water_target_not_found");
+    }
+
+    @Nonnull
+    private TargetResolution resolveWaterSearchResult(@Nonnull WaterTargetSearchResult result,
+                                                      @Nonnull String targetReason,
+                                                      @Nonnull String consumeRangeReason,
+                                                      @Nonnull String noStandReason,
+                                                      @Nonnull Ref<EntityStore> ref,
+                                                      @Nonnull Store<EntityStore> store) {
+        if (result.target() != null) {
+            return TargetResolution.of(result.target(), targetReason);
+        }
+        if (result.foundConsumableSourceInConsumeRange()) {
+            return TargetResolution.of(resolveCurrentPosition(ref, store), consumeRangeReason);
+        }
+        if (result.foundConsumableSource()) {
+            return TargetResolution.none(noStandReason);
+        }
+        return TargetResolution.unresolved();
     }
 
     @Nullable
@@ -477,11 +501,21 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                              @Nullable Vector3d target,
                              @Nonnull String reason,
                              long nowMs) {
-        long ttlMs = target != null ? TARGET_CACHE_HIT_TTL_MS : TARGET_CACHE_MISS_TTL_MS;
+        long ttlMs = targetCacheTtlMs(target != null);
         cachedTargetsByNpcId.put(
                 npcUuid,
                 new CachedTargetResult(target != null ? new Vector3d(target) : null, reason, nowMs + ttlMs)
         );
+    }
+
+    static boolean shouldRunFallbackWaterSearch(double primaryRange, double fallbackRange) {
+        return Double.isFinite(fallbackRange)
+                && fallbackRange > 0.0
+                && (!Double.isFinite(primaryRange) || fallbackRange > primaryRange + EPSILON);
+    }
+
+    static long targetCacheTtlMs(boolean hasTarget) {
+        return hasTarget ? TARGET_CACHE_HIT_TTL_MS : TARGET_CACHE_MISS_TTL_MS;
     }
 
     private long resolveCurrentTimeMs() {
@@ -554,6 +588,15 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         @Nonnull
         private static TargetResolution none(@Nonnull String reason) {
             return new TargetResolution(null, reason);
+        }
+
+        @Nonnull
+        private static TargetResolution unresolved() {
+            return new TargetResolution(null, "unresolved");
+        }
+
+        private boolean isResolved() {
+            return target != null || !"unresolved".equals(reason);
         }
     }
 
