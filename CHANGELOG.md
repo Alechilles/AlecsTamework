@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.14.0 - Localization and Runtime Polish - 2026-06-09
+
+### Added
+- Added language-key support for Tamework talent, trait, command, settings, progression, interaction, and happiness UI text so translations can be provided through `Server/Languages/*/server.lang`.
+- Added bundled French (France), French (Canada), and Brazilian Portuguese `server.lang` translations for Tamework UI, item, config, and notification text.
+
+### Changed
+- Reduced needs water target scanning churn so companion water searches resolve candidate item IDs and refill container checks more narrowly.
+
+### Fixed
+- Fixed ridden flying mounts so collision recovery clears blocked motion and prevents mounts from getting stuck after hitting terrain.
+- Fixed Java-built Tamework UI text, including companion talent effect rows and settings pages, so non-English `server.lang` fallbacks use the player's language instead of bundled English.
+- Fixed asset patches so archived mods such as DynamicSeasons can be used as the source asset for generated patched bucket assets.
+
 ## 2.13.3 - Harvest Timer and Asset Pack Hotfix - 2026-06-07
 
 ### Added
@@ -7,8 +21,6 @@
 - Embedded Creditor so `/credits` is available from the Tamework jar and includes richer Tamework credit metadata.
 - Added a generic `TameworkAlarm` NPC sensor so assets can listen for durable Tamework alarm states without relying on base-game alarms.
 - Added `debugride`-gated mounted ride input diagnostics for tracing rider packet and fallback movement intent.
-- Added language-key support for Tamework talent, trait, command, settings, progression, interaction, and happiness UI text so translations can be provided through `Server/Languages/*/server.lang`.
-- Added bundled French (France), French (Canada), and Brazilian Portuguese `server.lang` translations for Tamework UI, item, config, and notification text.
 
 ### Changed
 - Moved feed-trough water refill bucket integration from full bucket item overrides into targeted asset patches, improving compatibility with other mods that edit bucket assets.
@@ -18,7 +30,6 @@
 - Fixed harvest cooldown setup so optimized milk and container harvest interactions resolve the animal's configured `HarvestTimeout`, refuse to overwrite an active harvest cooldown, reject missing or zero-length harvest timers, and apply the cooldown gate before handing out milk or other harvest rewards.
 - Fixed optimized milk and container harvests so their cooldown survives harvest state transitions and prevents repeated immediate milking until the configured world-time cooldown expires.
 - Fixed milk and container harvest bonus procs so `CooldownPreserve` resolves role-specific `HarvestBonusMode` settings before deciding whether to skip the harvest cooldown.
-- Fixed Java-built Tamework UI text, including companion talent effect rows, so non-English `server.lang` fallbacks use the player's language instead of falling back to bundled English.
 
 ## 2.13.2 - Companion Instant-Death and Diagnostics Fixes - 2026-06-05
 
