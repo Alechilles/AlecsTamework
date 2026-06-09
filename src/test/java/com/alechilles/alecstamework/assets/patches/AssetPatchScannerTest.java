@@ -9,6 +9,8 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import com.hypixel.hytale.assetstore.AssetPack;
 import org.junit.jupiter.api.Test;
@@ -235,10 +237,39 @@ final class AssetPatchScannerTest {
         assertEquals("Override", resolver.readAsset(source).get("Name").getAsString());
     }
 
+    @Test
+    void targetResolverReadsWinningSourceFromArchivedPack() throws Exception {
+        Path baseRoot = tempDir.resolve("base-pack");
+        Path overrideJar = tempDir.resolve("DynamicSeasons-5.0.4.jar");
+        String target = "Server/Item/Items/Container/Container_Bucket.json";
+        writeTemplate(baseRoot, target, "Base Bucket");
+        writeArchiveEntry(overrideJar, target, "{ \"Name\": \"DynamicSeasons Bucket\", \"BlockType\": { \"TickProcedure\": {} } }");
+
+        AssetPatchTargetResolver resolver = new AssetPatchTargetResolver();
+        AssetPatchTargetResolver.TargetSource source = resolver.resolve(
+                List.of(pack("Base", baseRoot), pack("BlueOrbit:DynamicSeasons", overrideJar)),
+                "GeneratedPack",
+                target
+        );
+
+        assertNotNull(source);
+        assertEquals("BlueOrbit:DynamicSeasons", source.packId());
+        assertEquals("DynamicSeasons Bucket", resolver.readAsset(source).get("Name").getAsString());
+        assertTrue(resolver.readAsset(source).getAsJsonObject("BlockType").has("TickProcedure"));
+    }
+
     private static void writeTemplate(Path root, String target, String name) throws Exception {
         Path output = root.resolve(target);
         Files.createDirectories(output.getParent());
         Files.writeString(output, "{ \"Name\": \"" + name + "\" }", StandardCharsets.UTF_8);
+    }
+
+    private static void writeArchiveEntry(Path archive, String target, String json) throws Exception {
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(archive))) {
+            output.putNextEntry(new ZipEntry(target));
+            output.write(json.getBytes(StandardCharsets.UTF_8));
+            output.closeEntry();
+        }
     }
 
     private static AssetPack pack(String name, Path root) {
