@@ -247,8 +247,15 @@ if ($DryRun) {
         Write-Host "Note: curseforge.gameVersionTypeIds is empty in $ConfigPath."
     }
     if ($requiredProjects.Count -gt 0) {
-        $projectSummary = @($requiredProjects | ForEach-Object { "$($_.id):$($_.slug)" }) -join ", "
-        Write-Host "Required dependency projects: $projectSummary"
+        $projectSummary = @($requiredProjects | ForEach-Object {
+            $relationType = if ($_.PSObject.Properties["type"] -and -not [string]::IsNullOrWhiteSpace("$($_.type)")) {
+                "$($_.type)"
+            } else {
+                "requiredDependency"
+            }
+            "$($_.id):$($_.slug):$relationType"
+        }) -join ", "
+        Write-Host "CurseForge relation projects: $projectSummary"
     } elseif ($requiredProjectIds.Count -gt 0) {
         Write-Host "Required dependency project IDs (legacy): $($requiredProjectIds -join ', ')"
     }

@@ -15,7 +15,18 @@
     "releaseType": "release",
     "changelogType": "html",
     "gameVersionTypeIds": [65437],
-    "requiredProjects": []
+    "requiredProjects": [
+      {
+        "id": 1560961,
+        "slug": "creditor",
+        "type": "embeddedLibrary"
+      },
+      {
+        "id": 1520383,
+        "slug": "alecs-telemetry",
+        "type": "embeddedLibrary"
+      }
+    ]
   },
   "modtale": {
     "projectId": "3145c0f3-a890-49b3-bc87-0648b8bd736c",
