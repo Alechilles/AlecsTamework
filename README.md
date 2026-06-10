@@ -69,3 +69,8 @@ If you run into a bug, integration issue, or behavior problem, report it in the 
 
 https://discord.gg/E8n8RgTTdq
 
+<H2>Telemetry</H2>
+<a><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> utilizes <a href="https://www.curseforge.com/hytale/mods/alecs-telemetry>"> Alec's Telemetry</a> to report crash, error, performance, and usage telemetry data to the developer.</p>
+<p>This data does <strong>not</strong> contain any personally identifiable information, and is exclusively used to diagnose issues in the mod to provide a better user experience.</p>
+<p>You may disable this feature at any time in the `/tw settings` menu in the Telemetry section.</p>
+
