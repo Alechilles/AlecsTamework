@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.TargetRejector;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.WaterTargetSearchResult;
+import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
+import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
@@ -34,6 +36,7 @@ import javax.annotation.Nullable;
  */
 public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase {
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
+    private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE = new NeedsResourcePathPreflightService();
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     private static final long TARGET_CACHE_MISS_TTL_MS = 3_000L;
     private static final double REJECTED_TARGET_DEFAULT_TTL_SECONDS = 30.0;
@@ -142,10 +145,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig, npcUuid, nowMs);
         };
         Vector3d target = resolution.target();
-        if (npcUuid != null) {
-            cacheTarget(npcUuid, target, resolution.reason(), nowMs);
-        }
         if (target == null) {
+            if (npcUuid != null) {
+                cacheTarget(npcUuid, null, resolution.reason(), nowMs);
+            }
             maybeLog(
                     ref,
                     store,
@@ -159,6 +162,51 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     null
             );
             return false;
+        }
+        if (npcUuid == null) {
+            maybeLog(
+                    ref,
+                    store,
+                    npcId,
+                    roleId,
+                    resolveResourceLabel(),
+                    "miss",
+                    "path_preflight_npc_uuid_missing",
+                    false,
+                    eligibility.currentRatio(),
+                    target
+            );
+            return false;
+        }
+        PathPreflightResult preflight = PATH_PREFLIGHT_SERVICE.preflight(
+                ref,
+                role,
+                store,
+                npcUuid,
+                resolveResourceLabel(),
+                target,
+                nowMs
+        );
+        if (!preflight.ready()) {
+            if (preflight.noPath()) {
+                rejectTarget(npcUuid, resourceType, target, REJECTED_TARGET_DEFAULT_TTL_SECONDS, nowMs);
+            }
+            maybeLog(
+                    ref,
+                    store,
+                    npcId,
+                    roleId,
+                    resolveResourceLabel(),
+                    "miss",
+                    preflight.reason(),
+                    false,
+                    eligibility.currentRatio(),
+                    target
+            );
+            return false;
+        }
+        if (npcUuid != null) {
+            cacheTarget(npcUuid, target, resolution.reason(), nowMs);
         }
         positionInfo.setTarget(target.x, target.y, target.z);
         maybeLog(
