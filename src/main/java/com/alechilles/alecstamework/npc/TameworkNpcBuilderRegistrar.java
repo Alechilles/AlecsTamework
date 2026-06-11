@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPrompt;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResourceConsume;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResourceRejectTarget;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkRejectPositionTarget;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetFlyingCompanionMode;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
@@ -34,6 +35,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIs
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkLifeStage;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedBelow;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkReachableBlockTarget;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.event.PluginSetupEvent;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -113,6 +115,10 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderActionTameworkNeedsResourceRejectTarget::new
             );
             actionFactory.add(
+                    BuilderActionTameworkRejectPositionTarget.BUILDER_ID,
+                    BuilderActionTameworkRejectPositionTarget::new
+            );
+            actionFactory.add(
                     BuilderActionTameworkSetFlyingCompanionMode.BUILDER_ID,
                     BuilderActionTameworkSetFlyingCompanionMode::new
             );
@@ -134,6 +140,10 @@ public final class TameworkNpcBuilderRegistrar {
             sensorFactory.add(BuilderSensorTameworkEffectActive.BUILDER_ID, BuilderSensorTameworkEffectActive::new);
             sensorFactory.add(BuilderSensorTameworkNeedBelow.BUILDER_ID, BuilderSensorTameworkNeedBelow::new);
             sensorFactory.add(BuilderSensorTameworkNeedsResourceTarget.BUILDER_ID, BuilderSensorTameworkNeedsResourceTarget::new);
+            sensorFactory.add(
+                    BuilderSensorTameworkReachableBlockTarget.BUILDER_ID,
+                    BuilderSensorTameworkReachableBlockTarget::new
+            );
         }
 
         BuilderFactory<IEntityFilter> filterFactory = npcPlugin.getBuilderManager().getFactory(IEntityFilter.class);

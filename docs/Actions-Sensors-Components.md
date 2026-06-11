@@ -14,6 +14,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkSetTamed`: Sets/clears tamed state.
 - `TameworkNeedsResourceConsume`: Consumes configured needs resource targets (food/water seek flows).
 - `TameworkNeedsResourceRejectTarget`: Temporarily suppresses a failed needs seek target so later scans can choose another reachable source.
+- `TameworkRejectPositionTarget`: Temporarily suppresses a failed generic position target for the current NPC.
 - `TameworkHarvestDrop`: Drops harvest outputs with trait-aware bonus support.
 - `TameworkDebugMessage`: Emits debug text from instruction flows.
 
@@ -27,6 +28,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkEffectActive` (checks active `EntityEffect` with optional `MinRemainingSeconds`)
 - `TameworkNeedBelow`
 - `TameworkNeedsResourceTarget`
+- `TameworkReachableBlockTarget` (finds a matching block set or exact block type, exposes a projected and path-preflighted approach position)
 
 `TameworkHook` context fields:
 - `HookId`

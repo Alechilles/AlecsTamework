@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Added reusable NPC position-target rejection and a generic reachable block target sensor/action so downstream animal behaviors can preflight block-seeking destinations before entering movement.
 - Improved companion food and water seeking so NPCs use bounded motion-controller projection to choose reachable trough and water stand targets, including diagonal approach positions, while keeping existing needs search caching and consume behavior.
 - Tightened needs-seek movement so projected food and water stand targets stay pathfinder-first until consume range and must be directly reachable before completion, preventing companions from walking into walls around blocked resources.
 - Needs seek now respects failed-seek cooldowns before re-entering movement, can re-scan from resting Hold states, and temporarily skips failed targets so blocked food or water sources do not trap companions in Idle/NeedsSeek loops.

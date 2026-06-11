@@ -13,13 +13,13 @@ import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
 /**
- * Selects bounded nearby stand targets for NPC need resources using the active motion controller's
+ * Selects bounded nearby stand targets for NPC block-like targets using the active motion controller's
  * accessible-position projection.
  */
-final class NeedsResourceStandTargetSelector {
+public final class NeedsResourceStandTargetSelector {
 
-    static final int MAX_HORIZONTAL_OFFSET = 2;
-    static final double MIN_ADJACENT_DISTANCE = Math.sqrt(2.0) + 0.000001;
+    public static final int MAX_HORIZONTAL_OFFSET = 2;
+    public static final double MIN_ADJACENT_DISTANCE = Math.sqrt(2.0) + 0.000001;
 
     private static final double SOURCE_CENTER_OFFSET = 0.5;
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
@@ -31,7 +31,7 @@ final class NeedsResourceStandTargetSelector {
     private final Vector3d scratchCandidate = new Vector3d();
 
     @Nullable
-    CandidateProjector createProjector(@Nullable Role role, @Nullable Store<EntityStore> store) {
+    public CandidateProjector createProjector(@Nullable Role role, @Nullable Store<EntityStore> store) {
         if (role == null || store == null) {
             return null;
         }
@@ -56,7 +56,7 @@ final class NeedsResourceStandTargetSelector {
     }
 
     @Nullable
-    Vector3d findNearestProjectedTarget(
+    public Vector3d findNearestProjectedTarget(
         int sourceX,
         int sourceY,
         int sourceZ,
@@ -108,11 +108,11 @@ final class NeedsResourceStandTargetSelector {
         return found ? new Vector3d(bestX, bestY, bestZ) : null;
     }
 
-    static int maxCandidateCount() {
+    public static int maxCandidateCount() {
         return CANDIDATE_OFFSETS.length;
     }
 
-    static boolean hasDiagonalAdjacentCandidate() {
+    public static boolean hasDiagonalAdjacentCandidate() {
         for (CandidateOffset offset : CANDIDATE_OFFSETS) {
             if (Math.abs(offset.dx) == 1 && Math.abs(offset.dz) == 1 && offset.dy == 0) {
                 return true;
@@ -148,7 +148,7 @@ final class NeedsResourceStandTargetSelector {
     }
 
     @FunctionalInterface
-    interface CandidateProjector {
+    public interface CandidateProjector {
         boolean project(@Nonnull Vector3d candidate, double minY, double maxY);
     }
 

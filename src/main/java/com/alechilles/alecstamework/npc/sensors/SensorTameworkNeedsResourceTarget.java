@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentSer
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
+import com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
@@ -39,10 +40,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE = new NeedsResourcePathPreflightService();
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     private static final long TARGET_CACHE_MISS_TTL_MS = 3_000L;
-    private static final double REJECTED_TARGET_DEFAULT_TTL_SECONDS = 30.0;
-    private static final int REJECTED_TARGET_MAX_ENTRIES = 4096;
     private static final double EPSILON = 0.000001;
-    private static final ConcurrentHashMap<RejectedTargetKey, Long> rejectedTargets = new ConcurrentHashMap<>();
 
     private final ResourceType resourceType;
     @Nullable
@@ -189,7 +187,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         );
         if (!preflight.ready()) {
             if (preflight.noPath()) {
-                rejectTarget(npcUuid, resourceType, target, REJECTED_TARGET_DEFAULT_TTL_SECONDS, nowMs);
+                rejectTarget(npcUuid, resourceType, target, PositionTargetRejectCache.DEFAULT_TTL_SECONDS, nowMs);
             }
             maybeLog(
                     ref,
@@ -620,13 +618,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (npcUuid == null || target == null || !isFinite(target)) {
             return false;
         }
-        double ttlSeconds = Double.isFinite(suppressSeconds) && suppressSeconds > 0.0
-                ? suppressSeconds
-                : REJECTED_TARGET_DEFAULT_TTL_SECONDS;
-        long ttlMs = Math.max(1L, (long) Math.ceil(ttlSeconds * 1000.0));
-        rejectedTargets.put(RejectedTargetKey.from(npcUuid, type, target), nowMs + ttlMs);
-        cleanupRejectedTargets(nowMs);
-        return true;
+        return PositionTargetRejectCache.reject(npcUuid, typeLabel(type), target, suppressSeconds, nowMs);
     }
 
     static boolean rejectTargetForTests(@Nullable UUID npcUuid,
@@ -649,16 +641,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (npcUuid == null || target == null || !isFinite(target)) {
             return false;
         }
-        RejectedTargetKey key = RejectedTargetKey.from(npcUuid, type, target);
-        Long expiresAtMs = rejectedTargets.get(key);
-        if (expiresAtMs == null) {
-            return false;
-        }
-        if (nowMs >= expiresAtMs) {
-            rejectedTargets.remove(key, expiresAtMs);
-            return false;
-        }
-        return true;
+        return PositionTargetRejectCache.isRejected(npcUuid, typeLabel(type), target, nowMs);
     }
 
     static boolean isTargetRejectedForTests(@Nullable UUID npcUuid,
@@ -681,58 +664,19 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static boolean hasRejectedTargetFor(@Nullable UUID npcUuid,
                                                 @Nonnull ResourceType type,
                                                 long nowMs) {
-        if (npcUuid == null || rejectedTargets.isEmpty()) {
-            return false;
-        }
-        boolean found = false;
-        for (var entry : rejectedTargets.entrySet()) {
-            RejectedTargetKey key = entry.getKey();
-            Long expiresAtMs = entry.getValue();
-            if (key == null || expiresAtMs == null || nowMs >= expiresAtMs) {
-                if (key != null && expiresAtMs != null) {
-                    rejectedTargets.remove(key, expiresAtMs);
-                }
-                continue;
-            }
-            if (key.npcUuid().equals(npcUuid) && key.resourceType() == type) {
-                found = true;
-            }
-        }
-        return found;
-    }
-
-    private static void cleanupRejectedTargets(long nowMs) {
-        if (rejectedTargets.size() < REJECTED_TARGET_MAX_ENTRIES) {
-            return;
-        }
-        rejectedTargets.entrySet().removeIf(entry -> entry == null
-                || entry.getKey() == null
-                || entry.getValue() == null
-                || nowMs >= entry.getValue());
-        int excess = rejectedTargets.size() - REJECTED_TARGET_MAX_ENTRIES;
-        if (excess <= 0) {
-            return;
-        }
-        for (RejectedTargetKey key : rejectedTargets.keySet()) {
-            if (excess <= 0) {
-                return;
-            }
-            if (rejectedTargets.remove(key) != null) {
-                excess--;
-            }
-        }
+        return PositionTargetRejectCache.hasRejectedTargetFor(npcUuid, typeLabel(type), nowMs);
     }
 
     static void clearRejectedTargetsForTests() {
-        rejectedTargets.clear();
+        PositionTargetRejectCache.clearForTests();
     }
 
     static int rejectedTargetCountForTests() {
-        return rejectedTargets.size();
+        return PositionTargetRejectCache.countForTests();
     }
 
     static int rejectedTargetMaxEntriesForTests() {
-        return REJECTED_TARGET_MAX_ENTRIES;
+        return PositionTargetRejectCache.MAX_ENTRIES;
     }
 
     private static boolean isFinite(@Nonnull Vector3d vector) {
@@ -743,6 +687,11 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return rawResourceType == null
                 || rawResourceType.trim().isEmpty()
                 || "Auto".equalsIgnoreCase(rawResourceType.trim());
+    }
+
+    @Nonnull
+    private static String typeLabel(@Nonnull ResourceType type) {
+        return type == ResourceType.FOOD_CONTAINER ? "FoodContainer" : "Water";
     }
 
     private long resolveCurrentTimeMs() {
@@ -798,25 +747,6 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     configId == null || configId.isBlank() ? "<default>" : configId.trim().toLowerCase(Locale.ROOT),
                     List.of(passiveItemIds),
                     hasConfiguredItemIds
-            );
-        }
-    }
-
-    private record RejectedTargetKey(@Nonnull UUID npcUuid,
-                                     @Nonnull ResourceType resourceType,
-                                     int blockX,
-                                     int blockY,
-                                     int blockZ) {
-        @Nonnull
-        private static RejectedTargetKey from(@Nonnull UUID npcUuid,
-                                              @Nonnull ResourceType resourceType,
-                                              @Nonnull Vector3d target) {
-            return new RejectedTargetKey(
-                    npcUuid,
-                    resourceType,
-                    (int) Math.floor(target.x),
-                    (int) Math.floor(target.y),
-                    (int) Math.floor(target.z)
             );
         }
     }
