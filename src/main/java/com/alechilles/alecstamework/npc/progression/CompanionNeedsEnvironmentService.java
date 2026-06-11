@@ -46,6 +46,11 @@ public final class CompanionNeedsEnvironmentService {
             ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
     private static final ConcurrentHashMap<NeedsSearchCacheKey, CachedSearchResult> SEARCH_CACHE = new ConcurrentHashMap<>();
 
+    @FunctionalInterface
+    public interface TargetRejector {
+        boolean rejects(@Nonnull Vector3d target);
+    }
+
     enum ContainerConsumeStatus {
         SUCCESS,
         INVALID_CONTEXT,
@@ -410,6 +415,17 @@ public final class CompanionNeedsEnvironmentService {
                                                                   double radius,
                                                                   int verticalScanRadius,
                                                                   double consumeRadius) {
+        return findNearestWaterDrinkingTarget(npcRef, role, store, radius, verticalScanRadius, consumeRadius, null);
+    }
+
+    @Nonnull
+    public WaterTargetSearchResult findNearestWaterDrinkingTarget(@Nullable Ref<EntityStore> npcRef,
+                                                                  @Nullable Role role,
+                                                                  @Nullable Store<EntityStore> store,
+                                                                  double radius,
+                                                                  int verticalScanRadius,
+                                                                  double consumeRadius,
+                                                                  @Nullable TargetRejector targetRejector) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return WaterTargetSearchResult.miss(false);
         }
@@ -432,9 +448,11 @@ public final class CompanionNeedsEnvironmentService {
                 consumeRadius,
                 null
         );
-        WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(cacheKey, nowMs);
-        if (cachedResult != null) {
-            return cachedResult;
+        if (targetRejector == null) {
+            WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(cacheKey, nowMs);
+            if (cachedResult != null) {
+                return cachedResult;
+            }
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
@@ -464,7 +482,8 @@ public final class CompanionNeedsEnvironmentService {
                 1.0,
                 radiusSq,
                 chunkCache,
-                standProjector
+                standProjector,
+                targetRejector
         );
         if (bestResult.target() == null && consumeRadius > 1.0 + SCORE_EPSILON) {
             WaterTargetSearchResult expandedResult = findNearestWaterTarget(
@@ -479,11 +498,14 @@ public final class CompanionNeedsEnvironmentService {
                     consumeRadius,
                     radiusSq,
                     chunkCache,
-                    standProjector
+                    standProjector,
+                    targetRejector
             );
             bestResult = WaterTargetSearchResult.mergeMissMetadata(bestResult, expandedResult);
         }
-        cacheWaterSearchResult(cacheKey, bestResult, nowMs);
+        if (targetRejector == null) {
+            cacheWaterSearchResult(cacheKey, bestResult, nowMs);
+        }
         return bestResult;
     }
 
@@ -499,7 +521,8 @@ public final class CompanionNeedsEnvironmentService {
                                                                   double consumeRadius,
                                                                   double radiusSq,
                                                                   @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                  @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector) {
+                                                                  @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
+                                                                  @Nullable TargetRejector targetRejector) {
         boolean foundConsumableSource = false;
         boolean foundConsumableSourceInConsumeRange = false;
         for (int horizontalRadius = 0; horizontalRadius <= searchRadius; horizontalRadius++) {
@@ -515,7 +538,8 @@ public final class CompanionNeedsEnvironmentService {
                     consumeRadius,
                     radiusSq,
                     chunkCache,
-                    standProjector
+                    standProjector,
+                    targetRejector
             );
             foundConsumableSource |= ringResult.foundConsumableSource();
             foundConsumableSourceInConsumeRange |= ringResult.foundConsumableSourceInConsumeRange();
@@ -654,6 +678,17 @@ public final class CompanionNeedsEnvironmentService {
                                                      double radius,
                                                      @Nullable String[] allowedItemIds,
                                                      int verticalScanRadius) {
+        return findNearestFoodContainerPosition(npcRef, role, store, radius, allowedItemIds, verticalScanRadius, null);
+    }
+
+    @Nullable
+    public Vector3d findNearestFoodContainerPosition(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Role role,
+                                                     @Nullable Store<EntityStore> store,
+                                                     double radius,
+                                                     @Nullable String[] allowedItemIds,
+                                                     int verticalScanRadius,
+                                                     @Nullable TargetRejector targetRejector) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return null;
         }
@@ -680,9 +715,11 @@ public final class CompanionNeedsEnvironmentService {
                 0.0,
                 allowedFoods
         );
-        Vector3d cachedTarget = getCachedSearchTarget(cacheKey, nowMs);
-        if (cachedTarget != CACHE_MISS) {
-            return cachedTarget;
+        if (targetRejector == null) {
+            Vector3d cachedTarget = getCachedSearchTarget(cacheKey, nowMs);
+            if (cachedTarget != CACHE_MISS) {
+                return cachedTarget;
+            }
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
@@ -713,10 +750,13 @@ public final class CompanionNeedsEnvironmentService {
                     radiusSq,
                     allowedFoods,
                     chunkCache,
-                    standProjector
+                    standProjector,
+                    targetRejector
             );
         }
-        cacheSearchTarget(cacheKey, bestTarget, nowMs);
+        if (targetRejector == null) {
+            cacheSearchTarget(cacheKey, bestTarget, nowMs);
+        }
         return bestTarget;
     }
 
@@ -791,10 +831,11 @@ public final class CompanionNeedsEnvironmentService {
                                                                                   int blockZ,
                                                                                   int horizontalRadius,
                                                                                   int verticalScanRadius,
-                                                                                  double consumeRadius,
-                                                                                  double radiusSq,
-                                                                                  @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                                  @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector) {
+                                                                                   double consumeRadius,
+                                                                                   double radiusSq,
+                                                                                   @Nonnull Map<Long, WorldChunk> chunkCache,
+                                                                                   @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
+                                                                                   @Nullable TargetRejector targetRejector) {
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
         boolean foundConsumableSource = false;
@@ -838,6 +879,9 @@ public final class CompanionNeedsEnvironmentService {
                     if (standPosition == null) {
                         continue;
                     }
+                    if (targetRejector != null && targetRejector.rejects(standPosition)) {
+                        continue;
+                    }
                     double distanceSq = distanceSquared(standPosition, npcPosition);
                     if (Double.isFinite(distanceSq) && distanceSq < bestDistanceSq) {
                         bestDistanceSq = distanceSq;
@@ -864,7 +908,8 @@ public final class CompanionNeedsEnvironmentService {
                                                                   double radiusSq,
                                                                   @Nonnull Set<String> allowedFoods,
                                                                   @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                  @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector) {
+                                                                  @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
+                                                                  @Nullable TargetRejector targetRejector) {
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
         for (int yOffset = -verticalScanRadius; yOffset <= verticalScanRadius; yOffset++) {
@@ -909,6 +954,9 @@ public final class CompanionNeedsEnvironmentService {
                             standProjector
                     );
                     if (standPosition == null) {
+                        continue;
+                    }
+                    if (targetRejector != null && targetRejector.rejects(standPosition)) {
                         continue;
                     }
                     double distanceSq = distanceSquared(standPosition, npcPosition);

@@ -13,6 +13,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkSetOwner`: Assigns owner from interacting player.
 - `TameworkSetTamed`: Sets/clears tamed state.
 - `TameworkNeedsResourceConsume`: Consumes configured needs resource targets (food/water seek flows).
+- `TameworkNeedsResourceRejectTarget`: Temporarily suppresses a failed needs seek target so later scans can choose another reachable source.
 - `TameworkHarvestDrop`: Drops harvest outputs with trait-aware bonus support.
 - `TameworkDebugMessage`: Emits debug text from instruction flows.
 

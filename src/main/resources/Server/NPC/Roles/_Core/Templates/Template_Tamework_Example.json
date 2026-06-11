@@ -908,11 +908,20 @@
       }
     },
     {
-      "$Comment": "Bridge needs-seek sensor pass while in Idle state.",
+      "$Comment": "Bridge needs-seek sensor pass while in non-movement resting states.",
       "Continue": true,
       "Sensor": {
-        "Type": "State",
-        "State": "Idle"
+        "Type": "Or",
+        "Sensors": [
+          {
+            "Type": "State",
+            "State": "Idle"
+          },
+          {
+            "Type": "State",
+            "State": "Hold"
+          }
+        ]
       },
       "Instructions": [
         {

@@ -311,8 +311,17 @@
         "$Comment": "Tamework patch: needs seek sensor",
         "Continue": true,
         "Sensor": {
-          "Type": "State",
-          "State": "Idle"
+          "Type": "Or",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": "Idle"
+            },
+            {
+              "Type": "State",
+              "State": "Hold"
+            }
+          ]
         },
         "Instructions": [
           {

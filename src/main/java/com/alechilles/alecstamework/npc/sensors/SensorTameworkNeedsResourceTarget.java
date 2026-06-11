@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.TargetRejector;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.WaterTargetSearchResult;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
@@ -35,7 +36,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     private static final long TARGET_CACHE_MISS_TTL_MS = 3_000L;
+    private static final double REJECTED_TARGET_DEFAULT_TTL_SECONDS = 30.0;
+    private static final int REJECTED_TARGET_MAX_ENTRIES = 4096;
     private static final double EPSILON = 0.000001;
+    private static final ConcurrentHashMap<RejectedTargetKey, Long> rejectedTargets = new ConcurrentHashMap<>();
 
     private final ResourceType resourceType;
     @Nullable
@@ -93,6 +97,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         UUID npcUuid = resolveNpcUuid(ref, store);
         CachedTargetResult cached = npcUuid != null ? getCachedTarget(npcUuid, nowMs) : null;
         if (cached != null) {
+            if (cached.target() != null && npcUuid != null && isTargetRejected(npcUuid, resourceType, cached.target(), nowMs)) {
+                cachedTargetsByNpcId.remove(npcUuid, cached);
+                cached = null;
+            }
+        }
+        if (cached != null) {
             if (cached.target() == null) {
                 maybeLog(
                         ref,
@@ -128,8 +138,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             needsConfig = resolveNeedsConfig(ref, store);
         }
         TargetResolution resolution = switch (resourceType) {
-            case WATER -> resolveWaterTarget(ref, role, store, needsConfig);
-            case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig);
+            case WATER -> resolveWaterTarget(ref, role, store, needsConfig, npcUuid, nowMs);
+            case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig, npcUuid, nowMs);
         };
         Vector3d target = resolution.target();
         if (npcUuid != null) {
@@ -182,7 +192,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private TargetResolution resolveWaterTarget(@Nonnull Ref<EntityStore> ref,
                                                 @Nonnull Role role,
                                                 @Nonnull Store<EntityStore> store,
-                                                @Nullable TwNeedsConfig needsConfig) {
+                                                @Nullable TwNeedsConfig needsConfig,
+                                                @Nullable UUID npcUuid,
+                                                long nowMs) {
+        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.WATER, nowMs);
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, range),
@@ -198,7 +211,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 store,
                 range,
                 verticalScanRadius,
-                consumeRadius
+                consumeRadius,
+                targetRejector
         );
         TargetResolution primaryResolution = resolveWaterSearchResult(
                 primaryResult,
@@ -221,7 +235,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 store,
                 fallbackRange,
                 verticalScanRadius,
-                consumeRadius
+                consumeRadius,
+                targetRejector
         );
         TargetResolution fallbackResolution = resolveWaterSearchResult(
                 fallbackResult,
@@ -260,11 +275,14 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private TargetResolution resolveFoodTarget(@Nonnull Ref<EntityStore> ref,
                                                @Nonnull Role role,
                                                @Nonnull Store<EntityStore> store,
-                                               @Nullable TwNeedsConfig needsConfig) {
+                                               @Nullable TwNeedsConfig needsConfig,
+                                               @Nullable UUID npcUuid,
+                                               long nowMs) {
         String[] effectiveItemIds = resolveFoodItemIds(needsConfig);
         if (effectiveItemIds == null || effectiveItemIds.length == 0) {
             return TargetResolution.none("food_item_ids_empty");
         }
+        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.FOOD_CONTAINER, nowMs);
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, range, effectiveItemIds),
@@ -279,7 +297,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 store,
                 range,
                 effectiveItemIds,
-                verticalScanRadius
+                verticalScanRadius,
+                targetRejector
         );
         if (target != null) {
             return TargetResolution.of(target, "food_target_search_primary");
@@ -297,7 +316,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 store,
                 fallbackRange,
                 effectiveItemIds,
-                verticalScanRadius
+                verticalScanRadius,
+                targetRejector
         );
         if (fallbackTarget != null) {
             return TargetResolution.of(fallbackTarget, "food_target_search_fallback");
@@ -524,6 +544,159 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return hasTarget ? TARGET_CACHE_HIT_TTL_MS : TARGET_CACHE_MISS_TTL_MS;
     }
 
+    public static boolean rejectTarget(@Nullable UUID npcUuid,
+                                       @Nullable String rawResourceType,
+                                       @Nullable Vector3d target,
+                                       double suppressSeconds) {
+        long nowMs = System.currentTimeMillis();
+        if (isAutoResourceType(rawResourceType)) {
+            boolean waterRejected = rejectTarget(npcUuid, ResourceType.WATER, target, suppressSeconds, nowMs);
+            boolean foodRejected = rejectTarget(
+                    npcUuid,
+                    ResourceType.FOOD_CONTAINER,
+                    target,
+                    suppressSeconds,
+                    nowMs
+            );
+            return waterRejected || foodRejected;
+        }
+        ResourceType type = ResourceType.from(rawResourceType);
+        return rejectTarget(npcUuid, type, target, suppressSeconds, nowMs);
+    }
+
+    static boolean rejectTarget(@Nullable UUID npcUuid,
+                                @Nonnull ResourceType type,
+                                @Nullable Vector3d target,
+                                double suppressSeconds,
+                                long nowMs) {
+        if (npcUuid == null || target == null || !isFinite(target)) {
+            return false;
+        }
+        double ttlSeconds = Double.isFinite(suppressSeconds) && suppressSeconds > 0.0
+                ? suppressSeconds
+                : REJECTED_TARGET_DEFAULT_TTL_SECONDS;
+        long ttlMs = Math.max(1L, (long) Math.ceil(ttlSeconds * 1000.0));
+        rejectedTargets.put(RejectedTargetKey.from(npcUuid, type, target), nowMs + ttlMs);
+        cleanupRejectedTargets(nowMs);
+        return true;
+    }
+
+    static boolean rejectTargetForTests(@Nullable UUID npcUuid,
+                                        @Nullable String rawResourceType,
+                                        @Nullable Vector3d target,
+                                        double suppressSeconds,
+                                        long nowMs) {
+        if (isAutoResourceType(rawResourceType)) {
+            boolean waterRejected = rejectTarget(npcUuid, ResourceType.WATER, target, suppressSeconds, nowMs);
+            boolean foodRejected = rejectTarget(npcUuid, ResourceType.FOOD_CONTAINER, target, suppressSeconds, nowMs);
+            return waterRejected || foodRejected;
+        }
+        return rejectTarget(npcUuid, ResourceType.from(rawResourceType), target, suppressSeconds, nowMs);
+    }
+
+    static boolean isTargetRejected(@Nullable UUID npcUuid,
+                                    @Nonnull ResourceType type,
+                                    @Nullable Vector3d target,
+                                    long nowMs) {
+        if (npcUuid == null || target == null || !isFinite(target)) {
+            return false;
+        }
+        RejectedTargetKey key = RejectedTargetKey.from(npcUuid, type, target);
+        Long expiresAtMs = rejectedTargets.get(key);
+        if (expiresAtMs == null) {
+            return false;
+        }
+        if (nowMs >= expiresAtMs) {
+            rejectedTargets.remove(key, expiresAtMs);
+            return false;
+        }
+        return true;
+    }
+
+    static boolean isTargetRejectedForTests(@Nullable UUID npcUuid,
+                                            @Nullable String rawResourceType,
+                                            @Nullable Vector3d target,
+                                            long nowMs) {
+        return isTargetRejected(npcUuid, ResourceType.from(rawResourceType), target, nowMs);
+    }
+
+    @Nullable
+    private static TargetRejector createTargetRejector(@Nullable UUID npcUuid,
+                                                       @Nonnull ResourceType type,
+                                                       long nowMs) {
+        if (!hasRejectedTargetFor(npcUuid, type, nowMs)) {
+            return null;
+        }
+        return target -> isTargetRejected(npcUuid, type, target, nowMs);
+    }
+
+    private static boolean hasRejectedTargetFor(@Nullable UUID npcUuid,
+                                                @Nonnull ResourceType type,
+                                                long nowMs) {
+        if (npcUuid == null || rejectedTargets.isEmpty()) {
+            return false;
+        }
+        boolean found = false;
+        for (var entry : rejectedTargets.entrySet()) {
+            RejectedTargetKey key = entry.getKey();
+            Long expiresAtMs = entry.getValue();
+            if (key == null || expiresAtMs == null || nowMs >= expiresAtMs) {
+                if (key != null && expiresAtMs != null) {
+                    rejectedTargets.remove(key, expiresAtMs);
+                }
+                continue;
+            }
+            if (key.npcUuid().equals(npcUuid) && key.resourceType() == type) {
+                found = true;
+            }
+        }
+        return found;
+    }
+
+    private static void cleanupRejectedTargets(long nowMs) {
+        if (rejectedTargets.size() < REJECTED_TARGET_MAX_ENTRIES) {
+            return;
+        }
+        rejectedTargets.entrySet().removeIf(entry -> entry == null
+                || entry.getKey() == null
+                || entry.getValue() == null
+                || nowMs >= entry.getValue());
+        int excess = rejectedTargets.size() - REJECTED_TARGET_MAX_ENTRIES;
+        if (excess <= 0) {
+            return;
+        }
+        for (RejectedTargetKey key : rejectedTargets.keySet()) {
+            if (excess <= 0) {
+                return;
+            }
+            if (rejectedTargets.remove(key) != null) {
+                excess--;
+            }
+        }
+    }
+
+    static void clearRejectedTargetsForTests() {
+        rejectedTargets.clear();
+    }
+
+    static int rejectedTargetCountForTests() {
+        return rejectedTargets.size();
+    }
+
+    static int rejectedTargetMaxEntriesForTests() {
+        return REJECTED_TARGET_MAX_ENTRIES;
+    }
+
+    private static boolean isFinite(@Nonnull Vector3d vector) {
+        return Double.isFinite(vector.x) && Double.isFinite(vector.y) && Double.isFinite(vector.z);
+    }
+
+    private static boolean isAutoResourceType(@Nullable String rawResourceType) {
+        return rawResourceType == null
+                || rawResourceType.trim().isEmpty()
+                || "Auto".equalsIgnoreCase(rawResourceType.trim());
+    }
+
     private long resolveCurrentTimeMs() {
         return System.currentTimeMillis();
     }
@@ -577,6 +750,25 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     configId == null || configId.isBlank() ? "<default>" : configId.trim().toLowerCase(Locale.ROOT),
                     List.of(passiveItemIds),
                     hasConfiguredItemIds
+            );
+        }
+    }
+
+    private record RejectedTargetKey(@Nonnull UUID npcUuid,
+                                     @Nonnull ResourceType resourceType,
+                                     int blockX,
+                                     int blockY,
+                                     int blockZ) {
+        @Nonnull
+        private static RejectedTargetKey from(@Nonnull UUID npcUuid,
+                                              @Nonnull ResourceType resourceType,
+                                              @Nonnull Vector3d target) {
+            return new RejectedTargetKey(
+                    npcUuid,
+                    resourceType,
+                    (int) Math.floor(target.x),
+                    (int) Math.floor(target.y),
+                    (int) Math.floor(target.z)
             );
         }
     }

@@ -326,12 +326,32 @@
             "$Comment": "Abort seek quickly when nav reports no viable path.",
             "Continue": true,
             "Sensor": {
-              "Type": "Nav",
-              "NavStates": [
-                "Defer"
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Nav",
+                  "NavStates": [
+                    "Defer"
+                  ]
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekReadRange"
+                  }
+                }
               ]
             },
             "Actions": [
+              {
+                "Type": "TameworkNeedsResourceRejectTarget",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                }
+              },
               {
                 "Type": "TimerStart",
                 "Name": {
@@ -364,11 +384,31 @@
             "$Comment": "Fail-safe completion when move timeout has elapsed.",
             "Continue": true,
             "Sensor": {
-              "Type": "Timer",
-              "Name": "NeedsSeek_Move_Timeout",
-              "State": "Stopped"
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Timer",
+                  "Name": "NeedsSeek_Move_Timeout",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekReadRange"
+                  }
+                }
+              ]
             },
             "Actions": [
+              {
+                "Type": "TameworkNeedsResourceRejectTarget",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                }
+              },
               {
                 "Type": "TimerStart",
                 "Name": {
@@ -534,10 +574,25 @@
               "Type": "Timer",
               "Name": "NeedsSeek_Move_Timeout",
               "State": "Stopped"
+            },
+            {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "NeedsSeekTargetSlot"
+              },
+              "Range": {
+                "Compute": "NeedsSeekReadRange"
+              }
             }
           ]
         },
         "Actions": [
+          {
+            "Type": "TameworkNeedsResourceRejectTarget",
+            "ResourceType": {
+              "Compute": "NeedsSeekResourceType"
+            }
+          },
           {
             "Type": "TimerStart",
             "Name": {

@@ -40,17 +40,35 @@ class NeedsSeekComponentAssetTest {
                 "Seek motion must stay active until consume range");
         assertEquals(1, countOccurrences(content, "\"Type\": \"MaintainDistance\""),
                 "Needs seek may only use maintain-distance after consume delay begins");
+        assertEquals(3, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),
+                "Needs seek movement failures must suppress the failed projected target");
+    }
+
+    @Test
+    void needsSeekSensorHonorsFailedCooldownBeforeEnteringMovement() {
+        String content = readResource(
+                "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource_Sensor.json"
+        );
+
+        assertEquals(2, countOccurrences(content, "\"Compute\": \"NeedsSeekFailedCooldownName\""),
+                "Food and water planner branches must both check the failed seek cooldown");
+        assertEquals(2, countOccurrences(content, "\"State\": \"Stopped\""),
+                "Food and water planner branches must wait for the failed seek cooldown to stop");
     }
 
     @Test
     void examplesUseSharedNeedsSeekComponentDefaults() {
         String tameworkExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json");
         String vanillaExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example_Vanilla.json");
+        String patchExample = readResource("Server/Tamework/Patches/Examples/Tamework_Example_Patch.json");
 
         assertTrue(tameworkExample.contains("\"Reference\": \"Component_Tamework_Instruction_Needs_Seek_Resource\""));
         assertTrue(vanillaExample.contains("\"Reference\": \"Component_Tamework_Instruction_Needs_Seek_Resource\""));
         assertFalse(tameworkExample.contains("\"NeedsSeekReachable\""));
         assertFalse(vanillaExample.contains("\"NeedsSeekReachable\""));
+        assertPlannerRunsFromIdleAndHold(tameworkExample);
+        assertPlannerRunsFromIdleAndHold(vanillaExample);
+        assertPlannerRunsFromIdleAndHold(patchExample);
     }
 
     private static JsonObject object(String json) {
@@ -71,5 +89,12 @@ class NeedsSeekComponentAssetTest {
 
     private static int countOccurrences(String content, String literal) {
         return Pattern.compile(Pattern.quote(literal)).split(content, -1).length - 1;
+    }
+
+    private static void assertPlannerRunsFromIdleAndHold(String content) {
+        assertTrue(content.contains("\"Reference\": \"Component_Tamework_Instruction_Needs_Seek_Resource_Sensor\""));
+        assertTrue(content.contains("\"Type\": \"Or\""));
+        assertTrue(content.contains("\"State\": \"Idle\""));
+        assertTrue(content.contains("\"State\": \"Hold\""));
     }
 }

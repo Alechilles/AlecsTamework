@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestDrop
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPrompt;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResourceConsume;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResourceRejectTarget;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetFlyingCompanionMode;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
@@ -107,6 +108,10 @@ public final class TameworkNpcBuilderRegistrar {
             actionFactory.add(BuilderActionTameworkInteract.BUILDER_ID, BuilderActionTameworkInteract::new);
             actionFactory.add(BuilderActionTameworkInteractPrompt.BUILDER_ID, BuilderActionTameworkInteractPrompt::new);
             actionFactory.add(BuilderActionTameworkNeedsResourceConsume.BUILDER_ID, BuilderActionTameworkNeedsResourceConsume::new);
+            actionFactory.add(
+                    BuilderActionTameworkNeedsResourceRejectTarget.BUILDER_ID,
+                    BuilderActionTameworkNeedsResourceRejectTarget::new
+            );
             actionFactory.add(
                     BuilderActionTameworkSetFlyingCompanionMode.BUILDER_ID,
                     BuilderActionTameworkSetFlyingCompanionMode::new

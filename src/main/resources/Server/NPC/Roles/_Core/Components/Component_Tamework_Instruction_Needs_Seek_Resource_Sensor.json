@@ -75,6 +75,13 @@
               }
             },
             {
+              "Type": "Timer",
+              "Name": {
+                "Compute": "NeedsSeekFailedCooldownName"
+              },
+              "State": "Stopped"
+            },
+            {
               "Type": "TameworkNeedsResourceTarget",
               "Need": "Thirst",
               "RatioBelow": {
@@ -122,6 +129,13 @@
               "RatioBelow": {
                 "Compute": "NeedsSeekWhenHungerBelowRatio"
               }
+            },
+            {
+              "Type": "Timer",
+              "Name": {
+                "Compute": "NeedsSeekFailedCooldownName"
+              },
+              "State": "Stopped"
             },
             {
               "Type": "TameworkNeedsResourceTarget",
