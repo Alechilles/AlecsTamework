@@ -13,6 +13,8 @@
             "resource": { "type": "enum", "values": ["food", "water", "both", "unknown"] },
             "roleId": { "type": "string", "maxLength": 160 },
             "result": { "type": "string", "maxLength": 120 },
+            "failureStage": { "type": "enum", "values": ["stand_target", "config", "component", "unknown"] },
+            "sourceCandidate": { "type": "enum", "values": ["found", "unknown"] },
             "cacheHit": { "type": "boolean" },
             "needBucket": { "type": "enum", "values": ["0-25", "26-50", "51-75", "76-100", "unknown"] },
             "searchRangeBucket": { "type": "enum", "values": ["0-8", "9-16", "17-32", "33+", "unknown"] }
@@ -49,6 +51,10 @@
             "consumeAttemptBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
             "consumeFailureBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
             "maxItemsBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "scanRadiusBucket": { "type": "enum", "values": ["0-2", "3-4", "5-8", "9+", "unknown"] },
+            "verticalScanBucket": { "type": "enum", "values": ["0", "1", "2-3", "4+", "unknown"] },
+            "nearestContainerDistanceBucket": { "type": "enum", "values": ["0-2", "3-4", "5-8", "9+", "none", "unknown"] },
+            "nearestAllowedContainerDistanceBucket": { "type": "enum", "values": ["0-2", "3-4", "5-8", "9+", "none", "unknown"] },
             "scanSource": { "type": "enum", "values": ["npc", "target", "unknown"] }
           }
         },

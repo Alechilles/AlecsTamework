@@ -53,8 +53,14 @@ class NeedsTelemetryDiagnosticsWiringTest {
         assertTrue(content.contains("\"reason\""), "Needs telemetry must retain low-cardinality failure reasons.");
         assertTrue(content.contains("\"resource\""), "Needs telemetry must retain resource breakdowns.");
         assertTrue(content.contains("\"needBucket\""), "Needs seek telemetry must retain bucketed need context.");
+        assertTrue(content.contains("\"failureStage\""), "Seek failures must expose the failing resolution stage.");
+        assertTrue(content.contains("\"sourceCandidate\""), "Seek failures must expose whether a resource source was found.");
         assertTrue(content.contains("\"containerStatus\""), "Consume failures must expose container failure status.");
         assertTrue(content.contains("\"matchingStackCountBucket\""), "Consume failures must expose matching stack buckets.");
+        assertTrue(content.contains("\"scanRadiusBucket\""), "Consume failures must expose scan radius buckets.");
+        assertTrue(content.contains("\"verticalScanBucket\""), "Consume failures must expose vertical scan buckets.");
+        assertTrue(content.contains("\"nearestContainerDistanceBucket\""), "Consume failures must expose nearest container distance buckets.");
+        assertTrue(content.contains("\"nearestAllowedContainerDistanceBucket\""), "Consume failures must expose nearest allowed-food distance buckets.");
         assertTrue(content.contains("\"scanSource\""), "Consume failures must expose container scan source.");
     }
 

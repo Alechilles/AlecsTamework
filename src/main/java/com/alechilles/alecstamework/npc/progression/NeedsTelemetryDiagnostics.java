@@ -63,6 +63,8 @@ public final class NeedsTelemetryDiagnostics {
                         .detail("resource", resource)
                         .detail("roleId", role)
                         .detail("result", normalizeReason(result))
+                        .detail("failureStage", seekFailureStage(reason))
+                        .detail("sourceCandidate", seekSourceCandidate(reason))
                         .detail("cacheHit", cacheHit)
                         .detail("needBucket", needsBucket(currentRatio))
                         .detail("searchRangeBucket", rangeBucket(searchRange))
@@ -171,6 +173,28 @@ public final class NeedsTelemetryDiagnostics {
                 || "needs_component_type_missing".equals(reason)
                 || "needs_component_missing".equals(reason)
                 || "needs_config_missing_or_disabled".equals(reason);
+    }
+
+    @Nonnull
+    static String seekFailureStage(@Nonnull String reason) {
+        if (reason.contains("_source_found_but_no_stand_target")) {
+            return "stand_target";
+        }
+        if ("food_item_ids_empty".equals(reason) || "needs_config_missing_or_disabled".equals(reason)) {
+            return "config";
+        }
+        if ("needs_component_type_missing".equals(reason) || "needs_component_missing".equals(reason)) {
+            return "component";
+        }
+        return "unknown";
+    }
+
+    @Nonnull
+    static String seekSourceCandidate(@Nonnull String reason) {
+        if (reason.contains("_source_found_but_no_stand_target")) {
+            return "found";
+        }
+        return "unknown";
     }
 
     @Nonnull
@@ -329,6 +353,10 @@ public final class NeedsTelemetryDiagnostics {
                     .detail("consumeAttemptBucket", countBucketOrUnknown(detail("attempts")))
                     .detail("consumeFailureBucket", countBucketOrUnknown(detail("failures")))
                     .detail("maxItemsBucket", countBucketOrUnknown(detail("maxItems")))
+                    .detail("scanRadiusBucket", decimalBucketOrUnknown(detail("radius")))
+                    .detail("verticalScanBucket", countBucketOrUnknown(detail("vScan")))
+                    .detail("nearestContainerDistanceBucket", distanceBucketOrUnknown(detail("nearestContainerDist")))
+                    .detail("nearestAllowedContainerDistanceBucket", distanceBucketOrUnknown(detail("nearestAllowedContainerDist")))
                     .detail("scanSource", normalizeReason(detail("scanSource")).toLowerCase(Locale.ROOT));
         }
 
@@ -339,6 +367,44 @@ public final class NeedsTelemetryDiagnostics {
             } catch (NumberFormatException ex) {
                 return "unknown";
             }
+        }
+
+        @Nonnull
+        private static String decimalBucketOrUnknown(@Nonnull String value) {
+            try {
+                return distanceBucket(Double.parseDouble(value));
+            } catch (NumberFormatException ex) {
+                return "unknown";
+            }
+        }
+
+        @Nonnull
+        private static String distanceBucketOrUnknown(@Nonnull String value) {
+            if ("n/a".equalsIgnoreCase(value)) {
+                return "none";
+            }
+            try {
+                return distanceBucket(Double.parseDouble(value));
+            } catch (NumberFormatException ex) {
+                return "unknown";
+            }
+        }
+
+        @Nonnull
+        private static String distanceBucket(double value) {
+            if (!Double.isFinite(value) || value < 0.0d) {
+                return "unknown";
+            }
+            if (value <= 2.0d) {
+                return "0-2";
+            }
+            if (value <= 4.0d) {
+                return "3-4";
+            }
+            if (value <= 8.0d) {
+                return "5-8";
+            }
+            return "9+";
         }
     }
 }

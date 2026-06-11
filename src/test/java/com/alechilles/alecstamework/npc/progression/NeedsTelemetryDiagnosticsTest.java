@@ -49,6 +49,8 @@ class NeedsTelemetryDiagnosticsTest {
         assertEquals("2", context.detail("containers"));
         assertEquals("0", context.detail("matchingStacks"));
         assertEquals("TARGET", context.detail("scanSource"));
+        assertEquals("2.00", context.detail("radius"));
+        assertEquals("2", context.detail("vScan"));
     }
 
     @Test
@@ -73,5 +75,20 @@ class NeedsTelemetryDiagnosticsTest {
         assertTrue(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("food_source_found_but_no_stand_target"));
         assertTrue(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("water_source_found_but_no_stand_target"));
         assertTrue(NeedsTelemetryDiagnostics.isReportableSeekFailureReason("needs_config_missing_or_disabled"));
+    }
+
+    @Test
+    void groupsSeekFailuresByStageAndSourceCandidatePresence() {
+        assertEquals(
+                "stand_target",
+                NeedsTelemetryDiagnostics.seekFailureStage("food_source_found_but_no_stand_target")
+        );
+        assertEquals(
+                "found",
+                NeedsTelemetryDiagnostics.seekSourceCandidate("water_source_found_but_no_stand_target")
+        );
+        assertEquals("config", NeedsTelemetryDiagnostics.seekFailureStage("food_item_ids_empty"));
+        assertEquals("component", NeedsTelemetryDiagnostics.seekFailureStage("needs_component_missing"));
+        assertEquals("unknown", NeedsTelemetryDiagnostics.seekSourceCandidate("needs_component_missing"));
     }
 }
