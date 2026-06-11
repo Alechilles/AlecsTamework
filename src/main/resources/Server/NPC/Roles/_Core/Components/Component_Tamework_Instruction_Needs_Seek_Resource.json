@@ -64,8 +64,8 @@
       "Description": "Avoid environmental block damage while pathing to needs resources."
     },
     "NeedsSeekReachable": {
-      "Value": false,
-      "Description": "Require direct hitbox overlap with target position before considering goal reached."
+      "Value": true,
+      "Description": "Require direct reachability to the projected stand target before considering the needs seek goal reached."
     },
     "NeedsSeekReadRange": {
       "Value": 96,
