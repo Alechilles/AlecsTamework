@@ -128,8 +128,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             needsConfig = resolveNeedsConfig(ref, store);
         }
         TargetResolution resolution = switch (resourceType) {
-            case WATER -> resolveWaterTarget(ref, store, needsConfig);
-            case FOOD_CONTAINER -> resolveFoodTarget(ref, store, needsConfig);
+            case WATER -> resolveWaterTarget(ref, role, store, needsConfig);
+            case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig);
         };
         Vector3d target = resolution.target();
         if (npcUuid != null) {
@@ -180,6 +180,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     @Nullable
     private TargetResolution resolveWaterTarget(@Nonnull Ref<EntityStore> ref,
+                                                @Nonnull Role role,
                                                 @Nonnull Store<EntityStore> store,
                                                 @Nullable TwNeedsConfig needsConfig) {
         if (needsConfig == null) {
@@ -193,6 +194,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         double consumeRadius = passiveRefill.getWaterConsumeRadius();
         WaterTargetSearchResult primaryResult = ENVIRONMENT_SERVICE.findNearestWaterDrinkingTarget(
                 ref,
+                role,
                 store,
                 range,
                 verticalScanRadius,
@@ -215,6 +217,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         WaterTargetSearchResult fallbackResult = ENVIRONMENT_SERVICE.findNearestWaterDrinkingTarget(
                 ref,
+                role,
                 store,
                 fallbackRange,
                 verticalScanRadius,
@@ -255,6 +258,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     @Nullable
     private TargetResolution resolveFoodTarget(@Nonnull Ref<EntityStore> ref,
+                                               @Nonnull Role role,
                                                @Nonnull Store<EntityStore> store,
                                                @Nullable TwNeedsConfig needsConfig) {
         String[] effectiveItemIds = resolveFoodItemIds(needsConfig);
@@ -271,6 +275,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         int verticalScanRadius = passiveRefill.getContainerVerticalScanRadius();
         Vector3d target = ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(
                 ref,
+                role,
                 store,
                 range,
                 effectiveItemIds,
@@ -288,6 +293,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         Vector3d fallbackTarget = ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(
                 ref,
+                role,
                 store,
                 fallbackRange,
                 effectiveItemIds,
