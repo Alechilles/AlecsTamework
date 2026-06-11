@@ -102,6 +102,13 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                     (interaction, parent) -> interaction.trajectoryMode = parent.trajectoryMode
             )
             .add()
+            .<LaunchPositionOffsetSettings>appendInherited(
+                    new KeyedCodec<>("LaunchPositionOffset", LaunchPositionOffsetSettings.CODEC),
+                    (interaction, value) -> interaction.launchPositionOffset = value,
+                    interaction -> interaction.launchPositionOffset,
+                    (interaction, parent) -> interaction.launchPositionOffset = parent.launchPositionOffset
+            )
+            .add()
             .<Double>appendInherited(
                     new KeyedCodec<>("RandomAroundSourceMinRadius", Codec.DOUBLE),
                     (interaction, value) -> interaction.randomAroundSourceMinRadius = value,
@@ -147,6 +154,8 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     private double pitchSpreadDegrees = 0.0;
     private boolean failIfNoSolution = true;
     private TrajectoryMode trajectoryMode = TrajectoryMode.HIGH_ANGLE;
+    @Nullable
+    private LaunchPositionOffsetSettings launchPositionOffset;
     private double randomAroundSourceMinRadius = 0.0;
     private double randomAroundSourceMaxRadius = 0.0;
     private double randomAroundSourceVerticalOffset = 0.0;
@@ -194,6 +203,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
 
         Transform sourceLook = TargetUtil.getLook(sourceRef, commandBuffer);
+        Vector3d launchPosition = resolveLaunchPosition(sourceLook);
         Vector3d targetPosition = resolveTargetPosition(context, sourceRef, commandBuffer, sourceLook);
         if (targetPosition == null) {
             fail(context);
@@ -201,12 +211,12 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
 
         float yaw = PhysicsMath.headingFromDirection(
-                targetPosition.x - sourceLook.getPosition().x,
-                targetPosition.z - sourceLook.getPosition().z
+                targetPosition.x - launchPosition.x,
+                targetPosition.z - launchPosition.z
         );
         Float pitch = this.trajectoryMode == TrajectoryMode.DIRECT
-                ? solveDirectPitch(sourceLook.getPosition(), targetPosition)
-                : solveHighAnglePitch(sourceLook.getPosition(), targetPosition, muzzleVelocity, gravity);
+                ? solveDirectPitch(launchPosition, targetPosition)
+                : solveHighAnglePitch(launchPosition, targetPosition, muzzleVelocity, gravity);
         if (pitch == null) {
             fail(context);
             return;
@@ -224,7 +234,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         UUID sourceUuid = sourceUuidComponent.getUuid();
         TimeResource timeResource = commandBuffer.getResource(TimeResource.getResourceType());
         Rotation3f lookRotation = new Rotation3f(pitch, yaw, sourceLook.getRotation().roll());
-        Holder<EntityStore> holder = ProjectileComponent.assembleDefaultProjectile(timeResource, this.projectileId, sourceLook.getPosition(), lookRotation);
+        Holder<EntityStore> holder = ProjectileComponent.assembleDefaultProjectile(timeResource, this.projectileId, launchPosition, lookRotation);
         ProjectileComponent projectileComponent = holder.getComponent(ProjectileComponent.getComponentType());
         if (projectileComponent == null) {
             fail(context);
@@ -243,9 +253,9 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         projectileComponent.shoot(
                 holder,
                 sourceUuid,
-                sourceLook.getPosition().x,
-                sourceLook.getPosition().y,
-                sourceLook.getPosition().z,
+                launchPosition.x,
+                launchPosition.y,
+                launchPosition.z,
                 yaw,
                 pitch
         );
@@ -264,6 +274,19 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     protected void simulateFirstRun(@Nonnull InteractionType type,
                                     @Nonnull InteractionContext context,
                                     @Nonnull CooldownHandler cooldownHandler) {
+    }
+
+    private Vector3d resolveLaunchPosition(@Nonnull Transform sourceLook) {
+        if (this.launchPositionOffset == null || this.launchPositionOffset.isZero()) {
+            return sourceLook.getPosition();
+        }
+        return TameworkLaunchOriginService.applyOffset(
+                sourceLook.getPosition(),
+                sourceLook.getRotation().yaw(),
+                this.launchPositionOffset.getX(),
+                this.launchPositionOffset.getY(),
+                this.launchPositionOffset.getZ()
+        );
     }
 
     @Nullable
@@ -441,6 +464,52 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     public enum TrajectoryMode {
         DIRECT,
         HIGH_ANGLE
+    }
+
+    public static final class LaunchPositionOffsetSettings {
+        public static final BuilderCodec<LaunchPositionOffsetSettings> CODEC = BuilderCodec.builder(
+                LaunchPositionOffsetSettings.class,
+                LaunchPositionOffsetSettings::new
+        )
+                .<Double>append(
+                        new KeyedCodec<>("X", Codec.DOUBLE),
+                        (settings, value) -> settings.x = value == null ? 0.0 : value,
+                        settings -> settings.x
+                )
+                .add()
+                .<Double>append(
+                        new KeyedCodec<>("Y", Codec.DOUBLE),
+                        (settings, value) -> settings.y = value == null ? 0.0 : value,
+                        settings -> settings.y
+                )
+                .add()
+                .<Double>append(
+                        new KeyedCodec<>("Z", Codec.DOUBLE),
+                        (settings, value) -> settings.z = value == null ? 0.0 : value,
+                        settings -> settings.z
+                )
+                .add()
+                .build();
+
+        private double x;
+        private double y;
+        private double z;
+
+        public double getX() {
+            return this.x;
+        }
+
+        public double getY() {
+            return this.y;
+        }
+
+        public double getZ() {
+            return this.z;
+        }
+
+        private boolean isZero() {
+            return this.x == 0.0 && this.y == 0.0 && this.z == 0.0;
+        }
     }
 
     public static final class ImpactEffectSettings {
