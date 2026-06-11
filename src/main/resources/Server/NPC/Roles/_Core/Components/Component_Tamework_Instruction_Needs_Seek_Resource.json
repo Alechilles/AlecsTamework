@@ -48,8 +48,8 @@
       "Description": "Use nav pathfinding while moving to a needs resource target."
     },
     "NeedsSeekUseSteering": {
-      "Value": true,
-      "Description": "Allow steering assist while pathfinding to a needs resource target."
+      "Value": false,
+      "Description": "Keep needs seek pathfinder-first so blocked resources fail navigation instead of direct-steering into obstacles."
     },
     "NeedsSeekUseBestPath": {
       "Value": false,
@@ -398,38 +398,6 @@
             ]
           },
           {
-            "$Comment": "At close range, use maintain-distance steering to recover from local collision/stacking stalls.",
-            "Sensor": {
-              "Type": "ReadPosition",
-              "Slot": {
-                "Compute": "NeedsSeekTargetSlot"
-              },
-              "Range": {
-                "Compute": "NeedsSeekSlowDownDistance"
-              },
-              "MinRange": {
-                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
-              }
-            },
-            "BodyMotion": {
-              "Type": "MaintainDistance",
-              "DesiredDistanceRange": {
-                "Compute": "NeedsSeekConsumeMaintainDistanceRange"
-              },
-              "MoveThreshold": 0.1,
-              "StrafingDurationRange": [
-                0,
-                0
-              ],
-              "RelativeForwardsSpeed": {
-                "Compute": "NeedsSeekRelativeSpeed"
-              },
-              "RelativeBackwardsSpeed": {
-                "Compute": "NeedsSeekRelativeSpeed"
-              }
-            }
-          },
-          {
             "$Comment": "Seek toward the stored destination.",
             "Sensor": {
               "Type": "ReadPosition",
@@ -440,7 +408,7 @@
                 "Compute": "NeedsSeekReadRange"
               },
               "MinRange": {
-                "Compute": "NeedsSeekSlowDownDistance"
+                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
               }
             },
             "BodyMotion": {

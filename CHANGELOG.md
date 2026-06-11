@@ -4,7 +4,7 @@
 
 ### Changed
 - Improved companion food and water seeking so NPCs use bounded motion-controller projection to choose reachable trough and water stand targets, including diagonal approach positions, while keeping existing needs search caching and consume behavior.
-- Tightened needs-seek movement so projected food and water stand targets must be directly reachable before the seek can be considered complete, preventing companions from walking into walls around blocked resources.
+- Tightened needs-seek movement so projected food and water stand targets stay pathfinder-first until consume range and must be directly reachable before completion, preventing companions from walking into walls around blocked resources.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 
