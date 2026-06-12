@@ -63,7 +63,7 @@ public final class BuilderSensorTameworkReachableBlockTarget extends TameworkSen
                 "BlockSet",
                 this.blockSet,
                 null,
-                StringNotEmptyValidator.get(),
+                null,
                 BuilderDescriptorState.Stable,
                 "Optional block set id to match.",
                 null
@@ -73,7 +73,7 @@ public final class BuilderSensorTameworkReachableBlockTarget extends TameworkSen
                 "Blocks",
                 this.blocks,
                 null,
-                StringNotEmptyValidator.get(),
+                null,
                 BuilderDescriptorState.Stable,
                 "Optional vanilla-style block set alias.",
                 null
