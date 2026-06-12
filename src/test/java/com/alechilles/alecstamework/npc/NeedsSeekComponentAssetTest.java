@@ -125,6 +125,22 @@ class NeedsSeekComponentAssetTest {
     }
 
     @Test
+    void needsSeekMovementLogsStateTransitionsAndTerminalBranches() {
+        String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
+
+        assertEquals(8, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
+                "Needs seek movement diagnostics should cover transition and terminal movement branches only");
+        assertTrue(content.contains("\"Stage\": \"move_start\""));
+        assertTrue(content.contains("\"Stage\": \"target_lost\""));
+        assertTrue(content.contains("\"Stage\": \"nav_defer\""));
+        assertTrue(content.contains("\"Stage\": \"move_timeout\""));
+        assertTrue(content.contains("\"Stage\": \"consume_delay_start\""));
+        assertTrue(content.contains("\"Stage\": \"consume_delay_timeout\""));
+        assertTrue(content.contains("\"Detail\": \"strict_band\""));
+        assertTrue(content.contains("\"Detail\": \"fallback_close_range\""));
+    }
+
+    @Test
     void examplesUseSharedNeedsSeekComponentDefaults() {
         String tameworkExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json");
         String vanillaExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example_Vanilla.json");

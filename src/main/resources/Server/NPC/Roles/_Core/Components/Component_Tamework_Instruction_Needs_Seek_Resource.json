@@ -198,6 +198,14 @@
         },
         "Actions": [
           {
+            "Type": "TameworkNeedsResourceMovementDiagnostic",
+            "ResourceType": {
+              "Compute": "NeedsSeekResourceType"
+            },
+            "Stage": "move_start",
+            "Detail": "target_read"
+          },
+          {
             "Type": "TimerStart",
             "Name": "NeedsSeek_Move_Timeout",
             "StartValueRange": {
@@ -252,6 +260,14 @@
             },
             "Actions": [
               {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "consume_delay_start",
+                "Detail": "within_consume_range"
+              },
+              {
                 "Type": "PlayAnimation",
                 "Slot": "Status",
                 "Animation": {
@@ -294,6 +310,14 @@
               }
             },
             "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "target_lost",
+                "Detail": "target_unreadable"
+              },
               {
                 "Type": "TimerStart",
                 "Name": {
@@ -346,6 +370,14 @@
               ]
             },
             "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "nav_defer",
+                "Detail": "path_deferred"
+              },
               {
                 "Type": "TameworkNeedsResourceRejectTarget",
                 "ResourceType": {
@@ -403,6 +435,14 @@
               ]
             },
             "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "move_timeout",
+                "Detail": "timeout_elapsed"
+              },
               {
                 "Type": "TameworkNeedsResourceRejectTarget",
                 "ResourceType": {
@@ -588,6 +628,14 @@
         },
         "Actions": [
           {
+            "Type": "TameworkNeedsResourceMovementDiagnostic",
+            "ResourceType": {
+              "Compute": "NeedsSeekResourceType"
+            },
+            "Stage": "consume_delay_timeout",
+            "Detail": "timeout_elapsed"
+          },
+          {
             "Type": "TameworkNeedsResourceRejectTarget",
             "ResourceType": {
               "Compute": "NeedsSeekResourceType"
@@ -652,6 +700,14 @@
               ]
             },
             "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "consume_attempt",
+                "Detail": "strict_band"
+              },
               {
                 "Type": "TameworkNeedsResourceConsume",
                 "ResourceType": {
@@ -726,6 +782,14 @@
               ]
             },
             "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "consume_attempt",
+                "Detail": "fallback_close_range"
+              },
               {
                 "Type": "TameworkNeedsResourceConsume",
                 "ResourceType": {

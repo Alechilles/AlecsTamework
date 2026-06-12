@@ -438,6 +438,23 @@ public final class CompanionNeedsService {
     }
 
     /**
+     * Emits a runtime-only diagnostic when the asset flow reaches the consume action.
+     */
+    public static void logResourceConsumeActionReached(@Nullable Ref<EntityStore> npcRef,
+                                                       @Nullable Store<EntityStore> store,
+                                                       @Nullable String roleId,
+                                                       @Nullable String resourceType,
+                                                       @Nullable Vector3d consumeOriginOverride) {
+        CompanionNeedsConsumeService.logResourceConsumeActionReached(
+                npcRef,
+                store,
+                roleId,
+                resourceType,
+                consumeOriginOverride
+        );
+    }
+
+    /**
      * Returns whether this NPC is currently in a needs-damage state (damage enabled and hunger/thirst at minimum).
      */
     public static boolean isNeedsDamageActive(@Nullable Ref<EntityStore> npcRef,

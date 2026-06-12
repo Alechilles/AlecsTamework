@@ -1,30 +1,34 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceMovementDiagnostics;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /**
- * Action that performs explicit needs resource consumption driven by template flow.
+ * Logs gated movement-phase diagnostics for needs seek resource movement.
  */
-public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase {
+public final class ActionTameworkNeedsResourceMovementDiagnostic extends TameworkActionBase {
     @Nullable
     private final String resourceType;
     @Nullable
-    private final String[] foodItemIds;
+    private final String stage;
+    @Nullable
+    private final String detail;
 
-    public ActionTameworkNeedsResourceConsume(BuilderActionTameworkNeedsResourceConsume builder, BuilderSupport support) {
+    public ActionTameworkNeedsResourceMovementDiagnostic(BuilderActionTameworkNeedsResourceMovementDiagnostic builder,
+                                                         BuilderSupport support) {
         super(builder);
         this.resourceType = builder.getResourceType(support);
-        this.foodItemIds = builder.getFoodItemIds(support);
+        this.stage = builder.getStage(support);
+        this.detail = builder.getDetail(support);
     }
 
     @Override
@@ -45,27 +49,19 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
         if (!canExecute(npcRef, role, infoProvider, dt, store)) {
             return false;
         }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        Vector3d consumeOrigin = resolveConsumeOrigin(infoProvider);
-        CompanionNeedsService.logResourceConsumeActionReached(
-                npcRef,
-                store,
-                roleId,
+        NeedsResourceMovementDiagnostics.maybeLog(
+                NeedsResourceMovementDiagnostics.resolveNpcId(npcRef, store),
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store),
                 resourceType,
-                consumeOrigin
+                stage,
+                detail,
+                resolveTarget(infoProvider)
         );
-        return CompanionNeedsService.applyResourceConsumeWithDiagnostics(
-                npcRef,
-                store,
-                roleId,
-                resourceType,
-                foodItemIds,
-                consumeOrigin
-        );
+        return true;
     }
 
     @Nullable
-    private static Vector3d resolveConsumeOrigin(@Nullable InfoProvider infoProvider) {
+    private static Vector3d resolveTarget(@Nullable InfoProvider infoProvider) {
         if (infoProvider == null || !infoProvider.hasPosition()) {
             return null;
         }

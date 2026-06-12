@@ -5,10 +5,12 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /**
  * Builds and emits structured diagnostics for action-driven needs consume attempts.
@@ -74,6 +76,65 @@ final class NeedsConsumeDiagnostics {
                 thirstGain,
                 reason
         ));
+    }
+
+    static void maybeLogRuntime(boolean diagnostics,
+                                @Nonnull String npcId,
+                                @Nullable String roleId,
+                                @Nonnull String mode,
+                                @Nonnull String stage,
+                                @Nonnull String result,
+                                int consumedItems,
+                                double hungerGain,
+                                double thirstGain,
+                                @Nullable Vector3d target) {
+        if (!diagnostics || !isRuntimeEnabled() || !LOGGER.isLoggable(Level.INFO)) {
+            return;
+        }
+        LOGGER.log(Level.INFO, formatRuntimeMessage(
+                npcId,
+                roleId,
+                mode,
+                stage,
+                result,
+                consumedItems,
+                hungerGain,
+                thirstGain,
+                target
+        ));
+    }
+
+    @Nonnull
+    static String formatRuntimeMessage(@Nonnull String npcId,
+                                       @Nullable String roleId,
+                                       @Nonnull String mode,
+                                       @Nonnull String stage,
+                                       @Nonnull String result,
+                                       int consumedItems,
+                                       double hungerGain,
+                                       double thirstGain,
+                                       @Nullable Vector3d target) {
+        return String.format(
+                Locale.ROOT,
+                "Needs consume runtime: npc=%s role=%s mode=%s stage=%s result=%s consumedItems=%d hungerGain=%.2f thirstGain=%.2f target=%s",
+                npcId,
+                roleId == null || roleId.isBlank() ? "<unknown>" : roleId,
+                mode,
+                stage,
+                result,
+                consumedItems,
+                hungerGain,
+                thirstGain,
+                formatTarget(target)
+        );
+    }
+
+    @Nonnull
+    private static String formatTarget(@Nullable Vector3d target) {
+        if (target == null) {
+            return "<none>";
+        }
+        return String.format(Locale.ROOT, "[%.2f,%.2f,%.2f]", target.x(), target.y(), target.z());
     }
 
     private static boolean isRuntimeEnabled() {

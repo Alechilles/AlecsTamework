@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.joml.Vector3d;
+
 class NeedsTelemetryDiagnosticsTest {
 
     @Test
@@ -90,5 +92,26 @@ class NeedsTelemetryDiagnosticsTest {
         assertEquals("config", NeedsTelemetryDiagnostics.seekFailureStage("food_item_ids_empty"));
         assertEquals("component", NeedsTelemetryDiagnostics.seekFailureStage("needs_component_missing"));
         assertEquals("unknown", NeedsTelemetryDiagnostics.seekSourceCandidate("needs_component_missing"));
+    }
+
+    @Test
+    void consumeRuntimeDiagnosticsUseSeparateNonTelemetryMessageShape() {
+        String message = NeedsConsumeDiagnostics.formatRuntimeMessage(
+                "npc-1",
+                "Tamed_Wolf",
+                "WATER",
+                "consume_result",
+                "success",
+                0,
+                0.0,
+                10.0,
+                new Vector3d(1.0, 2.0, 3.0)
+        );
+
+        assertTrue(message.startsWith("Needs consume runtime:"));
+        assertFalse(message.contains("Needs consume attempt:"));
+        assertTrue(message.contains("stage=consume_result"));
+        assertTrue(message.contains("result=success"));
+        assertTrue(message.contains("target=[1.00,2.00,3.00]"));
     }
 }

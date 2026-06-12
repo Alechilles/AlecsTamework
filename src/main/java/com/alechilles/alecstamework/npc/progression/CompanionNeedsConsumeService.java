@@ -104,6 +104,25 @@ public final class CompanionNeedsConsumeService {
         );
     }
 
+    public static void logResourceConsumeActionReached(@Nullable Ref<EntityStore> npcRef,
+                                                       @Nullable Store<EntityStore> store,
+                                                       @Nullable String roleId,
+                                                       @Nullable String resourceType,
+                                                       @Nullable Vector3d consumeOriginOverride) {
+        NeedsConsumeDiagnostics.maybeLogRuntime(
+                true,
+                NeedsConsumeDiagnostics.resolveNpcId(npcRef, store),
+                roleId,
+                NeedsResourceConsumeMode.from(resourceType).name(),
+                "action_reached",
+                "pending",
+                0,
+                0.0,
+                0.0,
+                consumeOriginOverride
+        );
+    }
+
     private static boolean applyResourceConsumeInternal(@Nullable Ref<EntityStore> npcRef,
                                                         @Nullable Store<EntityStore> store,
                                                         @Nullable String roleId,
@@ -291,6 +310,18 @@ public final class CompanionNeedsConsumeService {
                     hungerGain,
                     thirstGain
             );
+            NeedsConsumeDiagnostics.maybeLogRuntime(
+                    diagnostics,
+                    npcId,
+                    roleId,
+                    mode.name(),
+                    "consume_result",
+                    "success",
+                    consumedItems,
+                    hungerGain,
+                    thirstGain,
+                    consumeOriginOverride
+            );
             return true;
         }
 
@@ -305,6 +336,18 @@ public final class CompanionNeedsConsumeService {
                     consumedItems,
                     hungerGain,
                     thirstGain
+            );
+            NeedsConsumeDiagnostics.maybeLogRuntime(
+                    diagnostics,
+                    npcId,
+                    roleId,
+                    mode.name(),
+                    "consume_result",
+                    "success_happiness_only",
+                    consumedItems,
+                    hungerGain,
+                    thirstGain,
+                    consumeOriginOverride
             );
             return true;
         }
