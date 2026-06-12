@@ -15,6 +15,7 @@
 - Fixed companion needs stand selection so a failed path candidate does not make NPCs ignore other reachable approach points around the same food or water source.
 - Fixed water seeking so companions can retry a recently confirmed water target after wandering just outside the normal source scan radius, without expanding the routine block scan.
 - Reduced the sensor-side no-path memory for needs resource checks so temporary water path preflight misses do not suppress valid retries for half a minute.
+- Fixed needs-seek planning so a valid water target is not overwritten by a food target in the same sensor pass when both hunger and thirst are low.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 

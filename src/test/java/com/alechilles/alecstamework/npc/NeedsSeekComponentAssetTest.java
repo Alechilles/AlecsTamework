@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.regex.Pattern;
@@ -57,6 +59,29 @@ class NeedsSeekComponentAssetTest {
     }
 
     @Test
+    void needsSeekSensorStopsAfterAcceptingOneResourceTarget() {
+        String content = readResource(
+                "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource_Sensor.json"
+        );
+        JsonArray instructions = object(content)
+                .getAsJsonObject("Content")
+                .getAsJsonArray("Instructions");
+
+        assertFalse(
+                findInstructionByParentState(instructions, "OnNeedsSeekWaterActive")
+                        .get("Continue")
+                        .getAsBoolean(),
+                "Water target acceptance must not let food overwrite the shared needs-seek target"
+        );
+        assertFalse(
+                findInstructionByParentState(instructions, "OnNeedsSeekFoodActive")
+                        .get("Continue")
+                        .getAsBoolean(),
+                "Food target acceptance should stop later resource target branches"
+        );
+    }
+
+    @Test
     void examplesUseSharedNeedsSeekComponentDefaults() {
         String tameworkExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json");
         String vanillaExample = readResource("Server/NPC/Roles/_Core/Templates/Template_Tamework_Example_Vanilla.json");
@@ -89,6 +114,24 @@ class NeedsSeekComponentAssetTest {
 
     private static int countOccurrences(String content, String literal) {
         return Pattern.compile(Pattern.quote(literal)).split(content, -1).length - 1;
+    }
+
+    private static JsonObject findInstructionByParentState(JsonArray instructions, String state) {
+        for (JsonElement instructionElement : instructions) {
+            JsonObject instruction = instructionElement.getAsJsonObject();
+            JsonArray actions = instruction.getAsJsonArray("Actions");
+            if (actions == null) {
+                continue;
+            }
+            for (JsonElement actionElement : actions) {
+                JsonObject action = actionElement.getAsJsonObject();
+                if ("ParentState".equals(action.get("Type").getAsString())
+                        && state.equals(action.get("State").getAsString())) {
+                    return instruction;
+                }
+            }
+        }
+        throw new AssertionError("Missing needs-seek parent state action: " + state);
     }
 
     private static void assertPlannerRunsFromIdleAndHold(String content) {

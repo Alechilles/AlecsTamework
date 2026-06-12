@@ -59,7 +59,7 @@
       },
       {
         "$Comment": "Trigger water seek when thirst is low and a water target is resolvable.",
-        "Continue": true,
+        "Continue": false,
         "Sensor": {
           "Type": "And",
           "Sensors": [
@@ -115,7 +115,7 @@
       },
       {
         "$Comment": "Trigger food seek when hunger is low and a food container target is resolvable.",
-        "Continue": true,
+        "Continue": false,
         "Sensor": {
           "Type": "And",
           "Sensors": [
