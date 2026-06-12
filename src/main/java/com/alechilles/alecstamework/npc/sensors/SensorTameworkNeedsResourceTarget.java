@@ -40,7 +40,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE = new NeedsResourcePathPreflightService();
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
-    private static final long TARGET_CACHE_MISS_TTL_MS = 3_000L;
+    private static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
     private static final double EPSILON = 0.000001;
 
     private final ResourceType resourceType;
@@ -97,7 +97,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         long nowMs = resolveCurrentTimeMs();
         UUID npcUuid = resolveNpcUuid(ref, store);
-        CachedTargetResult cached = npcUuid != null ? getCachedTarget(npcUuid, nowMs) : null;
+        TargetCacheBlock currentCacheBlock = resolveCurrentCacheBlock(ref, store);
+        CachedTargetResult cached = npcUuid != null ? getCachedTarget(npcUuid, nowMs, currentCacheBlock) : null;
         if (cached != null) {
             if (cached.target() != null && npcUuid != null && isTargetRejected(npcUuid, resourceType, cached.target(), nowMs)) {
                 cachedTargetsByNpcId.remove(npcUuid, cached);
@@ -146,7 +147,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         Vector3d target = resolution.target();
         if (target == null) {
             if (npcUuid != null) {
-                cacheTarget(npcUuid, null, resolution.reason(), nowMs);
+                cacheTarget(npcUuid, null, resolution.reason(), currentCacheBlock, nowMs);
             }
             maybeLog(
                     ref,
@@ -205,7 +206,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             return false;
         }
         if (npcUuid != null) {
-            cacheTarget(npcUuid, target, resolution.reason(), nowMs);
+            cacheTarget(npcUuid, target, resolution.reason(), currentCacheBlock, nowMs);
         }
         positionInfo.setTarget(target.x, target.y, target.z);
         maybeLog(
@@ -599,12 +600,18 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     }
 
     @Nullable
-    private CachedTargetResult getCachedTarget(@Nonnull UUID npcUuid, long nowMs) {
+    private CachedTargetResult getCachedTarget(@Nonnull UUID npcUuid,
+                                               long nowMs,
+                                               @Nullable TargetCacheBlock currentCacheBlock) {
         CachedTargetResult cached = cachedTargetsByNpcId.get(npcUuid);
         if (cached == null) {
             return null;
         }
         if (nowMs >= cached.expiresAtMs()) {
+            cachedTargetsByNpcId.remove(npcUuid, cached);
+            return null;
+        }
+        if (currentCacheBlock == null || !currentCacheBlock.equals(cached.scanBlock())) {
             cachedTargetsByNpcId.remove(npcUuid, cached);
             return null;
         }
@@ -614,11 +621,20 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private void cacheTarget(@Nonnull UUID npcUuid,
                              @Nullable Vector3d target,
                              @Nonnull String reason,
+                             @Nullable TargetCacheBlock currentCacheBlock,
                              long nowMs) {
+        if (currentCacheBlock == null) {
+            return;
+        }
         long ttlMs = targetCacheTtlMs(target != null);
         cachedTargetsByNpcId.put(
                 npcUuid,
-                new CachedTargetResult(target != null ? new Vector3d(target) : null, reason, nowMs + ttlMs)
+                new CachedTargetResult(
+                        target != null ? new Vector3d(target) : null,
+                        reason,
+                        currentCacheBlock,
+                        nowMs + ttlMs
+                )
         );
     }
 
@@ -630,6 +646,13 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     static long targetCacheTtlMs(boolean hasTarget) {
         return hasTarget ? TARGET_CACHE_HIT_TTL_MS : TARGET_CACHE_MISS_TTL_MS;
+    }
+
+    static boolean targetCacheBlockMatchesForTests(@Nonnull Vector3d cachedScanPosition,
+                                                   @Nonnull Vector3d currentPosition) {
+        TargetCacheBlock cachedBlock = TargetCacheBlock.from(cachedScanPosition);
+        TargetCacheBlock currentBlock = TargetCacheBlock.from(currentPosition);
+        return cachedBlock != null && cachedBlock.equals(currentBlock);
     }
 
     @Nonnull
@@ -779,9 +802,37 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return npc != null ? npc.getUuid() : null;
     }
 
+    @Nullable
+    private static TargetCacheBlock resolveCurrentCacheBlock(@Nonnull Ref<EntityStore> ref,
+                                                             @Nonnull Store<EntityStore> store) {
+        TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+        if (transform == null || transform.getPosition() == null) {
+            return null;
+        }
+        return TargetCacheBlock.from(transform.getPosition());
+    }
+
     private record CachedTargetResult(@Nullable Vector3d target,
                                       @Nonnull String reason,
+                                      @Nonnull TargetCacheBlock scanBlock,
                                       long expiresAtMs) {
+    }
+
+    private record TargetCacheBlock(int x, int y, int z) {
+        @Nullable
+        private static TargetCacheBlock from(@Nullable Vector3d position) {
+            if (position == null
+                    || !Double.isFinite(position.x)
+                    || !Double.isFinite(position.y)
+                    || !Double.isFinite(position.z)) {
+                return null;
+            }
+            return new TargetCacheBlock(
+                    (int) Math.floor(position.x),
+                    (int) Math.floor(position.y),
+                    (int) Math.floor(position.z)
+            );
+        }
     }
 
     private record SearchEligibility(boolean allowed,

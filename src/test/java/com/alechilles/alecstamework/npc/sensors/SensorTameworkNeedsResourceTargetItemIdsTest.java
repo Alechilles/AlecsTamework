@@ -38,8 +38,21 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
     }
 
     @Test
-    void waterTargetMissCacheIsLongEnoughToThrottleRepeatedFullScans() {
-        assertTrue(SensorTameworkNeedsResourceTarget.targetCacheTtlMs(false) >= 3_000L);
+    void targetMissCacheIsShortEnoughForMovingNpcs() {
+        assertTrue(SensorTameworkNeedsResourceTarget.targetCacheTtlMs(false) > 0L);
+        assertTrue(SensorTameworkNeedsResourceTarget.targetCacheTtlMs(false) <= 1_000L);
+    }
+
+    @Test
+    void targetCacheIsScopedToNpcBlockPosition() {
+        assertTrue(SensorTameworkNeedsResourceTarget.targetCacheBlockMatchesForTests(
+                new Vector3d(10.2, 64.0, -3.8),
+                new Vector3d(10.9, 64.9, -3.1)
+        ));
+        assertFalse(SensorTameworkNeedsResourceTarget.targetCacheBlockMatchesForTests(
+                new Vector3d(10.2, 64.0, -3.8),
+                new Vector3d(11.0, 64.0, -3.8)
+        ));
     }
 
     @Test
