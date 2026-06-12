@@ -42,6 +42,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE = new NeedsResourcePathPreflightService();
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     private static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
+    private static final double PREFLIGHT_REJECT_TTL_SECONDS = 4.0;
     private static final double EPSILON = 0.000001;
 
     private final ResourceType resourceType;
@@ -197,7 +198,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         );
         if (!preflight.ready()) {
             if (preflight.noPath()) {
-                rejectTarget(npcUuid, resourceType, target, PositionTargetRejectCache.DEFAULT_TTL_SECONDS, nowMs);
+                rejectTarget(npcUuid, resourceType, target, PREFLIGHT_REJECT_TTL_SECONDS, nowMs);
                 recentTargetCache.forget(npcUuid, target);
             }
             maybeLog(
@@ -659,6 +660,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     static long targetCacheTtlMs(boolean hasTarget) {
         return hasTarget ? TARGET_CACHE_HIT_TTL_MS : TARGET_CACHE_MISS_TTL_MS;
+    }
+
+    static double preflightRejectTtlSecondsForTests() {
+        return PREFLIGHT_REJECT_TTL_SECONDS;
     }
 
     private boolean shouldUseRecentTargetFallback(@Nonnull String reason) {

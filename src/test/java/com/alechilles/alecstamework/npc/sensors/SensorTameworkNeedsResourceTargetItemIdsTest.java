@@ -44,6 +44,12 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
     }
 
     @Test
+    void preflightRejectCacheIsShorterThanMovementFailureSuppression() {
+        assertTrue(SensorTameworkNeedsResourceTarget.preflightRejectTtlSecondsForTests() > 0.0);
+        assertTrue(SensorTameworkNeedsResourceTarget.preflightRejectTtlSecondsForTests() < 10.0);
+    }
+
+    @Test
     void targetCacheIsScopedToNpcBlockPosition() {
         assertTrue(SensorTameworkNeedsResourceTarget.targetCacheBlockMatchesForTests(
                 new Vector3d(10.2, 64.0, -3.8),

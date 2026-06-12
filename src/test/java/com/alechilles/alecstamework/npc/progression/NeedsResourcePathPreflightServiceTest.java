@@ -103,6 +103,35 @@ class NeedsResourcePathPreflightServiceTest {
     }
 
     @Test
+    void noPathResultExpiresQuicklyEnoughForSensorFalseNegatives() {
+        NeedsResourcePathPreflightService service = new NeedsResourcePathPreflightService();
+        NeedsResourcePathPreflightService.PreflightKey key = keyFor(33);
+        AtomicInteger factoryCalls = new AtomicInteger();
+
+        PathPreflightResult first = service.preflight(
+                key,
+                () -> {
+                    factoryCalls.incrementAndGet();
+                    return new FakeComputation(PathPreflightStatus.NO_PATH);
+                },
+                1_000L
+        );
+        PathPreflightResult second = service.preflight(
+                key,
+                () -> {
+                    factoryCalls.incrementAndGet();
+                    return new FakeComputation(PathPreflightStatus.READY);
+                },
+                1_000L + NeedsResourcePathPreflightService.NO_PATH_TTL_MS + 1L
+        );
+
+        assertTrue(first.noPath());
+        assertTrue(second.ready());
+        assertTrue(NeedsResourcePathPreflightService.NO_PATH_TTL_MS <= 10_000L);
+        assertEquals(2, factoryCalls.get());
+    }
+
+    @Test
     void computingEntriesAreClearedWhenServiceIsReset() {
         NeedsResourcePathPreflightService service = new NeedsResourcePathPreflightService();
         FakeComputation computation = new FakeComputation(PathPreflightStatus.COMPUTING);

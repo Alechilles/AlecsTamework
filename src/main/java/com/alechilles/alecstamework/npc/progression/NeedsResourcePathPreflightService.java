@@ -36,7 +36,7 @@ public final class NeedsResourcePathPreflightService {
     static final int MAX_PATH_LENGTH = 128;
     static final int PRECHECK_CACHE_MAX_ENTRIES = 4096;
     static final long READY_TTL_MS = 1_500L;
-    static final long NO_PATH_TTL_MS = 30_000L;
+    static final long NO_PATH_TTL_MS = 8_000L;
     static final long COMPUTING_TTL_MS = 5_000L;
     private static final int MAX_GLOBAL_NODES_PER_50MS = 512;
     private static final long GLOBAL_BUDGET_WINDOW_MS = 50L;
