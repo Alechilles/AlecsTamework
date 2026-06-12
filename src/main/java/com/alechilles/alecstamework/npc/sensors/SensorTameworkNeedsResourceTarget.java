@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentSer
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.FoodTargetSearchResult;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.TargetRejector;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.WaterTargetSearchResult;
+import com.alechilles.alecstamework.npc.progression.NeedsRecentTargetCache;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
@@ -55,6 +56,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             new TameworkTargetPositionInfoProvider(null, positionInfo);
     private final ConcurrentHashMap<UUID, CachedTargetResult> cachedTargetsByNpcId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<FoodItemIdsCacheKey, String[]> foodItemIdsByConfig = new ConcurrentHashMap<>();
+    private final NeedsRecentTargetCache recentTargetCache = new NeedsRecentTargetCache();
 
     public SensorTameworkNeedsResourceTarget(@Nonnull BuilderSensorTameworkNeedsResourceTarget builder,
                                              @Nonnull BuilderSupport support) {
@@ -145,6 +147,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig, npcUuid, nowMs);
         };
         Vector3d target = resolution.target();
+        if (target == null && shouldUseRecentTargetFallback(resolution.reason())) {
+            target = resolveRecentTarget(ref, store, npcUuid, nowMs);
+            if (target != null) {
+                resolution = TargetResolution.of(target, "water_target_search_recent");
+            }
+        }
         if (target == null) {
             if (npcUuid != null) {
                 cacheTarget(npcUuid, null, resolution.reason(), currentCacheBlock, nowMs);
@@ -190,6 +198,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (!preflight.ready()) {
             if (preflight.noPath()) {
                 rejectTarget(npcUuid, resourceType, target, PositionTargetRejectCache.DEFAULT_TTL_SECONDS, nowMs);
+                recentTargetCache.forget(npcUuid, target);
             }
             maybeLog(
                     ref,
@@ -207,6 +216,9 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         if (npcUuid != null) {
             cacheTarget(npcUuid, target, resolution.reason(), currentCacheBlock, nowMs);
+            if (resourceType == ResourceType.WATER) {
+                recentTargetCache.remember(npcUuid, target, nowMs);
+            }
         }
         positionInfo.setTarget(target.x, target.y, target.z);
         maybeLog(
@@ -647,6 +659,23 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     static long targetCacheTtlMs(boolean hasTarget) {
         return hasTarget ? TARGET_CACHE_HIT_TTL_MS : TARGET_CACHE_MISS_TTL_MS;
+    }
+
+    private boolean shouldUseRecentTargetFallback(@Nonnull String reason) {
+        return resourceType == ResourceType.WATER && "water_target_not_found".equals(reason);
+    }
+
+    @Nullable
+    private Vector3d resolveRecentTarget(@Nonnull Ref<EntityStore> ref,
+                                         @Nonnull Store<EntityStore> store,
+                                         @Nullable UUID npcUuid,
+                                         long nowMs) {
+        Vector3d target = recentTargetCache.resolve(npcUuid, resolveCurrentPosition(ref, store), nowMs);
+        if (target != null && isTargetRejected(npcUuid, resourceType, target, nowMs)) {
+            recentTargetCache.forget(npcUuid, target);
+            return null;
+        }
+        return target;
     }
 
     static boolean targetCacheBlockMatchesForTests(@Nonnull Vector3d cachedScanPosition,

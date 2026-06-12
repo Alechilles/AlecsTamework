@@ -13,6 +13,7 @@
 ### Fixed
 - Fixed companion needs seeking so a temporary source lookup miss is not reused after the NPC moves to a different block, reducing cases where starving or thirsty companions fail to retry nearby food or water sources.
 - Fixed companion needs stand selection so a failed path candidate does not make NPCs ignore other reachable approach points around the same food or water source.
+- Fixed water seeking so companions can retry a recently confirmed water target after wandering just outside the normal source scan radius, without expanding the routine block scan.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 
