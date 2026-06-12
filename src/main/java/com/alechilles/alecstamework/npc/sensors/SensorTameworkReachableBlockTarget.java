@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.sensors;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.TargetRejector;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
@@ -29,6 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -38,13 +41,17 @@ import org.joml.Vector3d;
  */
 public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase {
     public static final double DEFAULT_APPROACH_RADIUS = NeedsResourceStandTargetSelector.MIN_ADJACENT_DISTANCE;
+    private static final Logger LOGGER = Logger.getLogger(SensorTameworkReachableBlockTarget.class.getName());
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE = new NeedsResourcePathPreflightService();
     private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
             ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     private static final long TARGET_CACHE_MISS_TTL_MS = 3_000L;
+    private static final long DIAGNOSTIC_REPEAT_INTERVAL_MS = 2_000L;
     private static final int MAX_SOURCE_CANDIDATES_PER_SCAN = 16;
     private static final double SCORE_EPSILON = 0.000001;
+    private static final ConcurrentHashMap<String, DiagnosticSnapshot> LAST_DIAGNOSTIC_BY_NPC_AND_LABEL =
+            new ConcurrentHashMap<>();
 
     @Nullable
     private final String blockSet;
@@ -90,9 +97,11 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         }
         if (cached != null) {
             if (cached.target() == null) {
+                maybeLogDiagnostic(npcUuid, "cache_miss", "negative_cache", null);
                 return false;
             }
             positionInfo.setTarget(cached.target().x, cached.target().y, cached.target().z);
+            maybeLogDiagnostic(npcUuid, "target_found", "cache_hit", cached.target());
             return true;
         }
 
@@ -101,12 +110,14 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
             if (npcUuid != null && resolution.cacheMiss()) {
                 cacheTarget(npcUuid, null, nowMs);
             }
+            maybeLogDiagnostic(npcUuid, "target_missing", resolution.detail(), null);
             return false;
         }
         if (npcUuid != null) {
             cacheTarget(npcUuid, resolution.target(), nowMs);
         }
         positionInfo.setTarget(resolution.target().x, resolution.target().y, resolution.target().z);
+        maybeLogDiagnostic(npcUuid, "target_found", resolution.detail(), resolution.target());
         return true;
     }
 
@@ -124,23 +135,24 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
         World world = resolveWorld(store);
         if (transform == null || transform.getPosition() == null || world == null || world.getChunkStore() == null) {
-            return TargetResolution.miss(true);
+            return TargetResolution.miss(true, "motion_or_world_context_missing");
         }
         if (npcUuid == null) {
-            return TargetResolution.miss(true);
+            return TargetResolution.miss(true, "npc_uuid_missing");
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
         if (chunkStoreStore == null) {
-            return TargetResolution.miss(true);
+            return TargetResolution.miss(true, "chunk_store_missing");
         }
 
         Vector3d npcPosition = transform.getPosition();
         NeedsResourceStandTargetSelector.CandidateProjector projector =
                 STAND_TARGET_SELECTOR.get().createProjector(role, store);
         if (projector == null) {
-            return TargetResolution.miss(true);
+            return TargetResolution.miss(true, "projector_missing");
         }
+        ScanDiagnostics diagnostics = new ScanDiagnostics();
         ScanContext context = new ScanContext(
                 ref,
                 role,
@@ -158,7 +170,8 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 projector,
                 PositionTargetRejectCache.hasRejectedTargetFor(npcUuid, label, nowMs)
                         ? target -> PositionTargetRejectCache.isRejected(npcUuid, label, target, nowMs)
-                        : null
+                        : null,
+                diagnostics
         );
         int searchRadius = Math.max(1, (int) Math.ceil(range));
 
@@ -167,13 +180,13 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
             RingResult ringResult = scanRing(context, horizontalRadius, checkedSources);
             checkedSources += ringResult.checkedSources();
             if (ringResult.target() != null) {
-                return TargetResolution.hit(ringResult.target());
+                return TargetResolution.hit(ringResult.target(), diagnostics.summary("source_ready"));
             }
             if (ringResult.deferred() || checkedSources >= MAX_SOURCE_CANDIDATES_PER_SCAN) {
-                return TargetResolution.miss(false);
+                return TargetResolution.miss(false, diagnostics.summary("source_limit_deferred"));
             }
         }
-        return TargetResolution.miss(true);
+        return TargetResolution.miss(true, diagnostics.summary("scan_exhausted"));
     }
 
     @Nonnull
@@ -197,6 +210,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                     if (worldChunk == null || !matchesConfiguredBlock(worldChunk, x, y, z, blockSet, blockTypes)) {
                         continue;
                     }
+                    context.diagnostics().recordMatchingSource(x, y, z, worldChunk.getBlockType(x, y, z));
                     checkedSources++;
                     if (alreadyCheckedSources + checkedSources > MAX_SOURCE_CANDIDATES_PER_SCAN) {
                         return RingResult.deferred(checkedSources);
@@ -227,6 +241,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 context.projector()
         );
         if (target == null || (context.rejector() != null && context.rejector().rejects(target))) {
+            context.diagnostics().recordProjectionRejected(target == null ? "projection_failed" : "target_rejected");
             return CandidateResult.empty();
         }
         PathPreflightResult preflight = PATH_PREFLIGHT_SERVICE.preflight(
@@ -239,6 +254,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                 context.nowMs()
         );
         if (preflight.ready()) {
+            context.diagnostics().recordPreflight(preflight.reason());
             return CandidateResult.hit(target);
         }
         if (preflight.noPath()) {
@@ -249,8 +265,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                     PositionTargetRejectCache.DEFAULT_TTL_SECONDS,
                     context.nowMs()
             );
+            context.diagnostics().recordPreflight(preflight.reason());
             return CandidateResult.empty();
         }
+        context.diagnostics().recordPreflight(preflight.reason());
         return CandidateResult.pending();
     }
 
@@ -405,6 +423,54 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         return MAX_SOURCE_CANDIDATES_PER_SCAN;
     }
 
+    private void maybeLogDiagnostic(@Nullable UUID npcUuid,
+                                    @Nonnull String result,
+                                    @Nonnull String detail,
+                                    @Nullable Vector3d target) {
+        if (npcUuid == null || !isDiagnosticsEnabled() || !LOGGER.isLoggable(Level.INFO)) {
+            return;
+        }
+        long nowMs = System.currentTimeMillis();
+        String key = npcUuid + "|" + label;
+        String signature = result + "|" + detail + "|" + formatTarget(target);
+        DiagnosticSnapshot previous = LAST_DIAGNOSTIC_BY_NPC_AND_LABEL.get(key);
+        if (previous != null
+                && previous.signature().equals(signature)
+                && nowMs < previous.loggedAtMs() + DIAGNOSTIC_REPEAT_INTERVAL_MS) {
+            return;
+        }
+        LAST_DIAGNOSTIC_BY_NPC_AND_LABEL.put(key, new DiagnosticSnapshot(signature, nowMs));
+        LOGGER.log(Level.INFO, String.format(
+                Locale.ROOT,
+                "Reachable block target probe: npc=%s label=%s result=%s detail=%s blockSet=%s blockTypes=%d range=%.2f verticalRadius=%d target=%s",
+                npcUuid,
+                label,
+                result,
+                detail,
+                blockSet == null ? "<none>" : blockSet,
+                blockTypes.size(),
+                range,
+                verticalRadius,
+                formatTarget(target)
+        ));
+    }
+
+    private static boolean isDiagnosticsEnabled() {
+        Tamework instance = Tamework.getInstance();
+        return instance != null && instance.isDebugNeedsSeekDiagnosticsEnabled();
+    }
+
+    @Nonnull
+    private static String formatTarget(@Nullable Vector3d target) {
+        if (target == null
+                || !Double.isFinite(target.x)
+                || !Double.isFinite(target.y)
+                || !Double.isFinite(target.z)) {
+            return "<none>";
+        }
+        return String.format(Locale.ROOT, "[%.2f,%.2f,%.2f]", target.x, target.y, target.z);
+    }
+
     private record CachedTargetResult(@Nullable Vector3d target, long expiresAtMs) {
     }
 
@@ -422,18 +488,19 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                                double radiusSq,
                                @Nonnull Map<Long, WorldChunk> chunkCache,
                                @Nonnull NeedsResourceStandTargetSelector.CandidateProjector projector,
-                               @Nullable TargetRejector rejector) {
+                               @Nullable TargetRejector rejector,
+                               @Nonnull ScanDiagnostics diagnostics) {
     }
 
-    private record TargetResolution(@Nullable Vector3d target, boolean cacheMiss) {
+    private record TargetResolution(@Nullable Vector3d target, boolean cacheMiss, @Nonnull String detail) {
         @Nonnull
-        private static TargetResolution hit(@Nonnull Vector3d target) {
-            return new TargetResolution(target, true);
+        private static TargetResolution hit(@Nonnull Vector3d target, @Nonnull String detail) {
+            return new TargetResolution(target, true, detail);
         }
 
         @Nonnull
-        private static TargetResolution miss(boolean cacheMiss) {
-            return new TargetResolution(null, cacheMiss);
+        private static TargetResolution miss(boolean cacheMiss, @Nonnull String detail) {
+            return new TargetResolution(null, cacheMiss, detail);
         }
     }
 
@@ -473,5 +540,58 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         private static CandidateResult pending() {
             return new CandidateResult(null, true);
         }
+    }
+
+    private static final class ScanDiagnostics {
+        private int matchingSources;
+        private int projectionFailures;
+        private int rejectedTargets;
+        @Nullable
+        private String firstSource;
+        @Nullable
+        private String lastPreflightReason;
+
+        private void recordMatchingSource(int x, int y, int z, @Nullable BlockType blockType) {
+            matchingSources++;
+            if (firstSource == null) {
+                firstSource = String.format(
+                        Locale.ROOT,
+                        "%s@[%d,%d,%d]",
+                        blockType == null || blockType.getId() == null ? "<unknown>" : blockType.getId(),
+                        x,
+                        y,
+                        z
+                );
+            }
+        }
+
+        private void recordProjectionRejected(@Nonnull String reason) {
+            if ("target_rejected".equals(reason)) {
+                rejectedTargets++;
+                return;
+            }
+            projectionFailures++;
+        }
+
+        private void recordPreflight(@Nonnull String reason) {
+            lastPreflightReason = reason;
+        }
+
+        @Nonnull
+        private String summary(@Nonnull String result) {
+            return String.format(
+                    Locale.ROOT,
+                    "%s sources=%d projectionFailures=%d rejectedTargets=%d firstSource=%s lastPreflight=%s",
+                    result,
+                    matchingSources,
+                    projectionFailures,
+                    rejectedTargets,
+                    firstSource == null ? "<none>" : firstSource,
+                    lastPreflightReason == null ? "<none>" : lastPreflightReason
+            );
+        }
+    }
+
+    private record DiagnosticSnapshot(@Nonnull String signature, long loggedAtMs) {
     }
 }
