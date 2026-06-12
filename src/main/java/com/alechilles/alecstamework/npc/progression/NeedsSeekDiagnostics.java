@@ -29,7 +29,8 @@ public final class NeedsSeekDiagnostics {
                                 @Nullable Double currentRatio,
                                 @Nullable Double ratioBelow,
                                 boolean cacheHit,
-                                @Nullable Vector3d target) {
+                                @Nullable Vector3d target,
+                                @Nullable Vector3d scanPosition) {
         Level level = resolveLevel(result);
         NeedsTelemetryDiagnostics.recordSeekFailure(
                 roleId,
@@ -45,7 +46,7 @@ public final class NeedsSeekDiagnostics {
         }
         long nowMs = System.currentTimeMillis();
         String modeKey = npcId + '|' + resourceType;
-        String signature = result + '|' + detail + '|' + formatTarget(target) + '|' + cacheHit;
+        String signature = result + '|' + detail + '|' + formatTarget(target) + '|' + cacheHit + '|' + formatBlock(scanPosition);
         DiagnosticSnapshot previous = LAST_LOG_BY_NPC_AND_MODE.get(modeKey);
         if (previous != null
                 && previous.signature().equals(signature)
@@ -55,7 +56,7 @@ public final class NeedsSeekDiagnostics {
         LAST_LOG_BY_NPC_AND_MODE.put(modeKey, new DiagnosticSnapshot(signature, nowMs));
         LOGGER.log(level, String.format(
                 Locale.ROOT,
-                "Needs seek probe: npc=%s role=%s type=%s result=%s detail=%s cacheHit=%s range=%.2f currentRatio=%s threshold=%s target=%s",
+                "Needs seek probe: npc=%s role=%s type=%s result=%s detail=%s cacheHit=%s range=%.2f currentRatio=%s threshold=%s scanBlock=%s target=%s",
                 npcId,
                 roleId == null || roleId.isBlank() ? "<unknown>" : roleId,
                 resourceType,
@@ -65,8 +66,34 @@ public final class NeedsSeekDiagnostics {
                 searchRange,
                 formatRatio(currentRatio),
                 formatRatio(ratioBelow),
+                formatBlock(scanPosition),
                 formatTarget(target)
         ));
+    }
+
+    public static void maybeLog(@Nonnull String npcId,
+                                @Nullable String roleId,
+                                @Nonnull String resourceType,
+                                @Nonnull String result,
+                                @Nonnull String detail,
+                                double searchRange,
+                                @Nullable Double currentRatio,
+                                @Nullable Double ratioBelow,
+                                boolean cacheHit,
+                                @Nullable Vector3d target) {
+        maybeLog(
+                npcId,
+                roleId,
+                resourceType,
+                result,
+                detail,
+                searchRange,
+                currentRatio,
+                ratioBelow,
+                cacheHit,
+                target,
+                null
+        );
     }
 
     @Nonnull
@@ -96,6 +123,23 @@ public final class NeedsSeekDiagnostics {
             return "<none>";
         }
         return String.format(Locale.ROOT, "[%.2f,%.2f,%.2f]", target.x, target.y, target.z);
+    }
+
+    @Nonnull
+    private static String formatBlock(@Nullable Vector3d position) {
+        if (position == null
+                || !Double.isFinite(position.x)
+                || !Double.isFinite(position.y)
+                || !Double.isFinite(position.z)) {
+            return "<unknown>";
+        }
+        return String.format(
+                Locale.ROOT,
+                "[%d,%d,%d]",
+                (int) Math.floor(position.x),
+                (int) Math.floor(position.y),
+                (int) Math.floor(position.z)
+        );
     }
 
     private record DiagnosticSnapshot(@Nonnull String signature,

@@ -71,6 +71,43 @@ class NeedsResourceStandTargetSelectorTest {
     }
 
     @Test
+    void rejectedNearestProjectedCandidateFallsBackToNextBest() {
+        NeedsResourceStandTargetSelector selector = new NeedsResourceStandTargetSelector();
+
+        Vector3d target = selector.findNearestProjectedTarget(
+                0,
+                0,
+                0,
+                new Vector3d(1.5, 0.0, 0.5),
+                1.0,
+                false,
+                (candidate, minY, maxY) -> true,
+                candidate -> Math.floor(candidate.x) == 1.0 && Math.floor(candidate.z) == 0.0
+        );
+
+        assertNotNull(target);
+        assertTrue(Math.floor(target.x) != 1.0 || Math.floor(target.z) != 0.0);
+    }
+
+    @Test
+    void allRejectedProjectedCandidatesReturnNull() {
+        NeedsResourceStandTargetSelector selector = new NeedsResourceStandTargetSelector();
+
+        Vector3d target = selector.findNearestProjectedTarget(
+                0,
+                0,
+                0,
+                new Vector3d(1.5, 0.0, 0.5),
+                1.0,
+                false,
+                (candidate, minY, maxY) -> true,
+                candidate -> true
+        );
+
+        assertNull(target);
+    }
+
+    @Test
     void candidateCountRemainsBoundedBySelectorConstant() {
         NeedsResourceStandTargetSelector selector = new NeedsResourceStandTargetSelector();
         AtomicInteger checkedCandidates = new AtomicInteger();

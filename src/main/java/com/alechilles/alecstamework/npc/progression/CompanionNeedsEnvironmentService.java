@@ -47,7 +47,8 @@ public final class CompanionNeedsEnvironmentService {
     private static final ConcurrentHashMap<NeedsSearchCacheKey, CachedSearchResult> SEARCH_CACHE = new ConcurrentHashMap<>();
 
     @FunctionalInterface
-    public interface TargetRejector {
+    public interface TargetRejector extends NeedsResourceStandTargetSelector.CandidateRejector {
+        @Override
         boolean rejects(@Nonnull Vector3d target);
     }
 
@@ -946,7 +947,8 @@ public final class CompanionNeedsEnvironmentService {
                             npcPosition,
                             consumeRadius,
                             chunkCache,
-                            standProjector
+                            standProjector,
+                            targetRejector
                     );
                     if (standPosition == null) {
                         continue;
@@ -1031,7 +1033,8 @@ public final class CompanionNeedsEnvironmentService {
                             z,
                             npcPosition,
                             chunkCache,
-                            standProjector
+                            standProjector,
+                            targetRejector
                     );
                     if (standPosition == null) {
                         continue;
@@ -1657,7 +1660,8 @@ public final class CompanionNeedsEnvironmentService {
                                                                     int sourceZ,
                                                                     @Nonnull Vector3d npcPosition,
                                                                     @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                    @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector) {
+                                                                    @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
+                                                                    @Nullable TargetRejector targetRejector) {
         if (standProjector != null) {
             return standTargetSelector().findNearestProjectedTarget(
                     sourceX,
@@ -1666,7 +1670,8 @@ public final class CompanionNeedsEnvironmentService {
                     npcPosition,
                     NeedsResourceStandTargetSelector.MIN_ADJACENT_DISTANCE,
                     false,
-                    standProjector
+                    standProjector,
+                    targetRejector
             );
         }
         return findNearestStandPositionNearBlock(
@@ -1677,7 +1682,8 @@ public final class CompanionNeedsEnvironmentService {
                 sourceZ,
                 npcPosition,
                 1.0,
-                chunkCache
+                chunkCache,
+                targetRejector
         );
     }
 
@@ -1690,7 +1696,8 @@ public final class CompanionNeedsEnvironmentService {
                                                                     @Nonnull Vector3d npcPosition,
                                                                     double consumeRadius,
                                                                     @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                    @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector) {
+                                                                    @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
+                                                                    @Nullable TargetRejector targetRejector) {
         if (standProjector != null) {
             return standTargetSelector().findNearestProjectedTarget(
                     sourceX,
@@ -1699,7 +1706,8 @@ public final class CompanionNeedsEnvironmentService {
                     npcPosition,
                     Math.max(NeedsResourceStandTargetSelector.MIN_ADJACENT_DISTANCE, consumeRadius),
                     true,
-                    standProjector
+                    standProjector,
+                    targetRejector
             );
         }
         return findNearestStandPositionNearBlock(
@@ -1710,7 +1718,8 @@ public final class CompanionNeedsEnvironmentService {
                 sourceZ,
                 npcPosition,
                 Math.max(1.0, consumeRadius),
-                chunkCache
+                chunkCache,
+                targetRejector
         );
     }
 
@@ -1722,7 +1731,8 @@ public final class CompanionNeedsEnvironmentService {
                                                               int sourceZ,
                                                               @Nonnull Vector3d npcPosition,
                                                               double maxDistance,
-                                                              @Nonnull Map<Long, WorldChunk> chunkCache) {
+                                                              @Nonnull Map<Long, WorldChunk> chunkCache,
+                                                              @Nullable TargetRejector targetRejector) {
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
         double normalizedMaxDistance = Double.isFinite(maxDistance) && maxDistance > 0.0 ? maxDistance : 1.0;
@@ -1745,6 +1755,9 @@ public final class CompanionNeedsEnvironmentService {
                             candidateY + STAND_POSITION_Y_OFFSET,
                             candidateZ + 0.5
                     );
+                    if (targetRejector != null && targetRejector.rejects(target)) {
+                        continue;
+                    }
                     double distanceSq = distanceSquared(target, npcPosition);
                     if (!Double.isFinite(distanceSq) || distanceSq >= bestDistanceSq) {
                         continue;

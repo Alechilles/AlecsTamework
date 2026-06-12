@@ -65,6 +65,29 @@ public final class NeedsResourceStandTargetSelector {
         boolean includeSourceBlock,
         @Nonnull CandidateProjector projector
     ) {
+        return findNearestProjectedTarget(
+                sourceX,
+                sourceY,
+                sourceZ,
+                npcPosition,
+                maxDistance,
+                includeSourceBlock,
+                projector,
+                null
+        );
+    }
+
+    @Nullable
+    public Vector3d findNearestProjectedTarget(
+        int sourceX,
+        int sourceY,
+        int sourceZ,
+        @Nonnull Vector3d npcPosition,
+        double maxDistance,
+        boolean includeSourceBlock,
+        @Nonnull CandidateProjector projector,
+        @Nullable CandidateRejector candidateRejector
+    ) {
         double effectiveMaxDistance = Math.min(Math.max(0.0, maxDistance), MAX_HORIZONTAL_OFFSET);
         double maxDistanceSquared = effectiveMaxDistance * effectiveMaxDistance;
         double bestScore = Double.MAX_VALUE;
@@ -92,6 +115,9 @@ public final class NeedsResourceStandTargetSelector {
                 continue;
             }
             if (!isFinite(scratchCandidate)) {
+                continue;
+            }
+            if (candidateRejector != null && candidateRejector.rejects(scratchCandidate)) {
                 continue;
             }
 
@@ -150,6 +176,11 @@ public final class NeedsResourceStandTargetSelector {
     @FunctionalInterface
     public interface CandidateProjector {
         boolean project(@Nonnull Vector3d candidate, double minY, double maxY);
+    }
+
+    @FunctionalInterface
+    public interface CandidateRejector {
+        boolean rejects(@Nonnull Vector3d target);
     }
 
     private static final class CandidateOffset {

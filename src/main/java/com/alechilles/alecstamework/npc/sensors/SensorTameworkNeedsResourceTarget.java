@@ -569,7 +569,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 currentRatio,
                 gatedNeed == null || !Double.isFinite(gatedRatioBelow) ? null : gatedRatioBelow,
                 cacheHit,
-                target
+                target,
+                resolveCurrentPosition(ref, store)
         );
     }
 
