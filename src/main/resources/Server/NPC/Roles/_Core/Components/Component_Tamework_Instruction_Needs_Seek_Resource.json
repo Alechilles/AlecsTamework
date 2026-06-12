@@ -40,7 +40,7 @@
       "Description": "Desired distance band used by MaintainDistance while recovering consume position."
     },
     "NeedsSeekRelativeSpeed": {
-      "Value": 0.55,
+      "Value": 0.75,
       "Description": "Relative movement speed while seeking needs resources."
     },
     "NeedsSeekUsePathfinder": {
@@ -73,8 +73,8 @@
     },
     "NeedsSeekMoveTimeoutRange": {
       "Value": [
-        8,
-        10
+        16,
+        20
       ],
       "Description": "Fail-safe maximum move time before resource seek completes."
     },

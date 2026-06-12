@@ -16,6 +16,7 @@
 - Fixed water seeking so companions can retry a recently confirmed water target after wandering just outside the normal source scan radius, without expanding the routine block scan.
 - Reduced the sensor-side no-path memory for needs resource checks so temporary water path preflight misses do not suppress valid retries for half a minute.
 - Fixed needs-seek planning so a valid water target is not overwritten by a food target in the same sensor pass when both hunger and thirst are low.
+- Reduced repeated companion needs-seek retries by giving confirmed food and water paths a longer movement window and a faster seek pace before timing out.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 

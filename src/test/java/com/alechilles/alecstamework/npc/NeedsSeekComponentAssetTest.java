@@ -30,14 +30,25 @@ class NeedsSeekComponentAssetTest {
         JsonObject steering = parameters.getAsJsonObject("NeedsSeekUseSteering");
         JsonObject bestPath = parameters.getAsJsonObject("NeedsSeekUseBestPath");
         JsonObject reachable = parameters.getAsJsonObject("NeedsSeekReachable");
+        JsonObject relativeSpeed = parameters.getAsJsonObject("NeedsSeekRelativeSpeed");
+        JsonObject moveTimeout = parameters.getAsJsonObject("NeedsSeekMoveTimeoutRange");
         assertNotNull(pathfinder, "Needs seek component must expose NeedsSeekUsePathfinder");
         assertNotNull(steering, "Needs seek component must expose NeedsSeekUseSteering");
         assertNotNull(bestPath, "Needs seek component must expose NeedsSeekUseBestPath");
         assertNotNull(reachable, "Needs seek component must expose NeedsSeekReachable");
+        assertNotNull(relativeSpeed, "Needs seek component must expose NeedsSeekRelativeSpeed");
+        assertNotNull(moveTimeout, "Needs seek component must expose NeedsSeekMoveTimeoutRange");
         assertTrue(pathfinder.get("Value").getAsBoolean(), "Needs seek must use pathfinding");
         assertFalse(steering.get("Value").getAsBoolean(), "Needs seek must not direct-steer around pathfinding");
         assertFalse(bestPath.get("Value").getAsBoolean(), "Needs seek must not accept partial best-path fallback");
         assertTrue(reachable.get("Value").getAsBoolean(), "Needs seek must require direct reachability at goal");
+        assertTrue(relativeSpeed.get("Value").getAsDouble() >= 0.75,
+                "Needs seek must move fast enough to avoid repeated timeout/retry loops");
+        JsonArray timeoutRange = moveTimeout.getAsJsonArray("Value");
+        assertTrue(timeoutRange.get(0).getAsDouble() >= 16.0,
+                "Needs seek must allow enough time for valid preflight paths to complete");
+        assertTrue(timeoutRange.get(1).getAsDouble() >= 20.0,
+                "Needs seek must allow enough time for valid preflight paths to complete");
         assertTrue(content.contains("\"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\""),
                 "Seek motion must stay active until consume range");
         assertEquals(1, countOccurrences(content, "\"Type\": \"MaintainDistance\""),
