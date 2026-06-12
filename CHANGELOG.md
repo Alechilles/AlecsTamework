@@ -18,6 +18,7 @@
 - Fixed needs-seek planning so a valid water target is not overwritten by a food target in the same sensor pass when both hunger and thirst are low.
 - Reduced repeated companion needs-seek retries by giving confirmed food and water paths a longer movement window and a faster seek pace before timing out.
 - Fixed companion needs-seek priority so hunger can interrupt water top-offs when food is the lower need, while keeping fallback behavior when the preferred resource is unavailable.
+- Improved companion needs-seek fairness so food gets priority when hunger and thirst are nearly tied, reducing long water-biased delays at mid-range needs.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 

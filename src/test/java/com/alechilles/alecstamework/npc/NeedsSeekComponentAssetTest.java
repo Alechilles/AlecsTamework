@@ -85,6 +85,23 @@ class NeedsSeekComponentAssetTest {
     }
 
     @Test
+    void needsSeekSensorLetsFoodWinNearTieBeforeWaterPriority() {
+        String content = readResource(
+                "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource_Sensor.json"
+        );
+
+        assertTrue(content.contains("\"NeedsSeekFoodNearTieBiasRatio\""),
+                "Needs planner must expose a small food bias for near-tie hunger/thirst cases");
+        assertTrue(content.contains("\"AllowedHigherBy\""),
+                "Food priority comparison must allow a small near-tie ratio band");
+        assertTrue(
+                content.indexOf("Prefer food seek when hunger is close to or below thirst")
+                        < content.indexOf("Prefer water seek when thirst is the lowest active need"),
+                "Near-tie food priority must run before strict water priority"
+        );
+    }
+
+    @Test
     void needsSeekSensorStopsAfterAcceptingOneResourceTarget() {
         String content = readResource(
                 "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource_Sensor.json"

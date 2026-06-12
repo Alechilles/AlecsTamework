@@ -22,12 +22,14 @@ public final class SensorTameworkNeedLowest extends TameworkSensorBase {
 
     private final NeedType needType;
     private final NeedType otherNeedType;
+    private final double allowedHigherBy;
 
     public SensorTameworkNeedLowest(@Nonnull BuilderSensorTameworkNeedLowest builder,
                                     @Nonnull BuilderSupport support) {
         super(builder);
         this.needType = NeedType.from(builder.getNeed(support));
         this.otherNeedType = NeedType.from(builder.getOtherNeed(support));
+        this.allowedHigherBy = clamp01(builder.getAllowedHigherBy(support));
     }
 
     @Override
@@ -53,7 +55,7 @@ public final class SensorTameworkNeedLowest extends TameworkSensorBase {
         }
         double selectedRatio = resolveRatio(needs, config, needType);
         double otherRatio = resolveRatio(needs, config, otherNeedType);
-        return isSelectedNeedLowestForTests(selectedRatio, otherRatio);
+        return isSelectedNeedLowestForTests(selectedRatio, otherRatio, allowedHigherBy);
     }
 
     @Override
@@ -62,10 +64,15 @@ public final class SensorTameworkNeedLowest extends TameworkSensorBase {
     }
 
     static boolean isSelectedNeedLowestForTests(double selectedRatio, double otherRatio) {
+        return isSelectedNeedLowestForTests(selectedRatio, otherRatio, 0.0);
+    }
+
+    static boolean isSelectedNeedLowestForTests(double selectedRatio, double otherRatio, double allowedHigherBy) {
         if (!Double.isFinite(selectedRatio) || !Double.isFinite(otherRatio)) {
             return false;
         }
-        return selectedRatio <= otherRatio + EPSILON;
+        double effectiveAllowedHigherBy = Double.isFinite(allowedHigherBy) ? Math.max(0.0, allowedHigherBy) : 0.0;
+        return selectedRatio <= otherRatio + effectiveAllowedHigherBy + EPSILON;
     }
 
     private static double resolveRatio(@Nonnull TameworkNeedsComponent needs,

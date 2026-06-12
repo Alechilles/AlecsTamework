@@ -20,6 +20,11 @@ class SensorTameworkNeedLowestTest {
     }
 
     @Test
+    void selectedNeedCanWinNearTieWithAllowedHigherRatio() {
+        assertTrue(SensorTameworkNeedLowest.isSelectedNeedLowestForTests(0.442, 0.425, 0.05));
+    }
+
+    @Test
     void selectedNeedLosesWhenOtherNeedIsLower() {
         assertFalse(SensorTameworkNeedLowest.isSelectedNeedLowestForTests(0.849, 0.0));
         assertFalse(SensorTameworkNeedLowest.isSelectedNeedLowestForTests(0.75, 0.25));

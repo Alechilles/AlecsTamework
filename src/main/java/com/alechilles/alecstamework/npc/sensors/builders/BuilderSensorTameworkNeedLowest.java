@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.npc.sensors.SensorTameworkNeedLowest;
 import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.StringNotEmptyValidator;
 import com.hypixel.hytale.server.npc.instructions.Sensor;
@@ -17,6 +18,7 @@ public final class BuilderSensorTameworkNeedLowest extends TameworkSensorBuilder
 
     private final StringHolder need = new StringHolder();
     private final StringHolder otherNeed = new StringHolder();
+    private final DoubleHolder allowedHigherBy = new DoubleHolder();
 
     @Override
     public String getBuilderId() {
@@ -38,7 +40,7 @@ public final class BuilderSensorTameworkNeedLowest extends TameworkSensorBuilder
     @Nonnull
     @Override
     public String getLongDescription() {
-        return "Checks two Tamework needs and matches when the selected need's normalized ratio is lower than or tied with the other need.";
+        return "Checks two Tamework needs and matches when the selected need's normalized ratio is lower than, tied with, or within the configured near-tie band of the other need.";
     }
 
     @Nonnull
@@ -68,6 +70,16 @@ public final class BuilderSensorTameworkNeedLowest extends TameworkSensorBuilder
                 "Other need type to compare against: Hunger or Thirst.",
                 null
         );
+        this.getDouble(
+                data,
+                "AllowedHigherBy",
+                this.allowedHigherBy,
+                0.0,
+                null,
+                BuilderDescriptorState.Stable,
+                "Optional normalized ratio band where the selected need may be slightly higher than the other need and still match.",
+                null
+        );
         return this;
     }
 
@@ -79,5 +91,9 @@ public final class BuilderSensorTameworkNeedLowest extends TameworkSensorBuilder
     @Nonnull
     public String getOtherNeed(@Nonnull BuilderSupport support) {
         return this.otherNeed.get(support.getExecutionContext());
+    }
+
+    public double getAllowedHigherBy(@Nonnull BuilderSupport support) {
+        return this.allowedHigherBy.get(support.getExecutionContext());
     }
 }

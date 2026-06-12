@@ -24,6 +24,10 @@
       "Value": 0.85,
       "Description": "Start water seeking when normalized thirst is at or below this ratio."
     },
+    "NeedsSeekFoodNearTieBiasRatio": {
+      "Value": 0.05,
+      "Description": "When hunger and thirst are both low, prefer food if hunger is within this normalized ratio above thirst."
+    },
     "NeedsSeekWaterSearchRange": {
       "Value": 16,
       "Description": "Water search radius in blocks."
@@ -56,6 +60,73 @@
           "Type": "State",
           "State": ".Listen"
         }
+      },
+      {
+        "$Comment": "Prefer food seek when hunger is close to or below thirst and a food target is resolvable.",
+        "Continue": false,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Listen"
+            },
+            {
+              "Type": "TameworkNeedBelow",
+              "Need": "Hunger",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenHungerBelowRatio"
+              }
+            },
+            {
+              "Type": "TameworkNeedLowest",
+              "Need": "Hunger",
+              "OtherNeed": "Thirst",
+              "AllowedHigherBy": {
+                "Compute": "NeedsSeekFoodNearTieBiasRatio"
+              }
+            },
+            {
+              "Type": "Timer",
+              "Name": {
+                "Compute": "NeedsSeekFailedCooldownName"
+              },
+              "State": "Stopped"
+            },
+            {
+              "Type": "TameworkNeedsResourceTarget",
+              "Need": "Hunger",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenHungerBelowRatio"
+              },
+              "ResourceType": "FoodContainer",
+              "Range": {
+                "Compute": "NeedsSeekFoodSearchRange"
+              },
+              "ItemIds": {
+                "Compute": "NeedsSeekFoodItemIds"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "NeedsSeekTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "NeedsSeekClearTargetSlot"
+            }
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnNeedsSeekFoodActive"
+          }
+        ]
       },
       {
         "$Comment": "Prefer water seek when thirst is the lowest active need and a water target is resolvable.",
@@ -115,70 +186,6 @@
           {
             "Type": "ParentState",
             "State": "OnNeedsSeekWaterActive"
-          }
-        ]
-      },
-      {
-        "$Comment": "Prefer food seek when hunger is the lowest active need and a food target is resolvable.",
-        "Continue": false,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Listen"
-            },
-            {
-              "Type": "TameworkNeedBelow",
-              "Need": "Hunger",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenHungerBelowRatio"
-              }
-            },
-            {
-              "Type": "TameworkNeedLowest",
-              "Need": "Hunger",
-              "OtherNeed": "Thirst"
-            },
-            {
-              "Type": "Timer",
-              "Name": {
-                "Compute": "NeedsSeekFailedCooldownName"
-              },
-              "State": "Stopped"
-            },
-            {
-              "Type": "TameworkNeedsResourceTarget",
-              "Need": "Hunger",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenHungerBelowRatio"
-              },
-              "ResourceType": "FoodContainer",
-              "Range": {
-                "Compute": "NeedsSeekFoodSearchRange"
-              },
-              "ItemIds": {
-                "Compute": "NeedsSeekFoodItemIds"
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "StorePosition",
-            "Slot": {
-              "Compute": "NeedsSeekTargetSlot"
-            }
-          },
-          {
-            "Type": "ReleaseTarget",
-            "TargetSlot": {
-              "Compute": "NeedsSeekClearTargetSlot"
-            }
-          },
-          {
-            "Type": "ParentState",
-            "State": "OnNeedsSeekFoodActive"
           }
         ]
       },
