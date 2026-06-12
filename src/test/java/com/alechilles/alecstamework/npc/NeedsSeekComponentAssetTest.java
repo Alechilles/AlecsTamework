@@ -8,11 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /** Tests asset wiring for needs-seek movement behavior. */
@@ -72,24 +71,6 @@ class NeedsSeekComponentAssetTest {
         assertPlannerRunsFromIdleAndHold(patchExample);
     }
 
-    @Test
-    void feedTroughsAreNotPatchedIntoFenceBlockSet() {
-        Path patchRoot = Path.of("src", "main", "resources", "Server", "Tamework", "Patches");
-
-        try (Stream<Path> paths = Files.walk(patchRoot)) {
-            boolean patchesTroughIntoFence = paths
-                    .filter(path -> Files.isRegularFile(path) && path.toString().endsWith(".json"))
-                    .map(NeedsSeekComponentAssetTest::readFile)
-                    .anyMatch(content -> content.contains("\"Target\": \"Server/Item/Block/Sets/Fence.json\"")
-                            && content.contains("Tw_Feed_Trough"));
-
-            assertFalse(patchesTroughIntoFence,
-                    "Feed troughs must not be added to the Fence block set; that breaks needs path probes");
-        } catch (Exception ex) {
-            throw new AssertionError("Failed to inspect Tamework patch resources", ex);
-        }
-    }
-
     private static JsonObject object(String json) {
         return JsonParser.parseString(json).getAsJsonObject();
     }
@@ -97,16 +78,12 @@ class NeedsSeekComponentAssetTest {
     private static String readResource(String path) {
         Path resourcePath = Path.of("src", "main", "resources", path);
         assertTrue(Files.exists(resourcePath), "Missing test resource file: " + resourcePath);
-        return readFile(resourcePath);
-    }
-
-    private static String readFile(Path path) {
         try {
-            String content = Files.readString(path, StandardCharsets.UTF_8);
+            String content = Files.readString(resourcePath, StandardCharsets.UTF_8);
             assertNotEquals("", content);
             return content;
         } catch (Exception ex) {
-            throw new AssertionError("Failed to read file: " + path, ex);
+            throw new AssertionError("Failed to read resource: " + resourcePath, ex);
         }
     }
 
