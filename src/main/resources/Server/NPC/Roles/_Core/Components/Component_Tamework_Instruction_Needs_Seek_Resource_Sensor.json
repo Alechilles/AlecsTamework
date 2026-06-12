@@ -58,7 +58,132 @@
         }
       },
       {
-        "$Comment": "Trigger water seek when thirst is low and a water target is resolvable.",
+        "$Comment": "Prefer water seek when thirst is the lowest active need and a water target is resolvable.",
+        "Continue": false,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Listen"
+            },
+            {
+              "Type": "TameworkNeedBelow",
+              "Need": "Thirst",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenThirstBelowRatio"
+              }
+            },
+            {
+              "Type": "TameworkNeedLowest",
+              "Need": "Thirst",
+              "OtherNeed": "Hunger"
+            },
+            {
+              "Type": "Timer",
+              "Name": {
+                "Compute": "NeedsSeekFailedCooldownName"
+              },
+              "State": "Stopped"
+            },
+            {
+              "Type": "TameworkNeedsResourceTarget",
+              "Need": "Thirst",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenThirstBelowRatio"
+              },
+              "ResourceType": "Water",
+              "Range": {
+                "Compute": "NeedsSeekWaterSearchRange"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "NeedsSeekTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "NeedsSeekClearTargetSlot"
+            }
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnNeedsSeekWaterActive"
+          }
+        ]
+      },
+      {
+        "$Comment": "Prefer food seek when hunger is the lowest active need and a food target is resolvable.",
+        "Continue": false,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Listen"
+            },
+            {
+              "Type": "TameworkNeedBelow",
+              "Need": "Hunger",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenHungerBelowRatio"
+              }
+            },
+            {
+              "Type": "TameworkNeedLowest",
+              "Need": "Hunger",
+              "OtherNeed": "Thirst"
+            },
+            {
+              "Type": "Timer",
+              "Name": {
+                "Compute": "NeedsSeekFailedCooldownName"
+              },
+              "State": "Stopped"
+            },
+            {
+              "Type": "TameworkNeedsResourceTarget",
+              "Need": "Hunger",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenHungerBelowRatio"
+              },
+              "ResourceType": "FoodContainer",
+              "Range": {
+                "Compute": "NeedsSeekFoodSearchRange"
+              },
+              "ItemIds": {
+                "Compute": "NeedsSeekFoodItemIds"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "NeedsSeekTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "NeedsSeekClearTargetSlot"
+            }
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnNeedsSeekFoodActive"
+          }
+        ]
+      },
+      {
+        "$Comment": "Fallback water seek when thirst is low and a water target is resolvable.",
         "Continue": false,
         "Sensor": {
           "Type": "And",
@@ -114,7 +239,7 @@
         ]
       },
       {
-        "$Comment": "Trigger food seek when hunger is low and a food container target is resolvable.",
+        "$Comment": "Fallback food seek when hunger is low and a food container target is resolvable.",
         "Continue": false,
         "Sensor": {
           "Type": "And",

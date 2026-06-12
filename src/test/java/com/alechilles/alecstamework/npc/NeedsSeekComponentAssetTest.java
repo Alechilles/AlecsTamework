@@ -63,10 +63,25 @@ class NeedsSeekComponentAssetTest {
                 "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource_Sensor.json"
         );
 
-        assertEquals(2, countOccurrences(content, "\"Compute\": \"NeedsSeekFailedCooldownName\""),
-                "Food and water planner branches must both check the failed seek cooldown");
-        assertEquals(2, countOccurrences(content, "\"State\": \"Stopped\""),
-                "Food and water planner branches must wait for the failed seek cooldown to stop");
+        assertEquals(4, countOccurrences(content, "\"Compute\": \"NeedsSeekFailedCooldownName\""),
+                "Priority and fallback planner branches must check the failed seek cooldown");
+        assertEquals(4, countOccurrences(content, "\"State\": \"Stopped\""),
+                "Priority and fallback planner branches must wait for the failed seek cooldown to stop");
+    }
+
+    @Test
+    void needsSeekSensorPrioritizesLowerNeedBeforeFallbacks() {
+        String content = readResource(
+                "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource_Sensor.json"
+        );
+
+        assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedLowest\""),
+                "Needs planner must compare hunger and thirst before static fallback ordering");
+        assertTrue(
+                content.indexOf("\"Type\": \"TameworkNeedLowest\"")
+                        < content.indexOf("Fallback water seek"),
+                "Priority resource checks must run before fallback resource checks"
+        );
     }
 
     @Test
