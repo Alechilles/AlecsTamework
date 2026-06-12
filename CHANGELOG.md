@@ -10,6 +10,9 @@
 - Needs resource scans now run a bounded pathfinder preflight before entering movement, so blocked troughs or water sources no longer pull companions out of idle/resting states unless a path is already confirmed.
 - Feed trough blocks are now added to the vanilla Fence block set through an asset patch so movement and path checks treat trough variants consistently with fence-like obstacles.
 
+### Fixed
+- Fixed companion needs seeking so a temporary source lookup miss is not reused after the NPC moves to a different block, reducing cases where starving or thirsty companions fail to retry nearby food or water sources.
+
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 
 ### Added
