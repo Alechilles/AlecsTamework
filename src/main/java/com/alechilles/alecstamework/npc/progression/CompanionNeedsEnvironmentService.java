@@ -639,13 +639,14 @@ public final class CompanionNeedsEnvironmentService {
             return null;
         }
         TwNeedsConfig.PassiveRefillSettings passive = config.getPassiveRefill();
-        return findNearestFoodContainerPosition(
+        return findNearestFoodContainerTarget(
                 npcRef,
                 store,
                 passive.getContainerSearchRadius(),
                 passive.getContainerFoodItemIds(),
-                passive.getContainerVerticalScanRadius()
-        );
+                passive.getContainerVerticalScanRadius(),
+                passive.getContainerConsumeRadius()
+        ).target();
     }
 
     @Nullable
@@ -653,13 +654,14 @@ public final class CompanionNeedsEnvironmentService {
                                                      @Nullable Store<EntityStore> store,
                                                      double radius,
                                                      @Nullable String[] allowedItemIds) {
-        return findNearestFoodContainerPosition(
+        return findNearestFoodContainerTarget(
                 npcRef,
                 store,
                 radius,
                 allowedItemIds,
-                DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS
-        );
+                DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS,
+                0.0
+        ).target();
     }
 
     @Nullable
@@ -668,7 +670,16 @@ public final class CompanionNeedsEnvironmentService {
                                                      double radius,
                                                      @Nullable String[] allowedItemIds,
                                                      int verticalScanRadius) {
-        return findNearestFoodContainerPosition(npcRef, null, store, radius, allowedItemIds, verticalScanRadius);
+        return findNearestFoodContainerTarget(
+                npcRef,
+                null,
+                store,
+                radius,
+                allowedItemIds,
+                verticalScanRadius,
+                0.0,
+                null
+        ).target();
     }
 
     @Nullable
@@ -678,7 +689,16 @@ public final class CompanionNeedsEnvironmentService {
                                                      double radius,
                                                      @Nullable String[] allowedItemIds,
                                                      int verticalScanRadius) {
-        return findNearestFoodContainerPosition(npcRef, role, store, radius, allowedItemIds, verticalScanRadius, null);
+        return findNearestFoodContainerTarget(
+                npcRef,
+                role,
+                store,
+                radius,
+                allowedItemIds,
+                verticalScanRadius,
+                0.0,
+                null
+        ).target();
     }
 
     @Nullable
@@ -689,22 +709,63 @@ public final class CompanionNeedsEnvironmentService {
                                                      @Nullable String[] allowedItemIds,
                                                      int verticalScanRadius,
                                                      @Nullable TargetRejector targetRejector) {
+        return findNearestFoodContainerTarget(
+                npcRef,
+                role,
+                store,
+                radius,
+                allowedItemIds,
+                verticalScanRadius,
+                0.0,
+                targetRejector
+        ).target();
+    }
+
+    @Nonnull
+    public FoodTargetSearchResult findNearestFoodContainerTarget(@Nullable Ref<EntityStore> npcRef,
+                                                                 @Nullable Store<EntityStore> store,
+                                                                 double radius,
+                                                                 @Nullable String[] allowedItemIds,
+                                                                 int verticalScanRadius,
+                                                                 double consumeRadius) {
+        return findNearestFoodContainerTarget(
+                npcRef,
+                null,
+                store,
+                radius,
+                allowedItemIds,
+                verticalScanRadius,
+                consumeRadius,
+                null
+        );
+    }
+
+    @Nonnull
+    public FoodTargetSearchResult findNearestFoodContainerTarget(@Nullable Ref<EntityStore> npcRef,
+                                                                 @Nullable Role role,
+                                                                 @Nullable Store<EntityStore> store,
+                                                                 double radius,
+                                                                 @Nullable String[] allowedItemIds,
+                                                                 int verticalScanRadius,
+                                                                 double consumeRadius,
+                                                                 @Nullable TargetRejector targetRejector) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
-            return null;
+            return FoodTargetSearchResult.miss(false);
         }
         Set<String> allowedFoods = normalizeItemIds(allowedItemIds);
         if (allowedFoods.isEmpty()) {
-            return null;
+            return FoodTargetSearchResult.miss(false);
         }
         TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
         World world = resolveWorld(store);
         if (transform == null || world == null || world.getChunkStore() == null) {
-            return null;
+            return FoodTargetSearchResult.miss(false);
         }
         if (!Double.isFinite(radius) || radius <= 0.0) {
-            return null;
+            return FoodTargetSearchResult.miss(false);
         }
         long nowMs = resolveCurrentTimeMs();
+        double effectiveConsumeRadius = Double.isFinite(consumeRadius) && consumeRadius > 0.0 ? consumeRadius : 0.0;
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
@@ -712,19 +773,19 @@ public final class CompanionNeedsEnvironmentService {
                 transform.getPosition(),
                 radius,
                 verticalScanRadius,
-                0.0,
+                effectiveConsumeRadius,
                 allowedFoods
         );
         if (targetRejector == null) {
-            Vector3d cachedTarget = getCachedSearchTarget(cacheKey, nowMs);
-            if (cachedTarget != CACHE_MISS) {
-                return cachedTarget;
+            FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(cacheKey, nowMs);
+            if (cachedResult != null) {
+                return cachedResult;
             }
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
         if (chunkStoreStore == null) {
-            return null;
+            return FoodTargetSearchResult.miss(false);
         }
 
         int blockX = (int) Math.floor(transform.getPosition().x);
@@ -736,9 +797,11 @@ public final class CompanionNeedsEnvironmentService {
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
         NeedsResourceStandTargetSelector.CandidateProjector standProjector =
                 standTargetSelector().createProjector(role, store);
-        Vector3d bestTarget = null;
-        for (int horizontalRadius = 0; horizontalRadius <= searchRadius && bestTarget == null; horizontalRadius++) {
-            bestTarget = findNearestFoodTargetInHorizontalRing(
+        boolean foundConsumableSource = false;
+        boolean foundConsumableSourceInConsumeRange = false;
+        FoodTargetSearchResult bestResult = null;
+        for (int horizontalRadius = 0; horizontalRadius <= searchRadius && bestResult == null; horizontalRadius++) {
+            FoodTargetSearchResult ringResult = findNearestFoodTargetInHorizontalRing(
                     chunkStore,
                     chunkStoreStore,
                     transform.getPosition(),
@@ -748,16 +811,25 @@ public final class CompanionNeedsEnvironmentService {
                     horizontalRadius,
                     clampedVerticalRadius,
                     radiusSq,
+                    effectiveConsumeRadius,
                     allowedFoods,
                     chunkCache,
                     standProjector,
                     targetRejector
             );
+            foundConsumableSource |= ringResult.foundConsumableSource();
+            foundConsumableSourceInConsumeRange |= ringResult.foundConsumableSourceInConsumeRange();
+            if (ringResult.target() != null) {
+                bestResult = ringResult;
+            }
+        }
+        if (bestResult == null) {
+            bestResult = FoodTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
         }
         if (targetRejector == null) {
-            cacheSearchTarget(cacheKey, bestTarget, nowMs);
+            cacheFoodSearchResult(cacheKey, bestResult, nowMs);
         }
-        return bestTarget;
+        return bestResult;
     }
 
     public boolean hasFoodContainerWithAllowedFoodInRange(@Nullable Ref<EntityStore> npcRef,
@@ -896,22 +968,26 @@ public final class CompanionNeedsEnvironmentService {
         return WaterTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
     }
 
-    @Nullable
-    private static Vector3d findNearestFoodTargetInHorizontalRing(@Nonnull ChunkStore chunkStore,
-                                                                  @Nonnull Store<ChunkStore> chunkStoreStore,
-                                                                  @Nonnull Vector3d npcPosition,
-                                                                  int blockX,
-                                                                  int blockY,
-                                                                  int blockZ,
-                                                                  int horizontalRadius,
-                                                                  int verticalScanRadius,
-                                                                  double radiusSq,
-                                                                  @Nonnull Set<String> allowedFoods,
-                                                                  @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                  @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
-                                                                  @Nullable TargetRejector targetRejector) {
+    @Nonnull
+    private static FoodTargetSearchResult findNearestFoodTargetInHorizontalRing(@Nonnull ChunkStore chunkStore,
+                                                                                @Nonnull Store<ChunkStore> chunkStoreStore,
+                                                                                @Nonnull Vector3d npcPosition,
+                                                                                int blockX,
+                                                                                int blockY,
+                                                                                int blockZ,
+                                                                                int horizontalRadius,
+                                                                                int verticalScanRadius,
+                                                                                double radiusSq,
+                                                                                double consumeRadius,
+                                                                                @Nonnull Set<String> allowedFoods,
+                                                                                @Nonnull Map<Long, WorldChunk> chunkCache,
+                                                                                @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
+                                                                                @Nullable TargetRejector targetRejector) {
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
+        boolean foundConsumableSource = false;
+        boolean foundConsumableSourceInConsumeRange = false;
+        double consumeRadiusSq = consumeRadius * consumeRadius;
         for (int yOffset = -verticalScanRadius; yOffset <= verticalScanRadius; yOffset++) {
             int y = blockY + yOffset;
             for (int x = blockX - horizontalRadius; x <= blockX + horizontalRadius; x++) {
@@ -943,6 +1019,10 @@ public final class CompanionNeedsEnvironmentService {
                     if (container == null || !containsAllowedFood(container, allowedFoods)) {
                         continue;
                     }
+                    foundConsumableSource = true;
+                    if (consumeRadius > SCORE_EPSILON && (dx * dx) + (dz * dz) <= consumeRadiusSq + SCORE_EPSILON) {
+                        foundConsumableSourceInConsumeRange = true;
+                    }
                     Vector3d standPosition = findNearestStandPositionAdjacentToBlock(
                             chunkStore,
                             chunkStoreStore,
@@ -967,7 +1047,10 @@ public final class CompanionNeedsEnvironmentService {
                 }
             }
         }
-        return bestTarget;
+        if (bestTarget != null) {
+            return FoodTargetSearchResult.target(bestTarget, foundConsumableSourceInConsumeRange);
+        }
+        return FoodTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
     }
 
     @Nullable
@@ -1001,6 +1084,27 @@ public final class CompanionNeedsEnvironmentService {
             return null;
         }
         return new WaterTargetSearchResult(
+                cached.target() != null ? new Vector3d(cached.target()) : null,
+                cached.foundConsumableSource(),
+                cached.foundConsumableSourceInConsumeRange()
+        );
+    }
+
+    @Nullable
+    private static FoodTargetSearchResult getCachedFoodSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
+                                                                    long nowMs) {
+        if (cacheKey == null) {
+            return null;
+        }
+        CachedSearchResult cached = SEARCH_CACHE.get(cacheKey);
+        if (cached == null) {
+            return null;
+        }
+        if (nowMs >= cached.expiresAtMs()) {
+            SEARCH_CACHE.remove(cacheKey, cached);
+            return null;
+        }
+        return new FoodTargetSearchResult(
                 cached.target() != null ? new Vector3d(cached.target()) : null,
                 cached.foundConsumableSource(),
                 cached.foundConsumableSourceInConsumeRange()
@@ -1045,6 +1149,25 @@ public final class CompanionNeedsEnvironmentService {
         cleanupExpiredSearchCache(nowMs);
     }
 
+    private static void cacheFoodSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
+                                              @Nonnull FoodTargetSearchResult result,
+                                              long nowMs) {
+        if (cacheKey == null) {
+            return;
+        }
+        long ttlMs = searchCacheTtlMs(result.target() != null);
+        SEARCH_CACHE.put(
+                cacheKey,
+                new CachedSearchResult(
+                        result.target() != null ? new Vector3d(result.target()) : null,
+                        result.foundConsumableSource(),
+                        result.foundConsumableSourceInConsumeRange(),
+                        nowMs + ttlMs
+                )
+        );
+        cleanupExpiredSearchCache(nowMs);
+    }
+
     static long searchCacheTtlMs(boolean hasTarget) {
         return hasTarget ? SEARCH_CACHE_HIT_TTL_MS : SEARCH_CACHE_MISS_TTL_MS;
     }
@@ -1067,6 +1190,27 @@ public final class CompanionNeedsEnvironmentService {
         cacheSearchTarget(cacheKey, target, nowMs);
         Vector3d cachedTarget = getCachedSearchTarget(cacheKey, nowMs);
         return cachedTarget == CACHE_MISS ? new Vector3d(Double.NaN, Double.NaN, Double.NaN) : cachedTarget;
+    }
+
+    @Nonnull
+    static FoodTargetSearchResult cacheFoodSearchResultRoundTripForTests(@Nonnull FoodTargetSearchResult result,
+                                                                         long nowMs) {
+        SEARCH_CACHE.clear();
+        NeedsSearchCacheKey cacheKey = new NeedsSearchCacheKey(
+                new UUID(0L, 2L),
+                "test-world",
+                ResourceSearchKind.FOOD_CONTAINER,
+                1,
+                2,
+                3,
+                4,
+                5,
+                7,
+                6
+        );
+        cacheFoodSearchResult(cacheKey, result, nowMs);
+        FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(cacheKey, nowMs);
+        return cachedResult != null ? cachedResult : FoodTargetSearchResult.miss(false);
     }
 
     private static NeedsResourceStandTargetSelector standTargetSelector() {
@@ -1185,6 +1329,32 @@ public final class CompanionNeedsEnvironmentService {
                     primary.foundConsumableSourceInConsumeRange()
                             || secondary.foundConsumableSourceInConsumeRange()
             );
+        }
+    }
+
+    public record FoodTargetSearchResult(@Nullable Vector3d target,
+                                         boolean foundConsumableSource,
+                                         boolean foundConsumableSourceInConsumeRange) {
+        @Nonnull
+        public static FoodTargetSearchResult target(@Nonnull Vector3d target) {
+            return target(target, true);
+        }
+
+        @Nonnull
+        private static FoodTargetSearchResult target(@Nonnull Vector3d target,
+                                                     boolean foundConsumableSourceInConsumeRange) {
+            return new FoodTargetSearchResult(target, true, foundConsumableSourceInConsumeRange);
+        }
+
+        @Nonnull
+        public static FoodTargetSearchResult miss(boolean foundConsumableSource) {
+            return miss(foundConsumableSource, false);
+        }
+
+        @Nonnull
+        private static FoodTargetSearchResult miss(boolean foundConsumableSource,
+                                                  boolean foundConsumableSourceInConsumeRange) {
+            return new FoodTargetSearchResult(null, foundConsumableSource, foundConsumableSourceInConsumeRange);
         }
     }
 

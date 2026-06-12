@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.FoodTargetSearchResult;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.TargetRejector;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.WaterTargetSearchResult;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
@@ -337,41 +338,82 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
         int verticalScanRadius = passiveRefill.getContainerVerticalScanRadius();
-        Vector3d target = ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(
+        double consumeRadius = passiveRefill.getContainerConsumeRadius();
+        FoodTargetSearchResult primaryResult = ENVIRONMENT_SERVICE.findNearestFoodContainerTarget(
                 ref,
                 role,
                 store,
                 range,
                 effectiveItemIds,
                 verticalScanRadius,
+                consumeRadius,
                 targetRejector
         );
-        if (target != null) {
-            return TargetResolution.of(target, "food_target_search_primary");
-        }
-        if (ENVIRONMENT_SERVICE.hasFoodContainerWithAllowedFoodInRange(ref, store, range, effectiveItemIds, verticalScanRadius)) {
-            return TargetResolution.none("food_source_found_but_no_stand_target");
+        TargetResolution primaryResolution = resolveFoodSearchResult(
+                primaryResult,
+                "food_target_search_primary",
+                "food_already_in_consume_range",
+                "food_source_found_but_no_stand_target",
+                ref,
+                store
+        );
+        if (primaryResolution.isResolved()) {
+            return primaryResolution;
         }
         double fallbackRange = passiveRefill.getContainerSearchRadius();
         if (fallbackRange <= 0.0 || approximatelyEqual(fallbackRange, range)) {
             return TargetResolution.none("food_target_not_found");
         }
-        Vector3d fallbackTarget = ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(
+        FoodTargetSearchResult fallbackResult = ENVIRONMENT_SERVICE.findNearestFoodContainerTarget(
                 ref,
                 role,
                 store,
                 fallbackRange,
                 effectiveItemIds,
                 verticalScanRadius,
+                consumeRadius,
                 targetRejector
         );
-        if (fallbackTarget != null) {
-            return TargetResolution.of(fallbackTarget, "food_target_search_fallback");
-        }
-        if (ENVIRONMENT_SERVICE.hasFoodContainerWithAllowedFoodInRange(ref, store, fallbackRange, effectiveItemIds, verticalScanRadius)) {
-            return TargetResolution.none("food_source_found_but_no_stand_target_fallback");
+        TargetResolution fallbackResolution = resolveFoodSearchResult(
+                fallbackResult,
+                "food_target_search_fallback",
+                "food_in_consume_range_after_fallback",
+                "food_source_found_but_no_stand_target_fallback",
+                ref,
+                store
+        );
+        if (fallbackResolution.isResolved()) {
+            return fallbackResolution;
         }
         return TargetResolution.none("food_target_not_found");
+    }
+
+    @Nonnull
+    private TargetResolution resolveFoodSearchResult(@Nonnull FoodTargetSearchResult result,
+                                                     @Nonnull String targetReason,
+                                                     @Nonnull String consumeRangeReason,
+                                                     @Nonnull String noStandReason,
+                                                     @Nonnull Ref<EntityStore> ref,
+                                                     @Nonnull Store<EntityStore> store) {
+        return resolveFoodSearchResult(result, targetReason, consumeRangeReason, noStandReason, resolveCurrentPosition(ref, store));
+    }
+
+    @Nonnull
+    private static TargetResolution resolveFoodSearchResult(@Nonnull FoodTargetSearchResult result,
+                                                            @Nonnull String targetReason,
+                                                            @Nonnull String consumeRangeReason,
+                                                            @Nonnull String noStandReason,
+                                                            @Nullable Vector3d currentPosition) {
+        if (result.target() != null) {
+            return TargetResolution.of(result.target(), targetReason);
+        }
+        if (result.foundConsumableSourceInConsumeRange()) {
+            return TargetResolution.of(currentPosition, consumeRangeReason);
+        }
+        if (result.foundConsumableSource()) {
+            return TargetResolution.none(noStandReason);
+        }
+        return TargetResolution.unresolved();
     }
 
     @Nullable
@@ -588,6 +630,30 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     static long targetCacheTtlMs(boolean hasTarget) {
         return hasTarget ? TARGET_CACHE_HIT_TTL_MS : TARGET_CACHE_MISS_TTL_MS;
+    }
+
+    @Nonnull
+    static String resolveFoodSearchReasonForTests(@Nonnull FoodTargetSearchResult result,
+                                                  @Nullable Vector3d currentPosition) {
+        return resolveFoodSearchResult(
+                result,
+                "food_target_search_primary",
+                "food_already_in_consume_range",
+                "food_source_found_but_no_stand_target",
+                currentPosition
+        ).reason();
+    }
+
+    @Nullable
+    static Vector3d resolveFoodSearchTargetForTests(@Nonnull FoodTargetSearchResult result,
+                                                    @Nullable Vector3d currentPosition) {
+        return resolveFoodSearchResult(
+                result,
+                "food_target_search_primary",
+                "food_already_in_consume_range",
+                "food_source_found_but_no_stand_target",
+                currentPosition
+        ).target();
     }
 
     public static boolean rejectTarget(@Nullable UUID npcUuid,
