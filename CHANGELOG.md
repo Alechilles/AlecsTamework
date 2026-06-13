@@ -19,6 +19,7 @@
 - Reduced repeated companion needs-seek retries by giving confirmed food and water paths a longer movement window and a faster seek pace before timing out.
 - Fixed companion needs-seek priority so hunger can interrupt water top-offs when food is the lower need, while keeping fallback behavior when the preferred resource is unavailable.
 - Improved companion needs-seek fairness so food gets priority when hunger and thirst are nearly tied, reducing long water-biased delays at mid-range needs.
+- Fixed companion needs-seek movement so aborted paths and sustained blocked nav states reject the current food or water target before the full move timeout, reducing long stalls around crowded resources.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 

@@ -355,7 +355,8 @@
                 {
                   "Type": "Nav",
                   "NavStates": [
-                    "Defer"
+                    "Defer",
+                    "Aborted"
                   ]
                 },
                 {
@@ -376,7 +377,74 @@
                   "Compute": "NeedsSeekResourceType"
                 },
                 "Stage": "nav_defer",
-                "Detail": "path_deferred"
+                "Detail": "path_deferred_or_aborted"
+              },
+              {
+                "Type": "TameworkNeedsResourceRejectTarget",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                }
+              },
+              {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Abort seek when movement stays blocked long enough that the live path is no longer useful.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Nav",
+                  "NavStates": [
+                    "Blocked"
+                  ],
+                  "ThrottleDuration": 2
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekReadRange"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "nav_blocked",
+                "Detail": "path_blocked"
               },
               {
                 "Type": "TameworkNeedsResourceRejectTarget",

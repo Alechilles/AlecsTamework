@@ -53,8 +53,12 @@ class NeedsSeekComponentAssetTest {
                 "Seek motion must stay active until consume range");
         assertEquals(1, countOccurrences(content, "\"Type\": \"MaintainDistance\""),
                 "Needs seek may only use maintain-distance after consume delay begins");
-        assertEquals(3, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),
+        assertEquals(4, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),
                 "Needs seek movement failures must suppress the failed projected target");
+        assertTrue(content.contains("\"Aborted\""),
+                "Needs seek must exit when nav aborts an otherwise accepted path");
+        assertTrue(content.contains("\"Blocked\""),
+                "Needs seek must exit before full timeout when nav reports sustained blocking");
     }
 
     @Test
@@ -128,11 +132,12 @@ class NeedsSeekComponentAssetTest {
     void needsSeekMovementLogsStateTransitionsAndTerminalBranches() {
         String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
 
-        assertEquals(8, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
+        assertEquals(9, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
                 "Needs seek movement diagnostics should cover transition and terminal movement branches only");
         assertTrue(content.contains("\"Stage\": \"move_start\""));
         assertTrue(content.contains("\"Stage\": \"target_lost\""));
         assertTrue(content.contains("\"Stage\": \"nav_defer\""));
+        assertTrue(content.contains("\"Stage\": \"nav_blocked\""));
         assertTrue(content.contains("\"Stage\": \"move_timeout\""));
         assertTrue(content.contains("\"Stage\": \"consume_delay_start\""));
         assertTrue(content.contains("\"Stage\": \"consume_delay_timeout\""));
