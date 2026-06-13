@@ -10,6 +10,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -155,9 +157,9 @@ class NeedsSeekComponentAssetTest {
         assertTrue(vanillaExample.contains("\"Reference\": \"Component_Tamework_Instruction_Needs_Seek_Resource\""));
         assertFalse(tameworkExample.contains("\"NeedsSeekReachable\""));
         assertFalse(vanillaExample.contains("\"NeedsSeekReachable\""));
-        assertPlannerRunsFromIdleAndHold(tameworkExample);
-        assertPlannerRunsFromIdleAndHold(vanillaExample);
-        assertPlannerRunsFromIdleAndHold(patchExample);
+        assertPlannerRunsFromPassiveCompanionStates(tameworkExample);
+        assertPlannerRunsFromPassiveCompanionStates(vanillaExample);
+        assertPlannerRunsFromPassiveCompanionStates(patchExample);
     }
 
     private static JsonObject object(String json) {
@@ -198,10 +200,60 @@ class NeedsSeekComponentAssetTest {
         throw new AssertionError("Missing needs-seek parent state action: " + state);
     }
 
-    private static void assertPlannerRunsFromIdleAndHold(String content) {
-        assertTrue(content.contains("\"Reference\": \"Component_Tamework_Instruction_Needs_Seek_Resource_Sensor\""));
-        assertTrue(content.contains("\"Type\": \"Or\""));
-        assertTrue(content.contains("\"State\": \"Idle\""));
-        assertTrue(content.contains("\"State\": \"Hold\""));
+    private static void assertPlannerRunsFromPassiveCompanionStates(String content) {
+        JsonObject bridge = findNeedsSensorBridge(object(content));
+        JsonObject sensor = bridge.getAsJsonObject("Sensor");
+        assertNotNull(sensor, "Needs seek bridge must have a state gate sensor");
+        assertEquals("Or", sensor.get("Type").getAsString());
+
+        Set<String> states = new LinkedHashSet<>();
+        for (JsonElement sensorElement : sensor.getAsJsonArray("Sensors")) {
+            JsonObject stateSensor = sensorElement.getAsJsonObject();
+            assertEquals("State", stateSensor.get("Type").getAsString());
+            states.add(stateSensor.get("State").getAsString());
+        }
+        assertEquals(Set.of("Idle", "Hold", "Follow", "Sleep"), states,
+                "Needs scanner must stay active in passive companion states before switching to movement");
+    }
+
+    private static JsonObject findNeedsSensorBridge(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            throw new AssertionError("Missing needs-seek sensor bridge");
+        }
+        if (element.isJsonObject()) {
+            JsonObject object = element.getAsJsonObject();
+            JsonArray instructions = object.getAsJsonArray("Instructions");
+            if (instructions != null && containsNeedsSensorReference(instructions)) {
+                return object;
+            }
+            for (String key : object.keySet()) {
+                try {
+                    return findNeedsSensorBridge(object.get(key));
+                } catch (AssertionError ignored) {
+                    // Continue recursive search.
+                }
+            }
+        } else if (element.isJsonArray()) {
+            for (JsonElement child : element.getAsJsonArray()) {
+                try {
+                    return findNeedsSensorBridge(child);
+                } catch (AssertionError ignored) {
+                    // Continue recursive search.
+                }
+            }
+        }
+        throw new AssertionError("Missing needs-seek sensor bridge");
+    }
+
+    private static boolean containsNeedsSensorReference(JsonArray instructions) {
+        for (JsonElement instructionElement : instructions) {
+            JsonObject instruction = instructionElement.getAsJsonObject();
+            JsonElement reference = instruction.get("Reference");
+            if (reference != null
+                    && "Component_Tamework_Instruction_Needs_Seek_Resource_Sensor".equals(reference.getAsString())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

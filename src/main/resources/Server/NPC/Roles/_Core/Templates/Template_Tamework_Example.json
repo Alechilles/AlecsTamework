@@ -908,7 +908,7 @@
       }
     },
     {
-      "$Comment": "Bridge needs-seek sensor pass while in non-movement resting states.",
+      "$Comment": "Bridge needs-seek sensor pass while in passive companion states.",
       "Continue": true,
       "Sensor": {
         "Type": "Or",
@@ -920,6 +920,14 @@
           {
             "Type": "State",
             "State": "Hold"
+          },
+          {
+            "Type": "State",
+            "State": "Follow"
+          },
+          {
+            "Type": "State",
+            "State": "Sleep"
           }
         ]
       },

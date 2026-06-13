@@ -320,6 +320,14 @@
             {
               "Type": "State",
               "State": "Hold"
+            },
+            {
+              "Type": "State",
+              "State": "Follow"
+            },
+            {
+              "Type": "State",
+              "State": "Sleep"
             }
           ]
         },
