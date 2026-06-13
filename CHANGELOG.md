@@ -21,6 +21,7 @@
 - Improved companion needs-seek fairness so food gets priority when hunger and thirst are nearly tied, reducing long water-biased delays at mid-range needs.
 - Fixed companion needs-seek movement so aborted paths and sustained blocked nav states reject the current food or water target before the full move timeout, reducing long stalls around crowded resources.
 - Fixed companion needs-seek targeting so multiple NPCs do not pile onto the same confirmed food or water approach point, and water targets avoid standing on the source block itself.
+- Fixed companion needs-seek movement so an active food or water trip keeps the target it started with instead of following later planner updates mid-path.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 

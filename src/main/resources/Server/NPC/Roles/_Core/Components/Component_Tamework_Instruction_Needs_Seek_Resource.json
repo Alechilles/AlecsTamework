@@ -11,6 +11,10 @@
       "Value": "TameworkNeedsSeekTarget",
       "Description": "Stored destination slot used while a needs resource seek is active."
     },
+    "NeedsSeekActiveTargetSlot": {
+      "Value": "TameworkNeedsSeekActiveTarget",
+      "Description": "Locked destination slot copied from the planner target when movement starts."
+    },
     "NeedsSeekResourceType": {
       "Value": "Auto",
       "Description": "Resource consume mode used at seek completion (Auto, Water, FoodContainer)."
@@ -160,6 +164,12 @@
             }
           },
           {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "NeedsSeekActiveTargetSlot"
+            }
+          },
+          {
             "Type": "ParentState",
             "State": "OnNeedsSeekComplete"
           }
@@ -197,6 +207,12 @@
           ]
         },
         "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "NeedsSeekActiveTargetSlot"
+            }
+          },
           {
             "Type": "TameworkNeedsResourceMovementDiagnostic",
             "ResourceType": {
@@ -252,7 +268,7 @@
             "Sensor": {
               "Type": "ReadPosition",
               "Slot": {
-                "Compute": "NeedsSeekTargetSlot"
+                "Compute": "NeedsSeekActiveTargetSlot"
               },
               "Range": {
                 "Compute": "NeedsSeekConsumeMaintainMaxDistance"
@@ -302,7 +318,7 @@
               "Sensor": {
                 "Type": "ReadPosition",
                 "Slot": {
-                  "Compute": "NeedsSeekTargetSlot"
+                  "Compute": "NeedsSeekActiveTargetSlot"
                 },
                 "Range": {
                   "Compute": "NeedsSeekReadRange"
@@ -337,6 +353,12 @@
                 }
               },
               {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
+                }
+              },
+              {
                 "Type": "State",
                 "State": ".Default"
               },
@@ -362,7 +384,7 @@
                 {
                   "Type": "ReadPosition",
                   "Slot": {
-                    "Compute": "NeedsSeekTargetSlot"
+                    "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
                     "Compute": "NeedsSeekReadRange"
@@ -404,6 +426,12 @@
                 }
               },
               {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
+                }
+              },
+              {
                 "Type": "State",
                 "State": ".Default"
               },
@@ -429,7 +457,7 @@
                 {
                   "Type": "ReadPosition",
                   "Slot": {
-                    "Compute": "NeedsSeekTargetSlot"
+                    "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
                     "Compute": "NeedsSeekReadRange"
@@ -471,6 +499,12 @@
                 }
               },
               {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
+                }
+              },
+              {
                 "Type": "State",
                 "State": ".Default"
               },
@@ -494,7 +528,7 @@
                 {
                   "Type": "ReadPosition",
                   "Slot": {
-                    "Compute": "NeedsSeekTargetSlot"
+                    "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
                     "Compute": "NeedsSeekReadRange"
@@ -536,6 +570,12 @@
                 }
               },
               {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
+                }
+              },
+              {
                 "Type": "State",
                 "State": ".Default"
               },
@@ -550,7 +590,7 @@
             "Sensor": {
               "Type": "ReadPosition",
               "Slot": {
-                "Compute": "NeedsSeekTargetSlot"
+                "Compute": "NeedsSeekActiveTargetSlot"
               },
               "Range": {
                 "Compute": "NeedsSeekReadRange"
@@ -607,7 +647,7 @@
               "Sensor": {
                 "Type": "ReadPosition",
                 "Slot": {
-                  "Compute": "NeedsSeekTargetSlot"
+                  "Compute": "NeedsSeekActiveTargetSlot"
                 },
                 "Range": {
                   "Compute": "NeedsSeekConsumeMaintainMaxDistance"
@@ -650,7 +690,7 @@
             {
               "Type": "ReadPosition",
               "Slot": {
-                "Compute": "NeedsSeekTargetSlot"
+                "Compute": "NeedsSeekActiveTargetSlot"
               },
               "Range": {
                 "Compute": "NeedsSeekConsumeMaintainMaxDistance"
@@ -686,7 +726,7 @@
             {
               "Type": "ReadPosition",
               "Slot": {
-                "Compute": "NeedsSeekTargetSlot"
+                "Compute": "NeedsSeekActiveTargetSlot"
               },
               "Range": {
                 "Compute": "NeedsSeekReadRange"
@@ -728,6 +768,12 @@
             }
           },
           {
+            "Type": "ReleaseTarget",
+            "TargetSlot": {
+              "Compute": "NeedsSeekActiveTargetSlot"
+            }
+          },
+          {
             "Type": "State",
             "State": ".Default"
           },
@@ -756,7 +802,7 @@
                 {
                   "Type": "ReadPosition",
                   "Slot": {
-                    "Compute": "NeedsSeekTargetSlot"
+                    "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
                     "Compute": "NeedsSeekConsumeMaintainMaxDistance"
@@ -804,6 +850,12 @@
                 }
               },
               {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
+                }
+              },
+              {
                 "Type": "State",
                 "State": ".Default"
               },
@@ -826,7 +878,7 @@
                 {
                   "Type": "ReadPosition",
                   "Slot": {
-                    "Compute": "NeedsSeekTargetSlot"
+                    "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
                     "Compute": "NeedsSeekConsumeMaintainMaxDistance"
@@ -837,7 +889,7 @@
                   "Sensor": {
                     "Type": "ReadPosition",
                     "Slot": {
-                      "Compute": "NeedsSeekTargetSlot"
+                      "Compute": "NeedsSeekActiveTargetSlot"
                     },
                     "Range": {
                       "Compute": "NeedsSeekConsumeMaintainMaxDistance"
@@ -883,6 +935,12 @@
                 "Type": "TimerRestart",
                 "Name": {
                   "Compute": "NeedsSeekFailedCooldownName"
+                }
+              },
+              {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
                 }
               },
               {

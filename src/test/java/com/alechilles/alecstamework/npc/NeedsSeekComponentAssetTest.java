@@ -131,6 +131,24 @@ class NeedsSeekComponentAssetTest {
     }
 
     @Test
+    void needsSeekMovementLocksPlannerTargetOnceActive() {
+        String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
+        JsonObject component = object(content);
+        JsonObject parameters = component.getAsJsonObject("Parameters");
+
+        assertNotNull(parameters.getAsJsonObject("NeedsSeekActiveTargetSlot"),
+                "Needs seek movement must expose a locked active target slot");
+        assertEquals(2, countOccurrences(content, "\"Compute\": \"NeedsSeekTargetSlot\""),
+                "Only default recovery and move startup may read the planner target slot directly");
+        assertEquals(1, countOccurrences(content, "\"Type\": \"StorePosition\""),
+                "Needs seek must copy the planner target into the active movement slot exactly once");
+        assertTrue(countOccurrences(content, "\"Compute\": \"NeedsSeekActiveTargetSlot\"") > 10,
+                "Runtime movement, consume, and failure branches must use the locked active target slot");
+        assertEquals(8, countOccurrences(content, "\"Type\": \"ReleaseTarget\""),
+                "Every terminal movement branch must clear the locked active target");
+    }
+
+    @Test
     void needsSeekMovementLogsStateTransitionsAndTerminalBranches() {
         String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
 
