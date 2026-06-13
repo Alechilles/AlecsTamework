@@ -38,6 +38,17 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
     }
 
     @Test
+    void activeSeekVerticalScanExpandsToBoundedSearchRange() {
+        assertEquals(16, SensorTameworkNeedsResourceTarget.activeSeekVerticalScanRadius(2, 16.0));
+        assertEquals(6, SensorTameworkNeedsResourceTarget.activeSeekVerticalScanRadius(6, 4.0));
+        assertEquals(
+                SensorTameworkNeedsResourceTarget.maxActiveSeekVerticalScanRadiusForTests(),
+                SensorTameworkNeedsResourceTarget.activeSeekVerticalScanRadius(2, 64.0)
+        );
+        assertEquals(2, SensorTameworkNeedsResourceTarget.activeSeekVerticalScanRadius(2, Double.NaN));
+    }
+
+    @Test
     void targetMissCacheIsShortEnoughForMovingNpcs() {
         assertTrue(SensorTameworkNeedsResourceTarget.targetCacheTtlMs(false) > 0L);
         assertTrue(SensorTameworkNeedsResourceTarget.targetCacheTtlMs(false) <= 1_000L);

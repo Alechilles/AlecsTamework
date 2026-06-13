@@ -42,6 +42,7 @@ import javax.annotation.Nullable;
 public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase {
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
     private static final NeedsResourcePathPreflightService PATH_PREFLIGHT_SERVICE = new NeedsResourcePathPreflightService();
+    private static final int MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS = 16;
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     private static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
     private static final double PREFLIGHT_REJECT_TTL_SECONDS = 4.0;
@@ -287,7 +288,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             );
         }
         TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
-        int verticalScanRadius = passiveRefill.getWaterVerticalScanRadius();
+        int verticalScanRadius = activeSeekVerticalScanRadius(passiveRefill.getWaterVerticalScanRadius(), range);
         double consumeRadius = passiveRefill.getWaterConsumeRadius();
         WaterTargetSearchResult primaryResult = ENVIRONMENT_SERVICE.findNearestWaterDrinkingTarget(
                 ref,
@@ -313,12 +314,16 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (!shouldRunFallbackWaterSearch(range, fallbackRange)) {
             return TargetResolution.none("water_target_not_found");
         }
+        int fallbackVerticalScanRadius = activeSeekVerticalScanRadius(
+                passiveRefill.getWaterVerticalScanRadius(),
+                fallbackRange
+        );
         WaterTargetSearchResult fallbackResult = ENVIRONMENT_SERVICE.findNearestWaterDrinkingTarget(
                 ref,
                 role,
                 store,
                 fallbackRange,
-                verticalScanRadius,
+                fallbackVerticalScanRadius,
                 consumeRadius,
                 targetRejector
         );
@@ -375,7 +380,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             );
         }
         TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
-        int verticalScanRadius = passiveRefill.getContainerVerticalScanRadius();
+        int verticalScanRadius = activeSeekVerticalScanRadius(passiveRefill.getContainerVerticalScanRadius(), range);
         double consumeRadius = passiveRefill.getContainerConsumeRadius();
         FoodTargetSearchResult primaryResult = ENVIRONMENT_SERVICE.findNearestFoodContainerTarget(
                 ref,
@@ -402,13 +407,17 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (fallbackRange <= 0.0 || approximatelyEqual(fallbackRange, range)) {
             return TargetResolution.none("food_target_not_found");
         }
+        int fallbackVerticalScanRadius = activeSeekVerticalScanRadius(
+                passiveRefill.getContainerVerticalScanRadius(),
+                fallbackRange
+        );
         FoodTargetSearchResult fallbackResult = ENVIRONMENT_SERVICE.findNearestFoodContainerTarget(
                 ref,
                 role,
                 store,
                 fallbackRange,
                 effectiveItemIds,
-                verticalScanRadius,
+                fallbackVerticalScanRadius,
                 consumeRadius,
                 targetRejector
         );
@@ -680,6 +689,19 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return Double.isFinite(fallbackRange)
                 && fallbackRange > 0.0
                 && (!Double.isFinite(primaryRange) || fallbackRange > primaryRange + EPSILON);
+    }
+
+    static int activeSeekVerticalScanRadius(int configuredVerticalScanRadius, double searchRange) {
+        int configured = Math.max(0, configuredVerticalScanRadius);
+        if (!Double.isFinite(searchRange) || searchRange <= 0.0) {
+            return configured;
+        }
+        int boundedSeekRadius = Math.min(MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS, (int) Math.ceil(searchRange));
+        return Math.max(configured, boundedSeekRadius);
+    }
+
+    static int maxActiveSeekVerticalScanRadiusForTests() {
+        return MAX_ACTIVE_SEEK_VERTICAL_SCAN_RADIUS;
     }
 
     static long targetCacheTtlMs(boolean hasTarget) {
