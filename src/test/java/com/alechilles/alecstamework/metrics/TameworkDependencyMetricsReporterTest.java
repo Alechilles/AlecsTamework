@@ -28,6 +28,8 @@ class TameworkDependencyMetricsReporterTest {
                 manifest("Alechilles", "Alec's Cats!", "1.5.6", true),
                 manifest("Alechilles", "Alec's Nametags!", "1.1.2", true),
                 manifest("Alechilles", "Alec's Coops!", "1.0.0", true),
+                manifest("excellynt", "Celly's Baby Animals", "1.0.6", true),
+                manifest("excellynt", "Celly's Wildlife Skins", "1.1.7", false),
                 manifest("Alechilles", "Alec's Animal Husbandry!", "1.0.3", false),
                 manifest("Example", "Other Mod", "1.0.0", true)
         );
@@ -37,10 +39,12 @@ class TameworkDependencyMetricsReporterTest {
 
         reporter.reportTrackedDependencies(manifests, serverUuidFile);
 
-        assertEquals(3, client.calls.size());
+        assertEquals(5, client.calls.size());
         assertEquals("fba66910-eab2-4721-b8e5-a90b6f493887", client.calls.get(0).pluginUuid);
         assertEquals("4f1d847d-57fe-4aef-8042-2e77690e2a4a", client.calls.get(1).pluginUuid);
         assertEquals("3ce09431-552e-4279-90ca-e0735bd9763b", client.calls.get(2).pluginUuid);
+        assertEquals("a50d1c7e-4970-476e-a3b2-5aa81edbee86", client.calls.get(3).pluginUuid);
+        assertEquals("517fcdc7-b3d2-4b08-9b8a-bcebbe049b4a", client.calls.get(4).pluginUuid);
     }
 
     @Test

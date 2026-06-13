@@ -52,7 +52,8 @@ public final class TameworkDependencyMetricsReporter {
             if (isBlank(pluginUuid)) {
                 continue;
             }
-            if (!manifest.dependsOnTamework()) {
+            if (TameworkTrackedModRegistry.requiresTameworkDependency(manifest.modId())
+                    && !manifest.dependsOnTamework()) {
                 info("Tamework HStats forwarding skipped " + manifest.modId()
                         + " from " + manifest.sourcePath()
                         + " because it does not declare a Tamework dependency.");

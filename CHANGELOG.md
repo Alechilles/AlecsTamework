@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Added HStats forwarding for Celly's Baby Animals and Celly's Wildlife Skins when Tamework detects those installed mods.
+
 ### Changed
 - Added reusable NPC position-target rejection and a generic reachable block target sensor/action so downstream animal behaviors can preflight block-seeking destinations before entering movement.
 - Improved companion food and water seeking so NPCs use bounded motion-controller projection to choose reachable trough and water stand targets, including diagonal approach positions, while keeping existing needs search caching and consume behavior.
