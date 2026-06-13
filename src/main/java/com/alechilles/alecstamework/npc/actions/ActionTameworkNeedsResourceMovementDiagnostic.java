@@ -2,13 +2,17 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceMovementDiagnostics;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceMovementProgressTracker;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
@@ -57,7 +61,48 @@ public final class ActionTameworkNeedsResourceMovementDiagnostic extends Tamewor
                 detail,
                 resolveTarget(infoProvider)
         );
+        updateProgressTracker(npcRef, infoProvider, store);
         return true;
+    }
+
+    private void updateProgressTracker(Ref<EntityStore> npcRef, InfoProvider infoProvider, Store<EntityStore> store) {
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        if ("move_start".equals(stage)) {
+            NeedsResourceMovementProgressTracker.recordStart(
+                    npcUuid,
+                    resourceType,
+                    resolveTarget(infoProvider),
+                    resolveCurrentPosition(npcRef, store),
+                    System.currentTimeMillis()
+            );
+            return;
+        }
+        if (clearsMovementProgress(stage)) {
+            NeedsResourceMovementProgressTracker.clear(npcUuid, resourceType);
+        }
+    }
+
+    private static boolean clearsMovementProgress(@Nullable String stage) {
+        return "consume_delay_start".equals(stage)
+                || "target_lost".equals(stage)
+                || "nav_defer".equals(stage)
+                || "nav_blocked".equals(stage)
+                || "move_stalled".equals(stage)
+                || "move_timeout".equals(stage)
+                || "consume_delay_timeout".equals(stage)
+                || "consume_attempt".equals(stage);
+    }
+
+    @Nullable
+    private static UUID resolveNpcUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        return npc != null ? npc.getUuid() : null;
+    }
+
+    @Nullable
+    private static Vector3d resolveCurrentPosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        return transform == null ? null : transform.getPosition();
     }
 
     @Nullable

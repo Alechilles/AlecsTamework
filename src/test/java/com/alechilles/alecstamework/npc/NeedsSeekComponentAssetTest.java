@@ -34,12 +34,16 @@ class NeedsSeekComponentAssetTest {
         JsonObject reachable = parameters.getAsJsonObject("NeedsSeekReachable");
         JsonObject relativeSpeed = parameters.getAsJsonObject("NeedsSeekRelativeSpeed");
         JsonObject moveTimeout = parameters.getAsJsonObject("NeedsSeekMoveTimeoutRange");
+        JsonObject stallGraceSeconds = parameters.getAsJsonObject("NeedsSeekStallGraceSeconds");
+        JsonObject stallMinProgress = parameters.getAsJsonObject("NeedsSeekStallMinProgress");
         assertNotNull(pathfinder, "Needs seek component must expose NeedsSeekUsePathfinder");
         assertNotNull(steering, "Needs seek component must expose NeedsSeekUseSteering");
         assertNotNull(bestPath, "Needs seek component must expose NeedsSeekUseBestPath");
         assertNotNull(reachable, "Needs seek component must expose NeedsSeekReachable");
         assertNotNull(relativeSpeed, "Needs seek component must expose NeedsSeekRelativeSpeed");
         assertNotNull(moveTimeout, "Needs seek component must expose NeedsSeekMoveTimeoutRange");
+        assertNotNull(stallGraceSeconds, "Needs seek component must expose NeedsSeekStallGraceSeconds");
+        assertNotNull(stallMinProgress, "Needs seek component must expose NeedsSeekStallMinProgress");
         assertTrue(pathfinder.get("Value").getAsBoolean(), "Needs seek must use pathfinding");
         assertFalse(steering.get("Value").getAsBoolean(), "Needs seek must not direct-steer around pathfinding");
         assertFalse(bestPath.get("Value").getAsBoolean(), "Needs seek must not accept partial best-path fallback");
@@ -55,12 +59,14 @@ class NeedsSeekComponentAssetTest {
                 "Seek motion must stay active until consume range");
         assertEquals(1, countOccurrences(content, "\"Type\": \"MaintainDistance\""),
                 "Needs seek may only use maintain-distance after consume delay begins");
-        assertEquals(4, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),
+        assertEquals(5, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),
                 "Needs seek movement failures must suppress the failed projected target");
         assertTrue(content.contains("\"Aborted\""),
                 "Needs seek must exit when nav aborts an otherwise accepted path");
         assertTrue(content.contains("\"Blocked\""),
                 "Needs seek must exit before full timeout when nav reports sustained blocking");
+        assertTrue(content.contains("\"Type\": \"TameworkNeedsResourceMovementStalled\""),
+                "Needs seek must exit before full timeout when movement makes no useful progress");
     }
 
     @Test
@@ -144,7 +150,7 @@ class NeedsSeekComponentAssetTest {
                 "Needs seek must copy the planner target into the active movement slot exactly once");
         assertTrue(countOccurrences(content, "\"Compute\": \"NeedsSeekActiveTargetSlot\"") > 10,
                 "Runtime movement, consume, and failure branches must use the locked active target slot");
-        assertEquals(8, countOccurrences(content, "\"Type\": \"ReleaseTarget\""),
+        assertEquals(9, countOccurrences(content, "\"Type\": \"ReleaseTarget\""),
                 "Every terminal movement branch must clear the locked active target");
     }
 
@@ -152,12 +158,13 @@ class NeedsSeekComponentAssetTest {
     void needsSeekMovementLogsStateTransitionsAndTerminalBranches() {
         String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
 
-        assertEquals(9, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
+        assertEquals(10, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
                 "Needs seek movement diagnostics should cover transition and terminal movement branches only");
         assertTrue(content.contains("\"Stage\": \"move_start\""));
         assertTrue(content.contains("\"Stage\": \"target_lost\""));
         assertTrue(content.contains("\"Stage\": \"nav_defer\""));
         assertTrue(content.contains("\"Stage\": \"nav_blocked\""));
+        assertTrue(content.contains("\"Stage\": \"move_stalled\""));
         assertTrue(content.contains("\"Stage\": \"move_timeout\""));
         assertTrue(content.contains("\"Stage\": \"consume_delay_start\""));
         assertTrue(content.contains("\"Stage\": \"consume_delay_timeout\""));

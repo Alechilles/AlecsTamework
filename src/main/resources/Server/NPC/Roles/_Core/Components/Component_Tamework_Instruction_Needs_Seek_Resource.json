@@ -82,6 +82,14 @@
       ],
       "Description": "Fail-safe maximum move time before resource seek completes."
     },
+    "NeedsSeekStallGraceSeconds": {
+      "Value": 8,
+      "Description": "Seconds after movement start before insufficient progress rejects the active resource target."
+    },
+    "NeedsSeekStallMinProgress": {
+      "Value": 0.75,
+      "Description": "Minimum distance the NPC must close toward a resource target before the stall grace period ends."
+    },
     "NeedsSeekConsumeDelayRange": {
       "Value": [
         0.5,
@@ -473,6 +481,87 @@
                 },
                 "Stage": "nav_blocked",
                 "Detail": "path_blocked"
+              },
+              {
+                "Type": "TameworkNeedsResourceRejectTarget",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                }
+              },
+              {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                }
+              },
+              {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Abort seek when movement fails to make progress after the stall grace period.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkNeedsResourceMovementStalled",
+                  "ResourceType": {
+                    "Compute": "NeedsSeekResourceType"
+                  },
+                  "GraceSeconds": {
+                    "Compute": "NeedsSeekStallGraceSeconds"
+                  },
+                  "MinProgress": {
+                    "Compute": "NeedsSeekStallMinProgress"
+                  }
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekActiveTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekReadRange"
+                  },
+                  "MinRange": {
+                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "move_stalled",
+                "Detail": "insufficient_progress"
               },
               {
                 "Type": "TameworkNeedsResourceRejectTarget",
