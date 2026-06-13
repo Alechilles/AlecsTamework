@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightSe
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.progression.PositionTargetRejectCache;
+import com.alechilles.alecstamework.npc.progression.PositionTargetReservationCache;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
@@ -21,6 +22,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
@@ -43,6 +45,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final long TARGET_CACHE_HIT_TTL_MS = 1_500L;
     private static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
     private static final double PREFLIGHT_REJECT_TTL_SECONDS = 4.0;
+    private static final double TARGET_RESERVATION_TTL_SECONDS = PositionTargetReservationCache.DEFAULT_TTL_SECONDS;
     private static final double EPSILON = 0.000001;
 
     private final ResourceType resourceType;
@@ -100,10 +103,14 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         long nowMs = resolveCurrentTimeMs();
         UUID npcUuid = resolveNpcUuid(ref, store);
+        String worldName = resolveWorldName(store);
         TargetCacheBlock currentCacheBlock = resolveCurrentCacheBlock(ref, store);
         CachedTargetResult cached = npcUuid != null ? getCachedTarget(npcUuid, nowMs, currentCacheBlock) : null;
         if (cached != null) {
-            if (cached.target() != null && npcUuid != null && isTargetRejected(npcUuid, resourceType, cached.target(), nowMs)) {
+            if (cached.target() != null
+                    && npcUuid != null
+                    && (isTargetRejected(npcUuid, resourceType, cached.target(), nowMs)
+                    || isTargetReservedByOther(npcUuid, worldName, resourceType, cached.target(), nowMs))) {
                 cachedTargetsByNpcId.remove(npcUuid, cached);
                 cached = null;
             }
@@ -144,8 +151,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             needsConfig = resolveNeedsConfig(ref, store);
         }
         TargetResolution resolution = switch (resourceType) {
-            case WATER -> resolveWaterTarget(ref, role, store, needsConfig, npcUuid, nowMs);
-            case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig, npcUuid, nowMs);
+            case WATER -> resolveWaterTarget(ref, role, store, needsConfig, npcUuid, worldName, nowMs);
+            case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig, npcUuid, worldName, nowMs);
         };
         Vector3d target = resolution.target();
         if (target == null && shouldUseRecentTargetFallback(resolution.reason())) {
@@ -215,6 +222,21 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             );
             return false;
         }
+        if (!reserveTarget(npcUuid, worldName, resourceType, target, nowMs)) {
+            maybeLog(
+                    ref,
+                    store,
+                    npcId,
+                    roleId,
+                    resolveResourceLabel(),
+                    "miss",
+                    "target_reserved",
+                    false,
+                    eligibility.currentRatio(),
+                    target
+            );
+            return false;
+        }
         if (npcUuid != null) {
             cacheTarget(npcUuid, target, resolution.reason(), currentCacheBlock, nowMs);
             if (resourceType == ResourceType.WATER) {
@@ -252,11 +274,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     @Nullable
     private TargetResolution resolveWaterTarget(@Nonnull Ref<EntityStore> ref,
                                                 @Nonnull Role role,
-                                                @Nonnull Store<EntityStore> store,
-                                                @Nullable TwNeedsConfig needsConfig,
-                                                @Nullable UUID npcUuid,
-                                                long nowMs) {
-        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.WATER, nowMs);
+                                                 @Nonnull Store<EntityStore> store,
+                                                 @Nullable TwNeedsConfig needsConfig,
+                                                 @Nullable UUID npcUuid,
+                                                 @Nullable String worldName,
+                                                 long nowMs) {
+        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.WATER, worldName, nowMs);
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, range),
@@ -338,12 +361,13 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                @Nonnull Store<EntityStore> store,
                                                @Nullable TwNeedsConfig needsConfig,
                                                @Nullable UUID npcUuid,
+                                               @Nullable String worldName,
                                                long nowMs) {
         String[] effectiveItemIds = resolveFoodItemIds(needsConfig);
         if (effectiveItemIds == null || effectiveItemIds.length == 0) {
             return TargetResolution.none("food_item_ids_empty");
         }
-        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.FOOD_CONTAINER, nowMs);
+        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.FOOD_CONTAINER, worldName, nowMs);
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, range, effectiveItemIds),
@@ -778,11 +802,15 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     @Nullable
     private static TargetRejector createTargetRejector(@Nullable UUID npcUuid,
                                                        @Nonnull ResourceType type,
+                                                       @Nullable String worldName,
                                                        long nowMs) {
-        if (!hasRejectedTargetFor(npcUuid, type, nowMs)) {
+        boolean hasRejectedTargets = hasRejectedTargetFor(npcUuid, type, nowMs);
+        boolean hasReservedTargets = PositionTargetReservationCache.hasReservationFor(worldName, typeLabel(type), nowMs);
+        if (!hasRejectedTargets && !hasReservedTargets) {
             return null;
         }
-        return target -> isTargetRejected(npcUuid, type, target, nowMs);
+        return target -> isTargetRejected(npcUuid, type, target, nowMs)
+                || isTargetReservedByOther(npcUuid, worldName, type, target, nowMs);
     }
 
     private static boolean hasRejectedTargetFor(@Nullable UUID npcUuid,
@@ -803,6 +831,33 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return PositionTargetRejectCache.MAX_ENTRIES;
     }
 
+    static boolean reserveTargetForTests(@Nullable UUID npcUuid,
+                                         @Nullable String worldName,
+                                         @Nullable String rawResourceType,
+                                         @Nullable Vector3d target,
+                                         long nowMs) {
+        return reserveTarget(npcUuid, worldName, ResourceType.from(rawResourceType), target, nowMs);
+    }
+
+    static boolean isTargetReservedByOtherForTests(@Nullable UUID npcUuid,
+                                                   @Nullable String worldName,
+                                                   @Nullable String rawResourceType,
+                                                   @Nullable Vector3d target,
+                                                   long nowMs) {
+        return isTargetReservedByOther(npcUuid, worldName, ResourceType.from(rawResourceType), target, nowMs);
+    }
+
+    static void releaseTargetForTests(@Nullable UUID npcUuid,
+                                      @Nullable String worldName,
+                                      @Nullable String rawResourceType,
+                                      @Nullable Vector3d target) {
+        releaseTarget(npcUuid, worldName, rawResourceType, target);
+    }
+
+    static void clearTargetReservationsForTests() {
+        PositionTargetReservationCache.clearForTests();
+    }
+
     private static boolean isFinite(@Nonnull Vector3d vector) {
         return Double.isFinite(vector.x) && Double.isFinite(vector.y) && Double.isFinite(vector.z);
     }
@@ -816,6 +871,59 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     @Nonnull
     private static String typeLabel(@Nonnull ResourceType type) {
         return type == ResourceType.FOOD_CONTAINER ? "FoodContainer" : "Water";
+    }
+
+    public static void releaseTarget(@Nullable Ref<EntityStore> npcRef,
+                                     @Nullable Store<EntityStore> store,
+                                     @Nullable String rawResourceType,
+                                     @Nullable Vector3d target) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return;
+        }
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        releaseTarget(npcUuid, resolveWorldName(store), rawResourceType, target);
+    }
+
+    private static void releaseTarget(@Nullable UUID npcUuid,
+                                      @Nullable String worldName,
+                                      @Nullable String rawResourceType,
+                                      @Nullable Vector3d target) {
+        if (isAutoResourceType(rawResourceType)) {
+            releaseTarget(npcUuid, worldName, ResourceType.WATER, target);
+            releaseTarget(npcUuid, worldName, ResourceType.FOOD_CONTAINER, target);
+            return;
+        }
+        releaseTarget(npcUuid, worldName, ResourceType.from(rawResourceType), target);
+    }
+
+    private static void releaseTarget(@Nullable UUID npcUuid,
+                                      @Nullable String worldName,
+                                      @Nonnull ResourceType type,
+                                      @Nullable Vector3d target) {
+        PositionTargetReservationCache.release(npcUuid, worldName, typeLabel(type), target);
+    }
+
+    private static boolean reserveTarget(@Nullable UUID npcUuid,
+                                         @Nullable String worldName,
+                                         @Nonnull ResourceType type,
+                                         @Nullable Vector3d target,
+                                         long nowMs) {
+        return PositionTargetReservationCache.reserve(
+                npcUuid,
+                worldName,
+                typeLabel(type),
+                target,
+                TARGET_RESERVATION_TTL_SECONDS,
+                nowMs
+        );
+    }
+
+    private static boolean isTargetReservedByOther(@Nullable UUID npcUuid,
+                                                   @Nullable String worldName,
+                                                   @Nonnull ResourceType type,
+                                                   @Nullable Vector3d target,
+                                                   long nowMs) {
+        return PositionTargetReservationCache.isReservedByOther(npcUuid, worldName, typeLabel(type), target, nowMs);
     }
 
     private long resolveCurrentTimeMs() {
@@ -832,9 +940,18 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     }
 
     @Nullable
-    private UUID resolveNpcUuid(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+    private static UUID resolveNpcUuid(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
         return npc != null ? npc.getUuid() : null;
+    }
+
+    @Nullable
+    private static String resolveWorldName(@Nonnull Store<EntityStore> store) {
+        if (store.getExternalData() == null || store.getExternalData().getWorld() == null) {
+            return null;
+        }
+        World world = store.getExternalData().getWorld();
+        return world != null ? world.getName() : null;
     }
 
     @Nullable

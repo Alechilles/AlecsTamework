@@ -49,7 +49,9 @@ public final class ActionTameworkNeedsResourceRejectTarget extends TameworkActio
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         UUID npcUuid = npc != null ? npc.getUuid() : null;
-        return SensorTameworkNeedsResourceTarget.rejectTarget(npcUuid, resourceType, target, suppressSeconds);
+        boolean rejected = SensorTameworkNeedsResourceTarget.rejectTarget(npcUuid, resourceType, target, suppressSeconds);
+        SensorTameworkNeedsResourceTarget.releaseTarget(npcRef, store, resourceType, target);
+        return rejected;
     }
 
     @Nullable

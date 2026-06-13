@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.sensors.SensorTameworkNeedsResourceTarget;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
@@ -54,7 +55,7 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
                 resourceType,
                 consumeOrigin
         );
-        return CompanionNeedsService.applyResourceConsumeWithDiagnostics(
+        boolean consumed = CompanionNeedsService.applyResourceConsumeWithDiagnostics(
                 npcRef,
                 store,
                 roleId,
@@ -62,6 +63,8 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
                 foodItemIds,
                 consumeOrigin
         );
+        SensorTameworkNeedsResourceTarget.releaseTarget(npcRef, store, resourceType, consumeOrigin);
+        return consumed;
     }
 
     @Nullable

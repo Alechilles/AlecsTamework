@@ -144,6 +144,11 @@ class NeedsResourceStandTargetSelectorTest {
         assertTrue(projectedTarget != cachedTarget);
     }
 
+    @Test
+    void waterStandTargetSelectionExcludesSourceBlockCenters() {
+        assertTrue(!CompanionNeedsEnvironmentService.waterStandTargetsIncludeSourceBlockForTests());
+    }
+
     private static boolean approximatelyEqual(double left, double right) {
         return Math.abs(left - right) < 0.000001;
     }

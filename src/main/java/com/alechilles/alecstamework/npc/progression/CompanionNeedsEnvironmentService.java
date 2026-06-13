@@ -42,6 +42,7 @@ public final class CompanionNeedsEnvironmentService {
     private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
     private static final double SCORE_EPSILON = 0.000001;
+    private static final boolean WATER_STAND_TARGETS_INCLUDE_SOURCE_BLOCK = false;
     private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
             ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
     private static final ConcurrentHashMap<NeedsSearchCacheKey, CachedSearchResult> SEARCH_CACHE = new ConcurrentHashMap<>();
@@ -1175,6 +1176,10 @@ public final class CompanionNeedsEnvironmentService {
         return hasTarget ? SEARCH_CACHE_HIT_TTL_MS : SEARCH_CACHE_MISS_TTL_MS;
     }
 
+    static boolean waterStandTargetsIncludeSourceBlockForTests() {
+        return WATER_STAND_TARGETS_INCLUDE_SOURCE_BLOCK;
+    }
+
     @Nonnull
     static Vector3d cacheSearchTargetRoundTripForTests(@Nonnull Vector3d target, long nowMs) {
         SEARCH_CACHE.clear();
@@ -1705,7 +1710,7 @@ public final class CompanionNeedsEnvironmentService {
                     sourceZ,
                     npcPosition,
                     Math.max(NeedsResourceStandTargetSelector.MIN_ADJACENT_DISTANCE, consumeRadius),
-                    true,
+                    WATER_STAND_TARGETS_INCLUDE_SOURCE_BLOCK,
                     standProjector,
                     targetRejector
             );

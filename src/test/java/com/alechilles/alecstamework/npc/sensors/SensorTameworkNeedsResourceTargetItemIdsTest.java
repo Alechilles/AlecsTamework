@@ -157,4 +157,44 @@ class SensorTameworkNeedsResourceTargetItemIdsTest {
         assertTrue(SensorTameworkNeedsResourceTarget.isTargetRejectedForTests(npc, "Water", target, 1_001L));
         assertTrue(SensorTameworkNeedsResourceTarget.isTargetRejectedForTests(npc, "FoodContainer", target, 1_001L));
     }
+
+    @Test
+    void reservedNeedsTargetSuppressesOtherNpcUntilReleased() {
+        SensorTameworkNeedsResourceTarget.clearTargetReservationsForTests();
+        UUID owner = new UUID(0L, 200L);
+        UUID other = new UUID(0L, 201L);
+        Vector3d target = new Vector3d(-776.5, 122.65, 459.5);
+
+        assertTrue(SensorTameworkNeedsResourceTarget.reserveTargetForTests(
+                owner,
+                "test-world",
+                "Water",
+                target,
+                1_000L
+        ));
+
+        assertFalse(SensorTameworkNeedsResourceTarget.isTargetReservedByOtherForTests(
+                owner,
+                "test-world",
+                "Water",
+                target,
+                1_001L
+        ));
+        assertTrue(SensorTameworkNeedsResourceTarget.isTargetReservedByOtherForTests(
+                other,
+                "test-world",
+                "Water",
+                target,
+                1_001L
+        ));
+
+        SensorTameworkNeedsResourceTarget.releaseTargetForTests(owner, "test-world", "Water", target);
+        assertFalse(SensorTameworkNeedsResourceTarget.isTargetReservedByOtherForTests(
+                other,
+                "test-world",
+                "Water",
+                target,
+                1_002L
+        ));
+    }
 }
