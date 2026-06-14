@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import org.junit.jupiter.api.Test;
 
@@ -64,5 +65,30 @@ class SpawnerNpcProgressionMetadataServiceTest {
         assertEquals(0.0, restored.getAppliedHappinessPenalty(), 0.000001);
         assertEquals(0L, restored.getLastUpdateMs());
         assertEquals(0L, restored.getLastPassiveSweepMs());
+    }
+
+    @Test
+    void capturedGenderFallsBackToResolvedGenderWhenLifeStageGenderMissing() {
+        TameworkLifeStageComponent component = new TameworkLifeStageComponent();
+
+        String capturedGender = SpawnerNpcProgressionMetadataService.resolveCapturedGenderForMetadata(
+                component,
+                "female"
+        );
+
+        assertEquals("Female", capturedGender);
+    }
+
+    @Test
+    void capturedGenderPrefersExistingLifeStageGenderOverResolvedFallback() {
+        TameworkLifeStageComponent component = new TameworkLifeStageComponent();
+        component.setGender("Male");
+
+        String capturedGender = SpawnerNpcProgressionMetadataService.resolveCapturedGenderForMetadata(
+                component,
+                "Female"
+        );
+
+        assertEquals("Male", capturedGender);
     }
 }

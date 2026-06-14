@@ -11,10 +11,10 @@ import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
-import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
@@ -271,6 +271,16 @@ final class SpawnerNpcProgressionMetadataService {
                 0L,
                 0L
         );
+    }
+
+    @Nullable
+    static String resolveCapturedGenderForMetadata(@Nullable TameworkLifeStageComponent component,
+                                                   @Nullable String resolvedGender) {
+        String componentGender = component != null ? CompanionGenderService.normalizeGender(component.getGender()) : null;
+        if (componentGender != null) {
+            return componentGender;
+        }
+        return CompanionGenderService.normalizeGender(resolvedGender);
     }
 
     private ItemStack applyBreedingMetadata(ItemStack stack,
@@ -654,8 +664,10 @@ final class SpawnerNpcProgressionMetadataService {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
-            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
-            return updated;
+            return applyCapturedGenderMetadata(
+                    updated,
+                    resolveCapturedGenderForMetadata(null, CompanionGenderService.resolveGender(npcRef, store, null, null))
+            );
         }
         ItemStack updated = stack;
         if (component.getStage() != null && !component.getStage().isBlank()) {
@@ -706,12 +718,18 @@ final class SpawnerNpcProgressionMetadataService {
                 Codec.BOOLEAN,
                 component.isGrowthScalingEnabled()
         );
-        if (component.getGender() != null && !component.getGender().isBlank()) {
-            updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_GENDER, Codec.STRING, component.getGender());
-        } else {
-            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
-        }
+        updated = applyCapturedGenderMetadata(
+                updated,
+                resolveCapturedGenderForMetadata(component, CompanionGenderService.resolveGender(npcRef, store, null, null))
+        );
         return updated;
+    }
+
+    private ItemStack applyCapturedGenderMetadata(ItemStack stack, @Nullable String gender) {
+        if (gender != null && !gender.isBlank()) {
+            return stack.withMetadata(TameworkMetadataKeys.LIFE_STAGE_GENDER, Codec.STRING, gender);
+        }
+        return clearMetadataKey(stack, TameworkMetadataKeys.LIFE_STAGE_GENDER);
     }
 
     private void restoreLifeStageComponent(ItemStack stack,
