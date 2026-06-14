@@ -603,6 +603,12 @@
                 }
               },
               {
+                "Type": "TameworkNeedsResourceReleaseTarget",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                }
+              },
+              {
                 "Type": "ReleaseTarget",
                 "TargetSlot": {
                   "Compute": "NeedsSeekActiveTargetSlot"
