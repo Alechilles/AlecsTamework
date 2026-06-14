@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.asset.builder.holder.BooleanHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringArrayHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.StringArrayNoEmptyStringsValidator;
@@ -15,6 +16,7 @@ public final class BuilderActionTameworkNeedsResourceConsume extends TameworkAct
 
     private final StringHolder resourceType = new StringHolder();
     private final StringArrayHolder foodItemIds = new StringArrayHolder();
+    private final BooleanHolder releaseTarget = new BooleanHolder();
 
     @Override
     public String getBuilderId() {
@@ -48,6 +50,15 @@ public final class BuilderActionTameworkNeedsResourceConsume extends TameworkAct
                 "Optional allowed food item ids for container consumption.",
                 "If empty, role FoodItemIDs and then TwNeedsConfig fallback list is used."
         );
+        getBoolean(
+                element,
+                "ReleaseTarget",
+                releaseTarget,
+                true,
+                BuilderDescriptorState.Stable,
+                "Whether this consume attempt should release the active resource reservation.",
+                "Set false when role assets will repeat consumption before final completion."
+        );
         return this;
     }
 
@@ -57,6 +68,10 @@ public final class BuilderActionTameworkNeedsResourceConsume extends TameworkAct
 
     public String[] getFoodItemIds(BuilderSupport support) {
         return foodItemIds.get(support.getExecutionContext());
+    }
+
+    public boolean getReleaseTarget(BuilderSupport support) {
+        return releaseTarget.get(support.getExecutionContext());
     }
 
     public ActionTameworkNeedsResourceConsume build(BuilderSupport support) {

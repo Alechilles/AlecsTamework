@@ -24,6 +24,14 @@
       "TypeHint": "String",
       "Description": "Optional allowed food item ids passed to consume action for container intake."
     },
+    "NeedsSeekWhenHungerBelowRatio": {
+      "Value": 0.85,
+      "Description": "Repeat food consumption while normalized hunger is at or below this ratio."
+    },
+    "NeedsSeekWhenThirstBelowRatio": {
+      "Value": 0.85,
+      "Description": "Repeat water consumption while normalized thirst is at or below this ratio."
+    },
     "NeedsSeekSlowDownDistance": {
       "Value": 4,
       "Description": "Distance where needs-seek movement starts slowing down."
@@ -194,6 +202,13 @@
               "Sensor": {
                 "Type": "State",
                 "State": ".Move"
+              }
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "State",
+                "State": ".PostConsume"
               }
             },
             {
@@ -918,39 +933,12 @@
                 },
                 "FoodItemIDs": {
                   "Compute": "NeedsSeekFoodItemIDs"
-                }
-              },
-              {
-                "Type": "TimerStart",
-                "Name": {
-                  "Compute": "NeedsSeekFailedCooldownName"
                 },
-                "StartValueRange": {
-                  "Compute": "NeedsSeekFailedCooldownRange"
-                },
-                "RestartValueRange": {
-                  "Compute": "NeedsSeekFailedCooldownRange"
-                }
-              },
-              {
-                "Type": "TimerRestart",
-                "Name": {
-                  "Compute": "NeedsSeekFailedCooldownName"
-                }
-              },
-              {
-                "Type": "ReleaseTarget",
-                "TargetSlot": {
-                  "Compute": "NeedsSeekActiveTargetSlot"
-                }
+                "ReleaseTarget": false
               },
               {
                 "Type": "State",
-                "State": ".Default"
-              },
-              {
-                "Type": "ParentState",
-                "State": "OnNeedsSeekComplete"
+                "State": ".PostConsume"
               }
             ]
           },
@@ -1006,8 +994,149 @@
                 },
                 "FoodItemIDs": {
                   "Compute": "NeedsSeekFoodItemIDs"
+                },
+                "ReleaseTarget": false
+              },
+              {
+                "Type": "State",
+                "State": ".PostConsume"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "$Comment": "After consuming once, either repeat the paced consume delay while the need is still low, or release the target and return to the parent state.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".PostConsume"
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkNeedsResourceConsumeSucceeded",
+                  "ResourceType": "FoodContainer"
+                },
+                {
+                  "Type": "TameworkNeedBelow",
+                  "Need": "Hunger",
+                  "RatioBelow": {
+                    "Compute": "NeedsSeekWhenHungerBelowRatio"
+                  }
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekActiveTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": "FoodContainer",
+                "Stage": "consume_repeat",
+                "Detail": "food_still_below_threshold"
+              },
+              {
+                "Type": "PlayAnimation",
+                "Slot": "Status",
+                "Animation": {
+                  "Compute": "NeedsSeekConsumeAnimation"
                 }
               },
+              {
+                "Type": "TimerStart",
+                "Name": "NeedsSeek_Consume_Delay",
+                "StartValueRange": {
+                  "Compute": "NeedsSeekConsumeDelayRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekConsumeDelayRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "NeedsSeek_Consume_Delay"
+              },
+              {
+                "Type": "State",
+                "State": ".ConsumeDelay"
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkNeedsResourceConsumeSucceeded",
+                  "ResourceType": "Water"
+                },
+                {
+                  "Type": "TameworkNeedBelow",
+                  "Need": "Thirst",
+                  "RatioBelow": {
+                    "Compute": "NeedsSeekWhenThirstBelowRatio"
+                  }
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekActiveTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": "Water",
+                "Stage": "consume_repeat",
+                "Detail": "water_still_below_threshold"
+              },
+              {
+                "Type": "PlayAnimation",
+                "Slot": "Status",
+                "Animation": {
+                  "Compute": "NeedsSeekConsumeAnimation"
+                }
+              },
+              {
+                "Type": "TimerStart",
+                "Name": "NeedsSeek_Consume_Delay",
+                "StartValueRange": {
+                  "Compute": "NeedsSeekConsumeDelayRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekConsumeDelayRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "NeedsSeek_Consume_Delay"
+              },
+              {
+                "Type": "State",
+                "State": ".ConsumeDelay"
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "Any"
+            },
+            "Actions": [
               {
                 "Type": "TimerStart",
                 "Name": {

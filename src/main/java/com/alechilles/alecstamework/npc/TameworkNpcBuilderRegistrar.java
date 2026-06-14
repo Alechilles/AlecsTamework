@@ -36,6 +36,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIs
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkLifeStage;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedBelow;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedLowest;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceConsumeSucceeded;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceMovementStalled;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkReachableBlockTarget;
@@ -147,6 +148,10 @@ public final class TameworkNpcBuilderRegistrar {
             sensorFactory.add(BuilderSensorTameworkEffectActive.BUILDER_ID, BuilderSensorTameworkEffectActive::new);
             sensorFactory.add(BuilderSensorTameworkNeedBelow.BUILDER_ID, BuilderSensorTameworkNeedBelow::new);
             sensorFactory.add(BuilderSensorTameworkNeedLowest.BUILDER_ID, BuilderSensorTameworkNeedLowest::new);
+            sensorFactory.add(
+                    BuilderSensorTameworkNeedsResourceConsumeSucceeded.BUILDER_ID,
+                    BuilderSensorTameworkNeedsResourceConsumeSucceeded::new
+            );
             sensorFactory.add(
                     BuilderSensorTameworkNeedsResourceMovementStalled.BUILDER_ID,
                     BuilderSensorTameworkNeedsResourceMovementStalled::new

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceConsumeAttemptTracker;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceMovementDiagnostics;
 import com.alechilles.alecstamework.npc.progression.NeedsResourceMovementProgressTracker;
 import com.hypixel.hytale.component.Ref;
@@ -68,6 +69,7 @@ public final class ActionTameworkNeedsResourceMovementDiagnostic extends Tamewor
     private void updateProgressTracker(Ref<EntityStore> npcRef, InfoProvider infoProvider, Store<EntityStore> store) {
         UUID npcUuid = resolveNpcUuid(npcRef, store);
         if ("move_start".equals(stage)) {
+            NeedsResourceConsumeAttemptTracker.clear(npcUuid, resourceType);
             NeedsResourceMovementProgressTracker.recordStart(
                     npcUuid,
                     resourceType,
@@ -79,6 +81,7 @@ public final class ActionTameworkNeedsResourceMovementDiagnostic extends Tamewor
         }
         if (clearsMovementProgress(stage)) {
             NeedsResourceMovementProgressTracker.clear(npcUuid, resourceType);
+            NeedsResourceConsumeAttemptTracker.clear(npcUuid, resourceType);
         }
     }
 

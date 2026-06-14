@@ -2,15 +2,18 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceConsumeAttemptTracker;
 import com.alechilles.alecstamework.npc.sensors.SensorTameworkNeedsResourceTarget;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
@@ -21,11 +24,13 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
     private final String resourceType;
     @Nullable
     private final String[] foodItemIds;
+    private final boolean releaseTarget;
 
     public ActionTameworkNeedsResourceConsume(BuilderActionTameworkNeedsResourceConsume builder, BuilderSupport support) {
         super(builder);
         this.resourceType = builder.getResourceType(support);
         this.foodItemIds = builder.getFoodItemIds(support);
+        this.releaseTarget = builder.getReleaseTarget(support);
     }
 
     @Override
@@ -63,8 +68,17 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
                 foodItemIds,
                 consumeOrigin
         );
-        SensorTameworkNeedsResourceTarget.releaseTarget(npcRef, store, resourceType, consumeOrigin);
+        NeedsResourceConsumeAttemptTracker.record(resolveNpcUuid(npcRef, store), resourceType, consumed, System.currentTimeMillis());
+        if (releaseTarget) {
+            SensorTameworkNeedsResourceTarget.releaseTarget(npcRef, store, resourceType, consumeOrigin);
+        }
         return consumed;
+    }
+
+    @Nullable
+    private static UUID resolveNpcUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        return npc != null ? npc.getUuid() : null;
     }
 
     @Nullable

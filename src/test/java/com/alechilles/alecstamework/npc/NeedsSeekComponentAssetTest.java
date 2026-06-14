@@ -150,7 +150,7 @@ class NeedsSeekComponentAssetTest {
                 "Needs seek must copy the planner target into the active movement slot exactly once");
         assertTrue(countOccurrences(content, "\"Compute\": \"NeedsSeekActiveTargetSlot\"") > 10,
                 "Runtime movement, consume, and failure branches must use the locked active target slot");
-        assertEquals(9, countOccurrences(content, "\"Type\": \"ReleaseTarget\""),
+        assertEquals(8, countOccurrences(content, "\"Type\": \"ReleaseTarget\""),
                 "Every terminal movement branch must clear the locked active target");
     }
 
@@ -158,7 +158,7 @@ class NeedsSeekComponentAssetTest {
     void needsSeekMovementLogsStateTransitionsAndTerminalBranches() {
         String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
 
-        assertEquals(10, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
+        assertEquals(12, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
                 "Needs seek movement diagnostics should cover transition and terminal movement branches only");
         assertTrue(content.contains("\"Stage\": \"move_start\""));
         assertTrue(content.contains("\"Stage\": \"target_lost\""));
@@ -170,6 +170,25 @@ class NeedsSeekComponentAssetTest {
         assertTrue(content.contains("\"Stage\": \"consume_delay_timeout\""));
         assertTrue(content.contains("\"Detail\": \"strict_band\""));
         assertTrue(content.contains("\"Detail\": \"fallback_close_range\""));
+        assertTrue(content.contains("\"Stage\": \"consume_repeat\""));
+    }
+
+    @Test
+    void needsSeekConsumptionRepeatsUntilNeedThresholdIsSatisfied() {
+        String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
+
+        assertTrue(content.contains("\"State\": \".PostConsume\""),
+                "Needs seek must inspect the need after each consume before completing");
+        assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsume\""),
+                "Strict and fallback close-range branches should remain the only consume entry points");
+        assertEquals(2, countOccurrences(content, "\"ReleaseTarget\": false"),
+                "Consume attempts must keep the active reservation while repeat checks run");
+        assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsumeSucceeded\""),
+                "Food and water repeat branches must only loop after a successful consume attempt");
+        assertTrue(content.contains("\"Need\": \"Hunger\""));
+        assertTrue(content.contains("\"Need\": \"Thirst\""));
+        assertTrue(content.contains("\"Compute\": \"NeedsSeekWhenHungerBelowRatio\""));
+        assertTrue(content.contains("\"Compute\": \"NeedsSeekWhenThirstBelowRatio\""));
     }
 
     @Test
