@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
@@ -158,6 +159,17 @@ class NeedsResourcePathPreflightServiceTest {
         }
 
         assertTrue(service.cacheSizeForTests() <= maxEntries);
+    }
+
+    @Test
+    void looseGoalAcceptsNearbyPathNodeWithoutExactFinalProbe() {
+        assertTrue(NeedsSeekPathEvaluator.isWithinPreflightGoal(0.65, 3.99, 4.0));
+    }
+
+    @Test
+    void looseGoalStillRejectsBadHeightOrDistance() {
+        assertFalse(NeedsSeekPathEvaluator.isWithinPreflightGoal(1.25, 1.0, 4.0));
+        assertFalse(NeedsSeekPathEvaluator.isWithinPreflightGoal(0.0, 4.25, 4.0));
     }
 
     private static NeedsResourcePathPreflightService.PreflightKey keyFor(int index) {

@@ -15,8 +15,9 @@ import javax.annotation.Nonnull;
 import org.joml.Vector3d;
 
 /**
- * Mirrors needs seek's final goal test for A* preflight by requiring both pathfinder proximity
- * and direct reachability from the candidate path node to the stored stand target.
+ * Evaluates bounded A* preflight for needs seek targets. The default mode verifies that a path
+ * can get close enough to the selected stand target, leaving exact final approach recovery to the
+ * runtime seek/stall flow where temporary crowding is handled better.
  */
 final class NeedsSeekPathEvaluator implements AStarEvaluator {
     private static final double HEIGHT_RANGE_MIN = -1.0;
@@ -26,18 +27,27 @@ final class NeedsSeekPathEvaluator implements AStarEvaluator {
     private final Vector3d target;
     private final Box selfBoundingBox;
     private final double stopDistanceSquared;
+    private final boolean requireDirectFinalReach;
     private final ProbeMoveData reachProbe = new ProbeMoveData();
     private final Vector3d scratchDirection = new Vector3d();
 
     NeedsSeekPathEvaluator(@Nonnull Vector3d target,
                            @Nonnull Box selfBoundingBox,
                            double stopDistance) {
+        this(target, selfBoundingBox, stopDistance, false);
+    }
+
+    NeedsSeekPathEvaluator(@Nonnull Vector3d target,
+                           @Nonnull Box selfBoundingBox,
+                           double stopDistance,
+                           boolean requireDirectFinalReach) {
         this.target = new Vector3d(target);
         this.selfBoundingBox = new Box(selfBoundingBox);
         double effectiveStopDistance = Double.isFinite(stopDistance) && stopDistance > 0.0
                 ? stopDistance
                 : 2.0;
         this.stopDistanceSquared = effectiveStopDistance * effectiveStopDistance;
+        this.requireDirectFinalReach = requireDirectFinalReach;
         this.reachProbe.setRelaxedConstraints(EnumSet.noneOf(RelaxedConstraint.class));
     }
 
@@ -51,12 +61,15 @@ final class NeedsSeekPathEvaluator implements AStarEvaluator {
         if (position == null || !isFinite(position)) {
             return false;
         }
-        double heightDelta = target.y - position.y;
-        if (heightDelta < HEIGHT_RANGE_MIN || heightDelta > HEIGHT_RANGE_MAX) {
+        if (!isWithinPreflightGoal(
+                target.y - position.y,
+                motionController.waypointDistanceSquared(position, target),
+                stopDistanceSquared
+        )) {
             return false;
         }
-        if (motionController.waypointDistanceSquared(position, target) > stopDistanceSquared + EPSILON) {
-            return false;
+        if (!requireDirectFinalReach) {
+            return true;
         }
         return canReachTarget(ref, position, motionController, componentAccessor);
     }
@@ -89,6 +102,17 @@ final class NeedsSeekPathEvaluator implements AStarEvaluator {
                 target.y - entityPosition.y,
                 target.z - entityPosition.z
         );
+    }
+
+    static boolean isWithinPreflightGoal(double heightDelta,
+                                         double waypointDistanceSquared,
+                                         double stopDistanceSquared) {
+        return Double.isFinite(heightDelta)
+                && Double.isFinite(waypointDistanceSquared)
+                && Double.isFinite(stopDistanceSquared)
+                && heightDelta >= HEIGHT_RANGE_MIN
+                && heightDelta <= HEIGHT_RANGE_MAX
+                && waypointDistanceSquared <= stopDistanceSquared + EPSILON;
     }
 
     private static boolean isFinite(@Nonnull Vector3d vector) {

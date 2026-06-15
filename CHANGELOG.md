@@ -11,6 +11,7 @@
 - Tightened needs-seek movement so projected food and water stand targets stay pathfinder-first until consume range and must be directly reachable before completion, preventing companions from walking into walls around blocked resources.
 - Needs seek now respects failed-seek cooldowns before re-entering movement, can re-scan from resting Hold states, and temporarily skips failed targets so blocked food or water sources do not trap companions in Idle/NeedsSeek loops.
 - Needs resource scans now run a bounded pathfinder preflight before entering movement, so blocked troughs or water sources no longer pull companions out of idle/resting states unless a path is already confirmed.
+- Needs resource preflight now treats a path near the selected food or water stand target as sufficient and leaves exact final approach recovery to movement stall handling, improving consistency around crowded resources.
 - Feed trough blocks are now added to the vanilla Fence block set through an asset patch so movement and path checks treat trough variants consistently with fence-like obstacles.
 
 ### Fixed
