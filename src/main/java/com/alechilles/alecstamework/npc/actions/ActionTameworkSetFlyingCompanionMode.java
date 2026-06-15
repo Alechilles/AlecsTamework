@@ -7,7 +7,11 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import org.joml.Vector3d;
+
+import javax.annotation.Nullable;
 
 /**
  * Sets the desired Tamework flying companion mode on an NPC.
@@ -20,6 +24,8 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
     private final long reissueDelayMs;
     private final long groundedStableTicks;
     private final double verticalMovementEpsilon;
+    private final int landingTargetSlotIndex;
+    private final boolean landingUseInfoProviderPosition;
 
     public ActionTameworkSetFlyingCompanionMode(BuilderActionTameworkSetFlyingCompanionMode builder,
                                                 BuilderSupport support) {
@@ -31,6 +37,8 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         this.reissueDelayMs = builder.getReissueDelayMs(support);
         this.groundedStableTicks = builder.getGroundedStableTicks(support);
         this.verticalMovementEpsilon = builder.getVerticalMovementEpsilon(support);
+        this.landingTargetSlotIndex = builder.getLandingTargetSlotIndex(support);
+        this.landingUseInfoProviderPosition = builder.getLandingUseInfoProviderPosition(support);
     }
 
     @Override
@@ -61,6 +69,7 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
                 ? existing.clone()
                 : new TameworkFlyingCompanionComponent();
         String previousMode = updated.getMode();
+        Vector3d landingPosition = landingUseInfoProviderPosition ? resolveLandingPosition(infoProvider) : null;
         updated.configure(
                 mode,
                 landingState,
@@ -68,7 +77,9 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
                 descendStep,
                 reissueDelayMs,
                 groundedStableTicks,
-                verticalMovementEpsilon
+                verticalMovementEpsilon,
+                landingTargetSlotIndex,
+                landingPosition
         );
         boolean modeChanged = previousMode == null || !previousMode.equalsIgnoreCase(updated.getMode());
         if (TameworkFlyingCompanionComponent.MODE_HOLD.equals(updated.getMode())) {
@@ -84,6 +95,24 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         }
         store.putComponent(npcRef, type, updated);
         return true;
+    }
+
+    @Nullable
+    private static Vector3d resolveLandingPosition(@Nullable InfoProvider infoProvider) {
+        if (infoProvider == null || !infoProvider.hasPosition()) {
+            return null;
+        }
+        IPositionProvider provider = infoProvider.getPositionProvider();
+        if (provider == null || !provider.hasPosition()) {
+            return null;
+        }
+        double x = provider.getX();
+        double y = provider.getY();
+        double z = provider.getZ();
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+            return null;
+        }
+        return new Vector3d(x, y, z);
     }
 
     private boolean isGroundedState(Role role, String groundedState) {

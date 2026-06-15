@@ -3,12 +3,16 @@ package com.alechilles.alecstamework.npc.components;
 import com.alechilles.alecstamework.Tamework;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.codecs.simple.BooleanCodec;
 import com.hypixel.hytale.codec.codecs.simple.DoubleCodec;
 import com.hypixel.hytale.codec.codecs.simple.LongCodec;
 import com.hypixel.hytale.codec.codecs.simple.StringCodec;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import org.joml.Vector3d;
+
+import javax.annotation.Nullable;
 
 /**
  * Stores high-level Tamework control state for flying companions that need help settling on the ground.
@@ -25,6 +29,11 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
     public static final String LAST_OBSERVED_Y_TAG = "LastObservedY";
     public static final String STABLE_TICK_COUNT_TAG = "StableTickCount";
     public static final String NEXT_COMMAND_AT_MS_TAG = "NextCommandAtMs";
+    public static final String LANDING_TARGET_SLOT_INDEX_TAG = "LandingTargetSlotIndex";
+    public static final String HAS_LANDING_TARGET_POSITION_TAG = "HasLandingTargetPosition";
+    public static final String LANDING_TARGET_X_TAG = "LandingTargetX";
+    public static final String LANDING_TARGET_Y_TAG = "LandingTargetY";
+    public static final String LANDING_TARGET_Z_TAG = "LandingTargetZ";
 
     public static final String MODE_FOLLOW = "Follow";
     public static final String MODE_HOLD = "Hold";
@@ -103,6 +112,36 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
             TameworkFlyingCompanionComponent::getNextCommandAtMs
         )
         .add()
+        .append(
+            new KeyedCodec<>(LANDING_TARGET_SLOT_INDEX_TAG, new LongCodec()),
+            TameworkFlyingCompanionComponent::setLandingTargetSlotIndex,
+            TameworkFlyingCompanionComponent::getLandingTargetSlotIndex
+        )
+        .add()
+        .append(
+            new KeyedCodec<>(HAS_LANDING_TARGET_POSITION_TAG, new BooleanCodec()),
+            TameworkFlyingCompanionComponent::setHasLandingTargetPosition,
+            TameworkFlyingCompanionComponent::hasLandingTargetPosition
+        )
+        .add()
+        .append(
+            new KeyedCodec<>(LANDING_TARGET_X_TAG, new DoubleCodec()),
+            TameworkFlyingCompanionComponent::setLandingTargetX,
+            TameworkFlyingCompanionComponent::getLandingTargetX
+        )
+        .add()
+        .append(
+            new KeyedCodec<>(LANDING_TARGET_Y_TAG, new DoubleCodec()),
+            TameworkFlyingCompanionComponent::setLandingTargetY,
+            TameworkFlyingCompanionComponent::getLandingTargetY
+        )
+        .add()
+        .append(
+            new KeyedCodec<>(LANDING_TARGET_Z_TAG, new DoubleCodec()),
+            TameworkFlyingCompanionComponent::setLandingTargetZ,
+            TameworkFlyingCompanionComponent::getLandingTargetZ
+        )
+        .add()
         .build();
 
     private String mode = MODE_FOLLOW;
@@ -116,6 +155,11 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
     private double lastObservedY;
     private long stableTickCount;
     private long nextCommandAtMs;
+    private long landingTargetSlotIndex = -1L;
+    private boolean hasLandingTargetPosition;
+    private double landingTargetX;
+    private double landingTargetY;
+    private double landingTargetZ;
 
     public static ComponentType<EntityStore, TameworkFlyingCompanionComponent> getComponentType() {
         Tamework instance = Tamework.getInstance();
@@ -210,6 +254,75 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
         this.nextCommandAtMs = Math.max(0L, nextCommandAtMs);
     }
 
+    public long getLandingTargetSlotIndex() {
+        return landingTargetSlotIndex;
+    }
+
+    public void setLandingTargetSlotIndex(long landingTargetSlotIndex) {
+        this.landingTargetSlotIndex = landingTargetSlotIndex >= 0L ? landingTargetSlotIndex : -1L;
+    }
+
+    public boolean hasLandingTargetSlot() {
+        return landingTargetSlotIndex >= 0L;
+    }
+
+    public boolean hasLandingTargetPosition() {
+        return hasLandingTargetPosition;
+    }
+
+    public void setHasLandingTargetPosition(boolean hasLandingTargetPosition) {
+        this.hasLandingTargetPosition = hasLandingTargetPosition;
+    }
+
+    public double getLandingTargetX() {
+        return landingTargetX;
+    }
+
+    public void setLandingTargetX(double landingTargetX) {
+        this.landingTargetX = landingTargetX;
+    }
+
+    public double getLandingTargetY() {
+        return landingTargetY;
+    }
+
+    public void setLandingTargetY(double landingTargetY) {
+        this.landingTargetY = landingTargetY;
+    }
+
+    public double getLandingTargetZ() {
+        return landingTargetZ;
+    }
+
+    public void setLandingTargetZ(double landingTargetZ) {
+        this.landingTargetZ = landingTargetZ;
+    }
+
+    @Nullable
+    public Vector3d getLandingTargetPosition() {
+        if (!hasLandingTargetPosition) {
+            return null;
+        }
+        return new Vector3d(landingTargetX, landingTargetY, landingTargetZ);
+    }
+
+    public void setLandingTargetPosition(@Nullable Vector3d landingTargetPosition) {
+        if (landingTargetPosition == null
+                || !Double.isFinite(landingTargetPosition.x)
+                || !Double.isFinite(landingTargetPosition.y)
+                || !Double.isFinite(landingTargetPosition.z)) {
+            hasLandingTargetPosition = false;
+            landingTargetX = 0.0;
+            landingTargetY = 0.0;
+            landingTargetZ = 0.0;
+            return;
+        }
+        hasLandingTargetPosition = true;
+        landingTargetX = landingTargetPosition.x;
+        landingTargetY = landingTargetPosition.y;
+        landingTargetZ = landingTargetPosition.z;
+    }
+
     public boolean isHoldMode() {
         return MODE_HOLD.equals(mode);
     }
@@ -228,7 +341,9 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
                           double descendStep,
                           long reissueDelayMs,
                           long groundedStableTicks,
-                          double verticalMovementEpsilon) {
+                          double verticalMovementEpsilon,
+                          long landingTargetSlotIndex,
+                          @Nullable Vector3d landingTargetPosition) {
         setMode(mode);
         setLandingState(landingState);
         setGroundedState(groundedState);
@@ -236,12 +351,16 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
         setReissueDelayMs(reissueDelayMs);
         setGroundedStableTicks(groundedStableTicks);
         setVerticalMovementEpsilon(verticalMovementEpsilon);
+        setLandingTargetSlotIndex(landingTargetSlotIndex);
+        setLandingTargetPosition(landingTargetPosition);
     }
 
     public void enterFollowingPhase() {
         setPhase(PHASE_FOLLOWING);
         stableTickCount = 0;
         nextCommandAtMs = 0L;
+        landingTargetSlotIndex = -1L;
+        setLandingTargetPosition(null);
     }
 
     public void enterLandingPhase(double currentY) {
@@ -272,6 +391,11 @@ public final class TameworkFlyingCompanionComponent implements Component<EntityS
         clone.lastObservedY = lastObservedY;
         clone.stableTickCount = stableTickCount;
         clone.nextCommandAtMs = nextCommandAtMs;
+        clone.landingTargetSlotIndex = landingTargetSlotIndex;
+        clone.hasLandingTargetPosition = hasLandingTargetPosition;
+        clone.landingTargetX = landingTargetX;
+        clone.landingTargetY = landingTargetY;
+        clone.landingTargetZ = landingTargetZ;
         return clone;
     }
 

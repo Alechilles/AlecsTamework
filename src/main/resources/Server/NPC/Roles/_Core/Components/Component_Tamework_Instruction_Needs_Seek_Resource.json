@@ -123,6 +123,14 @@
         6
       ],
       "Description": "Cooldown duration after nav/path failures before another seek can be started."
+    },
+    "NeedsSeekFlyingLandingEnabled": {
+      "Value": false,
+      "Description": "Whether this needs-seek move should ask Tamework aerial settling to land near the resource."
+    },
+    "NeedsSeekFlyingLandingState": {
+      "Value": "",
+      "Description": "Parent state to keep active while an aerial NPC descends near the resource."
     }
   },
   "Content": {
@@ -239,6 +247,29 @@
             "Slot": {
               "Compute": "NeedsSeekActiveTargetSlot"
             }
+          },
+          {
+            "Type": "Sequence",
+            "Enabled": {
+              "Compute": "NeedsSeekFlyingLandingEnabled"
+            },
+            "Actions": [
+              {
+                "Type": "TameworkSetFlyingCompanionMode",
+                "Mode": "Hold",
+                "LandingState": {
+                  "Compute": "NeedsSeekFlyingLandingState"
+                },
+                "GroundedState": {
+                  "Compute": "NeedsSeekFlyingLandingState"
+                },
+                "DescendStep": 0.12,
+                "ReissueDelayMs": 50,
+                "GroundedStableTicks": 3,
+                "VerticalMovementEpsilon": 0.15,
+                "LandingUseInfoProviderPosition": true
+              }
+            ]
           },
           {
             "Type": "TameworkNeedsResourceMovementDiagnostic",

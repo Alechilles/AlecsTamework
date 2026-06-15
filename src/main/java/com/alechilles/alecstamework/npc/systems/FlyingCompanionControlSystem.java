@@ -122,7 +122,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         Vector3d currentPosition = transform.getPosition();
         double currentY = currentPosition.y;
         String currentState = resolveCurrentStateSpec(npc);
-        Vector3d standPosition = resolveLandingTarget(ref, store, currentPosition);
+        Vector3d standPosition = resolveLandingTarget(ref, store, npc, component, currentPosition);
         boolean groundedByController = isGroundedByController(npc.getRole());
         logDebugSignature(ref, store, npc, component, currentState, currentY, standPosition, groundedByController);
         double groundedHeightTolerance = Math.max(
@@ -291,7 +291,14 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
     @Nullable
     private Vector3d resolveLandingTarget(@Nonnull Ref<EntityStore> ref,
                                           @Nonnull Store<EntityStore> store,
+                                          @Nonnull NPCEntity npc,
+                                          @Nonnull TameworkFlyingCompanionComponent component,
                                           @Nonnull Vector3d currentPosition) {
+        Vector3d configuredOrigin = resolveConfiguredLandingOrigin(store, npc, component);
+        if (configuredOrigin != null) {
+            return resolveNearestSafeStandPosition(store, configuredOrigin);
+        }
+
         Vector3d existing = landingTargets.get(ref);
         if (existing != null) {
             return existing;
@@ -301,6 +308,31 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             landingTargets.put(ref, resolved);
         }
         return resolved;
+    }
+
+    @Nullable
+    private Vector3d resolveConfiguredLandingOrigin(@Nonnull Store<EntityStore> store,
+                                                    @Nonnull NPCEntity npc,
+                                                    @Nonnull TameworkFlyingCompanionComponent component) {
+        Vector3d fixedPosition = component.getLandingTargetPosition();
+        if (fixedPosition != null) {
+            return fixedPosition;
+        }
+        if (!component.hasLandingTargetSlot()) {
+            return null;
+        }
+        Role role = npc.getRole();
+        if (role == null || role.getMarkedEntitySupport() == null) {
+            return null;
+        }
+        Ref<EntityStore> targetRef = role.getMarkedEntitySupport().getMarkedEntityRef(
+                (int) component.getLandingTargetSlotIndex()
+        );
+        if (targetRef == null || !targetRef.isValid()) {
+            return null;
+        }
+        TransformComponent targetTransform = store.getComponent(targetRef, TransformComponent.getComponentType());
+        return targetTransform != null ? targetTransform.getPosition() : null;
     }
 
     private String resolveCurrentStateSpec(NPCEntity npc) {

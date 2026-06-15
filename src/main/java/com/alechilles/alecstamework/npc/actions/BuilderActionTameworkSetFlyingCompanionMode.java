@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.asset.builder.holder.BooleanHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.StringNotEmptyValidator;
@@ -20,6 +21,8 @@ public final class BuilderActionTameworkSetFlyingCompanionMode extends TameworkA
     private final DoubleHolder reissueDelayMs = new DoubleHolder();
     private final DoubleHolder groundedStableTicks = new DoubleHolder();
     private final DoubleHolder verticalMovementEpsilon = new DoubleHolder();
+    private final StringHolder landingTargetSlot = new StringHolder();
+    private final BooleanHolder landingUseInfoProviderPosition = new BooleanHolder();
 
     @Override
     public String getBuilderId() {
@@ -100,6 +103,25 @@ public final class BuilderActionTameworkSetFlyingCompanionMode extends TameworkA
                 "Maximum Y movement treated as stable during landing detection.",
                 null
         );
+        getString(
+                element,
+                "LandingTargetSlot",
+                landingTargetSlot,
+                "",
+                null,
+                BuilderDescriptorState.Stable,
+                "Optional marked-entity target slot used as the safe-landing search origin.",
+                "Use for player-relative hold landings, for example MasterTarget."
+        );
+        getBoolean(
+                element,
+                "LandingUseInfoProviderPosition",
+                landingUseInfoProviderPosition,
+                false,
+                BuilderDescriptorState.Stable,
+                "When true, capture the current sensor position as the safe-landing search origin.",
+                "Use for resource-relative landings after ReadPosition has provided a block or entity position."
+        );
         return this;
     }
 
@@ -131,6 +153,18 @@ public final class BuilderActionTameworkSetFlyingCompanionMode extends TameworkA
         return verticalMovementEpsilon.get(support.getExecutionContext());
     }
 
+    public int getLandingTargetSlotIndex(BuilderSupport support) {
+        String slot = landingTargetSlot.get(support.getExecutionContext());
+        if (slot == null || slot.isBlank()) {
+            return -1;
+        }
+        return support.getTargetSlot(slot);
+    }
+
+    public boolean getLandingUseInfoProviderPosition(BuilderSupport support) {
+        return landingUseInfoProviderPosition.get(support.getExecutionContext());
+    }
+
     public ActionTameworkSetFlyingCompanionMode build(BuilderSupport support) {
         return new ActionTameworkSetFlyingCompanionMode(this, support);
     }
@@ -140,6 +174,6 @@ public final class BuilderActionTameworkSetFlyingCompanionMode extends TameworkA
     }
 
     public String getLongDescription() {
-        return "Custom action that switches a flying companion between Follow and Hold behavior and configures landing settle thresholds.";
+        return "Custom action that switches a flying companion between Follow and Hold behavior and configures landing settle thresholds and targets.";
     }
 }
