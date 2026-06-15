@@ -36,6 +36,7 @@ class NeedsSeekComponentAssetTest {
         JsonObject moveTimeout = parameters.getAsJsonObject("NeedsSeekMoveTimeoutRange");
         JsonObject stallGraceSeconds = parameters.getAsJsonObject("NeedsSeekStallGraceSeconds");
         JsonObject stallMinProgress = parameters.getAsJsonObject("NeedsSeekStallMinProgress");
+        JsonObject consumeStartDistance = parameters.getAsJsonObject("NeedsSeekConsumeStartDistance");
         assertNotNull(pathfinder, "Needs seek component must expose NeedsSeekUsePathfinder");
         assertNotNull(steering, "Needs seek component must expose NeedsSeekUseSteering");
         assertNotNull(bestPath, "Needs seek component must expose NeedsSeekUseBestPath");
@@ -44,6 +45,7 @@ class NeedsSeekComponentAssetTest {
         assertNotNull(moveTimeout, "Needs seek component must expose NeedsSeekMoveTimeoutRange");
         assertNotNull(stallGraceSeconds, "Needs seek component must expose NeedsSeekStallGraceSeconds");
         assertNotNull(stallMinProgress, "Needs seek component must expose NeedsSeekStallMinProgress");
+        assertNotNull(consumeStartDistance, "Needs seek component must expose NeedsSeekConsumeStartDistance");
         assertTrue(pathfinder.get("Value").getAsBoolean(), "Needs seek must use pathfinding");
         assertTrue(steering.get("Value").getAsBoolean(),
                 "Needs seek experiment should allow vanilla simple steering while pathfinding remains enabled");
@@ -57,14 +59,19 @@ class NeedsSeekComponentAssetTest {
                 "Needs seek must allow enough time for valid preflight paths to complete");
         assertTrue(timeoutRange.get(1).getAsDouble() >= 36.0,
                 "Needs seek must allow enough time for valid preflight paths to complete");
+        assertEquals(2.25, consumeStartDistance.get("Value").getAsDouble(), 0.0001,
+                "Needs seek must allow a small arrival buffer before consume delay starts");
         assertTrue(content.contains("\"Type\": \"Seek\""),
                 "Needs seek should use vanilla Seek while testing simple steering with pathfinding");
         assertTrue(content.contains("\"UseSteering\": {\n                \"Compute\": \"NeedsSeekUseSteering\"")
                         || content.contains("\"UseSteering\": {\r\n                \"Compute\": \"NeedsSeekUseSteering\""),
                 "Needs seek must pass the simple steering toggle into vanilla Seek");
-        assertTrue(content.contains("\"StopDistance\": {\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\"")
-                        || content.contains("\"StopDistance\": {\r\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\""),
-                "Seek motion must stay active until consume range");
+        assertTrue(content.contains("\"StopDistance\": {\n                \"Compute\": \"NeedsSeekConsumeStartDistance\"")
+                        || content.contains("\"StopDistance\": {\r\n                \"Compute\": \"NeedsSeekConsumeStartDistance\""),
+                "Seek motion must stop at the relaxed consume-start range to avoid near-arrival timeout loops");
+        assertTrue(content.contains("\"Stage\": \"consume_delay_start\"")
+                        && content.contains("\"Compute\": \"NeedsSeekConsumeStartDistance\""),
+                "Consume delay must be allowed to start at the relaxed arrival distance");
         assertEquals(1, countOccurrences(content, "\"Type\": \"MaintainDistance\""),
                 "Needs seek may only use maintain-distance after consume delay begins");
         assertEquals(5, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),

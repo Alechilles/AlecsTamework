@@ -44,6 +44,10 @@
       "Value": 2,
       "Description": "Maximum distance to maintain from consume target before consume can complete."
     },
+    "NeedsSeekConsumeStartDistance": {
+      "Value": 2.25,
+      "Description": "Relaxed arrival distance that starts consume delay when vanilla Seek stops slightly outside the strict maintain band."
+    },
     "NeedsSeekConsumeMaintainDistanceRange": {
       "Value": [
         1,
@@ -317,7 +321,7 @@
                 "Compute": "NeedsSeekActiveTargetSlot"
               },
               "Range": {
-                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                "Compute": "NeedsSeekConsumeStartDistance"
               }
             },
             "Actions": [
@@ -587,7 +591,7 @@
                     "Compute": "NeedsSeekReadRange"
                   },
                   "MinRange": {
-                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                    "Compute": "NeedsSeekConsumeStartDistance"
                   }
                 }
               ]
@@ -729,7 +733,7 @@
                 "Compute": "NeedsSeekReadRange"
               },
               "MinRange": {
-                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                "Compute": "NeedsSeekConsumeStartDistance"
               }
             },
             "BodyMotion": {
@@ -756,7 +760,7 @@
                 "Compute": "NeedsSeekSlowDownDistance"
               },
               "StopDistance": {
-                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                "Compute": "NeedsSeekConsumeStartDistance"
               },
               "RelativeSpeed": {
                 "Compute": "NeedsSeekRelativeSpeed"
@@ -987,7 +991,7 @@
                     "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
-                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                    "Compute": "NeedsSeekConsumeStartDistance"
                   }
                 },
                 {
@@ -1062,7 +1066,7 @@
                     "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
-                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                    "Compute": "NeedsSeekConsumeStartDistance"
                   }
                 }
               ]
@@ -1122,7 +1126,7 @@
                     "Compute": "NeedsSeekActiveTargetSlot"
                   },
                   "Range": {
-                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                    "Compute": "NeedsSeekConsumeStartDistance"
                   }
                 }
               ]
