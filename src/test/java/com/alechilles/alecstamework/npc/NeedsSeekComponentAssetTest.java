@@ -56,8 +56,13 @@ class NeedsSeekComponentAssetTest {
                 "Needs seek must allow enough time for valid preflight paths to complete");
         assertTrue(timeoutRange.get(1).getAsDouble() >= 36.0,
                 "Needs seek must allow enough time for valid preflight paths to complete");
-        assertTrue(content.contains("\"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\""),
-                "Seek motion must stay active until consume range");
+        assertTrue(content.contains("\"Type\": \"TameworkNeedsResourceApproach\""),
+                "Needs seek should use the custom crowd-tolerant approach body motion");
+        assertFalse(content.contains("\"Type\": \"Seek\""),
+                "Needs seek should not use vanilla Seek while testing crowded resource movement");
+        assertTrue(content.contains("\"StopDistance\": {\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\"")
+                        || content.contains("\"StopDistance\": {\r\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\""),
+                "Needs approach motion must stay active until consume range");
         assertEquals(1, countOccurrences(content, "\"Type\": \"MaintainDistance\""),
                 "Needs seek may only use maintain-distance after consume delay begins");
         assertEquals(5, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),

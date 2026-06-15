@@ -13,6 +13,7 @@
 - Needs resource scans now run a bounded pathfinder preflight before entering movement, so blocked troughs or water sources no longer pull companions out of idle/resting states unless a path is already confirmed.
 - Needs resource preflight now treats a path near the selected food or water stand target as sufficient and leaves exact final approach recovery to movement stall handling, improving consistency around crowded resources.
 - Needs resource seek now targets the food or water source itself and validates movement by consume-radius approach distance instead of requiring a projected adjacent stand point, improving crowded trough consistency.
+- Needs resource movement now uses a custom direct approach motion after preflight so crowded food and water trips are less likely to stall in vanilla seek pathing.
 - Feed trough blocks are now added to the vanilla Fence block set through an asset patch so movement and path checks treat trough variants consistently with fence-like obstacles.
 
 ### Fixed
