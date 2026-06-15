@@ -47,6 +47,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final long TARGET_CACHE_MISS_TTL_MS = 1_000L;
     private static final double PREFLIGHT_REJECT_TTL_SECONDS = 4.0;
     private static final double TARGET_RESERVATION_TTL_SECONDS = PositionTargetReservationCache.DEFAULT_TTL_SECONDS;
+    private static final double DEFAULT_APPROACH_RADIUS = 2.0;
     private static final double EPSILON = 0.000001;
 
     private final ResourceType resourceType;
@@ -110,8 +111,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (cached != null) {
             if (cached.target() != null
                     && npcUuid != null
-                    && (isTargetRejected(npcUuid, resourceType, cached.target(), nowMs)
-                    || isTargetReservedByOther(npcUuid, worldName, resourceType, cached.target(), nowMs))) {
+                    && isTargetRejected(npcUuid, resourceType, cached.target(), nowMs)) {
                 cachedTargetsByNpcId.remove(npcUuid, cached);
                 cached = null;
             }
@@ -159,12 +159,12 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (target == null && shouldUseRecentTargetFallback(resolution.reason())) {
             target = resolveRecentTarget(ref, store, npcUuid, nowMs);
             if (target != null) {
-                resolution = TargetResolution.of(target, "water_target_search_recent");
+                resolution = TargetResolution.of(target, "water_target_search_recent", DEFAULT_APPROACH_RADIUS);
             }
         }
         if (target == null) {
             if (npcUuid != null) {
-                cacheTarget(npcUuid, null, resolution.reason(), currentCacheBlock, nowMs);
+                cacheTarget(npcUuid, null, resolution.reason(), DEFAULT_APPROACH_RADIUS, currentCacheBlock, nowMs);
             }
             maybeLog(
                     ref,
@@ -202,6 +202,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 npcUuid,
                 resolveResourceLabel(),
                 target,
+                resolution.approachRadius(),
                 nowMs
         );
         if (!preflight.ready()) {
@@ -223,23 +224,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             );
             return false;
         }
-        if (!reserveTarget(npcUuid, worldName, resourceType, target, nowMs)) {
-            maybeLog(
-                    ref,
-                    store,
-                    npcId,
-                    roleId,
-                    resolveResourceLabel(),
-                    "miss",
-                    "target_reserved",
-                    false,
-                    eligibility.currentRatio(),
-                    target
-            );
-            return false;
-        }
         if (npcUuid != null) {
-            cacheTarget(npcUuid, target, resolution.reason(), currentCacheBlock, nowMs);
+            cacheTarget(npcUuid, target, resolution.reason(), resolution.approachRadius(), currentCacheBlock, nowMs);
             if (resourceType == ResourceType.WATER) {
                 recentTargetCache.remember(npcUuid, target, nowMs);
             }
@@ -284,7 +270,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, range),
-                    "water_target_search_default"
+                    "water_target_search_default",
+                    DEFAULT_APPROACH_RADIUS
             );
         }
         TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
@@ -349,10 +336,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                       @Nonnull Ref<EntityStore> ref,
                                                       @Nonnull Store<EntityStore> store) {
         if (result.target() != null) {
-            return TargetResolution.of(result.target(), targetReason);
+            return TargetResolution.of(result.target(), targetReason, result.approachRadius());
         }
         if (result.foundConsumableSourceInConsumeRange()) {
-            return TargetResolution.of(resolveCurrentPosition(ref, store), consumeRangeReason);
+            return TargetResolution.of(resolveCurrentPosition(ref, store), consumeRangeReason, result.approachRadius());
         }
         if (result.foundConsumableSource()) {
             return TargetResolution.none(noStandReason);
@@ -376,7 +363,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, range, effectiveItemIds),
-                    "food_target_search_default"
+                    "food_target_search_default",
+                    DEFAULT_APPROACH_RADIUS
             );
         }
         TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
@@ -452,10 +440,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                             @Nonnull String noStandReason,
                                                             @Nullable Vector3d currentPosition) {
         if (result.target() != null) {
-            return TargetResolution.of(result.target(), targetReason);
+            return TargetResolution.of(result.target(), targetReason, result.approachRadius());
         }
         if (result.foundConsumableSourceInConsumeRange()) {
-            return TargetResolution.of(currentPosition, consumeRangeReason);
+            return TargetResolution.of(currentPosition, consumeRangeReason, result.approachRadius());
         }
         if (result.foundConsumableSource()) {
             return TargetResolution.none(noStandReason);
@@ -646,6 +634,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return clamp(value, 0.0, 1.0);
     }
 
+    private static double sanitizeApproachRadius(double value) {
+        return Double.isFinite(value) && value > EPSILON ? value : DEFAULT_APPROACH_RADIUS;
+    }
+
     @Nullable
     private CachedTargetResult getCachedTarget(@Nonnull UUID npcUuid,
                                                long nowMs,
@@ -668,6 +660,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private void cacheTarget(@Nonnull UUID npcUuid,
                              @Nullable Vector3d target,
                              @Nonnull String reason,
+                             double approachRadius,
                              @Nullable TargetCacheBlock currentCacheBlock,
                              long nowMs) {
         if (currentCacheBlock == null) {
@@ -679,6 +672,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 new CachedTargetResult(
                         target != null ? new Vector3d(target) : null,
                         reason,
+                        sanitizeApproachRadius(approachRadius),
                         currentCacheBlock,
                         nowMs + ttlMs
                 )
@@ -827,12 +821,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                        @Nullable String worldName,
                                                        long nowMs) {
         boolean hasRejectedTargets = hasRejectedTargetFor(npcUuid, type, nowMs);
-        boolean hasReservedTargets = PositionTargetReservationCache.hasReservationFor(worldName, typeLabel(type), nowMs);
-        if (!hasRejectedTargets && !hasReservedTargets) {
+        if (!hasRejectedTargets) {
             return null;
         }
-        return target -> isTargetRejected(npcUuid, type, target, nowMs)
-                || isTargetReservedByOther(npcUuid, worldName, type, target, nowMs);
+        return target -> isTargetRejected(npcUuid, type, target, nowMs);
     }
 
     private static boolean hasRejectedTargetFor(@Nullable UUID npcUuid,
@@ -988,6 +980,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     private record CachedTargetResult(@Nullable Vector3d target,
                                       @Nonnull String reason,
+                                      double approachRadius,
                                       @Nonnull TargetCacheBlock scanBlock,
                                       long expiresAtMs) {
     }
@@ -1043,23 +1036,31 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     }
 
     private record TargetResolution(@Nullable Vector3d target,
-                                    @Nonnull String reason) {
+                                    @Nonnull String reason,
+                                    double approachRadius) {
         @Nonnull
         private static TargetResolution of(@Nullable Vector3d target, @Nonnull String reason) {
+            return of(target, reason, DEFAULT_APPROACH_RADIUS);
+        }
+
+        @Nonnull
+        private static TargetResolution of(@Nullable Vector3d target,
+                                           @Nonnull String reason,
+                                           double approachRadius) {
             if (target == null) {
-                return new TargetResolution(null, reason + "_miss");
+                return new TargetResolution(null, reason + "_miss", DEFAULT_APPROACH_RADIUS);
             }
-            return new TargetResolution(target, reason);
+            return new TargetResolution(target, reason, sanitizeApproachRadius(approachRadius));
         }
 
         @Nonnull
         private static TargetResolution none(@Nonnull String reason) {
-            return new TargetResolution(null, reason);
+            return new TargetResolution(null, reason, DEFAULT_APPROACH_RADIUS);
         }
 
         @Nonnull
         private static TargetResolution unresolved() {
-            return new TargetResolution(null, "unresolved");
+            return new TargetResolution(null, "unresolved", DEFAULT_APPROACH_RADIUS);
         }
 
         private boolean isResolved() {

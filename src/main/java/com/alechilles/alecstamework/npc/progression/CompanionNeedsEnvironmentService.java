@@ -41,6 +41,8 @@ public final class CompanionNeedsEnvironmentService {
     private static final int SEARCH_CACHE_MAX_ENTRIES = 8192;
     private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
+    private static final double SOURCE_TARGET_CENTER_OFFSET = 0.5;
+    private static final double DEFAULT_APPROACH_RADIUS = 2.0;
     private static final double SCORE_EPSILON = 0.000001;
     private static final boolean WATER_STAND_TARGETS_INCLUDE_SOURCE_BLOCK = false;
     private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
@@ -469,9 +471,6 @@ public final class CompanionNeedsEnvironmentService {
         double radiusSq = radius * radius;
         int clampedVerticalRadius = Math.max(0, verticalScanRadius);
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        NeedsResourceStandTargetSelector.CandidateProjector standProjector =
-                standTargetSelector().createProjector(role, store);
-        // Prefer the same edge-adjacent style target that food seek uses so the NPC visibly walks up to water.
         WaterTargetSearchResult bestResult = findNearestWaterTarget(
                 chunkStore,
                 chunkStoreStore,
@@ -484,7 +483,6 @@ public final class CompanionNeedsEnvironmentService {
                 1.0,
                 radiusSq,
                 chunkCache,
-                standProjector,
                 targetRejector
         );
         if (bestResult.target() == null && consumeRadius > 1.0 + SCORE_EPSILON) {
@@ -500,7 +498,6 @@ public final class CompanionNeedsEnvironmentService {
                     consumeRadius,
                     radiusSq,
                     chunkCache,
-                    standProjector,
                     targetRejector
             );
             bestResult = WaterTargetSearchResult.mergeMissMetadata(bestResult, expandedResult);
@@ -523,7 +520,6 @@ public final class CompanionNeedsEnvironmentService {
                                                                   double consumeRadius,
                                                                   double radiusSq,
                                                                   @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                  @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
                                                                   @Nullable TargetRejector targetRejector) {
         boolean foundConsumableSource = false;
         boolean foundConsumableSourceInConsumeRange = false;
@@ -540,7 +536,6 @@ public final class CompanionNeedsEnvironmentService {
                     consumeRadius,
                     radiusSq,
                     chunkCache,
-                    standProjector,
                     targetRejector
             );
             foundConsumableSource |= ringResult.foundConsumableSource();
@@ -797,8 +792,6 @@ public final class CompanionNeedsEnvironmentService {
         double radiusSq = radius * radius;
         int clampedVerticalRadius = Math.max(0, verticalScanRadius);
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        NeedsResourceStandTargetSelector.CandidateProjector standProjector =
-                standTargetSelector().createProjector(role, store);
         boolean foundConsumableSource = false;
         boolean foundConsumableSourceInConsumeRange = false;
         FoodTargetSearchResult bestResult = null;
@@ -816,7 +809,6 @@ public final class CompanionNeedsEnvironmentService {
                     effectiveConsumeRadius,
                     allowedFoods,
                     chunkCache,
-                    standProjector,
                     targetRejector
             );
             foundConsumableSource |= ringResult.foundConsumableSource();
@@ -908,7 +900,6 @@ public final class CompanionNeedsEnvironmentService {
                                                                                    double consumeRadius,
                                                                                    double radiusSq,
                                                                                    @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                                   @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
                                                                                    @Nullable TargetRejector targetRejector) {
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
@@ -939,34 +930,20 @@ public final class CompanionNeedsEnvironmentService {
                     if ((dx * dx) + (dz * dz) <= consumeRadiusSq + SCORE_EPSILON) {
                         foundConsumableSourceInConsumeRange = true;
                     }
-                    Vector3d standPosition = findNearestStandPositionNearWaterSource(
-                            chunkStore,
-                            chunkStoreStore,
-                            x,
-                            y,
-                            z,
-                            npcPosition,
-                            consumeRadius,
-                            chunkCache,
-                            standProjector,
-                            targetRejector
-                    );
-                    if (standPosition == null) {
+                    Vector3d sourceTarget = sourceBlockTarget(x, y, z);
+                    if (targetRejector != null && targetRejector.rejects(sourceTarget)) {
                         continue;
                     }
-                    if (targetRejector != null && targetRejector.rejects(standPosition)) {
-                        continue;
-                    }
-                    double distanceSq = distanceSquared(standPosition, npcPosition);
+                    double distanceSq = distanceSquared(sourceTarget, npcPosition);
                     if (Double.isFinite(distanceSq) && distanceSq < bestDistanceSq) {
                         bestDistanceSq = distanceSq;
-                        bestTarget = standPosition;
+                        bestTarget = sourceTarget;
                     }
                 }
             }
         }
         if (bestTarget != null) {
-            return WaterTargetSearchResult.target(bestTarget, foundConsumableSourceInConsumeRange);
+            return WaterTargetSearchResult.target(bestTarget, foundConsumableSourceInConsumeRange, consumeRadius);
         }
         return WaterTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
     }
@@ -984,7 +961,6 @@ public final class CompanionNeedsEnvironmentService {
                                                                                 double consumeRadius,
                                                                                 @Nonnull Set<String> allowedFoods,
                                                                                 @Nonnull Map<Long, WorldChunk> chunkCache,
-                                                                                @Nullable NeedsResourceStandTargetSelector.CandidateProjector standProjector,
                                                                                 @Nullable TargetRejector targetRejector) {
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
@@ -1026,33 +1002,20 @@ public final class CompanionNeedsEnvironmentService {
                     if (consumeRadius > SCORE_EPSILON && (dx * dx) + (dz * dz) <= consumeRadiusSq + SCORE_EPSILON) {
                         foundConsumableSourceInConsumeRange = true;
                     }
-                    Vector3d standPosition = findNearestStandPositionAdjacentToBlock(
-                            chunkStore,
-                            chunkStoreStore,
-                            x,
-                            y,
-                            z,
-                            npcPosition,
-                            chunkCache,
-                            standProjector,
-                            targetRejector
-                    );
-                    if (standPosition == null) {
+                    Vector3d sourceTarget = sourceBlockTarget(x, y, z);
+                    if (targetRejector != null && targetRejector.rejects(sourceTarget)) {
                         continue;
                     }
-                    if (targetRejector != null && targetRejector.rejects(standPosition)) {
-                        continue;
-                    }
-                    double distanceSq = distanceSquared(standPosition, npcPosition);
+                    double distanceSq = distanceSquared(sourceTarget, npcPosition);
                     if (Double.isFinite(distanceSq) && distanceSq < bestDistanceSq) {
                         bestDistanceSq = distanceSq;
-                        bestTarget = standPosition;
+                        bestTarget = sourceTarget;
                     }
                 }
             }
         }
         if (bestTarget != null) {
-            return FoodTargetSearchResult.target(bestTarget, foundConsumableSourceInConsumeRange);
+            return FoodTargetSearchResult.target(bestTarget, foundConsumableSourceInConsumeRange, consumeRadius);
         }
         return FoodTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
     }
@@ -1090,7 +1053,8 @@ public final class CompanionNeedsEnvironmentService {
         return new WaterTargetSearchResult(
                 cached.target() != null ? new Vector3d(cached.target()) : null,
                 cached.foundConsumableSource(),
-                cached.foundConsumableSourceInConsumeRange()
+                cached.foundConsumableSourceInConsumeRange(),
+                cached.approachRadius()
         );
     }
 
@@ -1111,7 +1075,8 @@ public final class CompanionNeedsEnvironmentService {
         return new FoodTargetSearchResult(
                 cached.target() != null ? new Vector3d(cached.target()) : null,
                 cached.foundConsumableSource(),
-                cached.foundConsumableSourceInConsumeRange()
+                cached.foundConsumableSourceInConsumeRange(),
+                cached.approachRadius()
         );
     }
 
@@ -1128,6 +1093,7 @@ public final class CompanionNeedsEnvironmentService {
                         target != null ? new Vector3d(target) : null,
                         target != null,
                         target != null,
+                        DEFAULT_APPROACH_RADIUS,
                         nowMs + ttlMs
                 )
         );
@@ -1147,6 +1113,7 @@ public final class CompanionNeedsEnvironmentService {
                         result.target() != null ? new Vector3d(result.target()) : null,
                         result.foundConsumableSource(),
                         result.foundConsumableSourceInConsumeRange(),
+                        result.approachRadius(),
                         nowMs + ttlMs
                 )
         );
@@ -1166,6 +1133,7 @@ public final class CompanionNeedsEnvironmentService {
                         result.target() != null ? new Vector3d(result.target()) : null,
                         result.foundConsumableSource(),
                         result.foundConsumableSourceInConsumeRange(),
+                        result.approachRadius(),
                         nowMs + ttlMs
                 )
         );
@@ -1298,21 +1266,40 @@ public final class CompanionNeedsEnvironmentService {
     private record CachedSearchResult(@Nullable Vector3d target,
                                       boolean foundConsumableSource,
                                       boolean foundConsumableSourceInConsumeRange,
+                                      double approachRadius,
                                       long expiresAtMs) {
     }
 
     public record WaterTargetSearchResult(@Nullable Vector3d target,
                                           boolean foundConsumableSource,
-                                          boolean foundConsumableSourceInConsumeRange) {
+                                          boolean foundConsumableSourceInConsumeRange,
+                                          double approachRadius) {
+        public WaterTargetSearchResult(@Nullable Vector3d target,
+                                       boolean foundConsumableSource,
+                                       boolean foundConsumableSourceInConsumeRange) {
+            this(target, foundConsumableSource, foundConsumableSourceInConsumeRange, DEFAULT_APPROACH_RADIUS);
+        }
+
         @Nonnull
         public static WaterTargetSearchResult target(@Nonnull Vector3d target) {
-            return target(target, true);
+            return target(target, DEFAULT_APPROACH_RADIUS);
+        }
+
+        @Nonnull
+        public static WaterTargetSearchResult target(@Nonnull Vector3d target, double approachRadius) {
+            return target(target, true, approachRadius);
         }
 
         @Nonnull
         private static WaterTargetSearchResult target(@Nonnull Vector3d target,
-                                                      boolean foundConsumableSourceInConsumeRange) {
-            return new WaterTargetSearchResult(target, true, foundConsumableSourceInConsumeRange);
+                                                      boolean foundConsumableSourceInConsumeRange,
+                                                      double approachRadius) {
+            return new WaterTargetSearchResult(
+                    target,
+                    true,
+                    foundConsumableSourceInConsumeRange,
+                    sanitizeApproachRadius(approachRadius)
+            );
         }
 
         @Nonnull
@@ -1323,7 +1310,12 @@ public final class CompanionNeedsEnvironmentService {
         @Nonnull
         private static WaterTargetSearchResult miss(boolean foundConsumableSource,
                                                    boolean foundConsumableSourceInConsumeRange) {
-            return new WaterTargetSearchResult(null, foundConsumableSource, foundConsumableSourceInConsumeRange);
+            return new WaterTargetSearchResult(
+                    null,
+                    foundConsumableSource,
+                    foundConsumableSourceInConsumeRange,
+                    DEFAULT_APPROACH_RADIUS
+            );
         }
 
         @Nonnull
@@ -1342,16 +1334,34 @@ public final class CompanionNeedsEnvironmentService {
 
     public record FoodTargetSearchResult(@Nullable Vector3d target,
                                          boolean foundConsumableSource,
-                                         boolean foundConsumableSourceInConsumeRange) {
+                                         boolean foundConsumableSourceInConsumeRange,
+                                         double approachRadius) {
+        public FoodTargetSearchResult(@Nullable Vector3d target,
+                                      boolean foundConsumableSource,
+                                      boolean foundConsumableSourceInConsumeRange) {
+            this(target, foundConsumableSource, foundConsumableSourceInConsumeRange, DEFAULT_APPROACH_RADIUS);
+        }
+
         @Nonnull
         public static FoodTargetSearchResult target(@Nonnull Vector3d target) {
-            return target(target, true);
+            return target(target, DEFAULT_APPROACH_RADIUS);
+        }
+
+        @Nonnull
+        public static FoodTargetSearchResult target(@Nonnull Vector3d target, double approachRadius) {
+            return target(target, true, approachRadius);
         }
 
         @Nonnull
         private static FoodTargetSearchResult target(@Nonnull Vector3d target,
-                                                     boolean foundConsumableSourceInConsumeRange) {
-            return new FoodTargetSearchResult(target, true, foundConsumableSourceInConsumeRange);
+                                                     boolean foundConsumableSourceInConsumeRange,
+                                                     double approachRadius) {
+            return new FoodTargetSearchResult(
+                    target,
+                    true,
+                    foundConsumableSourceInConsumeRange,
+                    sanitizeApproachRadius(approachRadius)
+            );
         }
 
         @Nonnull
@@ -1362,7 +1372,12 @@ public final class CompanionNeedsEnvironmentService {
         @Nonnull
         private static FoodTargetSearchResult miss(boolean foundConsumableSource,
                                                   boolean foundConsumableSourceInConsumeRange) {
-            return new FoodTargetSearchResult(null, foundConsumableSource, foundConsumableSourceInConsumeRange);
+            return new FoodTargetSearchResult(
+                    null,
+                    foundConsumableSource,
+                    foundConsumableSourceInConsumeRange,
+                    DEFAULT_APPROACH_RADIUS
+            );
         }
     }
 
@@ -1802,6 +1817,21 @@ public final class CompanionNeedsEnvironmentService {
             return false;
         }
         return isSolidBlock(groundBlockId, groundFluid);
+    }
+
+    @Nonnull
+    private static Vector3d sourceBlockTarget(int blockX, int blockY, int blockZ) {
+        return new Vector3d(
+                blockX + SOURCE_TARGET_CENTER_OFFSET,
+                blockY + SOURCE_TARGET_CENTER_OFFSET,
+                blockZ + SOURCE_TARGET_CENTER_OFFSET
+        );
+    }
+
+    private static double sanitizeApproachRadius(double approachRadius) {
+        return Double.isFinite(approachRadius) && approachRadius > SCORE_EPSILON
+                ? approachRadius
+                : DEFAULT_APPROACH_RADIUS;
     }
 
     private static boolean isConsumableWaterSourceAt(@Nullable WorldChunk worldChunk,

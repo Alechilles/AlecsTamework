@@ -172,14 +172,27 @@ class NeedsResourcePathPreflightServiceTest {
         assertFalse(NeedsSeekPathEvaluator.isWithinPreflightGoal(0.0, 4.25, 4.0));
     }
 
+    @Test
+    void preflightCacheKeyIncludesApproachDistance() {
+        NeedsResourcePathPreflightService.PreflightKey nearKey = keyFor(40, 1.0);
+        NeedsResourcePathPreflightService.PreflightKey farKey = keyFor(40, 3.0);
+
+        assertFalse(nearKey.equals(farKey));
+    }
+
     private static NeedsResourcePathPreflightService.PreflightKey keyFor(int index) {
+        return keyFor(index, 2.0);
+    }
+
+    private static NeedsResourcePathPreflightService.PreflightKey keyFor(int index, double approachDistance) {
         return NeedsResourcePathPreflightService.PreflightKey.from(
                 new UUID(0L, index),
                 "test-world",
                 "FoodContainer",
                 "Walk",
                 new Vector3d(index, 64.0, 0.0),
-                new Vector3d(index + 4.0, 64.0, 0.0)
+                new Vector3d(index + 4.0, 64.0, 0.0),
+                approachDistance
         );
     }
 

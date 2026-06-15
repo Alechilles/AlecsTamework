@@ -41,7 +41,6 @@ public final class NeedsResourcePathPreflightService {
     private static final int MAX_GLOBAL_NODES_PER_50MS = 512;
     private static final long GLOBAL_BUDGET_WINDOW_MS = 50L;
     private static final double DEFAULT_STOP_DISTANCE = 2.0;
-    private static final double SAME_POSITION_DISTANCE_SQ = 0.25;
     private static final double EPSILON = 0.000001;
     private static final AtomicLong budgetWindowMs = new AtomicLong();
     private static final AtomicInteger budgetUsedNodes = new AtomicInteger();
@@ -56,9 +55,22 @@ public final class NeedsResourcePathPreflightService {
                                          @Nonnull String resourceType,
                                          @Nullable Vector3d target,
                                          long nowMs) {
+        return preflight(ref, role, store, npcUuid, resourceType, target, DEFAULT_STOP_DISTANCE, nowMs);
+    }
+
+    @Nonnull
+    public PathPreflightResult preflight(@Nonnull Ref<EntityStore> ref,
+                                         @Nonnull Role role,
+                                         @Nonnull Store<EntityStore> store,
+                                         @Nonnull UUID npcUuid,
+                                         @Nonnull String resourceType,
+                                         @Nullable Vector3d target,
+                                         double stopDistance,
+                                         long nowMs) {
         if (target == null || !isFinite(target)) {
             return PathPreflightResult.unavailable("path_preflight_target_invalid");
         }
+        double effectiveStopDistance = sanitizeStopDistance(stopDistance);
         MotionController motionController = role.getActiveMotionController();
         TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
         BoundingBox boundingBox = store.getComponent(ref, BoundingBox.getComponentType());
@@ -79,14 +91,15 @@ public final class NeedsResourcePathPreflightService {
                 resourceType,
                 motionController.getType(),
                 start,
-                target
+                target,
+                effectiveStopDistance
         );
         if (key == null) {
             return PathPreflightResult.unavailable("path_preflight_key_unavailable");
         }
-        if (isSamePosition(start, target, motionController)) {
-            cacheTerminalResult(key, PathPreflightStatus.READY, "path_preflight_already_at_target", nowMs);
-            return PathPreflightResult.ready("path_preflight_already_at_target");
+        if (isWithinStopDistance(start, target, effectiveStopDistance, motionController)) {
+            cacheTerminalResult(key, PathPreflightStatus.READY, "path_preflight_already_in_range", nowMs);
+            return PathPreflightResult.ready("path_preflight_already_in_range");
         }
         return preflight(
                 key,
@@ -96,6 +109,7 @@ public final class NeedsResourcePathPreflightService {
                         motionController,
                         start,
                         target,
+                        effectiveStopDistance,
                         boundingBox.getBoundingBox(),
                         nodePoolProvider
                 ),
@@ -175,6 +189,7 @@ public final class NeedsResourcePathPreflightService {
                                                   @Nonnull MotionController motionController,
                                                   @Nonnull Vector3d start,
                                                   @Nonnull Vector3d target,
+                                                  double stopDistance,
                                                   @Nonnull Box selfBoundingBox,
                                                   @Nonnull AStarNodePoolProviderSimple nodePoolProvider) {
         AStarWithTarget aStar = new AStarWithTarget();
@@ -193,7 +208,7 @@ public final class NeedsResourcePathPreflightService {
                 aStar,
                 new Vector3d(start),
                 new Vector3d(target),
-                new NeedsSeekPathEvaluator(target, selfBoundingBox, DEFAULT_STOP_DISTANCE),
+                new NeedsSeekPathEvaluator(target, selfBoundingBox, stopDistance),
                 probeMoveData,
                 nodePoolProvider
         );
@@ -290,10 +305,18 @@ public final class NeedsResourcePathPreflightService {
         return worldName == null || worldName.isBlank() ? null : worldName;
     }
 
-    private static boolean isSamePosition(@Nonnull Vector3d start,
-                                          @Nonnull Vector3d target,
-                                          @Nonnull MotionController motionController) {
-        return motionController.waypointDistanceSquared(start, target) <= SAME_POSITION_DISTANCE_SQ + EPSILON;
+    private static boolean isWithinStopDistance(@Nonnull Vector3d start,
+                                                @Nonnull Vector3d target,
+                                                double stopDistance,
+                                                @Nonnull MotionController motionController) {
+        double effectiveStopDistance = sanitizeStopDistance(stopDistance);
+        double distanceSquared = motionController.waypointDistanceSquared(start, target);
+        return Double.isFinite(distanceSquared)
+                && distanceSquared <= (effectiveStopDistance * effectiveStopDistance) + EPSILON;
+    }
+
+    private static double sanitizeStopDistance(double stopDistance) {
+        return Double.isFinite(stopDistance) && stopDistance > 0.0 ? stopDistance : DEFAULT_STOP_DISTANCE;
     }
 
     private static boolean isFinite(@Nonnull Vector3d vector) {
@@ -351,7 +374,8 @@ public final class NeedsResourcePathPreflightService {
                         int startZ,
                         int targetX,
                         int targetY,
-                        int targetZ) {
+                        int targetZ,
+                        int stopDistanceKey) {
         @Nullable
         static PreflightKey from(@Nonnull UUID npcUuid,
                                  @Nullable String worldName,
@@ -359,6 +383,17 @@ public final class NeedsResourcePathPreflightService {
                                  @Nullable String motionControllerType,
                                  @Nonnull Vector3d start,
                                  @Nonnull Vector3d target) {
+            return from(npcUuid, worldName, resourceType, motionControllerType, start, target, DEFAULT_STOP_DISTANCE);
+        }
+
+        @Nullable
+        static PreflightKey from(@Nonnull UUID npcUuid,
+                                 @Nullable String worldName,
+                                 @Nonnull String resourceType,
+                                 @Nullable String motionControllerType,
+                                 @Nonnull Vector3d start,
+                                 @Nonnull Vector3d target,
+                                 double stopDistance) {
             if (worldName == null || worldName.isBlank()) {
                 return null;
             }
@@ -376,7 +411,8 @@ public final class NeedsResourcePathPreflightService {
                     (int) Math.floor(start.z),
                     (int) Math.floor(target.x),
                     (int) Math.floor(target.y),
-                    (int) Math.floor(target.z)
+                    (int) Math.floor(target.z),
+                    (int) Math.ceil(sanitizeStopDistance(stopDistance) * 10.0)
             );
         }
     }

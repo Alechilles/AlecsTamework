@@ -23,10 +23,11 @@ class CompanionNeedsEnvironmentServiceWaterTargetTest {
         Vector3d target = new Vector3d(1.0, 2.0, 3.0);
 
         CompanionNeedsEnvironmentService.WaterTargetSearchResult result =
-                CompanionNeedsEnvironmentService.WaterTargetSearchResult.target(target);
+                CompanionNeedsEnvironmentService.WaterTargetSearchResult.target(target, 2.5);
 
         assertSame(target, result.target());
         assertTrue(result.foundConsumableSource());
+        assertEquals(2.5, result.approachRadius(), 0.000001);
     }
 
     @Test
@@ -48,13 +49,14 @@ class CompanionNeedsEnvironmentServiceWaterTargetTest {
     void foodSearchCachePreservesMetadataAndCopiesTarget() {
         Vector3d target = new Vector3d(3.5, 4.05, 7.5);
         CompanionNeedsEnvironmentService.FoodTargetSearchResult result =
-                CompanionNeedsEnvironmentService.FoodTargetSearchResult.target(target);
+                CompanionNeedsEnvironmentService.FoodTargetSearchResult.target(target, 1.75);
 
         CompanionNeedsEnvironmentService.FoodTargetSearchResult cachedResult =
                 CompanionNeedsEnvironmentService.cacheFoodSearchResultRoundTripForTests(result, 1_000L);
 
         assertTrue(cachedResult.foundConsumableSource());
         assertTrue(cachedResult.foundConsumableSourceInConsumeRange());
+        assertEquals(1.75, cachedResult.approachRadius(), 0.000001);
         assertTrue(cachedResult.target() != target);
         assertEquals(target.x, cachedResult.target().x, 0.000001);
         assertEquals(target.y, cachedResult.target().y, 0.000001);
