@@ -55,10 +55,10 @@ class NeedsSeekComponentAssetTest {
         assertTrue(relativeSpeed.get("Value").getAsDouble() >= 0.75,
                 "Needs seek must move fast enough to avoid repeated timeout/retry loops");
         JsonArray timeoutRange = moveTimeout.getAsJsonArray("Value");
-        assertTrue(timeoutRange.get(0).getAsDouble() >= 28.0,
-                "Needs seek must allow enough time for valid preflight paths to complete");
-        assertTrue(timeoutRange.get(1).getAsDouble() >= 36.0,
-                "Needs seek must allow enough time for valid preflight paths to complete");
+        assertEquals(15.0, timeoutRange.get(0).getAsDouble(), 0.0001,
+                "Needs seek should fail quickly when movement reaches no consumable position");
+        assertEquals(15.0, timeoutRange.get(1).getAsDouble(), 0.0001,
+                "Needs seek should fail quickly when movement reaches no consumable position");
         assertEquals(2.25, consumeStartDistance.get("Value").getAsDouble(), 0.0001,
                 "Needs seek must allow a small arrival buffer before consume delay starts");
         assertTrue(content.contains("\"Type\": \"Seek\""),

@@ -89,8 +89,8 @@
     },
     "NeedsSeekMoveTimeoutRange": {
       "Value": [
-        28,
-        36
+        15,
+        15
       ],
       "Description": "Fail-safe maximum move time before resource seek completes."
     },
