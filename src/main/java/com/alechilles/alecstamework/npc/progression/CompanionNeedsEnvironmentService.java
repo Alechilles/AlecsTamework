@@ -457,6 +457,12 @@ public final class CompanionNeedsEnvironmentService {
             if (cachedResult != null) {
                 return cachedResult;
             }
+        } else {
+            WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(cacheKey, nowMs);
+            if (cachedResult != null
+                    && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
+                return cachedResult;
+            }
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
@@ -776,6 +782,12 @@ public final class CompanionNeedsEnvironmentService {
         if (targetRejector == null) {
             FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(cacheKey, nowMs);
             if (cachedResult != null) {
+                return cachedResult;
+            }
+        } else {
+            FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(cacheKey, nowMs);
+            if (cachedResult != null
+                    && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
                 return cachedResult;
             }
         }
@@ -1796,23 +1808,21 @@ public final class CompanionNeedsEnvironmentService {
                                       int blockY,
                                       int blockZ,
                                       @Nonnull Map<Long, WorldChunk> chunkCache) {
-        WorldChunk feetChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
-        WorldChunk headChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
-        WorldChunk groundChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
-        if (feetChunk == null || headChunk == null || groundChunk == null) {
+        WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        if (worldChunk == null) {
             return false;
         }
 
-        int feetFluid = feetChunk.getFluidId(blockX, blockY, blockZ);
-        int headFluid = headChunk.getFluidId(blockX, blockY + 1, blockZ);
-        int groundFluid = groundChunk.getFluidId(blockX, blockY - 1, blockZ);
+        int feetFluid = worldChunk.getFluidId(blockX, blockY, blockZ);
+        int headFluid = worldChunk.getFluidId(blockX, blockY + 1, blockZ);
+        int groundFluid = worldChunk.getFluidId(blockX, blockY - 1, blockZ);
         if (feetFluid != 0 || headFluid != 0) {
             return false;
         }
 
-        int feetBlockId = feetChunk.getBlock(blockX, blockY, blockZ);
-        int headBlockId = headChunk.getBlock(blockX, blockY + 1, blockZ);
-        int groundBlockId = groundChunk.getBlock(blockX, blockY - 1, blockZ);
+        int feetBlockId = worldChunk.getBlock(blockX, blockY, blockZ);
+        int headBlockId = worldChunk.getBlock(blockX, blockY + 1, blockZ);
+        int groundBlockId = worldChunk.getBlock(blockX, blockY - 1, blockZ);
         if (isSolidBlock(feetBlockId, feetFluid) || isSolidBlock(headBlockId, headFluid)) {
             return false;
         }
