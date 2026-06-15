@@ -66,9 +66,9 @@ class NeedsSeekComponentAssetTest {
         assertTrue(content.contains("\"UseSteering\": {\n                \"Compute\": \"NeedsSeekUseSteering\"")
                         || content.contains("\"UseSteering\": {\r\n                \"Compute\": \"NeedsSeekUseSteering\""),
                 "Needs seek must pass the simple steering toggle into vanilla Seek");
-        assertTrue(content.contains("\"StopDistance\": {\n                \"Compute\": \"NeedsSeekConsumeStartDistance\"")
-                        || content.contains("\"StopDistance\": {\r\n                \"Compute\": \"NeedsSeekConsumeStartDistance\""),
-                "Seek motion must stop at the relaxed consume-start range to avoid near-arrival timeout loops");
+        assertTrue(content.contains("\"StopDistance\": {\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\"")
+                        || content.contains("\"StopDistance\": {\r\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\""),
+                "Seek motion should aim inside the relaxed consume-start range instead of stopping at its outer edge");
         assertTrue(content.contains("\"Stage\": \"consume_delay_start\"")
                         && content.contains("\"Compute\": \"NeedsSeekConsumeStartDistance\""),
                 "Consume delay must be allowed to start at the relaxed arrival distance");

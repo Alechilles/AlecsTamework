@@ -760,7 +760,7 @@
                 "Compute": "NeedsSeekSlowDownDistance"
               },
               "StopDistance": {
-                "Compute": "NeedsSeekConsumeStartDistance"
+                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
               },
               "RelativeSpeed": {
                 "Compute": "NeedsSeekRelativeSpeed"
