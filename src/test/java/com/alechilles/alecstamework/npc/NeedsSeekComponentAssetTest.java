@@ -47,7 +47,8 @@ class NeedsSeekComponentAssetTest {
         assertTrue(pathfinder.get("Value").getAsBoolean(), "Needs seek must use pathfinding");
         assertFalse(steering.get("Value").getAsBoolean(), "Needs seek must not direct-steer around pathfinding");
         assertFalse(bestPath.get("Value").getAsBoolean(), "Needs seek must not accept partial best-path fallback");
-        assertTrue(reachable.get("Value").getAsBoolean(), "Needs seek must require direct reachability at goal");
+        assertFalse(reachable.get("Value").getAsBoolean(),
+                "Needs seek should rely on preflight reachability instead of the motion exact-target gate");
         assertTrue(relativeSpeed.get("Value").getAsDouble() >= 0.75,
                 "Needs seek must move fast enough to avoid repeated timeout/retry loops");
         JsonArray timeoutRange = moveTimeout.getAsJsonArray("Value");

@@ -76,8 +76,8 @@
       "Description": "Avoid environmental block damage while pathing to needs resources."
     },
     "NeedsSeekReachable": {
-      "Value": true,
-      "Description": "Require direct reachability to the projected stand target before considering the needs seek goal reached."
+      "Value": false,
+      "Description": "Let custom needs preflight own resource reachability so seek movement can path to consume range without rechecking exact-target reachability."
     },
     "NeedsSeekReadRange": {
       "Value": 96,
