@@ -47,6 +47,50 @@ class SensorTameworkReachableBlockTargetTest {
     }
 
     @Test
+    void blockSetMatchingUsesSetIndexBeforeBlockTypeIndex() {
+        int expectedBlockSetIndex = 7;
+        int expectedBlockTypeIndex = 42;
+
+        assertTrue(SensorTameworkReachableBlockTarget.matchesConfiguredBlock(
+                new BlockType("hytale:hay_bale"),
+                expectedBlockTypeIndex,
+                expectedBlockSetIndex,
+                Set.of(),
+                (blockSetIndex, blockTypeIndex) -> {
+                    assertEquals(expectedBlockSetIndex, blockSetIndex);
+                    assertEquals(expectedBlockTypeIndex, blockTypeIndex);
+                    return true;
+                }
+        ));
+    }
+
+    @Test
+    void unresolvedBlockSetSkipsMembershipLookup() {
+        assertFalse(SensorTameworkReachableBlockTarget.matchesConfiguredBlock(
+                new BlockType("hytale:hay_bale"),
+                42,
+                Integer.MIN_VALUE,
+                Set.of(),
+                (blockSetIndex, blockTypeIndex) -> {
+                    throw new AssertionError("Unknown block sets should not call membership lookup.");
+                }
+        ));
+    }
+
+    @Test
+    void exactBlockTypeMatchDoesNotRequireBlockSetLookup() {
+        assertTrue(SensorTameworkReachableBlockTarget.matchesConfiguredBlock(
+                new BlockType("hytale:hay_bale"),
+                42,
+                Integer.MIN_VALUE,
+                Set.of("hytale:hay_bale"),
+                (blockSetIndex, blockTypeIndex) -> {
+                    throw new AssertionError("Exact block types should short-circuit block set lookup.");
+                }
+        ));
+    }
+
+    @Test
     void sanitizerDropsBlankIdsAndKeepsUniqueValues() {
         Set<String> sanitized = SensorTameworkReachableBlockTarget.sanitizeIdSet(new String[]{
                 "A",

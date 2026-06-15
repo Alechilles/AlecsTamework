@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkRe
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
+import com.hypixel.hytale.server.core.asset.type.blockset.config.BlockSet;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.blockset.BlockSetModule;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -55,6 +56,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
 
     @Nullable
     private final String blockSet;
+    private final int blockSetIndex;
     @Nonnull
     private final Set<String> blockTypes;
     @Nonnull
@@ -71,6 +73,7 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                                               @Nonnull BuilderSupport support) {
         super(builder);
         this.blockSet = sanitizeNullableId(builder.getBlockSet(support));
+        this.blockSetIndex = resolveBlockSetIndex(this.blockSet);
         this.blockTypes = sanitizeIdSet(builder.getBlockTypes(support));
         this.label = sanitizeLabel(builder.getLabel(support));
         this.range = sanitizePositive(builder.getRange(support), 12.0);
@@ -207,7 +210,8 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                             z,
                             context.chunkCache()
                     );
-                    if (worldChunk == null || !matchesConfiguredBlock(worldChunk, x, y, z, blockSet, blockTypes)) {
+                    if (worldChunk == null
+                            || !matchesConfiguredBlock(worldChunk, x, y, z, blockSetIndex, blockTypes)) {
                         continue;
                     }
                     context.diagnostics().recordMatchingSource(x, y, z, worldChunk.getBlockType(x, y, z));
@@ -276,17 +280,31 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
                                           int x,
                                           int y,
                                           int z,
-                                          @Nullable String blockSet,
+                                          int blockSetIndex,
                                           @Nonnull Set<String> blockTypes) {
         BlockType blockType = worldChunk.getBlockType(x, y, z);
         int blockId = worldChunk.getBlock(x, y, z);
-        return matchesConfiguredBlock(blockType, blockId, blockSet, blockTypes);
+        return matchesConfiguredBlock(blockType, blockId, blockSetIndex, blockTypes, resolveBlockSetMembership());
     }
 
     static boolean matchesConfiguredBlock(@Nullable BlockType blockType,
                                           int blockId,
                                           @Nullable String blockSet,
                                           @Nonnull Set<String> blockTypes) {
+        return matchesConfiguredBlock(
+                blockType,
+                blockId,
+                resolveBlockSetIndex(sanitizeNullableId(blockSet)),
+                blockTypes,
+                resolveBlockSetMembership()
+        );
+    }
+
+    static boolean matchesConfiguredBlock(@Nullable BlockType blockType,
+                                          int blockId,
+                                          int blockSetIndex,
+                                          @Nonnull Set<String> blockTypes,
+                                          @Nullable BlockSetMembership blockSetMembership) {
         if (blockType == null) {
             return false;
         }
@@ -294,19 +312,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
         if (id != null && blockTypes.contains(id)) {
             return true;
         }
-        String normalizedBlockSet = sanitizeNullableId(blockSet);
-        if (normalizedBlockSet == null) {
+        if (blockSetIndex == Integer.MIN_VALUE || blockSetMembership == null) {
             return false;
         }
-        BlockSetModule module = BlockSetModule.getInstance();
-        if (module == null) {
-            return false;
-        }
-        try {
-            return module.blockInSet(blockId, normalizedBlockSet);
-        } catch (RuntimeException ignored) {
-            return false;
-        }
+        return blockSetMembership.blockInSet(blockSetIndex, blockId);
     }
 
     @Nonnull
@@ -338,7 +347,20 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
     }
 
     private boolean hasMatchConfig() {
-        return blockSet != null || !blockTypes.isEmpty();
+        return blockSetIndex != Integer.MIN_VALUE || !blockTypes.isEmpty();
+    }
+
+    private static int resolveBlockSetIndex(@Nullable String blockSet) {
+        if (blockSet == null) {
+            return Integer.MIN_VALUE;
+        }
+        return BlockSet.getAssetMap().getIndex(blockSet);
+    }
+
+    @Nullable
+    private static BlockSetMembership resolveBlockSetMembership() {
+        BlockSetModule module = BlockSetModule.getInstance();
+        return module == null ? null : module::blockInSet;
     }
 
     @Nullable
@@ -593,5 +615,10 @@ public final class SensorTameworkReachableBlockTarget extends TameworkSensorBase
     }
 
     private record DiagnosticSnapshot(@Nonnull String signature, long loggedAtMs) {
+    }
+
+    @FunctionalInterface
+    interface BlockSetMembership {
+        boolean blockInSet(int blockSetIndex, int blockTypeIndex);
     }
 }

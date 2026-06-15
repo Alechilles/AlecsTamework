@@ -33,6 +33,7 @@
 - Fixed companion needs-seek targeting so multiple NPCs do not pile onto the same confirmed food or water approach point, and water targets avoid standing on the source block itself.
 - Fixed companion needs-seek movement so an active food or water trip keeps the target it started with instead of following later planner updates mid-path.
 - Fixed active needs-seek scans so animals can detect reachable food and water on nearby vertical terrain without widening passive refill sweeps.
+- Fixed reachable block target scans so block-set checks use the resolved block-set index instead of relying on repeated engine exceptions during failed food and water searches.
 
 ## 2.14.0 - Localization and Runtime Polish - 2026-06-09
 
