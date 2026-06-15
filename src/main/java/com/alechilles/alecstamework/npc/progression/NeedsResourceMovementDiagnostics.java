@@ -30,6 +30,17 @@ public final class NeedsResourceMovementDiagnostics {
                                 @Nullable String stage,
                                 @Nullable String detail,
                                 @Nullable Vector3d target) {
+        maybeLog(npcId, roleId, resourceType, stage, detail, target, null, null);
+    }
+
+    public static void maybeLog(@Nonnull String npcId,
+                                @Nullable String roleId,
+                                @Nullable String resourceType,
+                                @Nullable String stage,
+                                @Nullable String detail,
+                                @Nullable Vector3d target,
+                                @Nullable Vector3d currentPosition,
+                                @Nullable NeedsResourceMovementProgressTracker.ProgressSnapshot progress) {
         if (!isRuntimeEnabled() || !LOGGER.isLoggable(Level.INFO)) {
             return;
         }
@@ -37,6 +48,8 @@ public final class NeedsResourceMovementDiagnostics {
         String normalizedDetail = normalize(detail);
         String normalizedResource = normalize(resourceType);
         String formattedTarget = formatTarget(target);
+        String formattedCurrent = formatTarget(currentPosition);
+        String formattedProgress = formatProgress(progress);
         String signature = npcId
                 + '|' + normalizedResource
                 + '|' + normalizedStage
@@ -51,7 +64,9 @@ public final class NeedsResourceMovementDiagnostics {
                 normalizedResource,
                 normalizedStage,
                 normalizedDetail,
-                formattedTarget
+                formattedTarget,
+                formattedCurrent,
+                formattedProgress
         ));
     }
 
@@ -74,15 +89,29 @@ public final class NeedsResourceMovementDiagnostics {
                                 @Nonnull String stage,
                                 @Nonnull String detail,
                                 @Nonnull String target) {
+        return formatMessage(npcId, roleId, resourceType, stage, detail, target, "<none>", "n/a");
+    }
+
+    @Nonnull
+    static String formatMessage(@Nonnull String npcId,
+                                @Nullable String roleId,
+                                @Nonnull String resourceType,
+                                @Nonnull String stage,
+                                @Nonnull String detail,
+                                @Nonnull String target,
+                                @Nonnull String currentPosition,
+                                @Nonnull String progress) {
         return String.format(
                 Locale.ROOT,
-                "Needs seek movement: npc=%s role=%s type=%s stage=%s detail=%s target=%s",
+                "Needs seek movement: npc=%s role=%s type=%s stage=%s detail=%s target=%s current=%s progress=%s",
                 npcId,
                 roleId == null || roleId.isBlank() ? "<unknown>" : roleId,
                 resourceType,
                 stage,
                 detail,
-                target
+                target,
+                currentPosition,
+                progress
         );
     }
 
@@ -100,6 +129,21 @@ public final class NeedsResourceMovementDiagnostics {
             return "<none>";
         }
         return String.format(Locale.ROOT, "[%.2f,%.2f,%.2f]", target.x(), target.y(), target.z());
+    }
+
+    @Nonnull
+    private static String formatProgress(@Nullable NeedsResourceMovementProgressTracker.ProgressSnapshot progress) {
+        if (progress == null) {
+            return "n/a";
+        }
+        return String.format(
+                Locale.ROOT,
+                "startDistance=%.2f,currentDistance=%.2f,closed=%.2f,elapsedMs=%d",
+                progress.startDistance(),
+                progress.currentDistance(),
+                progress.progress(),
+                progress.elapsedMs()
+        );
     }
 
     private static boolean shouldSuppress(@Nonnull String signature, long nowMs) {

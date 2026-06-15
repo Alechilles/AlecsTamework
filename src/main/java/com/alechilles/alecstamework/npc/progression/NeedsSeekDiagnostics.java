@@ -96,6 +96,52 @@ public final class NeedsSeekDiagnostics {
         );
     }
 
+    public static void maybeLogPreflight(@Nonnull String npcId,
+                                         @Nullable String roleId,
+                                         @Nonnull String resourceType,
+                                         @Nonnull String status,
+                                         @Nonnull String reason,
+                                         @Nonnull String sourceReason,
+                                         double stopDistance,
+                                         @Nullable Vector3d target,
+                                         @Nullable Vector3d currentPosition) {
+        if (!isRuntimeEnabled() || !LOGGER.isLoggable(Level.INFO)) {
+            return;
+        }
+        long nowMs = System.currentTimeMillis();
+        String modeKey = npcId + '|' + resourceType + "|preflight";
+        String signature = status
+                + '|'
+                + reason
+                + '|'
+                + sourceReason
+                + '|'
+                + formatTarget(target)
+                + '|'
+                + String.format(Locale.ROOT, "%.2f", stopDistance);
+        DiagnosticSnapshot previous = LAST_LOG_BY_NPC_AND_MODE.get(modeKey);
+        if (previous != null
+                && previous.signature().equals(signature)
+                && nowMs < previous.loggedAtMs() + REPEAT_LOG_INTERVAL_MS) {
+            return;
+        }
+        LAST_LOG_BY_NPC_AND_MODE.put(modeKey, new DiagnosticSnapshot(signature, nowMs));
+        LOGGER.log(Level.INFO, String.format(
+                Locale.ROOT,
+                "Needs seek preflight: npc=%s role=%s type=%s status=%s reason=%s sourceReason=%s stopDistance=%.2f current=%s target=%s distance=%s",
+                npcId,
+                roleId == null || roleId.isBlank() ? "<unknown>" : roleId,
+                resourceType,
+                status,
+                reason,
+                sourceReason,
+                stopDistance,
+                formatTarget(currentPosition),
+                formatTarget(target),
+                formatDistance(currentPosition, target)
+        ));
+    }
+
     @Nonnull
     private static Level resolveLevel(@Nonnull String result) {
         return "target_found".equals(result) ? Level.INFO : Level.WARNING;
@@ -140,6 +186,24 @@ public final class NeedsSeekDiagnostics {
                 (int) Math.floor(position.y),
                 (int) Math.floor(position.z)
         );
+    }
+
+    @Nonnull
+    private static String formatDistance(@Nullable Vector3d first, @Nullable Vector3d second) {
+        if (first == null
+                || second == null
+                || !Double.isFinite(first.x)
+                || !Double.isFinite(first.y)
+                || !Double.isFinite(first.z)
+                || !Double.isFinite(second.x)
+                || !Double.isFinite(second.y)
+                || !Double.isFinite(second.z)) {
+            return "n/a";
+        }
+        double dx = first.x - second.x;
+        double dy = first.y - second.y;
+        double dz = first.z - second.z;
+        return String.format(Locale.ROOT, "%.2f", Math.sqrt((dx * dx) + (dy * dy) + (dz * dz)));
     }
 
     private record DiagnosticSnapshot(@Nonnull String signature,

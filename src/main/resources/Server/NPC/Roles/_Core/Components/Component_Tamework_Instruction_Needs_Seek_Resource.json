@@ -286,6 +286,29 @@
             ]
           },
           {
+            "$Comment": "Throttled diagnostic probe while the base Seek body motion owns movement.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "NeedsSeekActiveTargetSlot"
+              },
+              "Range": {
+                "Compute": "NeedsSeekReadRange"
+              }
+            },
+            "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "move_probe",
+                "Detail": "before_seek"
+              }
+            ]
+          },
+          {
             "$Comment": "When close enough, start a short consume delay.",
             "Continue": true,
             "Sensor": {

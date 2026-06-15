@@ -159,9 +159,10 @@ class NeedsSeekComponentAssetTest {
     void needsSeekMovementLogsStateTransitionsAndTerminalBranches() {
         String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
 
-        assertEquals(12, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
-                "Needs seek movement diagnostics should cover transition and terminal movement branches only");
+        assertEquals(13, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
+                "Needs seek movement diagnostics should cover transition, active probe, and terminal movement branches");
         assertTrue(content.contains("\"Stage\": \"move_start\""));
+        assertTrue(content.contains("\"Stage\": \"move_probe\""));
         assertTrue(content.contains("\"Stage\": \"target_lost\""));
         assertTrue(content.contains("\"Stage\": \"nav_defer\""));
         assertTrue(content.contains("\"Stage\": \"nav_blocked\""));

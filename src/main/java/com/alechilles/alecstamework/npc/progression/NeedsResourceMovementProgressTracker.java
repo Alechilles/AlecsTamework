@@ -53,6 +53,21 @@ public final class NeedsResourceMovementProgressTracker {
         );
     }
 
+    @Nullable
+    public static ProgressSnapshot snapshot(@Nullable UUID npcUuid,
+                                            @Nullable String resourceType,
+                                            @Nullable Vector3d currentPosition,
+                                            long nowMs) {
+        if (npcUuid == null || currentPosition == null || !isFinite(currentPosition)) {
+            return null;
+        }
+        NpcProgressRecords records = RECORDS_BY_NPC.get(npcUuid);
+        if (records == null) {
+            return null;
+        }
+        return records.snapshot(resourceSlot(resourceType), currentPosition, nowMs);
+    }
+
     public static void clear(@Nullable UUID npcUuid, @Nullable String resourceType) {
         if (npcUuid == null) {
             return;
@@ -139,6 +154,14 @@ public final class NeedsResourceMovementProgressTracker {
             return record != null && record.isStalled(currentPosition, nowMs, graceSeconds, minProgress);
         }
 
+        @Nullable
+        private synchronized ProgressSnapshot snapshot(int slot,
+                                                       @Nonnull Vector3d currentPosition,
+                                                       long nowMs) {
+            ProgressRecord record = record(slot);
+            return record == null ? null : record.snapshot(currentPosition, nowMs);
+        }
+
         private synchronized void clear(int slot) {
             if (slot == 0) {
                 water = null;
@@ -201,11 +224,28 @@ public final class NeedsResourceMovementProgressTracker {
             return startDistance - currentDistance < minProgress;
         }
 
+        @Nonnull
+        private ProgressSnapshot snapshot(@Nonnull Vector3d currentPosition, long nowMs) {
+            double currentDistance = distance(currentPosition.x, currentPosition.y, currentPosition.z, targetX, targetY, targetZ);
+            return new ProgressSnapshot(
+                    startDistance,
+                    currentDistance,
+                    startDistance - currentDistance,
+                    Math.max(0L, nowMs - startedAtMs)
+            );
+        }
+
         private static double distance(double ax, double ay, double az, double bx, double by, double bz) {
             double dx = ax - bx;
             double dy = ay - by;
             double dz = az - bz;
             return Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
         }
+    }
+
+    public record ProgressSnapshot(double startDistance,
+                                   double currentDistance,
+                                   double progress,
+                                   long elapsedMs) {
     }
 }

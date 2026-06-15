@@ -54,31 +54,41 @@ public final class ActionTameworkNeedsResourceMovementDiagnostic extends Tamewor
         if (!canExecute(npcRef, role, infoProvider, dt, store)) {
             return false;
         }
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        Vector3d target = resolveTarget(infoProvider);
+        Vector3d currentPosition = resolveCurrentPosition(npcRef, store);
+        if ("move_start".equals(stage)) {
+            NeedsResourceConsumeAttemptTracker.clear(npcUuid, resourceType);
+            NeedsResourceMovementProgressTracker.recordStart(
+                    npcUuid,
+                    resourceType,
+                    target,
+                    currentPosition,
+                    System.currentTimeMillis()
+            );
+        }
+        NeedsResourceMovementProgressTracker.ProgressSnapshot progress =
+                NeedsResourceMovementProgressTracker.snapshot(
+                        npcUuid,
+                        resourceType,
+                        currentPosition,
+                        System.currentTimeMillis()
+                );
         NeedsResourceMovementDiagnostics.maybeLog(
                 NeedsResourceMovementDiagnostics.resolveNpcId(npcRef, store),
                 CompanionRoleIdResolver.resolveRoleId(npcRef, store),
                 resourceType,
                 stage,
                 detail,
-                resolveTarget(infoProvider)
+                target,
+                currentPosition,
+                progress
         );
-        updateProgressTracker(npcRef, infoProvider, store);
+        clearProgressAfterTerminalStage(npcUuid);
         return true;
     }
 
-    private void updateProgressTracker(Ref<EntityStore> npcRef, InfoProvider infoProvider, Store<EntityStore> store) {
-        UUID npcUuid = resolveNpcUuid(npcRef, store);
-        if ("move_start".equals(stage)) {
-            NeedsResourceConsumeAttemptTracker.clear(npcUuid, resourceType);
-            NeedsResourceMovementProgressTracker.recordStart(
-                    npcUuid,
-                    resourceType,
-                    resolveTarget(infoProvider),
-                    resolveCurrentPosition(npcRef, store),
-                    System.currentTimeMillis()
-            );
-            return;
-        }
+    private void clearProgressAfterTerminalStage(UUID npcUuid) {
         if (clearsMovementProgress(stage)) {
             NeedsResourceMovementProgressTracker.clear(npcUuid, resourceType);
             NeedsResourceConsumeAttemptTracker.clear(npcUuid, resourceType);

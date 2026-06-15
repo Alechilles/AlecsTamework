@@ -205,6 +205,17 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 resolution.approachRadius(),
                 nowMs
         );
+        NeedsSeekDiagnostics.maybeLogPreflight(
+                npcId,
+                roleId,
+                resolveResourceLabel(),
+                preflight.status().name(),
+                preflight.reason(),
+                resolution.reason(),
+                resolution.approachRadius(),
+                target,
+                resolveCurrentPosition(ref, store)
+        );
         if (!preflight.ready()) {
             if (preflight.noPath()) {
                 rejectTarget(npcUuid, resourceType, target, PREFLIGHT_REJECT_TTL_SECONDS, nowMs);
