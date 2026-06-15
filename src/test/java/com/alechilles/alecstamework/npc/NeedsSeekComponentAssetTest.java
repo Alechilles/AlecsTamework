@@ -45,7 +45,8 @@ class NeedsSeekComponentAssetTest {
         assertNotNull(stallGraceSeconds, "Needs seek component must expose NeedsSeekStallGraceSeconds");
         assertNotNull(stallMinProgress, "Needs seek component must expose NeedsSeekStallMinProgress");
         assertTrue(pathfinder.get("Value").getAsBoolean(), "Needs seek must use pathfinding");
-        assertFalse(steering.get("Value").getAsBoolean(), "Needs seek must not direct-steer around pathfinding");
+        assertTrue(steering.get("Value").getAsBoolean(),
+                "Needs seek experiment should allow vanilla simple steering while pathfinding remains enabled");
         assertFalse(bestPath.get("Value").getAsBoolean(), "Needs seek must not accept partial best-path fallback");
         assertFalse(reachable.get("Value").getAsBoolean(),
                 "Needs seek should rely on preflight reachability instead of the motion exact-target gate");
@@ -56,13 +57,14 @@ class NeedsSeekComponentAssetTest {
                 "Needs seek must allow enough time for valid preflight paths to complete");
         assertTrue(timeoutRange.get(1).getAsDouble() >= 36.0,
                 "Needs seek must allow enough time for valid preflight paths to complete");
-        assertTrue(content.contains("\"Type\": \"TameworkNeedsResourceApproach\""),
-                "Needs seek should use the custom crowd-tolerant approach body motion");
-        assertFalse(content.contains("\"Type\": \"Seek\""),
-                "Needs seek should not use vanilla Seek while testing crowded resource movement");
+        assertTrue(content.contains("\"Type\": \"Seek\""),
+                "Needs seek should use vanilla Seek while testing simple steering with pathfinding");
+        assertTrue(content.contains("\"UseSteering\": {\n                \"Compute\": \"NeedsSeekUseSteering\"")
+                        || content.contains("\"UseSteering\": {\r\n                \"Compute\": \"NeedsSeekUseSteering\""),
+                "Needs seek must pass the simple steering toggle into vanilla Seek");
         assertTrue(content.contains("\"StopDistance\": {\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\"")
                         || content.contains("\"StopDistance\": {\r\n                \"Compute\": \"NeedsSeekConsumeMaintainMaxDistance\""),
-                "Needs approach motion must stay active until consume range");
+                "Seek motion must stay active until consume range");
         assertEquals(1, countOccurrences(content, "\"Type\": \"MaintainDistance\""),
                 "Needs seek may only use maintain-distance after consume delay begins");
         assertEquals(5, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceRejectTarget\""),
