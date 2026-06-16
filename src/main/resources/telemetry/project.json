@@ -372,6 +372,9 @@
       }
     }
   },
+  "ui": {
+    "iconTexturePath": "Tamework/Telemetry/TameworkConsentIcon.png"
+  },
   "ownerPluginIdentifiers": [
     "Alechilles:Alec's Tamework!"
   ],
