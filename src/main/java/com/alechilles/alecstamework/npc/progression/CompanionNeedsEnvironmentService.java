@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.items.FeedTroughContainerCompat;
 import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
+import com.alechilles.alecstamework.performance.RuntimePressureDomain;
+import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -479,6 +481,7 @@ public final class CompanionNeedsEnvironmentService {
         double radiusSq = radius * radius;
         int clampedVerticalRadius = Math.max(0, verticalScanRadius);
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        long startedNs = System.nanoTime();
         WaterTargetSearchResult bestResult = findNearestWaterTarget(
                 chunkStore,
                 chunkStoreStore,
@@ -510,6 +513,7 @@ public final class CompanionNeedsEnvironmentService {
             );
             bestResult = WaterTargetSearchResult.mergeMissMetadata(bestResult, expandedResult);
         }
+        recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorWaterSearchResult(bestResult)) {
             cacheWaterSearchResult(cacheKey, bestResult, nowMs);
         }
@@ -809,6 +813,7 @@ public final class CompanionNeedsEnvironmentService {
         boolean foundConsumableSource = false;
         boolean foundConsumableSourceInConsumeRange = false;
         FoodTargetSearchResult bestResult = null;
+        long startedNs = System.nanoTime();
         for (int horizontalRadius = 0; horizontalRadius <= searchRadius && bestResult == null; horizontalRadius++) {
             FoodTargetSearchResult ringResult = findNearestFoodTargetInHorizontalRing(
                     chunkStore,
@@ -834,6 +839,7 @@ public final class CompanionNeedsEnvironmentService {
         if (bestResult == null) {
             bestResult = FoodTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
         }
+        recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorFoodSearchResult(bestResult)) {
             cacheFoodSearchResult(cacheKey, bestResult, nowMs);
         }
@@ -1155,14 +1161,25 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     static long searchCacheTtlMs(boolean hasTarget) {
-        return hasTarget ? SEARCH_CACHE_HIT_TTL_MS : SEARCH_CACHE_MISS_TTL_MS;
+        return searchCacheTtlMs(hasTarget, true);
     }
 
     static long searchCacheTtlMs(boolean hasTarget, boolean foundConsumableSource) {
+        return searchCacheTtlMs(hasTarget, foundConsumableSource, resolveCurrentTimeMs());
+    }
+
+    static long searchCacheTtlMs(boolean hasTarget, boolean foundConsumableSource, long nowMs) {
+        long baseTtlMs;
         if (hasTarget) {
-            return SEARCH_CACHE_HIT_TTL_MS;
+            baseTtlMs = SEARCH_CACHE_HIT_TTL_MS;
+        } else {
+            baseTtlMs = foundConsumableSource ? SEARCH_CACHE_MISS_TTL_MS : SEARCH_CACHE_SOURCE_ABSENT_MISS_TTL_MS;
         }
-        return foundConsumableSource ? SEARCH_CACHE_MISS_TTL_MS : SEARCH_CACHE_SOURCE_ABSENT_MISS_TTL_MS;
+        return TameworkRuntimePressureService.getInstance().scaleTtlMs(
+                RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
+                baseTtlMs,
+                nowMs
+        );
     }
 
     static boolean shouldRunExpandedWaterSearchForTests(@Nonnull WaterTargetSearchResult primaryResult,
@@ -1221,6 +1238,15 @@ public final class CompanionNeedsEnvironmentService {
 
     private static NeedsResourceStandTargetSelector standTargetSelector() {
         return STAND_TARGET_SELECTOR.get();
+    }
+
+    private static void recordResourceSearchWork(long startedNs, long nowMs) {
+        long elapsedNs = Math.max(0L, System.nanoTime() - startedNs);
+        TameworkRuntimePressureService.getInstance().recordWork(
+                RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
+                elapsedNs,
+                nowMs
+        );
     }
 
     private static void cleanupExpiredSearchCache(long nowMs) {

@@ -6,10 +6,18 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.performance.RuntimePressureDomain;
+import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import org.joml.Vector3d;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class CompanionNeedsEnvironmentServiceWaterTargetTest {
+    @AfterEach
+    void clearRuntimePressure() {
+        TameworkRuntimePressureService.getInstance().clearForTests();
+    }
+
     @Test
     void waterSearchResultPreservesSourceFoundWhenNoStandTargetExists() {
         CompanionNeedsEnvironmentService.WaterTargetSearchResult result =
@@ -43,6 +51,18 @@ class CompanionNeedsEnvironmentServiceWaterTargetTest {
 
         assertTrue(sourceAbsentMissTtl > sourcePresentMissTtl);
         assertEquals(CompanionNeedsEnvironmentService.searchCacheTtlMs(false), sourcePresentMissTtl);
+    }
+
+    @Test
+    void sourceAbsentMissCacheUsesRuntimePressureBackoff() {
+        TameworkRuntimePressureService pressure = TameworkRuntimePressureService.getInstance();
+        long baseTtl = CompanionNeedsEnvironmentService.searchCacheTtlMs(false, false);
+
+        for (int i = 0; i < 700; i++) {
+            pressure.recordWork(RuntimePressureDomain.NEEDS_RESOURCE_SEARCH, 100_000L, System.currentTimeMillis());
+        }
+
+        assertTrue(CompanionNeedsEnvironmentService.searchCacheTtlMs(false, false) > baseTtl);
     }
 
     @Test

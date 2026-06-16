@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.performance.RuntimePressureDomain;
+import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -149,13 +151,16 @@ public final class NeedsResourcePathPreflightService {
         }
 
         PathPreflightStatus status;
+        long startedNs = System.nanoTime();
         try {
             status = computation.compute(budget);
         } catch (RuntimeException ignored) {
+            recordPathPreflightWork(startedNs, nowMs);
             clearComputation(computation);
             cacheTerminalResult(key, PathPreflightStatus.NO_PATH, "path_preflight_exception", nowMs);
             return PathPreflightResult.noPath("path_preflight_exception");
         }
+        recordPathPreflightWork(startedNs, nowMs);
 
         if (status == PathPreflightStatus.READY) {
             clearComputation(computation);
@@ -231,12 +236,37 @@ public final class NeedsResourcePathPreflightService {
                                      @Nonnull PathPreflightStatus status,
                                      @Nonnull String reason,
                                      long nowMs) {
-        cache.put(key, new CachedPreflight(status, reason, nowMs + terminalTtlMs(status), null));
+        cache.put(key, new CachedPreflight(status, reason, nowMs + terminalTtlMs(status, nowMs), null));
         cleanupCache(nowMs);
     }
 
     private static long terminalTtlMs(@Nonnull PathPreflightStatus status) {
-        return status == PathPreflightStatus.READY ? READY_TTL_MS : NO_PATH_TTL_MS;
+        return terminalTtlMs(status, System.currentTimeMillis());
+    }
+
+    private static long terminalTtlMs(@Nonnull PathPreflightStatus status, long nowMs) {
+        long baseTtlMs = status == PathPreflightStatus.READY ? READY_TTL_MS : NO_PATH_TTL_MS;
+        if (status == PathPreflightStatus.READY) {
+            return baseTtlMs;
+        }
+        return TameworkRuntimePressureService.getInstance().scaleTtlMs(
+                RuntimePressureDomain.NEEDS_PATH_PREFLIGHT,
+                baseTtlMs,
+                nowMs
+        );
+    }
+
+    static long terminalTtlMsForTests(@Nonnull PathPreflightStatus status) {
+        return terminalTtlMs(status);
+    }
+
+    private static void recordPathPreflightWork(long startedNs, long nowMs) {
+        long elapsedNs = Math.max(0L, System.nanoTime() - startedNs);
+        TameworkRuntimePressureService.getInstance().recordWork(
+                RuntimePressureDomain.NEEDS_PATH_PREFLIGHT,
+                elapsedNs,
+                nowMs
+        );
     }
 
     private void cleanupCache(long nowMs) {

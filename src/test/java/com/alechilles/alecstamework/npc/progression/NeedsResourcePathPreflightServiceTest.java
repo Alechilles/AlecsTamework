@@ -4,14 +4,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.performance.RuntimePressureDomain;
+import com.alechilles.alecstamework.performance.TameworkRuntimePressureService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightStatus;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.joml.Vector3d;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class NeedsResourcePathPreflightServiceTest {
+    @AfterEach
+    void clearRuntimePressure() {
+        TameworkRuntimePressureService.getInstance().clearForTests();
+    }
 
     @Test
     void readyResultIsCachedWithoutReRunningComputation() {
@@ -130,6 +137,18 @@ class NeedsResourcePathPreflightServiceTest {
         assertTrue(second.ready());
         assertTrue(NeedsResourcePathPreflightService.NO_PATH_TTL_MS <= 10_000L);
         assertEquals(2, factoryCalls.get());
+    }
+
+    @Test
+    void noPathCacheTtlUsesRuntimePressureBackoff() {
+        TameworkRuntimePressureService pressure = TameworkRuntimePressureService.getInstance();
+        long baseTtl = NeedsResourcePathPreflightService.terminalTtlMsForTests(PathPreflightStatus.NO_PATH);
+
+        for (int i = 0; i < 700; i++) {
+            pressure.recordWork(RuntimePressureDomain.NEEDS_PATH_PREFLIGHT, 100_000L, System.currentTimeMillis());
+        }
+
+        assertTrue(NeedsResourcePathPreflightService.terminalTtlMsForTests(PathPreflightStatus.NO_PATH) > baseTtl);
     }
 
     @Test
