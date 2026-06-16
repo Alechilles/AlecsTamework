@@ -6,6 +6,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
@@ -83,7 +84,7 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         );
         boolean modeChanged = previousMode == null || !previousMode.equalsIgnoreCase(updated.getMode());
         if (TameworkFlyingCompanionComponent.MODE_HOLD.equals(updated.getMode())) {
-            if (isGroundedState(role, updated.getGroundedState())) {
+            if (isGroundedByController(role) && isGroundedState(role, updated.getGroundedState())) {
                 if (modeChanged || !updated.isGroundedPhase()) {
                     updated.enterGroundedPhase(updated.getLastObservedY());
                 }
@@ -113,6 +114,14 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
             return null;
         }
         return new Vector3d(x, y, z);
+    }
+
+    private boolean isGroundedByController(Role role) {
+        if (role == null) {
+            return false;
+        }
+        MotionController controller = role.getActiveMotionController();
+        return controller != null && controller.onGround();
     }
 
     private boolean isGroundedState(Role role, String groundedState) {

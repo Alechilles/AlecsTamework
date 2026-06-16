@@ -130,7 +130,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                 component.getVerticalMovementEpsilon() * 4.0
         );
 
-        if (matchesState(currentState, component.getGroundedState())) {
+        if (groundedByController && matchesState(currentState, component.getGroundedState())) {
             if (!component.isGroundedPhase()) {
                 component.enterGroundedPhase(currentY);
             }
@@ -296,7 +296,10 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                                           @Nonnull Vector3d currentPosition) {
         Vector3d configuredOrigin = resolveConfiguredLandingOrigin(store, npc, component);
         if (configuredOrigin != null) {
-            return resolveNearestSafeStandPosition(store, configuredOrigin);
+            Vector3d configuredTarget = resolveNearestSafeStandPosition(store, configuredOrigin);
+            if (configuredTarget != null) {
+                return configuredTarget;
+            }
         }
 
         Vector3d existing = landingTargets.get(ref);
