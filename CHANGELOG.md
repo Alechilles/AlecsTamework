@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.14.1 - Companion Needs Pathing Fixes - 2026-06-16
 
 ### Added
 - Added HStats forwarding for Celly's Baby Animals and Celly's Wildlife Skins when Tamework detects those installed mods.
