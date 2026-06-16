@@ -141,6 +141,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             if (!component.isGroundedPhase()) {
                 component.enterGroundedPhase(currentY);
             }
+            stopMotion(npc);
             if (!component.isSettledMode()) {
                 component.setMode(TameworkFlyingCompanionComponent.MODE_SETTLED);
             }
@@ -165,6 +166,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                 if (!component.isSettledMode()) {
                     component.setMode(TameworkFlyingCompanionComponent.MODE_SETTLED);
                 }
+                stopMotion(npc);
                 if (!matchesState(currentState, component.getGroundedState())) {
                     logDebugEvent(ref, store, npc, "reapplyGroundedState state=" + safeValue(component.getGroundedState()));
                     applyState(npc.getRole(), ref, store, component.getGroundedState());
@@ -196,6 +198,8 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
 
         if (standPosition != null) {
             applySmoothLandingMotion(ref, store, npc, component, currentPosition, standPosition);
+        } else {
+            stopMotion(npc);
         }
         component.setNextCommandAtMs(nowMs + component.getReissueDelayMs());
         if (!matchesState(currentState, component.getLandingState())) {
@@ -243,6 +247,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         if (role != null) {
             role.setActiveMotionController(ref, npc, "Walk", store);
         }
+        stopMotion(npc);
         npc.moveTo(ref, standPosition.x, standPosition.y, standPosition.z, store);
     }
 
@@ -256,6 +261,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         landingTargets.remove(ref);
         component.enterGroundedPhase(standPosition.y);
         component.setMode(TameworkFlyingCompanionComponent.MODE_SETTLED);
+        stopMotion(npc);
         applyState(role, ref, store, component.getGroundedState());
     }
 
@@ -278,6 +284,9 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         double horizontalDx = standPosition.x - currentPosition.x;
         double horizontalDz = standPosition.z - currentPosition.z;
         double horizontalDistance = Math.sqrt(horizontalDx * horizontalDx + horizontalDz * horizontalDz);
+        if (controller != null && controller.onGround() && horizontalDistance > LANDING_HORIZONTAL_HANDOFF_DISTANCE) {
+            role.setActiveMotionController(ref, npc, "Fly", store);
+        }
         double horizontalSpeed = Math.min(LANDING_HORIZONTAL_MAX_SPEED, horizontalDistance * LANDING_HORIZONTAL_GAIN);
         double velocityX = 0.0;
         double velocityZ = 0.0;
@@ -312,6 +321,14 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         role.setVelocity(new Vector3d(velocityX, velocityY, velocityZ), (VelocityConfig) null, true);
     }
 
+    private void stopMotion(@Nonnull NPCEntity npc) {
+        Role role = npc.getRole();
+        if (role == null) {
+            return;
+        }
+        role.setVelocity(new Vector3d(0.0, 0.0, 0.0), (VelocityConfig) null, true);
+    }
+
     @Nullable
     private Vector3d resolveLandingTarget(@Nonnull Ref<EntityStore> ref,
                                           @Nonnull Store<EntityStore> store,
@@ -324,6 +341,9 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             if (configuredTarget != null) {
                 return configuredTarget;
             }
+        }
+        if (component.hasLandingTargetPosition() || component.hasLandingTargetSlot()) {
+            return null;
         }
 
         Vector3d existing = landingTargets.get(ref);

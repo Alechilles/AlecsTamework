@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionCompon
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
@@ -71,6 +72,9 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
                 : new TameworkFlyingCompanionComponent();
         String previousMode = updated.getMode();
         Vector3d landingPosition = landingUseInfoProviderPosition ? resolveLandingPosition(infoProvider) : null;
+        if (landingPosition == null && landingTargetSlotIndex >= 0) {
+            landingPosition = resolveMarkedTargetPosition(role, store, landingTargetSlotIndex);
+        }
         updated.configure(
                 mode,
                 landingState,
@@ -96,6 +100,25 @@ public final class ActionTameworkSetFlyingCompanionMode extends TameworkActionBa
         }
         store.putComponent(npcRef, type, updated);
         return true;
+    }
+
+    @Nullable
+    private static Vector3d resolveMarkedTargetPosition(@Nullable Role role,
+                                                        @Nullable Store<EntityStore> store,
+                                                        int targetSlotIndex) {
+        if (role == null || store == null || targetSlotIndex < 0 || role.getMarkedEntitySupport() == null) {
+            return null;
+        }
+        Ref<EntityStore> targetRef = role.getMarkedEntitySupport().getMarkedEntityRef(targetSlotIndex);
+        if (targetRef == null || !targetRef.isValid()) {
+            return null;
+        }
+        TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
+        if (transform == null || transform.getPosition() == null) {
+            return null;
+        }
+        Vector3d position = transform.getPosition();
+        return new Vector3d(position.x, position.y, position.z);
     }
 
     @Nullable
