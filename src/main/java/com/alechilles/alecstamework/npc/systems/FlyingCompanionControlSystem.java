@@ -43,8 +43,10 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
     private static final int SAFE_HORIZONTAL_SCAN_RADIUS = 2;
     private static final double SAFE_STAND_HEIGHT_OFFSET = 0.05;
     private static final double MIN_GROUNDED_HEIGHT_TOLERANCE = 0.35;
+    private static final double LANDING_HORIZONTAL_HANDOFF_DISTANCE = 0.9;
+    private static final double LANDING_APPROACH_HEIGHT = 4.0;
     private static final double LANDING_HORIZONTAL_GAIN = 2.0;
-    private static final double LANDING_HORIZONTAL_MAX_SPEED = 0.18;
+    private static final double LANDING_HORIZONTAL_MAX_SPEED = 0.28;
     private static final double LANDING_VERTICAL_MIN_SPEED = 0.035;
     private static final double LANDING_VERTICAL_EASE_DISTANCE = 1.0;
 
@@ -123,6 +125,11 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         double currentY = currentPosition.y;
         String currentState = resolveCurrentStateSpec(npc);
         Vector3d standPosition = resolveLandingTarget(ref, store, npc, component, currentPosition);
+        double horizontalDistanceToStand = standPosition == null
+                ? Double.MAX_VALUE
+                : horizontalDistance(currentPosition, standPosition);
+        boolean horizontallyReadyToLand = standPosition != null
+                && horizontalDistanceToStand <= LANDING_HORIZONTAL_HANDOFF_DISTANCE;
         boolean groundedByController = isGroundedByController(npc.getRole());
         logDebugSignature(ref, store, npc, component, currentState, currentY, standPosition, groundedByController);
         double groundedHeightTolerance = Math.max(
@@ -147,7 +154,9 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         }
         component.setLastObservedY(currentY);
 
-        if (standPosition != null && Math.abs(currentY - standPosition.y) <= groundedHeightTolerance) {
+        if (standPosition != null
+                && horizontallyReadyToLand
+                && Math.abs(currentY - standPosition.y) <= groundedHeightTolerance) {
             if (groundedByController) {
                 if (!component.isGroundedPhase()) {
                     logDebugEvent(ref, store, npc, "finalizeGroundedWithoutPrepare targetY=" + formatDouble(standPosition.y));
@@ -277,13 +286,28 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             velocityZ = horizontalDz / horizontalDistance * horizontalSpeed;
         }
 
-        double verticalDistance = Math.max(0.0, currentPosition.y - standPosition.y);
         double configuredVerticalSpeed = Math.max(LANDING_VERTICAL_MIN_SPEED, component.getDescendStep());
-        double easedVerticalSpeed = Math.min(
-                configuredVerticalSpeed,
-                Math.max(LANDING_VERTICAL_MIN_SPEED, verticalDistance / LANDING_VERTICAL_EASE_DISTANCE * configuredVerticalSpeed)
-        );
-        double velocityY = -easedVerticalSpeed;
+        double velocityY;
+        if (horizontalDistance > LANDING_HORIZONTAL_HANDOFF_DISTANCE) {
+            double approachY = standPosition.y + LANDING_APPROACH_HEIGHT;
+            double verticalDelta = approachY - currentPosition.y;
+            if (Math.abs(verticalDelta) <= component.getVerticalMovementEpsilon()) {
+                velocityY = 0.0;
+            } else {
+                double approachSpeed = Math.min(
+                        configuredVerticalSpeed,
+                        Math.max(LANDING_VERTICAL_MIN_SPEED, Math.abs(verticalDelta) / LANDING_APPROACH_HEIGHT * configuredVerticalSpeed)
+                );
+                velocityY = Math.copySign(approachSpeed, verticalDelta);
+            }
+        } else {
+            double verticalDistance = Math.max(0.0, currentPosition.y - standPosition.y);
+            double easedVerticalSpeed = Math.min(
+                    configuredVerticalSpeed,
+                    Math.max(LANDING_VERTICAL_MIN_SPEED, verticalDistance / LANDING_VERTICAL_EASE_DISTANCE * configuredVerticalSpeed)
+            );
+            velocityY = -easedVerticalSpeed;
+        }
 
         role.setVelocity(new Vector3d(velocityX, velocityY, velocityZ), (VelocityConfig) null, true);
     }
@@ -596,6 +620,12 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         double dy = a.y - b.y;
         double dz = a.z - b.z;
         return dx * dx + dy * dy + dz * dz;
+    }
+
+    private double horizontalDistance(@Nonnull Vector3d a, @Nonnull Vector3d b) {
+        double dx = a.x - b.x;
+        double dz = a.z - b.z;
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     private <T extends Component<EntityStore>> T safeGetComponent(@Nonnull Store<EntityStore> store,
