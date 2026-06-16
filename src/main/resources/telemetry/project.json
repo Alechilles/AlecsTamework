@@ -372,6 +372,80 @@
       }
     }
   },
+  "reports": {
+    "enabled": true,
+    "issue": {
+      "enabled": true,
+      "fields": {
+        "area": {
+          "type": "enum",
+          "label": "Area",
+          "required": true,
+          "values": [
+            "npc_behavior",
+            "interaction",
+            "settings_ui",
+            "asset_patch",
+            "persistence",
+            "performance",
+            "compatibility",
+            "other"
+          ]
+        },
+        "severity": {
+          "type": "enum",
+          "label": "Severity",
+          "required": true,
+          "values": [
+            "minor",
+            "moderate",
+            "major",
+            "blocking"
+          ]
+        },
+        "steps": {
+          "type": "text",
+          "label": "Steps to reproduce",
+          "maxLength": 2000
+        },
+        "affectedElement": {
+          "type": "string",
+          "label": "Affected NPC, item, role, or config",
+          "maxLength": 160
+        }
+      }
+    },
+    "suggestion": {
+      "enabled": true,
+      "fields": {
+        "category": {
+          "type": "enum",
+          "label": "Category",
+          "values": [
+            "npc_behavior",
+            "tooling",
+            "settings_ui",
+            "asset_patch",
+            "api",
+            "documentation",
+            "other"
+          ]
+        }
+      }
+    },
+    "attachments": {
+      "currentServerLog": true,
+      "previousServerLog": true,
+      "maxBytes": 262144
+    },
+    "contact": {
+      "enabled": true,
+      "maxLength": 160
+    },
+    "resolutionUpdates": {
+      "enabled": true
+    }
+  },
   "ui": {
     "iconTexturePath": "Tamework/Telemetry/TameworkConsentIcon.png"
   },
