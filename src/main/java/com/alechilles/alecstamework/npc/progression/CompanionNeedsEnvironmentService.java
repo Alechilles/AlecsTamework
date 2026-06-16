@@ -38,6 +38,7 @@ public final class CompanionNeedsEnvironmentService {
     private static final int DEFAULT_WATER_VERTICAL_SCAN_RADIUS = 1;
     private static final long SEARCH_CACHE_HIT_TTL_MS = 1_500L;
     private static final long SEARCH_CACHE_MISS_TTL_MS = 3_000L;
+    private static final long SEARCH_CACHE_SOURCE_ABSENT_MISS_TTL_MS = 8_000L;
     private static final int SEARCH_CACHE_MAX_ENTRIES = 8192;
     private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
@@ -48,6 +49,7 @@ public final class CompanionNeedsEnvironmentService {
     private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
             ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
     private static final ConcurrentHashMap<NeedsSearchCacheKey, CachedSearchResult> SEARCH_CACHE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Integer, Boolean> WATER_TROUGH_BLOCK_ID_CACHE = new ConcurrentHashMap<>();
 
     @FunctionalInterface
     public interface TargetRejector extends NeedsResourceStandTargetSelector.CandidateRejector {
@@ -1118,7 +1120,7 @@ public final class CompanionNeedsEnvironmentService {
         if (cacheKey == null) {
             return;
         }
-        long ttlMs = searchCacheTtlMs(result.target() != null);
+        long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource());
         SEARCH_CACHE.put(
                 cacheKey,
                 new CachedSearchResult(
@@ -1138,7 +1140,7 @@ public final class CompanionNeedsEnvironmentService {
         if (cacheKey == null) {
             return;
         }
-        long ttlMs = searchCacheTtlMs(result.target() != null);
+        long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource());
         SEARCH_CACHE.put(
                 cacheKey,
                 new CachedSearchResult(
@@ -1154,6 +1156,13 @@ public final class CompanionNeedsEnvironmentService {
 
     static long searchCacheTtlMs(boolean hasTarget) {
         return hasTarget ? SEARCH_CACHE_HIT_TTL_MS : SEARCH_CACHE_MISS_TTL_MS;
+    }
+
+    static long searchCacheTtlMs(boolean hasTarget, boolean foundConsumableSource) {
+        if (hasTarget) {
+            return SEARCH_CACHE_HIT_TTL_MS;
+        }
+        return foundConsumableSource ? SEARCH_CACHE_MISS_TTL_MS : SEARCH_CACHE_SOURCE_ABSENT_MISS_TTL_MS;
     }
 
     static boolean shouldRunExpandedWaterSearchForTests(@Nonnull WaterTargetSearchResult primaryResult,
@@ -1890,10 +1899,11 @@ public final class CompanionNeedsEnvironmentService {
         if (worldChunk == null) {
             return false;
         }
-        BlockType blockType = worldChunk.getBlockType(blockX, blockY, blockZ);
-        if (!FeedTroughWaterStateService.isWaterTroughBlockType(blockType)) {
+        int blockId = worldChunk.getBlock(blockX, blockY, blockZ);
+        if (!isWaterTroughBlockId(blockId)) {
             return false;
         }
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
         return FeedTroughWaterStateService.hasConsumableWater(
                 worldChunk,
                 chunkStore,
@@ -1902,6 +1912,21 @@ public final class CompanionNeedsEnvironmentService {
                 blockZ,
                 blockType
         );
+    }
+
+    private static boolean isWaterTroughBlockId(int blockId) {
+        if (blockId == 0) {
+            return false;
+        }
+        return WATER_TROUGH_BLOCK_ID_CACHE.computeIfAbsent(
+                blockId,
+                CompanionNeedsEnvironmentService::resolveWaterTroughBlockId
+        );
+    }
+
+    private static boolean resolveWaterTroughBlockId(int blockId) {
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
+        return FeedTroughWaterStateService.isWaterTroughBlockType(blockType);
     }
 
     private static boolean isSolidBlock(int blockId, int fluidId) {

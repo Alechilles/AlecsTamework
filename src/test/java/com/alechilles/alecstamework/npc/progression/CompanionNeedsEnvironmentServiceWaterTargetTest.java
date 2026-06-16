@@ -37,6 +37,15 @@ class CompanionNeedsEnvironmentServiceWaterTargetTest {
     }
 
     @Test
+    void sourceAbsentMissCacheBacksOffLongerThanSourcePresentMiss() {
+        long sourcePresentMissTtl = CompanionNeedsEnvironmentService.searchCacheTtlMs(false, true);
+        long sourceAbsentMissTtl = CompanionNeedsEnvironmentService.searchCacheTtlMs(false, false);
+
+        assertTrue(sourceAbsentMissTtl > sourcePresentMissTtl);
+        assertEquals(CompanionNeedsEnvironmentService.searchCacheTtlMs(false), sourcePresentMissTtl);
+    }
+
+    @Test
     void expandedWaterSearchIsSkippedWhenPrimaryScanFoundNoConsumableSource() {
         CompanionNeedsEnvironmentService.WaterTargetSearchResult result =
                 CompanionNeedsEnvironmentService.WaterTargetSearchResult.miss(false);
