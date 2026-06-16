@@ -491,7 +491,7 @@ public final class CompanionNeedsEnvironmentService {
                 chunkCache,
                 targetRejector
         );
-        if (bestResult.target() == null && consumeRadius > 1.0 + SCORE_EPSILON) {
+        if (shouldRunExpandedWaterSearch(bestResult, consumeRadius)) {
             WaterTargetSearchResult expandedResult = findNearestWaterTarget(
                     chunkStore,
                     chunkStoreStore,
@@ -508,7 +508,7 @@ public final class CompanionNeedsEnvironmentService {
             );
             bestResult = WaterTargetSearchResult.mergeMissMetadata(bestResult, expandedResult);
         }
-        if (targetRejector == null) {
+        if (targetRejector == null || shouldCacheRejectorWaterSearchResult(bestResult)) {
             cacheWaterSearchResult(cacheKey, bestResult, nowMs);
         }
         return bestResult;
@@ -832,7 +832,7 @@ public final class CompanionNeedsEnvironmentService {
         if (bestResult == null) {
             bestResult = FoodTargetSearchResult.miss(foundConsumableSource, foundConsumableSourceInConsumeRange);
         }
-        if (targetRejector == null) {
+        if (targetRejector == null || shouldCacheRejectorFoodSearchResult(bestResult)) {
             cacheFoodSearchResult(cacheKey, bestResult, nowMs);
         }
         return bestResult;
@@ -1156,6 +1156,15 @@ public final class CompanionNeedsEnvironmentService {
         return hasTarget ? SEARCH_CACHE_HIT_TTL_MS : SEARCH_CACHE_MISS_TTL_MS;
     }
 
+    static boolean shouldRunExpandedWaterSearchForTests(@Nonnull WaterTargetSearchResult primaryResult,
+                                                        double consumeRadius) {
+        return shouldRunExpandedWaterSearch(primaryResult, consumeRadius);
+    }
+
+    static boolean shouldCacheRejectorWaterSearchResultForTests(@Nonnull WaterTargetSearchResult result) {
+        return shouldCacheRejectorWaterSearchResult(result);
+    }
+
     static boolean waterStandTargetsIncludeSourceBlockForTests() {
         return WATER_STAND_TARGETS_INCLUDE_SOURCE_BLOCK;
     }
@@ -1256,6 +1265,21 @@ public final class CompanionNeedsEnvironmentService {
 
     private static long resolveCurrentTimeMs() {
         return System.currentTimeMillis();
+    }
+
+    private static boolean shouldRunExpandedWaterSearch(@Nonnull WaterTargetSearchResult primaryResult,
+                                                        double consumeRadius) {
+        return primaryResult.target() == null
+                && primaryResult.foundConsumableSource()
+                && consumeRadius > 1.0 + SCORE_EPSILON;
+    }
+
+    private static boolean shouldCacheRejectorWaterSearchResult(@Nonnull WaterTargetSearchResult result) {
+        return result.target() == null && !result.foundConsumableSource();
+    }
+
+    private static boolean shouldCacheRejectorFoodSearchResult(@Nonnull FoodTargetSearchResult result) {
+        return result.target() == null && !result.foundConsumableSource();
     }
 
     private enum ResourceSearchKind {
@@ -1867,6 +1891,9 @@ public final class CompanionNeedsEnvironmentService {
             return false;
         }
         BlockType blockType = worldChunk.getBlockType(blockX, blockY, blockZ);
+        if (!FeedTroughWaterStateService.isWaterTroughBlockType(blockType)) {
+            return false;
+        }
         return FeedTroughWaterStateService.hasConsumableWater(
                 worldChunk,
                 chunkStore,

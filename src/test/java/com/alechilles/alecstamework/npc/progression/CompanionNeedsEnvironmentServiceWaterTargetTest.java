@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,6 +34,33 @@ class CompanionNeedsEnvironmentServiceWaterTargetTest {
     @Test
     void waterSearchMissCacheIsLongEnoughToThrottleRepeatedFullScans() {
         assertTrue(CompanionNeedsEnvironmentService.searchCacheTtlMs(false) >= 3_000L);
+    }
+
+    @Test
+    void expandedWaterSearchIsSkippedWhenPrimaryScanFoundNoConsumableSource() {
+        CompanionNeedsEnvironmentService.WaterTargetSearchResult result =
+                CompanionNeedsEnvironmentService.WaterTargetSearchResult.miss(false);
+
+        assertFalse(CompanionNeedsEnvironmentService.shouldRunExpandedWaterSearchForTests(result, 4.0));
+    }
+
+    @Test
+    void expandedWaterSearchStillRunsWhenPrimaryScanFoundOnlyRejectedSource() {
+        CompanionNeedsEnvironmentService.WaterTargetSearchResult result =
+                CompanionNeedsEnvironmentService.WaterTargetSearchResult.miss(true);
+
+        assertTrue(CompanionNeedsEnvironmentService.shouldRunExpandedWaterSearchForTests(result, 4.0));
+    }
+
+    @Test
+    void rejectorWaterSearchCachesOnlyTrueNoSourceMisses() {
+        CompanionNeedsEnvironmentService.WaterTargetSearchResult noSource =
+                CompanionNeedsEnvironmentService.WaterTargetSearchResult.miss(false);
+        CompanionNeedsEnvironmentService.WaterTargetSearchResult sourceWithoutTarget =
+                CompanionNeedsEnvironmentService.WaterTargetSearchResult.miss(true);
+
+        assertTrue(CompanionNeedsEnvironmentService.shouldCacheRejectorWaterSearchResultForTests(noSource));
+        assertFalse(CompanionNeedsEnvironmentService.shouldCacheRejectorWaterSearchResultForTests(sourceWithoutTarget));
     }
 
     @Test
