@@ -34,6 +34,7 @@ class CrashTelemetryServiceTest {
 
         assertEquals(0, runtime.setupFailureCalls);
         assertFalse(service.diagnostics().enabled());
+        assertEquals(true, runtime.lastProjectEnabled);
     }
 
     @Test
@@ -42,7 +43,7 @@ class CrashTelemetryServiceTest {
         CrashTelemetryService service = createService(false, true, runtime);
 
         assertFalse(service.diagnostics().enabled());
-        assertEquals(false, runtime.lastProjectEnabled);
+        assertEquals(true, runtime.lastProjectEnabled);
 
         service.applyEnabledSetting(true);
         assertTrue(service.diagnostics().enabled());
@@ -51,8 +52,21 @@ class CrashTelemetryServiceTest {
 
         service.applyEnabledSetting(false);
         assertFalse(service.diagnostics().enabled());
-        assertEquals(1, runtime.shutdownCalls);
-        assertEquals(false, runtime.lastProjectEnabled);
+        assertEquals(0, runtime.shutdownCalls);
+        assertEquals(true, runtime.lastProjectEnabled);
+    }
+
+    @Test
+    void startsEmbeddedRuntimeWhenCrashTelemetryDisabledSoStatsCanRun() {
+        FakeEmbeddedRuntime runtime = new FakeEmbeddedRuntime();
+        CrashTelemetryService service = createService(false, true, runtime);
+
+        service.start();
+
+        assertEquals(1, runtime.startCalls);
+        assertEquals(true, runtime.lastProjectEnabled);
+        assertFalse(service.recordError("disabled_error", testThrowable("disabled"), "detail"));
+        assertEquals(0, runtime.errorCalls);
     }
 
     @Test

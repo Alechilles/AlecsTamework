@@ -72,20 +72,22 @@ public final class CrashTelemetryService {
         this.enabled = new AtomicBoolean(enabled);
         this.breadcrumbsEnabled = new AtomicBoolean(breadcrumbsEnabled);
         telemetry.setBreadcrumbsEnabled(breadcrumbsEnabled);
-        telemetry.setProjectEnabled(enabled);
+        if (!telemetry.setProjectEnabled(true)) {
+            updateLastFlushStatus("Failed to persist embedded telemetry project enabled setting.");
+        }
         syncLastFlushStatus();
     }
 
     public synchronized void start() {
         syncLastFlushStatus();
-        if (!isRuntimeEnabled()) {
+        if (!isEmbeddedRuntimeAvailable()) {
             updateLastFlushStatus(disabledReason());
             return;
         }
         if (!started.compareAndSet(false, true)) {
             return;
         }
-        if (breadcrumbsEnabled.get()) {
+        if (isCrashTelemetryEnabled() && breadcrumbsEnabled.get()) {
             telemetry.recordBreadcrumb("lifecycle", "Embedded telemetry started.");
         }
         telemetry.start();
@@ -105,25 +107,18 @@ public final class CrashTelemetryService {
 
     public synchronized void applyEnabledSetting(boolean enabled) {
         boolean previous = this.enabled.getAndSet(enabled);
-        if (!telemetry.setProjectEnabled(enabled)) {
-            updateLastFlushStatus("Failed to persist embedded telemetry enabled setting.");
-        }
         if (previous == enabled) {
             return;
         }
         if (enabled) {
-            updateLastFlushStatus("Embedded telemetry enabled.");
+            updateLastFlushStatus("Embedded crash telemetry enabled.");
             start();
             if (breadcrumbsEnabled.get()) {
-                telemetry.recordBreadcrumb("settings", "Embedded telemetry enabled via runtime setting.");
+                telemetry.recordBreadcrumb("settings", "Embedded crash telemetry enabled via runtime setting.");
             }
             return;
         }
-        if (breadcrumbsEnabled.get()) {
-            telemetry.recordBreadcrumb("settings", "Embedded telemetry disabled via runtime setting.");
-        }
-        shutdown();
-        updateLastFlushStatus("Embedded telemetry disabled by settings.");
+        updateLastFlushStatus("Embedded crash telemetry disabled by Tamework settings.");
     }
 
     public synchronized void applyBreadcrumbsEnabledSetting(boolean enabled) {
@@ -135,7 +130,7 @@ public final class CrashTelemetryService {
             return;
         }
         if (enabled) {
-            if (isRuntimeEnabled()) {
+            if (isCrashTelemetryEnabled()) {
                 telemetry.recordBreadcrumb("settings", "Embedded telemetry breadcrumbs enabled via runtime setting.");
             }
             return;
@@ -144,14 +139,14 @@ public final class CrashTelemetryService {
     }
 
     public void recordBreadcrumb(@Nonnull String category, @Nonnull String detail) {
-        if (!isRuntimeEnabled() || !breadcrumbsEnabled.get()) {
+        if (!isCrashTelemetryEnabled() || !breadcrumbsEnabled.get()) {
             return;
         }
         telemetry.recordBreadcrumb(category, detail);
     }
 
     public void captureSetupFailure(@Nullable Throwable throwable) {
-        if (!isRuntimeEnabled() || throwable == null) {
+        if (!isCrashTelemetryEnabled() || throwable == null) {
             return;
         }
         recordBreadcrumb("capture", "Capturing setup failure.");
@@ -160,7 +155,7 @@ public final class CrashTelemetryService {
     }
 
     public void captureStartFailure(@Nullable Throwable throwable) {
-        if (!isRuntimeEnabled() || throwable == null) {
+        if (!isCrashTelemetryEnabled() || throwable == null) {
             return;
         }
         recordBreadcrumb("capture", "Capturing start failure.");
@@ -170,7 +165,7 @@ public final class CrashTelemetryService {
 
     public void captureExceptionalWorldRemoval(@Nullable World world,
                                                @Nullable RemoveWorldEvent.RemovalReason removalReason) {
-        if (!isRuntimeEnabled() || world == null || removalReason != RemoveWorldEvent.RemovalReason.EXCEPTIONAL) {
+        if (!isCrashTelemetryEnabled() || world == null || removalReason != RemoveWorldEvent.RemovalReason.EXCEPTIONAL) {
             return;
         }
         recordBreadcrumb("capture", "Capturing exceptional world removal for " + safeWorldName(world) + ".");
@@ -247,7 +242,7 @@ public final class CrashTelemetryService {
     }
 
     public boolean triggerFlushAsync() {
-        if (!isRuntimeEnabled()) {
+        if (!isCrashTelemetryEnabled()) {
             return false;
         }
         recordBreadcrumb("flush", "Manual embedded telemetry flush requested.");
@@ -261,7 +256,7 @@ public final class CrashTelemetryService {
         syncLastFlushStatus();
         EmbeddedTelemetryDiagnostics diagnostics = telemetry.diagnostics();
         return new CrashTelemetryDiagnostics(
-                isRuntimeEnabled(),
+                isCrashTelemetryEnabled(),
                 diagnostics.endpoint(),
                 diagnostics.pendingReports(),
                 diagnostics.flushInProgress(),
@@ -282,12 +277,16 @@ public final class CrashTelemetryService {
         );
     }
 
-    private boolean isRuntimeEnabled() {
+    private boolean isCrashTelemetryEnabled() {
         return enabled.get() && telemetry.isEnabled();
     }
 
+    private boolean isEmbeddedRuntimeAvailable() {
+        return telemetry.isEnabled();
+    }
+
     private boolean canRecordEvents() {
-        return isRuntimeEnabled() && !"<disabled>".equals(telemetry.diagnostics().endpoint());
+        return isCrashTelemetryEnabled() && !"<disabled>".equals(telemetry.diagnostics().endpoint());
     }
 
     private void syncLastFlushStatus() {
