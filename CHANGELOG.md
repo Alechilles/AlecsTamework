@@ -19,6 +19,7 @@
 - Feed trough blocks are now added to the vanilla Fence block set through an asset patch so movement and path checks treat trough variants consistently with fence-like obstacles.
 
 ### Fixed
+- Fixed embedded Alec's Telemetry consent defaults so Tamework starts crash, error, lifecycle, performance, usage, stats, and breadcrumb toggles enabled.
 - Fixed captured spawner items so companion gender is preserved even when capture happens before explicit life-stage gender metadata has been written.
 - Fixed companion needs consumption so animals can remain at reachable food or water and consume repeatedly until the relevant need rises above the seek threshold, instead of returning to idle after one bite or drink.
 - Fixed repeated needs consumption so completed food and water visits release their reserved approach point immediately, reducing avoidable delays for other nearby animals.

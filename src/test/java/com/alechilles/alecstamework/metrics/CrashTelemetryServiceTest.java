@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryDiagnostics;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import org.junit.jupiter.api.Test;
@@ -290,6 +292,32 @@ class CrashTelemetryServiceTest {
 
         assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("shared-report.json")));
         assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("local-report.json")));
+    }
+
+    @Test
+    void seedsEmbeddedConsentDefaultsForAllRuntimeToggles() throws Exception {
+        Path overrideFile = tempDir.resolve("plugin-data")
+                .resolve("Telemetry")
+                .resolve("Settings")
+                .resolve("projects")
+                .resolve("alecs-tamework.json");
+
+        assertTrue(CrashTelemetryService.seedEmbeddedConsentDefaults(overrideFile, true, null));
+
+        JsonObject root = JsonParser.parseString(Files.readString(overrideFile, StandardCharsets.UTF_8)).getAsJsonObject();
+        assertTrue(root.get("enabled").getAsBoolean());
+        JsonObject capture = root.getAsJsonObject("capture");
+        assertTrue(capture.get("uncaughtExceptions").getAsBoolean());
+        assertTrue(capture.get("setupFailures").getAsBoolean());
+        assertTrue(capture.get("startFailures").getAsBoolean());
+        assertTrue(capture.get("exceptionalWorldRemovals").getAsBoolean());
+        JsonObject events = root.getAsJsonObject("events");
+        assertTrue(events.getAsJsonObject("errors").get("enabled").getAsBoolean());
+        assertTrue(events.getAsJsonObject("lifecycle").get("enabled").getAsBoolean());
+        assertTrue(events.getAsJsonObject("breadcrumbs").get("enabled").getAsBoolean());
+        assertTrue(root.getAsJsonObject("performance").get("enabled").getAsBoolean());
+        assertTrue(root.getAsJsonObject("usage").get("enabled").getAsBoolean());
+        assertTrue(root.getAsJsonObject("stats").get("enabled").getAsBoolean());
     }
 
     @Test

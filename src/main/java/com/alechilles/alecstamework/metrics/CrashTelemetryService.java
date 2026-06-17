@@ -4,6 +4,8 @@ import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryBootstrap;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryDiagnostics;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryService;
+import com.alechilles.alecstelemetry.runtime.TelemetryDataPaths;
+import com.alechilles.alecstelemetry.runtime.TelemetryProjectOverrideStore;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
@@ -59,6 +61,11 @@ public final class CrashTelemetryService {
         migrateLegacyTelemetryData(
                 pluginDataDirectory.resolve("Telemetry"),
                 legacyTelemetryRootCandidates(pluginDataDirectory, tameworkUniverseRoot),
+                logger
+        );
+        seedEmbeddedConsentDefaults(
+                TelemetryDataPaths.forEmbeddedOwner(plugin).projectOverrideFile(TAMEWORK_PROJECT_ID),
+                breadcrumbsEnabled,
                 logger
         );
         EmbeddedTelemetryService embeddedTelemetry = EmbeddedTelemetryBootstrap.bootstrap(plugin);
@@ -364,6 +371,24 @@ public final class CrashTelemetryService {
             }
             copyLegacyTelemetryArtifacts(sourceRoot, targetRoot, isPluginLocalLegacyRoot(sourceRoot, targetRoot), logger);
         }
+    }
+
+    static boolean seedEmbeddedConsentDefaults(@Nonnull Path projectOverrideFile,
+                                               boolean breadcrumbsEnabled,
+                                               @Nullable HytaleLogger logger) {
+        TelemetryProjectOverrideStore store = new TelemetryProjectOverrideStore(logger);
+        boolean saved = store.saveProjectEnabled(projectOverrideFile, true);
+        saved &= store.saveCrashEnabled(projectOverrideFile, true);
+        saved &= store.saveErrorEventsEnabled(projectOverrideFile, true);
+        saved &= store.saveLifecycleEventsEnabled(projectOverrideFile, true);
+        saved &= store.savePerformanceEnabled(projectOverrideFile, true);
+        saved &= store.saveUsageEnabled(projectOverrideFile, true);
+        saved &= store.saveStatsEnabled(projectOverrideFile, true);
+        saved &= store.saveBreadcrumbsEnabled(projectOverrideFile, breadcrumbsEnabled);
+        if (!saved && logger != null) {
+            logger.at(Level.WARNING).log("Failed to persist embedded telemetry consent defaults.");
+        }
+        return saved;
     }
 
     private static boolean copyLegacyTelemetryArtifacts(@Nonnull Path oldTelemetryRoot,
