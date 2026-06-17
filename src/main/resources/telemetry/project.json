@@ -372,6 +372,9 @@
       }
     }
   },
+  "stats": {
+    "enabled": true
+  },
   "reports": {
     "enabled": true,
     "issue": {
