@@ -4,6 +4,7 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -43,16 +44,15 @@ public final class RoleNameResolver {
         if (role == null) {
             return null;
         }
-        Object markedSupport = invokeObjectGetter(role, "getMarkedEntitySupport");
-        if (markedSupport == null) {
-            return null;
+        String nameTranslationKey = role.getNameTranslationKey();
+        if (nameTranslationKey != null && !nameTranslationKey.isBlank()) {
+            return nameTranslationKey;
         }
-        Object entitySupport = invokeObjectGetter(markedSupport, "getEntitySupport");
+        EntitySupport entitySupport = role.getEntitySupport();
         if (entitySupport == null) {
             return null;
         }
-        Object sensorScope = invokeObjectGetter(entitySupport, "getSensorScope");
-        return readScopeStringParam(sensorScope, ROLE_NAME_PARAM_KEYS);
+        return readScopeStringParam(entitySupport.getSensorScope(), ROLE_NAME_PARAM_KEYS);
     }
 
     @Nullable
@@ -290,16 +290,4 @@ public final class RoleNameResolver {
         return null;
     }
 
-    @Nullable
-    private static Object invokeObjectGetter(@Nullable Object target, @Nullable String methodName) {
-        if (target == null || methodName == null || methodName.isBlank()) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
 }
