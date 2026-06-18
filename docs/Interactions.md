@@ -59,7 +59,7 @@ Common fields:
 - `ItemsInHand`
 - `ItemsParam`
 - `Role`
-- `RoleParam` (overrides `Role` when resolved)
+- `RoleParam` (overrides `Role` when resolved from the NPC role's authored parameters or exported scopes)
 
 Behavior:
 - Requires untamed NPC and matching held item.

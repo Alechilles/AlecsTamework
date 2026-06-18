@@ -8,6 +8,7 @@ import java.util.Arrays;
 
 /** Interaction param resolver. */
 final class InteractionParamResolver {
+    private final StdScope roleParameterScopeSnapshot;
     private final StdScope globalScopeSnapshot;
     private final StdScope execScopeSnapshot;
     private final StdScope sensorScopeSnapshot;
@@ -16,6 +17,14 @@ final class InteractionParamResolver {
     InteractionParamResolver(StdScope globalScopeSnapshot,
                              StdScope execScopeSnapshot,
                              StdScope sensorScopeSnapshot) {
+        this(null, globalScopeSnapshot, execScopeSnapshot, sensorScopeSnapshot);
+    }
+
+    InteractionParamResolver(StdScope roleParameterScopeSnapshot,
+                             StdScope globalScopeSnapshot,
+                             StdScope execScopeSnapshot,
+                             StdScope sensorScopeSnapshot) {
+        this.roleParameterScopeSnapshot = roleParameterScopeSnapshot;
         this.globalScopeSnapshot = globalScopeSnapshot;
         this.execScopeSnapshot = execScopeSnapshot;
         this.sensorScopeSnapshot = sensorScopeSnapshot;
@@ -102,19 +111,28 @@ final class InteractionParamResolver {
     }
 
     private StdScope[] orderedScopes(StdScope primary) {
-        StdScope[] scopes = new StdScope[4];
+        StdScope[] scopes = new StdScope[5];
         int count = 0;
         if (primary != null) {
             scopes[count++] = primary;
         }
-        if (globalScopeSnapshot != null && globalScopeSnapshot != primary) {
+        if (roleParameterScopeSnapshot != null && roleParameterScopeSnapshot != primary) {
+            scopes[count++] = roleParameterScopeSnapshot;
+        }
+        if (globalScopeSnapshot != null
+                && globalScopeSnapshot != primary
+                && globalScopeSnapshot != roleParameterScopeSnapshot) {
             scopes[count++] = globalScopeSnapshot;
         }
-        if (execScopeSnapshot != null && execScopeSnapshot != primary) {
+        if (execScopeSnapshot != null
+                && execScopeSnapshot != primary
+                && execScopeSnapshot != roleParameterScopeSnapshot
+                && execScopeSnapshot != globalScopeSnapshot) {
             scopes[count++] = execScopeSnapshot;
         }
         if (sensorScopeSnapshot != null
                 && sensorScopeSnapshot != primary
+                && sensorScopeSnapshot != roleParameterScopeSnapshot
                 && sensorScopeSnapshot != globalScopeSnapshot
                 && sensorScopeSnapshot != execScopeSnapshot) {
             scopes[count++] = sensorScopeSnapshot;

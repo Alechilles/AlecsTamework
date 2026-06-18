@@ -18,6 +18,8 @@ class InteractionParamResolverTest {
     void paramResolverUsesExpectedScopeOrder() throws Exception {
         StdScope primary = new StdScope(null);
         primary.addConst("Param", "Primary");
+        StdScope roleParameters = new StdScope(null);
+        roleParameters.addConst("RoleOnlyParam", "RoleParameters");
         StdScope global = new StdScope(null);
         global.addConst("Param", "Global");
         StdScope exec = new StdScope(null);
@@ -25,9 +27,10 @@ class InteractionParamResolverTest {
         StdScope sensor = new StdScope(null);
         sensor.addConst("Param", "Sensor");
 
-        InteractionParamResolver resolver = new InteractionParamResolver(global, exec, sensor);
+        InteractionParamResolver resolver = new InteractionParamResolver(roleParameters, global, exec, sensor);
         Role roleWithPrimary = newRoleWithScope(primary);
         assertEquals("Primary", resolver.getStringParam(roleWithPrimary, null, "Param"));
+        assertEquals("RoleParameters", resolver.getStringParam(roleWithPrimary, null, "RoleOnlyParam"));
 
         Role roleWithoutPrimary = newRoleWithScope(new StdScope(null));
         assertEquals("Global", resolver.getStringParam(roleWithoutPrimary, null, "Param"));

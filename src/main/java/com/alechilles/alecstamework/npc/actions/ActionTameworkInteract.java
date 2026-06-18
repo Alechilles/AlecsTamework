@@ -22,6 +22,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.asset.builder.Builder;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
@@ -79,7 +81,9 @@ public class ActionTameworkInteract extends TameworkActionBase {
         StdScope globalSnapshot = null;
         StdScope execSnapshot = null;
         StdScope sensorSnapshot = null;
+        StdScope roleParameterSnapshot = null;
         if (support != null) {
+            roleParameterSnapshot = snapshotRoleParameterScope(support);
             Scope globalScope = support.getGlobalScope();
             if (globalScope != null) {
                 globalSnapshot = globalScope instanceof StdScope
@@ -98,7 +102,12 @@ public class ActionTameworkInteract extends TameworkActionBase {
                 sensorSnapshot = StdScope.copyOf(supportScope);
             }
         }
-        InteractionParamResolver paramResolver = new InteractionParamResolver(globalSnapshot, execSnapshot, sensorSnapshot);
+        InteractionParamResolver paramResolver = new InteractionParamResolver(
+                roleParameterSnapshot,
+                globalSnapshot,
+                execSnapshot,
+                sensorSnapshot
+        );
         InteractionParamAccess paramAccess = new InteractionParamAccess(
                 paramResolver,
                 hasLovedItemsOverride,
@@ -501,6 +510,19 @@ public class ActionTameworkInteract extends TameworkActionBase {
 
     String describeTriggerSource() {
         return triggerSource != null && !triggerSource.isBlank() ? triggerSource : "<unspecified>";
+    }
+
+    private static StdScope snapshotRoleParameterScope(BuilderSupport support) {
+        if (support == null) {
+            return null;
+        }
+        try {
+            Builder<?> roleBuilder = support.getParentSpawnable();
+            BuilderParameters builderParameters = roleBuilder != null ? roleBuilder.getBuilderParameters() : null;
+            return builderParameters != null ? builderParameters.createScope() : null;
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
     }
 
     private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
