@@ -62,7 +62,8 @@ class TameworkSettingsPageLocalizationTest {
 
         assertTrue(page.contains("TameworkSettingsPageTextBinder.bindStaticText(commandBuilder, playerRef)"));
         assertTrue(ui.contains("Label #TwSettingsExperiencePresetsLabel"));
-        assertTrue(ui.contains("Label #TwSettingsTelemetryBreadcrumbsEnabledLabel"));
+        assertTrue(ui.contains("Label #TwSettingsTelemetryConsentInstructionLabel"));
+        assertFalse(ui.contains("CheckBox #TwSettingsTelemetryEnabledCheck"));
         assertTrue(binder.contains("#TwSettingsTitle"));
         assertTrue(binder.contains("#TwSettingsExperiencePresetsTooltip"));
         assertTrue(binder.contains("#TwSettingsPresetDropdown"));

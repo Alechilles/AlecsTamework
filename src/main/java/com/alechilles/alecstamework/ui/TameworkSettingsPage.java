@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
-import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
@@ -35,7 +34,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Curated /tw settings page for common global settings + crash telemetry toggle.
+ * Curated /tw settings page for common global settings.
  */
 public final class TameworkSettingsPage extends InteractiveCustomUIPage<TameworkSettingsPage.EventPayload> {
     public static final String UI_PATH = "TameworkSettingsPage.ui";
@@ -82,8 +81,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_TALENTS_ENABLED = "@TalentsEnabled";
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
     private static final String KEY_RECALL_TELEPORTING_ENABLED = "@RecallTeleportingEnabled";
-    private static final String KEY_TELEMETRY_ENABLED = "@TelemetryEnabled";
-    private static final String KEY_TELEMETRY_BREADCRUMBS_ENABLED = "@TelemetryBreadcrumbsEnabled";
 
     private final Tamework plugin;
     private final World world;
@@ -216,9 +213,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_LEVELING_ENABLED, "#TwSettingsLevelingEnabledCheck.Value")
                 .append(KEY_TALENTS_ENABLED, "#TwSettingsTalentsEnabledCheck.Value")
                 .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
-                .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value")
-                .append(KEY_TELEMETRY_ENABLED, "#TwSettingsTelemetryEnabledCheck.Value")
-                .append(KEY_TELEMETRY_BREADCRUMBS_ENABLED, "#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value");
+                .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value");
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
@@ -271,8 +266,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsTalentsEnabledCheck.Value", currentValues.talentsEnabled());
         commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
         commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
-        commandBuilder.set("#TwSettingsTelemetryEnabledCheck.Value", currentValues.telemetryEnabled());
-        commandBuilder.set("#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value", currentValues.telemetryBreadcrumbsEnabled());
     }
 
     private void onApply(@Nonnull EventPayload payload, @Nonnull Store<EntityStore> store) {
@@ -356,26 +349,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
         }
 
-        String telemetryWarning = saveTelemetrySettings(values.telemetryEnabled(), values.telemetryBreadcrumbsEnabled());
-        if (!telemetryWarning.isBlank()) {
-            return ApplyOutcome.partial(resolveText("tamework.ui.settings.status.appliedUniverse"), telemetryWarning);
-        }
         return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));
-    }
-
-    @Nonnull
-    private String saveTelemetrySettings(boolean enabled, boolean breadcrumbsEnabled) {
-        try {
-            CrashTelemetryService service = plugin.getCrashTelemetryService();
-            if (service != null) {
-                service.applyBreadcrumbsEnabledSetting(breadcrumbsEnabled);
-                service.applyEnabledSetting(enabled);
-            }
-        } catch (Exception ex) {
-            plugin.getLogger().at(Level.WARNING).withCause(ex).log("Failed applying crash telemetry setting at runtime.");
-            return resolveText("tamework.ui.settings.warning.telemetryApplyFailed");
-        }
-        return "";
     }
 
     @Nonnull
@@ -510,8 +484,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 boolOrDefault(payload.talentsEnabled, currentValues.talentsEnabled()),
                 boolOrDefault(payload.reviveSystemEnabled, currentValues.reviveSystemEnabled()),
                 boolOrDefault(payload.recallTeleportingEnabled, currentValues.recallTeleportingEnabled()),
-                boolOrDefault(payload.telemetryEnabled, currentValues.telemetryEnabled()),
-                boolOrDefault(payload.telemetryBreadcrumbsEnabled, currentValues.telemetryBreadcrumbsEnabled())
+                currentValues.telemetryEnabled(),
+                currentValues.telemetryBreadcrumbsEnabled()
         );
         return ParseResult.success(values);
     }
@@ -698,13 +672,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_TALENTS_ENABLED, Codec.BOOLEAN), (x, v) -> x.talentsEnabled = v, x -> x.talentsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
-                .<Boolean>append(new KeyedCodec<>(KEY_TELEMETRY_ENABLED, Codec.BOOLEAN), (x, v) -> x.telemetryEnabled = v, x -> x.telemetryEnabled).add()
-                .<Boolean>append(
-                        new KeyedCodec<>(KEY_TELEMETRY_BREADCRUMBS_ENABLED, Codec.BOOLEAN),
-                        (x, v) -> x.telemetryBreadcrumbsEnabled = v,
-                        x -> x.telemetryBreadcrumbsEnabled
-                )
-                .add()
                 .build();
 
         private String action;
@@ -744,7 +711,5 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private Boolean talentsEnabled;
         private Boolean reviveSystemEnabled;
         private Boolean recallTeleportingEnabled;
-        private Boolean telemetryEnabled;
-        private Boolean telemetryBreadcrumbsEnabled;
     }
 }

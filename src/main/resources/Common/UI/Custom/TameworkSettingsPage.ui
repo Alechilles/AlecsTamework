@@ -137,7 +137,7 @@ $C.@PageOverlay {
               TextButton #TwSettingsPresetNoteTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 18);
                 Text: "";
-                TooltipText: "Preset loads only affect the main experience toggles in this section. They do not change ownership, population, claims, or telemetry settings.";
+                TooltipText: "Preset loads only affect the main experience toggles in this section. They do not change ownership, population, or claims settings.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
@@ -1258,66 +1258,26 @@ $C.@PageOverlay {
 
               Label #TwSettingsTelemetrySectionLabel {
                 Anchor: (Left: 0, Right: 0, Height: 24);
-                Text: "Crash Telemetry (Server)";
+                Text: "Telemetry Consent";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
               }
 
               TextButton #TwSettingsCrashTelemetrySectionTooltip {
                 Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "";
-                TooltipText: "Controls Tamework's server crash reporting uploads and breadcrumb diagnostics.";
+                TooltipText: "Telemetry consent is managed by the shared Alec's Telemetry command.";
                 TextTooltipStyle: @SettingsLabelTooltipStyle;
                 Style: @SettingsLabelTooltipButtonStyle;
               }
             }
 
             Group {
-              Anchor: (Height: 26);
+              Anchor: (Height: 44);
 
-              Label #TwSettingsTelemetryEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
-                Text: "Enable Crash Telemetry Uploads";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
-              }
-
-              TextButton #TwSettingsTelemetryEnabledTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
-                Text: "";
-                TooltipText: "Allows Tamework to upload crash telemetry reports from the server.";
-                TextTooltipStyle: @SettingsLabelTooltipStyle;
-                Style: @SettingsLabelTooltipButtonStyle;
-              }
-
-              CheckBox #TwSettingsTelemetryEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
-                Padding: (Full: 4);
-                Style: $C.@DefaultCheckBoxStyle;
-              }
-            }
-
-            Group {
-              Anchor: (Height: 26);
-
-              Label #TwSettingsTelemetryBreadcrumbsEnabledLabel {
-                Anchor: (Left: 0, Width: 250, Height: 24);
-                Text: "Enable Crash Telemetry Breadcrumbs";
-                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
-              }
-
-              TextButton #TwSettingsTelemetryBreadcrumbsTooltip {
-                Anchor: (Left: 0, Width: 250, Height: 24);
-                Text: "";
-                TooltipText: "Includes breadcrumb diagnostics in crash telemetry reports for more context.";
-                TextTooltipStyle: @SettingsLabelTooltipStyle;
-                Style: @SettingsLabelTooltipButtonStyle;
-              }
-
-              CheckBox #TwSettingsTelemetryBreadcrumbsEnabledCheck {
-                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
-                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
-                Padding: (Full: 4);
-                Style: $C.@DefaultCheckBoxStyle;
+              Label #TwSettingsTelemetryConsentInstructionLabel {
+                Anchor: (Left: 0, Right: 16, Height: 42);
+                Text: "Use /telemetry consent to review or change Tamework telemetry consent. This settings page no longer edits telemetry.";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
               }
             }
           }

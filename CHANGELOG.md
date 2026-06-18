@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Fixed optimized interaction `RoleParam` resolution so authored role `Parameters` can override literal tame and `SetRole` targets without requiring duplicate exported role fields.
+
 ## 2.14.1 - Companion Needs Pathing Fixes - 2026-06-16
 
 ### Added
@@ -17,6 +22,7 @@
 - Needs resource seek now targets the food or water source itself and validates movement by consume-radius approach distance instead of requiring a projected adjacent stand point, improving crowded trough consistency.
 - Needs resource movement now keeps vanilla seek after preflight while enabling simple steering fallback to compare crowded food and water movement behavior.
 - Feed trough blocks are now added to the vanilla Fence block set through an asset patch so movement and path checks treat trough variants consistently with fence-like obstacles.
+- Replaced the telemetry toggles in `/tw settings` with guidance to manage telemetry consent through `/telemetry consent`.
 
 ### Fixed
 - Fixed captured spawner items so companion gender is preserved even when capture happens before explicit life-stage gender metadata has been written.

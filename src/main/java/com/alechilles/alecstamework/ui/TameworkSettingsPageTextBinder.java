@@ -64,8 +64,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsBreedingRequiresClaimLabel", "tamework.ui.settings.label.breedingRequiresClaim"},
             {"#TwSettingsSimpleClaimsProtectLabel", "tamework.ui.settings.label.simpleClaimsProtect"},
             {"#TwSettingsTelemetrySectionLabel", "tamework.ui.settings.label.telemetrySection"},
-            {"#TwSettingsTelemetryEnabledLabel", "tamework.ui.settings.label.telemetryEnabled"},
-            {"#TwSettingsTelemetryBreadcrumbsEnabledLabel", "tamework.ui.settings.label.telemetryBreadcrumbsEnabled"}
+            {"#TwSettingsTelemetryConsentInstructionLabel", "tamework.ui.settings.note.telemetryConsentCommand"}
     };
 
     private static final String[][] TOOLTIP_BINDINGS = {
@@ -118,9 +117,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsClaimLimitTotalTooltip", "tamework.ui.settings.tooltip.claimLimitTotal"},
             {"#TwSettingsBreedingRequiresClaimTooltip", "tamework.ui.settings.tooltip.breedingRequiresClaim"},
             {"#TwSettingsSimpleClaimsProtectTooltip", "tamework.ui.settings.tooltip.simpleClaimsProtect"},
-            {"#TwSettingsCrashTelemetrySectionTooltip", "tamework.ui.settings.tooltip.telemetrySection"},
-            {"#TwSettingsTelemetryEnabledTooltip", "tamework.ui.settings.tooltip.telemetryEnabled"},
-            {"#TwSettingsTelemetryBreadcrumbsTooltip", "tamework.ui.settings.tooltip.telemetryBreadcrumbsEnabled"}
+            {"#TwSettingsCrashTelemetrySectionTooltip", "tamework.ui.settings.tooltip.telemetrySection"}
     };
 
     private static final String[][] NO_ITEMS_BINDINGS = {
