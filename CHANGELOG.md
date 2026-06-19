@@ -2,7 +2,19 @@
 
 ## Unreleased
 
+## 2.15.0 - Telemetry Reports and Runtime Cleanup - 2026-06-18
+
+### Added
+- Added telemetry-backed manual player reports so Tamework can collect issue and suggestion submissions with attachment and resolution-update support.
+- Added opt-in telemetry stats descriptors plus a packaged consent icon so embedded telemetry surfaces can present project-specific consent and reporting metadata.
+
+### Changed
+- Routed embedded telemetry through the shared runtime host and removed the old runtime-mode descriptor dependency for the bundled Tamework project descriptor.
+- Replaced `/tw settings` telemetry controls with guidance that sends players to `/telemetry consent`.
+
 ### Fixed
+- Fixed telemetry enablement defaults so consent review and stats remain independently controllable when Tamework owns the active runtime.
+- Fixed live role display names to resolve against the current role state.
 - Fixed optimized interaction `RoleParam` resolution so authored role `Parameters` can override literal tame and `SetRole` targets without requiring duplicate exported role fields.
 
 ## 2.14.1 - Companion Needs Pathing Fixes - 2026-06-16
