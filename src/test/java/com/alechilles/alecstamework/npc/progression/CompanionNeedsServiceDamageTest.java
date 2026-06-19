@@ -175,6 +175,13 @@ class CompanionNeedsServiceDamageTest {
     }
 
     @Test
+    void loadedNeedsTickCapsLargeElapsedGaps() {
+        assertEquals(0L, CompanionNeedsService.capLoadedTickElapsedMs(-1L));
+        assertEquals(10_000L, CompanionNeedsService.capLoadedTickElapsedMs(10_000L));
+        assertEquals(30_000L, CompanionNeedsService.capLoadedTickElapsedMs(24L * 60L * 60L * 1000L));
+    }
+
+    @Test
     void regenSuppressionBlocksNaturalRegenWithoutAllowedHealBudget() {
         CompanionNeedsService.NaturalRegenSuppressionResolution resolution =
                 CompanionNeedsService.resolveNaturalRegenSuppression(

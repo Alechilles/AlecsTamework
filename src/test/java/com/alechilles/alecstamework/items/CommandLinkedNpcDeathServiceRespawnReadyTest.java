@@ -38,6 +38,7 @@ class CommandLinkedNpcDeathServiceRespawnReadyTest {
         CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot updatedOwnerSnapshot = snapshots.get(npcAOnCooldown);
         assertNotNull(updatedOwnerSnapshot);
         assertTrue(updatedOwnerSnapshot.respawnAvailableAtMs() <= System.currentTimeMillis());
+        assertEquals("Male", updatedOwnerSnapshot.lifeStageGender());
 
         CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot untouchedOwnerSnapshot = snapshots.get(npcBOnCooldown);
         assertNotNull(untouchedOwnerSnapshot);
@@ -102,7 +103,8 @@ class CommandLinkedNpcDeathServiceRespawnReadyTest {
                 0,
                 null,
                 CommandLinkedNpcDeathService.DeathCauseKind.UNKNOWN,
-                null
+                null,
+                "Male"
         );
     }
 }

@@ -217,7 +217,8 @@ public final class CommandLinkedNpcDeathService {
                                 cached.talentsSpentPoints(),
                                 cached.purchasedTalentIds(),
                                 deathDetails.causeKind(),
-                                deathDetails.sourceName()
+                                deathDetails.sourceName(),
+                                cached.lifeStageGender()
                         )
                 );
                 DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
@@ -289,6 +290,7 @@ public final class CommandLinkedNpcDeathService {
         double lifeStageAdultScale = lifeStageComponent != null ? lifeStageComponent.getAdultScale() : 1.00;
         boolean lifeStageGrowthScalingEnabled = lifeStageComponent != null
                 && lifeStageComponent.isGrowthScalingEnabled();
+        String lifeStageGender = lifeStageComponent != null ? lifeStageComponent.getGender() : null;
         ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
                 TameworkAttachmentsComponent.getComponentType();
         TameworkAttachmentsComponent attachmentsComponent = attachmentsType != null
@@ -375,7 +377,8 @@ public final class CommandLinkedNpcDeathService {
                         talentsSpentPoints,
                         purchasedTalentIds,
                         deathDetails.causeKind(),
-                        deathDetails.sourceName()
+                        deathDetails.sourceName(),
+                        lifeStageGender
                 )
         );
         DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
@@ -489,7 +492,8 @@ public final class CommandLinkedNpcDeathService {
                     snapshot.talentsSpentPoints(),
                     snapshot.purchasedTalentIds(),
                     snapshot.deathCauseKind(),
-                    snapshot.deathSourceName()
+                    snapshot.deathSourceName(),
+                    snapshot.lifeStageGender()
             );
             deadByNpc.put(snapshot.npcUuid(), updated);
             enqueueProfileUpdate(updated, null, null);
@@ -699,7 +703,8 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + snapshot.talentsSpentPoints()
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.purchasedTalentIds())
                 + FIELD_SEPARATOR + encodeNullableEnum(snapshot.deathCauseKind())
-                + FIELD_SEPARATOR + encodeNullableString(snapshot.deathSourceName());
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.deathSourceName())
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.lifeStageGender());
     }
 
     @Nullable
@@ -796,6 +801,7 @@ public final class CommandLinkedNpcDeathService {
             deathCauseKind = decodeNullableEnum(parts[37], DeathCauseKind.class);
             deathSourceName = decodeNullableString(parts[38]);
         }
+        String lifeStageGender = parts.length > 45 ? decodeNullableString(parts[45]) : null;
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -841,7 +847,8 @@ public final class CommandLinkedNpcDeathService {
                 talentsSpentPoints,
                 purchasedTalentIds,
                 deathCauseKind,
-                deathSourceName
+                deathSourceName,
+                lifeStageGender
         );
     }
 
@@ -1357,7 +1364,8 @@ public final class CommandLinkedNpcDeathService {
                                           int talentsSpentPoints,
                                           @Nullable String purchasedTalentIds,
                                           @Nullable DeathCauseKind deathCauseKind,
-                                          @Nullable String deathSourceName) {
+                                          @Nullable String deathSourceName,
+                                          @Nullable String lifeStageGender) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

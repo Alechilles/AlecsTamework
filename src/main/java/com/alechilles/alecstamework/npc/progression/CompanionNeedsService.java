@@ -42,6 +42,7 @@ public final class CompanionNeedsService {
     private static final String HEALTH_STAT_ID = "Health";
     private static final double NON_LETHAL_MIN_REMAINING_HEALTH = 1.0;
     private static final double MIN_DAMAGE_AMOUNT = 0.0001;
+    private static final long MAX_LOADED_TICK_CATCH_UP_MS = 30_000L;
     private static final double REGEN_SUPPRESSION_BASELINE_UNSET = -1.0;
     private static final double MAX_REGEN_SUPPRESSION_ALLOWED_HEAL = 10_000.0;
     private static final long REGEN_HARD_BLOCK_MIN_FUTURE_SECONDS = 30L;
@@ -571,7 +572,9 @@ public final class CompanionNeedsService {
         double thirstBeforeTick = thirst;
         long lastUpdateMs = component.getLastUpdateMs();
         UUID ownerId = resolveOwnerId(npcRef, store);
-        long effectiveElapsedMs = resolveEffectiveElapsedMs(config, ownerId, lastUpdateMs, nowMs);
+        long effectiveElapsedMs = capLoadedTickElapsedMs(
+                resolveEffectiveElapsedMs(config, ownerId, lastUpdateMs, nowMs)
+        );
         boolean diagnosticsEnabled = isNeedsDamageDiagnosticsEnabled();
         String npcId = diagnosticsEnabled ? resolveNpcId(npcRef, store) : "<disabled>";
         double healthBeforeTick = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
@@ -798,6 +801,13 @@ public final class CompanionNeedsService {
             return nowMs - lastUpdateMs;
         }
         return OwnerPresenceTimelineService.get().resolveEffectiveElapsedMs(ownerId, lastUpdateMs, nowMs, tickPolicy);
+    }
+
+    static long capLoadedTickElapsedMs(long effectiveElapsedMs) {
+        if (effectiveElapsedMs <= 0L) {
+            return 0L;
+        }
+        return Math.min(effectiveElapsedMs, MAX_LOADED_TICK_CATCH_UP_MS);
     }
 
     @Nullable

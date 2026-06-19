@@ -113,7 +113,8 @@ public final class DeathRepository {
                             (int) getLong(payload, "talentsSpentPoints", 0L),
                             getString(payload, "purchasedTalentIds"),
                             parseDeathCauseKind(payload, "deathCauseKind"),
-                            getString(payload, "deathSourceName")
+                            getString(payload, "deathSourceName"),
+                            getString(payload, "lifeStageGender")
                     ));
                 }
             }
@@ -252,6 +253,7 @@ public final class DeathRepository {
             payload.addProperty("deathCauseKind", snapshot.deathCauseKind().name());
         }
         putString(payload, "deathSourceName", snapshot.deathSourceName());
+        putString(payload, "lifeStageGender", snapshot.lifeStageGender());
         return payload.toString();
     }
 

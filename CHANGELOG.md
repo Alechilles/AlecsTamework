@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+- Fixed companion needs so animals do not apply days of unloaded hunger or thirst decay in one update when they load again.
+- Fixed linked companion recovery snapshots so captured gender is preserved through death, lost-state recovery, and respawn flows.
+
 ## 2.15.0 - Telemetry Reports and Runtime Cleanup - 2026-06-18
 
 ### Added

@@ -745,6 +745,7 @@ public final class CommandLinkedNpcLostService {
         double lifeStageAdultScale = lifeStageComponent != null ? lifeStageComponent.getAdultScale() : 1.00;
         boolean lifeStageGrowthScalingEnabled = lifeStageComponent != null
                 && lifeStageComponent.isGrowthScalingEnabled();
+        String lifeStageGender = lifeStageComponent != null ? lifeStageComponent.getGender() : null;
 
         ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
                 TameworkAttachmentsComponent.getComponentType();
@@ -812,7 +813,8 @@ public final class CommandLinkedNpcLostService {
                 talentsSpentPoints,
                 purchasedTalentIds,
                 null,
-                null
+                null,
+                lifeStageGender
         );
     }
 

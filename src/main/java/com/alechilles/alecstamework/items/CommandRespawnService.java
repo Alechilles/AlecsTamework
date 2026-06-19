@@ -552,6 +552,7 @@ final class CommandRespawnService {
                 || snapshot.lifeStageFullyGrownAtMs() > 0L;
         if (!hasLifeStageData) {
             CompanionLifeStageService.ensureLifeStageComponent(spawnedRef, store);
+            applyRespawnGender(spawnedRef, store, type, snapshot.lifeStageGender());
             CompanionLifeStageService.refreshLifeStage(
                     spawnedRef,
                     store.getComponent(spawnedRef, NPCEntity.getComponentType()),
@@ -573,12 +574,27 @@ final class CommandRespawnService {
                 snapshot.lifeStageAdultScale(),
                 snapshot.lifeStageGrowthScalingEnabled()
         );
+        component.setGender(snapshot.lifeStageGender());
         store.putComponent(spawnedRef, type, component);
         CompanionLifeStageService.refreshLifeStage(
                 spawnedRef,
                 store.getComponent(spawnedRef, NPCEntity.getComponentType()),
                 store
         );
+    }
+
+    private void applyRespawnGender(Ref<EntityStore> spawnedRef,
+                                    Store<EntityStore> store,
+                                    ComponentType<EntityStore, TameworkLifeStageComponent> type,
+                                    @Nullable String gender) {
+        if (gender == null || gender.isBlank()) {
+            return;
+        }
+        TameworkLifeStageComponent component = store.getComponent(spawnedRef, type);
+        if (component != null) {
+            component.setGender(gender);
+            store.putComponent(spawnedRef, type, component);
+        }
     }
 
     private boolean resolveBreedingReadiness(String configId,
