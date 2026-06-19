@@ -51,6 +51,9 @@ public final class CoopResidentStateSnapshotService {
     public RemovedCoopResidentCapture onNpcRemoved(@Nullable Ref<EntityStore> reference,
                                                    @Nullable RemoveReason reason,
                                                    @Nullable Store<EntityStore> store) {
+        if (reason == RemoveReason.UNLOAD) {
+            return null;
+        }
         if (reference == null || !reference.isValid() || store == null) {
             return null;
         }

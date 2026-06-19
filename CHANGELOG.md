@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Fixed
+- Fixed a server freeze that could happen when coop-resident NPCs unloaded with chunks, especially in animal-heavy worlds.
 - Fixed companion needs so animals do not apply days of unloaded hunger or thirst decay in one update when they load again.
 - Fixed linked companion recovery snapshots so captured gender is preserved through death, lost-state recovery, and respawn flows.
 
