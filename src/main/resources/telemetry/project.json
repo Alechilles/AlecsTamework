@@ -2,7 +2,6 @@
   "schemaVersion": 1,
   "projectId": "alecs-tamework",
   "displayName": "Alec's Tamework!",
-  "runtimeMode": "embedded",
   "events": {
     "errors": {
       "enabled": true,
