@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2.15.1 - Consent Metrics and Companion Stability - 2026-06-19
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to 0.2.1 so consent opt-in and opt-out aggregates are reported to the hosted portal.
 
 ### Fixed
 - Fixed a server freeze that could happen when coop-resident NPCs unloaded with chunks, especially in animal-heavy worlds.
