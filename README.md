@@ -1,12 +1,21 @@
-[![Tamework](https://img.shields.io/curseforge/dt/1447962?label=Tamework&style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-tamework)
-[![Cats](https://img.shields.io/curseforge/dt/1432112?label=Cats&style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-cats)
-[![Nametags](https://img.shields.io/curseforge/dt/1464844?label=Nametags&style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-nametags)
-[![Animal Husbandry](https://img.shields.io/curseforge/dt/1480275?label=Animal%20Husbandry&style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-animal-husbandry)
-
-[![Discord](https://img.shields.io/discord/1468261809739005996?style=for-the-badge&logo=discord&logoColor=white&label=Discord&color=rgb(88,101,242))](https://discord.gg/E8n8RgTTdq)
-[![Buy me a coffee](https://img.shields.io/badge/ko--fi-Support%20Me-ff5f5f?logo=ko-fi&style=for-the-badge)](https://ko-fi.com/alechilles) [![Creator Code](https://img.shields.io/badge/Creator%20Code-Alec-00AEEF?style=for-the-badge)](https://hytale.com/) ![X (Formerly Twitter)](https://img.shields.io/badge/Follow-%40Alec-White?style=for-the-badge&logo=x&logoColor=%23ffffff&logoSize=auto&label=Follow&labelColor=%23555555&color=%23939393&link=https%3A%2F%2Ftwitter.com%2Fintent%2Fuser%3Fscreen_name%3DAlechilles)
-
-[![Sponsored By HytaleModding Grant Program](https://github.com/user-attachments/assets/a03709e3-445a-4e58-8ec5-591688490c5d)](https://hytalemodding.dev/en/grants)
+<p>
+    <a href="https://www.curseforge.com/hytale/mods/alecs-tamework" target="_blank" rel="noopener noreferrer"><img alt="Tamework downloads" src="https://img.shields.io/curseforge/dt/1447962?label=Tamework&amp;style=for-the-badge&amp;logo=curseforge&amp;color=rgb(241%2C100%2C54)" /></a>
+    <a href="https://www.curseforge.com/hytale/mods/alecs-cats" target="_blank" rel="noopener noreferrer"><img alt="Cats downloads" src="https://img.shields.io/curseforge/dt/1432112?label=Cats&amp;style=for-the-badge&amp;logo=curseforge&amp;color=rgb(241%2C100%2C54)" /></a>
+    <a href="https://www.curseforge.com/hytale/mods/alecs-nametags" target="_blank" rel="noopener noreferrer"><img alt="Nametags downloads" src="https://img.shields.io/curseforge/dt/1464844?label=Nametags&amp;style=for-the-badge&amp;logo=curseforge&amp;color=rgb(241%2C100%2C54)" /></a>
+    <a href="https://www.curseforge.com/hytale/mods/alecs-animal-husbandry" target="_blank" rel="noopener noreferrer"><img alt="Animal Husbandry downloads" src="https://img.shields.io/curseforge/dt/1480275?label=Animal%20Husbandry&amp;style=for-the-badge&amp;logo=curseforge&amp;color=rgb(241%2C100%2C54)" /></a>
+  </p>
+  <p>
+    <a href="https://discord.gg/E8n8RgTTdq" target="_blank" rel="noopener noreferrer"><img alt="Join Discord" src="https://img.shields.io/discord/1468261809739005996?style=for-the-badge&amp;logo=discord&amp;logoColor=white&amp;label=Join%20Discord&amp;color=rgb(88,101,242)" /></a>
+    <a href="https://ko-fi.com/alechilles" target="_blank" rel="noopener noreferrer"><img alt="Support me on Ko-fi" src="https://img.shields.io/badge/ko--fi-Support%20Me-ff5f5f?logo=ko-fi&amp;style=for-the-badge" /></a>
+    <a href="https://hytale.com/" target="_blank" rel="noopener noreferrer"><img alt="Creator Code Alec" src="https://img.shields.io/badge/Creator%20Code-Alec-00AEEF?style=for-the-badge" /></a>
+    <a href="https://twitter.com/intent/user?screen_name=Alechilles" target="_blank" rel="noopener noreferrer"><img alt="Follow Alec on X" src="https://img.shields.io/badge/Follow-%40Alec-White?style=for-the-badge&amp;logo=x&amp;logoColor=rgb(255%2C255%2C255)&amp;logoSize=auto&amp;label=Follow&amp;labelColor=rgb(85%2C85%2C85)&amp;color=rgb(147%2C147%2C147)" /></a>
+  </p>
+<p>
+    <a href="https://bisecthosting.com/Alec" target="_blank"><img alt="25% Off BisectHosting Servers With Code: Alec" src="https://www.bisecthosting.com/partners/custom-banners/249bd432-0996-4ccb-8184-65cd3791a3d2.webp" /></a>
+  </p>
+  <p>
+    <a href="https://hytalemodding.dev/en/grants" target="_blank" rel="noopener noreferrer"><img alt="Sponsored by HytaleModding Grant Program" src="https://github.com/user-attachments/assets/a03709e3-445a-4e58-8ec5-591688490c5d" /></a>
+  </p>
 
 ## Now Includes a Universal, Non-Destructive Asset Patcher!
 - Add, merge, and insert JSON into *any* Hytale asset at runtime
@@ -61,8 +70,6 @@ Player-facing Tamework config strings support `server.lang` keys. Built-in talen
 - [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation)
 - [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
 
-## Roadmap
-- [Tamework Roadmap](https://curious-bench-850.notion.site/32c1f4061f368026b735f19a8187a480?v=32c1f4061f3680ab877b000cdda43a23)
 
 ## Issue Reporting
 If you run into a bug, integration issue, or behavior problem, report it in the Discord server:
@@ -70,7 +77,9 @@ If you run into a bug, integration issue, or behavior problem, report it in the 
 https://discord.gg/E8n8RgTTdq
 
 <H2>Telemetry</H2>
-<a><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> utilizes <a href="https://www.curseforge.com/hytale/mods/alecs-telemetry>"> Alec's Telemetry</a> to report crash, error, performance, and usage telemetry data to the developer.</p>
-<p>This data does <strong>not</strong> contain any personally identifiable information, and is exclusively used to diagnose issues in the mod to provide a better user experience.</p>
-<p>You may disable this feature at any time in the `/tw settings` menu in the Telemetry section.</p>
+<p><a href="https://www.curseforge.com/hytale/mods/alecs-tamework">Alec's Tamework</a> utilizes <a href="https://www.curseforge.com/hytale/mods/alecs-telemetry">Alec's Telemetry</a> to report crash, error, performance, and usage telemetry data to the developer.</p>
+<p>This data is anonymous and does <strong>not</strong> contain any personally identifiable information, and is exclusively used to diagnose issues in the mod to provide a better user experience.</p>
+<p>You may disable this feature at any time in the `/telemetry consent` menu.</p>
+<p>Alec's Tamework also reports anonymized active user numbers to <a href="https://hstats.dev/">HStats</a> to track active user count summaries.</p>
+<br />
 
