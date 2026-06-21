@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.15.2 - Aggregate ModStats Heartbeat Hotfix - 2026-06-20
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to 0.2.2.
+- Reduced ModStats upload pressure by using the new aggregate stats heartbeat runtime, so multiple installed telemetry-enabled mods no longer require one separate heartbeat upload each from the active Tamework runtime.
+
 ## 2.15.1 - Coop World Thread Freeze Fix and Other Stability Fixes - 2026-06-19
 
 ### Changed
