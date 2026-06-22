@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.15.4 - Server Verification Setup Hotfix - 2026-06-22
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to 0.2.4.
+- Server owners can now run `/telemetry server verify <key>` to save the ModStats server claim token and verify immediately instead of editing the identity file by hand.
+
 ## 2.15.3 - Telemetry Intake Backoff Hotfix - 2026-06-22
 
 ### Changed
