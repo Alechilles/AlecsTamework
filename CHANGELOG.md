@@ -7,6 +7,7 @@
 
 ### Fixed
 - Honored hosted telemetry intake backoff hints so Tamework slows retry attempts when the hosted ingest service is under pressure.
+- Fixed low-needs thought bubble textures so food and water icons render at the intended 160px size.
 
 ## 2.15.2 - Aggregate ModStats Heartbeat Hotfix - 2026-06-20
 
