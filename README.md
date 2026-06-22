@@ -14,8 +14,8 @@
     <a href="https://bisecthosting.com/Alec" target="_blank"><img alt="25% Off BisectHosting Servers With Code: Alec" src="https://www.bisecthosting.com/partners/custom-banners/249bd432-0996-4ccb-8184-65cd3791a3d2.webp" /></a>
   </p>
   <p>
-    <a href="https://hytalemodding.dev/en/grants" target="_blank" rel="noopener noreferrer"><img alt="Sponsored by HytaleModding Grant Program" src="https://github.com/user-attachments/assets/a03709e3-445a-4e58-8ec5-591688490c5d" /></a>
-  </p>
+    <a href="https://www.modstats.io/stats/alecs-tamework"><img src="https://www.modstats.io/api/v1/stats/projects/alecs-tamework/embed/card.svg?layout=compact&amp;theme=curseforge" alt="Alec's Tamework! ModStats"></a>
+</p>
 
 ## Now Includes a Universal, Non-Destructive Asset Patcher!
 - Add, merge, and insert JSON into *any* Hytale asset at runtime
