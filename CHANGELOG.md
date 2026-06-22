@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.15.3 - Telemetry Intake Backoff Hotfix - 2026-06-22
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to 0.2.3.
+
+### Fixed
+- Honored hosted telemetry intake backoff hints so Tamework slows retry attempts when the hosted ingest service is under pressure.
+
 ## 2.15.2 - Aggregate ModStats Heartbeat Hotfix - 2026-06-20
 
 ### Changed
