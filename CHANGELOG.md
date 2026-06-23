@@ -10,6 +10,9 @@
 - The embedded telemetry runtime now migrates old save-folder, server-root, and
   embedded-owner telemetry data into `mods/Alechilles_Alec's Telemetry!` and
   removes stale legacy files after successful migration.
+- The embedded telemetry runtime now leaves unsupported telemetry categories
+  undefined in project consent overrides, so future Tamework or downstream
+  telemetry defaults are not pinned off by older local settings.
 
 ## 2.15.3 - Telemetry Intake Backoff Hotfix - 2026-06-22
 
