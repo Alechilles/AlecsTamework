@@ -20,11 +20,6 @@
         "id": 1560961,
         "slug": "creditor",
         "type": "embeddedLibrary"
-      },
-      {
-        "id": 1520383,
-        "slug": "alecs-telemetry",
-        "type": "embeddedLibrary"
       }
     ]
   },
