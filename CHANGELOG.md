@@ -8,8 +8,8 @@
 
 ### Fixed
 - The embedded telemetry runtime now migrates old save-folder, server-root, and
-  embedded-owner telemetry data into the canonical Alec's Telemetry runtime root
-  and removes stale legacy files after successful migration.
+  embedded-owner telemetry data into `mods/Alechilles_Alec's Telemetry!` and
+  removes stale legacy files after successful migration.
 
 ## 2.15.3 - Telemetry Intake Backoff Hotfix - 2026-06-22
 
