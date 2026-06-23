@@ -12,9 +12,9 @@
   </p>
 <p>
     <a href="https://bisecthosting.com/Alec" target="_blank"><img alt="25% Off BisectHosting Servers With Code: Alec" src="https://www.bisecthosting.com/partners/custom-banners/249bd432-0996-4ccb-8184-65cd3791a3d2.webp" /></a>
-  </p>
-  <p>
-    <a href="https://www.modstats.io/stats/alecs-tamework"><img src="https://www.modstats.io/api/v1/stats/projects/alecs-tamework/embed/card.svg?layout=compact&amp;theme=curseforge" alt="Alec's Tamework! ModStats"></a>
+</p>
+<p>
+    <a href="https://www.modstats.io/stats/alecs-tamework" target="_blank" rel="nofollow"><img src="https://www.modstats.io/api/v1/stats/projects/alecs-tamework/embed/card.svg?layout=live&amp;theme=curseforge" alt="Alec's Tamework! ModStats"></a>
 </p>
 
 ## Now Includes a Universal, Non-Destructive Asset Patcher!

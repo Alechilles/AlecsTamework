@@ -6,6 +6,11 @@
 - Updated the embedded Alec's Telemetry runtime to 0.2.4.
 - Server owners can now run `/telemetry server verify <key>` to save the ModStats server claim token and verify immediately instead of editing the identity file by hand.
 
+### Fixed
+- The embedded telemetry runtime now migrates old save-folder, server-root, and
+  embedded-owner telemetry data into the canonical Alec's Telemetry runtime root
+  and removes stale legacy files after successful migration.
+
 ## 2.15.3 - Telemetry Intake Backoff Hotfix - 2026-06-22
 
 ### Changed
