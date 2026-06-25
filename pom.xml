@@ -6,7 +6,7 @@
 
     <groupId>com.alechilles</groupId>
     <artifactId>alecstamework</artifactId>
-    <version>2.15.4</version>
+    <version>2.15.5</version>
     <packaging>jar</packaging>
 
     <name>.Alec's Tamework!</name>
@@ -18,7 +18,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <sqlite.jdbc.version>3.49.1.0</sqlite.jdbc.version>
         <slf4j.version>1.7.36</slf4j.version>
-        <alecstelemetry.version>0.2.4</alecstelemetry.version>
+        <alecstelemetry.version>0.2.5</alecstelemetry.version>
         <creditor.file.id>8195970</creditor.file.id>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>

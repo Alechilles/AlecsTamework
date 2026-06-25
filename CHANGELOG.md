@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24
+
+### Changed
+- Updated the embedded Alec's Telemetry runtime to 0.2.5.
+
+### Fixed
+- Fixed host-backed embedded consent review reporting so Tamework-owned runtime
+  installs can upload first-review consent funnel completion metrics instead of
+  only recording local consent review state.
+
 ## 2.15.4 - Server Verification Setup Hotfix - 2026-06-22
 
 ### Changed
