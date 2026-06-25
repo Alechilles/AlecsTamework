@@ -9,6 +9,9 @@
 - Fixed host-backed embedded consent review reporting so Tamework-owned runtime
   installs can upload first-review consent funnel completion metrics instead of
   only recording local consent review state.
+- Fixed embedded Alec's Telemetry runtime version reporting so consent funnel
+  analytics report runtime `0.2.5` from the packaged metadata instead of the
+  stale `0.1.3` fallback.
 
 ## 2.15.4 - Server Verification Setup Hotfix - 2026-06-22
 
