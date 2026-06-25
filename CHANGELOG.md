@@ -12,6 +12,8 @@
 - Fixed embedded Alec's Telemetry runtime version reporting so consent funnel
   analytics report runtime `0.2.5` from the packaged metadata instead of the
   stale `0.1.3` fallback.
+- Fixed embedded Alec's Telemetry stats heartbeats so player interval peak and
+  average counts are preserved by the active runtime coordinator.
 
 ## 2.15.4 - Server Verification Setup Hotfix - 2026-06-22
 
