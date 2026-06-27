@@ -3,13 +3,11 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
-import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
+import com.alechilles.alecstamework.npc.actions.TameworkTameFoodDisplayResolver;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
-import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.TameworkCommandTargetHud;
@@ -51,6 +49,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
     private final CommandTargetHudFoodResolver foodResolver;
+    private final TameworkTameFoodDisplayResolver tameFoodDisplayResolver;
     private final CommandTargetHudAttachmentResolver attachmentResolver;
     private final CommandTargetHudTameRequirementResolver tameRequirementResolver;
     private final Map<UUID, HudState> stateByPlayer = new HashMap<>();
@@ -67,6 +66,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 new CommandLinkedPanelCooldownSnapshotService()
         );
         this.foodResolver = new CommandTargetHudFoodResolver();
+        this.tameFoodDisplayResolver = new TameworkTameFoodDisplayResolver();
         this.attachmentResolver = new CommandTargetHudAttachmentResolver();
         this.tameRequirementResolver = new CommandTargetHudTameRequirementResolver();
     }
@@ -210,21 +210,13 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         }
         return new CommandTargetHudViewModel(
                 status,
-                foodResolver.resolveFavoriteFood(player, resolveFavoriteFoodItemIds(npcRef, store)),
+                foodResolver.resolveFavoriteFood(
+                        player,
+                        tameFoodDisplayResolver.resolveTamingFoodItemIds(roleId, npc.getRole())
+                ),
                 attachmentResolver.resolveRows(roleId, resolveModelAssetId(npcRef, store), resolveAttachmentIds(npcRef, store)),
                 resolveTameRequirement(npcRef, roleId, store)
         );
-    }
-
-    @Nullable
-    private String[] resolveFavoriteFoodItemIds(@Nonnull Ref<EntityStore> npcRef,
-                                                @Nonnull Store<EntityStore> store) {
-        TameworkNeedsComponent needs = store.getComponent(npcRef, TameworkNeedsComponent.getComponentType());
-        TwNeedsConfig config = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
-        if (config == null || !config.isConfiguredEnabled()) {
-            return null;
-        }
-        return config.getPassiveRefill().getContainerFoodItemIds();
     }
 
     @Nullable

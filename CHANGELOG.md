@@ -13,6 +13,7 @@
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
+- Command target HUD favorite food now shows the food required for taming instead of generic feed items used by needs systems.
 
 ## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24
 
