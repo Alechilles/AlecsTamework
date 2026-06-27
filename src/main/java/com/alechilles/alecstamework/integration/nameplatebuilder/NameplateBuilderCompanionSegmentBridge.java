@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
 import com.frotty27.nameplatebuilder.api.NameplateAPI;
 import com.frotty27.nameplatebuilder.api.SegmentBuilder;
 import com.frotty27.nameplatebuilder.api.SegmentTarget;
@@ -43,7 +44,6 @@ public final class NameplateBuilderCompanionSegmentBridge {
     private static final String TRANQUILIZER_SEGMENT_ID = "tranquilizer";
     private static final String TRAITS_SEGMENT_ID = "traits";
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
-    private static final double TRANQUILIZER_STACK_DURATION_SECONDS = 30.0;
     private static final int UNRESOLVED_EFFECT_INDEX = Integer.MIN_VALUE;
     private static final int HAPPINESS_CACHE_TICKS = 20;
     private static final int NEEDS_CACHE_TICKS = 20;
@@ -187,14 +187,16 @@ public final class NameplateBuilderCompanionSegmentBridge {
         }
         double peakRemainingSeconds = resolveTrackedTranquilizerPeakSeconds(store, entityRef, activeEffect);
         if (activeEffect.isInfinite()) {
-            int stacks = computeTranquilizerStacks(peakRemainingSeconds);
+            int stacks = TranquilizerStackDisplayService.computeStacks(peakRemainingSeconds);
             return formatTranquilizerValue(stacks, "inf", variantIndex);
         }
         double remainingSeconds = activeEffect.getRemainingDuration();
         if (!Double.isFinite(remainingSeconds) || remainingSeconds <= 0.0) {
             return null;
         }
-        int stacks = computeTranquilizerStacks(resolvePeakDuration(peakRemainingSeconds, remainingSeconds));
+        int stacks = TranquilizerStackDisplayService.computeStacks(
+                TranquilizerStackDisplayService.resolvePeakDuration(peakRemainingSeconds, remainingSeconds)
+        );
         return formatTranquilizerValue(stacks, formatRemainingDuration(remainingSeconds), variantIndex);
     }
 
@@ -323,42 +325,20 @@ public final class NameplateBuilderCompanionSegmentBridge {
     }
 
     static String formatRemainingDuration(double remainingSeconds) {
-        long totalSeconds = Math.max(0L, (long) Math.ceil(remainingSeconds));
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        if (minutes <= 0L) {
-            return totalSeconds + "s";
-        }
-        return minutes + "m " + seconds + "s";
+        return TranquilizerStackDisplayService.formatRemainingDuration(remainingSeconds);
     }
 
     static int computeTranquilizerStacks(double initialDurationSeconds) {
-        if (!Double.isFinite(initialDurationSeconds) || initialDurationSeconds <= 0.0) {
-            return 0;
-        }
-        return Math.max(1, (int) Math.round(initialDurationSeconds / TRANQUILIZER_STACK_DURATION_SECONDS));
+        return TranquilizerStackDisplayService.computeStacks(initialDurationSeconds);
     }
 
     static double resolvePeakDuration(double trackedPeakSeconds, double currentRemainingSeconds) {
-        double tracked = sanitizePositive(trackedPeakSeconds);
-        double current = sanitizePositive(currentRemainingSeconds);
-        return Math.max(tracked, current);
+        return TranquilizerStackDisplayService.resolvePeakDuration(trackedPeakSeconds, currentRemainingSeconds);
     }
 
+    @Nullable
     static String formatTranquilizerValue(int stacks, @Nullable String remainingText, int variantIndex) {
-        return switch (variantIndex) {
-            case 1 -> stacks > 0 ? Integer.toString(stacks) : null;
-            case 2 -> remainingText;
-            default -> {
-                if (stacks > 0 && remainingText != null && !remainingText.isBlank()) {
-                    yield stacks + " (" + remainingText + ")";
-                }
-                if (stacks > 0) {
-                    yield Integer.toString(stacks);
-                }
-                yield remainingText;
-            }
-        };
+        return TranquilizerStackDisplayService.formatStackValue(stacks, remainingText, variantIndex);
     }
 
     @Nullable
@@ -521,14 +501,7 @@ public final class NameplateBuilderCompanionSegmentBridge {
         if (activeEffect == null || activeEffect.isInfinite()) {
             return trackedPeak;
         }
-        return resolvePeakDuration(trackedPeak, activeEffect.getRemainingDuration());
-    }
-
-    private static double sanitizePositive(double value) {
-        if (!Double.isFinite(value) || value <= 0.0) {
-            return 0.0;
-        }
-        return value;
+        return TranquilizerStackDisplayService.resolvePeakDuration(trackedPeak, activeEffect.getRemainingDuration());
     }
 
     @Nullable
