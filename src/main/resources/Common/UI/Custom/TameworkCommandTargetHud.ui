@@ -1,0 +1,90 @@
+$C = "Common.ui";
+
+Group #Root {
+    Anchor: (Top: 230, Right: 28, Width: 248, Height: 330);
+    Background: #081220(0.82);
+    Padding: (Left: 10, Right: 10, Top: 10, Bottom: 10);
+    LayoutMode: Top;
+    Visible: false;
+
+    Label #Name {
+        Anchor: (Height: 24);
+        Text: "";
+        Style: (FontSize: 17, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
+
+    Group #HealthRow {
+        Anchor: (Top: 3, Height: 30);
+
+        Label #HealthText {
+            Anchor: (Top: 0, Left: 0, Width: 78, Height: 18);
+            Text: "";
+            Style: (FontSize: 12, RenderBold: true, TextColor: #dce8f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Group #HealthBar {
+            Anchor: (Top: 3, Right: 0, Width: 150, Height: 14);
+            Background: #1f3144;
+
+            Group #HealthFill {
+                Anchor: (Top: 1, Left: 1, Width: 0, Height: 12);
+                Background: #72c66f;
+            }
+        }
+    }
+
+    Group #HappinessRow {
+        Anchor: (Height: 20);
+        Visible: false;
+        Label #Label { Anchor: (Left: 0, Width: 112, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+        Label #Value { Anchor: (Right: 0, Width: 96, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); }
+    }
+
+    Group #HungerRow {
+        Anchor: (Height: 20);
+        Visible: false;
+        Label #Label { Anchor: (Left: 0, Width: 112, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+        Label #Value { Anchor: (Right: 0, Width: 96, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); }
+    }
+
+    Group #ThirstRow {
+        Anchor: (Height: 20);
+        Visible: false;
+        Label #Label { Anchor: (Left: 0, Width: 112, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+        Label #Value { Anchor: (Right: 0, Width: 96, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); }
+    }
+
+    Group #LevelRow {
+        Anchor: (Height: 20);
+        Visible: false;
+        Label #Label { Anchor: (Left: 0, Width: 112, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+        Label #Value { Anchor: (Right: 0, Width: 96, Height: 20); Text: ""; Style: (FontSize: 12, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); }
+    }
+
+    Group #TraitRow0 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 128, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 80, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #TraitRow1 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 128, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 80, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #TraitRow2 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 128, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 80, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #TraitRow3 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 128, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 80, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+
+    Group #FoodRow {
+        Anchor: (Top: 4, Height: 22);
+        Visible: false;
+        Group #FoodIcon { Anchor: (Left: 0, Width: 18, Height: 18); Visible: false; }
+        Label #FoodLabel { Anchor: (Left: 22, Width: 82, Height: 20); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+        Label #FoodName { Anchor: (Right: 0, Width: 118, Height: 20); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); }
+    }
+
+    Group #AttachmentRow0 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #AttachmentRow1 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #AttachmentRow2 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+
+    Group #HarvestCooldownRow { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 142, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #ffd79e, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 68, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #fff1d7, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #BreedingCooldownRow { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 142, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #ffd79e, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 68, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #fff1d7, HorizontalAlignment: End, VerticalAlignment: Center); } }
+
+    Group #TameRequirementRow {
+        Anchor: (Top: 4, Height: 32);
+        Visible: false;
+        Label #TameRequirementLabel { Anchor: (Top: 0, Left: 0, Width: 220, Height: 14); Text: ""; Style: (FontSize: 11, RenderBold: true, TextColor: #ffc4c4, HorizontalAlignment: Start, VerticalAlignment: Center); }
+        Label #TameRequirementValue { Anchor: (Top: 14, Left: 0, Width: 220, Height: 16); Text: ""; Style: (FontSize: 11, TextColor: #ffe7e7, HorizontalAlignment: Start, VerticalAlignment: Center); }
+    }
+}

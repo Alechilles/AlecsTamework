@@ -722,3 +722,17 @@ tamework.ui.settings.tooltip.breedingRequiresClaim=Requires breeding to happen i
 tamework.ui.settings.tooltip.simpleClaimsProtect=Prevents non-members of a claim from harming or interfering with owned companions inside that claim.
 tamework.ui.settings.tooltip.telemetrySection=Telemetry consent is managed by the shared Alec's Telemetry command.
 
+tamework.ui.commandTargetHud.name.unknown=Companion
+tamework.ui.commandTargetHud.health.unavailable=Health --
+tamework.ui.commandTargetHud.health.value={0}/{1} HP
+tamework.ui.commandTargetHud.happiness=Happiness
+tamework.ui.commandTargetHud.hunger=Hunger
+tamework.ui.commandTargetHud.thirst=Thirst
+tamework.ui.commandTargetHud.level=Level
+tamework.ui.commandTargetHud.favoriteFood=Food
+tamework.ui.commandTargetHud.harvestCooldown=Harvest
+tamework.ui.commandTargetHud.breedingCooldown=Breeding
+tamework.ui.commandTargetHud.tameRequirement=Tame requirement
+tamework.ui.commandTargetHud.tameRequirement.stacks={0} tranquilizer stacks
+tamework.ui.commandTargetHud.tameRequirement.current=(current {0})
+
