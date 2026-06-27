@@ -914,10 +914,9 @@ Group {
                 Background: #081220;
             }
 
-            Label #BreedingCooldownIcon {
-                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-                Text: %server.tamework.ui.linkedPanel.needs.breeding.short;
-                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Group #BreedingCooldownIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Fertility.png");
             }
 
             TextButton #BreedingCooldownTooltip {
@@ -997,10 +996,9 @@ Group {
                 Background: #081220;
             }
 
-            Label #HarvestCooldownIcon {
-                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-                Text: %server.tamework.ui.linkedPanel.needs.harvest.short;
-                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            Group #HarvestCooldownIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Harvest_Cooldown.png");
             }
 
             TextButton #HarvestCooldownTooltip {

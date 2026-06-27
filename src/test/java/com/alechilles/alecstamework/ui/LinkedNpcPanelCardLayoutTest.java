@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -9,9 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -38,6 +42,9 @@ class LinkedNpcPanelCardLayoutTest {
     private static final Pattern TALENT_POINT_BADGE_BORDER_ANCHOR = Pattern.compile(
             "Group #TalentPointCountBadgeBorder \\{\\s*Anchor: \\(Top: (\\d+), Left: (\\d+), Width: (\\d+), Height: (\\d+)\\);",
             Pattern.MULTILINE
+    );
+    private static final Path LINKED_PANEL_ICONS = Paths.get(
+            "src", "main", "resources", "Common", "UI", "Custom", "Tamework", "LinkedPanelIcons"
     );
 
     @Test
@@ -156,6 +163,23 @@ class LinkedNpcPanelCardLayoutTest {
         assertTrue(bindingBlock.contains("config.openTalentsCommandPrefix() + entry.npcUuid()"), "Level-indicator action should open the same talent page.");
     }
 
+    @Test
+    void cooldownRingsUsePackagedTextureIcons() throws IOException {
+        String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
+
+        assertTrue(
+                cardUi.contains("TexturePath: \"Tamework/LinkedPanelIcons/Trait_Fertility.png\""),
+                "Breeding cooldown should reuse the fertility trait icon texture."
+        );
+        assertTrue(
+                cardUi.contains("TexturePath: \"Tamework/LinkedPanelIcons/Harvest_Cooldown.png\""),
+                "Harvest cooldown should use the packaged harvest cooldown texture."
+        );
+
+        assertLinkedPanelIconSize("Trait_Fertility.png");
+        assertLinkedPanelIconSize("Harvest_Cooldown.png");
+    }
+
     private static List<String> findUnquotedStringTextDefaults(String cardUi) {
         List<String> matches = new ArrayList<>();
         String[] lines = cardUi.split("\\R");
@@ -175,5 +199,14 @@ class LinkedNpcPanelCardLayoutTest {
             }
         }
         return matches;
+    }
+
+    private static void assertLinkedPanelIconSize(String fileName) throws IOException {
+        Path path = LINKED_PANEL_ICONS.resolve(fileName);
+        assertTrue(Files.isRegularFile(path), () -> "Missing linked-panel icon: " + path);
+        BufferedImage image = ImageIO.read(path.toFile());
+        assertNotNull(image, () -> "Linked-panel icon must be a readable PNG: " + path);
+        assertEquals(32, image.getWidth(), () -> "Linked-panel icon width should stay 32px: " + path);
+        assertEquals(32, image.getHeight(), () -> "Linked-panel icon height should stay 32px: " + path);
     }
 }

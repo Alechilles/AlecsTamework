@@ -6,6 +6,7 @@
 - Feed trough water states now require holding the empty interaction briefly, reducing accidental water dumps from quick use-key taps.
 - Empty feed trough prompts now mention that right-clicking with a water bucket fills the trough.
 - Linked companion panel cards now show active harvest cooldown timers beside breeding cooldown timers.
+- Linked companion panel cooldown timers now use icon art for breeding and harvest instead of letter labels.
 
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
