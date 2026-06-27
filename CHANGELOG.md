@@ -16,6 +16,8 @@
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
 - Command target HUD favorite food now stays on the preferred tame food while tamed NPCs also show other compatible feed items such as feedbags or cohort feed.
+- Command target HUD food and tame requirement rows now show preferred-food icons, compatible food icons, and tranquilizer stack requirements more reliably.
+- Command target HUD attachment selections now use the same `Name: Value` line format as captured spawner item tooltips.
 - Command target HUD now clears and refreshes nearly instantly when players stop targeting a supported NPC, switch held items, or look at another supported NPC.
 - Command target HUD now appears for untamed NPCs that have enabled Tamework tame interactions.
 

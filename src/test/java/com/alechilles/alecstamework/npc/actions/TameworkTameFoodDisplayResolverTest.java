@@ -91,6 +91,22 @@ class TameworkTameFoodDisplayResolverTest {
     }
 
     @Test
+    void foodDisplayUsesRolePreferredFoodBeforeTameFeedFallback() throws Exception {
+        StdScope scope = new StdScope(null);
+        scope.addConst("AttractiveItemSet", new String[] { "Plant_Crop_Lettuce_Item" });
+        Role role = newRoleWithScope(scope);
+        TwInteractionConfig.TameInteraction tame = new TwInteractionConfig.TameInteraction();
+        setField(TwInteractionConfig.TameInteraction.class, tame, "itemsInHand", new String[] { "Tw_Feed_Herbivore" });
+
+        TameworkTameFoodDisplayResolver.FoodDisplay display =
+                new TameworkTameFoodDisplayResolver("AttractiveItemSet")
+                        .resolveFoodDisplayItemIds(configWith(tame), role, true);
+
+        assertArrayEquals(new String[] { "Plant_Crop_Lettuce_Item" }, display.favoriteItemIds());
+        assertArrayEquals(new String[] { "Tw_Feed_Herbivore" }, display.compatibleItemIds());
+    }
+
+    @Test
     void tranquilizerRequirementCanResolveRoleThresholdParam() throws Exception {
         StdScope scope = new StdScope(null);
         scope.addConst("TranquilizerSleepThresholdSeconds", 80.0);
@@ -98,6 +114,18 @@ class TameworkTameFoodDisplayResolverTest {
 
         double seconds = new TameworkTameFoodDisplayResolver("AttractiveItemSet")
                 .resolveRequiredTranquilizerSeconds(role, configWith(new TwInteractionConfig.TameInteraction()));
+
+        Assertions.assertEquals(80.0, seconds);
+    }
+
+    @Test
+    void tranquilizerRequirementCanResolveRoleThresholdWithoutConfig() throws Exception {
+        StdScope scope = new StdScope(null);
+        scope.addConst("TranquilizerSleepThresholdSeconds", 80.0);
+        Role role = newRoleWithScope(scope);
+
+        double seconds = new TameworkTameFoodDisplayResolver("AttractiveItemSet")
+                .resolveRequiredTranquilizerSeconds(role, null);
 
         Assertions.assertEquals(80.0, seconds);
     }

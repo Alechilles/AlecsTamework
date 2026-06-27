@@ -20,6 +20,13 @@ public record CommandTargetHudViewModel(@Nonnull LinkedNpcEntry status,
     }
 
     public record AttachmentRow(@Nonnull String setLabel, @Nonnull String valueLabel) {
+        @Nonnull
+        public String displayLine() {
+            if (valueLabel == null || valueLabel.isBlank()) {
+                return setLabel;
+            }
+            return setLabel + ": " + valueLabel;
+        }
     }
 
     public record TameRequirementRow(boolean tranquilizerRequired,

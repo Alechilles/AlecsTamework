@@ -9,7 +9,7 @@ import javax.annotation.Nullable;
 
 /** Resolves compact attachment rows for the command target HUD. */
 final class CommandTargetHudAttachmentResolver {
-    private static final int DEFAULT_MAX_ROWS = 3;
+    private static final int DEFAULT_MAX_ROWS = 6;
 
     private final AttachmentDisplaySource resolver;
 

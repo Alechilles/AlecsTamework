@@ -5,7 +5,7 @@ $C = "Common.ui";
 @HudTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 300, LabelStyle: (Wrap: true, FontSize: 13, TextColor: #eef4fb), Padding: 10);
 
 Group #Root {
-    Anchor: (Top: 218, Right: 26, Width: 252, Height: 244);
+    Anchor: (Top: 218, Right: 26, Width: 252, Height: 294);
     Background: #081220(0.82);
     Padding: (Left: 10, Right: 10, Top: 10, Bottom: 10);
     Visible: false;
@@ -239,7 +239,10 @@ Group #Root {
                 Anchor: (Top: 38, Left: 0, Width: 112, Height: 18);
                 Visible: false;
                 Label #CompatibleFoodLabel { Anchor: (Top: 0, Left: 0, Width: 54, Height: 18); Text: ""; Style: (FontSize: 9, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
-                Label #CompatibleFoodName { Anchor: (Top: 0, Left: 56, Width: 56, Height: 18); Text: ""; Style: (FontSize: 9, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center); }
+                Group #CompatibleFoodIcon0 { Anchor: (Top: 1, Left: 56, Width: 16, Height: 16); Visible: false; }
+                Group #CompatibleFoodIcon1 { Anchor: (Top: 1, Left: 76, Width: 16, Height: 16); Visible: false; }
+                Group #CompatibleFoodIcon2 { Anchor: (Top: 1, Left: 96, Width: 16, Height: 16); Visible: false; }
+                Label #CompatibleFoodMore { Anchor: (Top: 0, Left: 94, Width: 18, Height: 18); Text: ""; Visible: false; Style: (FontSize: 9, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); }
             }
         }
 
@@ -251,7 +254,10 @@ Group #Root {
         }
     }
 
-    Group #AttachmentRow0 { Anchor: (Top: 164, Left: 0, Right: 0, Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
-    Group #AttachmentRow1 { Anchor: (Top: 182, Left: 0, Right: 0, Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
-    Group #AttachmentRow2 { Anchor: (Top: 200, Left: 0, Right: 0, Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #AttachmentRow0 { Anchor: (Top: 164, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #aeb2ba, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+    Group #AttachmentRow1 { Anchor: (Top: 182, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #aeb2ba, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+    Group #AttachmentRow2 { Anchor: (Top: 200, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #aeb2ba, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+    Group #AttachmentRow3 { Anchor: (Top: 218, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #aeb2ba, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+    Group #AttachmentRow4 { Anchor: (Top: 236, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #aeb2ba, HorizontalAlignment: Start, VerticalAlignment: Center); } }
+    Group #AttachmentRow5 { Anchor: (Top: 254, Left: 0, Right: 0, Height: 18); Visible: false; Label #Text { Anchor: (Left: 0, Right: 0, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #aeb2ba, HorizontalAlignment: Start, VerticalAlignment: Center); } }
 }

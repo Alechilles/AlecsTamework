@@ -53,13 +53,14 @@ public final class TameworkTameFoodDisplayResolver {
         InteractionItemIdResolver itemIdResolver = new InteractionItemIdResolver(paramResolver);
         String[] lovedItems = resolveLovedItems(paramResolver, role, ctx);
         String[] favoriteCandidates = resolveTamingFoodItemIds(config, role, itemIdResolver, ctx, lovedItems);
-        if (!hasItems(favoriteCandidates)) {
-            favoriteCandidates = lovedItems;
+        String favorite = firstPreferredFood(lovedItems);
+        if (favorite == null) {
+            favorite = firstPreferredFood(favoriteCandidates);
         }
 
-        String favorite = firstPreferredFood(favoriteCandidates);
         LinkedHashSet<String> compatible = new LinkedHashSet<>();
         if (tamed) {
+            addItems(compatible, lovedItems);
             addItems(compatible, favoriteCandidates);
             addItems(compatible, resolveFeedFoodItemIds(config, role, ctx, itemIdResolver, lovedItems));
         }
@@ -80,25 +81,20 @@ public final class TameworkTameFoodDisplayResolver {
     }
 
     private double resolveRequiredTranquilizerSecondsInternal(@Nullable Role role, @Nullable TwInteractionConfig config) {
+        InteractionParamResolver paramResolver = new InteractionParamResolver(null, null, null);
+        InteractionContextSnapshot ctx = InteractionContextSnapshot.from(null, paramResolver.resolveRoleScopes(role, null));
+        double requiredSeconds = Math.max(
+                0.0,
+                paramResolver.getNumberParam(role, ctx, TRANQUILIZER_SLEEP_THRESHOLD_PARAM, 0.0)
+        );
         if (config == null || !config.isEnabled()) {
-            return 0.0;
+            return requiredSeconds;
         }
-        double requiredSeconds = 0.0;
-        boolean hasTameInteraction = false;
         for (TwInteractionConfig.InteractionEntry entry : config.getInteractions()) {
             if (!(entry instanceof TwInteractionConfig.TameInteraction) || !entry.isEnabled()) {
                 continue;
             }
-            hasTameInteraction = true;
             requiredSeconds = Math.max(requiredSeconds, resolveRequiredTranquilizerSeconds(entry.getRequires()));
-        }
-        if (hasTameInteraction) {
-            InteractionParamResolver paramResolver = new InteractionParamResolver(null, null, null);
-            InteractionContextSnapshot ctx = InteractionContextSnapshot.from(null, paramResolver.resolveRoleScopes(role, null));
-            requiredSeconds = Math.max(
-                    requiredSeconds,
-                    paramResolver.getNumberParam(role, ctx, TRANQUILIZER_SLEEP_THRESHOLD_PARAM, 0.0)
-            );
         }
         return requiredSeconds;
     }
