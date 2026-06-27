@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -274,6 +275,13 @@ public final class TameworkTameFoodDisplayResolver {
             return 0.0;
         }
         double requiredSeconds = 0.0;
+        boolean requiresTranquilizedNpcState = false;
+        for (TwInteractionConfig.StringRequirement state : bucket.getNpcState()) {
+            if (isTranquilizedSleepState(state)) {
+                requiresTranquilizedNpcState = true;
+                break;
+            }
+        }
         for (TwInteractionConfig.CustomRequirement custom : bucket.getCustom()) {
             if (custom == null) {
                 continue;
@@ -283,7 +291,18 @@ public final class TameworkTameFoodDisplayResolver {
                     resolveRequiredTranquilizerSeconds(custom.getId(), custom.getJsonPayload())
             );
         }
+        if (requiresTranquilizedNpcState && requiredSeconds <= 0.0) {
+            return TranquilizerStackDisplayService.STACK_DURATION_SECONDS;
+        }
         return requiredSeconds;
+    }
+
+    private static boolean isTranquilizedSleepState(@Nullable TwInteractionConfig.StringRequirement state) {
+        if (state == null) {
+            return false;
+        }
+        return "Sleep".equalsIgnoreCase(safeTrim(state.getState()))
+                && "Tranquilized".equalsIgnoreCase(safeTrim(state.getSubState()));
     }
 
     public static double resolveRequiredTranquilizerSeconds(@Nullable String requirementId,

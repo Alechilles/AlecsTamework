@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.items.CommandTargetHudViewModel;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.ui.ItemGridSlot;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -85,11 +87,7 @@ final class CommandTargetHudBinder {
         if (food != null) {
             commandBuilder.set("#FoodLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.favoriteFood"));
             commandBuilder.set("#FoodName.Text", food.displayName());
-            boolean hasIcon = food.iconPath() != null && !food.iconPath().isBlank();
-            commandBuilder.set("#FoodIcon.Visible", hasIcon);
-            if (hasIcon) {
-                commandBuilder.set("#FoodIcon.Background", food.iconPath());
-            }
+            bindFoodGrid(commandBuilder, "#FoodItemGrid", food);
         }
         if (hasCompatibleFoods) {
             commandBuilder.set("#CompatibleFoodLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.compatibleFoods"));
@@ -104,19 +102,17 @@ final class CommandTargetHudBinder {
                 ? MAX_COMPATIBLE_FOOD_ICONS - 1
                 : MAX_COMPATIBLE_FOOD_ICONS;
         for (CommandTargetHudViewModel.FoodRow food : foods) {
-            if (food == null || food.iconPath() == null || food.iconPath().isBlank()) {
+            if (food == null || food.itemId() == null || food.itemId().isBlank()) {
                 continue;
             }
             if (rendered >= maxIcons) {
                 break;
             }
-            String selector = "#CompatibleFoodIcon" + rendered;
-            commandBuilder.set(selector + ".Visible", true);
-            commandBuilder.set(selector + ".Background", food.iconPath());
+            bindFoodGrid(commandBuilder, "#CompatibleFoodGrid" + rendered, food);
             rendered++;
         }
         for (int i = rendered; i < MAX_COMPATIBLE_FOOD_ICONS; i++) {
-            commandBuilder.set("#CompatibleFoodIcon" + i + ".Visible", false);
+            commandBuilder.set("#CompatibleFoodGrid" + i + ".Visible", false);
         }
         int remaining = foods.size() - rendered;
         if (remaining > 0) {
@@ -125,6 +121,25 @@ final class CommandTargetHudBinder {
         } else {
             commandBuilder.set("#CompatibleFoodMore.Visible", false);
         }
+    }
+
+    private static void bindFoodGrid(@Nonnull UICommandBuilder commandBuilder,
+                                     @Nonnull String selector,
+                                     @Nullable CommandTargetHudViewModel.FoodRow food) {
+        if (food == null || food.itemId() == null || food.itemId().isBlank()) {
+            commandBuilder.set(selector + ".Visible", false);
+            return;
+        }
+        commandBuilder.set(selector + ".Visible", true);
+        commandBuilder.set(selector + ".Slots", List.of(itemSlot(food)));
+    }
+
+    @Nonnull
+    private static ItemGridSlot itemSlot(@Nonnull CommandTargetHudViewModel.FoodRow food) {
+        ItemGridSlot slot = new ItemGridSlot(new ItemStack(food.itemId(), 1));
+        slot.setName(food.displayName());
+        slot.setSkipItemQualityBackground(true);
+        return slot;
     }
 
     private static void bindAttachments(UICommandBuilder commandBuilder,

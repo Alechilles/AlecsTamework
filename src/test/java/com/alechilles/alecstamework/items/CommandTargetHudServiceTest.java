@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -114,6 +116,16 @@ class CommandTargetHudServiceTest {
     void tamedTargetsStillRequireCommandEligibility() {
         Assertions.assertFalse(CommandTargetHudService.shouldShowForEligibility(true, false, true));
         Assertions.assertTrue(CommandTargetHudService.shouldShowForEligibility(true, true, false));
+    }
+
+    @Test
+    void hidePathRemovesCustomHudFromManager() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
+        ));
+
+        Assertions.assertTrue(source.contains("removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY)"));
+        Assertions.assertFalse(source.contains("previous.hud().hideNow()"));
     }
 
     @Test

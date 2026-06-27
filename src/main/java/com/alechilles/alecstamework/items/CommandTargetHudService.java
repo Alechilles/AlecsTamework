@@ -120,7 +120,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return;
         }
         if (target == null) {
-            hideHud(playerUuid, player, nowMs);
+            hideHud(playerUuid, player);
             return;
         }
         showHud(playerUuid, player, target.model(), targetKey, nowMs);
@@ -212,7 +212,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 foodResolver.resolveFavoriteFood(player, foodDisplay.favoriteItemIds()),
                 tamed ? foodResolver.resolveFoods(player, foodDisplay.compatibleItemIds()) : List.of(),
                 attachmentResolver.resolveRows(roleId, resolveModelAssetId(npcRef, store), resolveAttachmentIds(npcRef, store)),
-                resolveTameRequirement(npcRef, roleId, npc.getRole(), store)
+                resolveTameRequirement(npcRef, roleId, npc.getRole(), tamed, store)
         );
     }
 
@@ -235,7 +235,11 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private CommandTargetHudViewModel.TameRequirementRow resolveTameRequirement(@Nonnull Ref<EntityStore> npcRef,
                                                                                 @Nullable String roleId,
                                                                                 @Nullable com.hypixel.hytale.server.npc.role.Role role,
+                                                                                boolean tamed,
                                                                                 @Nonnull Store<EntityStore> store) {
+        if (tamed) {
+            return null;
+        }
         double requiredSeconds = tameFoodDisplayResolver.resolveRequiredTranquilizerSeconds(roleId, role);
         if (requiredSeconds <= 0.0) {
             return null;
@@ -281,7 +285,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         stateByPlayer.put(playerUuid, new HudState(targetKey, nowMs, hud, true));
     }
 
-    private void hideHud(@Nonnull UUID playerUuid, @Nullable Player player, long nowMs) {
+    private void hideHud(@Nonnull UUID playerUuid, @Nullable Player player) {
         HudState previous = stateByPlayer.get(playerUuid);
         if (previous == null || previous.hud() == null) {
             return;
@@ -290,10 +294,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             stateByPlayer.remove(playerUuid);
             return;
         }
-        if (previous.visible()) {
-            previous.hud().hideNow();
-        }
-        stateByPlayer.put(playerUuid, new HudState(null, nowMs, previous.hud(), false));
+        player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
+        stateByPlayer.remove(playerUuid);
     }
 
     private void clearInactivePlayers(@Nonnull HashSet<UUID> activePlayers) {
