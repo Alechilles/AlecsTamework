@@ -11,8 +11,8 @@ public final class TameworkCommandTargetHud extends CustomUIHud {
     public static final String HUD_KEY = "alecstamework:command_target";
     public static final String UI_PATH = "TameworkCommandTargetHud.ui";
 
-    private final CommandTargetHudViewModel model;
-    private final String language;
+    private CommandTargetHudViewModel model;
+    private String language;
 
     public TameworkCommandTargetHud(@Nonnull PlayerRef playerRef,
                                     @Nonnull CommandTargetHudViewModel model,
@@ -23,6 +23,8 @@ public final class TameworkCommandTargetHud extends CustomUIHud {
     }
 
     public void refresh(@Nonnull CommandTargetHudViewModel updatedModel, String updatedLanguage) {
+        this.model = updatedModel;
+        this.language = updatedLanguage;
         UICommandBuilder commandBuilder = new UICommandBuilder();
         CommandTargetHudBinder.bind(commandBuilder, updatedModel, updatedLanguage);
         update(false, commandBuilder);

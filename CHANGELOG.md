@@ -7,6 +7,8 @@
 - Empty feed trough prompts now mention that right-clicking with a water bucket fills the trough.
 - Linked companion panel cards now show active harvest cooldown timers beside breeding cooldown timers.
 - Linked companion panel cooldown timers now use icon art for breeding and harvest instead of letter labels.
+- Taming now tells players when a new companion is automatically linked to a command item, or when no matching command item was found in inventory.
+- Holding a command item while looking at a supported NPC now shows a compact right-side status HUD with vitals, progression details, favorite food, attachment selections, and tame tranquilizer requirements when available.
 
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.

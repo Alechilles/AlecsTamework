@@ -70,6 +70,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
+import com.alechilles.alecstamework.items.CommandTargetHudService;
 import com.alechilles.alecstamework.items.CommandTeleportArrivalRelocationSystem;
 import com.alechilles.alecstamework.items.CoopDebugLogger;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
@@ -842,6 +843,9 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CommandTargetHudService(commandItemRegistry)
         );
 
         // Register /tw commands if the server supports it.

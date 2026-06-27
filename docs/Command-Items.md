@@ -65,6 +65,10 @@ Link metadata includes:
 
 Inactive linked rows stay visible in the panel, can still use per-row actions, and are excluded from bulk dispatch.
 
+When a player tames a supported NPC, Tamework attempts to auto-link the new companion to a matching command item in that player's inventory. Players now receive explicit feedback for both outcomes:
+- linked: the notification names the animal and command item that was linked.
+- not linked: the notification names the animal, applicable command item, and crafting bench type.
+
 ## Command list and steps
 Each `CommandList` entry supports:
 - `Id`
@@ -93,6 +97,7 @@ Per-step controls:
 Selection UI:
 - `Common/UI/Custom/TameworkCommandRadialMenu.ui`
 - `TameworkCommandSelectionPage`
+- Target HUD: `Common/UI/Custom/TameworkCommandTargetHud.ui`
 
 Linked panel supports:
 - Mode toggle: `LinkedMode` / `NearbyMode`
@@ -108,6 +113,12 @@ Linked panel supports:
 - Status lanes for loaded/unloaded/dead/lost companions
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
 - Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
+
+Command target HUD:
+- Appears while the player holds any registered command item and looks directly at a supported NPC within 6 units.
+- Uses the same loaded-NPC status snapshot as the linked panel for display name, health, happiness, hunger, thirst, level, traits, harvest cooldown, and breeding cooldown.
+- Adds compact target-only rows for favorite food, attachment selections, and required tranquilizer stacks for tame interactions that require `TameworkEffectActive` with `Tw_Status_Tranquilized`.
+- Clears automatically when the player looks away, switches away from command items, or targets an unsupported NPC.
 
 ## Move/home/recall and off-screen relocation
 Loaded flow:
