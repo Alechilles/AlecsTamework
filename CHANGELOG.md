@@ -10,13 +10,13 @@
 - Taming now tells players when a new companion is automatically linked to a command item, or when no matching command item was found in inventory.
 - Taming now shows warning notifications when the player is at the per-player ownership limit or the target claim is at its SimpleClaims companion limit.
 - Holding a command item while looking at a supported NPC now shows a compact right-side status HUD with vitals, progression details, favorite food, attachment selections, and tame tranquilizer requirements when available.
-- Command target HUD vitals, cooldowns, level, talent points, and traits now use the same compact ring controls as the linked companion panel.
+- Command target HUD vitals, cooldowns, level, talent points, gender, and traits now use the same compact ring controls and header placement as the linked companion panel.
 
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
 - Command target HUD favorite food now shows the food required for taming instead of generic feed items used by needs systems.
-- Command target HUD now clears and refreshes reliably when players stop targeting a supported NPC, switch held items, or look at another supported NPC.
+- Command target HUD now clears and refreshes nearly instantly when players stop targeting a supported NPC, switch held items, or look at another supported NPC.
 
 ## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24
 

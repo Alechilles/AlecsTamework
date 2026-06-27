@@ -13,6 +13,8 @@ class CommandTargetHudBinderTest {
         ));
 
         Assertions.assertTrue(source.contains("#FoodRow.Visible"));
+        Assertions.assertTrue(source.contains("#GenderMaleIcon.Visible"));
+        Assertions.assertTrue(source.contains("#GenderFemaleIcon.Visible"));
         Assertions.assertTrue(source.contains("\"#AttachmentRow\" + i"));
         Assertions.assertTrue(source.contains("selector + \".Visible\""));
         Assertions.assertTrue(source.contains("#TameRequirementRow.Visible"));
@@ -31,6 +33,8 @@ class CommandTargetHudBinderTest {
         ));
 
         Assertions.assertTrue(ui.contains("FoodRow"));
+        Assertions.assertTrue(ui.contains("GenderMaleIcon"));
+        Assertions.assertTrue(ui.contains("GenderFemaleIcon"));
         Assertions.assertTrue(ui.contains("FoodIcon"));
         Assertions.assertTrue(ui.contains("AttachmentRow0"));
         Assertions.assertTrue(ui.contains("TameRequirementRow"));
@@ -44,9 +48,11 @@ class CommandTargetHudBinderTest {
         Assertions.assertTrue(ui.contains("BreedingCooldown"));
         Assertions.assertTrue(ui.contains("HarvestCooldown"));
         Assertions.assertTrue(ui.contains("ProgressionRow"));
+        Assertions.assertTrue(ui.contains("Group #ProgressionRow {\n        Anchor: (Top: 62, Right: 0, Width: 56, Height: 26);"));
         Assertions.assertTrue(ui.contains("XpProgressRing"));
         Assertions.assertTrue(ui.contains("TalentPointAction"));
         Assertions.assertTrue(ui.contains("TraitRingRow"));
+        Assertions.assertTrue(ui.contains("Group #TraitRingRow {\n            Anchor: (Top: 0, Right: 0, Width: 120, Height: 24);"));
         Assertions.assertTrue(ui.contains("TraitSlot0"));
     }
 }

@@ -5,20 +5,49 @@ $C = "Common.ui";
 @HudTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 300, LabelStyle: (Wrap: true, FontSize: 13, TextColor: #eef4fb), Padding: 10);
 
 Group #Root {
-    Anchor: (Top: 218, Right: 26, Width: 252, Height: 302);
+    Anchor: (Top: 218, Right: 26, Width: 252, Height: 224);
     Background: #081220(0.82);
     Padding: (Left: 10, Right: 10, Top: 10, Bottom: 10);
-    LayoutMode: Top;
     Visible: false;
 
-    Label #Name {
-        Anchor: (Height: 24);
-        Text: "";
-        Style: (FontSize: 17, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Group #HeaderRow {
+        Anchor: (Top: 0, Left: 0, Right: 0, Height: 26);
+
+        Group #GenderMaleIcon {
+            Anchor: (Top: 4, Left: 0, Width: 16, Height: 16);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png");
+            Visible: false;
+        }
+
+        Group #GenderFemaleIcon {
+            Anchor: (Top: 4, Left: 0, Width: 16, Height: 16);
+            Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png");
+            Visible: false;
+        }
+
+        Label #Name {
+            Anchor: (Top: 0, Left: 22, Right: 126, Height: 24);
+            Text: "";
+            Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Group #TraitRingRow {
+            Anchor: (Top: 0, Right: 0, Width: 120, Height: 24);
+            LayoutMode: Left;
+            Visible: false;
+
+            Group #TraitSlot0 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
+            Group { Anchor: (Width: 8); }
+            Group #TraitSlot1 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
+            Group { Anchor: (Width: 8); }
+            Group #TraitSlot2 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
+            Group { Anchor: (Width: 8); }
+            Group #TraitSlot3 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
+        }
     }
 
     Group #HealthRow {
-        Anchor: (Top: 2, Height: 28);
+        Anchor: (Top: 28, Left: 0, Right: 0, Height: 28);
 
         Group #HealthBar {
             Anchor: (Top: 6, Left: 0, Right: 0, Height: 16);
@@ -52,7 +81,7 @@ Group #Root {
     }
 
     Group #StatusRingRow {
-        Anchor: (Top: 4, Height: 28);
+        Anchor: (Top: 62, Left: 0, Width: 154, Height: 28);
         LayoutMode: Left;
         Visible: false;
 
@@ -156,9 +185,21 @@ Group #Root {
     }
 
     Group #ProgressionRow {
-        Anchor: (Top: 4, Height: 26);
+        Anchor: (Top: 62, Right: 0, Width: 56, Height: 26);
         LayoutMode: Left;
         Visible: false;
+
+        Group #TalentPointAction {
+            Anchor: (Width: 24, Height: 24);
+            Visible: false;
+            Group #TalentPointIcon { Anchor: (Top: 2, Left: 2, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png"); }
+            Group #TalentPointCountBadgeBorder { Anchor: (Top: 0, Left: 10, Width: 14, Height: 12); Background: #f6d56b; }
+            Group #TalentPointCountBadgeFill { Anchor: (Top: 1, Left: 11, Width: 12, Height: 10); Background: #081220; }
+            Label #TalentPointCountShadow { Anchor: (Top: 1, Left: 12, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center); }
+            Label #TalentPointCount { Anchor: (Top: 0, Left: 11, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
+        }
+
+        Group { Anchor: (Width: 8); }
 
         Group #XpProgressRing {
             Anchor: (Width: 24, Height: 24);
@@ -177,36 +218,10 @@ Group #Root {
             Label #XpLevelText { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #eaf8ff, HorizontalAlignment: Center, VerticalAlignment: Center); }
             TextButton #XpTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; }
         }
-
-        Group { Anchor: (Width: 8); }
-
-        Group #TalentPointAction {
-            Anchor: (Width: 24, Height: 24);
-            Visible: false;
-            Group #TalentPointIcon { Anchor: (Top: 2, Left: 2, Width: 20, Height: 20); Background: (TexturePath: "Tamework/LinkedPanelIcons/TalentPoint_UpArrow.png"); }
-            Group #TalentPointCountBadgeBorder { Anchor: (Top: 0, Left: 10, Width: 14, Height: 12); Background: #f6d56b; }
-            Group #TalentPointCountBadgeFill { Anchor: (Top: 1, Left: 11, Width: 12, Height: 10); Background: #081220; }
-            Label #TalentPointCountShadow { Anchor: (Top: 1, Left: 12, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #000000, HorizontalAlignment: Center, VerticalAlignment: Center); }
-            Label #TalentPointCount { Anchor: (Top: 0, Left: 11, Width: 12, Height: 10); Text: "1"; Style: (FontSize: 8, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center); }
-        }
-    }
-
-    Group #TraitRingRow {
-        Anchor: (Top: 4, Height: 26);
-        LayoutMode: Left;
-        Visible: false;
-
-        Group #TraitSlot0 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
-        Group { Anchor: (Width: 8); }
-        Group #TraitSlot1 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
-        Group { Anchor: (Width: 8); }
-        Group #TraitSlot2 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
-        Group { Anchor: (Width: 8); }
-        Group #TraitSlot3 { Anchor: (Width: 24, Height: 24); Visible: false; Group #RingTrackTopLeft { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackTopRight { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #23354a; } Group #RingTrackLeft { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #23354a; } Group #RingTrackBottom { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #23354a; } Group #RingTrackRight { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #23354a; } Group #RingFillBar1 { Anchor: (Top: 0, Left: 0, Width: 12, Height: 3); Background: #6fc576; } Group #RingFillBar2 { Anchor: (Top: 0, Left: 0, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar3 { Anchor: (Top: 21, Left: 0, Width: 24, Height: 3); Background: #6fc576; } Group #RingFillBar4 { Anchor: (Top: 0, Left: 21, Width: 3, Height: 24); Background: #6fc576; } Group #RingFillBar5 { Anchor: (Top: 0, Left: 12, Width: 12, Height: 3); Background: #6fc576; } Group { Anchor: (Top: 3, Left: 3, Width: 18, Height: 18); Background: #081220; } Group #TraitIconImage { Anchor: (Top: 6, Left: 6, Width: 12, Height: 12); Visible: false; } Label #TraitIcon { Anchor: (Top: 4, Left: 4, Width: 16, Height: 16); Text: "?"; Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center); } TextButton #TraitTooltip { Anchor: (Top: 0, Left: 0, Width: 24, Height: 24); Style: @HudTooltipButtonStyle; Text: ""; TooltipText: ""; TextTooltipStyle: @HudTooltipStyle; } }
     }
 
     Group #FoodTameRow {
-        Anchor: (Top: 4, Height: 42);
+        Anchor: (Top: 96, Left: 0, Right: 0, Height: 42);
 
         Group #FoodRow {
             Anchor: (Top: 0, Left: 0, Width: 112, Height: 40);
@@ -224,7 +239,7 @@ Group #Root {
         }
     }
 
-    Group #AttachmentRow0 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
-    Group #AttachmentRow1 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
-    Group #AttachmentRow2 { Anchor: (Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #AttachmentRow0 { Anchor: (Top: 144, Left: 0, Right: 0, Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #AttachmentRow1 { Anchor: (Top: 162, Left: 0, Right: 0, Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
+    Group #AttachmentRow2 { Anchor: (Top: 180, Left: 0, Right: 0, Height: 18); Visible: false; Label #Label { Anchor: (Left: 0, Width: 104, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); } Label #Value { Anchor: (Right: 0, Width: 112, Height: 18); Text: ""; Style: (FontSize: 11, TextColor: #eff4fa, HorizontalAlignment: End, VerticalAlignment: Center); } }
 }

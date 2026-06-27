@@ -6,6 +6,14 @@ import org.junit.jupiter.api.Test;
 
 class CommandTargetHudServiceTest {
     @Test
+    void sweepsFastEnoughForNearInstantTargetChanges() {
+        Assertions.assertTrue(
+                CommandTargetHudService.sweepIntervalMsForTests() <= 25L,
+                "Command target HUD should react on the next practical tick when targeting changes."
+        );
+    }
+
+    @Test
     void refreshesWhenTargetChanges() {
         Assertions.assertTrue(CommandTargetHudService.shouldRefreshForTests(
                 "npc-a",

@@ -40,7 +40,7 @@ import javax.annotation.Nullable;
  * Shows a compact right-side status HUD while a player points a command item at a supported NPC.
  */
 public final class CommandTargetHudService extends TickingSystem<EntityStore> {
-    private static final long SWEEP_INTERVAL_MS = 100L;
+    private static final long SWEEP_INTERVAL_MS = 25L;
     private static final long REFRESH_INTERVAL_MS = 500L;
     private static final float TARGET_DISTANCE = 6.0f;
     private static final String TRANQUILIZER_REQUIREMENT_ID = "TameworkEffectActive";
@@ -340,6 +340,10 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return true;
         }
         return nowMs - previousRefreshMs >= Math.max(0L, refreshIntervalMs);
+    }
+
+    static long sweepIntervalMsForTests() {
+        return SWEEP_INTERVAL_MS;
     }
 
     static double resolveRequiredTranquilizerSecondsForTests(@Nullable String requirementId,

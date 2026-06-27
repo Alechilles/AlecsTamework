@@ -19,6 +19,8 @@ final class CommandTargetHudBinder {
                      @Nullable String language) {
         LinkedNpcEntry status = model.status();
         commandBuilder.set("#Root.Visible", true);
+        commandBuilder.set("#GenderMaleIcon.Visible", status.isMale());
+        commandBuilder.set("#GenderFemaleIcon.Visible", status.isFemale());
         commandBuilder.set("#Name.Text", safe(status.displayName(), LocalizedText.resolve(language, "tamework.ui.commandTargetHud.name.unknown")));
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, "#Root", status, language);
         bindStatusRingVisibility(commandBuilder, status);
