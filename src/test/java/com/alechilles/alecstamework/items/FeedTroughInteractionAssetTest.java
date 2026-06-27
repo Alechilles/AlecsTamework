@@ -68,7 +68,7 @@ class FeedTroughInteractionAssetTest {
                 "interactionHints.openTrough"
         );
 
-        assertEquals("Press [{key}] to open Trough; right-click Water Bucket to fill", value);
+        assertEquals("Press [{key}] to open Trough | [RMB] with Water Bucket to fill", value);
     }
 
     private static JsonObject readTroughAsset() throws IOException {
