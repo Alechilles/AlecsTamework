@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -73,10 +75,24 @@ public final class OwnerMessageUtil {
         String scopeLabel = safeScope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
                 ? "across loaded worlds"
                 : "in this world";
-        send(player, Message.raw(
+        notifyWarning(
+                player,
                 "You cannot tame more NPCs right now (" + safeCurrent + "/" + safeLimit
                         + " owned " + scopeLabel + ")."
-        ));
+        );
+    }
+
+    public static void sendClaimPopulationCapReached(Player player, int currentCount, int limit) {
+        if (!canSend(player)) {
+            return;
+        }
+        int safeCurrent = Math.max(0, currentCount);
+        int safeLimit = Math.max(0, limit);
+        notifyWarning(
+                player,
+                "You cannot tame more NPCs in this claim right now ("
+                        + safeCurrent + "/" + safeLimit + " owned in this claim)."
+        );
     }
 
     private static boolean canSend(Player player) {
@@ -102,5 +118,12 @@ public final class OwnerMessageUtil {
         if (playerRef != null) {
             playerRef.sendMessage(message);
         }
+    }
+
+    private static void notifyWarning(Player player, String message) {
+        if (player == null || message == null || message.isBlank()) {
+            return;
+        }
+        new TameworkUiMessageService().show(player, message, NotificationStyle.Warning);
     }
 }

@@ -307,10 +307,10 @@ final class BreedingClaimLimitPolicyService {
     }
 
     @Nullable
-    private static ConstraintState evaluateClaimConstraint(@Nonnull TwGlobalConfig globalConfig,
-                                                           @Nonnull ResolvedClaim resolvedClaim,
-                                                           int currentCount,
-                                                           int pendingReservations) {
+    static ConstraintState evaluateClaimConstraint(@Nonnull TwGlobalConfig globalConfig,
+                                                   @Nonnull ResolvedClaim resolvedClaim,
+                                                   int currentCount,
+                                                   int pendingReservations) {
         if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
             return null;
         }
@@ -409,9 +409,9 @@ final class BreedingClaimLimitPolicyService {
     }
 
     @Nonnull
-    private CountResult countOwnedPopulationInClaim(@Nonnull Store<EntityStore> store,
-                                                    @Nonnull String worldName,
-                                                    @Nonnull UUID claimPartyId) {
+    CountResult countOwnedPopulationInClaim(@Nonnull Store<EntityStore> store,
+                                            @Nonnull String worldName,
+                                            @Nonnull UUID claimPartyId) {
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
@@ -711,13 +711,13 @@ final class BreedingClaimLimitPolicyService {
         }
     }
 
-    private record ConstraintState(ConstraintType type,
-                                   int effectiveCap,
-                                   int currentCount,
-                                   int pendingReservations,
-                                   int remainingHeadroom) {
+    record ConstraintState(ConstraintType type,
+                           int effectiveCap,
+                           int currentCount,
+                           int pendingReservations,
+                           int remainingHeadroom) {
     }
 
-    private record CountResult(boolean success, int count, @Nullable String message) {
+    record CountResult(boolean success, int count, @Nullable String message) {
     }
 }

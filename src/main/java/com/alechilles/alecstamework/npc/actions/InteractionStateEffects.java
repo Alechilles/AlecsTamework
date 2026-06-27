@@ -21,6 +21,7 @@ import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffec
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -34,6 +35,7 @@ import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.UUID;
 import java.util.logging.Level;
+import org.joml.Vector3d;
 
 /** Applies interaction effects that change NPC ownership, stats, or states. */
 final class InteractionStateEffects {
@@ -42,6 +44,7 @@ final class InteractionStateEffects {
     private static final int EFFECT_INDEX_UNRESOLVED = Integer.MIN_VALUE;
     private static final int DISABLE_DESPAWN_SPAWN_CONFIGURATION = Integer.MIN_VALUE;
     private static int tranquilizerEffectIndex = EFFECT_INDEX_UNRESOLVED;
+    private final TameClaimLimitPolicyService claimLimitPolicyService = new TameClaimLimitPolicyService();
     /**
      * Cross-template swaps (for example wild -> tamed livestock) can fail when preserving
      * state/substate names from the source role. Interaction-driven role changes should
@@ -169,7 +172,19 @@ final class InteractionStateEffects {
         }
         OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(store, playerId);
         if (decision.allowed()) {
-            return false;
+            BreedingClaimLimitPolicyService.Decision claimDecision =
+                    claimLimitPolicyService.evaluate(store, resolvePosition(npcRef, store));
+            if (claimDecision.allowed()) {
+                return false;
+            }
+            if ("claim-cap-reached".equals(claimDecision.reason())) {
+                OwnerMessageUtil.sendClaimPopulationCapReached(
+                        player,
+                        claimDecision.currentCount(),
+                        claimDecision.effectiveCap()
+                );
+            }
+            return true;
         }
         OwnerMessageUtil.sendPopulationCapReached(
                 player,
@@ -178,6 +193,12 @@ final class InteractionStateEffects {
                 decision.scope()
         );
         return true;
+    }
+
+    private Vector3d resolvePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
+        TransformComponent transform = transformType == null ? null : store.getComponent(npcRef, transformType);
+        return transform == null ? null : transform.getPosition();
     }
 
     // Applies stat deltas from a modify stats effect.

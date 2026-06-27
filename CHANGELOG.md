@@ -8,6 +8,7 @@
 - Linked companion panel cards now show active harvest cooldown timers beside breeding cooldown timers.
 - Linked companion panel cooldown timers now use icon art for breeding and harvest instead of letter labels.
 - Taming now tells players when a new companion is automatically linked to a command item, or when no matching command item was found in inventory.
+- Taming now shows warning notifications when the player is at the per-player ownership limit or the target claim is at its SimpleClaims companion limit.
 - Holding a command item while looking at a supported NPC now shows a compact right-side status HUD with vitals, progression details, favorite food, attachment selections, and tame tranquilizer requirements when available.
 - Command target HUD vitals, cooldowns, level, talent points, and traits now use the same compact ring controls as the linked companion panel.
 

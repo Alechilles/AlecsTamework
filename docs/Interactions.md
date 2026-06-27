@@ -63,6 +63,7 @@ Common fields:
 
 Behavior:
 - Requires untamed NPC and matching held item.
+- Blocks acquisition when the player is at the per-player owned companion limit or the target SimpleClaims claim is at its companion limit, and shows a warning notification.
 - Sets tamed + owner, consumes held item, optional role swap.
 
 ### Feed

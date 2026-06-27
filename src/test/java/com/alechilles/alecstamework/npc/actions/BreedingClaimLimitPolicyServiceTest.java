@@ -52,6 +52,25 @@ class BreedingClaimLimitPolicyServiceTest {
     }
 
     @Test
+    void noClaimAllowsTameAcquisitionEvenWhenBreedingRequiresClaim() throws Exception {
+        TwGlobalConfig global = globalSettings(true, 2, 10, true);
+        BreedingClaimLimitPolicyService.Decision decision =
+                TameClaimLimitPolicyService.evaluateResolved(
+                        global,
+                        new BreedingClaimLimitPolicyService.ResolvedClaim(
+                                BreedingClaimLimitPolicyService.ClaimResolutionStatus.NO_CLAIM,
+                                null,
+                                0,
+                                null
+                        ),
+                        0
+                );
+
+        assertTrue(decision.allowed());
+        assertEquals("outside-claim", decision.reason());
+    }
+
+    @Test
     void chunkScaledCapUsesClaimSize() throws Exception {
         TwGlobalConfig global = globalSettings(true, 3, 0, false);
         BreedingClaimLimitPolicyService.ClaimReservationKey key =
@@ -87,6 +106,22 @@ class BreedingClaimLimitPolicyServiceTest {
         assertFalse(decision.allowed());
         assertEquals("claim-cap-reached", decision.reason());
         assertEquals(5, decision.effectiveCap());
+    }
+
+    @Test
+    void totalCapBlocksTameAcquisitionAtClaimLimit() throws Exception {
+        TwGlobalConfig global = globalSettings(true, 0, 5, false);
+        BreedingClaimLimitPolicyService.Decision decision =
+                TameClaimLimitPolicyService.evaluateResolved(
+                        global,
+                        claimFound(3),
+                        5
+                );
+
+        assertFalse(decision.allowed());
+        assertEquals("claim-cap-reached", decision.reason());
+        assertEquals(5, decision.effectiveCap());
+        assertEquals(5, decision.currentCount());
     }
 
     @Test
