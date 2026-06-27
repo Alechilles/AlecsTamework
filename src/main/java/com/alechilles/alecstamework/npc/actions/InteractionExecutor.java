@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Interactio
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
+import com.alechilles.alecstamework.items.CommandAutoLinkResult;
 import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -78,7 +79,8 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
-            CommandAutoLinkService.autoLinkNewlyTamedNpc(player, npcRef, store);
+            CommandAutoLinkResult autoLink = CommandAutoLinkService.autoLinkNewlyTamedNpc(player, npcRef, store);
+            sendTameAutoLinkFeedback(player, autoLink);
             return applied;
         }
         if (entry instanceof FeedInteraction) {
@@ -212,5 +214,42 @@ final class InteractionExecutor {
             ) | applied;
         }
         return false;
+    }
+
+    private void sendTameAutoLinkFeedback(Player player, CommandAutoLinkResult result) {
+        if (player == null || result == null) {
+            return;
+        }
+        InteractionUiMessageService ui = new InteractionUiMessageService();
+        if (result.status() == CommandAutoLinkResult.Status.LINKED) {
+            ui.showSuccessKey(
+                    player,
+                    "tamework.ui.notifications.tame.autoLink.linked",
+                    safeCompanion(result.animalDisplayName()),
+                    safeCommandItem(result.commandItemDisplayName())
+            );
+            return;
+        }
+        if (result.status() == CommandAutoLinkResult.Status.NO_APPLICABLE_TOOL) {
+            ui.showWarningKey(
+                    player,
+                    "tamework.ui.notifications.tame.autoLink.noTool",
+                    safeCompanion(result.animalDisplayName()),
+                    safeCommandItem(result.commandItemDisplayName()),
+                    safeCraftingStation(result.craftingStationDisplayName())
+            );
+        }
+    }
+
+    private String safeCompanion(String value) {
+        return value == null || value.isBlank() ? "Companion" : value;
+    }
+
+    private String safeCommandItem(String value) {
+        return value == null || value.isBlank() ? "command item" : value;
+    }
+
+    private String safeCraftingStation(String value) {
+        return value == null || value.isBlank() ? "crafting bench" : value;
     }
 }

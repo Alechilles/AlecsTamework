@@ -29,10 +29,22 @@ public final class CommandAutoLinkService {
     private final CommandItemRegistry registry;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandLinkMutationService linkMutationService;
+    private final CommandNpcNameResolver nameResolver;
+    private final CommandLinkPolicyService policyService;
+    private final CommandItemDisplayResolver displayResolver;
 
     CommandAutoLinkService(CommandItemRegistry registry,
                            CommandPanelPreferenceService panelPreferenceService,
                            CommandLinkMutationService linkMutationService) {
+        this(registry, panelPreferenceService, linkMutationService, null, null, null);
+    }
+
+    CommandAutoLinkService(CommandItemRegistry registry,
+                           CommandPanelPreferenceService panelPreferenceService,
+                           CommandLinkMutationService linkMutationService,
+                           CommandNpcNameResolver nameResolver,
+                           CommandLinkPolicyService policyService,
+                           CommandItemDisplayResolver displayResolver) {
         this.registry = registry;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
@@ -40,17 +52,20 @@ public final class CommandAutoLinkService {
         this.linkMutationService = linkMutationService != null
                 ? linkMutationService
                 : new CommandLinkMutationService(null, null, null);
+        this.nameResolver = nameResolver != null ? nameResolver : new CommandNpcNameResolver();
+        this.policyService = policyService != null ? policyService : new CommandLinkPolicyService();
+        this.displayResolver = displayResolver != null ? displayResolver : new CommandItemDisplayResolver();
     }
 
-    public static void autoLinkNewlyTamedNpc(@Nullable Player player,
-                                             @Nullable Ref<EntityStore> npcRef,
-                                             @Nullable Store<EntityStore> store) {
+    public static CommandAutoLinkResult autoLinkNewlyTamedNpc(@Nullable Player player,
+                                                              @Nullable Ref<EntityStore> npcRef,
+                                                              @Nullable Store<EntityStore> store) {
         Tamework plugin = Tamework.getInstance();
         CommandItemRegistry registry = plugin != null ? plugin.getCommandItemRegistry() : null;
         if (registry == null) {
-            return;
+            return CommandAutoLinkResult.skipped(null);
         }
-        new CommandAutoLinkService(registry, new CommandPanelPreferenceService(), new CommandLinkMutationService(
+        return new CommandAutoLinkService(registry, new CommandPanelPreferenceService(), new CommandLinkMutationService(
                 new CommandLinkedNpcRecordStore(),
                 new CommandLinkPolicyService(),
                 new CommandNpcNameResolver(),
@@ -75,29 +90,34 @@ public final class CommandAutoLinkService {
         )).autoLinkNpcToPreferredToolInternal(player, npcRef, store, preferredToolId);
     }
 
-    private void autoLinkNewlyTamedNpcInternal(@Nullable Player player,
-                                               @Nullable Ref<EntityStore> npcRef,
-                                               @Nullable Store<EntityStore> store) {
+    private CommandAutoLinkResult autoLinkNewlyTamedNpcInternal(@Nullable Player player,
+                                                                @Nullable Ref<EntityStore> npcRef,
+                                                                @Nullable Store<EntityStore> store) {
+        String animalName = resolveAnimalDisplayName(npcRef, store);
         if (player == null || npcRef == null || !npcRef.isValid() || store == null) {
-            return;
+            return CommandAutoLinkResult.skipped(animalName);
         }
         Inventory inventory = player.getInventory();
         if (inventory == null) {
-            return;
+            return missingToolResult(player, npcRef, store, animalName);
         }
         CombinedItemContainer combined = inventory.getCombinedBackpackStorageHotbarFirst();
         if (combined == null || combined.getCapacity() <= 0) {
-            return;
+            return missingToolResult(player, npcRef, store, animalName);
         }
         List<ToolCandidate> toolCandidates = resolveToolCandidates(combined);
         if (toolCandidates.isEmpty()) {
-            return;
+            return missingToolResult(player, npcRef, store, animalName);
         }
         for (ToolCandidate candidate : toolCandidates) {
-            if (candidate == null || tryLinkCandidate(player, store, npcRef, candidate)) {
-                break;
+            if (candidate != null && tryLinkCandidate(player, store, npcRef, candidate)) {
+                return CommandAutoLinkResult.linked(
+                        animalName,
+                        displayResolver.resolveItemDisplayName(player, candidate.stack().getItemId())
+                );
             }
         }
+        return CommandAutoLinkResult.failed(animalName);
     }
 
     private void autoLinkNpcToPreferredToolInternal(@Nullable Player player,
@@ -153,9 +173,9 @@ public final class CommandAutoLinkService {
         TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
         Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
         Vector3d homePosition = links.hasHome() ? links.getHomePosition() : null;
-        String displayName = new CommandNpcNameResolver().resolveNpcDisplayNameFromComponents(npcRef, store);
-        String nameKey = new CommandNpcNameResolver().resolveNpcNameKey(npc);
-        String roleId = new CommandLinkPolicyService().resolveRoleId(npc);
+        String displayName = nameResolver.resolveNpcDisplayNameFromComponents(npcRef, store);
+        String nameKey = nameResolver.resolveNpcNameKey(npc);
+        String roleId = policyService.resolveRoleId(npc);
         ItemStack updated = linkMutationService.upsertLinkedNpcRecord(
                 stack,
                 npc.getUuid(),
@@ -228,6 +248,76 @@ public final class CommandAutoLinkService {
         return true;
     }
 
+    private CommandAutoLinkResult missingToolResult(@Nullable Player player,
+                                                    @Nullable Ref<EntityStore> npcRef,
+                                                    @Nullable Store<EntityStore> store,
+                                                    @Nullable String animalName) {
+        ApplicableToolDisplay missing = resolveFirstApplicableToolDisplay(player, npcRef, store);
+        return CommandAutoLinkResult.noApplicableTool(
+                animalName,
+                missing.commandItemName(),
+                missing.craftingStationName()
+        );
+    }
+
+    private ApplicableToolDisplay resolveFirstApplicableToolDisplay(@Nullable Player player,
+                                                                    @Nullable Ref<EntityStore> npcRef,
+                                                                    @Nullable Store<EntityStore> store) {
+        if (registry == null) {
+            return new ApplicableToolDisplay(
+                    displayResolver.resolveItemDisplayName(player, null),
+                    displayResolver.resolveCraftingStationDisplayName(player)
+            );
+        }
+        String roleId = resolveRoleId(npcRef, store);
+        for (TwCommandItemConfig config : registry.snapshot().values()) {
+            if (config == null || !config.isEnabled() || !config.isLinkEnabled()) {
+                continue;
+            }
+            if (!policyService.isRoleAllowed(roleId, config, true)) {
+                continue;
+            }
+            return new ApplicableToolDisplay(
+                    displayResolver.resolveItemDisplayName(player, firstItemId(config)),
+                    displayResolver.resolveCraftingStationDisplayName(player)
+            );
+        }
+        return new ApplicableToolDisplay(
+                displayResolver.resolveItemDisplayName(player, null),
+                displayResolver.resolveCraftingStationDisplayName(player)
+        );
+    }
+
+    @Nullable
+    private String resolveAnimalDisplayName(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        return nameResolver.resolveNpcDisplayNameFromComponents(npcRef, store);
+    }
+
+    @Nullable
+    private String resolveRoleId(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        return policyService.resolveRoleId(npc);
+    }
+
+    @Nullable
+    private static String firstItemId(@Nullable TwCommandItemConfig config) {
+        if (config == null || config.getItemIds() == null) {
+            return null;
+        }
+        for (String itemId : config.getItemIds()) {
+            if (itemId != null && !itemId.isBlank()) {
+                return itemId;
+            }
+        }
+        return null;
+    }
+
     private ToolResolution ensureToolId(@Nonnull ItemStack stack, @Nullable String toolId) {
         if (toolId != null && !toolId.isBlank()) {
             return new ToolResolution(stack, toolId, false);
@@ -250,5 +340,9 @@ public final class CommandAutoLinkService {
     private record ToolResolution(@Nonnull ItemStack stack,
                                   @Nonnull String toolId,
                                   boolean changed) {
+    }
+
+    private record ApplicableToolDisplay(@Nonnull String commandItemName,
+                                         @Nonnull String craftingStationName) {
     }
 }
