@@ -54,18 +54,19 @@ public final class CompanionGenderService {
         if (component == null) {
             return null;
         }
-        String existing = normalizeGender(component.getGender());
-        if (existing != null) {
-            return existing;
-        }
         String resolved = preferredGender != null
                 ? preferredGender.toConfigValue()
-                : resolveGender(npcRef, store, roleId, config);
+                : resolveConfiguredOrExistingGender(config, roleId, component);
+        if (resolved == null) {
+            resolved = settings.selectGender(stableGenderRoll(npcRef, store)).toConfigValue();
+        }
         if (resolved == null) {
             return null;
         }
-        component.setGender(resolved);
-        store.putComponent(npcRef, type, component);
+        if (!resolved.equals(normalizeGender(component.getGender()))) {
+            component.setGender(resolved);
+            store.putComponent(npcRef, type, component);
+        }
         return resolved;
     }
 
@@ -89,13 +90,9 @@ public final class CompanionGenderService {
         }
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
         TameworkLifeStageComponent component = type != null ? store.getComponent(npcRef, type) : null;
-        String existing = component != null ? normalizeGender(component.getGender()) : null;
-        if (existing != null) {
-            return existing;
-        }
-        TwBreedingConfig.Gender roleGender = resolveRoleGender(effectiveConfig, roleId, component);
-        if (roleGender != null) {
-            return roleGender.toConfigValue();
+        String configuredOrExisting = resolveConfiguredOrExistingGender(effectiveConfig, roleId, component);
+        if (configuredOrExisting != null) {
+            return configuredOrExisting;
         }
         return settings.selectGender(stableGenderRoll(npcRef, store)).toConfigValue();
     }
@@ -113,6 +110,17 @@ public final class CompanionGenderService {
         String normalizedLeft = normalizeGender(left);
         String normalizedRight = normalizeGender(right);
         return normalizedLeft != null && normalizedRight != null && !normalizedLeft.equals(normalizedRight);
+    }
+
+    @Nullable
+    static String resolveConfiguredOrExistingGender(@Nullable TwBreedingConfig config,
+                                                   @Nullable String roleId,
+                                                   @Nullable TameworkLifeStageComponent component) {
+        TwBreedingConfig.Gender roleGender = resolveRoleGender(config, roleId, component);
+        if (roleGender != null) {
+            return roleGender.toConfigValue();
+        }
+        return component != null ? normalizeGender(component.getGender()) : null;
     }
 
     @Nullable

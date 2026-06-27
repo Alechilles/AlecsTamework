@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
+
 ## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24
 
 ### Changed
