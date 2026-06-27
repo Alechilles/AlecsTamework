@@ -79,7 +79,11 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.breedingCooldownActive(),
                     entry.breedingCooldownRemainingMs(),
                     entry.breedingCooldownRatio(),
-                    entry.breedingCooldownKnown()
+                    entry.breedingCooldownKnown(),
+                    entry.harvestCooldownActive(),
+                    entry.harvestCooldownRemainingMs(),
+                    entry.harvestCooldownRatio(),
+                    entry.harvestCooldownKnown()
             ));
         }
         return out.toArray(new LinkedNpcEntry[0]);

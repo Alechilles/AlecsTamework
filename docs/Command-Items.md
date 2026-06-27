@@ -107,7 +107,7 @@ Linked panel supports:
 - Group manager flow (create/rename/recolor/delete)
 - Status lanes for loaded/unloaded/dead/lost companions
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
-- Breeding cooldown ring/status and progression vitals/trait indicators
+- Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
 
 ## Move/home/recall and off-screen relocation
 Loaded flow:

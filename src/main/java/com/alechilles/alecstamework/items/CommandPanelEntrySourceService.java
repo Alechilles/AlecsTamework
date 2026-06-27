@@ -174,6 +174,10 @@ final class CommandPanelEntrySourceService {
                         false,
                         0L,
                         0.0,
+                        false,
+                        false,
+                        0L,
+                        0.0,
                         false
                 ));
                 seen.add(npc.getUuid());

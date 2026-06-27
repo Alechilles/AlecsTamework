@@ -1,16 +1,12 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
-import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
-import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
-import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
@@ -58,6 +54,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandGroupService groupService;
     private final CommandLinkedPanelProgressionPresentationService progressionPresentationService;
+    private final CommandLinkedPanelCooldownSnapshotService cooldownSnapshotService;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
@@ -76,6 +73,7 @@ final class CommandLinkedPanelEntryService {
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();
         this.progressionPresentationService = new CommandLinkedPanelProgressionPresentationService();
+        this.cooldownSnapshotService = new CommandLinkedPanelCooldownSnapshotService();
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -137,6 +135,10 @@ final class CommandLinkedPanelEntryService {
             long breedingCooldownRemainingMs = 0L;
             double breedingCooldownRatio = 0.0;
             boolean breedingCooldownKnown = false;
+            boolean harvestCooldownActive = false;
+            long harvestCooldownRemainingMs = 0L;
+            double harvestCooldownRatio = 0.0;
+            boolean harvestCooldownKnown = false;
             LinkedNpcEntry.FutureStat futureStatA = null;
             LinkedNpcEntry.FutureStat futureStatB = null;
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
@@ -183,13 +185,22 @@ final class CommandLinkedPanelEntryService {
                             thirst = needsSnapshot.thirstCurrent;
                             maxThirst = needsSnapshot.thirstMax;
                         }
-                        BreedingCooldownSnapshot breedingSnapshot = readBreedingCooldownSnapshot(npcRef, store, speciesId);
+                        CommandLinkedPanelCooldownSnapshotService.CooldownSnapshot breedingSnapshot =
+                                cooldownSnapshotService.readBreedingCooldownSnapshot(npcRef, store, speciesId);
                         if (breedingSnapshot != null) {
                             breedingEnabled = breedingSnapshot.enabled;
                             breedingCooldownKnown = breedingSnapshot.known;
                             breedingCooldownActive = breedingSnapshot.active;
                             breedingCooldownRemainingMs = breedingSnapshot.remainingMs;
                             breedingCooldownRatio = breedingSnapshot.ratio;
+                        }
+                        CommandLinkedPanelCooldownSnapshotService.CooldownSnapshot harvestSnapshot =
+                                cooldownSnapshotService.readHarvestCooldownSnapshot(npcRef, store);
+                        if (harvestSnapshot != null) {
+                            harvestCooldownKnown = harvestSnapshot.known;
+                            harvestCooldownActive = harvestSnapshot.active;
+                            harvestCooldownRemainingMs = harvestSnapshot.remainingMs;
+                            harvestCooldownRatio = harvestSnapshot.ratio;
                         }
                         CompanionLevelingService.LevelingSnapshot levelingSnapshot =
                                 CompanionLevelingService.resolveSnapshot(npcRef, store, resolvedRoleId);
@@ -334,7 +345,11 @@ final class CommandLinkedPanelEntryService {
                     breedingCooldownActive,
                     breedingCooldownRemainingMs,
                     breedingCooldownRatio,
-                    breedingCooldownKnown
+                    breedingCooldownKnown,
+                    harvestCooldownActive,
+                    harvestCooldownRemainingMs,
+                    harvestCooldownRatio,
+                    harvestCooldownKnown
             ));
         }
         return entries;
@@ -769,84 +784,6 @@ final class CommandLinkedPanelEntryService {
         return String.format(Locale.ROOT, "%+.2f", value);
     }
 
-    private BreedingCooldownSnapshot readBreedingCooldownSnapshot(Ref<EntityStore> npcRef,
-                                                                  Store<EntityStore> store,
-                                                                  String resolvedRoleId) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return null;
-        }
-        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
-        if (breedingType == null) {
-            return null;
-        }
-        TameworkBreedingComponent breeding = safeGetComponent(store, npcRef, breedingType);
-        if (breeding == null) {
-            return new BreedingCooldownSnapshot(false, false, false, 0L, 0.0);
-        }
-        long now = BreedingTimeService.resolveCurrentTimeMs(store);
-        long until = breeding.getCooldownUntilMs();
-        boolean active = until != 0L && now < until;
-        long remainingGameMs = active ? Math.max(0L, until - now) : 0L;
-        long remainingRealMs = active
-                ? BreedingTimeService.toEstimatedRealDurationMs(remainingGameMs, store)
-                : 0L;
-        double ratio = active
-                ? resolveBreedingCooldownRatio(breeding, npcRef, store, resolvedRoleId, remainingGameMs)
-                : 1.0;
-        return new BreedingCooldownSnapshot(true, breeding.isEnabled(), active, remainingRealMs, ratio);
-    }
-
-    private double resolveBreedingCooldownRatio(TameworkBreedingComponent breeding,
-                                                Ref<EntityStore> npcRef,
-                                                Store<EntityStore> store,
-                                                String resolvedRoleId,
-                                                long remainingMs) {
-        long knownDurationMs = 0L;
-        if (breeding != null) {
-            knownDurationMs = Math.max(0L, breeding.getCooldownDurationMs());
-            if (knownDurationMs <= 0L) {
-                long startedAtMs = breeding.getCooldownStartedAtMs();
-                long untilMs = breeding.getCooldownUntilMs();
-                if (startedAtMs > 0L && untilMs > startedAtMs) {
-                    knownDurationMs = untilMs - startedAtMs;
-                }
-            }
-        }
-        if (knownDurationMs > 0L) {
-            double progress = 1.0 - ((double) remainingMs / (double) knownDurationMs);
-            return clamp(progress, 0.0, 1.0);
-        }
-
-        TwBreedingConfig config = null;
-        if (breeding != null && breeding.getConfigId() != null && !breeding.getConfigId().isBlank()) {
-            config = TwBreedingConfig.resolveById(breeding.getConfigId());
-        }
-        if (config == null) {
-            String roleId = resolvedRoleId;
-            if (roleId == null || roleId.isBlank()) {
-                roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-            }
-            config = TwBreedingConfig.resolveForRole(roleId);
-        }
-        String roleId = resolvedRoleId;
-        if (roleId == null || roleId.isBlank()) {
-            roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        }
-        if (config == null || config.resolveCooldowns(roleId) == null || config.resolveTiming(roleId) == null) {
-            return 0.0;
-        }
-        long baseDurationMs = BreedingTimeService.toGameDurationMs(
-                config.resolveCooldowns(roleId).getBaseCooldownSeconds(),
-                config.resolveTiming(roleId).getTimerBasis(),
-                store
-        );
-        if (baseDurationMs <= 0L) {
-            return 0.0;
-        }
-        double progress = 1.0 - ((double) remainingMs / (double) baseDurationMs);
-        return clamp(progress, 0.0, 1.0);
-    }
-
     private static final class HealthSnapshot {
         private final int current;
         private final int max;
@@ -885,23 +822,4 @@ final class CommandLinkedPanelEntryService {
         }
     }
 
-    private static final class BreedingCooldownSnapshot {
-        private final boolean known;
-        private final boolean enabled;
-        private final boolean active;
-        private final long remainingMs;
-        private final double ratio;
-
-        private BreedingCooldownSnapshot(boolean known,
-                                        boolean enabled,
-                                        boolean active,
-                                        long remainingMs,
-                                        double ratio) {
-            this.known = known;
-            this.enabled = enabled;
-            this.active = active;
-            this.remainingMs = Math.max(0L, remainingMs);
-            this.ratio = Math.max(0.0, Math.min(1.0, ratio));
-        }
-    }
 }

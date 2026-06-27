@@ -583,7 +583,7 @@ Group {
     }
 
     Group #NeedRingRow {
-        Anchor: (Top: 52, Left: 0, Width: 114, Height: 24);
+        Anchor: (Top: 52, Left: 0, Width: 144, Height: 24);
         LayoutMode: Left;
 
         Group #NeedHappiness {
@@ -925,6 +925,89 @@ Group {
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
                 TooltipText: %server.tamework.ui.linkedPanel.needs.breeding.tooltip;
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+
+        Group {
+            Anchor: (Width: 6);
+        }
+
+        Group #HarvestCooldown {
+            Anchor: (Width: 24, Height: 24);
+            Visible: false;
+
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #68d391;
+            }
+
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #68d391;
+            }
+
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #68d391;
+            }
+
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #68d391;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #68d391;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+            }
+
+            Group {
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+                Background: #081220;
+            }
+
+            Label #HarvestCooldownIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: %server.tamework.ui.linkedPanel.needs.harvest.short;
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #HarvestCooldownTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: %server.tamework.ui.linkedPanel.needs.harvest.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }

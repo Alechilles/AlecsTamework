@@ -23,6 +23,7 @@ final class LinkedNpcPanelVitalsBinder {
         bindHealth(commandBuilder, entrySelector, entry, language);
         bindNeedRings(commandBuilder, entrySelector, entry, language);
         bindBreedingCooldown(commandBuilder, entrySelector, entry, language);
+        bindHarvestCooldown(commandBuilder, entrySelector, entry, language);
     }
 
     private static void bindHealth(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry, String language) {
@@ -241,6 +242,28 @@ final class LinkedNpcPanelVitalsBinder {
                 LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry, language)
         );
         LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(entry.breedingCooldownRatio());
+        commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
+    }
+
+    private static void bindHarvestCooldown(UICommandBuilder commandBuilder,
+                                            String entrySelector,
+                                            LinkedNpcEntry entry,
+                                            String language) {
+        String slotSelector = entrySelector + " #HarvestCooldown";
+        boolean cooldownRecharging = entry.harvestCooldownKnown() && entry.harvestCooldownActive();
+        commandBuilder.set(slotSelector + ".Visible", cooldownRecharging);
+        if (!cooldownRecharging) {
+            return;
+        }
+        commandBuilder.set(
+                slotSelector + " #HarvestCooldownTooltip.TooltipText",
+                LinkedNpcPanelStatusTextService.resolveHarvestCooldownTooltip(entry, language)
+        );
+        LinkedNpcPanelRingFill.SegmentFill fill = LinkedNpcPanelRingFill.resolve(entry.harvestCooldownRatio());
         commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
         commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
         commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));

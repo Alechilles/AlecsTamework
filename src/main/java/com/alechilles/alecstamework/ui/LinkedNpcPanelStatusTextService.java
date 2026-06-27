@@ -132,6 +132,27 @@ final class LinkedNpcPanelStatusTextService {
         );
     }
 
+    static String resolveHarvestCooldownTooltip(LinkedNpcEntry entry) {
+        return resolveHarvestCooldownTooltip(entry, null);
+    }
+
+    static String resolveHarvestCooldownTooltip(LinkedNpcEntry entry, String language) {
+        if (entry == null || !entry.loaded()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.unavailable");
+        }
+        if (!entry.harvestCooldownKnown()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.unavailable");
+        }
+        if (!entry.harvestCooldownActive()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.harvestCooldown.ready");
+        }
+        return LocalizedText.format(
+                language,
+                "tamework.ui.linkedPanel.harvestCooldown.remaining",
+                formatRemainingClock(entry.harvestCooldownRemainingMs())
+        );
+    }
+
     private static String formatRemainingTime(long remainingMs, String language) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long minutes = totalSeconds / 60L;
