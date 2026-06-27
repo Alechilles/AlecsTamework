@@ -157,7 +157,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (model == null) {
             return null;
         }
-        return new TargetSnapshot(npc.getUuid().toString(), model);
+        return new TargetSnapshot(buildTargetKey(npc.getUuid(), activeStack.getItemId()), model);
     }
 
     private boolean isSupportedTarget(@Nonnull Ref<EntityStore> npcRef,
@@ -299,8 +299,21 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             if (playerUuid == null || activePlayers.contains(playerUuid)) {
                 continue;
             }
-            stateByPlayer.remove(playerUuid);
+            HudState state = stateByPlayer.get(playerUuid);
+            if (state == null || state.hud() == null) {
+                stateByPlayer.remove(playerUuid);
+            }
         }
+    }
+
+    @Nonnull
+    private static String buildTargetKey(@Nonnull UUID npcUuid, @Nullable String activeItemId) {
+        return npcUuid + "|" + (activeItemId == null ? "" : activeItemId);
+    }
+
+    @Nonnull
+    static String buildTargetKeyForTests(@Nonnull UUID npcUuid, @Nullable String activeItemId) {
+        return buildTargetKey(npcUuid, activeItemId);
     }
 
     private static boolean shouldRefresh(@Nullable HudState previous,

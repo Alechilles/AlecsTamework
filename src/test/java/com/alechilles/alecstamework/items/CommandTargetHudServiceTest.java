@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +10,21 @@ class CommandTargetHudServiceTest {
         Assertions.assertTrue(CommandTargetHudService.shouldRefreshForTests(
                 "npc-a",
                 "npc-b",
+                1_000L,
+                1_100L,
+                500L
+        ));
+    }
+
+    @Test
+    void refreshesWhenHeldCommandItemChangesForSameTarget() {
+        UUID npcUuid = UUID.fromString("2ef48f27-68c3-47e8-9629-b9e1c9cf2ddf");
+        String whistleTarget = CommandTargetHudService.buildTargetKeyForTests(npcUuid, "Tamework:CommandWhistle");
+        String fluteTarget = CommandTargetHudService.buildTargetKeyForTests(npcUuid, "Tamework:CommandFlute");
+
+        Assertions.assertTrue(CommandTargetHudService.shouldRefreshForTests(
+                whistleTarget,
+                fluteTarget,
                 1_000L,
                 1_100L,
                 500L

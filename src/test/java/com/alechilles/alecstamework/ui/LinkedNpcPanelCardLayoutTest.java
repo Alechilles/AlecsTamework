@@ -28,6 +28,9 @@ class LinkedNpcPanelCardLayoutTest {
     private static final Path CARD_BINDER = Paths.get(
             "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcPanelCardBinder.java"
     );
+    private static final Path PROGRESSION_BINDER = Paths.get(
+            "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcPanelProgressionBinder.java"
+    );
     private static final Pattern CARD_HEIGHT = Pattern.compile(
             "CARD_HEIGHT\\s*=\\s*(\\d+)"
     );
@@ -51,6 +54,7 @@ class LinkedNpcPanelCardLayoutTest {
     void compactLinkedPanelCardContainsProgressionControls() throws IOException {
         String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
         String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
+        String progressionBinder = Files.readString(PROGRESSION_BINDER, StandardCharsets.UTF_8);
 
         Matcher cardHeight = CARD_HEIGHT.matcher(binder);
         Matcher xpRing = XP_RING_ANCHOR.matcher(cardUi);
@@ -73,7 +77,7 @@ class LinkedNpcPanelCardLayoutTest {
                 "Talent point count should have a dark badge fill for contrast."
         );
         assertTrue(
-                binder.contains("Integer.toString(availableTalentPoints(stat))"),
+                progressionBinder.contains("Integer.toString(availableTalentPoints(stat))"),
                 "Talent point badge should show the compact count without a plus prefix."
         );
         assertTrue(

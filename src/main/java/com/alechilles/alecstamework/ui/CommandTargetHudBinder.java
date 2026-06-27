@@ -9,8 +9,6 @@ import javax.annotation.Nullable;
 
 /** Binds compact command-target HUD data into the passive right-side overlay. */
 final class CommandTargetHudBinder {
-    private static final int HEALTH_FILL_WIDTH = 148;
-    private static final int MAX_TRAIT_ROWS = 4;
     private static final int MAX_ATTACHMENT_ROWS = 3;
 
     private CommandTargetHudBinder() {
@@ -22,77 +20,52 @@ final class CommandTargetHudBinder {
         LinkedNpcEntry status = model.status();
         commandBuilder.set("#Root.Visible", true);
         commandBuilder.set("#Name.Text", safe(status.displayName(), LocalizedText.resolve(language, "tamework.ui.commandTargetHud.name.unknown")));
-        bindHealth(commandBuilder, status, language);
-        bindNeedRow(commandBuilder, "#HappinessRow", "tamework.ui.commandTargetHud.happiness", status.hasHappiness(), status.currentHappiness(), status.maxHappiness(), language);
-        bindNeedRow(commandBuilder, "#HungerRow", "tamework.ui.commandTargetHud.hunger", status.hasHunger(), status.currentHunger(), status.maxHunger(), language);
-        bindNeedRow(commandBuilder, "#ThirstRow", "tamework.ui.commandTargetHud.thirst", status.hasThirst(), status.currentThirst(), status.maxThirst(), language);
-        bindLevel(commandBuilder, status.futureStatA(), language);
-        bindTraits(commandBuilder, status.traitIndicators());
+        LinkedNpcPanelVitalsBinder.bind(commandBuilder, "#Root", status, language);
+        bindStatusRingVisibility(commandBuilder, status);
+        bindProgression(commandBuilder, status);
+        bindTraitRings(commandBuilder, status.traitIndicators());
         bindFood(commandBuilder, model.favoriteFood(), language);
         bindAttachments(commandBuilder, model.attachments());
-        bindCooldown(commandBuilder, "#HarvestCooldownRow", status.harvestCooldownKnown() && status.harvestCooldownActive(),
-                "tamework.ui.commandTargetHud.harvestCooldown", status.harvestCooldownRemainingMs(), language);
-        bindCooldown(commandBuilder, "#BreedingCooldownRow", status.breedingCooldownKnown() && status.breedingCooldownActive(),
-                "tamework.ui.commandTargetHud.breedingCooldown", status.breedingCooldownRemainingMs(), language);
         bindTameRequirement(commandBuilder, model.tameRequirement(), language);
     }
 
-    private static void bindHealth(UICommandBuilder commandBuilder, LinkedNpcEntry status, String language) {
-        if (!status.hasHealth()) {
-            commandBuilder.set("#HealthText.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.health.unavailable"));
-            commandBuilder.set("#HealthBar.Visible", false);
-            commandBuilder.set("#HealthFill.Visible", false);
-            return;
-        }
-        commandBuilder.set("#HealthText.Text", LocalizedText.format(
-                language,
-                "tamework.ui.commandTargetHud.health.value",
-                status.currentHealth(),
-                status.maxHealth()
-        ));
-        commandBuilder.set("#HealthBar.Visible", true);
-        commandBuilder.set("#HealthFill.Visible", true);
-        commandBuilder.setObject("#HealthFill.Anchor", LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(status.healthRatio(), HEALTH_FILL_WIDTH));
+    private static void bindStatusRingVisibility(UICommandBuilder commandBuilder, LinkedNpcEntry status) {
+        boolean hasHappiness = status.hasHappiness();
+        boolean hasHunger = status.hasHunger();
+        boolean hasThirst = status.hasThirst();
+        boolean hasBreedingCooldown = status.breedingCooldownKnown() && status.breedingCooldownActive();
+        boolean hasHarvestCooldown = status.harvestCooldownKnown() && status.harvestCooldownActive();
+        commandBuilder.set("#NeedHappiness.Visible", hasHappiness);
+        commandBuilder.set("#NeedHunger.Visible", hasHunger);
+        commandBuilder.set("#NeedThirst.Visible", hasThirst);
+        commandBuilder.set("#StatusRingRow.Visible", hasHappiness || hasHunger || hasThirst || hasBreedingCooldown || hasHarvestCooldown);
     }
 
-    private static void bindNeedRow(UICommandBuilder commandBuilder,
-                                    String rowSelector,
-                                    String labelKey,
-                                    boolean visible,
-                                    int current,
-                                    int max,
-                                    @Nullable String language) {
-        commandBuilder.set(rowSelector + ".Visible", visible);
-        if (!visible) {
-            return;
-        }
-        commandBuilder.set(rowSelector + " #Label.Text", LocalizedText.resolve(language, labelKey));
-        commandBuilder.set(rowSelector + " #Value.Text", current + "/" + max);
+    private static void bindProgression(UICommandBuilder commandBuilder, LinkedNpcEntry status) {
+        boolean hasLevel = status.futureStatA() != null;
+        boolean hasTalentPoints = LinkedNpcPanelProgressionBinder.availableTalentPoints(status.futureStatB()) > 0;
+        commandBuilder.set("#ProgressionRow.Visible", hasLevel || hasTalentPoints);
+        LinkedNpcPanelProgressionBinder.bindXpProgressRing(
+                commandBuilder,
+                "#XpProgressRing",
+                "#XpProgressRing #XpLevelText",
+                "#XpProgressRing #XpTooltip",
+                status.futureStatA()
+        );
+        LinkedNpcPanelProgressionBinder.bindTalentPointIndicator(
+                commandBuilder,
+                "#TalentPointAction",
+                "#TalentPointAction #TalentPointCount",
+                "#TalentPointAction #TalentPointCountShadow",
+                status.futureStatB(),
+                hasTalentPoints
+        );
     }
 
-    private static void bindLevel(UICommandBuilder commandBuilder,
-                                  @Nullable LinkedNpcEntry.FutureStat levelStat,
-                                  @Nullable String language) {
-        commandBuilder.set("#LevelRow.Visible", levelStat != null);
-        if (levelStat == null) {
-            return;
-        }
-        commandBuilder.set("#LevelRow #Label.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.level"));
-        commandBuilder.set("#LevelRow #Value.Text", safe(levelStat.label(), "?"));
-    }
-
-    private static void bindTraits(UICommandBuilder commandBuilder, LinkedNpcTraitIndicator[] indicators) {
+    private static void bindTraitRings(UICommandBuilder commandBuilder, LinkedNpcTraitIndicator[] indicators) {
         LinkedNpcTraitIndicator[] safeIndicators = indicators == null ? LinkedNpcTraitIndicator.EMPTY : indicators;
-        for (int i = 0; i < MAX_TRAIT_ROWS; i++) {
-            String selector = "#TraitRow" + i;
-            boolean visible = i < safeIndicators.length && safeIndicators[i] != null;
-            commandBuilder.set(selector + ".Visible", visible);
-            if (!visible) {
-                continue;
-            }
-            commandBuilder.set(selector + " #Label.Text", safe(safeIndicators[i].label(), ""));
-            commandBuilder.set(selector + " #Value.Text", safe(safeIndicators[i].iconText(), ""));
-        }
+        commandBuilder.set("#TraitRingRow.Visible", safeIndicators.length > 0);
+        LinkedNpcTraitIndicatorBinder.bind(commandBuilder, "#Root", safeIndicators);
     }
 
     private static void bindFood(UICommandBuilder commandBuilder,
@@ -126,20 +99,6 @@ final class CommandTargetHudBinder {
         }
     }
 
-    private static void bindCooldown(UICommandBuilder commandBuilder,
-                                     String rowSelector,
-                                     boolean visible,
-                                     String labelKey,
-                                     long remainingMs,
-                                     @Nullable String language) {
-        commandBuilder.set(rowSelector + ".Visible", visible);
-        if (!visible) {
-            return;
-        }
-        commandBuilder.set(rowSelector + " #Label.Text", LocalizedText.resolve(language, labelKey));
-        commandBuilder.set(rowSelector + " #Value.Text", formatRemaining(remainingMs));
-    }
-
     private static void bindTameRequirement(UICommandBuilder commandBuilder,
                                             @Nullable CommandTargetHudViewModel.TameRequirementRow row,
                                             @Nullable String language) {
@@ -157,13 +116,6 @@ final class CommandTargetHudBinder {
         }
         commandBuilder.set("#TameRequirementLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.tameRequirement"));
         commandBuilder.set("#TameRequirementValue.Text", value);
-    }
-
-    private static String formatRemaining(long remainingMs) {
-        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
     }
 
     private static String safe(@Nullable String value, @Nullable String fallback) {

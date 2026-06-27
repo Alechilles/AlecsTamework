@@ -16,8 +16,12 @@ class CommandTargetHudBinderTest {
         Assertions.assertTrue(source.contains("\"#AttachmentRow\" + i"));
         Assertions.assertTrue(source.contains("selector + \".Visible\""));
         Assertions.assertTrue(source.contains("#TameRequirementRow.Visible"));
-        Assertions.assertTrue(source.contains("#HarvestCooldownRow"));
-        Assertions.assertTrue(source.contains("#BreedingCooldownRow"));
+        Assertions.assertTrue(source.contains("LinkedNpcPanelVitalsBinder.bind"));
+        Assertions.assertTrue(source.contains("LinkedNpcPanelProgressionBinder.bindXpProgressRing"));
+        Assertions.assertTrue(source.contains("LinkedNpcTraitIndicatorBinder.bind"));
+        Assertions.assertTrue(source.contains("#StatusRingRow.Visible"));
+        Assertions.assertTrue(source.contains("#ProgressionRow.Visible"));
+        Assertions.assertTrue(source.contains("#TraitRingRow.Visible"));
     }
 
     @Test
@@ -31,5 +35,18 @@ class CommandTargetHudBinderTest {
         Assertions.assertTrue(ui.contains("AttachmentRow0"));
         Assertions.assertTrue(ui.contains("TameRequirementRow"));
         Assertions.assertTrue(ui.contains("HealthText"));
+        Assertions.assertTrue(ui.contains("HealthTextShadow"));
+        Assertions.assertTrue(ui.contains("HealthTooltip"));
+        Assertions.assertTrue(ui.contains("StatusRingRow"));
+        Assertions.assertTrue(ui.contains("NeedHappiness"));
+        Assertions.assertTrue(ui.contains("NeedHunger"));
+        Assertions.assertTrue(ui.contains("NeedThirst"));
+        Assertions.assertTrue(ui.contains("BreedingCooldown"));
+        Assertions.assertTrue(ui.contains("HarvestCooldown"));
+        Assertions.assertTrue(ui.contains("ProgressionRow"));
+        Assertions.assertTrue(ui.contains("XpProgressRing"));
+        Assertions.assertTrue(ui.contains("TalentPointAction"));
+        Assertions.assertTrue(ui.contains("TraitRingRow"));
+        Assertions.assertTrue(ui.contains("TraitSlot0"));
     }
 }
