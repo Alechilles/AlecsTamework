@@ -64,8 +64,8 @@ public class TameworkClearFeedTroughWaterInteraction extends SimpleInteraction {
                          @Nonnull InteractionType type,
                          @Nonnull InteractionContext context,
                          @Nonnull CooldownHandler cooldownHandler) {
-        if (!firstRun) {
-            super.tick0(false, time, type, context, cooldownHandler);
+        if (time < getRunTime()) {
+            super.tick0(firstRun, time, type, context, cooldownHandler);
             return;
         }
         ItemStack heldItem = context.getHeldItem();
@@ -112,7 +112,7 @@ public class TameworkClearFeedTroughWaterInteraction extends SimpleInteraction {
             fail(context, time, type, cooldownHandler);
             return;
         }
-        super.tick0(true, time, type, context, cooldownHandler);
+        super.tick0(firstRun, time, type, context, cooldownHandler);
     }
 
     @Override
