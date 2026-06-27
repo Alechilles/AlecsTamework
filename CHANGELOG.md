@@ -17,6 +17,7 @@
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
 - Command target HUD favorite food now shows the food required for taming instead of generic feed items used by needs systems.
 - Command target HUD now clears and refreshes nearly instantly when players stop targeting a supported NPC, switch held items, or look at another supported NPC.
+- Command target HUD now appears for untamed NPCs that have enabled Tamework tame interactions.
 
 ## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24
 

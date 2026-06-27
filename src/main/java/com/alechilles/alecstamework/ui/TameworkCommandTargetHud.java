@@ -28,6 +28,13 @@ public final class TameworkCommandTargetHud extends CustomUIHud {
         UICommandBuilder commandBuilder = new UICommandBuilder();
         CommandTargetHudBinder.bind(commandBuilder, updatedModel, updatedLanguage);
         update(false, commandBuilder);
+        show();
+    }
+
+    public void hideNow() {
+        UICommandBuilder commandBuilder = new UICommandBuilder();
+        commandBuilder.set("#Root.Visible", false);
+        update(false, commandBuilder);
     }
 
     @Override

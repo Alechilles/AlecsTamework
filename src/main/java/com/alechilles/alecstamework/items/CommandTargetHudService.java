@@ -40,7 +40,7 @@ import javax.annotation.Nullable;
  * Shows a compact right-side status HUD while a player points a command item at a supported NPC.
  */
 public final class CommandTargetHudService extends TickingSystem<EntityStore> {
-    private static final long SWEEP_INTERVAL_MS = 25L;
+    private static final long SWEEP_INTERVAL_MS = 0L;
     private static final long REFRESH_INTERVAL_MS = 500L;
     private static final float TARGET_DISTANCE = 6.0f;
     private static final String TRANQUILIZER_REQUIREMENT_ID = "TameworkEffectActive";
@@ -74,7 +74,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (SWEEP_INTERVAL_MS > 0L && nowMs < nextSweepAtMs) {
             return;
         }
         nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
@@ -123,7 +123,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return;
         }
         if (target == null) {
-            clearHud(playerUuid, player);
+            hideHud(playerUuid, player, nowMs);
             return;
         }
         showHud(playerUuid, player, target.model(), targetKey, nowMs);
@@ -167,11 +167,9 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                                       @Nonnull Store<EntityStore> store) {
         String roleId = linkPolicyService.resolveRoleId(npc);
         boolean tamed = TamedStateResolver.isTamed(npcRef, store);
-        if (!linkPolicyService.isRoleAllowed(roleId, config, tamed)) {
-            return false;
-        }
         UUID playerUuid = player.getUuid();
-        return playerUuid != null
+        boolean commandEligible = playerUuid != null
+                && linkPolicyService.isRoleAllowed(roleId, config, tamed)
                 && linkPolicyService.passesOwnerAndTamed(
                 config.isRequireOwner(),
                 config.isRequireTamed(),
@@ -179,6 +177,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 playerUuid,
                 store
         );
+        return shouldShowForEligibility(tamed, commandEligible, isUntamedTameableTarget(tamed, roleId));
     }
 
     @Nullable
@@ -267,7 +266,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                          long nowMs) {
         PlayerRef playerRef = player.getPlayerRef();
         if (playerRef == null || player.getHudManager() == null) {
-            clearHud(playerUuid, player);
+            stateByPlayer.remove(playerUuid);
             return;
         }
         String language = playerRef.getLanguage();
@@ -280,15 +279,22 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         } else {
             hud.refresh(model, language);
         }
-        stateByPlayer.put(playerUuid, new HudState(targetKey, nowMs, hud));
+        stateByPlayer.put(playerUuid, new HudState(targetKey, nowMs, hud, true));
     }
 
-    private void clearHud(@Nonnull UUID playerUuid, @Nullable Player player) {
-        HudState removed = stateByPlayer.remove(playerUuid);
-        if (removed == null || player == null || player.getPlayerRef() == null || player.getHudManager() == null) {
+    private void hideHud(@Nonnull UUID playerUuid, @Nullable Player player, long nowMs) {
+        HudState previous = stateByPlayer.get(playerUuid);
+        if (previous == null || previous.hud() == null) {
             return;
         }
-        player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
+        if (player == null || player.getPlayerRef() == null || player.getHudManager() == null) {
+            stateByPlayer.remove(playerUuid);
+            return;
+        }
+        if (previous.visible()) {
+            previous.hud().hideNow();
+        }
+        stateByPlayer.put(playerUuid, new HudState(null, nowMs, previous.hud(), false));
     }
 
     private void clearInactivePlayers(@Nonnull HashSet<UUID> activePlayers) {
@@ -299,10 +305,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             if (playerUuid == null || activePlayers.contains(playerUuid)) {
                 continue;
             }
-            HudState state = stateByPlayer.get(playerUuid);
-            if (state == null || state.hud() == null) {
-                stateByPlayer.remove(playerUuid);
-            }
+            stateByPlayer.remove(playerUuid);
         }
     }
 
@@ -320,12 +323,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                                          @Nullable String targetKey,
                                          long nowMs) {
         if (targetKey == null || targetKey.isBlank()) {
-            return previous != null;
+            return previous != null && previous.visible();
         }
-        if (previous == null || previous.hud() == null) {
+        if (previous == null || previous.hud() == null || !previous.visible()) {
             return true;
         }
-        return shouldRefreshForTests(previous.targetKey(), targetKey, previous.lastRefreshMs(), nowMs, REFRESH_INTERVAL_MS);
+        return shouldRefreshForTests(previous.targetKey(), previous.visible(), targetKey, previous.lastRefreshMs(), nowMs, REFRESH_INTERVAL_MS);
     }
 
     static boolean shouldRefreshForTests(@Nullable String previousTargetKey,
@@ -333,13 +336,26 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                                          long previousRefreshMs,
                                          long nowMs,
                                          long refreshIntervalMs) {
+        return shouldRefreshForTests(previousTargetKey, true, currentTargetKey, previousRefreshMs, nowMs, refreshIntervalMs);
+    }
+
+    static boolean shouldRefreshForTests(@Nullable String previousTargetKey,
+                                         boolean previousVisible,
+                                         @Nullable String currentTargetKey,
+                                         long previousRefreshMs,
+                                         long nowMs,
+                                         long refreshIntervalMs) {
         if (currentTargetKey == null || currentTargetKey.isBlank()) {
-            return previousTargetKey != null && !previousTargetKey.isBlank();
+            return previousVisible && previousTargetKey != null && !previousTargetKey.isBlank();
         }
-        if (previousTargetKey == null || !previousTargetKey.equals(currentTargetKey)) {
+        if (!previousVisible || previousTargetKey == null || !previousTargetKey.equals(currentTargetKey)) {
             return true;
         }
         return nowMs - previousRefreshMs >= Math.max(0L, refreshIntervalMs);
+    }
+
+    static boolean shouldShowForEligibility(boolean tamed, boolean commandEligible, boolean untamedTameable) {
+        return tamed ? commandEligible : commandEligible || untamedTameable;
     }
 
     static long sweepIntervalMsForTests() {
@@ -364,6 +380,26 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             requiredSeconds = Math.max(requiredSeconds, resolveRequiredTranquilizerSeconds(entry.getRequires()));
         }
         return requiredSeconds;
+    }
+
+    private static boolean isUntamedTameableTarget(boolean tamed, @Nullable String roleId) {
+        if (tamed) {
+            return false;
+        }
+        TwInteractionConfig config = TwInteractionConfig.resolveForRole(roleId);
+        return hasEnabledTameInteraction(config);
+    }
+
+    private static boolean hasEnabledTameInteraction(@Nullable TwInteractionConfig config) {
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        for (TwInteractionConfig.InteractionEntry entry : config.getInteractions()) {
+            if (entry instanceof TwInteractionConfig.TameInteraction && entry.isEnabled()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static double resolveRequiredTranquilizerSeconds(@Nullable TwInteractionConfig.RequirementGroup group) {
@@ -439,7 +475,10 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         return value == null ? null : value.trim();
     }
 
-    private record HudState(@Nonnull String targetKey, long lastRefreshMs, @Nullable TameworkCommandTargetHud hud) {
+    private record HudState(@Nullable String targetKey,
+                            long lastRefreshMs,
+                            @Nullable TameworkCommandTargetHud hud,
+                            boolean visible) {
     }
 
     private record TargetSnapshot(@Nonnull String key, @Nonnull CommandTargetHudViewModel model) {

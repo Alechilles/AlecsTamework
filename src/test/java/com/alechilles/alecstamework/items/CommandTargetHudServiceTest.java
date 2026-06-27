@@ -76,6 +76,47 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
+    void doesNotRepeatClearForAlreadyHiddenHud() {
+        Assertions.assertFalse(CommandTargetHudService.shouldRefreshForTests(
+                "npc-a",
+                false,
+                null,
+                1_000L,
+                1_100L,
+                500L
+        ));
+    }
+
+    @Test
+    void refreshesWhenHiddenHudFindsNewTarget() {
+        Assertions.assertTrue(CommandTargetHudService.shouldRefreshForTests(
+                null,
+                false,
+                "npc-a",
+                1_000L,
+                1_100L,
+                500L
+        ));
+    }
+
+    @Test
+    void untamedTameableTargetsDisplayEvenWhenCommandLinkRulesRejectThem() {
+        Assertions.assertTrue(CommandTargetHudService.shouldShowForEligibility(false, false, true));
+    }
+
+    @Test
+    void untamedNonTameableTargetsNeedCommandEligibility() {
+        Assertions.assertFalse(CommandTargetHudService.shouldShowForEligibility(false, false, false));
+        Assertions.assertTrue(CommandTargetHudService.shouldShowForEligibility(false, true, false));
+    }
+
+    @Test
+    void tamedTargetsStillRequireCommandEligibility() {
+        Assertions.assertFalse(CommandTargetHudService.shouldShowForEligibility(true, false, true));
+        Assertions.assertTrue(CommandTargetHudService.shouldShowForEligibility(true, true, false));
+    }
+
+    @Test
     void parsesTranquilizerRequirementSeconds() {
         double seconds = CommandTargetHudService.resolveRequiredTranquilizerSecondsForTests(
                 "TameworkEffectActive",
