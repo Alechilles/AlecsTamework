@@ -20,7 +20,7 @@ interactionHints.modeCycle=Drücke [{key}] zum Wechseln der Modi
 interactionHints.custom=Drücke [{key}] zum Interagieren
 interactionHints.harvest=Drücke [{key}] zum Ernten
 interactionHints.harvestContext=Benutze ein Item zum Ernten
-interactionHints.emptyTrough=Drücke [{key}] zum Leeren des Trogs
+interactionHints.emptyTrough=Halte [{key}], um den Trog zu leeren
 interactionHints.openTrough=Drücke [{key}] zum Öffnen des Trogs
 
 # === Tamework Betäubung ===

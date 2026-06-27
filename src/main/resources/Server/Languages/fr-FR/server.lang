@@ -20,7 +20,7 @@ interactionHints.modeCycle=Appuyez sur [{key}] pour changer de mode
 interactionHints.custom=Appuyez sur [{key}] pour interagir
 interactionHints.harvest=Appuyez sur [{key}] pour récolter
 interactionHints.harvestContext=Utilisez l'objet pour récolter
-interactionHints.emptyTrough=Appuyez sur [{key}] pour vider la mangeoire
+interactionHints.emptyTrough=Maintenez [{key}] pour vider la mangeoire
 interactionHints.openTrough=Appuyez sur [{key}] pour ouvrir la mangeoire
 
 # === Tamework Tranquilizer ===

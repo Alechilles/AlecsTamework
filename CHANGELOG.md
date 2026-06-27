@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- Feed trough water states now require holding the empty interaction briefly, reducing accidental water dumps from quick use-key taps.
+
 ### Fixed
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
 

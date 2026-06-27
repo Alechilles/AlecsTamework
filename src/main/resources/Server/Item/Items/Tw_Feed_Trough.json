@@ -136,7 +136,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -200,7 +200,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -264,7 +264,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -328,7 +328,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -392,7 +392,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -456,7 +456,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -520,7 +520,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -584,7 +584,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -648,7 +648,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -712,7 +712,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]
@@ -776,7 +776,7 @@
               "Interactions": [
                 {
                   "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 0.0,
+                  "RunTime": 1.25,
                   "RequireEmptyHand": false
                 }
               ]

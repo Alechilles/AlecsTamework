@@ -20,7 +20,7 @@ interactionHints.modeCycle=Pressione [{key}] para mudar de modo
 interactionHints.custom=Pressione [{key}] para interagir
 interactionHints.harvest=Pressione [{key}] para coletar
 interactionHints.harvestContext=Use o item para coletar
-interactionHints.emptyTrough=Pressione [{key}] para esvaziar o cocho
+interactionHints.emptyTrough=Segure [{key}] para esvaziar o cocho
 interactionHints.openTrough=Pressione [{key}] para abrir o cocho
 
 # === Tamework Tranquilizer ===
