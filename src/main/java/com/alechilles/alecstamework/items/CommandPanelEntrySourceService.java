@@ -3,13 +3,9 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
-import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
@@ -17,9 +13,6 @@ import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
-import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
@@ -38,6 +31,7 @@ final class CommandPanelEntrySourceService {
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandNpcNameResolver npcNameResolver;
+    private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
 
     CommandPanelEntrySourceService(CommandLinkedPanelEntryService linkedPanelEntryService,
                                    CommandPanelPreferenceService panelPreferenceService,
@@ -49,6 +43,12 @@ final class CommandPanelEntrySourceService {
                 : new CommandPanelPreferenceService();
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.npcNameResolver = npcNameResolver != null ? npcNameResolver : new CommandNpcNameResolver();
+        this.loadedSnapshotService = new CommandLoadedNpcStatusSnapshotService(
+                this.npcNameResolver,
+                this.linkPolicyService,
+                new CommandLinkedPanelProgressionPresentationService(),
+                new CommandLinkedPanelCooldownSnapshotService()
+        );
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -66,7 +66,6 @@ final class CommandPanelEntrySourceService {
             return applyFiltersAndSort(linkedEntries, stack);
         }
         UUID playerUuid = player.getUuid();
-        String playerLanguage = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         Ref<EntityStore> playerRef = player.getReference();
         if (playerUuid == null || playerRef == null || !playerRef.isValid()) {
             return applyFiltersAndSort(linkedEntries, stack);
@@ -128,59 +127,28 @@ final class CommandPanelEntrySourceService {
                     continue;
                 }
                 String roleId = normalize(linkPolicyService.resolveRoleId(npc));
-                HealthSnapshot healthSnapshot = readHealthSnapshot(npcRef, store);
-                TameworkCommandLinksComponent links =
-                        store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-                boolean hasHome = links != null && links.hasHome();
-                LinkedNpcTraitIndicator[] traitIndicators =
-                        linkedPanelEntryService.readLoadedTraitIndicators(npcRef, store, playerLanguage);
-                out.add(new LinkedNpcEntry(
-                        npc.getUuid(),
-                        npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
-                        CompanionGenderService.resolveGender(npcRef, store, roleId, null),
-                        healthSnapshot.current,
-                        healthSnapshot.max,
-                        0,
-                        0,
-                        0,
-                        null,
-                        0,
-                        0,
-                        0,
-                        0,
-                        true,
-                        hasHome,
-                        false,
-                        false,
-                        false,
-                        false,
-                        0L,
-                        null,
-                        null,
-                        null,
-                        traitIndicators,
-                        false,
-                        false,
-                        false,
-                        false,
-                        false,
-                        true,
-                        roleId,
-                        roleId,
-                        null,
-                        null,
-                        null,
-                        false,
-                        false,
-                        0L,
-                        0.0,
-                        false,
-                        false,
-                        0L,
-                        0.0,
-                        false
-                ));
-                seen.add(npc.getUuid());
+                LinkedNpcEntry loadedEntry = loadedSnapshotService.buildLoadedEntry(
+                        player,
+                        npcRef,
+                        store,
+                        new CommandLoadedNpcStatusSnapshotService.NpcStatusContext(
+                                npc.getUuid(),
+                                npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
+                                false,
+                                true,
+                                false,
+                                false,
+                                null,
+                                null,
+                                null,
+                                roleId,
+                                null
+                        )
+                );
+                if (loadedEntry != null) {
+                    out.add(loadedEntry);
+                    seen.add(npc.getUuid());
+                }
             }
         });
         return applyFiltersAndSort(out, stack);
@@ -281,34 +249,6 @@ final class CommandPanelEntrySourceService {
         return active;
     }
 
-    private HealthSnapshot readHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return HealthSnapshot.ZERO;
-        }
-        ComponentType<EntityStore, EntityStatMap> statType = EntityStatMap.getComponentType();
-        if (statType == null) {
-            return HealthSnapshot.ZERO;
-        }
-        EntityStatMap statMap = store.getComponent(npcRef, statType);
-        if (statMap == null) {
-            return HealthSnapshot.ZERO;
-        }
-        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
-        if (healthIndex < 0) {
-            return HealthSnapshot.ZERO;
-        }
-        EntityStatValue value = statMap.get(healthIndex);
-        if (value == null) {
-            return HealthSnapshot.ZERO;
-        }
-        int current = Math.max(0, Math.round(value.get()));
-        int max = Math.max(1, Math.round(value.getMax()));
-        if (current > max) {
-            current = max;
-        }
-        return new HealthSnapshot(current, max);
-    }
-
     private String normalize(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -340,7 +280,4 @@ final class CommandPanelEntrySourceService {
         return value == null ? "" : value;
     }
 
-    private record HealthSnapshot(int current, int max) {
-        private static final HealthSnapshot ZERO = new HealthSnapshot(0, 0);
-    }
 }

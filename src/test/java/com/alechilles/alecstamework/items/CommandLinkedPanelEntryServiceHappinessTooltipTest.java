@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
-import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -12,8 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CommandLinkedPanelEntryServiceHappinessTooltipTest {
 
     @Test
-    void breakdownIncludesOnlyActiveFeedImpulses() throws Exception {
-        CommandLinkedPanelEntryService service = newService();
+    void breakdownIncludesOnlyActiveFeedImpulses() {
+        CommandLoadedNpcStatusSnapshotService service = newService();
         CompanionHappinessService.HappinessSnapshot snapshot = new CompanionHappinessService.HappinessSnapshot(
                 60.0,
                 0.0,
@@ -32,7 +31,7 @@ class CommandLinkedPanelEntryServiceHappinessTooltipTest {
                 )
         );
 
-        String breakdown = invokeBuildHappinessModifierBreakdown(service, snapshot);
+        String breakdown = service.buildHappinessModifierBreakdown(snapshot);
 
         assertTrue(breakdown.contains("Owner nearby: +5.00"));
         assertTrue(breakdown.contains("Ate Herbivore Feed: -10.00"));
@@ -42,8 +41,8 @@ class CommandLinkedPanelEntryServiceHappinessTooltipTest {
     }
 
     @Test
-    void breakdownOmitsFeedLinesWhenNoActiveImpulsesExist() throws Exception {
-        CommandLinkedPanelEntryService service = newService();
+    void breakdownOmitsFeedLinesWhenNoActiveImpulsesExist() {
+        CommandLoadedNpcStatusSnapshotService service = newService();
         CompanionHappinessService.HappinessSnapshot snapshot = new CompanionHappinessService.HappinessSnapshot(
                 50.0,
                 0.0,
@@ -53,33 +52,13 @@ class CommandLinkedPanelEntryServiceHappinessTooltipTest {
                 List.of()
         );
 
-        String breakdown = invokeBuildHappinessModifierBreakdown(service, snapshot);
+        String breakdown = service.buildHappinessModifierBreakdown(snapshot);
 
         assertFalse(breakdown != null && breakdown.contains("Ate "));
         assertTrue(breakdown == null || breakdown.isBlank());
     }
 
-    private static CommandLinkedPanelEntryService newService() {
-        return new CommandLinkedPanelEntryService(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-        );
-    }
-
-    private static String invokeBuildHappinessModifierBreakdown(CommandLinkedPanelEntryService service,
-                                                                CompanionHappinessService.HappinessSnapshot snapshot)
-            throws Exception {
-        Method method = CommandLinkedPanelEntryService.class.getDeclaredMethod(
-                "buildHappinessModifierBreakdown",
-                CompanionHappinessService.HappinessSnapshot.class
-        );
-        method.setAccessible(true);
-        return (String) method.invoke(service, snapshot);
+    private static CommandLoadedNpcStatusSnapshotService newService() {
+        return new CommandLoadedNpcStatusSnapshotService(null, null, null, null);
     }
 }

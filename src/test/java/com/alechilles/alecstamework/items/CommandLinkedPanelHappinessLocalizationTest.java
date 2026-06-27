@@ -13,7 +13,7 @@ class CommandLinkedPanelHappinessLocalizationTest {
     @Test
     void happinessPresentationResolvesConfiguredLabelsAsLanguageKeys() throws Exception {
         String content = Files.readString(
-                Path.of("src/main/java/com/alechilles/alecstamework/items/CommandLinkedPanelEntryService.java"),
+                Path.of("src/main/java/com/alechilles/alecstamework/items/CommandLoadedNpcStatusSnapshotService.java"),
                 StandardCharsets.UTF_8
         );
 
