@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
@@ -44,6 +45,10 @@ public final class TameworkTameFoodDisplayResolver {
 
     @Nonnull
     public FoodDisplay resolveFoodDisplayItemIds(@Nullable String roleId, @Nullable Role role, boolean tamed) {
+        TwFoodConfig.ResolvedFoodProfile foodProfile = TwFoodConfig.resolveProfileForRole(roleId);
+        if (foodProfile != null && foodProfile.hasAnyFood()) {
+            return fromFoodProfile(foodProfile, tamed);
+        }
         TwInteractionConfig config = TwInteractionConfig.resolveForRole(roleId);
         return resolveFoodDisplayItemIds(config, role, tamed);
     }
@@ -77,8 +82,60 @@ public final class TameworkTameFoodDisplayResolver {
         removeItem(compatible, favorite);
         return new FoodDisplay(
                 favorite == null ? EMPTY_ITEMS : new String[] { favorite },
-                compatible.toArray(new String[0])
+                compatible.toArray(new String[0]),
+                legacyEntries(favorite, compatible)
         );
+    }
+
+    @Nonnull
+    private static FoodDisplay fromFoodProfile(@Nonnull TwFoodConfig.ResolvedFoodProfile profile, boolean tamed) {
+        TwFoodConfig.FoodEntry[] entries = profile.displayEntries(tamed);
+        return new FoodDisplay(
+                profile.preferredItemIds(),
+                tamed ? nonPreferredEntries(entries) : EMPTY_ITEMS,
+                entries
+        );
+    }
+
+    @Nonnull
+    private static String[] nonPreferredEntries(@Nullable TwFoodConfig.FoodEntry[] entries) {
+        if (entries == null || entries.length == 0) {
+            return EMPTY_ITEMS;
+        }
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        for (TwFoodConfig.FoodEntry entry : entries) {
+            if (entry == null || entry.itemId() == null || entry.itemId().isBlank()) {
+                continue;
+            }
+            if (entry.category() == TwFoodConfig.FoodCategory.Preferred) {
+                continue;
+            }
+            out.add(entry.itemId().trim());
+        }
+        return out.isEmpty() ? EMPTY_ITEMS : out.toArray(new String[0]);
+    }
+
+    @Nonnull
+    private static TwFoodConfig.FoodEntry[] legacyEntries(@Nullable String favorite,
+                                                          @Nonnull LinkedHashSet<String> compatible) {
+        ArrayList<TwFoodConfig.FoodEntry> entries = new ArrayList<>();
+        if (favorite != null && !favorite.isBlank()) {
+            entries.add(new TwFoodConfig.FoodEntry(
+                    favorite.trim(),
+                    TwFoodConfig.FoodCategory.Preferred,
+                    Double.NaN
+            ));
+        }
+        for (String item : compatible) {
+            if (item != null && !item.isBlank()) {
+                entries.add(new TwFoodConfig.FoodEntry(
+                        item.trim(),
+                        TwFoodConfig.FoodCategory.Compatible,
+                        Double.NaN
+                ));
+            }
+        }
+        return entries.isEmpty() ? new TwFoodConfig.FoodEntry[0] : entries.toArray(new TwFoodConfig.FoodEntry[0]);
     }
 
     public double resolveRequiredTranquilizerSeconds(@Nullable String roleId, @Nullable Role role) {
@@ -373,10 +430,13 @@ public final class TameworkTameFoodDisplayResolver {
         return globalConfig != null ? globalConfig.getLovedItemsParam() : "LovedItems";
     }
 
-    public record FoodDisplay(@Nonnull String[] favoriteItemIds, @Nonnull String[] compatibleItemIds) {
+    public record FoodDisplay(@Nonnull String[] favoriteItemIds,
+                              @Nonnull String[] compatibleItemIds,
+                              @Nonnull TwFoodConfig.FoodEntry[] entries) {
         public FoodDisplay {
             favoriteItemIds = favoriteItemIds == null ? EMPTY_ITEMS : favoriteItemIds.clone();
             compatibleItemIds = compatibleItemIds == null ? EMPTY_ITEMS : compatibleItemIds.clone();
+            entries = entries == null ? new TwFoodConfig.FoodEntry[0] : entries.clone();
         }
     }
 }

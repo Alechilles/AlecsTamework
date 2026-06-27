@@ -1,9 +1,10 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.hypixel.hytale.server.npc.role.Role;
-import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.WeakHashMap;
 import javax.annotation.Nonnull;
@@ -58,11 +59,13 @@ final class InteractionItemIdResolver {
         }
         String[] paramItems = resolveItemsParam(role, ctx, interaction.getItemsParam());
         String[] explicitItems = resolveExplicitFeedItemIds(interaction.getItemsInHand());
+        String[] profileItems = TwFoodConfig.resolveAcceptedItemIdsForRole(resolveRoleId(role));
         InteractionRequiredItems resolved;
         boolean hasParamItems = hasItems(paramItems);
         boolean hasExplicitItems = hasItems(explicitItems);
-        if (hasParamItems || hasExplicitItems) {
-            resolved = new InteractionRequiredItems(combineItemIds(paramItems, explicitItems), true);
+        boolean hasProfileItems = hasItems(profileItems);
+        if (hasParamItems || hasExplicitItems || hasProfileItems) {
+            resolved = new InteractionRequiredItems(combineItemIds(paramItems, explicitItems, profileItems), true);
         } else if (interaction.getUseLovedItems() == null || interaction.getUseLovedItems()) {
             resolved = new InteractionRequiredItems(lovedItems, true);
         } else {
@@ -91,18 +94,22 @@ final class InteractionItemIdResolver {
     }
 
     @Nonnull
-    private String[] combineItemIds(@Nullable String[] first, @Nullable String[] second) {
-        boolean hasFirst = hasItems(first);
-        boolean hasSecond = hasItems(second);
-        if (!hasFirst) {
-            return hasSecond ? second : EMPTY_ITEMS;
+    private String[] combineItemIds(@Nullable String[]... sources) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>();
+        if (sources == null || sources.length == 0) {
+            return EMPTY_ITEMS;
         }
-        if (!hasSecond) {
-            return first;
+        for (String[] source : sources) {
+            if (!hasItems(source)) {
+                continue;
+            }
+            for (String item : source) {
+                if (item != null && !item.isBlank()) {
+                    merged.add(item.trim());
+                }
+            }
         }
-        String[] merged = Arrays.copyOf(first, first.length + second.length);
-        System.arraycopy(second, 0, merged, first.length, second.length);
-        return merged;
+        return merged.isEmpty() ? EMPTY_ITEMS : merged.toArray(new String[0]);
     }
 
     private boolean hasItems(@Nullable String[] items) {
@@ -115,5 +122,13 @@ final class InteractionItemIdResolver {
             }
         }
         return false;
+    }
+
+    @Nullable
+    private static String resolveRoleId(@Nullable Role role) {
+        if (role == null || role.getRoleName() == null || role.getRoleName().isBlank()) {
+            return null;
+        }
+        return role.getRoleName();
     }
 }

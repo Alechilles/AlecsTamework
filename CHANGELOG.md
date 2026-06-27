@@ -9,13 +9,14 @@
 - Linked companion panel cooldown timers now use icon art for breeding and harvest instead of letter labels.
 - Taming now tells players when a new companion is automatically linked to a command item, or when no matching command item was found in inventory.
 - Taming now shows warning notifications when the player is at the per-player ownership limit or the target claim is at its SimpleClaims companion limit.
-- Holding a command item while looking at a supported NPC now shows a compact right-side status HUD with vitals, progression details, favorite food, compatible tamed food, attachment selections, and tame tranquilizer requirements when available.
+- Holding a command item while looking at a supported NPC now shows a compact right-side status HUD with vitals, progression details, food profiles, attachment selections, and tame tranquilizer requirements when available.
 - Command target HUD vitals, cooldowns, level, talent points, gender, and traits now use the same compact ring controls and header placement as the linked companion panel.
+- Added `TwFoodConfig` assets for role food profiles with Preferred, Premium, Compatible, and Disliked categories shared by taming prompts, feed matching, needs consumption, happiness deltas, and the command target HUD.
 
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
-- Command target HUD favorite food now uses explicit `FoodFavorite` role params when present and falls back to the preferred tame or compatible food while tamed NPCs also show other compatible feed items such as feedbags or cohort feed.
+- Command target HUD food display now resolves role food profiles before legacy role params, so favorite foods can be shown separately from compatible feed items such as feedbags or cohort feed.
 - Command target HUD food and tame requirement rows now render food items through item-slot icons and show tranquilizer stack requirements more reliably.
 - Command target HUD attachment selections now use the same `Name: Value` line format as captured spawner item tooltips.
 - Command target HUD now clears and refreshes nearly instantly when players stop targeting a supported NPC, switch held items, or look at another supported NPC.

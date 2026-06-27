@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.hypixel.hytale.component.Ref;
@@ -130,7 +131,10 @@ final class InteractionParamAccess {
         }
         FeedItem[] paramItems = resolveFeedItemsFromParam(role, ctx, interaction.getItemsParam());
         FeedItem[] explicitItems = interaction.getItemsInHand();
-        FeedItem[] mergedItems = mergeFeedItems(paramItems, explicitItems);
+        FeedItem[] profileItems = InteractionItemParser.toFeedItems(
+                TwFoodConfig.resolveAcceptedItemIdsForRole(resolveRoleId(role))
+        );
+        FeedItem[] mergedItems = mergeFeedItems(paramItems, explicitItems, profileItems);
         String[] mergedItemIds = InteractionItemParser.extractItemIds(mergedItems);
         if (mergedItemIds.length > 0) {
             return new InteractionFeedItems(mergedItemIds, mergedItems, true);
@@ -143,14 +147,22 @@ final class InteractionParamAccess {
     }
 
     @Nonnull
-    private FeedItem[] mergeFeedItems(@Nullable FeedItem[] paramItems, @Nullable FeedItem[] explicitItems) {
+    private FeedItem[] mergeFeedItems(@Nullable FeedItem[]... sources) {
         LinkedHashMap<String, FeedItem> mergedByItemId = new LinkedHashMap<>();
-        mergeFeedItemsIntoMap(mergedByItemId, paramItems);
-        mergeFeedItemsIntoMap(mergedByItemId, explicitItems);
+        if (sources != null) {
+            for (FeedItem[] source : sources) {
+                mergeFeedItemsIntoMap(mergedByItemId, source);
+            }
+        }
         if (mergedByItemId.isEmpty()) {
             return new FeedItem[0];
         }
         return mergedByItemId.values().toArray(new FeedItem[0]);
+    }
+
+    @Nonnull
+    private FeedItem[] mergeFeedItems(@Nullable FeedItem[] paramItems, @Nullable FeedItem[] explicitItems) {
+        return mergeFeedItems(new FeedItem[][] { paramItems, explicitItems });
     }
 
     private void mergeFeedItemsIntoMap(@Nonnull Map<String, FeedItem> mergedByItemId,
@@ -199,5 +211,13 @@ final class InteractionParamAccess {
     @Nullable
     String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
         return itemIdResolver.resolveItemsParam(role, ctx, itemsParam);
+    }
+
+    @Nullable
+    private static String resolveRoleId(@Nullable Role role) {
+        if (role == null || role.getRoleName() == null || role.getRoleName().isBlank()) {
+            return null;
+        }
+        return role.getRoleName();
     }
 }

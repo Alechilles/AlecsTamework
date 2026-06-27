@@ -1,7 +1,8 @@
 package com.alechilles.alecstamework.npc.progression;
 
-import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
@@ -588,6 +589,18 @@ public final class CompanionHappinessService {
         if (durationMs <= 0L) {
             return null;
         }
+        Double foodProfileImpulse = resolveFoodProfileImpulse(npcRef, store, normalizedItemId);
+        if (foodProfileImpulse != null
+                && Double.isFinite(foodProfileImpulse)
+                && Math.abs(foodProfileImpulse) > EPSILON) {
+            return new ResolvedFeedImpulse(
+                    "feed:food:" + normalizedItemId,
+                    IMPULSE_LABEL_ATE,
+                    foodProfileImpulse,
+                    System.currentTimeMillis() + durationMs,
+                    displayItemId
+            );
+        }
         Double explicitItemImpulse = impulses.getFeedItemImpulses().get(normalizedItemId);
         if (explicitItemImpulse != null && Double.isFinite(explicitItemImpulse)) {
             return new ResolvedFeedImpulse(
@@ -626,6 +639,14 @@ public final class CompanionHappinessService {
             );
         }
         return null;
+    }
+
+    @Nullable
+    private static Double resolveFoodProfileImpulse(@Nullable Ref<EntityStore> npcRef,
+                                                    @Nullable Store<EntityStore> store,
+                                                    @Nullable String normalizedItemId) {
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        return TwFoodConfig.resolveHappinessDeltaForRole(roleId, normalizedItemId);
     }
 
     static double resolveFeedImpulseTotal(@Nullable TwHappinessConfig happinessConfig,

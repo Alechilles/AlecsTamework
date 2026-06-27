@@ -10,6 +10,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwNameItemConfig`: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 - `TwNamesConfig`: `<ModRoot>/Server/Tamework/Names/*.json`
 - `TwCommandItemConfig`: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
+- `TwFoodConfig`: `<ModRoot>/Server/Tamework/Food/*.json`
 - `TwHappinessConfig`: `<ModRoot>/Server/Tamework/Happiness/*.json`
 - `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
 - `TwBreedingConfig`: `<ModRoot>/Server/Tamework/Breeding/*.json`
@@ -26,6 +27,7 @@ This document explains where Tamework config assets live and how each family res
 Resolved by role id + `Priority`:
 - `TwCompanionConfig`
 - `TwInteractionConfig`
+- `TwFoodConfig`
 - `TwHappinessConfig`
 - `TwNeedsConfig`
 - `TwBreedingConfig`

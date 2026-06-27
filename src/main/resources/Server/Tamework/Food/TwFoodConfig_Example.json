@@ -1,0 +1,18 @@
+{
+  "Enabled": false,
+  "Priority": 0,
+  "RoleIds": [],
+  "Foods": {
+    "Preferred": [],
+    "Premium": [],
+    "Compatible": [],
+    "Disliked": []
+  },
+  "Happiness": {
+    "Preferred": 6,
+    "Premium": 10,
+    "Compatible": 2,
+    "Disliked": -10
+  },
+  "RoleOverrides": {}
+}

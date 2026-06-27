@@ -14,12 +14,13 @@ class CommandTargetHudBinderTest {
 
         Assertions.assertTrue(source.contains("#FoodRow.Visible"));
         Assertions.assertTrue(source.contains("#FavoriteFoodBlock.Visible"));
-        Assertions.assertTrue(source.contains("#CompatibleFoodBlock.Visible"));
-        Assertions.assertTrue(source.contains("bindCompatibleFoodIcons"));
-        Assertions.assertTrue(source.contains("#CompatibleFoodGrid"));
+        Assertions.assertTrue(source.contains("#FoodStripBlock.Visible"));
+        Assertions.assertTrue(source.contains("bindFoodStrip"));
+        Assertions.assertTrue(source.contains("#FoodSlot"));
+        Assertions.assertTrue(source.contains("#FoodValue.Text"));
         Assertions.assertTrue(source.contains("new ItemGridSlot(new ItemStack"));
         Assertions.assertTrue(source.contains(".Slots"));
-        Assertions.assertTrue(source.contains("#CompatibleFoodMore.Visible"));
+        Assertions.assertTrue(source.contains("#FoodMore.Visible"));
         Assertions.assertTrue(source.contains("#GenderMaleIcon.Visible"));
         Assertions.assertTrue(source.contains("#GenderFemaleIcon.Visible"));
         Assertions.assertTrue(source.contains("\"#AttachmentRow\" + i"));
@@ -42,12 +43,13 @@ class CommandTargetHudBinderTest {
 
         Assertions.assertTrue(ui.contains("FoodRow"));
         Assertions.assertTrue(ui.contains("FavoriteFoodBlock"));
-        Assertions.assertTrue(ui.contains("CompatibleFoodBlock"));
+        Assertions.assertTrue(ui.contains("FoodStripBlock"));
         Assertions.assertTrue(ui.contains("ItemGrid #FoodItemGrid"));
-        Assertions.assertTrue(ui.contains("CompatibleFoodGrid0"));
-        Assertions.assertTrue(ui.contains("CompatibleFoodGrid1"));
-        Assertions.assertTrue(ui.contains("CompatibleFoodGrid2"));
-        Assertions.assertTrue(ui.contains("CompatibleFoodMore"));
+        Assertions.assertTrue(ui.contains("FoodSlot0"));
+        Assertions.assertTrue(ui.contains("FoodSlot1"));
+        Assertions.assertTrue(ui.contains("FoodSlot2"));
+        Assertions.assertTrue(ui.contains("FoodSlot3"));
+        Assertions.assertTrue(ui.contains("FoodMore"));
         Assertions.assertTrue(ui.contains("GenderMaleIcon"));
         Assertions.assertTrue(ui.contains("GenderFemaleIcon"));
         Assertions.assertTrue(ui.contains("RenderItemQualityBackground: false"));

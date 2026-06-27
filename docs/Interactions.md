@@ -75,8 +75,10 @@ Common fields:
 
 Behavior:
 - Requires tamed NPC and matching held item.
+- Also accepts foods supplied by the role's `TwFoodConfig` profile when one is configured.
 - Heals/consumes item.
 - Applies shared happiness gain (`TwHappinessConfig` or defaults) with trait scaling via `HappinessGainMultiplier`.
+- Consumed-feed happiness prefers the role's `TwFoodConfig` food category value, then falls back to `TwHappinessConfig` item/param impulses.
 - Applies manual needs refill rules from `TwNeedsConfig.ManualRefill` when configured.
 - Companion hydration can also consume feed trough water charges through needs/runtime systems; trough water states can be refilled via compatible bucket interactions.
 

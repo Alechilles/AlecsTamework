@@ -16,7 +16,13 @@ public record CommandTargetHudViewModel(@Nonnull LinkedNpcEntry status,
         attachments = attachments == null ? List.of() : List.copyOf(attachments);
     }
 
-    public record FoodRow(@Nonnull String itemId, @Nonnull String displayName, @Nullable String iconPath) {
+    public record FoodRow(@Nonnull String itemId,
+                          @Nonnull String displayName,
+                          @Nullable String iconPath,
+                          @Nullable Double happinessDelta) {
+        public FoodRow(@Nonnull String itemId, @Nonnull String displayName, @Nullable String iconPath) {
+            this(itemId, displayName, iconPath, null);
+        }
     }
 
     public record AttachmentRow(@Nonnull String setLabel, @Nonnull String valueLabel) {

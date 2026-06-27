@@ -730,6 +730,7 @@ tamework.ui.commandTargetHud.thirst=Thirst
 tamework.ui.commandTargetHud.level=Level
 tamework.ui.commandTargetHud.favoriteFood=Favorite food
 tamework.ui.commandTargetHud.compatibleFoods=Also
+tamework.ui.commandTargetHud.foodHappiness={0} happiness
 tamework.ui.commandTargetHud.harvestCooldown=Harvest
 tamework.ui.commandTargetHud.breedingCooldown=Breeding
 tamework.ui.commandTargetHud.tameRequirement=Tame requirement

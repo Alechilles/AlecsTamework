@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -22,15 +23,19 @@ final class FeedItemPreferenceResolver {
     private final Store<EntityStore> store;
     @Nullable
     private final TwHappinessConfig happinessConfig;
+    @Nullable
+    private final TwFoodConfig.ResolvedFoodProfile foodProfile;
     @Nonnull
     private final Map<String, Double> scoreCache = new HashMap<>();
 
     private FeedItemPreferenceResolver(@Nullable Ref<EntityStore> npcRef,
                                        @Nullable Store<EntityStore> store,
-                                       @Nullable TwHappinessConfig happinessConfig) {
+                                       @Nullable TwHappinessConfig happinessConfig,
+                                       @Nullable TwFoodConfig.ResolvedFoodProfile foodProfile) {
         this.npcRef = npcRef;
         this.store = store;
         this.happinessConfig = happinessConfig;
+        this.foodProfile = foodProfile;
     }
 
     @Nonnull
@@ -44,12 +49,17 @@ final class FeedItemPreferenceResolver {
         TwHappinessConfig config = byRole != null
                 ? byRole
                 : HappinessConfigResolver.resolveConfig(npcRef, store, null);
-        return new FeedItemPreferenceResolver(npcRef, store, config);
+        return new FeedItemPreferenceResolver(npcRef, store, config, TwFoodConfig.resolveProfileForRole(roleId));
     }
 
     @Nonnull
     static FeedItemPreferenceResolver create(@Nullable TwHappinessConfig happinessConfig) {
-        return new FeedItemPreferenceResolver(null, null, happinessConfig);
+        return new FeedItemPreferenceResolver(null, null, happinessConfig, null);
+    }
+
+    @Nonnull
+    static FeedItemPreferenceResolver create(@Nullable TwFoodConfig.ResolvedFoodProfile foodProfile) {
+        return new FeedItemPreferenceResolver(null, null, null, foodProfile);
     }
 
     double score(@Nullable String itemId) {
@@ -60,6 +70,11 @@ final class FeedItemPreferenceResolver {
         Double cached = scoreCache.get(normalizedItemId);
         if (cached != null) {
             return cached;
+        }
+        Double profileScore = foodProfile != null ? foodProfile.resolveHappinessDelta(normalizedItemId) : null;
+        if (profileScore != null && Double.isFinite(profileScore)) {
+            scoreCache.put(normalizedItemId, profileScore);
+            return profileScore;
         }
         double resolved = CompanionHappinessService.resolveFeedItemPreferenceScore(
                 npcRef,

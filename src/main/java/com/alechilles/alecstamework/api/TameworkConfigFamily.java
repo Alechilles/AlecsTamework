@@ -9,6 +9,7 @@ public enum TameworkConfigFamily {
     NAMES,
     COMMAND_ITEM,
     COOP,
+    FOOD,
     HAPPINESS,
     NEEDS,
     BREEDING,

@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
 /** Binds compact command-target HUD data into the passive right-side overlay. */
 final class CommandTargetHudBinder {
     private static final int MAX_ATTACHMENT_ROWS = 6;
-    private static final int MAX_COMPATIBLE_FOOD_ICONS = 3;
+    private static final int MAX_FOOD_STRIP_ITEMS = 4;
 
     private CommandTargetHudBinder() {
     }
@@ -75,13 +75,13 @@ final class CommandTargetHudBinder {
 
     private static void bindFood(UICommandBuilder commandBuilder,
                                  @Nullable CommandTargetHudViewModel.FoodRow food,
-                                 @Nonnull List<CommandTargetHudViewModel.FoodRow> compatibleFoods,
+                                 @Nonnull List<CommandTargetHudViewModel.FoodRow> foodRows,
                                  @Nullable String language) {
-        boolean hasCompatibleFoods = !compatibleFoods.isEmpty();
-        commandBuilder.set("#FoodRow.Visible", food != null || hasCompatibleFoods);
+        boolean hasFoodRows = !foodRows.isEmpty();
+        commandBuilder.set("#FoodRow.Visible", food != null || hasFoodRows);
         commandBuilder.set("#FavoriteFoodBlock.Visible", food != null);
-        commandBuilder.set("#CompatibleFoodBlock.Visible", hasCompatibleFoods);
-        if (food == null && !hasCompatibleFoods) {
+        commandBuilder.set("#FoodStripBlock.Visible", hasFoodRows);
+        if (food == null && !hasFoodRows) {
             return;
         }
         if (food != null) {
@@ -89,18 +89,18 @@ final class CommandTargetHudBinder {
             commandBuilder.set("#FoodName.Text", food.displayName());
             bindFoodGrid(commandBuilder, "#FoodItemGrid", food);
         }
-        if (hasCompatibleFoods) {
-            commandBuilder.set("#CompatibleFoodLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.compatibleFoods"));
-            bindCompatibleFoodIcons(commandBuilder, compatibleFoods);
+        if (hasFoodRows) {
+            bindFoodStrip(commandBuilder, foodRows, language);
         }
     }
 
-    private static void bindCompatibleFoodIcons(@Nonnull UICommandBuilder commandBuilder,
-                                                @Nonnull List<CommandTargetHudViewModel.FoodRow> foods) {
+    private static void bindFoodStrip(@Nonnull UICommandBuilder commandBuilder,
+                                      @Nonnull List<CommandTargetHudViewModel.FoodRow> foods,
+                                      @Nullable String language) {
         int rendered = 0;
-        int maxIcons = foods.size() > MAX_COMPATIBLE_FOOD_ICONS
-                ? MAX_COMPATIBLE_FOOD_ICONS - 1
-                : MAX_COMPATIBLE_FOOD_ICONS;
+        int maxIcons = foods.size() > MAX_FOOD_STRIP_ITEMS
+                ? MAX_FOOD_STRIP_ITEMS - 1
+                : MAX_FOOD_STRIP_ITEMS;
         for (CommandTargetHudViewModel.FoodRow food : foods) {
             if (food == null || food.itemId() == null || food.itemId().isBlank()) {
                 continue;
@@ -108,19 +108,30 @@ final class CommandTargetHudBinder {
             if (rendered >= maxIcons) {
                 break;
             }
-            bindFoodGrid(commandBuilder, "#CompatibleFoodGrid" + rendered, food);
+            bindFoodStripSlot(commandBuilder, rendered, food, language);
             rendered++;
         }
-        for (int i = rendered; i < MAX_COMPATIBLE_FOOD_ICONS; i++) {
-            commandBuilder.set("#CompatibleFoodGrid" + i + ".Visible", false);
+        for (int i = rendered; i < MAX_FOOD_STRIP_ITEMS; i++) {
+            commandBuilder.set("#FoodSlot" + i + ".Visible", false);
         }
         int remaining = foods.size() - rendered;
         if (remaining > 0) {
-            commandBuilder.set("#CompatibleFoodMore.Visible", true);
-            commandBuilder.set("#CompatibleFoodMore.Text", "+" + remaining);
+            commandBuilder.set("#FoodMore.Visible", true);
+            commandBuilder.set("#FoodMore.Text", "+" + remaining);
         } else {
-            commandBuilder.set("#CompatibleFoodMore.Visible", false);
+            commandBuilder.set("#FoodMore.Visible", false);
         }
+    }
+
+    private static void bindFoodStripSlot(@Nonnull UICommandBuilder commandBuilder,
+                                          int index,
+                                          @Nonnull CommandTargetHudViewModel.FoodRow food,
+                                          @Nullable String language) {
+        String selector = "#FoodSlot" + index;
+        commandBuilder.set(selector + ".Visible", true);
+        commandBuilder.set(selector + " #FoodValue.Text", formatHappinessDelta(food.happinessDelta()));
+        commandBuilder.set(selector + " #FoodTooltip.TooltipText", foodTooltip(food, language));
+        bindFoodGrid(commandBuilder, selector + " #FoodGrid", food);
     }
 
     private static void bindFoodGrid(@Nonnull UICommandBuilder commandBuilder,
@@ -140,6 +151,32 @@ final class CommandTargetHudBinder {
         slot.setName(food.displayName());
         slot.setSkipItemQualityBackground(true);
         return slot;
+    }
+
+    @Nonnull
+    private static String formatHappinessDelta(@Nullable Double value) {
+        if (value == null || !Double.isFinite(value)) {
+            return "";
+        }
+        double rounded = Math.rint(value);
+        String text = Math.abs(value - rounded) < 0.001
+                ? Integer.toString((int) rounded)
+                : String.format(java.util.Locale.ROOT, "%.1f", value);
+        return value > 0.0 ? "+" + text : text;
+    }
+
+    @Nonnull
+    private static String foodTooltip(@Nonnull CommandTargetHudViewModel.FoodRow food,
+                                      @Nullable String language) {
+        String delta = formatHappinessDelta(food.happinessDelta());
+        if (delta.isBlank()) {
+            return food.displayName();
+        }
+        return food.displayName() + "\n" + LocalizedText.format(
+                language,
+                "tamework.ui.commandTargetHud.foodHappiness",
+                delta
+        );
     }
 
     private static void bindAttachments(UICommandBuilder commandBuilder,

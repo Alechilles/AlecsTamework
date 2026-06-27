@@ -207,13 +207,25 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         boolean tamed = TamedStateResolver.isTamed(npcRef, store);
         TameworkTameFoodDisplayResolver.FoodDisplay foodDisplay =
                 tameFoodDisplayResolver.resolveFoodDisplayItemIds(roleId, npc.getRole(), tamed);
+        List<CommandTargetHudViewModel.FoodRow> foodRows =
+                foodResolver.resolveFoodEntries(player, foodDisplay.entries());
         return new CommandTargetHudViewModel(
                 status,
-                foodResolver.resolveFavoriteFood(player, foodDisplay.favoriteItemIds()),
-                tamed ? foodResolver.resolveFoods(player, foodDisplay.compatibleItemIds()) : List.of(),
+                tamed ? null : firstFoodRow(foodRows, player, foodDisplay.favoriteItemIds()),
+                tamed ? foodRows : List.of(),
                 attachmentResolver.resolveRows(roleId, resolveModelAssetId(npcRef, store), resolveAttachmentIds(npcRef, store)),
                 resolveTameRequirement(npcRef, roleId, npc.getRole(), tamed, store)
         );
+    }
+
+    @Nullable
+    private CommandTargetHudViewModel.FoodRow firstFoodRow(@Nonnull List<CommandTargetHudViewModel.FoodRow> rows,
+                                                          @Nonnull Player player,
+                                                          @Nullable String[] fallbackItemIds) {
+        if (!rows.isEmpty()) {
+            return rows.get(0);
+        }
+        return foodResolver.resolveFavoriteFood(player, fallbackItemIds);
     }
 
     @Nullable

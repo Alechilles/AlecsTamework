@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import java.lang.reflect.Method;
@@ -55,6 +56,28 @@ final class CommandTargetHudFoodResolver {
                     clean,
                     safe(nameResolver.apply(player, clean), humanize(clean)),
                     iconResolver.apply(clean)
+            ));
+        }
+        return rows.isEmpty() ? List.of() : List.copyOf(rows);
+    }
+
+    List<CommandTargetHudViewModel.FoodRow> resolveFoodEntries(@Nullable Player player,
+                                                               @Nullable TwFoodConfig.FoodEntry[] entries) {
+        if (entries == null || entries.length == 0) {
+            return List.of();
+        }
+        ArrayList<CommandTargetHudViewModel.FoodRow> rows = new ArrayList<>();
+        for (TwFoodConfig.FoodEntry entry : entries) {
+            if (entry == null || entry.itemId() == null || entry.itemId().isBlank()) {
+                continue;
+            }
+            String clean = entry.itemId().trim();
+            Double delta = Double.isFinite(entry.happinessDelta()) ? entry.happinessDelta() : null;
+            rows.add(new CommandTargetHudViewModel.FoodRow(
+                    clean,
+                    safe(nameResolver.apply(player, clean), humanize(clean)),
+                    iconResolver.apply(clean),
+                    delta
             ));
         }
         return rows.isEmpty() ? List.of() : List.copyOf(rows);

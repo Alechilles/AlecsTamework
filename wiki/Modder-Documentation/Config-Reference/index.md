@@ -18,6 +18,7 @@ This subsection contains one page per `Tw*Config` asset family. Structure is int
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
 - [TwNamesConfig Reference](/mod/alecs-tamework/twnamesconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
+- [TwFoodConfig Reference](/mod/alecs-tamework/twfoodconfig-reference)
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.items.FeedTroughContainerCompat;
@@ -1516,6 +1517,7 @@ public final class CompanionNeedsEnvironmentService {
             );
         }
         Set<String> allowedFoods = normalizeItemIds(preferredFoodItemIds);
+        allowedFoods.addAll(normalizeItemIds(TwFoodConfig.resolveNeedsConsumeItemIdsForRole(roleId)));
         allowedFoods.addAll(normalizeItemIds(passiveRefill.getContainerFoodItemIds()));
         if (allowedFoods.isEmpty()) {
             return new ContainerConsumeResult(

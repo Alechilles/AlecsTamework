@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -143,6 +144,7 @@ final class TwConfigSchemaAdapter {
             case NAME_ITEM -> TwNameItemConfig.CODEC;
             case NAMES -> TwNamesConfig.CODEC;
             case COMMAND_ITEM -> TwCommandItemConfig.CODEC;
+            case FOOD -> TwFoodConfig.CODEC;
             case HAPPINESS -> TwHappinessConfig.CODEC;
             case NEEDS -> TwNeedsConfig.CODEC;
             case BREEDING -> TwBreedingConfig.CODEC;

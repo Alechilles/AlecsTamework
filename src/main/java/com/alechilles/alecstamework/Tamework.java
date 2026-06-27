@@ -32,6 +32,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
+import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -234,6 +235,7 @@ public class Tamework extends JavaPlugin {
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private boolean coopAssetsRegistered;
+    private boolean foodAssetsRegistered;
     private boolean happinessAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
@@ -411,6 +413,7 @@ public class Tamework extends JavaPlugin {
         registerNamesAssets();
         registerCommandItemAssets();
         registerInteractionAssets();
+        registerFoodAssets();
         registerHappinessAssets();
         registerNeedsAssets();
         registerBreedingAssets();
@@ -1617,6 +1620,22 @@ public class Tamework extends JavaPlugin {
         happinessAssetsRegistered = true;
     }
 
+    private void registerFoodAssets() {
+        if (foodAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwFoodConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Food")
+                        .setCodec(TwFoodConfig.CODEC)
+                        .setKeyFunction(TwFoodConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwFoodConfig.class, this::onFoodAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwFoodConfig.class, this::onFoodAssetsRemoved);
+        foodAssetsRegistered = true;
+    }
+
     private void registerNeedsAssets() {
         if (needsAssetsRegistered) {
             return;
@@ -1999,6 +2018,22 @@ public class Tamework extends JavaPlugin {
         TwHappinessConfig.clearRoleCache();
         CompanionHappinessModifierService.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.HAPPINESS, event.getRemovedAssets());
+    }
+
+    private void onFoodAssetsLoaded(
+            LoadedAssetsEvent<String, TwFoodConfig, DefaultAssetMap<String, TwFoodConfig>> event) {
+        TwFoodConfig.clearRoleCache();
+        CompanionHappinessModifierService.clearCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.FOOD, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onFoodAssetsRemoved(
+            RemovedAssetsEvent<String, TwFoodConfig, DefaultAssetMap<String, TwFoodConfig>> event) {
+        TwFoodConfig.clearRoleCache();
+        CompanionHappinessModifierService.clearCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.FOOD, event.getRemovedAssets());
     }
 
     private void onNeedsAssetsLoaded(
