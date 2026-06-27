@@ -107,6 +107,41 @@ class TameworkTameFoodDisplayResolverTest {
     }
 
     @Test
+    void foodDisplayUsesExplicitFoodFavoriteBeforeAttractiveItems() throws Exception {
+        StdScope scope = new StdScope(null);
+        scope.addConst("FoodFavorite", new String[] { "Plant_Fruit_Apple" });
+        scope.addConst("AttractiveItemSet", new String[] { "Tool_Feedbag", "Plant_Crop_Lettuce_Item" });
+        Role role = newRoleWithScope(scope);
+        TwInteractionConfig.FeedInteraction feed = new TwInteractionConfig.FeedInteraction();
+        setField(TwInteractionConfig.FeedInteraction.class, feed, "itemsParam", "AttractiveItemSet");
+
+        TameworkTameFoodDisplayResolver.FoodDisplay display =
+                new TameworkTameFoodDisplayResolver("AttractiveItemSet")
+                        .resolveFoodDisplayItemIds(configWith(feed), role, true);
+
+        assertArrayEquals(new String[] { "Plant_Fruit_Apple" }, display.favoriteItemIds());
+        assertArrayEquals(new String[] { "Tool_Feedbag", "Plant_Crop_Lettuce_Item" }, display.compatibleItemIds());
+    }
+
+    @Test
+    void foodDisplayPromotesFirstCompatibleFoodWhenFavoriteSourcesAreEmpty() throws Exception {
+        StdScope scope = new StdScope(null);
+        Role role = newRoleWithScope(scope);
+        TwInteractionConfig.FeedInteraction feed = new TwInteractionConfig.FeedInteraction();
+        setField(TwInteractionConfig.FeedInteraction.class, feed, "itemsInHand", new TwInteractionConfig.FeedItem[] {
+                new TwInteractionConfig.FeedItem("Plant_Crop_Lettuce_Item", null),
+                new TwInteractionConfig.FeedItem("Tw_Feed_Herbivore", null)
+        });
+
+        TameworkTameFoodDisplayResolver.FoodDisplay display =
+                new TameworkTameFoodDisplayResolver("AttractiveItemSet")
+                        .resolveFoodDisplayItemIds(configWith(feed), role, true);
+
+        assertArrayEquals(new String[] { "Plant_Crop_Lettuce_Item" }, display.favoriteItemIds());
+        assertArrayEquals(new String[] { "Tw_Feed_Herbivore" }, display.compatibleItemIds());
+    }
+
+    @Test
     void tranquilizerRequirementCanResolveRoleThresholdParam() throws Exception {
         StdScope scope = new StdScope(null);
         scope.addConst("TranquilizerSleepThresholdSeconds", 80.0);

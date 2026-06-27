@@ -22,6 +22,7 @@ public final class TameworkTameFoodDisplayResolver {
     private static final String TRANQUILIZER_REQUIREMENT_ID = "TameworkEffectActive";
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
     private static final String TRANQUILIZER_SLEEP_THRESHOLD_PARAM = "TranquilizerSleepThresholdSeconds";
+    private static final String FOOD_FAVORITE_PARAM = "FoodFavorite";
 
     private final String lovedItemsParamName;
 
@@ -53,17 +54,25 @@ public final class TameworkTameFoodDisplayResolver {
         InteractionContextSnapshot ctx = InteractionContextSnapshot.from(null, paramResolver.resolveRoleScopes(role, null));
         InteractionItemIdResolver itemIdResolver = new InteractionItemIdResolver(paramResolver);
         String[] lovedItems = resolveLovedItems(paramResolver, role, ctx);
+        String[] favoriteItems = resolveFavoriteItems(paramResolver, role, ctx);
         String[] favoriteCandidates = resolveTamingFoodItemIds(config, role, itemIdResolver, ctx, lovedItems);
-        String favorite = firstPreferredFood(lovedItems);
+        String favorite = firstPreferredFood(favoriteItems);
+        if (favorite == null) {
+            favorite = firstPreferredFood(lovedItems);
+        }
         if (favorite == null) {
             favorite = firstPreferredFood(favoriteCandidates);
         }
 
         LinkedHashSet<String> compatible = new LinkedHashSet<>();
         if (tamed) {
+            addItems(compatible, favoriteItems);
             addItems(compatible, lovedItems);
             addItems(compatible, favoriteCandidates);
             addItems(compatible, resolveFeedFoodItemIds(config, role, ctx, itemIdResolver, lovedItems));
+        }
+        if (favorite == null && !compatible.isEmpty()) {
+            favorite = firstPreferredFood(compatible.toArray(new String[0]));
         }
         removeItem(compatible, favorite);
         return new FoodDisplay(
@@ -178,6 +187,14 @@ public final class TameworkTameFoodDisplayResolver {
                                        @Nullable Role role,
                                        @Nullable InteractionContextSnapshot ctx) {
         String[] items = paramResolver.getStringArrayParam(role, ctx, lovedItemsParamName);
+        return items != null ? items : EMPTY_ITEMS;
+    }
+
+    @Nonnull
+    private String[] resolveFavoriteItems(@Nonnull InteractionParamResolver paramResolver,
+                                          @Nullable Role role,
+                                          @Nullable InteractionContextSnapshot ctx) {
+        String[] items = paramResolver.getStringArrayParam(role, ctx, FOOD_FAVORITE_PARAM);
         return items != null ? items : EMPTY_ITEMS;
     }
 
