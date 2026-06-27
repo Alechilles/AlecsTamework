@@ -135,9 +135,14 @@
           "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -199,9 +204,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -263,9 +273,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -327,9 +342,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -391,9 +411,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -455,9 +480,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -519,9 +549,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -583,9 +618,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -647,9 +687,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -711,9 +756,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }
@@ -775,9 +825,14 @@
               "Use": {
               "Interactions": [
                 {
-                  "Type": "TameworkClearFeedTroughWater",
-                  "RunTime": 1.25,
-                  "RequireEmptyHand": false
+                  "Type": "Charging",
+                  "DisplayProgress": true,
+                  "Next": {
+                    "1.25": {
+                      "Type": "TameworkClearFeedTroughWater",
+                      "RequireEmptyHand": false
+                    }
+                  }
                 }
               ]
             }

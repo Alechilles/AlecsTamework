@@ -6,7 +6,7 @@
 - Feed trough water states now require holding the empty interaction briefly, reducing accidental water dumps from quick use-key taps.
 
 ### Fixed
-- Fixed feed trough water clearing so the water is only emptied after the hold interaction completes, instead of on the first accidental tap.
+- Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
 
 ## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24

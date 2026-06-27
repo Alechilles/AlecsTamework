@@ -32,17 +32,17 @@ class FeedTroughInteractionAssetTest {
 
     @Test
     void waterTroughEmptyInteractionRequiresHoldTime() throws IOException {
-        List<JsonObject> clearInteractions = findClearWaterInteractions(readTroughAsset());
+        List<JsonObject> chargeInteractions = findChargingClearWaterInteractions(readTroughAsset());
 
-        for (JsonObject clearInteraction : clearInteractions) {
+        for (JsonObject chargeInteraction : chargeInteractions) {
+            assertEquals("Charging", chargeInteraction.get("Type").getAsString());
+            JsonObject next = chargeInteraction.getAsJsonObject("Next");
+            JsonObject clearInteraction = next.getAsJsonObject("1.25");
             assertEquals("TameworkClearFeedTroughWater", clearInteraction.get("Type").getAsString());
-            assertTrue(
-                    clearInteraction.get("RunTime").getAsDouble() >= 1.0,
-                    "Water troughs should require a deliberate hold before emptying"
-            );
+            assertTrue(!clearInteraction.has("RunTime"), "Charging must own the hold timing so release can cancel.");
         }
 
-        assertEquals(11, clearInteractions.size());
+        assertEquals(11, chargeInteractions.size());
     }
 
     @Test
@@ -67,19 +67,19 @@ class FeedTroughInteractionAssetTest {
         }
     }
 
-    private static List<JsonObject> findClearWaterInteractions(JsonElement element) {
+    private static List<JsonObject> findChargingClearWaterInteractions(JsonElement element) {
         List<JsonObject> matches = new ArrayList<>();
-        collectClearWaterInteractions(element, matches);
+        collectChargingClearWaterInteractions(element, matches);
         return matches;
     }
 
-    private static void collectClearWaterInteractions(JsonElement element, List<JsonObject> matches) {
+    private static void collectChargingClearWaterInteractions(JsonElement element, List<JsonObject> matches) {
         if (element == null || element.isJsonNull()) {
             return;
         }
         if (element.isJsonArray()) {
             for (JsonElement child : element.getAsJsonArray()) {
-                collectClearWaterInteractions(child, matches);
+                collectChargingClearWaterInteractions(child, matches);
             }
             return;
         }
@@ -89,12 +89,27 @@ class FeedTroughInteractionAssetTest {
         JsonObject object = element.getAsJsonObject();
         JsonElement type = object.get("Type");
         if (type != null && type.isJsonPrimitive()
-                && "TameworkClearFeedTroughWater".equals(type.getAsString())) {
+                && "Charging".equals(type.getAsString())
+                && hasClearWaterThreshold(object)) {
             matches.add(object);
         }
         for (JsonElement child : object.asMap().values()) {
-            collectClearWaterInteractions(child, matches);
+            collectChargingClearWaterInteractions(child, matches);
         }
+    }
+
+    private static boolean hasClearWaterThreshold(JsonObject object) {
+        if (!object.has("Next") || !object.get("Next").isJsonObject()) {
+            return false;
+        }
+        JsonObject next = object.getAsJsonObject("Next");
+        if (!next.has("1.25") || !next.get("1.25").isJsonObject()) {
+            return false;
+        }
+        JsonObject threshold = next.getAsJsonObject("1.25");
+        JsonElement type = threshold.get("Type");
+        return type != null && type.isJsonPrimitive()
+                && "TameworkClearFeedTroughWater".equals(type.getAsString());
     }
 
     private static String readLanguageValue(Path path, String key) throws IOException {
