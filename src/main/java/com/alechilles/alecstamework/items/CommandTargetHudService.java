@@ -11,9 +11,6 @@ import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakCompo
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.TameworkCommandTargetHud;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -31,6 +28,7 @@ import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -43,7 +41,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 0L;
     private static final long REFRESH_INTERVAL_MS = 500L;
     private static final float TARGET_DISTANCE = 6.0f;
-    private static final String TRANQUILIZER_REQUIREMENT_ID = "TameworkEffectActive";
 
     private final CommandItemRegistry registry;
     private final CommandLinkPolicyService linkPolicyService;
@@ -207,14 +204,15 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (status == null) {
             return null;
         }
+        boolean tamed = TamedStateResolver.isTamed(npcRef, store);
+        TameworkTameFoodDisplayResolver.FoodDisplay foodDisplay =
+                tameFoodDisplayResolver.resolveFoodDisplayItemIds(roleId, npc.getRole(), tamed);
         return new CommandTargetHudViewModel(
                 status,
-                foodResolver.resolveFavoriteFood(
-                        player,
-                        tameFoodDisplayResolver.resolveTamingFoodItemIds(roleId, npc.getRole())
-                ),
+                foodResolver.resolveFavoriteFood(player, foodDisplay.favoriteItemIds()),
+                tamed ? foodResolver.resolveFoods(player, foodDisplay.compatibleItemIds()) : List.of(),
                 attachmentResolver.resolveRows(roleId, resolveModelAssetId(npcRef, store), resolveAttachmentIds(npcRef, store)),
-                resolveTameRequirement(npcRef, roleId, store)
+                resolveTameRequirement(npcRef, roleId, npc.getRole(), store)
         );
     }
 
@@ -236,8 +234,9 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     @Nullable
     private CommandTargetHudViewModel.TameRequirementRow resolveTameRequirement(@Nonnull Ref<EntityStore> npcRef,
                                                                                 @Nullable String roleId,
+                                                                                @Nullable com.hypixel.hytale.server.npc.role.Role role,
                                                                                 @Nonnull Store<EntityStore> store) {
-        double requiredSeconds = resolveRequiredTranquilizerSeconds(roleId);
+        double requiredSeconds = tameFoodDisplayResolver.resolveRequiredTranquilizerSeconds(roleId, role);
         if (requiredSeconds <= 0.0) {
             return null;
         }
@@ -364,22 +363,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
 
     static double resolveRequiredTranquilizerSecondsForTests(@Nullable String requirementId,
                                                             @Nullable String jsonPayload) {
-        return resolveRequiredTranquilizerSeconds(requirementId, jsonPayload);
-    }
-
-    private static double resolveRequiredTranquilizerSeconds(@Nullable String roleId) {
-        TwInteractionConfig config = TwInteractionConfig.resolveForRole(roleId);
-        if (config == null || !config.isEnabled()) {
-            return 0.0;
-        }
-        double requiredSeconds = 0.0;
-        for (TwInteractionConfig.InteractionEntry entry : config.getInteractions()) {
-            if (!(entry instanceof TwInteractionConfig.TameInteraction) || !entry.isEnabled()) {
-                continue;
-            }
-            requiredSeconds = Math.max(requiredSeconds, resolveRequiredTranquilizerSeconds(entry.getRequires()));
-        }
-        return requiredSeconds;
+        return TameworkTameFoodDisplayResolver.resolveRequiredTranquilizerSeconds(requirementId, jsonPayload);
     }
 
     private static boolean isUntamedTameableTarget(boolean tamed, @Nullable String roleId) {
@@ -400,79 +384,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             }
         }
         return false;
-    }
-
-    private static double resolveRequiredTranquilizerSeconds(@Nullable TwInteractionConfig.RequirementGroup group) {
-        if (group == null) {
-            return 0.0;
-        }
-        return Math.max(
-                resolveRequiredTranquilizerSeconds(group.getAll()),
-                resolveRequiredTranquilizerSeconds(group.getAny())
-        );
-    }
-
-    private static double resolveRequiredTranquilizerSeconds(@Nullable TwInteractionConfig.RequirementBucket bucket) {
-        if (bucket == null) {
-            return 0.0;
-        }
-        double requiredSeconds = 0.0;
-        for (TwInteractionConfig.CustomRequirement custom : bucket.getCustom()) {
-            if (custom == null) {
-                continue;
-            }
-            requiredSeconds = Math.max(
-                    requiredSeconds,
-                    resolveRequiredTranquilizerSeconds(custom.getId(), custom.getJsonPayload())
-            );
-        }
-        return requiredSeconds;
-    }
-
-    private static double resolveRequiredTranquilizerSeconds(@Nullable String requirementId,
-                                                            @Nullable String jsonPayload) {
-        if (!TRANQUILIZER_REQUIREMENT_ID.equalsIgnoreCase(safeTrim(requirementId))) {
-            return 0.0;
-        }
-        JsonObject payload = parsePayload(jsonPayload);
-        if (payload == null || !matchesTranquilizerEffect(payload)) {
-            return 0.0;
-        }
-        JsonElement value = payload.get("MinRemainingSeconds");
-        if (value == null || !value.isJsonPrimitive()) {
-            return 0.0;
-        }
-        try {
-            double seconds = value.getAsDouble();
-            return Double.isFinite(seconds) && seconds > 0.0 ? seconds : 0.0;
-        } catch (RuntimeException ignored) {
-            return 0.0;
-        }
-    }
-
-    @Nullable
-    private static JsonObject parsePayload(@Nullable String jsonPayload) {
-        if (jsonPayload == null || jsonPayload.isBlank()) {
-            return null;
-        }
-        try {
-            JsonElement parsed = JsonParser.parseString(jsonPayload);
-            return parsed != null && parsed.isJsonObject() ? parsed.getAsJsonObject() : null;
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
-
-    private static boolean matchesTranquilizerEffect(@Nonnull JsonObject payload) {
-        JsonElement effectId = payload.get("EffectId");
-        return effectId != null
-                && effectId.isJsonPrimitive()
-                && CommandTargetHudTameRequirementResolver.TRANQUILIZER_EFFECT_ID.equalsIgnoreCase(safeTrim(effectId.getAsString()));
-    }
-
-    @Nullable
-    private static String safeTrim(@Nullable String value) {
-        return value == null ? null : value.trim();
     }
 
     private record HudState(@Nullable String targetKey,

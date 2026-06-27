@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 /** Binds compact command-target HUD data into the passive right-side overlay. */
 final class CommandTargetHudBinder {
     private static final int MAX_ATTACHMENT_ROWS = 3;
+    private static final int MAX_COMPATIBLE_FOOD_NAMES = 3;
 
     private CommandTargetHudBinder() {
     }
@@ -26,7 +27,7 @@ final class CommandTargetHudBinder {
         bindStatusRingVisibility(commandBuilder, status);
         bindProgression(commandBuilder, status);
         bindTraitRings(commandBuilder, status.traitIndicators());
-        bindFood(commandBuilder, model.favoriteFood(), language);
+        bindFood(commandBuilder, model.favoriteFood(), model.compatibleFoods(), language);
         bindAttachments(commandBuilder, model.attachments());
         bindTameRequirement(commandBuilder, model.tameRequirement(), language);
     }
@@ -72,18 +73,45 @@ final class CommandTargetHudBinder {
 
     private static void bindFood(UICommandBuilder commandBuilder,
                                  @Nullable CommandTargetHudViewModel.FoodRow food,
+                                 @Nonnull List<CommandTargetHudViewModel.FoodRow> compatibleFoods,
                                  @Nullable String language) {
-        commandBuilder.set("#FoodRow.Visible", food != null);
-        if (food == null) {
+        boolean hasCompatibleFoods = !compatibleFoods.isEmpty();
+        commandBuilder.set("#FoodRow.Visible", food != null || hasCompatibleFoods);
+        commandBuilder.set("#FavoriteFoodBlock.Visible", food != null);
+        commandBuilder.set("#CompatibleFoodBlock.Visible", hasCompatibleFoods);
+        if (food == null && !hasCompatibleFoods) {
             return;
         }
-        commandBuilder.set("#FoodLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.favoriteFood"));
-        commandBuilder.set("#FoodName.Text", food.displayName());
-        boolean hasIcon = food.iconPath() != null && !food.iconPath().isBlank();
-        commandBuilder.set("#FoodIcon.Visible", hasIcon);
-        if (hasIcon) {
-            commandBuilder.set("#FoodIcon.Background", food.iconPath());
+        if (food != null) {
+            commandBuilder.set("#FoodLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.favoriteFood"));
+            commandBuilder.set("#FoodName.Text", food.displayName());
+            boolean hasIcon = food.iconPath() != null && !food.iconPath().isBlank();
+            commandBuilder.set("#FoodIcon.Visible", hasIcon);
+            if (hasIcon) {
+                commandBuilder.set("#FoodIcon.Background", food.iconPath());
+            }
         }
+        if (hasCompatibleFoods) {
+            commandBuilder.set("#CompatibleFoodLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.compatibleFoods"));
+            commandBuilder.set("#CompatibleFoodName.Text", formatCompatibleFoodNames(compatibleFoods));
+        }
+    }
+
+    @Nonnull
+    private static String formatCompatibleFoodNames(@Nonnull List<CommandTargetHudViewModel.FoodRow> foods) {
+        StringBuilder out = new StringBuilder();
+        int count = Math.min(MAX_COMPATIBLE_FOOD_NAMES, foods.size());
+        for (int i = 0; i < count; i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            out.append(foods.get(i).displayName());
+        }
+        int remaining = foods.size() - count;
+        if (remaining > 0) {
+            out.append(" +").append(remaining);
+        }
+        return out.toString();
     }
 
     private static void bindAttachments(UICommandBuilder commandBuilder,

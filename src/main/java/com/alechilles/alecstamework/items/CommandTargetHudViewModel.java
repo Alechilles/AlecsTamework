@@ -8,9 +8,11 @@ import javax.annotation.Nullable;
 /** Compact data model rendered by the command target HUD. */
 public record CommandTargetHudViewModel(@Nonnull LinkedNpcEntry status,
                                         @Nullable FoodRow favoriteFood,
+                                        @Nonnull List<FoodRow> compatibleFoods,
                                         @Nonnull List<AttachmentRow> attachments,
                                         @Nullable TameRequirementRow tameRequirement) {
     public CommandTargetHudViewModel {
+        compatibleFoods = compatibleFoods == null ? List.of() : List.copyOf(compatibleFoods);
         attachments = attachments == null ? List.of() : List.copyOf(attachments);
     }
 

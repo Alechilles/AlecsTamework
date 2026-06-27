@@ -13,6 +13,9 @@ class CommandTargetHudBinderTest {
         ));
 
         Assertions.assertTrue(source.contains("#FoodRow.Visible"));
+        Assertions.assertTrue(source.contains("#FavoriteFoodBlock.Visible"));
+        Assertions.assertTrue(source.contains("#CompatibleFoodBlock.Visible"));
+        Assertions.assertTrue(source.contains("formatCompatibleFoodNames"));
         Assertions.assertTrue(source.contains("#GenderMaleIcon.Visible"));
         Assertions.assertTrue(source.contains("#GenderFemaleIcon.Visible"));
         Assertions.assertTrue(source.contains("\"#AttachmentRow\" + i"));
@@ -33,6 +36,9 @@ class CommandTargetHudBinderTest {
         ));
 
         Assertions.assertTrue(ui.contains("FoodRow"));
+        Assertions.assertTrue(ui.contains("FavoriteFoodBlock"));
+        Assertions.assertTrue(ui.contains("CompatibleFoodBlock"));
+        Assertions.assertTrue(ui.contains("CompatibleFoodName"));
         Assertions.assertTrue(ui.contains("GenderMaleIcon"));
         Assertions.assertTrue(ui.contains("GenderFemaleIcon"));
         Assertions.assertTrue(ui.contains("FoodIcon"));

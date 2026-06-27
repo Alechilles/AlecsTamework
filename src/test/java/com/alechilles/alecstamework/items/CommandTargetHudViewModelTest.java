@@ -34,10 +34,15 @@ class CommandTargetHudViewModelTest {
         CommandTargetHudViewModel model = new CommandTargetHudViewModel(
                 status,
                 null,
+                List.of(new CommandTargetHudViewModel.FoodRow("Food_Apple", "Apple", null)),
                 List.of(new CommandTargetHudViewModel.AttachmentRow("Coat", "Black")),
                 null
         );
 
+        Assertions.assertThrows(
+                UnsupportedOperationException.class,
+                () -> model.compatibleFoods().add(new CommandTargetHudViewModel.FoodRow("Food_Berry", "Berry", null))
+        );
         Assertions.assertThrows(
                 UnsupportedOperationException.class,
                 () -> model.attachments().add(new CommandTargetHudViewModel.AttachmentRow("Tail", "Short"))

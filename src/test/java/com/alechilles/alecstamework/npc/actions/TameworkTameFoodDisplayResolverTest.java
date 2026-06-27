@@ -5,6 +5,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -68,10 +69,43 @@ class TameworkTameFoodDisplayResolverTest {
         assertArrayEquals(new String[0], resolved);
     }
 
-    private static TwInteractionConfig configWith(TwInteractionConfig.TameInteraction tame) throws Exception {
+    @Test
+    void foodDisplayKeepsPreferredFoodSeparateFromCompatibleFeedItems() throws Exception {
+        StdScope scope = new StdScope(null);
+        scope.addConst("AttractiveItemSet", new String[] { "Tool_Feedbag", "Plant_Crop_Lettuce_Item" });
+        Role role = newRoleWithScope(scope);
+        TwInteractionConfig.TameInteraction tame = new TwInteractionConfig.TameInteraction();
+        setField(TwInteractionConfig.TameInteraction.class, tame, "itemsParam", "AttractiveItemSet");
+        TwInteractionConfig.FeedInteraction feed = new TwInteractionConfig.FeedInteraction();
+        setField(TwInteractionConfig.FeedInteraction.class, feed, "itemsParam", "AttractiveItemSet");
+        setField(TwInteractionConfig.FeedInteraction.class, feed, "itemsInHand", new TwInteractionConfig.FeedItem[] {
+                new TwInteractionConfig.FeedItem("Tw_Feed_Herbivore", null)
+        });
+
+        TameworkTameFoodDisplayResolver.FoodDisplay display =
+                new TameworkTameFoodDisplayResolver("AttractiveItemSet")
+                        .resolveFoodDisplayItemIds(configWith(tame, feed), role, true);
+
+        assertArrayEquals(new String[] { "Plant_Crop_Lettuce_Item" }, display.favoriteItemIds());
+        assertArrayEquals(new String[] { "Tool_Feedbag", "Tw_Feed_Herbivore" }, display.compatibleItemIds());
+    }
+
+    @Test
+    void tranquilizerRequirementCanResolveRoleThresholdParam() throws Exception {
+        StdScope scope = new StdScope(null);
+        scope.addConst("TranquilizerSleepThresholdSeconds", 80.0);
+        Role role = newRoleWithScope(scope);
+
+        double seconds = new TameworkTameFoodDisplayResolver("AttractiveItemSet")
+                .resolveRequiredTranquilizerSeconds(role, configWith(new TwInteractionConfig.TameInteraction()));
+
+        Assertions.assertEquals(80.0, seconds);
+    }
+
+    private static TwInteractionConfig configWith(TwInteractionConfig.InteractionEntry... interactions) throws Exception {
         TwInteractionConfig config = (TwInteractionConfig) getUnsafe().allocateInstance(TwInteractionConfig.class);
         setField(TwInteractionConfig.class, config, "enabled", true);
-        setField(TwInteractionConfig.class, config, "interactions", new TwInteractionConfig.InteractionEntry[] { tame });
+        setField(TwInteractionConfig.class, config, "interactions", interactions);
         return config;
     }
 

@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -36,6 +38,26 @@ final class CommandTargetHudFoodResolver {
                 safe(nameResolver.apply(player, itemId), humanize(itemId)),
                 iconResolver.apply(itemId)
         );
+    }
+
+    List<CommandTargetHudViewModel.FoodRow> resolveFoods(@Nullable Player player,
+                                                         @Nullable String[] itemIds) {
+        if (itemIds == null || itemIds.length == 0) {
+            return List.of();
+        }
+        ArrayList<CommandTargetHudViewModel.FoodRow> rows = new ArrayList<>();
+        for (String itemId : itemIds) {
+            String clean = itemId == null ? null : itemId.trim();
+            if (clean == null || clean.isBlank()) {
+                continue;
+            }
+            rows.add(new CommandTargetHudViewModel.FoodRow(
+                    clean,
+                    safe(nameResolver.apply(player, clean), humanize(clean)),
+                    iconResolver.apply(clean)
+            ));
+        }
+        return rows.isEmpty() ? List.of() : List.copyOf(rows);
     }
 
     @Nullable

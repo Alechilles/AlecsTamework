@@ -117,7 +117,7 @@ Linked panel supports:
 Command target HUD:
 - Appears while the player holds any registered command item and looks directly at a supported NPC within 6 units.
 - Uses the same loaded-NPC status snapshot as the linked panel for display name, health, happiness, hunger, thirst, level, traits, harvest cooldown, and breeding cooldown.
-- Adds compact target-only rows for favorite food, attachment selections, and required tranquilizer stacks for tame interactions that require `TameworkEffectActive` with `Tw_Status_Tranquilized`.
+- Adds compact target-only rows for favorite food, other compatible foods on tamed NPCs, attachment selections, and required tranquilizer stacks for tame interactions that require tranquilizer setup.
 - Clears automatically when the player looks away, switches away from command items, or targets an unsupported NPC.
 
 ## Move/home/recall and off-screen relocation
