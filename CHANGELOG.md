@@ -4,6 +4,7 @@
 
 ### Changed
 - Feed trough water states now require holding the empty interaction briefly, reducing accidental water dumps from quick use-key taps.
+- Empty feed trough prompts now mention that right-clicking with a water bucket fills the trough.
 
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.

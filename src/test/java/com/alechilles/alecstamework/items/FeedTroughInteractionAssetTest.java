@@ -61,6 +61,16 @@ class FeedTroughInteractionAssetTest {
         }
     }
 
+    @Test
+    void englishOpenTroughHintMentionsWaterBucketFill() throws IOException {
+        String value = readLanguageValue(
+                Path.of("src/main/resources/Server/Languages/en-US/server.lang"),
+                "interactionHints.openTrough"
+        );
+
+        assertEquals("Press [{key}] to open Trough; right-click Water Bucket to fill", value);
+    }
+
     private static JsonObject readTroughAsset() throws IOException {
         try (Reader reader = Files.newBufferedReader(TROUGH_ASSET, StandardCharsets.UTF_8)) {
             return JsonParser.parseReader(reader).getAsJsonObject();
