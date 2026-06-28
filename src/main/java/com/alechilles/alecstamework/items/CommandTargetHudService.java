@@ -212,7 +212,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         TargetCandidate candidate = resolveTarget(player, playerRef, activeCommand, store);
         String targetKey = candidate != null ? candidate.key() : null;
         if (!shouldRefresh(previous, targetKey, nowMs)) {
-            keepHudVisible(previous);
             rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs);
             return;
         }
@@ -500,7 +499,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (hud == null) {
             hud = new TameworkCommandTargetHud(playerRef, model, language);
             player.getHudManager().addCustomHud(playerRef, hud);
-            hud.show();
         } else {
             hud.refresh(model, language);
         }
@@ -513,8 +511,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             stateByPlayer.remove(playerUuid);
             return;
         }
-        previous.hud().hideNow();
         if (player == null || player.getPlayerRef() == null || player.getHudManager() == null) {
+            previous.hud().hideNow();
             stateByPlayer.remove(playerUuid);
             return;
         }
@@ -528,9 +526,10 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                                             long nowMs) {
         HudState previous = stateByPlayer.get(playerUuid);
         if (previous != null && previous.hud() != null && previous.visible()) {
-            previous.hud().hideNow();
             if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
                 player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
+            } else {
+                previous.hud().hideNow();
             }
         }
         stateByPlayer.put(playerUuid, new HudState(null, previous != null ? previous.lastRefreshMs() : 0L, null, false, nowMs, activeItemId));
@@ -552,12 +551,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 nowMs,
                 activeItemId
         ));
-    }
-
-    private void keepHudVisible(@Nullable HudState previous) {
-        if (previous != null && previous.hud() != null && previous.visible()) {
-            previous.hud().keepVisible();
-        }
     }
 
     private void dropInactiveCandidate(@Nullable UUID playerUuid) {
