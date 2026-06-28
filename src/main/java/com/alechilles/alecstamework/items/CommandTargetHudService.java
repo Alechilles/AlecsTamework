@@ -59,6 +59,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private final CommandTargetHudActivationTracker activationTracker;
     private final Map<UUID, HudState> stateByPlayer = new HashMap<>();
     private final Map<StaticTargetCacheKey, StaticTargetDisplay> staticTargetCache = new HashMap<>();
+    private final Map<UUID, DebugLogState> debugLogStateByPlayer = new HashMap<>();
     private long nextSweepAtMs;
     private long nextFallbackDiscoveryAtMs;
     private int nextCandidateOffset;
@@ -196,33 +197,42 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (cachedActiveItemId != null
                 && !activationTracker.isDirty(playerUuid)
                 && !shouldScanTarget(previous, cachedActiveItemId, nowMs)) {
+            long presentationMs = pulsePresentation(playerUuid, previous, nowMs);
+            rememberPresentation(playerUuid, previous, presentationMs);
             return;
         }
 
         ActiveCommandItem activeCommand = resolveActiveCommandItem(player);
         if (activeCommand == null) {
             activationTracker.recordResolvedHand(playerUuid, null, false, nowMs);
+            debug(playerUuid, nowMs, "no-command", "no command item in active hand; previousVisible=" + isVisible(previous));
             hideHud(playerUuid, player);
             return;
         }
         activationTracker.recordResolvedHand(playerUuid, activeCommand.itemId(), true, nowMs);
         if (!shouldScanTarget(previous, activeCommand.itemId(), nowMs)) {
+            long presentationMs = pulsePresentation(playerUuid, previous, nowMs);
+            rememberPresentation(playerUuid, previous, presentationMs);
             return;
         }
 
         TargetCandidate candidate = resolveTarget(player, playerRef, activeCommand, store);
         String targetKey = candidate != null ? candidate.key() : null;
         if (!shouldRefresh(previous, targetKey, nowMs)) {
-            long presentationMs = pulsePresentation(previous, nowMs);
+            long presentationMs = pulsePresentation(playerUuid, previous, nowMs);
             rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs, presentationMs);
             return;
         }
         if (candidate == null) {
+            debug(playerUuid, nowMs, "no-target:" + activeCommand.itemId(),
+                    "no supported target; item=" + activeCommand.itemId() + ", previousVisible=" + isVisible(previous));
             hideHudAndRememberNoTarget(playerUuid, player, activeCommand.itemId(), nowMs);
             return;
         }
         CommandTargetHudViewModel model = buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs);
         if (model == null) {
+            debug(playerUuid, nowMs, "model-null:" + targetKey,
+                    "model build returned null; target=" + targetKey + ", item=" + activeCommand.itemId());
             hideHudAndRememberNoTarget(playerUuid, player, activeCommand.itemId(), nowMs);
             return;
         }
@@ -502,9 +512,13 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             hud = new TameworkCommandTargetHud(playerRef, model, language);
             player.getHudManager().addCustomHud(playerRef, hud);
             hud.present();
+            debug(playerUuid, nowMs, "show:" + targetKey,
+                    "created hud; target=" + targetKey + ", item=" + activeItemId + ", display=" + model.status().displayName());
         } else {
             hud.refresh(model, language);
             hud.present();
+            debug(playerUuid, nowMs, "refresh:" + targetKey,
+                    "refreshed hud; target=" + targetKey + ", item=" + activeItemId + ", display=" + model.status().displayName());
         }
         stateByPlayer.put(playerUuid, new HudState(targetKey, nowMs, hud, true, nowMs, activeItemId, nowMs));
     }
@@ -512,15 +526,20 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private void hideHud(@Nonnull UUID playerUuid, @Nullable Player player) {
         HudState previous = stateByPlayer.get(playerUuid);
         if (previous == null || previous.hud() == null) {
+            debug(playerUuid, System.currentTimeMillis(), "hide-empty", "hide requested with no stored hud state");
             stateByPlayer.remove(playerUuid);
             return;
         }
         if (player == null || player.getPlayerRef() == null || player.getHudManager() == null) {
             previous.hud().hideNow();
+            debug(playerUuid, System.currentTimeMillis(), "hide-fallback",
+                    "hide fallback clear; previousTarget=" + previous.targetKey());
             stateByPlayer.remove(playerUuid);
             return;
         }
         player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
+        debug(playerUuid, System.currentTimeMillis(), "hide-manager",
+                "removed hud through manager; previousTarget=" + previous.targetKey());
         stateByPlayer.remove(playerUuid);
     }
 
@@ -532,8 +551,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (previous != null && previous.hud() != null && previous.visible()) {
             if (player != null && player.getPlayerRef() != null && player.getHudManager() != null) {
                 player.getHudManager().removeCustomHud(player.getPlayerRef(), TameworkCommandTargetHud.HUD_KEY);
+                debug(playerUuid, nowMs, "hide-no-target-manager",
+                        "removed hud after target lost; previousTarget=" + previous.targetKey() + ", item=" + activeItemId);
             } else {
                 previous.hud().hideNow();
+                debug(playerUuid, nowMs, "hide-no-target-fallback",
+                        "fallback clear after target lost; previousTarget=" + previous.targetKey() + ", item=" + activeItemId);
             }
         }
         stateByPlayer.put(playerUuid, new HudState(
@@ -567,11 +590,29 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         ));
     }
 
-    private long pulsePresentation(@Nullable HudState previous, long nowMs) {
+    private void rememberPresentation(@Nonnull UUID playerUuid,
+                                      @Nullable HudState previous,
+                                      long presentationMs) {
+        if (previous == null) {
+            return;
+        }
+        stateByPlayer.put(playerUuid, new HudState(
+                previous.targetKey(),
+                previous.lastRefreshMs(),
+                previous.hud(),
+                previous.visible(),
+                previous.lastTargetScanMs(),
+                previous.activeItemId(),
+                presentationMs
+        ));
+    }
+
+    private long pulsePresentation(@Nonnull UUID playerUuid, @Nullable HudState previous, long nowMs) {
         if (!shouldPulsePresentation(previous, nowMs)) {
             return previous != null ? previous.lastPresentationMs() : 0L;
         }
         previous.hud().present();
+        debug(playerUuid, nowMs, "present:" + previous.targetKey(), "presentation pulse; target=" + previous.targetKey());
         return nowMs;
     }
 
@@ -582,9 +623,31 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         HudState previous = stateByPlayer.get(playerUuid);
         if (previous != null && previous.hud() != null) {
             previous.hud().hideNow();
+            debug(playerUuid, System.currentTimeMillis(), "drop-inactive",
+                    "dropped inactive candidate; previousTarget=" + previous.targetKey());
         }
         activationTracker.remove(playerUuid);
         stateByPlayer.remove(playerUuid);
+        debugLogStateByPlayer.remove(playerUuid);
+    }
+
+    private void debug(@Nonnull UUID playerUuid,
+                       long nowMs,
+                       @Nonnull String key,
+                       @Nonnull String message) {
+        if (!CommandTargetHudDebugLog.isEnabled()) {
+            return;
+        }
+        DebugLogState previous = debugLogStateByPlayer.get(playerUuid);
+        if (previous != null && key.equals(previous.key()) && nowMs < previous.nextAtMs()) {
+            return;
+        }
+        debugLogStateByPlayer.put(playerUuid, new DebugLogState(key, nowMs + 1_000L));
+        CommandTargetHudDebugLog.info("player=" + playerUuid + " " + message);
+    }
+
+    private static boolean isVisible(@Nullable HudState state) {
+        return state != null && state.visible();
     }
 
     @Nonnull
@@ -764,6 +827,10 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                             long lastTargetScanMs,
                             @Nullable String activeItemId,
                             long lastPresentationMs) {
+    }
+
+    private record DebugLogState(@Nonnull String key,
+                                 long nextAtMs) {
     }
 
     private record PlayerCandidate(@Nonnull UUID playerUuid,

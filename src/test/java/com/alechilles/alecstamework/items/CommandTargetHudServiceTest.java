@@ -274,7 +274,7 @@ class CommandTargetHudServiceTest {
         int scanCheck = source.indexOf("shouldScanTarget(previous, activeCommand.itemId(), nowMs)", updatePlayer);
         int targetResolve = source.indexOf("resolveTarget(player, playerRef, activeCommand, store)", updatePlayer);
         int refreshCheck = source.indexOf("shouldRefresh(previous, targetKey, nowMs)", updatePlayer);
-        int pulsePresentation = source.indexOf("pulsePresentation(previous, nowMs)", refreshCheck);
+        int pulsePresentation = source.indexOf("pulsePresentation(playerUuid, previous, nowMs)", refreshCheck);
         int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs, presentationMs)", refreshCheck);
         int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs)", updatePlayer);
 
@@ -297,7 +297,7 @@ class CommandTargetHudServiceTest {
 
         int updatePlayer = source.indexOf("private void updatePlayer");
         int refreshBlock = source.indexOf("if (!shouldRefresh(previous, targetKey, nowMs))", updatePlayer);
-        int pulsePresentation = source.indexOf("pulsePresentation(previous, nowMs)", refreshBlock);
+        int pulsePresentation = source.indexOf("pulsePresentation(playerUuid, previous, nowMs)", refreshBlock);
         int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs, presentationMs)", refreshBlock);
         int returnStatement = source.indexOf("return;", rememberScan);
         int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs)", updatePlayer);
@@ -308,8 +308,36 @@ class CommandTargetHudServiceTest {
         Assertions.assertTrue(rememberScan > pulsePresentation);
         Assertions.assertTrue(returnStatement > rememberScan);
         Assertions.assertTrue(modelBuild > returnStatement);
-        Assertions.assertTrue(refreshBody.contains("pulsePresentation(previous, nowMs)"));
+        Assertions.assertTrue(refreshBody.contains("pulsePresentation(playerUuid, previous, nowMs)"));
         Assertions.assertFalse(refreshBody.contains("refresh("));
+    }
+
+    @Test
+    void targetScanThrottleStillAllowsPresentationPulse() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
+        ));
+
+        int updatePlayer = source.indexOf("private void updatePlayer");
+        int cachedScanGate = source.indexOf("!shouldScanTarget(previous, cachedActiveItemId, nowMs)", updatePlayer);
+        int cachedPulse = source.indexOf("pulsePresentation(playerUuid, previous, nowMs)", cachedScanGate);
+        int cachedRemember = source.indexOf("rememberPresentation(playerUuid, previous, presentationMs)", cachedPulse);
+        int cachedReturn = source.indexOf("return;", cachedRemember);
+        int activeScanGate = source.indexOf("!shouldScanTarget(previous, activeCommand.itemId(), nowMs)", cachedReturn);
+        int activePulse = source.indexOf("pulsePresentation(playerUuid, previous, nowMs)", activeScanGate);
+        int activeRemember = source.indexOf("rememberPresentation(playerUuid, previous, presentationMs)", activePulse);
+        int activeReturn = source.indexOf("return;", activeRemember);
+        String cachedGateBody = source.substring(cachedScanGate, cachedReturn);
+        String activeGateBody = source.substring(activeScanGate, activeReturn);
+
+        Assertions.assertTrue(cachedScanGate > updatePlayer);
+        Assertions.assertTrue(cachedPulse > cachedScanGate);
+        Assertions.assertTrue(cachedRemember > cachedPulse);
+        Assertions.assertFalse(cachedGateBody.contains("rememberScan("));
+        Assertions.assertTrue(activeScanGate > cachedReturn);
+        Assertions.assertTrue(activePulse > activeScanGate);
+        Assertions.assertTrue(activeRemember > activePulse);
+        Assertions.assertFalse(activeGateBody.contains("rememberScan("));
     }
 
     @Test
