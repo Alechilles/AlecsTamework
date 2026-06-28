@@ -92,8 +92,19 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
                             }
                         }
                         if (runNeedsSweep) {
-                            CompanionNeedsService.tickNeeds(ref, store, commandBuffer, roleId);
-                            if (linkedOwnerId != null
+                            boolean ticked = CompanionNeedsService.tickNeedsIfDue(
+                                    ref,
+                                    store,
+                                    commandBuffer,
+                                    roleId,
+                                    SYSTEM_SWEEP_INTERVAL_MS
+                            );
+                            if (!ticked
+                                    && CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(ref, store, roleId)) {
+                                CompanionNeedsService.tickNaturalRegenSuppressionOnly(ref, store, commandBuffer, roleId);
+                            }
+                            if (ticked
+                                    && linkedOwnerId != null
                                     && starvingLinkedByOwner != null
                                     && CompanionNeedsService.isNeedsDamageActive(ref, store, roleId)) {
                                 starvingLinkedByOwner.merge(linkedOwnerId, 1, Integer::sum);

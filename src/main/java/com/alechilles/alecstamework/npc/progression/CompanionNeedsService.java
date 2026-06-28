@@ -188,6 +188,46 @@ public final class CompanionNeedsService {
         return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, commandBuffer, null);
     }
 
+    public static boolean tickNeedsIfDue(@Nullable Ref<EntityStore> npcRef,
+                                         @Nullable Store<EntityStore> store,
+                                         @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                         @Nullable String roleId,
+                                         long intervalMs) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
+        if (needsType == null) {
+            return false;
+        }
+        TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
+        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
+            return removeNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component);
+        }
+        component = ensureNeedsComponent(npcRef, store, commandBuffer, roleId);
+        if (component == null) {
+            return false;
+        }
+        long nowMs = resolveNowMs(config, store);
+        UUID npcId = resolveNpcUuid(npcRef, store);
+        if (!NeedsSweepScheduler.shouldRunSweep(npcId, component.getLastPassiveSweepMs(), nowMs, intervalMs)) {
+            return false;
+        }
+        return runNeedsUpdate(
+                npcRef,
+                store,
+                roleId,
+                0.0,
+                0.0,
+                false,
+                true,
+                commandBuffer,
+                null,
+                true
+        );
+    }
+
     /**
      * Applies natural regeneration suppression without advancing hunger/thirst decay or needs damage.
      * Intended for high-frequency clamp passes between normal needs sweeps.
@@ -549,6 +589,30 @@ public final class CompanionNeedsService {
                                   boolean reconcileHappiness,
                                   @Nullable CommandBuffer<EntityStore> commandBuffer,
                                   @Nullable String heldItemId) {
+        return runNeedsUpdate(
+                npcRef,
+                store,
+                roleId,
+                explicitHungerGain,
+                explicitThirstGain,
+                includeConfiguredManualGains,
+                reconcileHappiness,
+                commandBuffer,
+                heldItemId,
+                false
+        );
+    }
+
+    private static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,
+                                          @Nullable Store<EntityStore> store,
+                                          @Nullable String roleId,
+                                          double explicitHungerGain,
+                                          double explicitThirstGain,
+                                          boolean includeConfiguredManualGains,
+                                          boolean reconcileHappiness,
+                                          @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                          @Nullable String heldItemId,
+                                          boolean markPassiveSweep) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -682,6 +746,10 @@ public final class CompanionNeedsService {
         }
         if (component.getLastUpdateMs() != nowMs) {
             component.setLastUpdateMs(nowMs);
+            componentChanged = true;
+        }
+        if (markPassiveSweep && component.getLastPassiveSweepMs() != nowMs) {
+            component.setLastPassiveSweepMs(nowMs);
             componentChanged = true;
         }
         if (componentChanged) {
@@ -836,6 +904,15 @@ public final class CompanionNeedsService {
             return 0L;
         }
         return Math.min(effectiveElapsedMs, MAX_LOADED_TICK_CATCH_UP_MS);
+    }
+
+    @Nullable
+    private static UUID resolveNpcUuid(@Nullable Ref<EntityStore> npcRef, @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        return npc != null ? npc.getUuid() : null;
     }
 
     @Nullable
