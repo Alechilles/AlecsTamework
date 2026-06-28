@@ -304,6 +304,24 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
+    void firstHudCreationShowsCustomHudImmediately() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
+        ));
+
+        int showMethod = source.indexOf("private void showHud");
+        int createBranch = source.indexOf("if (hud == null)", showMethod);
+        int addHud = source.indexOf("player.getHudManager().addCustomHud(playerRef, hud)", createBranch);
+        int showHud = source.indexOf("hud.show()", addHud);
+        int refreshBranch = source.indexOf("} else {", addHud);
+
+        Assertions.assertTrue(showMethod >= 0);
+        Assertions.assertTrue(addHud > createBranch);
+        Assertions.assertTrue(showHud > addHud);
+        Assertions.assertTrue(refreshBranch > showHud);
+    }
+
+    @Test
     void inactiveCandidateDropPathHidesCustomHudBeforeDroppingState() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"

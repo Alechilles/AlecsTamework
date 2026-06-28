@@ -499,6 +499,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (hud == null) {
             hud = new TameworkCommandTargetHud(playerRef, model, language);
             player.getHudManager().addCustomHud(playerRef, hud);
+            hud.show();
         } else {
             hud.refresh(model, language);
         }
