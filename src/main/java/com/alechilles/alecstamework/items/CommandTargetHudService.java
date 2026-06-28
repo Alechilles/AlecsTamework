@@ -106,7 +106,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         for (UUID playerUuid : selectedCandidates) {
             PlayerCandidate candidate = resolvePlayerCandidate(playerUuid, store);
             if (candidate == null) {
-                dropInactiveCandidate(playerUuid);
+                debugMissingFromStore(playerUuid, nowMs);
                 continue;
             }
             updatePlayer(candidate.playerUuid(), candidate.player(), candidate.playerRef(), store, nowMs);
@@ -616,19 +616,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         return nowMs;
     }
 
-    private void dropInactiveCandidate(@Nullable UUID playerUuid) {
+    private void debugMissingFromStore(@Nullable UUID playerUuid, long nowMs) {
         if (playerUuid == null) {
             return;
         }
-        HudState previous = stateByPlayer.get(playerUuid);
-        if (previous != null && previous.hud() != null) {
-            previous.hud().hideNow();
-            debug(playerUuid, System.currentTimeMillis(), "drop-inactive",
-                    "dropped inactive candidate; previousTarget=" + previous.targetKey());
-        }
-        activationTracker.remove(playerUuid);
-        stateByPlayer.remove(playerUuid);
-        debugLogStateByPlayer.remove(playerUuid);
+        debug(playerUuid, nowMs, "missing-from-store",
+                "candidate was not present in this world store; keeping any existing hud state");
     }
 
     private void debug(@Nonnull UUID playerUuid,

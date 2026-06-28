@@ -429,18 +429,27 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
-    void inactiveCandidateDropPathHidesCustomHudBeforeDroppingState() throws Exception {
+    void missingPlayerInCurrentStoreDoesNotDropSharedHudCandidate() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
         ));
 
-        int clearMethod = source.indexOf("private void dropInactiveCandidate");
-        int hideCall = source.indexOf("previous.hud().hideNow()", clearMethod);
-        int removeState = source.indexOf("stateByPlayer.remove(playerUuid)", clearMethod);
+        int processMethod = source.indexOf("private void processCandidatePlayers");
+        int candidateNull = source.indexOf("if (candidate == null)", processMethod);
+        int missingStore = source.indexOf("debugMissingFromStore(playerUuid, nowMs)", candidateNull);
+        int continueStatement = source.indexOf("continue;", missingStore);
+        String missingBranch = source.substring(candidateNull, continueStatement);
+        int missingMethod = source.indexOf("private void debugMissingFromStore");
+        int nextMethod = source.indexOf("private void debug(", missingMethod);
+        String missingMethodBody = source.substring(missingMethod, nextMethod);
 
-        Assertions.assertTrue(clearMethod >= 0);
-        Assertions.assertTrue(hideCall > clearMethod);
-        Assertions.assertTrue(removeState > hideCall);
+        Assertions.assertTrue(processMethod >= 0);
+        Assertions.assertTrue(missingStore > candidateNull);
+        Assertions.assertTrue(continueStatement > missingStore);
+        Assertions.assertFalse(missingBranch.contains("dropInactiveCandidate("));
+        Assertions.assertFalse(missingMethodBody.contains("activationTracker.remove("));
+        Assertions.assertFalse(missingMethodBody.contains("stateByPlayer.remove("));
+        Assertions.assertFalse(missingMethodBody.contains("hideNow()"));
     }
 
     @Test
