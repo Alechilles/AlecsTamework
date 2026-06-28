@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierSe
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
+import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -264,8 +265,9 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
     private static HappinessSnapshot resolveSnapshotFromComponents(@Nonnull Ref<EntityStore> npcRef,
                                                                    @Nonnull Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        TameworkHappinessComponent happiness = null;
         if (happinessType != null) {
-            TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+            happiness = store.getComponent(npcRef, happinessType);
             if (happiness != null && Double.isFinite(happiness.getValue())) {
                 return new HappinessSnapshot(
                         happiness.getValue(),
@@ -277,6 +279,9 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
                         List.of()
                 );
             }
+        }
+        if (!HappinessConfigResolver.isRuntimeEnabled(HappinessConfigResolver.resolveConfig(npcRef, store, happiness))) {
+            return null;
         }
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         if (breedingType == null) {

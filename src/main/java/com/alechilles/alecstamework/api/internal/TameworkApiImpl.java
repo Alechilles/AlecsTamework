@@ -1080,10 +1080,7 @@ public final class TameworkApiImpl
                 ? target.store().getComponent(target.reference(), breedingType)
                 : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(target.reference(), target.store(), happiness);
-        if (happiness == null
-                && breeding == null
-                && (happinessConfig == null
-                        || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled()))) {
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             return unsupportedMutation("No happiness progression is configured for this NPC.");
         }
 
@@ -1647,6 +1644,9 @@ public final class TameworkApiImpl
         TameworkHappinessComponent happinessComponent = readComponent(npcRef, store, TameworkHappinessComponent.getComponentType());
         TameworkBreedingComponent breedingComponent = readComponent(npcRef, store, TameworkBreedingComponent.getComponentType());
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happinessComponent);
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+            return null;
+        }
         CompanionHappinessService.HappinessSnapshot snapshot = CompanionHappinessService.resolveSnapshot(npcRef, store);
         if (snapshot == null) {
             return null;

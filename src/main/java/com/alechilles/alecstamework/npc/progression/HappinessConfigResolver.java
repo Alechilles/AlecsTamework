@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -36,5 +37,13 @@ public final class HappinessConfigResolver {
             }
         }
         return null;
+    }
+
+    public static boolean isRuntimeEnabled(@Nullable TwHappinessConfig config) {
+        return isRuntimeEnabled(config, TameworkRuntimeSettings.currentOrNull());
+    }
+
+    static boolean isRuntimeEnabled(@Nullable TwHappinessConfig config, @Nullable TameworkRuntimeSettings settings) {
+        return config != null && config.isEnabled() && (settings == null || settings.happinessEnabled());
     }
 }

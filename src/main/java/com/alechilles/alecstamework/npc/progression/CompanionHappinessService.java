@@ -108,6 +108,9 @@ public final class CompanionHappinessService {
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+            return removeHappinessRuntimeState(npcRef, store, commandBuffer, happinessType, happiness);
+        }
         HappinessRules rules = resolveRules(happinessConfig);
         ArrayList<TimedImpulseActivation> activations = new ArrayList<>();
         if (includeHandFeedImpulse) {
@@ -144,6 +147,9 @@ public final class CompanionHappinessService {
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+            return removeHappinessRuntimeState(npcRef, store, null, happinessType, happiness);
+        }
         ArrayList<TimedImpulseActivation> activations = new ArrayList<>(1);
         addPetActivation(activations, happinessConfig);
         return applyTimedImpulses(npcRef, store, activations);
@@ -171,6 +177,9 @@ public final class CompanionHappinessService {
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+            return removeHappinessRuntimeState(npcRef, store, commandBuffer, happinessType, happiness);
+        }
         ArrayList<TimedImpulseActivation> activations = new ArrayList<>(1);
         addDamageActivation(activations, happinessConfig);
         return applyTimedImpulses(npcRef, store, commandBuffer, activations);
@@ -210,9 +219,7 @@ public final class CompanionHappinessService {
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
-        if (happiness == null
-                && breeding == null
-                && (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled()))) {
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             return null;
         }
         HappinessRules rules = resolveRules(happinessConfig);
@@ -279,10 +286,8 @@ public final class CompanionHappinessService {
         TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
         TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
-        if (happiness == null
-                && breeding == null
-                && (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled()))) {
-            return false;
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+            return removeHappinessRuntimeState(npcRef, store, commandBuffer, happinessType, happiness);
         }
         TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
         HappinessRules rules = resolveRules(happinessConfig);
@@ -400,6 +405,22 @@ public final class CompanionHappinessService {
         store.putComponent(npcRef, componentType, component);
     }
 
+    private static boolean removeHappinessRuntimeState(@Nonnull Ref<EntityStore> npcRef,
+                                                       @Nonnull Store<EntityStore> store,
+                                                       @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                       @Nullable ComponentType<EntityStore, TameworkHappinessComponent> happinessType,
+                                                       @Nullable TameworkHappinessComponent happiness) {
+        if (happinessType == null || happiness == null) {
+            return false;
+        }
+        if (commandBuffer != null) {
+            commandBuffer.run(bufferStore -> bufferStore.tryRemoveComponent(npcRef, happinessType));
+            return true;
+        }
+        store.tryRemoveComponent(npcRef, happinessType);
+        return true;
+    }
+
     public static double resolveCurrentValue(@Nullable Ref<EntityStore> npcRef,
                                              @Nullable Store<EntityStore> store,
                                              double fallback) {
@@ -407,11 +428,20 @@ public final class CompanionHappinessService {
             return fallback;
         }
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        TameworkHappinessComponent happiness = null;
         if (happinessType != null) {
-            TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+            happiness = store.getComponent(npcRef, happinessType);
             if (happiness != null && Double.isFinite(happiness.getValue())) {
+                TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+                if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+                    return fallback;
+                }
                 return happiness.getValue();
             }
+        }
+        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+            return fallback;
         }
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         if (breedingType != null) {
@@ -424,7 +454,7 @@ public final class CompanionHappinessService {
     }
 
     private static HappinessRules resolveRules(@Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig != null && TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
+        if (HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             TwHappinessConfig.ValueSettings values = happinessConfig.getValues();
             double min = values.getMin();
             double max = values.getMax();
@@ -476,7 +506,7 @@ public final class CompanionHappinessService {
                                               double fallbackHandFeedGain) {
         double gain = fallbackHandFeedGain;
         double durationMinutes = DEFAULT_FEED_DURATION_MINUTES;
-        if (happinessConfig != null && TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
+        if (HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             TwHappinessConfig.ImpulseSettings impulses = happinessConfig.getImpulses();
             gain = impulses.getGainOnFeed();
             durationMinutes = impulses.getHandFeedDurationMinutes();
@@ -521,7 +551,7 @@ public final class CompanionHappinessService {
 
     private static void addPetActivation(@Nonnull List<TimedImpulseActivation> activations,
                                          @Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             return;
         }
         double gain = happinessConfig.getImpulses().getGainOnPet();
@@ -545,7 +575,7 @@ public final class CompanionHappinessService {
 
     private static void addDamageActivation(@Nonnull List<TimedImpulseActivation> activations,
                                             @Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             return;
         }
         double configuredLoss = happinessConfig.getImpulses().getLoseOnDamage();
@@ -573,7 +603,7 @@ public final class CompanionHappinessService {
                                                                      @Nullable Store<EntityStore> store,
                                                                      @Nullable TwHappinessConfig happinessConfig,
                                                                      @Nullable String consumedItemId) {
-        if (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             return null;
         }
         if (consumedItemId == null || consumedItemId.isBlank()) {

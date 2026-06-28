@@ -72,6 +72,12 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
         }
 
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(candidate.ref, store, happiness);
+        if (!HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "NPC " + candidate.npcUuid + " has no enabled happiness progression."
+            ));
+            return;
+        }
         TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(candidate.ref, store, breeding);
         ClampRules clampRules = resolveClampRules(happinessConfig);
         double clamped = clampRules != null
@@ -150,7 +156,7 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
 
     @Nullable
     private static ClampRules resolveClampRules(@Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig != null && TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
+        if (HappinessConfigResolver.isRuntimeEnabled(happinessConfig)) {
             double min = happinessConfig.getValues().getMin();
             double max = happinessConfig.getValues().getMax();
             return normalizeRange(min, max);

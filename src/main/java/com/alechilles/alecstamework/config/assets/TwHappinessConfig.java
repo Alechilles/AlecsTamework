@@ -440,7 +440,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         }
         TwHappinessConfig configured = resolveConfiguredForRole(roleId, assetMap);
         boolean configEnabled = configured == null || configured.isConfiguredEnabled();
-        return TameworkRuntimeSettings.happinessEnabled(configEnabled);
+        return configEnabled && TameworkRuntimeSettings.happinessEnabled(configEnabled);
     }
 
     @Nullable

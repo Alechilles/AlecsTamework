@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 
 /**
@@ -95,20 +96,31 @@ final class LinkedNpcPanelVitalsBinder {
                 commandBuilder,
                 entrySelector + " #NeedHappiness",
                 new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.happiness"), ICON_NEED_HAPPINESS),
-                resolveHappinessNeed(entry, language)
+                resolveHappinessNeed(entry, language),
+                shouldShowHappiness(entry)
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedHunger",
                 new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.hunger"), ICON_NEED_HUNGER),
-                resolveHungerNeed(entry, language)
+                resolveHungerNeed(entry, language),
+                shouldShowNeeds(entry)
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedThirst",
                 new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.thirst"), ICON_NEED_THIRST),
-                resolveThirstNeed(entry, language)
+                resolveThirstNeed(entry, language),
+                shouldShowNeeds(entry)
         );
+    }
+
+    private static boolean shouldShowHappiness(LinkedNpcEntry entry) {
+        return TameworkRuntimeSettings.happinessEnabled(true) && (entry.hasHappiness() || !entry.loaded());
+    }
+
+    private static boolean shouldShowNeeds(LinkedNpcEntry entry) {
+        return TameworkRuntimeSettings.needsEnabled(true) && ((entry.hasHunger() && entry.hasThirst()) || !entry.loaded());
     }
 
     private static NeedVisual resolveHappinessNeed(LinkedNpcEntry entry, String language) {
@@ -207,8 +219,12 @@ final class LinkedNpcPanelVitalsBinder {
     private static void bindNeedRing(UICommandBuilder commandBuilder,
                                      String slotSelector,
                                      NeedIcon icon,
-                                     NeedVisual visual) {
-        commandBuilder.set(slotSelector + ".Visible", true);
+                                     NeedVisual visual,
+                                     boolean visible) {
+        commandBuilder.set(slotSelector + ".Visible", visible);
+        if (!visible) {
+            return;
+        }
         if (icon.hasTexturePath()) {
             commandBuilder.set(slotSelector + " #NeedIcon.Visible", false);
             commandBuilder.set(slotSelector + " #NeedIconImage.Visible", true);

@@ -106,6 +106,12 @@ public final class CompanionProgressionBootstrapService {
         }
         TwHappinessConfig config = TwHappinessConfig.resolveForRole(roleId);
         TameworkHappinessComponent existing = store.getComponent(npcRef, happinessType);
+        if (!HappinessConfigResolver.isRuntimeEnabled(config)) {
+            if (existing != null) {
+                store.tryRemoveComponent(npcRef, happinessType);
+            }
+            return null;
+        }
         long now = System.currentTimeMillis();
         if (existing != null) {
             boolean changed = false;
