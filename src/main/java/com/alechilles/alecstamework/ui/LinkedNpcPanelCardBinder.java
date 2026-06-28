@@ -40,6 +40,7 @@ final class LinkedNpcPanelCardBinder {
         String maleIconSelector = entrySelector + " #GenderMaleIcon";
         String femaleIconSelector = entrySelector + " #GenderFemaleIcon";
         String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
+        String recallCountdownSelector = entrySelector + " #RecallCountdown";
         String statusConfirmSelector = entrySelector + " #StatusConfirm";
         String xpProgressRingSelector = entrySelector + " #XpProgressRing";
         String xpLevelTextSelector = xpProgressRingSelector + " #XpLevelText";
@@ -108,13 +109,30 @@ final class LinkedNpcPanelCardBinder {
         boolean showActiveToggleActive = isLinked && entry.active() && !pendingUnlink;
         boolean showActiveToggleInactive = isLinked && !entry.active() && !pendingUnlink;
         boolean showBreedingToggleEnabled =
-                isLinked && entry.loaded() && entry.breedingCooldownKnown() && entry.breedingEnabled() && !pendingUnlink;
+                isLinked && entry.loaded() && entry.breedingAvailable() && entry.breedingEnabled() && !pendingUnlink;
         boolean showBreedingToggleDisabled =
-                isLinked && entry.loaded() && entry.breedingCooldownKnown() && !entry.breedingEnabled() && !pendingUnlink;
+                isLinked && entry.loaded() && entry.breedingAvailable() && !entry.breedingEnabled() && !pendingUnlink;
         boolean showInactiveBadge = isLinked && !entry.active() && !pendingUnlink;
+        boolean showRecallCountdown = isLinked
+                && entry.recallPending()
+                && !entry.loaded()
+                && !entry.dead()
+                && !entry.captured()
+                && !entry.inCoop()
+                && !entry.lost()
+                && !pendingUnlink;
 
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
+        commandBuilder.set(recallCountdownSelector + ".Visible", showRecallCountdown);
+        commandBuilder.set(
+                recallCountdownSelector + ".Text",
+                LocalizedText.format(
+                        language,
+                        "tamework.ui.linkedPanel.card.recallCountdown",
+                        (entry.recallLostRemainingMs() + 999L) / 1000L
+                )
+        );
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
         commandBuilder.set(
                 statusConfirmSelector + ".Text",

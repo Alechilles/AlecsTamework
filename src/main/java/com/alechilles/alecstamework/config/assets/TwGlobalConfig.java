@@ -547,7 +547,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private double commandRecallSafeSpawnDistance = 20.0;
     private double commandRecallForceRelocateDistance = 80.0;
     private int commandRelocationRetryIntervalMs = 2000;
-    private int commandRelocationMaxWaitMs = 120000;
+    private int commandRelocationMaxWaitMs = 10000;
     private int commandRelocationMaxRetryAttempts = 60;
     private boolean commandDeadRespawnEnabled;
     private int commandDeadRespawnCooldownMs = 60000;

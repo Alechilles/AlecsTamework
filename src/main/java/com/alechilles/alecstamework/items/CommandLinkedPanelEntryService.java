@@ -36,6 +36,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcCaptureService captureService;
     private final CommandLinkedNpcCoopService coopService;
     private final CommandLinkedNpcLostService lostService;
+    private final CommandNpcRelocationService relocationService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandGroupService groupService;
@@ -48,6 +49,7 @@ final class CommandLinkedPanelEntryService {
                                    CommandLinkedNpcCaptureService captureService,
                                    CommandLinkedNpcCoopService coopService,
                                    CommandLinkedNpcLostService lostService,
+                                   CommandNpcRelocationService relocationService,
                                    CommandNpcNameResolver npcNameResolver,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandGroupService groupService) {
@@ -56,6 +58,7 @@ final class CommandLinkedPanelEntryService {
         this.captureService = captureService;
         this.coopService = coopService;
         this.lostService = lostService;
+        this.relocationService = relocationService;
         this.npcNameResolver = npcNameResolver;
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();
@@ -131,6 +134,8 @@ final class CommandLinkedPanelEntryService {
             long harvestCooldownRemainingMs = 0L;
             double harvestCooldownRatio = 0.0;
             boolean harvestCooldownKnown = false;
+            boolean recallPending = false;
+            long recallLostRemainingMs = 0L;
             LinkedNpcEntry.FutureStat futureStatA = null;
             LinkedNpcEntry.FutureStat futureStatB = null;
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
@@ -239,6 +244,14 @@ final class CommandLinkedPanelEntryService {
                     lost = true;
                 }
             }
+            if (!loaded && !dead && !captured && !inCoop && !lost && relocationService != null) {
+                CommandNpcRelocationService.PendingRecallSnapshot pendingRecall =
+                        relocationService.getPendingRecallSnapshot(record.npcUuid);
+                if (pendingRecall != null) {
+                    recallPending = true;
+                    recallLostRemainingMs = pendingRecall.remainingUntilLostMs();
+                }
+            }
             entries.add(new LinkedNpcEntry(
                     record.npcUuid,
                     displayName,
@@ -276,6 +289,7 @@ final class CommandLinkedPanelEntryService {
                     groupName,
                     groupColor,
                     breedingEnabled,
+                    breedingCooldownKnown,
                     breedingCooldownActive,
                     breedingCooldownRemainingMs,
                     breedingCooldownRatio,
@@ -283,7 +297,9 @@ final class CommandLinkedPanelEntryService {
                     harvestCooldownActive,
                     harvestCooldownRemainingMs,
                     harvestCooldownRatio,
-                    harvestCooldownKnown
+                    harvestCooldownKnown,
+                    recallPending,
+                    recallLostRemainingMs
             ));
         }
         return entries;

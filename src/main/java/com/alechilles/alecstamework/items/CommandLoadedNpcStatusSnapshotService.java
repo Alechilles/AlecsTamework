@@ -129,6 +129,7 @@ final class CommandLoadedNpcStatusSnapshotService {
         }
 
         boolean breedingEnabled = resolvedContext.breedingEnabled();
+        boolean breedingAvailable = false;
         boolean breedingCooldownActive = false;
         long breedingCooldownRemainingMs = 0L;
         double breedingCooldownRatio = 0.0;
@@ -136,7 +137,10 @@ final class CommandLoadedNpcStatusSnapshotService {
         CommandLinkedPanelCooldownSnapshotService.CooldownSnapshot breedingSnapshot =
                 cooldownSnapshotService.readBreedingCooldownSnapshot(npcRef, store, speciesId);
         if (breedingSnapshot != null) {
-            breedingEnabled = breedingSnapshot.enabled;
+            breedingAvailable = breedingSnapshot.available;
+            if (breedingSnapshot.known) {
+                breedingEnabled = breedingSnapshot.enabled;
+            }
             breedingCooldownKnown = breedingSnapshot.known;
             breedingCooldownActive = breedingSnapshot.active;
             breedingCooldownRemainingMs = breedingSnapshot.remainingMs;
@@ -229,6 +233,7 @@ final class CommandLoadedNpcStatusSnapshotService {
                 resolvedContext.groupName(),
                 resolvedContext.groupColorHex(),
                 breedingEnabled,
+                breedingAvailable,
                 breedingCooldownActive,
                 breedingCooldownRemainingMs,
                 breedingCooldownRatio,
@@ -236,7 +241,9 @@ final class CommandLoadedNpcStatusSnapshotService {
                 harvestCooldownActive,
                 harvestCooldownRemainingMs,
                 harvestCooldownRatio,
-                harvestCooldownKnown
+                harvestCooldownKnown,
+                false,
+                0L
         );
     }
 

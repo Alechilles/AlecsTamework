@@ -44,7 +44,7 @@ public final class CommandNpcRelocationService {
     private static final long RELOCATION_CONFIRMATION_TIMEOUT_MS = 5000L;
     private static final double DESTINATION_CONFIRM_TOLERANCE = 4.0;
     private static final long RETRY_INTERVAL_MS = 2000L;
-    private static final long MAX_RELOCATION_WAIT_MS = 120000L;
+    private static final long MAX_RELOCATION_WAIT_MS = 10000L;
     private static final int MAX_RETRY_ATTEMPTS = 60;
     private static final int RETRY_PROGRESS_LOG_STEP = 5;
 
@@ -94,6 +94,25 @@ public final class CommandNpcRelocationService {
         return new LastKnownLocation(
                 worldName,
                 position != null ? new Vector3d(position) : copyPosition(fallbackPosition)
+        );
+    }
+
+    @Nullable
+    public PendingRecallSnapshot getPendingRecallSnapshot(@Nullable UUID npcUuid) {
+        if (npcUuid == null) {
+            return null;
+        }
+        PendingRelocation pending = pendingByNpc.get(npcUuid);
+        if (pending == null) {
+            return null;
+        }
+        long nowMs = System.currentTimeMillis();
+        long maxWaitMs = Math.max(0L, resolveMaxRelocationWaitMs());
+        long lostAtMs = pending.queuedAtMs + maxWaitMs;
+        return new PendingRecallSnapshot(
+                pending.npcUuid,
+                pending.queuedAtMs,
+                Math.max(0L, lostAtMs - nowMs)
         );
     }
 
@@ -1164,6 +1183,9 @@ public final class CommandNpcRelocationService {
     }
 
     public record LastKnownLocation(@Nullable String worldName, @Nullable Vector3d position) {
+    }
+
+    public record PendingRecallSnapshot(UUID npcUuid, long queuedAtMs, long remainingUntilLostMs) {
     }
 
     private static final class PendingRelocation {

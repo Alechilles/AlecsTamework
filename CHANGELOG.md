@@ -7,6 +7,8 @@
 - Empty feed trough prompts now mention that right-clicking with a water bucket fills the trough.
 - Linked companion panel cards now show active harvest cooldown timers beside breeding cooldown timers.
 - Linked companion panel cooldown timers now use icon art for breeding and harvest instead of letter labels.
+- Linked companion panel cards now show an attempting-recall countdown before an unloaded companion is marked lost.
+- Linked companion recall now marks an unreachable NPC lost after 10 seconds by default.
 - Taming now tells players when a new companion is automatically linked to a command item, or when no matching command item was found in inventory.
 - Taming now shows warning notifications when the player is at the per-player ownership limit or the target claim is at its SimpleClaims companion limit.
 - Holding a command item while looking at a supported NPC now shows a compact right-side status HUD with vitals, progression details, food profiles, attachment selections, and tame tranquilizer requirements when available.
@@ -22,6 +24,7 @@
 - Command target HUD attachment selections now use the same `Name: Value` line format as captured spawner item tooltips.
 - Command target HUD now clears and refreshes nearly instantly when players stop targeting a supported NPC, switch held items, or look at another supported NPC.
 - Command target HUD now appears for untamed NPCs that have enabled Tamework tame interactions.
+- Fixed linked companion breeding toggles disappearing after some revive, recall, or lost-recovery flows when breeding was available but cooldown state was unavailable.
 
 ## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24
 

@@ -62,6 +62,13 @@ Group {
         Visible: false;
     }
 
+    Label #RecallCountdown {
+        Anchor: (Top: 30, Right: 24, Width: 148, Height: 18);
+        Text: %server.tamework.ui.linkedPanel.card.recallCountdown.default;
+        Style: (FontSize: 11, RenderBold: true, TextColor: #ffcf6e, HorizontalAlignment: Center, VerticalAlignment: Center);
+        Visible: false;
+    }
+
     Group #TraitStrip {
         Anchor: (Top: 1, Right: 34, Width: 108, Height: 24);
         LayoutMode: Left;

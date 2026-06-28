@@ -184,6 +184,56 @@ class LinkedNpcPanelCardLayoutTest {
         assertLinkedPanelIconSize("Harvest_Cooldown.png");
     }
 
+    @Test
+    void recoveredBreedingToggleUsesBreedingAvailabilityNotCooldownState() throws IOException {
+        String entry = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "ui", "LinkedNpcEntry.java"
+        ), StandardCharsets.UTF_8);
+        String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
+
+        assertTrue(entry.contains("boolean breedingAvailable"), "LinkedNpcEntry should carry breeding availability separately.");
+        assertTrue(entry.contains("public boolean breedingAvailable()"), "LinkedNpcEntry should expose breeding availability.");
+        assertTrue(
+                binder.contains("entry.breedingAvailable() && entry.breedingEnabled()"),
+                "Enabled breeding toggle should show when breeding is available, even without an active cooldown."
+        );
+        assertTrue(
+                binder.contains("entry.breedingAvailable() && !entry.breedingEnabled()"),
+                "Disabled breeding toggle should show when breeding is available, even without an active cooldown."
+        );
+        assertFalse(
+                binder.contains("entry.breedingCooldownKnown() && entry.breedingEnabled()"),
+                "Breeding toggle visibility must not depend on cooldown snapshot availability."
+        );
+    }
+
+    @Test
+    void linkedPanelCardHasRecallCountdownLabel() throws IOException {
+        String cardUi = Files.readString(CARD_UI, StandardCharsets.UTF_8);
+        String binder = Files.readString(CARD_BINDER, StandardCharsets.UTF_8);
+
+        assertTrue(
+                cardUi.contains("Label #RecallCountdown"),
+                "Linked card should reserve a label in the unloaded-card status area for recall countdown."
+        );
+        assertTrue(
+                cardUi.contains("%server.tamework.ui.linkedPanel.card.recallCountdown.default"),
+                "Recall countdown label should use a localized default."
+        );
+        assertTrue(
+                binder.contains("recallCountdownSelector"),
+                "Linked card binder should bind recall countdown visibility and text."
+        );
+        assertTrue(
+                binder.contains("entry.recallPending()"),
+                "Recall countdown should be driven by pending relocation state on the entry."
+        );
+        assertTrue(
+                binder.contains("tamework.ui.linkedPanel.card.recallCountdown"),
+                "Recall countdown text should use the localized countdown key."
+        );
+    }
+
     private static List<String> findUnquotedStringTextDefaults(String cardUi) {
         List<String> matches = new ArrayList<>();
         String[] lines = cardUi.split("\\R");

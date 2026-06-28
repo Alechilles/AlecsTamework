@@ -46,6 +46,7 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 
 ## Special statuses
 - `Unloaded` means the companion is not currently loaded near you, but the tool still knows about it.
+- `Attempting recall` means the tool is still retrying an unloaded companion relocation. The timer shows how many seconds remain before it is treated as lost.
 - `Dead` means the tool has a persisted death snapshot and may allow revive after policy and cooldown checks.
 - `LOST` means the tool could not safely complete relocation or travel recovery. In that state, normal recall and return-home actions are usually blocked.
 
@@ -56,6 +57,7 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 
 ## Practical tips
 - If a companion is `LOST`, look for revive or recovery behavior rather than repeatedly using recall.
+- If a row says `Attempting recall`, wait for the countdown to finish before deciding whether revive or lost recovery is needed.
 - If the row stays inactive, check whether you intentionally toggled it off for bulk commands.
 - If nearby actions appear only sometimes, move closer and confirm the creature is loaded and owned by you.
 

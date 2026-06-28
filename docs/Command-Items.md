@@ -113,6 +113,7 @@ Linked panel supports:
 - Status lanes for loaded/unloaded/dead/lost companions
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
 - Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
+- Attempting-recall countdown text for unloaded companions while relocation is still retrying
 
 Command target HUD:
 - Appears while the player holds any registered command item and looks directly at a supported NPC within 6 units.
@@ -134,7 +135,7 @@ Unloaded flow:
 - On-load relocation retries run via `CommandNpcRelocationOnLoadSystem`.
 
 Lost flow:
-- If relocation retry windows are exhausted, a linked companion can transition to `LOST`.
+- If relocation retry windows are exhausted, a linked companion can transition to `LOST`; the shipped default wait budget is 10 seconds.
 - `Recall`/`Return Home` are blocked while `LOST`.
 - `Revive`/`Respawn` can perform strict recovery (replacement spawn + stale-original suppression mapping).
 
@@ -145,7 +146,7 @@ Dead companions:
 ## Global tuning
 `TwGlobalConfig.Command` remains the shared relocation infrastructure location:
 - `RelocationRetryIntervalMs`
-- `RelocationMaxWaitMs`
+- `RelocationMaxWaitMs` (default: `10000`)
 - `RelocationMaxRetryAttempts`
 - `LinkedPanelRequireUnlinkConfirm`
 

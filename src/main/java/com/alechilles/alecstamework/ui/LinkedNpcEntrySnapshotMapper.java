@@ -76,6 +76,7 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.groupName(),
                     entry.groupColorHex(),
                     entry.breedingEnabled(),
+                    entry.breedingAvailable(),
                     entry.breedingCooldownActive(),
                     entry.breedingCooldownRemainingMs(),
                     entry.breedingCooldownRatio(),
@@ -83,7 +84,9 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.harvestCooldownActive(),
                     entry.harvestCooldownRemainingMs(),
                     entry.harvestCooldownRatio(),
-                    entry.harvestCooldownKnown()
+                    entry.harvestCooldownKnown(),
+                    entry.recallPending(),
+                    entry.recallLostRemainingMs()
             ));
         }
         return out.toArray(new LinkedNpcEntry[0]);

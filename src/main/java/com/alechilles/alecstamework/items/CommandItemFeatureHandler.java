@@ -156,6 +156,7 @@ public final class CommandItemFeatureHandler {
                 captureService,
                 coopService,
                 lostService,
+                relocationService,
                 npcNameResolver,
                 linkPolicyService,
                 this.groupService

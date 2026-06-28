@@ -38,6 +38,7 @@ public final class LinkedNpcEntry {
     private final String groupName;
     private final String groupColorHex;
     private final boolean breedingEnabled;
+    private final boolean breedingAvailable;
     private final boolean breedingCooldownActive;
     private final long breedingCooldownRemainingMs;
     private final double breedingCooldownRatio;
@@ -46,6 +47,8 @@ public final class LinkedNpcEntry {
     private final long harvestCooldownRemainingMs;
     private final double harvestCooldownRatio;
     private final boolean harvestCooldownKnown;
+    private final boolean recallPending;
+    private final long recallLostRemainingMs;
     private final FutureStat futureStatA;
     private final FutureStat futureStatB;
     private final LinkedNpcTraitIndicator[] traitIndicators;
@@ -111,13 +114,16 @@ public final class LinkedNpcEntry {
                 null,
                 false,
                 false,
+                false,
                 0L,
                 0.0,
                 false,
                 false,
                 0L,
                 0.0,
-                false
+                false,
+                false,
+                0L
         );
     }
 
@@ -184,13 +190,16 @@ public final class LinkedNpcEntry {
                 null,
                 false,
                 false,
+                false,
                 0L,
                 0.0,
                 false,
                 false,
                 0L,
                 0.0,
-                false
+                false,
+                false,
+                0L
         );
     }
 
@@ -360,6 +369,7 @@ public final class LinkedNpcEntry {
                 groupName,
                 groupColorHex,
                 breedingEnabled,
+                breedingCooldownKnown,
                 breedingCooldownActive,
                 breedingCooldownRemainingMs,
                 breedingCooldownRatio,
@@ -367,7 +377,9 @@ public final class LinkedNpcEntry {
                 harvestCooldownActive,
                 harvestCooldownRemainingMs,
                 harvestCooldownRatio,
-                harvestCooldownKnown
+                harvestCooldownKnown,
+                false,
+                0L
         );
     }
 
@@ -407,6 +419,7 @@ public final class LinkedNpcEntry {
                           String groupName,
                           String groupColorHex,
                           boolean breedingEnabled,
+                          boolean breedingAvailable,
                           boolean breedingCooldownActive,
                           long breedingCooldownRemainingMs,
                           double breedingCooldownRatio,
@@ -414,7 +427,9 @@ public final class LinkedNpcEntry {
                           boolean harvestCooldownActive,
                           long harvestCooldownRemainingMs,
                           double harvestCooldownRatio,
-                          boolean harvestCooldownKnown) {
+                          boolean harvestCooldownKnown,
+                          boolean recallPending,
+                          long recallLostRemainingMs) {
         this.npcUuid = npcUuid;
         this.displayName = displayName;
         this.gender = normalizeGender(gender);
@@ -444,6 +459,7 @@ public final class LinkedNpcEntry {
         this.groupName = groupName;
         this.groupColorHex = groupColorHex;
         this.breedingEnabled = breedingEnabled;
+        this.breedingAvailable = breedingAvailable || breedingCooldownKnown;
         this.breedingCooldownActive = breedingCooldownActive;
         this.breedingCooldownRemainingMs = Math.max(0L, breedingCooldownRemainingMs);
         this.breedingCooldownRatio = sanitizeRatio(breedingCooldownRatio);
@@ -452,6 +468,8 @@ public final class LinkedNpcEntry {
         this.harvestCooldownRemainingMs = Math.max(0L, harvestCooldownRemainingMs);
         this.harvestCooldownRatio = sanitizeRatio(harvestCooldownRatio);
         this.harvestCooldownKnown = harvestCooldownKnown;
+        this.recallPending = recallPending;
+        this.recallLostRemainingMs = Math.max(0L, recallLostRemainingMs);
         this.futureStatA = futureStatA;
         this.futureStatB = futureStatB;
         this.traitIndicators = sanitizeTraitIndicators(traitIndicators);
@@ -589,6 +607,10 @@ public final class LinkedNpcEntry {
         return breedingEnabled;
     }
 
+    public boolean breedingAvailable() {
+        return breedingAvailable;
+    }
+
     public boolean breedingCooldownActive() {
         return breedingCooldownActive;
     }
@@ -619,6 +641,14 @@ public final class LinkedNpcEntry {
 
     public boolean harvestCooldownKnown() {
         return harvestCooldownKnown;
+    }
+
+    public boolean recallPending() {
+        return recallPending;
+    }
+
+    public long recallLostRemainingMs() {
+        return recallLostRemainingMs;
     }
 
     public double healthRatio() {
@@ -774,6 +804,7 @@ public final class LinkedNpcEntry {
                 && hasHome == other.hasHome
                 && deadRespawnRemainingMs == other.deadRespawnRemainingMs
                 && breedingEnabled == other.breedingEnabled
+                && breedingAvailable == other.breedingAvailable
                 && breedingCooldownActive == other.breedingCooldownActive
                 && breedingCooldownRemainingMs == other.breedingCooldownRemainingMs
                 && Double.compare(breedingCooldownRatio, other.breedingCooldownRatio) == 0
@@ -782,6 +813,8 @@ public final class LinkedNpcEntry {
                 && harvestCooldownRemainingMs == other.harvestCooldownRemainingMs
                 && Double.compare(harvestCooldownRatio, other.harvestCooldownRatio) == 0
                 && harvestCooldownKnown == other.harvestCooldownKnown
+                && recallPending == other.recallPending
+                && recallLostRemainingMs == other.recallLostRemainingMs
                 && traitsActionVisible == other.traitsActionVisible
                 && traitsActionEnabled == other.traitsActionEnabled
                 && talentsActionVisible == other.talentsActionVisible
@@ -833,6 +866,7 @@ public final class LinkedNpcEntry {
                 groupName,
                 groupColorHex,
                 breedingEnabled,
+                breedingAvailable,
                 breedingCooldownActive,
                 breedingCooldownRemainingMs,
                 breedingCooldownRatio,
@@ -841,6 +875,8 @@ public final class LinkedNpcEntry {
                 harvestCooldownRemainingMs,
                 harvestCooldownRatio,
                 harvestCooldownKnown,
+                recallPending,
+                recallLostRemainingMs,
                 futureStatA,
                 futureStatB,
                 traitsActionVisible,

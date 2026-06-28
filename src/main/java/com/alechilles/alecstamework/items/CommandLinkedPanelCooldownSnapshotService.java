@@ -25,24 +25,25 @@ final class CommandLinkedPanelCooldownSnapshotService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
+        boolean availableByConfig = isBreedingAvailableForRole(resolvedRoleId);
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         if (breedingType == null) {
-            return null;
+            return new CooldownSnapshot(false, availableByConfig, false, false, 0L, 0.0);
         }
         TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
         if (breeding == null) {
-            return new CooldownSnapshot(false, false, false, 0L, 0.0);
+            return new CooldownSnapshot(false, availableByConfig, false, false, 0L, 0.0);
         }
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         long until = breeding.getCooldownUntilMs();
         boolean active = until != 0L && now < until;
         if (!active) {
-            return new CooldownSnapshot(true, breeding.isEnabled(), false, 0L, 1.0);
+            return new CooldownSnapshot(true, true, breeding.isEnabled(), false, 0L, 1.0);
         }
         long remainingGameMs = Math.max(0L, until - now);
         long remainingRealMs = BreedingTimeService.toEstimatedRealDurationMs(remainingGameMs, store);
         double ratio = resolveBreedingCooldownRatio(breeding, npcRef, store, resolvedRoleId, remainingGameMs);
-        return new CooldownSnapshot(true, breeding.isEnabled(), true, remainingRealMs, ratio);
+        return new CooldownSnapshot(true, true, breeding.isEnabled(), true, remainingRealMs, ratio);
     }
 
     @Nullable
@@ -63,21 +64,21 @@ final class CommandLinkedPanelCooldownSnapshotService {
                                            long durationMs,
                                            @Nullable Store<EntityStore> store) {
         if (!known) {
-            return new CooldownSnapshot(false, true, false, 0L, 0.0);
+            return new CooldownSnapshot(false, true, true, false, 0L, 0.0);
         }
         if (!active) {
-            return new CooldownSnapshot(true, true, false, 0L, 1.0);
+            return new CooldownSnapshot(true, true, true, false, 0L, 1.0);
         }
         long remainingGameMs = Math.max(0L, untilMs - nowMs);
         long remainingRealMs = BreedingTimeService.toEstimatedRealDurationMs(remainingGameMs, store);
         double ratio = resolveCooldownRatio(remainingGameMs, startedAtMs, durationMs, untilMs);
-        return new CooldownSnapshot(true, true, true, remainingRealMs, ratio);
+        return new CooldownSnapshot(true, true, true, true, remainingRealMs, ratio);
     }
 
     private static CooldownSnapshot fromAlarmSnapshot(@Nullable TameworkAlarmService.Snapshot snapshot,
                                                      @Nullable Store<EntityStore> store) {
         if (snapshot == null || !snapshot.valid) {
-            return new CooldownSnapshot(false, true, false, 0L, 0.0);
+            return new CooldownSnapshot(false, true, true, false, 0L, 0.0);
         }
         return fromAlarmWindow(
                 true,
@@ -134,6 +135,11 @@ final class CommandLinkedPanelCooldownSnapshotService {
         return clamp(1.0 - ((double) remainingMs / (double) baseDurationMs));
     }
 
+    private boolean isBreedingAvailableForRole(@Nullable String resolvedRoleId) {
+        TwBreedingConfig config = TwBreedingConfig.resolveForRole(resolvedRoleId);
+        return config != null && config.isEnabled();
+    }
+
     private static double resolveCooldownRatio(long remainingMs, long startedAtMs, long durationMs, long untilMs) {
         long knownDurationMs = Math.max(0L, durationMs);
         if (knownDurationMs <= 0L) {
@@ -164,13 +170,20 @@ final class CommandLinkedPanelCooldownSnapshotService {
 
     static final class CooldownSnapshot {
         final boolean known;
+        final boolean available;
         final boolean enabled;
         final boolean active;
         final long remainingMs;
         final double ratio;
 
-        private CooldownSnapshot(boolean known, boolean enabled, boolean active, long remainingMs, double ratio) {
+        private CooldownSnapshot(boolean known,
+                                 boolean available,
+                                 boolean enabled,
+                                 boolean active,
+                                 long remainingMs,
+                                 double ratio) {
             this.known = known;
+            this.available = available;
             this.enabled = enabled;
             this.active = active;
             this.remainingMs = Math.max(0L, remainingMs);

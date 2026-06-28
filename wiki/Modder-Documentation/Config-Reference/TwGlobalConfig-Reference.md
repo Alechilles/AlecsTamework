@@ -71,7 +71,7 @@ This section holds shared command infrastructure. Revive enablement is controlle
 - `RecallSafeSpawnDistance`: preferred placement distance when recalling an unloaded NPC.
 - `RecallForceRelocateDistance`: distance after which recall can force relocation instead of waiting for normal follow.
 - `RelocationRetryIntervalMs`: retry interval for queued off-screen relocations.
-- `RelocationMaxWaitMs`: total relocation wait budget before the runtime gives up.
+- `RelocationMaxWaitMs`: total relocation wait budget before the runtime gives up. The shipped default is `10000` milliseconds.
 - `RelocationMaxRetryAttempts`: cap on relocation retry attempts.
 - `DeadRespawnCooldownMs`: respawn cooldown in milliseconds.
 - `DeadRespawnCooldownMins`: human-friendly alias for the same cooldown. If both are present, the minutes key wins.
@@ -135,7 +135,7 @@ Older packs may still contain ownership protection, ownership requirement, popul
   },
   "Command": {
     "RelocationRetryIntervalMs": 2000,
-    "RelocationMaxWaitMs": 20000,
+    "RelocationMaxWaitMs": 10000,
     "RelocationMaxRetryAttempts": 60,
     "LinkedPanelRequireUnlinkConfirm": true
   },
