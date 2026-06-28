@@ -28,6 +28,24 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
+    void sweepThrottleIsTrackedPerWorldStore() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
+        ));
+
+        Assertions.assertTrue(source.contains("new IdentityHashMap<>()"));
+        Assertions.assertTrue(source.contains("storeTickStateByStore.computeIfAbsent(store"));
+        Assertions.assertTrue(source.contains("StoreTickState tickState = tickState(store)"));
+        Assertions.assertTrue(source.contains("nowMs < tickState.nextSweepAtMs"));
+        int sharedStateMap = source.indexOf("storeTickStateByStore");
+        int constructor = source.indexOf("public CommandTargetHudService", sharedStateMap);
+        String fieldSection = source.substring(sharedStateMap, constructor);
+        Assertions.assertFalse(fieldSection.contains("private long nextSweepAtMs;"));
+        Assertions.assertFalse(fieldSection.contains("private long nextFallbackDiscoveryAtMs;"));
+        Assertions.assertFalse(fieldSection.contains("private int nextCandidateOffset;"));
+    }
+
+    @Test
     void targetScanIntervalAvoidsPerTickRaycasts() {
         Assertions.assertTrue(
                 CommandTargetHudService.targetScanIntervalMsForTests() >= 200L,
@@ -365,13 +383,15 @@ class CommandTargetHudServiceTest {
         ));
 
         int tick = source.indexOf("public void tick");
-        int processCandidates = source.indexOf("processCandidatePlayers(store, nowMs)", tick);
+        int tickState = source.indexOf("StoreTickState tickState = tickState(store)", tick);
+        int processCandidates = source.indexOf("processCandidatePlayers(store, tickState, nowMs)", tick);
         int fallbackCall = source.indexOf("seedCandidatesFromPlayerSweep(store)", tick);
         int fallbackMethod = source.indexOf("private void seedCandidatesFromPlayerSweep");
         int directSweep = source.indexOf("store.forEachChunk", tick);
 
         Assertions.assertTrue(tick >= 0);
-        Assertions.assertTrue(processCandidates > tick);
+        Assertions.assertTrue(tickState > tick);
+        Assertions.assertTrue(processCandidates > tickState);
         Assertions.assertTrue(fallbackCall > tick);
         Assertions.assertTrue(fallbackMethod > tick);
         Assertions.assertTrue(directSweep > fallbackMethod);
@@ -411,7 +431,7 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
-    void firstHudCreationRegistersAndPresentsHud() throws Exception {
+    void firstHudCreationRegistersHudAndReliesOnManagerShow() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
         ));
@@ -419,13 +439,13 @@ class CommandTargetHudServiceTest {
         int showMethod = source.indexOf("private void showHud");
         int createBranch = source.indexOf("if (hud == null)", showMethod);
         int addHud = source.indexOf("player.getHudManager().addCustomHud(playerRef, hud)", createBranch);
-        int present = source.indexOf("hud.present()", addHud);
         int refreshBranch = source.indexOf("} else {", addHud);
+        String createBody = source.substring(createBranch, refreshBranch);
 
         Assertions.assertTrue(showMethod >= 0);
         Assertions.assertTrue(addHud > createBranch);
-        Assertions.assertTrue(present > addHud);
-        Assertions.assertTrue(refreshBranch > present);
+        Assertions.assertTrue(refreshBranch > addHud);
+        Assertions.assertFalse(createBody.contains("hud.present()"));
     }
 
     @Test
