@@ -48,6 +48,15 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
+    void compactHudSnapshotsSkipLinkedPanelOnlyDetails() {
+        CommandLoadedNpcStatusSnapshotService.SnapshotOptions options =
+                CommandLoadedNpcStatusSnapshotService.SnapshotOptions.compactHud();
+
+        Assertions.assertFalse(options.includeHappinessBreakdown());
+        Assertions.assertFalse(options.includeProgressionModifierTooltip());
+    }
+
+    @Test
     void throttlesTargetScanForSameHeldCommandItemUntilIntervalElapses() {
         Assertions.assertFalse(CommandTargetHudService.shouldScanTargetForTests(
                 "Tamework:CommandFlute",

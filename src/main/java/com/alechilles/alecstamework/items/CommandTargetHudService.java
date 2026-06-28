@@ -272,7 +272,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                         null,
                         roleId,
                         null
-                )
+                ),
+                CommandLoadedNpcStatusSnapshotService.SnapshotOptions.compactHud()
         );
         if (status == null) {
             return null;

@@ -57,6 +57,15 @@ final class CommandLoadedNpcStatusSnapshotService {
                                     @Nullable Ref<EntityStore> npcRef,
                                     @Nullable Store<EntityStore> store,
                                     @Nullable NpcStatusContext context) {
+        return buildLoadedEntry(player, npcRef, store, context, SnapshotOptions.linkedPanel());
+    }
+
+    @Nullable
+    LinkedNpcEntry buildLoadedEntry(@Nullable Player player,
+                                    @Nullable Ref<EntityStore> npcRef,
+                                    @Nullable Store<EntityStore> store,
+                                    @Nullable NpcStatusContext context,
+                                    @Nullable SnapshotOptions options) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
@@ -64,6 +73,7 @@ final class CommandLoadedNpcStatusSnapshotService {
         if (npc == null) {
             return null;
         }
+        SnapshotOptions resolvedOptions = options != null ? options : SnapshotOptions.linkedPanel();
         String language = player != null && player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         NpcStatusContext resolvedContext = context != null ? context : NpcStatusContext.empty(npc.getUuid());
         UUID npcUuid = resolvedContext.npcUuid() != null ? resolvedContext.npcUuid() : npc.getUuid();
@@ -93,7 +103,12 @@ final class CommandLoadedNpcStatusSnapshotService {
         int maxHappiness = 0;
         int targetHappinessPercent = 0;
         String happinessModifierBreakdown = null;
-        HappinessSnapshot happinessSnapshot = readNpcHappinessSnapshot(npcRef, store, language);
+        HappinessSnapshot happinessSnapshot = readNpcHappinessSnapshot(
+                npcRef,
+                store,
+                language,
+                resolvedOptions.includeHappinessBreakdown()
+        );
         if (happinessSnapshot != null) {
             happiness = happinessSnapshot.current;
             maxHappiness = happinessSnapshot.max;
@@ -148,10 +163,13 @@ final class CommandLoadedNpcStatusSnapshotService {
         CompanionLevelingService.LevelingSnapshot levelingSnapshot =
                 CompanionLevelingService.resolveSnapshot(npcRef, store, resolvedRoleId);
         if (levelingSnapshot != null) {
+            String modifierTooltip = resolvedOptions.includeProgressionModifierTooltip()
+                    ? progressionPresentationService.buildModifierTooltip(npcRef, store, npc, language)
+                    : null;
             futureStatA = progressionPresentationService.buildLevelFutureStat(
                     levelingSnapshot,
                     language,
-                    progressionPresentationService.buildModifierTooltip(npcRef, store, npc, language)
+                    modifierTooltip
             );
         }
         TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(npcRef, store);
@@ -312,7 +330,8 @@ final class CommandLoadedNpcStatusSnapshotService {
     @Nullable
     private HappinessSnapshot readNpcHappinessSnapshot(Ref<EntityStore> npcRef,
                                                        Store<EntityStore> store,
-                                                       @Nullable String language) {
+                                                       @Nullable String language,
+                                                       boolean includeModifierBreakdown) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
@@ -325,7 +344,7 @@ final class CommandLoadedNpcStatusSnapshotService {
         int roundedMax = Math.max(1, Math.round((float) max));
         int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
         int targetPercent = computePercent(snapshot.target(), snapshot.min(), snapshot.max());
-        String modifierBreakdown = buildHappinessModifierBreakdown(snapshot, language);
+        String modifierBreakdown = includeModifierBreakdown ? buildHappinessModifierBreakdown(snapshot, language) : null;
         return new HappinessSnapshot(roundedValue, roundedMax, targetPercent, modifierBreakdown);
     }
 
@@ -589,6 +608,17 @@ final class CommandLoadedNpcStatusSnapshotService {
                             String cachedNameKey) {
         static NpcStatusContext empty(@Nullable UUID npcUuid) {
             return new NpcStatusContext(npcUuid, null, false, true, false, false, null, null, null, null, null);
+        }
+    }
+
+    record SnapshotOptions(boolean includeHappinessBreakdown,
+                           boolean includeProgressionModifierTooltip) {
+        static SnapshotOptions linkedPanel() {
+            return new SnapshotOptions(true, true);
+        }
+
+        static SnapshotOptions compactHud() {
+            return new SnapshotOptions(false, false);
         }
     }
 
