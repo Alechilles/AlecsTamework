@@ -39,9 +39,6 @@ import javax.annotation.Nullable;
 public final class CompanionNeedsEnvironmentService {
     private static final int DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS = 2;
     private static final int DEFAULT_WATER_VERTICAL_SCAN_RADIUS = 1;
-    private static final long SEARCH_CACHE_HIT_TTL_MS = 1_500L;
-    private static final long SEARCH_CACHE_MISS_TTL_MS = 3_000L;
-    private static final long SEARCH_CACHE_SOURCE_ABSENT_MISS_TTL_MS = 8_000L;
     private static final int SEARCH_CACHE_MAX_ENTRIES = 8192;
     private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
@@ -458,12 +455,24 @@ public final class CompanionNeedsEnvironmentService {
                 null
         );
         if (targetRejector == null) {
-            WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(cacheKey, nowMs);
+            WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(
+                    cacheKey,
+                    transform.getPosition(),
+                    radius,
+                    verticalScanRadius,
+                    nowMs
+            );
             if (cachedResult != null) {
                 return cachedResult;
             }
         } else {
-            WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(cacheKey, nowMs);
+            WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(
+                    cacheKey,
+                    transform.getPosition(),
+                    radius,
+                    verticalScanRadius,
+                    nowMs
+            );
             if (cachedResult != null
                     && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
                 return cachedResult;
@@ -787,12 +796,24 @@ public final class CompanionNeedsEnvironmentService {
                 allowedFoods
         );
         if (targetRejector == null) {
-            FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(cacheKey, nowMs);
+            FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
+                    cacheKey,
+                    transform.getPosition(),
+                    radius,
+                    verticalScanRadius,
+                    nowMs
+            );
             if (cachedResult != null) {
                 return cachedResult;
             }
         } else {
-            FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(cacheKey, nowMs);
+            FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
+                    cacheKey,
+                    transform.getPosition(),
+                    radius,
+                    verticalScanRadius,
+                    nowMs
+            );
             if (cachedResult != null
                     && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
                 return cachedResult;
@@ -1059,6 +1080,9 @@ public final class CompanionNeedsEnvironmentService {
 
     @Nullable
     private static WaterTargetSearchResult getCachedWaterSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
+                                                                      @Nullable Vector3d currentPosition,
+                                                                      double radius,
+                                                                      int verticalScanRadius,
                                                                       long nowMs) {
         if (cacheKey == null) {
             return null;
@@ -1068,6 +1092,15 @@ public final class CompanionNeedsEnvironmentService {
             return null;
         }
         if (nowMs >= cached.expiresAtMs()) {
+            SEARCH_CACHE.remove(cacheKey, cached);
+            return null;
+        }
+        if (!NeedsResourceSearchCachePolicy.isCachedTargetUsable(
+                currentPosition,
+                cached.target(),
+                radius,
+                verticalScanRadius
+        )) {
             SEARCH_CACHE.remove(cacheKey, cached);
             return null;
         }
@@ -1081,6 +1114,9 @@ public final class CompanionNeedsEnvironmentService {
 
     @Nullable
     private static FoodTargetSearchResult getCachedFoodSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
+                                                                    @Nullable Vector3d currentPosition,
+                                                                    double radius,
+                                                                    int verticalScanRadius,
                                                                     long nowMs) {
         if (cacheKey == null) {
             return null;
@@ -1090,6 +1126,15 @@ public final class CompanionNeedsEnvironmentService {
             return null;
         }
         if (nowMs >= cached.expiresAtMs()) {
+            SEARCH_CACHE.remove(cacheKey, cached);
+            return null;
+        }
+        if (!NeedsResourceSearchCachePolicy.isCachedTargetUsable(
+                currentPosition,
+                cached.target(),
+                radius,
+                verticalScanRadius
+        )) {
             SEARCH_CACHE.remove(cacheKey, cached);
             return null;
         }
@@ -1170,12 +1215,7 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     static long searchCacheTtlMs(boolean hasTarget, boolean foundConsumableSource, long nowMs) {
-        long baseTtlMs;
-        if (hasTarget) {
-            baseTtlMs = SEARCH_CACHE_HIT_TTL_MS;
-        } else {
-            baseTtlMs = foundConsumableSource ? SEARCH_CACHE_MISS_TTL_MS : SEARCH_CACHE_SOURCE_ABSENT_MISS_TTL_MS;
-        }
+        long baseTtlMs = NeedsResourceSearchCachePolicy.baseTtlMs(hasTarget, foundConsumableSource);
         return TameworkRuntimePressureService.getInstance().scaleTtlMs(
                 RuntimePressureDomain.NEEDS_RESOURCE_SEARCH,
                 baseTtlMs,
@@ -1233,7 +1273,13 @@ public final class CompanionNeedsEnvironmentService {
                 6
         );
         cacheFoodSearchResult(cacheKey, result, nowMs);
-        FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(cacheKey, nowMs);
+        FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
+                cacheKey,
+                result.target() != null ? result.target() : new Vector3d(1.0, 2.0, 3.0),
+                16.0,
+                16,
+                nowMs
+        );
         return cachedResult != null ? cachedResult : FoodTargetSearchResult.miss(false);
     }
 
@@ -1279,9 +1325,9 @@ public final class CompanionNeedsEnvironmentService {
         if (npcUuid == null || worldName == null || worldName.isBlank()) {
             return null;
         }
-        int blockX = (int) Math.floor(position.x);
-        int blockY = (int) Math.floor(position.y);
-        int blockZ = (int) Math.floor(position.z);
+        int blockX = NeedsResourceSearchCachePolicy.quantizedBlockCoordinate((int) Math.floor(position.x));
+        int blockY = NeedsResourceSearchCachePolicy.quantizedBlockCoordinate((int) Math.floor(position.y));
+        int blockZ = NeedsResourceSearchCachePolicy.quantizedBlockCoordinate((int) Math.floor(position.z));
         int radiusKey = Math.max(1, (int) Math.ceil(radius * 10.0));
         int consumeRadiusKey = Math.max(0, (int) Math.ceil(consumeRadius * 10.0));
         int itemIdsHash = normalizedItemIds == null || normalizedItemIds.isEmpty() ? 0 : normalizedItemIds.hashCode();
