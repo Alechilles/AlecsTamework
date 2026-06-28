@@ -15,6 +15,7 @@
 
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
+- Fixed captured spawner ownership checks so spawners that clear ownership on capture can be traded and spawned by the receiving player.
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
 - Command target HUD food display now resolves role food profiles before legacy role params, so favorite foods can be shown separately from compatible feed items such as feedbags or cohort feed.
 - Command target HUD food and tame requirement rows now render food items through item-slot icons and show tranquilizer stack requirements more reliably.

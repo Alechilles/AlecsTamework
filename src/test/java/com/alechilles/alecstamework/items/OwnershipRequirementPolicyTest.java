@@ -1,11 +1,14 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import java.lang.reflect.Field;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests global ownership-requirement policy resolution helpers. */
@@ -58,6 +61,31 @@ class OwnershipRequirementPolicyTest {
         assertTrue(SpawnerOwnershipPolicyService.isOwnershipAllowed(false, true, player, null));
         assertFalse(SpawnerOwnershipPolicyService.isOwnershipAllowed(false, true, player, other));
         assertTrue(SpawnerOwnershipPolicyService.isOwnershipAllowed(false, true, player, player));
+    }
+
+    @Test
+    void spawnPolicyIgnoresCaptureSourceOwnerWhenCaptureClearedItemOwner() {
+        UUID currentOwner = UUID.randomUUID();
+        UUID oldOwner = UUID.randomUUID();
+        ItemFeatureConfig config = ItemFeatureConfig.builder()
+                .captureClearsOwner(true)
+                .build();
+
+        assertEquals(
+                currentOwner,
+                SpawnerOwnershipPolicyService.resolveSpawnPolicyOwner(currentOwner, oldOwner, config)
+        );
+        assertNull(SpawnerOwnershipPolicyService.resolveSpawnPolicyOwner(null, oldOwner, config));
+    }
+
+    @Test
+    void spawnPolicyCanUseCaptureSourceOwnerForNonClearingLegacyItems() {
+        UUID oldOwner = UUID.randomUUID();
+        ItemFeatureConfig config = ItemFeatureConfig.builder()
+                .captureClearsOwner(false)
+                .build();
+
+        assertEquals(oldOwner, SpawnerOwnershipPolicyService.resolveSpawnPolicyOwner(null, oldOwner, config));
     }
 
     @Test

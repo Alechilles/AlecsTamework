@@ -347,7 +347,11 @@ public final class SpawnerFeatureHandler {
 
         UUID ownerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING);
         UUID captureSourceOwnerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID, Codec.UUID_STRING);
-        UUID ownerForSpawnPolicy = ownerUuid != null ? ownerUuid : captureSourceOwnerUuid;
+        UUID ownerForSpawnPolicy = SpawnerOwnershipPolicyService.resolveSpawnPolicyOwner(
+                ownerUuid,
+                captureSourceOwnerUuid,
+                config
+        );
         if (!ownershipPolicyService.isSpawnAllowed(playerUuid, ownerForSpawnPolicy, config)) {
             logSpawnerFlowDebug(
                     "spawn denied by ownership policy item=" + itemStack.getItemId()
@@ -357,6 +361,7 @@ public final class SpawnerFeatureHandler {
                             + " ownerForPolicy=" + ownerForSpawnPolicy
                             + " requireOwnerOverride=" + config.getSpawnRequireOwnerOverride()
                             + " ownerRestricted=" + config.isSpawnOwnerRestricted()
+                            + " captureClearsOwner=" + config.isCaptureClearsOwner()
             );
             return false;
         }

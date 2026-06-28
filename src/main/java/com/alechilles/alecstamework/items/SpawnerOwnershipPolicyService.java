@@ -27,6 +27,19 @@ final class SpawnerOwnershipPolicyService {
         return isOwnershipAllowed(requireOwner, config.isSpawnOwnerRestricted(), playerUuid, ownerUuid);
     }
 
+    @Nullable
+    static UUID resolveSpawnPolicyOwner(@Nullable UUID itemOwnerUuid,
+                                        @Nullable UUID captureSourceOwnerUuid,
+                                        @Nullable ItemFeatureConfig config) {
+        if (itemOwnerUuid != null) {
+            return itemOwnerUuid;
+        }
+        if (config == null || config.isCaptureClearsOwner()) {
+            return null;
+        }
+        return captureSourceOwnerUuid;
+    }
+
     private boolean resolveCaptureRequireOwner(@Nonnull ItemFeatureConfig config) {
         return config.getCaptureRequireOwnerOverride() != null
                 ? config.getCaptureRequireOwnerOverride()
