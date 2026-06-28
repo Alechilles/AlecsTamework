@@ -44,7 +44,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 100L;
     private static final long FALLBACK_DISCOVERY_INTERVAL_MS = 1_500L;
     private static final long TARGET_SCAN_INTERVAL_MS = 200L;
-    private static final long PRESENTATION_PULSE_INTERVAL_MS = 250L;
     private static final long REFRESH_INTERVAL_MS = 5_000L;
     private static final long STATIC_DISPLAY_CACHE_MS = 30_000L;
     private static final int MAX_CANDIDATES_PER_PASS = 4;
@@ -212,8 +211,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (cachedActiveItemId != null
                 && !activationTracker.isDirty(playerUuid)
                 && !shouldScanTarget(previous, cachedActiveItemId, nowMs)) {
-            long presentationMs = pulsePresentation(playerUuid, previous, nowMs);
-            rememberPresentation(playerUuid, previous, presentationMs);
             return;
         }
 
@@ -226,16 +223,13 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         }
         activationTracker.recordResolvedHand(playerUuid, activeCommand.itemId(), true, nowMs);
         if (!shouldScanTarget(previous, activeCommand.itemId(), nowMs)) {
-            long presentationMs = pulsePresentation(playerUuid, previous, nowMs);
-            rememberPresentation(playerUuid, previous, presentationMs);
             return;
         }
 
         TargetCandidate candidate = resolveTarget(player, playerRef, activeCommand, store);
         String targetKey = candidate != null ? candidate.key() : null;
         if (!shouldRefresh(previous, targetKey, nowMs)) {
-            long presentationMs = pulsePresentation(playerUuid, previous, nowMs);
-            rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs, presentationMs);
+            rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs);
             return;
         }
         if (candidate == null) {
@@ -534,7 +528,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             debug(playerUuid, nowMs, "refresh:" + targetKey,
                     "refreshed hud; target=" + targetKey + ", item=" + activeItemId + ", display=" + model.status().displayName());
         }
-        stateByPlayer.put(playerUuid, new HudState(targetKey, nowMs, hud, true, nowMs, activeItemId, nowMs));
+        stateByPlayer.put(playerUuid, new HudState(targetKey, nowMs, hud, true, nowMs, activeItemId));
     }
 
     private void hideHud(@Nonnull UUID playerUuid, @Nullable Player player) {
@@ -579,18 +573,16 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 null,
                 false,
                 nowMs,
-                activeItemId,
-                previous != null ? previous.lastPresentationMs() : 0L
+                activeItemId
         ));
     }
 
     private void rememberScan(@Nonnull UUID playerUuid,
                               @Nullable HudState previous,
                               @Nonnull String activeItemId,
-                              long nowMs,
-                              long presentationMs) {
+                              long nowMs) {
         if (previous == null) {
-            stateByPlayer.put(playerUuid, new HudState(null, 0L, null, false, nowMs, activeItemId, presentationMs));
+            stateByPlayer.put(playerUuid, new HudState(null, 0L, null, false, nowMs, activeItemId));
             return;
         }
         stateByPlayer.put(playerUuid, new HudState(
@@ -599,35 +591,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 previous.hud(),
                 previous.visible(),
                 nowMs,
-                activeItemId,
-                presentationMs
+                activeItemId
         ));
-    }
-
-    private void rememberPresentation(@Nonnull UUID playerUuid,
-                                      @Nullable HudState previous,
-                                      long presentationMs) {
-        if (previous == null) {
-            return;
-        }
-        stateByPlayer.put(playerUuid, new HudState(
-                previous.targetKey(),
-                previous.lastRefreshMs(),
-                previous.hud(),
-                previous.visible(),
-                previous.lastTargetScanMs(),
-                previous.activeItemId(),
-                presentationMs
-        ));
-    }
-
-    private long pulsePresentation(@Nonnull UUID playerUuid, @Nullable HudState previous, long nowMs) {
-        if (!shouldPulsePresentation(previous, nowMs)) {
-            return previous != null ? previous.lastPresentationMs() : 0L;
-        }
-        previous.hud().present();
-        debug(playerUuid, nowMs, "present:" + previous.targetKey(), "presentation pulse; target=" + previous.targetKey());
-        return nowMs;
     }
 
     private void debugMissingFromStore(@Nullable UUID playerUuid, long nowMs) {
@@ -725,25 +690,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         return nowMs - previousScanMs >= Math.max(0L, scanIntervalMs);
     }
 
-    private static boolean shouldPulsePresentation(@Nullable HudState previous, long nowMs) {
-        return previous != null
-                && shouldPulsePresentationForTests(
-                previous.visible(),
-                previous.hud() != null,
-                previous.lastPresentationMs(),
-                nowMs,
-                PRESENTATION_PULSE_INTERVAL_MS
-        );
-    }
-
-    static boolean shouldPulsePresentationForTests(boolean visible,
-                                                   boolean hasHud,
-                                                   long previousPresentationMs,
-                                                   long nowMs,
-                                                   long pulseIntervalMs) {
-        return visible && hasHud && nowMs - previousPresentationMs >= Math.max(0L, pulseIntervalMs);
-    }
-
     static boolean shouldShowForEligibility(boolean tamed, boolean commandEligible, boolean untamedTameable) {
         return tamed ? commandEligible : commandEligible || untamedTameable;
     }
@@ -754,10 +700,6 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
 
     static long targetScanIntervalMsForTests() {
         return TARGET_SCAN_INTERVAL_MS;
-    }
-
-    static long presentationPulseIntervalMsForTests() {
-        return PRESENTATION_PULSE_INTERVAL_MS;
     }
 
     static float targetDistanceForTests() {
@@ -832,8 +774,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                             @Nullable TameworkCommandTargetHud hud,
                             boolean visible,
                             long lastTargetScanMs,
-                            @Nullable String activeItemId,
-                            long lastPresentationMs) {
+                            @Nullable String activeItemId) {
     }
 
     private record DebugLogState(@Nonnull String key,
