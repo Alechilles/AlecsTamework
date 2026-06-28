@@ -290,7 +290,7 @@ public final class NameplateBuilderCompanionSegmentBridge {
             return null;
         }
         TwNeedsConfig config = NeedsConfigResolver.resolveConfig(entityRef, store, needs);
-        if (config == null || !config.isEnabled() || config.getValues() == null) {
+        if (!NeedsConfigResolver.isRuntimeEnabled(config) || config.getValues() == null) {
             return null;
         }
         TwNeedsConfig.ValueSettings values = config.getValues();

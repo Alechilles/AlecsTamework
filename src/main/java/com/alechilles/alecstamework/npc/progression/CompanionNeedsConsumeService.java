@@ -167,7 +167,7 @@ public final class CompanionNeedsConsumeService {
         }
         TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
         TwNeedsConfig config = CompanionNeedsService.resolveNeedsConfig(npcRef, store, roleId, component);
-        if (config == null || !config.isEnabled()) {
+        if (!NeedsConfigResolver.isRuntimeEnabled(config)) {
             NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "config_missing_or_disabled");
             NeedsConsumeDiagnostics.maybeLogConsume(
                     diagnostics,

@@ -76,13 +76,14 @@ public final class CompanionNeedsService {
         if (needsType == null) {
             return null;
         }
-        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, store.getComponent(npcRef, needsType));
+        TameworkNeedsComponent existing = store.getComponent(npcRef, needsType);
+        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, existing);
         if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
+            removeNeedsRuntimeState(npcRef, store, commandBuffer, needsType, existing);
             return null;
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
         long nowMs = resolveNowMs(config, store);
-        TameworkNeedsComponent existing = store.getComponent(npcRef, needsType);
         if (existing == null) {
             TameworkNeedsComponent created = new TameworkNeedsComponent(
                     config.getId(),
@@ -214,7 +215,7 @@ public final class CompanionNeedsService {
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
         if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
-            return suspendNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component, config);
+            return removeNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component);
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
         double hunger = sanitizeAndClamp(
@@ -558,7 +559,7 @@ public final class CompanionNeedsService {
         TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
         if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
-            return suspendNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component, config);
+            return removeNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component);
         }
         component = ensureNeedsComponent(npcRef, store, commandBuffer, roleId);
         if (component == null) {
@@ -738,40 +739,21 @@ public final class CompanionNeedsService {
         return componentChanged || happinessChanged || damageApplied;
     }
 
-    private static boolean suspendNeedsRuntimeState(@Nonnull Ref<EntityStore> npcRef,
-                                                    @Nonnull Store<EntityStore> store,
-                                                    @Nullable CommandBuffer<EntityStore> commandBuffer,
-                                                    @Nonnull ComponentType<EntityStore, TameworkNeedsComponent> needsType,
-                                                    @Nullable TameworkNeedsComponent component,
-                                                    @Nullable TwNeedsConfig config) {
-        if (component == null || config == null) {
+    private static boolean removeNeedsRuntimeState(@Nonnull Ref<EntityStore> npcRef,
+                                                   @Nonnull Store<EntityStore> store,
+                                                   @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                   @Nonnull ComponentType<EntityStore, TameworkNeedsComponent> needsType,
+                                                   @Nullable TameworkNeedsComponent component) {
+        if (component == null) {
             return false;
         }
-        boolean changed = false;
-        if (Math.abs(component.getPendingNeedsDamage()) > EPSILON
-                || !Double.isFinite(component.getPendingNeedsDamage())) {
-            component.setPendingNeedsDamage(0.0);
-            changed = true;
+        syncNaturalRegenHardBlockDamageTimestamp(npcRef, store, commandBuffer, false);
+        if (commandBuffer != null) {
+            commandBuffer.run(bufferStore -> bufferStore.tryRemoveComponent(npcRef, needsType));
+        } else {
+            store.tryRemoveComponent(npcRef, needsType);
         }
-        if (!Double.isFinite(component.getAppliedHappinessPenalty())
-                || Math.abs(component.getAppliedHappinessPenalty()) > EPSILON) {
-            component.setAppliedHappinessPenalty(0.0);
-            changed = true;
-        }
-        long nowMs = resolveNowMs(config, store);
-        if (component.getLastUpdateMs() != nowMs) {
-            component.setLastUpdateMs(nowMs);
-            changed = true;
-        }
-        if (component.getLastPassiveSweepMs() != nowMs) {
-            component.setLastPassiveSweepMs(nowMs);
-            changed = true;
-        }
-        changed = applyNaturalRegenSuppression(npcRef, store, commandBuffer, component, false, false) || changed;
-        if (changed) {
-            putComponent(npcRef, store, commandBuffer, needsType, component);
-        }
-        return changed;
+        return true;
     }
 
     static boolean requiresFrequentNaturalRegenSuppressionTick(@Nullable TameworkNeedsComponent component,

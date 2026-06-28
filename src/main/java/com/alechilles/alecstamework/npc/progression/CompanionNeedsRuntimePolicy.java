@@ -17,10 +17,7 @@ final class CompanionNeedsRuntimePolicy {
     }
 
     static boolean isNeedsEnabled(@Nullable TwNeedsConfig config, @Nullable TameworkRuntimeSettings settings) {
-        if (config == null || !config.isEnabled()) {
-            return false;
-        }
-        return settings == null || settings.needsEnabled();
+        return NeedsConfigResolver.isRuntimeEnabled(config, settings);
     }
 
     @Nonnull

@@ -306,6 +306,20 @@ class CompanionNeedsServiceDamageTest {
     }
 
     @Test
+    void runtimeNeedsGateRequiresEnabledConfigAndEnabledSettings() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled();
+        TameworkRuntimeSettings enabledSettings = TameworkRuntimeSettings.from(settingsWithNeedsEnabled(true));
+        TameworkRuntimeSettings disabledSettings = TameworkRuntimeSettings.from(settingsWithNeedsEnabled(false));
+
+        assertEquals(true, NeedsConfigResolver.isRuntimeEnabled(config, enabledSettings));
+        assertEquals(false, NeedsConfigResolver.isRuntimeEnabled(config, disabledSettings));
+
+        setField(config, "enabled", false);
+
+        assertEquals(false, NeedsConfigResolver.isRuntimeEnabled(config, enabledSettings));
+    }
+
+    @Test
     void frequentSuppressionTickRequiredForResidualSuppressionCleanup() throws Exception {
         TwNeedsConfig config = createConfigWithDamageEnabled();
         TameworkNeedsComponent component = new TameworkNeedsComponent("needs", 50.0, 50.0, 0.0, 0L, 0L);

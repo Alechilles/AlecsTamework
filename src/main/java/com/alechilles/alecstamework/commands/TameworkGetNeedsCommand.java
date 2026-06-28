@@ -49,6 +49,12 @@ public final class TameworkGetNeedsCommand extends AbstractPlayerCommand {
             return;
         }
         TwNeedsConfig config = NeedsConfigResolver.resolveConfig(candidate.ref, store, needs);
+        if (!NeedsConfigResolver.isRuntimeEnabled(config)) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "NPC " + candidate.npcUuid + " has no tracked needs state."
+            ));
+            return;
+        }
         commandContext.sender().sendMessage(Message.raw(buildMessage(candidate.npcUuid, needs, config)));
     }
 

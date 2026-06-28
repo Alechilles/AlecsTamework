@@ -482,7 +482,7 @@ final class CommandLoadedNpcStatusSnapshotService {
             return null;
         }
         TwNeedsConfig config = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
-        if (config == null || !config.isEnabled()) {
+        if (!NeedsConfigResolver.isRuntimeEnabled(config)) {
             return null;
         }
         TwNeedsConfig.ValueSettings values = config.getValues();

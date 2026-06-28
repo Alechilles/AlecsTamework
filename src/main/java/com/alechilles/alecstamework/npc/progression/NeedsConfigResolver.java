@@ -54,12 +54,28 @@ public final class NeedsConfigResolver {
             return null;
         }
         return new NeedsSensorConfig(
-                TameworkRuntimeSettings.needsEnabled(base.enabled()),
+                base.enabled() && isRuntimeEnabled(base.enabled()),
                 base.hungerMin(),
                 base.hungerMax(),
                 base.thirstMin(),
                 base.thirstMax()
         );
+    }
+
+    public static boolean isRuntimeEnabled(@Nullable TwNeedsConfig config) {
+        return isRuntimeEnabled(config, TameworkRuntimeSettings.currentOrNull());
+    }
+
+    static boolean isRuntimeEnabled(@Nullable TwNeedsConfig config, @Nullable TameworkRuntimeSettings settings) {
+        return config != null && config.isEnabled() && isRuntimeEnabled(true, settings);
+    }
+
+    private static boolean isRuntimeEnabled(boolean configEnabled) {
+        return isRuntimeEnabled(configEnabled, TameworkRuntimeSettings.currentOrNull());
+    }
+
+    private static boolean isRuntimeEnabled(boolean configEnabled, @Nullable TameworkRuntimeSettings settings) {
+        return configEnabled && (settings == null || settings.needsEnabled());
     }
 
     public static void clearCache() {

@@ -1168,7 +1168,7 @@ public final class TameworkApiImpl
             return unsupportedMutation("Needs state is not available for this NPC.");
         }
         TwNeedsConfig config = NeedsConfigResolver.resolveConfig(target.reference(), target.store(), needs);
-        if (config == null || !config.isEnabled()) {
+        if (!NeedsConfigResolver.isRuntimeEnabled(config)) {
             return unsupportedMutation("No enabled needs config resolved for this NPC.");
         }
 
@@ -1677,10 +1677,22 @@ public final class TameworkApiImpl
         if (needsComponent == null) {
             return null;
         }
+        TwNeedsConfig config = resolveRuntimeNeedsConfig(npcRef, store, needsComponent);
+        if (config == null) {
+            return null;
+        }
         return ApiMapper.mapNeeds(
                 needsComponent,
-                NeedsConfigResolver.resolveConfig(npcRef, store, needsComponent)
+                config
         );
+    }
+
+    @Nullable
+    private TwNeedsConfig resolveRuntimeNeedsConfig(@Nonnull Ref<EntityStore> npcRef,
+                                                   @Nonnull Store<EntityStore> store,
+                                                   @Nonnull TameworkNeedsComponent needsComponent) {
+        TwNeedsConfig config = NeedsConfigResolver.resolveConfig(npcRef, store, needsComponent);
+        return NeedsConfigResolver.isRuntimeEnabled(config) ? config : null;
     }
 
     @Nullable
