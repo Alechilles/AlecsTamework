@@ -25,6 +25,7 @@
 - Command target HUD now clears and refreshes nearly instantly when players stop targeting a supported NPC, switch held items, or look at another supported NPC.
 - Command target HUD now appears for untamed NPCs that have enabled Tamework tame interactions.
 - Fixed linked companion breeding toggles disappearing after some revive, recall, or lost-recovery flows when breeding was available but cooldown state was unavailable.
+- Fixed revived and lost-recovered companions sometimes missing progression state such as happiness, needs, levels, traits, or talents.
 
 ## 2.15.5 - Embedded Consent Funnel Hotfix - 2026-06-24
 

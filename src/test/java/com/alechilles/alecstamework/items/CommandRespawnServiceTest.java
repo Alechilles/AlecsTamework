@@ -1,10 +1,14 @@
 package com.alechilles.alecstamework.items;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -44,6 +48,42 @@ class CommandRespawnServiceTest {
 
         assertEquals("Black", resolved.get("Coat"));
         assertEquals("BrightOrange", resolved.get("Eyes"));
+    }
+
+    @Test
+    void respawnRunsProgressionBootstrapAfterRestoringSnapshotState() throws Exception {
+        String source = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "items", "CommandRespawnService.java"
+        ), StandardCharsets.UTF_8);
+
+        int restoreIndex = source.indexOf("applyRespawnRecoveryState(spawnedRef, store, deadSnapshot);");
+        int bootstrapIndex = source.indexOf(
+                "CompanionProgressionBootstrapService.ensureProgressionComponents(spawnedRef, store, roleId);"
+        );
+        int logIndex = source.indexOf("post_restore recoveryStateApplied=true");
+
+        assertTrue(restoreIndex > 0, "Respawn should restore explicit snapshot and recovery state first.");
+        assertTrue(
+                bootstrapIndex > restoreIndex,
+                "Respawn should re-run progression bootstrap after restore so missing happiness, needs, levels, traits, and talents are reinitialized."
+        );
+        assertTrue(
+                logIndex < 0 || bootstrapIndex < logIndex,
+                "Respawn diagnostics should describe state after bootstrap has repaired missing progression components."
+        );
+    }
+
+    @Test
+    void progressionBootstrapIncludesTalentStorageRepair() throws Exception {
+        String source = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "npc", "progression",
+                "CompanionProgressionBootstrapService.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(
+                source.contains("CompanionTalentService.ensureTalentsComponent(npcRef, store, roleId);"),
+                "Shared progression bootstrap should repair missing talent storage during revive, lost recovery, and load repair."
+        );
     }
 
     private static TwAttachmentMigrationConfig attachmentMigrationConfig(String sourceSlot,

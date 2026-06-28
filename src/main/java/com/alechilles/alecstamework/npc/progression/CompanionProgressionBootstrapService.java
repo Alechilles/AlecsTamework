@@ -48,6 +48,7 @@ public final class CompanionProgressionBootstrapService {
         bootstrapHappinessComponent(npcRef, store, roleId);
         CompanionNeedsService.tickNeeds(npcRef, store, roleId);
         CompanionLevelingService.ensureLevelingComponent(npcRef, store, roleId);
+        CompanionTalentService.ensureTalentsComponent(npcRef, store, roleId);
         TameworkHappinessComponent happiness = resolveHappinessComponent(npcRef, store);
         bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
         ensureTraitComponents(npcRef, store, roleId);

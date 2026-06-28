@@ -45,6 +45,52 @@ public final class CompanionTalentService {
         return Math.max(0, earned - spent);
     }
 
+    @Nullable
+    public static TameworkTalentsComponent ensureTalentsComponent(@Nullable Ref<EntityStore> npcRef,
+                                                                 @Nullable Store<EntityStore> store,
+                                                                 @Nullable String roleIdHint) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        if (!CompanionProgressionSettings.isTalentsEnabled()) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        if (type == null) {
+            return null;
+        }
+        String roleId = roleIdHint;
+        if (roleId == null || roleId.isBlank()) {
+            roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        }
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        TwTalentConfig config = TwTalentConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return null;
+        }
+        String resolvedConfigId = config.getId();
+        if (resolvedConfigId == null || resolvedConfigId.isBlank()) {
+            return null;
+        }
+        TameworkTalentsComponent existing = store.getComponent(npcRef, type);
+        if (existing == null) {
+            TameworkTalentsComponent created = new TameworkTalentsComponent(resolvedConfigId, 0, new String[0]);
+            store.putComponent(npcRef, type, created);
+            return created;
+        }
+        if (existing.getConfigId() == null
+                || existing.getConfigId().isBlank()
+                || !resolvedConfigId.equalsIgnoreCase(existing.getConfigId())) {
+            TameworkTalentsComponent updated = existing.clone();
+            updated.setConfigId(resolvedConfigId);
+            store.putComponent(npcRef, type, updated);
+            return updated;
+        }
+        return existing;
+    }
+
     @Nonnull
     public static PurchaseResult purchaseTalent(@Nullable Ref<EntityStore> npcRef,
                                                 @Nullable Store<EntityStore> store,

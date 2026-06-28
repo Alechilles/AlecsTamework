@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
@@ -201,6 +202,7 @@ final class CommandRespawnService {
         applyRespawnAttachmentState(spawnedRef, spawnedNpc, store, deadSnapshot);
         applyRespawnProgressionState(spawnedRef, store, deadSnapshot);
         applyRespawnRecoveryState(spawnedRef, store, deadSnapshot);
+        CompanionProgressionBootstrapService.ensureProgressionComponents(spawnedRef, store, roleId);
         RespawnTraceLogSupport.log(
                 respawnTrace,
                 "post_restore recoveryStateApplied=true " + RespawnTraceLogSupport.describeNpcState(spawnedRef, store)
