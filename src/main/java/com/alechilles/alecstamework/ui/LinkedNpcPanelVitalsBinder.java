@@ -21,13 +21,25 @@ final class LinkedNpcPanelVitalsBinder {
     }
 
     static void bind(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry, String language) {
-        bindHealth(commandBuilder, entrySelector, entry, language);
+        bind(commandBuilder, entrySelector, entry, language, VITAL_FILL_MAX_WIDTH);
+    }
+
+    static void bind(UICommandBuilder commandBuilder,
+                     String entrySelector,
+                     LinkedNpcEntry entry,
+                     String language,
+                     int healthFillMaxWidth) {
+        bindHealth(commandBuilder, entrySelector, entry, language, healthFillMaxWidth);
         bindNeedRings(commandBuilder, entrySelector, entry, language);
         bindBreedingCooldown(commandBuilder, entrySelector, entry, language);
         bindHarvestCooldown(commandBuilder, entrySelector, entry, language);
     }
 
-    private static void bindHealth(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry, String language) {
+    private static void bindHealth(UICommandBuilder commandBuilder,
+                                   String entrySelector,
+                                   LinkedNpcEntry entry,
+                                   String language,
+                                   int healthFillMaxWidth) {
         String healthTextSelector = entrySelector + " #HealthText";
         String healthTextShadowSelector = entrySelector + " #HealthTextShadow";
         String healthFillSelector = entrySelector + " #HealthFill";
@@ -40,7 +52,7 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthTooltipSelector + ".TooltipText", healthText);
             commandBuilder.setObject(
                     healthFillSelector + ".Anchor",
-                    LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(entry.healthRatio(), VITAL_FILL_MAX_WIDTH)
+                    LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(entry.healthRatio(), healthFillMaxWidth)
             );
             return;
         }

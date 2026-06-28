@@ -28,6 +28,8 @@ class CommandTargetHudBinderTest {
         Assertions.assertTrue(source.contains("#Text.Text"));
         Assertions.assertTrue(source.contains("#TameRequirementRow.Visible"));
         Assertions.assertTrue(source.contains("LinkedNpcPanelVitalsBinder.bind"));
+        Assertions.assertTrue(source.contains("HEALTH_FILL_MAX_WIDTH = 230"));
+        Assertions.assertTrue(source.contains("LinkedNpcPanelVitalsBinder.bind(commandBuilder, \"#Root\", status, language, HEALTH_FILL_MAX_WIDTH)"));
         Assertions.assertTrue(source.contains("LinkedNpcPanelProgressionBinder.bindXpProgressRing"));
         Assertions.assertTrue(source.contains("LinkedNpcTraitIndicatorBinder.bind"));
         Assertions.assertTrue(source.contains("#StatusRingRow.Visible"));

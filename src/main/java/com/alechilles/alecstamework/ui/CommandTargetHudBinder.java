@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 final class CommandTargetHudBinder {
     private static final int MAX_ATTACHMENT_ROWS = 6;
     private static final int MAX_FOOD_STRIP_ITEMS = 4;
+    private static final int HEALTH_FILL_MAX_WIDTH = 230;
 
     private CommandTargetHudBinder() {
     }
@@ -25,7 +26,7 @@ final class CommandTargetHudBinder {
         commandBuilder.set("#GenderMaleIcon.Visible", status.isMale());
         commandBuilder.set("#GenderFemaleIcon.Visible", status.isFemale());
         commandBuilder.set("#Name.Text", safe(status.displayName(), LocalizedText.resolve(language, "tamework.ui.commandTargetHud.name.unknown")));
-        LinkedNpcPanelVitalsBinder.bind(commandBuilder, "#Root", status, language);
+        LinkedNpcPanelVitalsBinder.bind(commandBuilder, "#Root", status, language, HEALTH_FILL_MAX_WIDTH);
         bindStatusRingVisibility(commandBuilder, status);
         bindProgression(commandBuilder, status);
         bindTraitRings(commandBuilder, status.traitIndicators());
