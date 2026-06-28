@@ -15,23 +15,31 @@ class TameworkCommandTargetHudTest {
         int refreshMethod = source.indexOf("public void refresh");
         int bindCall = source.indexOf("CommandTargetHudBinder.bind(commandBuilder, updatedModel, updatedLanguage)", refreshMethod);
         int updateCall = source.indexOf("update(false, commandBuilder)", refreshMethod);
-        int hideMethod = source.indexOf("public void hideNow()", refreshMethod);
-        String refreshBody = source.substring(refreshMethod, hideMethod);
+        int presentMethod = source.indexOf("public void present()", refreshMethod);
+        String refreshBody = source.substring(refreshMethod, presentMethod);
 
         Assertions.assertTrue(refreshMethod >= 0);
         Assertions.assertTrue(bindCall > refreshMethod);
         Assertions.assertTrue(updateCall > bindCall);
-        Assertions.assertTrue(hideMethod > updateCall);
+        Assertions.assertTrue(presentMethod > updateCall);
         Assertions.assertFalse(refreshBody.contains("show()"));
     }
 
     @Test
-    void customHudDoesNotExposeManualShowKeepAlive() throws Exception {
+    void presentResendsCurrentHudWithoutChangingModel() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/ui/TameworkCommandTargetHud.java"
         ));
 
-        Assertions.assertFalse(source.contains("keepVisible()"));
+        int presentMethod = source.indexOf("public void present()");
+        int showCall = source.indexOf("show()", presentMethod);
+        int hideMethod = source.indexOf("public void hideNow()", presentMethod);
+        String presentBody = source.substring(presentMethod, hideMethod);
+
+        Assertions.assertTrue(presentMethod >= 0);
+        Assertions.assertTrue(showCall > presentMethod);
+        Assertions.assertFalse(presentBody.contains("this.model"));
+        Assertions.assertFalse(presentBody.contains("CommandTargetHudBinder.bind"));
     }
 
     @Test

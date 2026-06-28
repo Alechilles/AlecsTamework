@@ -54,6 +54,19 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
+    void presentationPulseIsCheapAndFrequentEnoughToKeepHudVisible() {
+        Assertions.assertTrue(
+                CommandTargetHudService.presentationPulseIntervalMsForTests()
+                        >= CommandTargetHudService.targetScanIntervalMsForTests(),
+                "Presentation should not pulse more often than the target raycast cadence."
+        );
+        Assertions.assertTrue(
+                CommandTargetHudService.presentationPulseIntervalMsForTests() <= 300L,
+                "Presentation must stay frequent enough that custom HUD visibility does not appear as periodic flashes."
+        );
+    }
+
+    @Test
     void compactHudSnapshotsSkipLinkedPanelOnlyDetails() {
         CommandLoadedNpcStatusSnapshotService.SnapshotOptions options =
                 CommandLoadedNpcStatusSnapshotService.SnapshotOptions.compactHud();
@@ -175,6 +188,39 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
+    void pulsesPresentationOnlyForVisibleExistingHudAfterInterval() {
+        long pulseIntervalMs = CommandTargetHudService.presentationPulseIntervalMsForTests();
+        Assertions.assertFalse(CommandTargetHudService.shouldPulsePresentationForTests(
+                true,
+                true,
+                1_000L,
+                1_000L + pulseIntervalMs - 1L,
+                pulseIntervalMs
+        ));
+        Assertions.assertTrue(CommandTargetHudService.shouldPulsePresentationForTests(
+                true,
+                true,
+                1_000L,
+                1_000L + pulseIntervalMs,
+                pulseIntervalMs
+        ));
+        Assertions.assertFalse(CommandTargetHudService.shouldPulsePresentationForTests(
+                false,
+                true,
+                1_000L,
+                1_000L + pulseIntervalMs,
+                pulseIntervalMs
+        ));
+        Assertions.assertFalse(CommandTargetHudService.shouldPulsePresentationForTests(
+                true,
+                false,
+                1_000L,
+                1_000L + pulseIntervalMs,
+                pulseIntervalMs
+        ));
+    }
+
+    @Test
     void refreshesWhenHudNeedsClearing() {
         Assertions.assertTrue(CommandTargetHudService.shouldRefreshForTests(
                 "npc-a",
@@ -228,7 +274,8 @@ class CommandTargetHudServiceTest {
         int scanCheck = source.indexOf("shouldScanTarget(previous, activeCommand.itemId(), nowMs)", updatePlayer);
         int targetResolve = source.indexOf("resolveTarget(player, playerRef, activeCommand, store)", updatePlayer);
         int refreshCheck = source.indexOf("shouldRefresh(previous, targetKey, nowMs)", updatePlayer);
-        int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs)", refreshCheck);
+        int pulsePresentation = source.indexOf("pulsePresentation(previous, nowMs)", refreshCheck);
+        int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs, presentationMs)", refreshCheck);
         int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs)", updatePlayer);
 
         Assertions.assertTrue(updatePlayer >= 0);
@@ -237,28 +284,31 @@ class CommandTargetHudServiceTest {
         Assertions.assertTrue(scanCheck > activeCommandResolve);
         Assertions.assertTrue(targetResolve > scanCheck);
         Assertions.assertTrue(refreshCheck > targetResolve);
-        Assertions.assertTrue(rememberScan > refreshCheck);
+        Assertions.assertTrue(pulsePresentation > refreshCheck);
+        Assertions.assertTrue(rememberScan > pulsePresentation);
         Assertions.assertTrue(modelBuild > refreshCheck);
     }
 
     @Test
-    void throttledSameTargetSkipsHudRebuildAndManualShow() throws Exception {
+    void throttledSameTargetPulsesPresentationWithoutHudRebuild() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
         ));
 
         int updatePlayer = source.indexOf("private void updatePlayer");
         int refreshBlock = source.indexOf("if (!shouldRefresh(previous, targetKey, nowMs))", updatePlayer);
-        int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs)", refreshBlock);
+        int pulsePresentation = source.indexOf("pulsePresentation(previous, nowMs)", refreshBlock);
+        int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs, presentationMs)", refreshBlock);
         int returnStatement = source.indexOf("return;", rememberScan);
         int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs)", updatePlayer);
         String refreshBody = source.substring(refreshBlock, returnStatement);
 
         Assertions.assertTrue(refreshBlock > updatePlayer);
-        Assertions.assertTrue(rememberScan > refreshBlock);
+        Assertions.assertTrue(pulsePresentation > refreshBlock);
+        Assertions.assertTrue(rememberScan > pulsePresentation);
         Assertions.assertTrue(returnStatement > rememberScan);
         Assertions.assertTrue(modelBuild > returnStatement);
-        Assertions.assertFalse(refreshBody.contains("show()"));
+        Assertions.assertTrue(refreshBody.contains("pulsePresentation(previous, nowMs)"));
         Assertions.assertFalse(refreshBody.contains("refresh("));
     }
 
@@ -333,7 +383,7 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
-    void firstHudCreationDelegatesShowToHudManager() throws Exception {
+    void firstHudCreationRegistersAndPresentsHud() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
         ));
@@ -341,12 +391,13 @@ class CommandTargetHudServiceTest {
         int showMethod = source.indexOf("private void showHud");
         int createBranch = source.indexOf("if (hud == null)", showMethod);
         int addHud = source.indexOf("player.getHudManager().addCustomHud(playerRef, hud)", createBranch);
+        int present = source.indexOf("hud.present()", addHud);
         int refreshBranch = source.indexOf("} else {", addHud);
-        String createBody = source.substring(createBranch, refreshBranch);
 
         Assertions.assertTrue(showMethod >= 0);
         Assertions.assertTrue(addHud > createBranch);
-        Assertions.assertFalse(createBody.contains("hud.show()"));
+        Assertions.assertTrue(present > addHud);
+        Assertions.assertTrue(refreshBranch > present);
     }
 
     @Test

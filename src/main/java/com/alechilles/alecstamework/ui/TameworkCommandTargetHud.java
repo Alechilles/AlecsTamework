@@ -30,6 +30,10 @@ public final class TameworkCommandTargetHud extends CustomUIHud {
         update(false, commandBuilder);
     }
 
+    public void present() {
+        show();
+    }
+
     public void hideNow() {
         UICommandBuilder commandBuilder = new UICommandBuilder();
         update(true, commandBuilder);
