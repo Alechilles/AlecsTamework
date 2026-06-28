@@ -57,6 +57,20 @@ class CommandTargetHudServiceTest {
     }
 
     @Test
+    void staticDisplayCacheExpiresAfterTtl() {
+        Assertions.assertTrue(CommandTargetHudService.isStaticDisplayCacheValidForTests(
+                1_000L,
+                1_500L,
+                30_000L
+        ));
+        Assertions.assertFalse(CommandTargetHudService.isStaticDisplayCacheValidForTests(
+                1_000L,
+                31_001L,
+                30_000L
+        ));
+    }
+
+    @Test
     void throttlesTargetScanForSameHeldCommandItemUntilIntervalElapses() {
         Assertions.assertFalse(CommandTargetHudService.shouldScanTargetForTests(
                 "Tamework:CommandFlute",
@@ -184,7 +198,7 @@ class CommandTargetHudServiceTest {
         int scanCheck = source.indexOf("shouldScanTarget(previous, activeCommand.itemId(), nowMs)", updatePlayer);
         int targetResolve = source.indexOf("resolveTarget(player, playerRef, activeCommand, store)", updatePlayer);
         int refreshCheck = source.indexOf("shouldRefresh(previous, targetKey, nowMs)", updatePlayer);
-        int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store)", updatePlayer);
+        int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs)", updatePlayer);
 
         Assertions.assertTrue(updatePlayer >= 0);
         Assertions.assertTrue(activationCheck > updatePlayer);

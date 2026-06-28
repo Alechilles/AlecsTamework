@@ -43,6 +43,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final long FALLBACK_DISCOVERY_INTERVAL_MS = 1_500L;
     private static final long TARGET_SCAN_INTERVAL_MS = 200L;
     private static final long REFRESH_INTERVAL_MS = 5_000L;
+    private static final long STATIC_DISPLAY_CACHE_MS = 30_000L;
     private static final float TARGET_DISTANCE = 15.0f;
 
     private final CommandItemRegistry registry;
@@ -54,6 +55,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private final CommandTargetHudTameRequirementResolver tameRequirementResolver;
     private final CommandTargetHudActivationTracker activationTracker;
     private final Map<UUID, HudState> stateByPlayer = new HashMap<>();
+    private final Map<StaticTargetCacheKey, StaticTargetDisplay> staticTargetCache = new HashMap<>();
     private long nextSweepAtMs;
     private long nextFallbackDiscoveryAtMs;
 
@@ -182,7 +184,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             hideHudAndRememberNoTarget(playerUuid, player, activeCommand.itemId(), nowMs);
             return;
         }
-        CommandTargetHudViewModel model = buildModel(player, candidate.npcRef(), candidate.npc(), store);
+        CommandTargetHudViewModel model = buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs);
         if (model == null) {
             hideHudAndRememberNoTarget(playerUuid, player, activeCommand.itemId(), nowMs);
             return;
@@ -254,7 +256,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private CommandTargetHudViewModel buildModel(@Nonnull Player player,
                                                  @Nonnull Ref<EntityStore> npcRef,
                                                  @Nonnull NPCEntity npc,
-                                                 @Nonnull Store<EntityStore> store) {
+                                                 @Nonnull Store<EntityStore> store,
+                                                 long nowMs) {
         String roleId = linkPolicyService.resolveRoleId(npc);
         LinkedNpcEntry status = loadedSnapshotService.buildLoadedEntry(
                 player,
@@ -279,18 +282,70 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             return null;
         }
         boolean tamed = TamedStateResolver.isTamed(npcRef, store);
+        StaticTargetDisplay staticDisplay = resolveStaticTargetDisplay(player, npcRef, npc, roleId, tamed, store, nowMs);
+        return new CommandTargetHudViewModel(
+                status,
+                staticDisplay.favoriteFood(),
+                tamed ? staticDisplay.foodRows() : List.of(),
+                staticDisplay.attachmentRows(),
+                resolveTameRequirement(npcRef, staticDisplay.tameRequirement(), store),
+                staticDisplay.ownerDisplayName()
+        );
+    }
+
+    @Nonnull
+    private StaticTargetDisplay resolveStaticTargetDisplay(@Nonnull Player player,
+                                                           @Nonnull Ref<EntityStore> npcRef,
+                                                           @Nonnull NPCEntity npc,
+                                                           @Nullable String roleId,
+                                                           boolean tamed,
+                                                           @Nonnull Store<EntityStore> store,
+                                                           long nowMs) {
+        StaticTargetCacheKey key = new StaticTargetCacheKey(
+                npc.getUuid(),
+                resolveLanguage(player),
+                roleId,
+                tamed
+        );
+        StaticTargetDisplay cached = staticTargetCache.get(key);
+        if (cached != null && isStaticDisplayCacheValidForTests(cached.cachedAtMs(), nowMs, STATIC_DISPLAY_CACHE_MS)) {
+            return cached;
+        }
+        if (cached != null) {
+            staticTargetCache.remove(key);
+        }
+        StaticTargetDisplay resolved = buildStaticTargetDisplay(player, npcRef, npc, roleId, tamed, store, nowMs);
+        staticTargetCache.put(key, resolved);
+        return resolved;
+    }
+
+    @Nonnull
+    private StaticTargetDisplay buildStaticTargetDisplay(@Nonnull Player player,
+                                                         @Nonnull Ref<EntityStore> npcRef,
+                                                         @Nonnull NPCEntity npc,
+                                                         @Nullable String roleId,
+                                                         boolean tamed,
+                                                         @Nonnull Store<EntityStore> store,
+                                                         long nowMs) {
         TameworkTameFoodDisplayResolver.FoodDisplay foodDisplay =
                 tameFoodDisplayResolver.resolveFoodDisplayItemIds(roleId, npc.getRole(), tamed);
         List<CommandTargetHudViewModel.FoodRow> foodRows =
                 foodResolver.resolveFoodEntries(player, foodDisplay.entries());
-        return new CommandTargetHudViewModel(
-                status,
+        return new StaticTargetDisplay(
                 tamed ? null : firstFoodRow(foodRows, player, foodDisplay.favoriteItemIds()),
                 tamed ? foodRows : List.of(),
                 attachmentResolver.resolveRows(roleId, resolveModelAssetId(npcRef, store), resolveAttachmentIds(npcRef, store)),
-                resolveTameRequirement(npcRef, roleId, npc.getRole(), tamed, store),
-                resolveOwnerDisplayName(npcRef, store)
+                resolveCachedTameRequirement(roleId, npc.getRole(), tamed),
+                resolveOwnerDisplayName(npcRef, store),
+                nowMs
         );
+    }
+
+    @Nullable
+    private static String resolveLanguage(@Nonnull Player player) {
+        PlayerRef playerRef = player.getPlayerRef();
+        String language = playerRef != null ? playerRef.getLanguage() : null;
+        return language != null && !language.isBlank() ? language : null;
     }
 
     @Nullable
@@ -348,11 +403,9 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     }
 
     @Nullable
-    private CommandTargetHudViewModel.TameRequirementRow resolveTameRequirement(@Nonnull Ref<EntityStore> npcRef,
-                                                                                @Nullable String roleId,
-                                                                                @Nullable com.hypixel.hytale.server.npc.role.Role role,
-                                                                                boolean tamed,
-                                                                                @Nonnull Store<EntityStore> store) {
+    private CachedTameRequirement resolveCachedTameRequirement(@Nullable String roleId,
+                                                               @Nullable com.hypixel.hytale.server.npc.role.Role role,
+                                                               boolean tamed) {
         if (tamed) {
             return null;
         }
@@ -360,8 +413,24 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         if (requiredSeconds <= 0.0) {
             return null;
         }
+        CommandTargetHudViewModel.TameRequirementRow row =
+                tameRequirementResolver.fromRequiredRemainingSeconds(requiredSeconds, null);
+        return row != null ? new CachedTameRequirement(row.tranquilizerRequired(), row.requiredStacks()) : null;
+    }
+
+    @Nullable
+    private CommandTargetHudViewModel.TameRequirementRow resolveTameRequirement(@Nonnull Ref<EntityStore> npcRef,
+                                                                                @Nullable CachedTameRequirement cached,
+                                                                                @Nonnull Store<EntityStore> store) {
+        if (cached == null) {
+            return null;
+        }
         String currentStacksText = resolveCurrentTranquilizerStacksText(npcRef, store);
-        return tameRequirementResolver.fromRequiredRemainingSeconds(requiredSeconds, currentStacksText);
+        return new CommandTargetHudViewModel.TameRequirementRow(
+                cached.tranquilizerRequired(),
+                cached.requiredStacks(),
+                currentStacksText
+        );
     }
 
     @Nullable
@@ -548,6 +617,10 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         return REFRESH_INTERVAL_MS;
     }
 
+    static boolean isStaticDisplayCacheValidForTests(long cachedAtMs, long nowMs, long ttlMs) {
+        return ttlMs > 0L && nowMs >= cachedAtMs && nowMs - cachedAtMs < ttlMs;
+    }
+
     static double resolveRequiredTranquilizerSecondsForTests(@Nullable String requirementId,
                                                             @Nullable String jsonPayload) {
         return TameworkTameFoodDisplayResolver.resolveRequiredTranquilizerSeconds(requirementId, jsonPayload);
@@ -584,6 +657,27 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private record PlayerCandidate(@Nonnull UUID playerUuid,
                                    @Nonnull Player player,
                                    @Nonnull Ref<EntityStore> playerRef) {
+    }
+
+    private record StaticTargetCacheKey(@Nullable UUID npcUuid,
+                                        @Nullable String language,
+                                        @Nullable String roleId,
+                                        boolean tamed) {
+    }
+
+    private record StaticTargetDisplay(@Nullable CommandTargetHudViewModel.FoodRow favoriteFood,
+                                       @Nonnull List<CommandTargetHudViewModel.FoodRow> foodRows,
+                                       @Nonnull List<CommandTargetHudViewModel.AttachmentRow> attachmentRows,
+                                       @Nullable CachedTameRequirement tameRequirement,
+                                       @Nullable String ownerDisplayName,
+                                       long cachedAtMs) {
+        private StaticTargetDisplay {
+            foodRows = foodRows == null ? List.of() : List.copyOf(foodRows);
+            attachmentRows = attachmentRows == null ? List.of() : List.copyOf(attachmentRows);
+        }
+    }
+
+    private record CachedTameRequirement(boolean tranquilizerRequired, int requiredStacks) {
     }
 
     private record ActiveCommandItem(@Nonnull String itemId,
