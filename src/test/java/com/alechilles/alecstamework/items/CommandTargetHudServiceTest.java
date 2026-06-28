@@ -3,12 +3,18 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class CommandTargetHudServiceTest {
+    private static final UUID PLAYER_A = UUID.fromString("64fb45b0-142b-4930-8668-c78437a26bb4");
+    private static final UUID PLAYER_B = UUID.fromString("80c1e2f4-f0f5-4ef0-a6ac-a30ef8f03950");
+    private static final UUID PLAYER_C = UUID.fromString("ff139abd-e93d-4088-8662-b81ad48d2d9f");
+    private static final UUID PLAYER_D = UUID.fromString("a6feef26-0951-4e2b-b523-a380d43e1922");
+
     @Test
     void sweepIntervalAvoidsPerTickCandidateChecks() {
         Assertions.assertTrue(
@@ -68,6 +74,30 @@ class CommandTargetHudServiceTest {
                 31_001L,
                 30_000L
         ));
+    }
+
+    @Test
+    void candidateSelectionCapsAndRotatesFromOffset() {
+        Assertions.assertEquals(
+                List.of(PLAYER_B, PLAYER_C),
+                CommandTargetHudService.selectCandidatesForPassForTests(
+                        List.of(PLAYER_A, PLAYER_B, PLAYER_C, PLAYER_D),
+                        2,
+                        1
+                )
+        );
+    }
+
+    @Test
+    void candidateSelectionWrapsAroundCandidateList() {
+        Assertions.assertEquals(
+                List.of(PLAYER_D, PLAYER_A),
+                CommandTargetHudService.selectCandidatesForPassForTests(
+                        List.of(PLAYER_A, PLAYER_B, PLAYER_C, PLAYER_D),
+                        2,
+                        3
+                )
+        );
     }
 
     @Test

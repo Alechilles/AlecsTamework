@@ -28,6 +28,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final long TARGET_SCAN_INTERVAL_MS = 200L;
     private static final long REFRESH_INTERVAL_MS = 5_000L;
     private static final long STATIC_DISPLAY_CACHE_MS = 30_000L;
+    private static final int MAX_CANDIDATES_PER_PASS = 4;
     private static final float TARGET_DISTANCE = 15.0f;
 
     private final CommandItemRegistry registry;
@@ -58,6 +60,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private final Map<StaticTargetCacheKey, StaticTargetDisplay> staticTargetCache = new HashMap<>();
     private long nextSweepAtMs;
     private long nextFallbackDiscoveryAtMs;
+    private int nextCandidateOffset;
 
     public CommandTargetHudService(CommandItemRegistry registry) {
         this(registry, new CommandTargetHudActivationTracker());
@@ -97,7 +100,8 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     }
 
     private void processCandidatePlayers(@Nonnull Store<EntityStore> store, long nowMs) {
-        for (UUID playerUuid : activationTracker.candidatePlayerUuids()) {
+        List<UUID> selectedCandidates = selectCandidatesForCurrentPass(activationTracker.candidatePlayerUuids());
+        for (UUID playerUuid : selectedCandidates) {
             PlayerCandidate candidate = resolvePlayerCandidate(playerUuid, store);
             if (candidate == null) {
                 dropInactiveCandidate(playerUuid);
@@ -105,6 +109,37 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
             }
             updatePlayer(candidate.playerUuid(), candidate.player(), candidate.playerRef(), store, nowMs);
         }
+    }
+
+    @Nonnull
+    private List<UUID> selectCandidatesForCurrentPass(@Nonnull List<UUID> candidates) {
+        if (candidates.isEmpty()) {
+            nextCandidateOffset = 0;
+            return List.of();
+        }
+        ArrayList<UUID> dirtyCandidates = new ArrayList<>();
+        ArrayList<UUID> regularCandidates = new ArrayList<>();
+        for (UUID candidate : candidates) {
+            if (activationTracker.isDirty(candidate)) {
+                dirtyCandidates.add(candidate);
+            } else {
+                regularCandidates.add(candidate);
+            }
+        }
+
+        ArrayList<UUID> selected = new ArrayList<>(Math.min(MAX_CANDIDATES_PER_PASS, candidates.size()));
+        for (UUID candidate : dirtyCandidates) {
+            if (selected.size() >= MAX_CANDIDATES_PER_PASS) {
+                return List.copyOf(selected);
+            }
+            selected.add(candidate);
+        }
+
+        int remaining = MAX_CANDIDATES_PER_PASS - selected.size();
+        List<UUID> selectedRegular = selectCandidatesForPass(regularCandidates, remaining, nextCandidateOffset);
+        selected.addAll(selectedRegular);
+        nextCandidateOffset = nextCandidateOffsetForPass(nextCandidateOffset, selectedRegular.size(), regularCandidates.size());
+        return selected.isEmpty() ? List.of() : List.copyOf(selected);
     }
 
     private void seedCandidatesFromPlayerSweep(@Nonnull Store<EntityStore> store) {
@@ -619,6 +654,36 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
 
     static boolean isStaticDisplayCacheValidForTests(long cachedAtMs, long nowMs, long ttlMs) {
         return ttlMs > 0L && nowMs >= cachedAtMs && nowMs - cachedAtMs < ttlMs;
+    }
+
+    static List<UUID> selectCandidatesForPassForTests(@Nonnull List<UUID> candidates,
+                                                       int maxCandidates,
+                                                       int offset) {
+        return selectCandidatesForPass(candidates, maxCandidates, offset);
+    }
+
+    @Nonnull
+    private static List<UUID> selectCandidatesForPass(@Nonnull List<UUID> candidates,
+                                                      int maxCandidates,
+                                                      int offset) {
+        if (candidates.isEmpty() || maxCandidates <= 0) {
+            return List.of();
+        }
+        int size = candidates.size();
+        int limit = Math.min(maxCandidates, size);
+        int start = Math.floorMod(offset, size);
+        ArrayList<UUID> selected = new ArrayList<>(limit);
+        for (int i = 0; i < limit; i++) {
+            selected.add(candidates.get((start + i) % size));
+        }
+        return List.copyOf(selected);
+    }
+
+    private static int nextCandidateOffsetForPass(int offset, int selectedCount, int candidateCount) {
+        if (candidateCount <= 0 || selectedCount <= 0) {
+            return 0;
+        }
+        return Math.floorMod(offset + selectedCount, candidateCount);
     }
 
     static double resolveRequiredTranquilizerSecondsForTests(@Nullable String requirementId,
