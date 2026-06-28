@@ -58,8 +58,9 @@ class DamageExecutionWriteSafetyGuardTest {
         String needsServiceContent = Files.readString(NEEDS_SERVICE, StandardCharsets.UTF_8);
 
         assertTrue(
-                needsSystemContent.contains("CompanionNeedsService.tickNeeds(ref, store, commandBuffer, roleId);"),
-                "CompanionNeedsSystem must call command-buffer tickNeeds overload."
+                needsSystemContent.contains("CompanionNeedsService.tickNeedsIfDue(")
+                        && needsSystemContent.contains("commandBuffer,"),
+                "CompanionNeedsSystem must call command-buffer needs sweep overload."
         );
         assertTrue(
                 needsServiceContent.contains("@Nullable CommandBuffer<EntityStore> commandBuffer"),
