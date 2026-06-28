@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -277,6 +280,32 @@ class CompanionNeedsServiceDamageTest {
     }
 
     @Test
+    void disabledRuntimeNeedsGateSuppressesDamageAndFrequentSuppression() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled();
+        TwNeedsConfig.ValueSettings values = new TwNeedsConfig.ValueSettings();
+        TameworkNeedsComponent component = new TameworkNeedsComponent("needs", 0.0, 0.0, 0.0, 0L, 0L);
+        TameworkRuntimeSettings disabledNeedsSettings = TameworkRuntimeSettings.from(settingsWithNeedsEnabled(false));
+
+        double damage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                0.0,
+                0.0,
+                ONE_MINUTE_MS,
+                MAX_HEALTH,
+                disabledNeedsSettings
+        );
+        boolean required = CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(
+                component,
+                config,
+                disabledNeedsSettings
+        );
+
+        assertEquals(0.0, damage, 0.000001);
+        assertEquals(false, required);
+    }
+
+    @Test
     void frequentSuppressionTickRequiredForResidualSuppressionCleanup() throws Exception {
         TwNeedsConfig config = createConfigWithDamageEnabled();
         TameworkNeedsComponent component = new TameworkNeedsComponent("needs", 50.0, 50.0, 0.0, 0L, 0L);
@@ -403,5 +432,48 @@ class CompanionNeedsServiceDamageTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static ResolvedTameworkSettings settingsWithNeedsEnabled(boolean enabled) {
+        ResolvedTameworkSettings defaults = TameworkSettingsStore.defaultGlobalSettings();
+        return new ResolvedTameworkSettings(
+                defaults.populationLimitPerPlayerOwnedTotal(),
+                defaults.populationPerPlayerLimitScope(),
+                defaults.simpleClaimsEnabled(),
+                defaults.simpleClaimsLimitPerClaimChunk(),
+                defaults.simpleClaimsLimitPerClaimTotal(),
+                defaults.simpleClaimsBreedingRequiresClaim(),
+                defaults.simpleClaimsProtectTamedFromNonMembers(),
+                defaults.blockOwnerDamage(),
+                defaults.blockAllPlayerDamageIfOwned(),
+                defaults.invulnerableIfOwned(),
+                defaults.captureClearsOwner(),
+                defaults.spawnSetsOwner(),
+                defaults.captureRequiresOwner(),
+                defaults.spawnRequiresOwner(),
+                defaults.interactionRequiresOwner(),
+                defaults.linkingRequiresOwner(),
+                enabled,
+                defaults.needsTickPolicyMode(),
+                defaults.needsOwnerOfflineGraceHours(),
+                defaults.needsOwnerOfflineDecayMultiplier(),
+                defaults.needsDamageEnabled(),
+                defaults.needsDamageModel(),
+                defaults.needsDamageDualNeedRule(),
+                defaults.needsStarvationDamagePerMinute(),
+                defaults.needsDehydrationDamagePerMinute(),
+                defaults.needsDamageLethal(),
+                defaults.happinessEnabled(),
+                defaults.passiveBreedingEnabled(),
+                defaults.breedingRequiresHappiness(),
+                defaults.breedingGenderEnabled(),
+                defaults.traitsEnabled(),
+                defaults.levelingEnabled(),
+                defaults.talentsEnabled(),
+                defaults.reviveSystemEnabled(),
+                defaults.recallTeleportingEnabled(),
+                defaults.telemetryEnabled(),
+                defaults.telemetryBreadcrumbsEnabled()
+        );
     }
 }

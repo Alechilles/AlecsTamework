@@ -77,7 +77,7 @@ public final class CompanionNeedsService {
             return null;
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, store.getComponent(npcRef, needsType));
-        if (config == null || !config.isEnabled()) {
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
             return null;
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
@@ -213,8 +213,8 @@ public final class CompanionNeedsService {
             return false;
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (config == null || !config.isEnabled()) {
-            return false;
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
+            return suspendNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component, config);
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
         double hunger = sanitizeAndClamp(
@@ -248,7 +248,7 @@ public final class CompanionNeedsService {
                 commandBuffer,
                 component,
                 suppressNaturalRegen,
-                !resolveRuntimeDamage(config).isLethal()
+                !CompanionNeedsRuntimePolicy.resolveDamage(config).isLethal()
         );
         double healthAfterSuppression = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
         if (suppressionChanged) {
@@ -300,7 +300,7 @@ public final class CompanionNeedsService {
             return;
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, null, component);
-        if (config == null || !config.isEnabled()) {
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
             return;
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
@@ -473,7 +473,7 @@ public final class CompanionNeedsService {
             return false;
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (config == null || !config.isEnabled()) {
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
             return false;
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
@@ -513,7 +513,7 @@ public final class CompanionNeedsService {
             return false;
         }
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (config == null || !config.isEnabled()) {
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
             return false;
         }
         return requiresFrequentNaturalRegenSuppressionTick(component, config);
@@ -557,8 +557,8 @@ public final class CompanionNeedsService {
         }
         TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
         TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (config == null || !config.isEnabled()) {
-            return false;
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config)) {
+            return suspendNeedsRuntimeState(npcRef, store, commandBuffer, needsType, component, config);
         }
         component = ensureNeedsComponent(npcRef, store, commandBuffer, roleId);
         if (component == null) {
@@ -640,7 +640,7 @@ public final class CompanionNeedsService {
                 commandBuffer,
                 component,
                 suppressNaturalRegen,
-                !resolveRuntimeDamage(config).isLethal()
+                !CompanionNeedsRuntimePolicy.resolveDamage(config).isLethal()
         );
         double healthAfterSuppression = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
         double suppressionHealthDelta = resolveHealthDelta(healthBeforeSuppression, healthAfterSuppression);
@@ -660,7 +660,7 @@ public final class CompanionNeedsService {
                 store,
                 commandBuffer,
                 pooledDamageAmount,
-                resolveRuntimeDamage(config).isLethal()
+                CompanionNeedsRuntimePolicy.resolveDamage(config).isLethal()
         );
         double healthAfterDamage = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
         boolean damageApplied = damageResult.applied;
@@ -738,9 +738,55 @@ public final class CompanionNeedsService {
         return componentChanged || happinessChanged || damageApplied;
     }
 
+    private static boolean suspendNeedsRuntimeState(@Nonnull Ref<EntityStore> npcRef,
+                                                    @Nonnull Store<EntityStore> store,
+                                                    @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                    @Nonnull ComponentType<EntityStore, TameworkNeedsComponent> needsType,
+                                                    @Nullable TameworkNeedsComponent component,
+                                                    @Nullable TwNeedsConfig config) {
+        if (component == null || config == null) {
+            return false;
+        }
+        boolean changed = false;
+        if (Math.abs(component.getPendingNeedsDamage()) > EPSILON
+                || !Double.isFinite(component.getPendingNeedsDamage())) {
+            component.setPendingNeedsDamage(0.0);
+            changed = true;
+        }
+        if (!Double.isFinite(component.getAppliedHappinessPenalty())
+                || Math.abs(component.getAppliedHappinessPenalty()) > EPSILON) {
+            component.setAppliedHappinessPenalty(0.0);
+            changed = true;
+        }
+        long nowMs = resolveNowMs(config, store);
+        if (component.getLastUpdateMs() != nowMs) {
+            component.setLastUpdateMs(nowMs);
+            changed = true;
+        }
+        if (component.getLastPassiveSweepMs() != nowMs) {
+            component.setLastPassiveSweepMs(nowMs);
+            changed = true;
+        }
+        changed = applyNaturalRegenSuppression(npcRef, store, commandBuffer, component, false, false) || changed;
+        if (changed) {
+            putComponent(npcRef, store, commandBuffer, needsType, component);
+        }
+        return changed;
+    }
+
     static boolean requiresFrequentNaturalRegenSuppressionTick(@Nullable TameworkNeedsComponent component,
                                                                @Nullable TwNeedsConfig config) {
-        if (component == null || config == null || !config.isEnabled()) {
+        return requiresFrequentNaturalRegenSuppressionTick(
+                component,
+                config,
+                TameworkRuntimeSettings.currentOrNull()
+        );
+    }
+
+    static boolean requiresFrequentNaturalRegenSuppressionTick(@Nullable TameworkNeedsComponent component,
+                                                               @Nullable TwNeedsConfig config,
+                                                               @Nullable TameworkRuntimeSettings settings) {
+        if (component == null || !CompanionNeedsRuntimePolicy.isNeedsEnabled(config, settings)) {
             return false;
         }
         TwNeedsConfig.ValueSettings values = config.getValues();
@@ -756,7 +802,7 @@ public final class CompanionNeedsService {
                 values.getThirstMin(),
                 values.getThirstMax()
         );
-        if (shouldSuppressNaturalRegen(config, values, hunger, thirst)) {
+        if (shouldSuppressNaturalRegen(config, values, hunger, thirst, settings)) {
             return true;
         }
         return hasResidualNaturalRegenSuppressionState(component);
@@ -796,7 +842,7 @@ public final class CompanionNeedsService {
         if (lastUpdateMs <= 0L || nowMs <= lastUpdateMs) {
             return 0L;
         }
-        TwNeedsConfig.TickPolicySettings tickPolicy = resolveRuntimeTickPolicy(config);
+        TwNeedsConfig.TickPolicySettings tickPolicy = CompanionNeedsRuntimePolicy.resolveTickPolicy(config);
         if (ownerId == null) {
             return nowMs - lastUpdateMs;
         }
@@ -834,7 +880,18 @@ public final class CompanionNeedsService {
                                               @Nonnull TwNeedsConfig.ValueSettings values,
                                               double hunger,
                                               double thirst) {
-        TwNeedsConfig.DamageSettings damageSettings = resolveRuntimeDamage(config);
+        return shouldSuppressNaturalRegen(config, values, hunger, thirst, TameworkRuntimeSettings.currentOrNull());
+    }
+
+    static boolean shouldSuppressNaturalRegen(@Nonnull TwNeedsConfig config,
+                                              @Nonnull TwNeedsConfig.ValueSettings values,
+                                              double hunger,
+                                              double thirst,
+                                              @Nullable TameworkRuntimeSettings settings) {
+        if (!CompanionNeedsRuntimePolicy.isNeedsEnabled(config, settings)) {
+            return false;
+        }
+        TwNeedsConfig.DamageSettings damageSettings = CompanionNeedsRuntimePolicy.resolveDamage(config, settings);
         if (damageSettings == null || !damageSettings.isEnabled()) {
             return false;
         }
@@ -862,7 +919,29 @@ public final class CompanionNeedsService {
         if (config == null || values == null || effectiveElapsedMs <= 0L) {
             return 0.0;
         }
-        TwNeedsConfig.DamageSettings damageSettings = resolveRuntimeDamage(config);
+        return resolveNeedsDamageAmount(
+                config,
+                values,
+                hunger,
+                thirst,
+                effectiveElapsedMs,
+                healthMax,
+                TameworkRuntimeSettings.currentOrNull()
+        );
+    }
+
+    static double resolveNeedsDamageAmount(@Nullable TwNeedsConfig config,
+                                           @Nullable TwNeedsConfig.ValueSettings values,
+                                           double hunger,
+                                           double thirst,
+                                           long effectiveElapsedMs,
+                                           double healthMax,
+                                           @Nullable TameworkRuntimeSettings settings) {
+        if (config == null || values == null || effectiveElapsedMs <= 0L
+                || !CompanionNeedsRuntimePolicy.isNeedsEnabled(config, settings)) {
+            return 0.0;
+        }
+        TwNeedsConfig.DamageSettings damageSettings = CompanionNeedsRuntimePolicy.resolveDamage(config, settings);
         if (damageSettings == null || !damageSettings.isEnabled()) {
             return 0.0;
         }
@@ -924,20 +1003,6 @@ public final class CompanionNeedsService {
         return new NeedsDamagePoolResolution(damageToApply, normalizePendingNeedsDamage(pendingRemainder));
     }
 
-    @Nonnull
-    private static TwNeedsConfig.TickPolicySettings resolveRuntimeTickPolicy(@Nonnull TwNeedsConfig config) {
-        TwNeedsConfig.TickPolicySettings base = config.getTickPolicy();
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
-        return settings == null ? base : settings.resolveNeedsTickPolicy(base);
-    }
-
-    @Nonnull
-    private static TwNeedsConfig.DamageSettings resolveRuntimeDamage(@Nonnull TwNeedsConfig config) {
-        TwNeedsConfig.DamageSettings base = config.getDamage();
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
-        return settings == null ? base : settings.resolveNeedsDamage(base);
-    }
-
     static double normalizePendingNeedsDamage(double pendingNeedsDamage) {
         if (!Double.isFinite(pendingNeedsDamage) || pendingNeedsDamage <= 0.0) {
             return 0.0;
@@ -955,7 +1020,7 @@ public final class CompanionNeedsService {
         if (config == null || values == null || effectiveElapsedMs <= 0L) {
             return null;
         }
-        TwNeedsConfig.DamageSettings damageSettings = resolveRuntimeDamage(config);
+        TwNeedsConfig.DamageSettings damageSettings = CompanionNeedsRuntimePolicy.resolveDamage(config);
         if (damageSettings == null || !damageSettings.isEnabled()) {
             return null;
         }
