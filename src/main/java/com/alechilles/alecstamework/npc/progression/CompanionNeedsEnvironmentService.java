@@ -251,6 +251,13 @@ public final class CompanionNeedsEnvironmentService {
         }
     }
 
+    private record TargetBlock(@Nonnull WorldChunk worldChunk,
+                               @Nonnull Store<ChunkStore> chunkStoreStore,
+                               int x,
+                               int y,
+                               int z) {
+    }
+
     public boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
                                @Nullable Store<EntityStore> store,
                                @Nonnull TwNeedsConfig config) {
@@ -573,6 +580,39 @@ public final class CompanionNeedsEnvironmentService {
                                            @Nullable Store<EntityStore> store,
                                            @Nonnull TwNeedsConfig config) {
         return consumeNearbyWaterTroughCharge(npcRef, store, config, null);
+    }
+
+    boolean consumeWaterTroughChargeAt(@Nullable Store<EntityStore> store,
+                                       @Nullable Vector3d consumeOrigin) {
+        TargetBlock target = resolveTargetBlock(store, consumeOrigin);
+        if (target == null || !isConsumableWaterTroughAt(
+                target.worldChunk(),
+                target.chunkStoreStore(),
+                target.x(),
+                target.y(),
+                target.z()
+        )) {
+            return false;
+        }
+        return FeedTroughWaterStateService.consumeSingleCharge(
+                target.worldChunk(),
+                target.chunkStoreStore(),
+                target.x(),
+                target.y(),
+                target.z()
+        );
+    }
+
+    boolean isConsumableWaterAt(@Nullable Store<EntityStore> store,
+                                @Nullable Vector3d consumeOrigin) {
+        TargetBlock target = resolveTargetBlock(store, consumeOrigin);
+        return target != null && isConsumableWaterSourceAt(
+                target.worldChunk(),
+                target.chunkStoreStore(),
+                target.x(),
+                target.y(),
+                target.z()
+        );
     }
 
     boolean consumeNearbyWaterTroughCharge(@Nullable Ref<EntityStore> npcRef,
@@ -1532,6 +1572,141 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     @Nonnull
+    ContainerConsumeResult consumeContainerFoodAtDetailed(@Nullable Ref<EntityStore> npcRef,
+                                                          @Nullable Store<EntityStore> store,
+                                                          @Nonnull TwNeedsConfig config,
+                                                          @Nullable String roleId,
+                                                          @Nullable String[] preferredFoodItemIds,
+                                                          @Nullable Vector3d consumeOrigin) {
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
+        int maxItems = passiveRefill.getMaxContainerItemsConsumedPerSweep();
+        int verticalScanRadius = passiveRefill.getContainerVerticalScanRadius();
+        double radius = passiveRefill.getContainerConsumeRadius();
+        int blockX = isFinitePosition(consumeOrigin) ? finiteBlockCoordinate(consumeOrigin.x) : 0;
+        int blockY = isFinitePosition(consumeOrigin) ? finiteBlockCoordinate(consumeOrigin.y) : 0;
+        int blockZ = isFinitePosition(consumeOrigin) ? finiteBlockCoordinate(consumeOrigin.z) : 0;
+        int npcBlockX = blockX;
+        int npcBlockY = blockY;
+        int npcBlockZ = blockZ;
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    blockX, blockY, blockZ,
+                    npcBlockX, npcBlockY, npcBlockZ,
+                    true,
+                    Double.NaN, Double.NaN,
+                    ContainerConsumeStatus.INVALID_CONTEXT
+            );
+        }
+        TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        if (transform != null && transform.getPosition() != null && isFinitePosition(transform.getPosition())) {
+            Vector3d npcPosition = transform.getPosition();
+            npcBlockX = finiteBlockCoordinate(npcPosition.x);
+            npcBlockY = finiteBlockCoordinate(npcPosition.y);
+            npcBlockZ = finiteBlockCoordinate(npcPosition.z);
+        }
+        if (maxItems <= 0) {
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    blockX, blockY, blockZ,
+                    npcBlockX, npcBlockY, npcBlockZ,
+                    true,
+                    Double.NaN, Double.NaN,
+                    ContainerConsumeStatus.MAX_ITEMS_NON_POSITIVE
+            );
+        }
+        Set<String> allowedFoods = normalizeItemIds(preferredFoodItemIds);
+        allowedFoods.addAll(normalizeItemIds(TwFoodConfig.resolveNeedsConsumeItemIdsForRole(roleId)));
+        allowedFoods.addAll(normalizeItemIds(passiveRefill.getContainerFoodItemIds()));
+        if (allowedFoods.isEmpty()) {
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    blockX, blockY, blockZ,
+                    npcBlockX, npcBlockY, npcBlockZ,
+                    true,
+                    Double.NaN, Double.NaN,
+                    ContainerConsumeStatus.ALLOWED_FOODS_EMPTY
+            );
+        }
+        TargetBlock target = resolveTargetBlock(store, consumeOrigin);
+        if (target == null) {
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    blockX, blockY, blockZ,
+                    npcBlockX, npcBlockY, npcBlockZ,
+                    true,
+                    Double.NaN, Double.NaN,
+                    ContainerConsumeStatus.WORLD_CONTEXT_MISSING
+            );
+        }
+        Object containerState = FeedTroughContainerCompat.resolveContainerState(
+                target.worldChunk(),
+                target.chunkStoreStore(),
+                target.x(),
+                target.y(),
+                target.z()
+        );
+        ItemContainer container = FeedTroughContainerCompat.getItemContainer(containerState);
+        if (container == null) {
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    target.x(), target.y(), target.z(),
+                    npcBlockX, npcBlockY, npcBlockZ,
+                    true,
+                    Double.NaN, Double.NaN,
+                    ContainerConsumeStatus.NO_CONTAINER_IN_RANGE
+            );
+        }
+        if (!containsAllowedFood(container, allowedFoods)) {
+            return new ContainerConsumeResult(
+                    0, 0, 1, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    target.x(), target.y(), target.z(),
+                    npcBlockX, npcBlockY, npcBlockZ,
+                    true,
+                    0.0, Double.NaN,
+                    ContainerConsumeStatus.NO_ALLOWED_FOOD_IN_RANGE
+            );
+        }
+        FeedItemPreferenceResolver preferenceResolver = FeedItemPreferenceResolver.create(npcRef, store, roleId);
+        SlotConsumeResult slotResult = consumeFoodFromContainerDetailed(
+                container,
+                allowedFoods,
+                maxItems,
+                preferenceResolver
+        );
+        ContainerConsumeStatus status;
+        if (slotResult.consumed > 0) {
+            status = ContainerConsumeStatus.SUCCESS;
+        } else if (slotResult.removalAttempts > 0 && slotResult.removalFailures >= slotResult.removalAttempts) {
+            status = ContainerConsumeStatus.REMOVE_TRANSACTION_FAILED;
+        } else {
+            status = ContainerConsumeStatus.NO_ITEMS_CONSUMED;
+        }
+        return new ContainerConsumeResult(
+                slotResult.consumed,
+                slotResult.consumedItemCountsByItemId,
+                1,
+                1,
+                slotResult.matchingStacksSeen,
+                slotResult.removalAttempts,
+                slotResult.removalFailures,
+                maxItems,
+                radius,
+                verticalScanRadius,
+                target.x(),
+                target.y(),
+                target.z(),
+                npcBlockX,
+                npcBlockY,
+                npcBlockZ,
+                true,
+                0.0,
+                0.0,
+                status
+        );
+    }
+
+    @Nonnull
     ContainerConsumeResult consumeNearbyContainerFoodDetailed(@Nullable Ref<EntityStore> npcRef,
                                                               @Nullable Store<EntityStore> store,
                                                               @Nonnull TwNeedsConfig config,
@@ -1789,6 +1964,43 @@ public final class CompanionNeedsEnvironmentService {
         WorldChunk worldChunk = chunkStoreStore.getComponent(chunkRef, WorldChunk.getComponentType());
         chunkCache.put(chunkIndex, worldChunk);
         return worldChunk;
+    }
+
+    @Nullable
+    private static TargetBlock resolveTargetBlock(@Nullable Store<EntityStore> store,
+                                                  @Nullable Vector3d consumeOrigin) {
+        if (store == null || !isFinitePosition(consumeOrigin)) {
+            return null;
+        }
+        World world = resolveWorld(store);
+        if (world == null || world.getChunkStore() == null) {
+            return null;
+        }
+        ChunkStore chunkStore = world.getChunkStore();
+        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
+        if (chunkStoreStore == null) {
+            return null;
+        }
+        int blockX = finiteBlockCoordinate(consumeOrigin.x);
+        int blockY = finiteBlockCoordinate(consumeOrigin.y);
+        int blockZ = finiteBlockCoordinate(consumeOrigin.z);
+        Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        if (worldChunk == null) {
+            return null;
+        }
+        return new TargetBlock(worldChunk, chunkStoreStore, blockX, blockY, blockZ);
+    }
+
+    private static boolean isFinitePosition(@Nullable Vector3d position) {
+        return position != null
+                && Double.isFinite(position.x)
+                && Double.isFinite(position.y)
+                && Double.isFinite(position.z);
+    }
+
+    private static int finiteBlockCoordinate(double value) {
+        return (int) Math.floor(value);
     }
 
     @Nullable

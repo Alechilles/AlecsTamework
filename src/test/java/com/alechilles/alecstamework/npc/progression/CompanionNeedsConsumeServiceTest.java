@@ -30,4 +30,18 @@ class CompanionNeedsConsumeServiceTest {
     void doesNotAwardFeedXpWhenStoredConsumptionDoesNotApply() {
         assertFalse(CompanionNeedsConsumeService.shouldAwardFeedXpForResourceConsume(1, true, false, false));
     }
+
+    @Test
+    void consumeOriginWithFiniteCoordinatesCanUseTargetFirstProbe() {
+        assertTrue(CompanionNeedsConsumeService.canUseTargetFirstConsumeProbeForTests(
+                new org.joml.Vector3d(1.5, 64.0, 2.5)
+        ));
+    }
+
+    @Test
+    void consumeOriginWithNaNCoordinateSkipsTargetFirstProbe() {
+        assertFalse(CompanionNeedsConsumeService.canUseTargetFirstConsumeProbeForTests(
+                new org.joml.Vector3d(Double.NaN, 64.0, 2.5)
+        ));
+    }
 }

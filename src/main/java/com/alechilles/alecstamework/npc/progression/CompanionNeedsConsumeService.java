@@ -204,16 +204,28 @@ public final class CompanionNeedsConsumeService {
                         passiveRefill.getContainerConsumeRadius(),
                         ACTION_FOOD_CONSUME_RADIUS_FLOOR
                 );
-                CompanionNeedsEnvironmentService.ContainerConsumeResult containerResult =
-                        ENVIRONMENT_SERVICE.consumeNearbyContainerFoodDetailed(
-                        npcRef,
-                        store,
-                        config,
-                        roleId,
-                        effectiveFoodIds,
-                        consumeRadius,
-                        consumeOriginOverride
-                );
+                CompanionNeedsEnvironmentService.ContainerConsumeResult containerResult = null;
+                if (isFiniteConsumeOrigin(consumeOriginOverride)) {
+                    containerResult = ENVIRONMENT_SERVICE.consumeContainerFoodAtDetailed(
+                            npcRef,
+                            store,
+                            config,
+                            roleId,
+                            effectiveFoodIds,
+                            consumeOriginOverride
+                    );
+                }
+                if (containerResult == null || containerResult.getConsumedItems() <= 0) {
+                    containerResult = ENVIRONMENT_SERVICE.consumeNearbyContainerFoodDetailed(
+                            npcRef,
+                            store,
+                            config,
+                            roleId,
+                            effectiveFoodIds,
+                            consumeRadius,
+                            consumeOriginOverride
+                    );
+                }
                 consumedItems = containerResult.getConsumedItems();
                 if (consumedItems > 0) {
                     hungerGain = consumedItems * passiveRefill.getHungerGainPerConsumedItem();
@@ -231,22 +243,23 @@ public final class CompanionNeedsConsumeService {
             if (!passiveRefill.isNearbyWaterDrinkEnabled()) {
                 NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "water_refill_disabled");
             } else {
-                boolean consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
-                        npcRef,
-                        store,
-                        config,
-                        consumeOriginOverride
-                );
-                if (!consumedTroughCharge && consumeOriginOverride != null) {
+                boolean targetFirstProbe = isFiniteConsumeOrigin(consumeOriginOverride);
+                boolean consumedTroughCharge = targetFirstProbe
+                        && ENVIRONMENT_SERVICE.consumeWaterTroughChargeAt(store, consumeOriginOverride);
+                if (!consumedTroughCharge) {
                     consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
                             npcRef,
                             store,
-                            config
+                            config,
+                            consumeOriginOverride
                     );
                 }
                 boolean nearWater = consumedTroughCharge
-                        || ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config, consumeOriginOverride);
-                if (!nearWater && consumeOriginOverride != null) {
+                        || (targetFirstProbe && ENVIRONMENT_SERVICE.isConsumableWaterAt(store, consumeOriginOverride));
+                if (!nearWater) {
+                    nearWater = ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config, consumeOriginOverride);
+                }
+                if (!nearWater && targetFirstProbe) {
                     nearWater = ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config);
                 }
                 if (nearWater) {
@@ -372,6 +385,17 @@ public final class CompanionNeedsConsumeService {
                                                        boolean updated,
                                                        boolean happinessChanged) {
         return (updated || happinessChanged) && (consumedItems > 0 || waterRefillApplied);
+    }
+
+    static boolean canUseTargetFirstConsumeProbeForTests(@Nullable Vector3d consumeOrigin) {
+        return isFiniteConsumeOrigin(consumeOrigin);
+    }
+
+    private static boolean isFiniteConsumeOrigin(@Nullable Vector3d consumeOrigin) {
+        return consumeOrigin != null
+                && Double.isFinite(consumeOrigin.x)
+                && Double.isFinite(consumeOrigin.y)
+                && Double.isFinite(consumeOrigin.z);
     }
 
     @Nonnull
