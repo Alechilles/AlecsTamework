@@ -53,4 +53,21 @@ class NeedsResourceSearchCachePolicyTest {
                 1
         ));
     }
+
+    @Test
+    void sourceAbsentMissTtlIsLongEnoughToThrottleFullScans() {
+        assertTrue(NeedsResourceSearchCachePolicy.baseTtlMs(false, false) >= 15_000L);
+    }
+
+    @Test
+    void sourcePresentMissStaysShorterThanSourceAbsentMiss() {
+        assertTrue(NeedsResourceSearchCachePolicy.baseTtlMs(false, true)
+                < NeedsResourceSearchCachePolicy.baseTtlMs(false, false));
+    }
+
+    @Test
+    void hitTtlStaysShortForMovingTargets() {
+        assertTrue(NeedsResourceSearchCachePolicy.baseTtlMs(true, true)
+                < NeedsResourceSearchCachePolicy.baseTtlMs(false, true));
+    }
 }
