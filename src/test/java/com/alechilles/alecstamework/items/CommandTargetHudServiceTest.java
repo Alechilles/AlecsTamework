@@ -24,11 +24,11 @@ class CommandTargetHudServiceTest {
     @Test
     void targetScanIntervalAvoidsPerTickRaycasts() {
         Assertions.assertTrue(
-                CommandTargetHudService.targetScanIntervalMsForTests() >= 75L,
+                CommandTargetHudService.targetScanIntervalMsForTests() >= 200L,
                 "Command target HUD should not raycast every world tick while a command item is held."
         );
         Assertions.assertTrue(
-                CommandTargetHudService.targetScanIntervalMsForTests() <= 125L,
+                CommandTargetHudService.targetScanIntervalMsForTests() <= 250L,
                 "Command target HUD should still hide or switch targets quickly enough to feel responsive."
         );
     }
@@ -54,14 +54,14 @@ class CommandTargetHudServiceTest {
                 "Tamework:CommandFlute",
                 1_000L,
                 1_050L,
-                100L
+                200L
         ));
         Assertions.assertTrue(CommandTargetHudService.shouldScanTargetForTests(
                 "Tamework:CommandFlute",
                 "Tamework:CommandFlute",
                 1_000L,
-                1_100L,
-                100L
+                1_200L,
+                200L
         ));
     }
 
@@ -72,7 +72,7 @@ class CommandTargetHudServiceTest {
                 "Tamework:CommandWhistle",
                 1_000L,
                 1_010L,
-                100L
+                200L
         ));
     }
 

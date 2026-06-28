@@ -41,7 +41,7 @@ import javax.annotation.Nullable;
 public final class CommandTargetHudService extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 100L;
     private static final long FALLBACK_DISCOVERY_INTERVAL_MS = 1_500L;
-    private static final long TARGET_SCAN_INTERVAL_MS = 100L;
+    private static final long TARGET_SCAN_INTERVAL_MS = 200L;
     private static final long REFRESH_INTERVAL_MS = 5_000L;
     private static final float TARGET_DISTANCE = 15.0f;
 
