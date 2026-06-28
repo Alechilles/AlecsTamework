@@ -228,6 +228,8 @@ class CommandTargetHudServiceTest {
         int scanCheck = source.indexOf("shouldScanTarget(previous, activeCommand.itemId(), nowMs)", updatePlayer);
         int targetResolve = source.indexOf("resolveTarget(player, playerRef, activeCommand, store)", updatePlayer);
         int refreshCheck = source.indexOf("shouldRefresh(previous, targetKey, nowMs)", updatePlayer);
+        int keepVisible = source.indexOf("keepHudVisible(previous)", refreshCheck);
+        int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs)", refreshCheck);
         int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs)", updatePlayer);
 
         Assertions.assertTrue(updatePlayer >= 0);
@@ -236,7 +238,29 @@ class CommandTargetHudServiceTest {
         Assertions.assertTrue(scanCheck > activeCommandResolve);
         Assertions.assertTrue(targetResolve > scanCheck);
         Assertions.assertTrue(refreshCheck > targetResolve);
+        Assertions.assertTrue(keepVisible > refreshCheck);
+        Assertions.assertTrue(rememberScan > keepVisible);
         Assertions.assertTrue(modelBuild > refreshCheck);
+    }
+
+    @Test
+    void throttledSameTargetKeepsExistingHudVisibleWithoutRebuildingModel() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandTargetHudService.java"
+        ));
+
+        int updatePlayer = source.indexOf("private void updatePlayer");
+        int refreshBlock = source.indexOf("if (!shouldRefresh(previous, targetKey, nowMs))", updatePlayer);
+        int keepVisible = source.indexOf("keepHudVisible(previous)", refreshBlock);
+        int rememberScan = source.indexOf("rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs)", refreshBlock);
+        int returnStatement = source.indexOf("return;", rememberScan);
+        int modelBuild = source.indexOf("buildModel(player, candidate.npcRef(), candidate.npc(), store, nowMs)", updatePlayer);
+
+        Assertions.assertTrue(refreshBlock > updatePlayer);
+        Assertions.assertTrue(keepVisible > refreshBlock);
+        Assertions.assertTrue(rememberScan > keepVisible);
+        Assertions.assertTrue(returnStatement > rememberScan);
+        Assertions.assertTrue(modelBuild > returnStatement);
     }
 
     @Test

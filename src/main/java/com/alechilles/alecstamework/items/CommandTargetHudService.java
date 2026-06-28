@@ -212,6 +212,7 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
         TargetCandidate candidate = resolveTarget(player, playerRef, activeCommand, store);
         String targetKey = candidate != null ? candidate.key() : null;
         if (!shouldRefresh(previous, targetKey, nowMs)) {
+            keepHudVisible(previous);
             rememberScan(playerUuid, previous, activeCommand.itemId(), nowMs);
             return;
         }
@@ -551,6 +552,12 @@ public final class CommandTargetHudService extends TickingSystem<EntityStore> {
                 nowMs,
                 activeItemId
         ));
+    }
+
+    private void keepHudVisible(@Nullable HudState previous) {
+        if (previous != null && previous.hud() != null && previous.visible()) {
+            previous.hud().keepVisible();
+        }
     }
 
     private void dropInactiveCandidate(@Nullable UUID playerUuid) {
