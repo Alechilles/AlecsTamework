@@ -139,8 +139,12 @@ final class InteractionItemRequirementResolver {
         if (itemId == null) {
             return false;
         }
-        String heldItemId = itemId;
-        return Arrays.stream(items).anyMatch(requiredItemId -> isHeldItemMatch(requiredItemId, heldItemId));
+        for (String requiredItemId : items) {
+            if (isHeldItemMatch(requiredItemId, itemId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Checks if the active item matches the list and has enough quantity.

@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class TwFoodConfigTest {
 
@@ -123,6 +125,29 @@ class TwFoodConfigTest {
         assertEquals(2.0, profile.resolveHappinessDelta("Parent_Premium"), 0.00001);
         assertEquals(20.0, profile.resolveHappinessDelta("Parent_Compatible"), 0.00001);
         assertEquals(4.0, profile.resolveHappinessDelta("Parent_Disliked"), 0.00001);
+    }
+
+    @Test
+    void resolvedProfilesAreCachedUntilRoleCacheClears() throws Exception {
+        TwFoodConfig.clearRoleCache();
+        TwFoodConfig config = config(
+                foods(new String[] { "Initial_Item" }, new String[0], new String[0], new String[0]),
+                happiness(6.0, 10.0, 2.0, -10.0)
+        );
+
+        TwFoodConfig.ResolvedFoodProfile first = config.resolveProfile("Example_Role");
+        TwFoodConfig.ResolvedFoodProfile second = config.resolveProfile("example_role");
+
+        assertSame(first, second);
+
+        setField(config, "foods", foods(new String[] { "Updated_Item" }, new String[0], new String[0], new String[0]));
+        assertSame(first, config.resolveProfile("Example_Role"));
+
+        TwFoodConfig.clearRoleCache();
+        TwFoodConfig.ResolvedFoodProfile refreshed = config.resolveProfile("Example_Role");
+
+        assertNotSame(first, refreshed);
+        assertArrayEquals(new String[] { "Updated_Item" }, refreshed.acceptedItemIds());
     }
 
     private static String[] entriesFor(TwFoodConfig.ResolvedFoodProfile profile,

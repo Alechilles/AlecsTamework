@@ -249,6 +249,7 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, TwFoodConfig> ROLE_CACHE = Map.of();
+    private static volatile long ROLE_CACHE_GENERATION;
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -258,6 +259,7 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
     private FoodSettings foods = new FoodSettings();
     private HappinessSettings happiness = new HappinessSettings();
     private Map<String, RoleOverrideSettings> roleOverrides = EMPTY_ROLE_OVERRIDES;
+    private final TwFoodProfileCache resolvedProfileCache = new TwFoodProfileCache();
 
     public static AssetStore<String, TwFoodConfig, DefaultAssetMap<String, TwFoodConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -280,6 +282,7 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
     public static void clearRoleCache() {
         INHERITANCE_CACHE_DIRTY = true;
         ROLE_CACHE_DIRTY = true;
+        ROLE_CACHE_GENERATION++;
     }
 
     @Nullable
@@ -494,6 +497,11 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
 
     @Nonnull
     public ResolvedFoodProfile resolveProfile(@Nullable String roleId) {
+        return resolvedProfileCache.resolve(roleId, ROLE_CACHE_GENERATION, this::buildResolvedProfile);
+    }
+
+    @Nonnull
+    private ResolvedFoodProfile buildResolvedProfile(@Nullable String roleId) {
         FoodSettings resolvedFoods = copyFoods(getFoods());
         HappinessSettings resolvedHappiness = copyHappiness(getHappiness());
         RoleOverrideSettings override = resolveRoleOverride(roleId);
@@ -530,17 +538,11 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
     protected TwFoodConfig() {}
 
     public String getId() { return id; }
-
     public boolean isEnabled() { return enabled; }
-
     public int getPriority() { return priority; }
-
     public String[] getRoleIds() { return roleIds == null ? ArrayUtil.EMPTY_STRING_ARRAY : roleIds; }
-
     public FoodSettings getFoods() { return foods == null ? new FoodSettings() : foods; }
-
     public HappinessSettings getHappiness() { return happiness == null ? new HappinessSettings() : happiness; }
-
     public Map<String, RoleOverrideSettings> getRoleOverrides() {
         return roleOverrides == null ? EMPTY_ROLE_OVERRIDES : roleOverrides;
     }
@@ -611,11 +613,8 @@ public final class TwFoodConfig implements JsonAssetWithMap<String, DefaultAsset
         private String[] disliked = EMPTY_ITEMS;
 
         public String[] getPreferred() { return cleanItems(preferred); }
-
         public String[] getPremium() { return cleanItems(premium); }
-
         public String[] getCompatible() { return cleanItems(compatible); }
-
         public String[] getDisliked() { return cleanItems(disliked); }
 
         @Nonnull
