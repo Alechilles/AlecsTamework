@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- Updated the embedded Alec's Telemetry runtime to 1.0.1.
 - Feed trough water states now require holding the empty interaction briefly, reducing accidental water dumps from quick use-key taps.
 - Empty feed trough prompts now mention that right-clicking with a water bucket fills the trough.
 - Linked companion panel cards now show active harvest cooldown timers beside breeding cooldown timers.
