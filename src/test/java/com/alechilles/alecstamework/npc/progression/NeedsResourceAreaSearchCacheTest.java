@@ -73,4 +73,24 @@ class NeedsResourceAreaSearchCacheTest {
         assertTrue(NeedsResourceAreaSearchCache.shouldShareResult(true, true));
         assertTrue(NeedsResourceAreaSearchCache.shouldShareResult(false, false));
     }
+
+    @Test
+    void foodItemHashSeparatesAreaKeys() {
+        NeedsResourceAreaSearchCache.AreaKey beefKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "food_container", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 123);
+        NeedsResourceAreaSearchCache.AreaKey wheatKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "food_container", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 456);
+
+        assertFalse(beefKey.equals(wheatKey));
+    }
+
+    @Test
+    void foodAndWaterDoNotShareAreaKeys() {
+        NeedsResourceAreaSearchCache.AreaKey foodKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "food_container", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);
+        NeedsResourceAreaSearchCache.AreaKey waterKey = NeedsResourceAreaSearchCache.AreaKey.from(
+                "world", "water", new Vector3d(10.0, 64.0, 10.0), 16.0, 2, 3.0, 0);
+
+        assertFalse(foodKey.equals(waterKey));
+    }
 }

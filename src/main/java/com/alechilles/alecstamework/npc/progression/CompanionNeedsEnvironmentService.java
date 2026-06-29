@@ -849,6 +849,7 @@ public final class CompanionNeedsEnvironmentService {
         }
         long nowMs = resolveCurrentTimeMs();
         double effectiveConsumeRadius = Double.isFinite(consumeRadius) && consumeRadius > 0.0 ? consumeRadius : 0.0;
+        int itemIdsHash = allowedFoods.hashCode();
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
@@ -858,6 +859,15 @@ public final class CompanionNeedsEnvironmentService {
                 verticalScanRadius,
                 effectiveConsumeRadius,
                 allowedFoods
+        );
+        NeedsResourceAreaSearchCache.AreaKey areaCacheKey = buildAreaSearchCacheKey(
+                store,
+                ResourceSearchKind.FOOD_CONTAINER,
+                transform.getPosition(),
+                radius,
+                verticalScanRadius,
+                effectiveConsumeRadius,
+                itemIdsHash
         );
         if (targetRejector == null) {
             FoodTargetSearchResult cachedResult = getCachedFoodSearchResult(
@@ -882,6 +892,18 @@ public final class CompanionNeedsEnvironmentService {
                     && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
                 return cachedResult;
             }
+        }
+        FoodTargetSearchResult areaCachedResult = getAreaCachedFoodSearchResult(
+                areaCacheKey,
+                transform.getPosition(),
+                radius,
+                verticalScanRadius,
+                targetRejector,
+                nowMs
+        );
+        if (areaCachedResult != null) {
+            cacheFoodSearchResult(cacheKey, areaCachedResult, nowMs);
+            return areaCachedResult;
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
@@ -928,6 +950,7 @@ public final class CompanionNeedsEnvironmentService {
         recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorFoodSearchResult(bestResult)) {
             cacheFoodSearchResult(cacheKey, bestResult, nowMs);
+            cacheAreaFoodSearchResult(areaCacheKey, bestResult, nowMs);
         }
         return bestResult;
     }
@@ -1257,6 +1280,32 @@ public final class CompanionNeedsEnvironmentService {
         );
     }
 
+    @Nullable
+    private static FoodTargetSearchResult getAreaCachedFoodSearchResult(
+            @Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
+            @Nullable Vector3d currentPosition,
+            double radius,
+            int verticalScanRadius,
+            @Nullable TargetRejector targetRejector,
+            long nowMs) {
+        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot =
+                AREA_SEARCH_CACHE.get(cacheKey, currentPosition, radius, verticalScanRadius, nowMs);
+        if (snapshot == null) {
+            return null;
+        }
+        Vector3d target = snapshot.target();
+        if (target != null && targetRejector != null && targetRejector.rejects(target)) {
+            return null;
+        }
+        if (target != null) {
+            return FoodTargetSearchResult.target(target, snapshot.approachRadius());
+        }
+        return FoodTargetSearchResult.miss(
+                snapshot.foundConsumableSource(),
+                snapshot.foundConsumableSourceInConsumeRange()
+        );
+    }
+
     private static void cacheSearchTarget(@Nullable NeedsSearchCacheKey cacheKey,
                                           @Nullable Vector3d target,
                                           long nowMs) {
@@ -1300,6 +1349,22 @@ public final class CompanionNeedsEnvironmentService {
     private static void cacheAreaWaterSearchResult(@Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
                                                    @Nonnull WaterTargetSearchResult result,
                                                    long nowMs) {
+        if (!NeedsResourceAreaSearchCache.shouldShareResult(
+                result.target() != null,
+                result.foundConsumableSource()
+        )) {
+            return;
+        }
+        long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource(), nowMs);
+        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot = result.target() != null
+                ? NeedsResourceAreaSearchCache.AreaSearchSnapshot.hit(result.target(), result.approachRadius(), ttlMs)
+                : NeedsResourceAreaSearchCache.AreaSearchSnapshot.sourceAbsentMiss(ttlMs);
+        AREA_SEARCH_CACHE.put(cacheKey, snapshot, nowMs);
+    }
+
+    private static void cacheAreaFoodSearchResult(@Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
+                                                  @Nonnull FoodTargetSearchResult result,
+                                                  long nowMs) {
         if (!NeedsResourceAreaSearchCache.shouldShareResult(
                 result.target() != null,
                 result.foundConsumableSource()
