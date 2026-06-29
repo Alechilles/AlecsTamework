@@ -45,4 +45,25 @@ class NeedsSweepSchedulerTest {
                 2_000L
         ));
     }
+
+    @Test
+    void lowNeedsKeepBaseInterval() {
+        assertEquals(2_000L, NeedsSweepIntervalPolicy.intervalMsForRatios(0.10, 0.90, 2_000L));
+        assertEquals(2_000L, NeedsSweepIntervalPolicy.intervalMsForRatios(0.90, 0.10, 2_000L));
+    }
+
+    @Test
+    void satisfiedNeedsUseLongerInterval() {
+        assertEquals(16_000L, NeedsSweepIntervalPolicy.intervalMsForRatios(0.90, 0.90, 2_000L));
+    }
+
+    @Test
+    void adaptiveIntervalIsCapped() {
+        assertEquals(30_000L, NeedsSweepIntervalPolicy.intervalMsForRatios(1.0, 1.0, 10_000L));
+    }
+
+    @Test
+    void invalidBaseIntervalFallsBackToImmediateSweep() {
+        assertEquals(0L, NeedsSweepIntervalPolicy.intervalMsForRatios(1.0, 1.0, 0L));
+    }
 }

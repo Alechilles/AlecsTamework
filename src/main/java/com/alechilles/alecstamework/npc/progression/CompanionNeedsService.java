@@ -211,7 +211,8 @@ public final class CompanionNeedsService {
         }
         long nowMs = resolveNowMs(config, store);
         UUID npcId = resolveNpcUuid(npcRef, store);
-        if (!NeedsSweepScheduler.shouldRunSweep(npcId, component.getLastPassiveSweepMs(), nowMs, intervalMs)) {
+        long effectiveIntervalMs = NeedsSweepIntervalPolicy.intervalMs(component, config, intervalMs);
+        if (!NeedsSweepScheduler.shouldRunSweep(npcId, component.getLastPassiveSweepMs(), nowMs, effectiveIntervalMs)) {
             return false;
         }
         return runNeedsUpdate(
