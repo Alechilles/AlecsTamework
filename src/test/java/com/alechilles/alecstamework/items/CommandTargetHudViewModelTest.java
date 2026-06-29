@@ -36,6 +36,7 @@ class CommandTargetHudViewModelTest {
                 null,
                 List.of(new CommandTargetHudViewModel.FoodRow("Food_Apple", "Apple", null)),
                 List.of(new CommandTargetHudViewModel.AttachmentRow("Coat", "Black")),
+                null,
                 null
         );
 

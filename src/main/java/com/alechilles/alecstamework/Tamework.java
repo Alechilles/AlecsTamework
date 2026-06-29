@@ -71,6 +71,9 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
+import com.alechilles.alecstamework.items.CommandTargetHudActivationTracker;
+import com.alechilles.alecstamework.items.CommandTargetHudActiveSlotSystem;
+import com.alechilles.alecstamework.items.CommandTargetHudInventoryChangeSystem;
 import com.alechilles.alecstamework.items.CommandTargetHudService;
 import com.alechilles.alecstamework.items.CommandTeleportArrivalRelocationSystem;
 import com.alechilles.alecstamework.items.CoopDebugLogger;
@@ -847,8 +850,15 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
         );
+        CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
         getEntityStoreRegistry().registerSystem(
-                new CommandTargetHudService(commandItemRegistry)
+                new CommandTargetHudActiveSlotSystem(commandTargetHudActivationTracker)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CommandTargetHudInventoryChangeSystem(commandTargetHudActivationTracker)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CommandTargetHudService(commandItemRegistry, commandTargetHudActivationTracker)
         );
 
         // Register /tw commands if the server supports it.

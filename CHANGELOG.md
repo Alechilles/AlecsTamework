@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 
 ### Changed
 - Updated the embedded Alec's Telemetry runtime to 1.0.1.
@@ -12,12 +12,14 @@
 - Linked companion recall now marks an unreachable NPC lost after 10 seconds by default.
 - Taming now tells players when a new companion is automatically linked to a command item, or when no matching command item was found in inventory.
 - Taming now shows warning notifications when the player is at the per-player ownership limit or the target claim is at its SimpleClaims companion limit.
-- Holding a command item while looking at a supported NPC now shows a compact right-side status HUD with vitals, progression details, food profiles, attachment selections, and tame tranquilizer requirements when available.
+- Holding a command item while looking at a supported NPC within 15 units now shows a compact right-side status HUD with vitals, progression details, food profiles, attachment selections, owner display, and tame tranquilizer requirements when available.
 - Command target HUD vitals, cooldowns, level, talent points, gender, and traits now use the same compact ring controls and header placement as the linked companion panel.
 - Added `TwFoodConfig` assets for role food profiles with Preferred, Premium, Compatible, and Disliked categories shared by taming prompts, feed matching, needs consumption, happiness deltas, and the command target HUD.
+- Reduced companion needs search overhead in busy worlds by sharing scan caches, staggering sweeps, backing off absent resources, and consuming from already-resolved food or water targets first.
 
 ### Fixed
 - Fixed feed trough water clearing so releasing the use key before the hold finishes cancels emptying, instead of dumping water after a quick tap.
+- Fixed the companion needs and happiness runtime settings so disabling them fully stops the affected behavior instead of leaving partial updates active.
 - Fixed captured spawner ownership checks so spawners that clear ownership on capture can be traded and spawned by the receiving player.
 - Role-specific companion genders now override incompatible stored gender values so configured roles such as deer doe/stag cannot keep the wrong gender after capture, respawn, or taming.
 - Command target HUD food display now resolves role food profiles before legacy role params, so favorite foods can be shown separately from compatible feed items such as feedbags or cohort feed.
@@ -25,6 +27,7 @@
 - Command target HUD attachment selections now use the same `Name: Value` line format as captured spawner item tooltips.
 - Command target HUD now clears and refreshes nearly instantly when players stop targeting a supported NPC, switch held items, or look at another supported NPC.
 - Command target HUD now appears for untamed NPCs that have enabled Tamework tame interactions.
+- Command target HUD now uses hotbar slot and inventory change events plus slower same-target status refreshes to reduce server work without delaying target switching or hide behavior.
 - Fixed linked companion breeding toggles disappearing after some revive, recall, or lost-recovery flows when breeding was available but cooldown state was unavailable.
 - Fixed revived and lost-recovered companions sometimes missing progression state such as happiness, needs, levels, traits, or talents.
 

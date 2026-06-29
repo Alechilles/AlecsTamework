@@ -10,7 +10,8 @@ public record CommandTargetHudViewModel(@Nonnull LinkedNpcEntry status,
                                         @Nullable FoodRow favoriteFood,
                                         @Nonnull List<FoodRow> compatibleFoods,
                                         @Nonnull List<AttachmentRow> attachments,
-                                        @Nullable TameRequirementRow tameRequirement) {
+                                        @Nullable TameRequirementRow tameRequirement,
+                                        @Nullable String ownerDisplayName) {
     public CommandTargetHudViewModel {
         compatibleFoods = compatibleFoods == null ? List.of() : List.copyOf(compatibleFoods);
         attachments = attachments == null ? List.of() : List.copyOf(attachments);
