@@ -49,6 +49,8 @@ public final class CompanionNeedsEnvironmentService {
     private static final ThreadLocal<NeedsResourceStandTargetSelector> STAND_TARGET_SELECTOR =
             ThreadLocal.withInitial(NeedsResourceStandTargetSelector::new);
     private static final ConcurrentHashMap<NeedsSearchCacheKey, CachedSearchResult> SEARCH_CACHE = new ConcurrentHashMap<>();
+    private static final NeedsResourceAreaSearchCache AREA_SEARCH_CACHE =
+            new NeedsResourceAreaSearchCache(SEARCH_CACHE_MAX_ENTRIES);
     private static final ConcurrentHashMap<Integer, Boolean> WATER_TROUGH_BLOCK_ID_CACHE = new ConcurrentHashMap<>();
 
     @FunctionalInterface
@@ -461,6 +463,15 @@ public final class CompanionNeedsEnvironmentService {
                 consumeRadius,
                 null
         );
+        NeedsResourceAreaSearchCache.AreaKey areaCacheKey = buildAreaSearchCacheKey(
+                store,
+                ResourceSearchKind.WATER,
+                transform.getPosition(),
+                radius,
+                verticalScanRadius,
+                consumeRadius,
+                0
+        );
         if (targetRejector == null) {
             WaterTargetSearchResult cachedResult = getCachedWaterSearchResult(
                     cacheKey,
@@ -484,6 +495,18 @@ public final class CompanionNeedsEnvironmentService {
                     && (cachedResult.target() == null || !targetRejector.rejects(cachedResult.target()))) {
                 return cachedResult;
             }
+        }
+        WaterTargetSearchResult areaCachedResult = getAreaCachedWaterSearchResult(
+                areaCacheKey,
+                transform.getPosition(),
+                radius,
+                verticalScanRadius,
+                targetRejector,
+                nowMs
+        );
+        if (areaCachedResult != null) {
+            cacheWaterSearchResult(cacheKey, areaCachedResult, nowMs);
+            return areaCachedResult;
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
@@ -533,6 +556,7 @@ public final class CompanionNeedsEnvironmentService {
         recordResourceSearchWork(startedNs, nowMs);
         if (targetRejector == null || shouldCacheRejectorWaterSearchResult(bestResult)) {
             cacheWaterSearchResult(cacheKey, bestResult, nowMs);
+            cacheAreaWaterSearchResult(areaCacheKey, bestResult, nowMs);
         }
         return bestResult;
     }
@@ -1186,6 +1210,53 @@ public final class CompanionNeedsEnvironmentService {
         );
     }
 
+    @Nullable
+    private static NeedsResourceAreaSearchCache.AreaKey buildAreaSearchCacheKey(@Nullable Store<EntityStore> store,
+                                                                                @Nonnull ResourceSearchKind resourceKind,
+                                                                                @Nullable Vector3d position,
+                                                                                double radius,
+                                                                                int verticalScanRadius,
+                                                                                double consumeRadius,
+                                                                                int itemIdsHash) {
+        World world = resolveWorld(store);
+        String worldName = world != null ? world.getName() : null;
+        return NeedsResourceAreaSearchCache.AreaKey.from(
+                worldName,
+                resourceKind.name(),
+                position,
+                radius,
+                verticalScanRadius,
+                consumeRadius,
+                itemIdsHash
+        );
+    }
+
+    @Nullable
+    private static WaterTargetSearchResult getAreaCachedWaterSearchResult(
+            @Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
+            @Nullable Vector3d currentPosition,
+            double radius,
+            int verticalScanRadius,
+            @Nullable TargetRejector targetRejector,
+            long nowMs) {
+        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot =
+                AREA_SEARCH_CACHE.get(cacheKey, currentPosition, radius, verticalScanRadius, nowMs);
+        if (snapshot == null) {
+            return null;
+        }
+        Vector3d target = snapshot.target();
+        if (target != null && targetRejector != null && targetRejector.rejects(target)) {
+            return null;
+        }
+        if (target != null) {
+            return WaterTargetSearchResult.target(target, snapshot.approachRadius());
+        }
+        return WaterTargetSearchResult.miss(
+                snapshot.foundConsumableSource(),
+                snapshot.foundConsumableSourceInConsumeRange()
+        );
+    }
+
     private static void cacheSearchTarget(@Nullable NeedsSearchCacheKey cacheKey,
                                           @Nullable Vector3d target,
                                           long nowMs) {
@@ -1224,6 +1295,22 @@ public final class CompanionNeedsEnvironmentService {
                 )
         );
         cleanupExpiredSearchCache(nowMs);
+    }
+
+    private static void cacheAreaWaterSearchResult(@Nullable NeedsResourceAreaSearchCache.AreaKey cacheKey,
+                                                   @Nonnull WaterTargetSearchResult result,
+                                                   long nowMs) {
+        if (!NeedsResourceAreaSearchCache.shouldShareResult(
+                result.target() != null,
+                result.foundConsumableSource()
+        )) {
+            return;
+        }
+        long ttlMs = searchCacheTtlMs(result.target() != null, result.foundConsumableSource(), nowMs);
+        NeedsResourceAreaSearchCache.AreaSearchSnapshot snapshot = result.target() != null
+                ? NeedsResourceAreaSearchCache.AreaSearchSnapshot.hit(result.target(), result.approachRadius(), ttlMs)
+                : NeedsResourceAreaSearchCache.AreaSearchSnapshot.sourceAbsentMiss(ttlMs);
+        AREA_SEARCH_CACHE.put(cacheKey, snapshot, nowMs);
     }
 
     private static void cacheFoodSearchResult(@Nullable NeedsSearchCacheKey cacheKey,
