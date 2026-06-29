@@ -48,6 +48,8 @@ public final class NeedsResourcePathPreflightService {
     private static final AtomicInteger budgetUsedNodes = new AtomicInteger();
 
     private final ConcurrentHashMap<PreflightKey, CachedPreflight> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<RecentReadyKey, RecentReadyPreflight> recentReadyTargets =
+            new ConcurrentHashMap<>();
 
     @Nonnull
     public PathPreflightResult preflight(@Nonnull Ref<EntityStore> ref,
@@ -123,6 +125,10 @@ public final class NeedsResourcePathPreflightService {
     PathPreflightResult preflight(@Nonnull PreflightKey key,
                                   @Nonnull PathComputationFactory computationFactory,
                                   long nowMs) {
+        PathPreflightResult recentReady = resolveRecentReady(key, nowMs);
+        if (recentReady != null) {
+            return recentReady;
+        }
         CachedPreflight cached = cache.get(key);
         if (cached != null && nowMs < cached.expiresAtMs()) {
             if (cached.status() == PathPreflightStatus.READY) {
@@ -165,6 +171,7 @@ public final class NeedsResourcePathPreflightService {
         if (status == PathPreflightStatus.READY) {
             clearComputation(computation);
             cacheTerminalResult(key, PathPreflightStatus.READY, "path_preflight_ready", nowMs);
+            cacheRecentReady(key, nowMs);
             return PathPreflightResult.ready("path_preflight_ready");
         }
         if (status == PathPreflightStatus.NO_PATH) {
@@ -181,6 +188,7 @@ public final class NeedsResourcePathPreflightService {
             clearComputation(value.computation());
         }
         cache.clear();
+        recentReadyTargets.clear();
         budgetWindowMs.set(0L);
         budgetUsedNodes.set(0);
     }
@@ -461,9 +469,59 @@ public final class NeedsResourcePathPreflightService {
     }
 
     private record CachedPreflight(@Nonnull PathPreflightStatus status,
-                                   @Nonnull String reason,
-                                   long expiresAtMs,
-                                   @Nullable PathComputation computation) {
+                                    @Nonnull String reason,
+                                    long expiresAtMs,
+                                    @Nullable PathComputation computation) {
+    }
+
+    @Nullable
+    private PathPreflightResult resolveRecentReady(@Nonnull PreflightKey key, long nowMs) {
+        RecentReadyKey recentKey = RecentReadyKey.from(key);
+        RecentReadyPreflight recent = recentReadyTargets.get(recentKey);
+        if (recent == null) {
+            return null;
+        }
+        if (nowMs >= recent.expiresAtMs()) {
+            recentReadyTargets.remove(recentKey, recent);
+            return null;
+        }
+        if (!NeedsResourcePreflightPolicy.canReuseRecentReady(recent.key(), key)) {
+            return null;
+        }
+        return PathPreflightResult.ready("path_preflight_recent_ready_target");
+    }
+
+    private void cacheRecentReady(@Nonnull PreflightKey key, long nowMs) {
+        recentReadyTargets.put(
+                RecentReadyKey.from(key),
+                new RecentReadyPreflight(key, nowMs + NeedsResourcePreflightPolicy.RECENT_READY_TTL_MS)
+        );
+    }
+
+    private record RecentReadyKey(@Nonnull UUID npcUuid,
+                                  @Nonnull String worldName,
+                                  @Nonnull String resourceType,
+                                  @Nonnull String motionControllerType,
+                                  int targetX,
+                                  int targetY,
+                                  int targetZ,
+                                  int stopDistanceKey) {
+        @Nonnull
+        static RecentReadyKey from(@Nonnull PreflightKey key) {
+            return new RecentReadyKey(
+                    key.npcUuid(),
+                    key.worldName(),
+                    key.resourceType(),
+                    key.motionControllerType(),
+                    key.targetX(),
+                    key.targetY(),
+                    key.targetZ(),
+                    key.stopDistanceKey()
+            );
+        }
+    }
+
+    private record RecentReadyPreflight(@Nonnull PreflightKey key, long expiresAtMs) {
     }
 
     private static final class HytalePathComputation implements PathComputation {

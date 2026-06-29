@@ -199,6 +199,80 @@ class NeedsResourcePathPreflightServiceTest {
         assertFalse(nearKey.equals(farKey));
     }
 
+    @Test
+    void recentReadyTargetAvoidsRecomputingWhenStartMovesNearby() {
+        NeedsResourcePathPreflightService service = new NeedsResourcePathPreflightService();
+        AtomicInteger factoryCalls = new AtomicInteger();
+        NeedsResourcePathPreflightService.PreflightKey firstKey = keyFor(50, 2.0);
+        NeedsResourcePathPreflightService.PreflightKey secondKey = NeedsResourcePathPreflightService.PreflightKey.from(
+                new UUID(0L, 50L),
+                "test-world",
+                "FoodContainer",
+                "Walk",
+                new Vector3d(51.0, 64.0, 0.0),
+                new Vector3d(54.0, 64.0, 0.0),
+                2.0
+        );
+
+        PathPreflightResult first = service.preflight(
+                firstKey,
+                () -> {
+                    factoryCalls.incrementAndGet();
+                    return new FakeComputation(PathPreflightStatus.READY);
+                },
+                1_000L
+        );
+        PathPreflightResult second = service.preflight(
+                secondKey,
+                () -> {
+                    factoryCalls.incrementAndGet();
+                    return new FakeComputation(PathPreflightStatus.NO_PATH);
+                },
+                1_100L
+        );
+
+        assertTrue(first.ready());
+        assertTrue(second.ready());
+        assertEquals("path_preflight_recent_ready_target", second.reason());
+        assertEquals(1, factoryCalls.get());
+    }
+
+    @Test
+    void recentReadyTargetExpires() {
+        NeedsResourcePathPreflightService service = new NeedsResourcePathPreflightService();
+        AtomicInteger factoryCalls = new AtomicInteger();
+        NeedsResourcePathPreflightService.PreflightKey firstKey = keyFor(60, 2.0);
+        NeedsResourcePathPreflightService.PreflightKey secondKey = NeedsResourcePathPreflightService.PreflightKey.from(
+                new UUID(0L, 60L),
+                "test-world",
+                "FoodContainer",
+                "Walk",
+                new Vector3d(61.0, 64.0, 0.0),
+                new Vector3d(64.0, 64.0, 0.0),
+                2.0
+        );
+
+        service.preflight(
+                firstKey,
+                () -> {
+                    factoryCalls.incrementAndGet();
+                    return new FakeComputation(PathPreflightStatus.READY);
+                },
+                1_000L
+        );
+        PathPreflightResult second = service.preflight(
+                secondKey,
+                () -> {
+                    factoryCalls.incrementAndGet();
+                    return new FakeComputation(PathPreflightStatus.NO_PATH);
+                },
+                1_000L + NeedsResourcePreflightPolicy.RECENT_READY_TTL_MS + 1L
+        );
+
+        assertTrue(second.noPath());
+        assertEquals(2, factoryCalls.get());
+    }
+
     private static NeedsResourcePathPreflightService.PreflightKey keyFor(int index) {
         return keyFor(index, 2.0);
     }
