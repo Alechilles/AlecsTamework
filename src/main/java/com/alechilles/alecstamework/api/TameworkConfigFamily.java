@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.api;
 public enum TameworkConfigFamily {
     GLOBAL,
     INTERACTION,
+    MOUNTED_GLIDE,
     COMPANION,
     SPAWNER,
     NAME_ITEM,

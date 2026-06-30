@@ -37,6 +37,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
+import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
@@ -101,6 +102,8 @@ import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -237,6 +240,7 @@ public class Tamework extends JavaPlugin {
     private boolean namesAssetsRegistered;
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
+    private boolean mountedGlideAssetsRegistered;
     private boolean coopAssetsRegistered;
     private boolean foodAssetsRegistered;
     private boolean happinessAssetsRegistered;
@@ -268,6 +272,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingCompanionComponentType;
     private ComponentType<EntityStore, TameworkRideMountComponent> rideMountComponentType;
     private ComponentType<EntityStore, TameworkRideRiderComponent> rideRiderComponentType;
+    private ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlideComponentType;
+    private ComponentType<EntityStore, TameworkMountedGlideRiderComponent> mountedGlideRiderComponentType;
     private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
@@ -416,6 +422,7 @@ public class Tamework extends JavaPlugin {
         registerNamesAssets();
         registerCommandItemAssets();
         registerInteractionAssets();
+        registerMountedGlideAssets();
         registerFoodAssets();
         registerHappinessAssets();
         registerNeedsAssets();
@@ -513,6 +520,18 @@ public class Tamework extends JavaPlugin {
                 TameworkRideRiderComponent.class,
                 "TameworkRideRider",
                 TameworkRideRiderComponent.CODEC
+        );
+
+        mountedGlideComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkMountedGlideComponent.class,
+                "TameworkMountedGlide",
+                TameworkMountedGlideComponent.CODEC
+        );
+
+        mountedGlideRiderComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkMountedGlideRiderComponent.class,
+                "TameworkMountedGlideRider",
+                TameworkMountedGlideRiderComponent.CODEC
         );
 
         levelingComponentType = getEntityStoreRegistry().registerComponent(
@@ -1598,6 +1617,22 @@ public class Tamework extends JavaPlugin {
         interactionAssetsRegistered = true;
     }
 
+    private void registerMountedGlideAssets() {
+        if (mountedGlideAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwMountedGlideConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Mounts/Glide")
+                        .setCodec(TwMountedGlideConfig.CODEC)
+                        .setKeyFunction(TwMountedGlideConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwMountedGlideConfig.class, this::onMountedGlideAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwMountedGlideConfig.class, this::onMountedGlideAssetsRemoved);
+        mountedGlideAssetsRegistered = true;
+    }
+
     private void registerCoopAssets() {
         if (coopAssetsRegistered) {
             return;
@@ -1986,6 +2021,20 @@ public class Tamework extends JavaPlugin {
         emitExperimentalConfigReload(TameworkConfigFamily.INTERACTION, event.getRemovedAssets());
     }
 
+    private void onMountedGlideAssetsLoaded(
+            LoadedAssetsEvent<String, TwMountedGlideConfig, DefaultAssetMap<String, TwMountedGlideConfig>> event) {
+        TwMountedGlideConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.MOUNTED_GLIDE, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onMountedGlideAssetsRemoved(
+            RemovedAssetsEvent<String, TwMountedGlideConfig, DefaultAssetMap<String, TwMountedGlideConfig>> event) {
+        TwMountedGlideConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.MOUNTED_GLIDE, event.getRemovedAssets());
+    }
+
     private void emitExperimentalConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Iterable<String> changedIds) {
         if (apiEventBus == null || changedIds == null) {
             return;
@@ -2305,6 +2354,14 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkRideRiderComponent> getRideRiderComponentType() {
         return rideRiderComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkMountedGlideComponent> getMountedGlideComponentType() {
+        return mountedGlideComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkMountedGlideRiderComponent> getMountedGlideRiderComponentType() {
+        return mountedGlideRiderComponentType;
     }
 
     public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {
