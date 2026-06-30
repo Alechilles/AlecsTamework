@@ -1,8 +1,12 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.network.MountedGlidePacketHandler;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
@@ -41,7 +45,10 @@ final class InteractionMountEffects {
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final String MOUNT_MODE_PARAM = "MountMode";
     private static final String MOUNT_MODE_TAMEWORK_RIDE = "TameworkRide";
+    private static final String MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE = "TameworkMountedGlide";
     private static final String MOUNT_RIDE_STATE_PARAM = "MountRideState";
+    private static final String MOUNT_GLIDE_STATE_PARAM = "MountGlideState";
+    private static final String MOUNT_GLIDE_CONTROLLER_PARAM = "MountGlideController";
     private static final String MOUNT_GROUND_CONTROLLER_PARAM = "MountGroundController";
     private static final String MOUNT_FLIGHT_CONTROLLER_PARAM = "MountFlightController";
 
@@ -68,6 +75,9 @@ final class InteractionMountEffects {
         }
         if (MOUNT_MODE_TAMEWORK_RIDE.equalsIgnoreCase(owner.getRoleStringParam(role, MOUNT_MODE_PARAM))) {
             return applyTameworkRideMount(npcRef, playerRef, role, store);
+        }
+        if (MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE.equalsIgnoreCase(owner.getRoleStringParam(role, MOUNT_MODE_PARAM))) {
+            return applyTameworkMountedGlideMount(npcRef, playerRef, role, store);
         }
         ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
         if (mountType == null) {
@@ -111,6 +121,68 @@ final class InteractionMountEffects {
         clearStatusAnimation(npcRef, npcComponent, store);
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
         applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
+        return true;
+    }
+
+    private boolean applyTameworkMountedGlideMount(Ref<EntityStore> npcRef,
+                                                   Ref<EntityStore> playerRef,
+                                                   Role role,
+                                                   Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkMountedGlideComponent> glideMountType =
+                TameworkMountedGlideComponent.getComponentType();
+        ComponentType<EntityStore, TameworkMountedGlideRiderComponent> glideRiderType =
+                TameworkMountedGlideRiderComponent.getComponentType();
+        if (glideMountType == null || glideRiderType == null) {
+            return false;
+        }
+        UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
+        UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
+        PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
+        NPCEntity npcComponent = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npcUuid == null || riderUuid == null || npcComponent == null) {
+            return false;
+        }
+        if (store.getComponent(npcRef, glideMountType) != null
+                || store.getComponent(playerRef, glideRiderType) != null) {
+            return false;
+        }
+        TwMountedGlideConfig config = TwMountedGlideConfig.resolveForRole(role.getRoleName());
+        if (config == null) {
+            config = new TwMountedGlideConfig();
+        }
+        String glideState = resolveStringParam(
+                role,
+                MOUNT_GLIDE_STATE_PARAM,
+                TameworkMountedGlideComponent.DEFAULT_GLIDE_STATE
+        );
+        String glideController = resolveStringParam(
+                role,
+                MOUNT_GLIDE_CONTROLLER_PARAM,
+                TameworkMountedGlideComponent.DEFAULT_GLIDE_CONTROLLER
+        );
+        TameworkMountedGlideComponent glideMount = new TameworkMountedGlideComponent(riderUuid.getUuid().toString());
+        glideMount.setConfigId(config.getId());
+        glideMount.setPreviousState(resolveCurrentState(role));
+        glideMount.setPreviousSubState(resolveCurrentSubState(role));
+        glideMount.setPreviousMotionController(resolveCurrentMotionController(role));
+        glideMount.setGlideState(glideState);
+        glideMount.setGlideController(glideController);
+        glideMount.setMountStartMs(System.currentTimeMillis());
+        glideMount.initializePhysicsState(config);
+
+        TameworkMountedGlideRiderComponent glideRider =
+                new TameworkMountedGlideRiderComponent(npcUuid.getUuid().toString());
+        store.putComponent(npcRef, glideMountType, glideMount);
+        store.putComponent(playerRef, glideRiderType, glideRider);
+        MountedGlidePacketHandler.registerGlide(
+                playerRefComponent == null ? null : playerRefComponent.getUuid(),
+                riderUuid.getUuid(),
+                npcUuid.getUuid(),
+                store.getExternalData().getWorld()
+        );
+        clearStatusAnimation(npcRef, npcComponent, store);
+        role.setActiveMotionController(npcRef, npcComponent, glideController, store);
+        applyRideState(npcRef, role, store, glideState);
         return true;
     }
 

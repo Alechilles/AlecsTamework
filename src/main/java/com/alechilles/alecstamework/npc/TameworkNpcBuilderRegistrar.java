@@ -25,8 +25,10 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkMountedGlide;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFly;
+import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkMountedGlide;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkRideWalk;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkAlarm;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
@@ -189,6 +191,10 @@ public final class TameworkNpcBuilderRegistrar {
             plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Body motion factory missing.");
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Body motion factory ready.");
+            bodyMotionFactory.add(
+                    BuilderBodyMotionTameworkMountedGlide.BUILDER_ID,
+                    BuilderBodyMotionTameworkMountedGlide::new
+            );
             bodyMotionFactory.add(BuilderBodyMotionTameworkRide.BUILDER_ID, BuilderBodyMotionTameworkRide::new);
         }
 
@@ -201,6 +207,10 @@ public final class TameworkNpcBuilderRegistrar {
             motionControllerFactory.add(
                     BuilderMotionControllerTameworkFly.BUILDER_ID,
                     BuilderMotionControllerTameworkFly::new
+            );
+            motionControllerFactory.add(
+                    BuilderMotionControllerTameworkMountedGlide.BUILDER_ID,
+                    BuilderMotionControllerTameworkMountedGlide::new
             );
             motionControllerFactory.add(
                     BuilderMotionControllerTameworkRideWalk.BUILDER_ID,
