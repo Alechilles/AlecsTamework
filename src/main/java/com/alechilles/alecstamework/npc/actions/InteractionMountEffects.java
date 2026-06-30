@@ -143,7 +143,7 @@ final class InteractionMountEffects {
         if (npcUuid == null || riderUuid == null || playerRefComponent == null || playerComponent == null || npcComponent == null) {
             return false;
         }
-        if (playerComponent.getMountEntityId() != 0
+        if (hasActiveNativeMount(playerComponent)
                 || store.getComponent(npcRef, npcMountType) != null
                 || store.getComponent(npcRef, glideMountType) != null
                 || store.getComponent(playerRef, glideRiderType) != null) {
@@ -200,6 +200,10 @@ final class InteractionMountEffects {
         applyRideState(npcRef, role, store, glideState);
         applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
         return true;
+    }
+
+    static boolean hasActiveNativeMount(@Nonnull Player playerComponent) {
+        return playerComponent.getMountEntityId() > 0;
     }
 
     private boolean applyTameworkRideMount(Ref<EntityStore> npcRef,

@@ -9,6 +9,7 @@
 - Fixed a rare command target HUD crash that could happen when inventory or hotbar events updated player candidates while the world tick was snapshotting them.
 - Fixed command target HUD tame requirements showing one required tranquilizer stack even when the NPC role required more.
 - Fixed beta mounted glide mounts to use Hytale's native NPC mount attachment plus rider movement/head state, so riders stay attached to the dragon while glide physics controls the mount.
+- Fixed beta mounted glide mount interactions being blocked when a player had a non-positive dismounted mount id from another mount implementation.
 
 ## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 
