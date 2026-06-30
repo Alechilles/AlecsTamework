@@ -33,6 +33,15 @@ public final class SensorTameworkEffectActive extends TameworkSensorBase {
         this.minRemainingSeconds = Math.max(0.0, builder.getMinRemainingSeconds(support));
     }
 
+    @Nonnull
+    public String getEffectId() {
+        return effectId;
+    }
+
+    public double getMinRemainingSeconds() {
+        return minRemainingSeconds;
+    }
+
     @Override
     public boolean matches(@Nonnull Ref<EntityStore> ref,
                            @Nonnull Role role,

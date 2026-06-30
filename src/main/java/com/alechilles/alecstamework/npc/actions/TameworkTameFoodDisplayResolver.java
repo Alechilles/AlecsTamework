@@ -5,15 +5,21 @@ import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayService;
+import com.alechilles.alecstamework.npc.sensors.SensorTameworkEffectActive;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
+import com.hypixel.hytale.server.npc.instructions.Instruction;
+import com.hypixel.hytale.server.npc.util.IAnnotatedComponent;
+import com.hypixel.hytale.server.npc.util.IAnnotatedComponentCollection;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import javax.annotation.Nonnull;
@@ -28,6 +34,7 @@ public final class TameworkTameFoodDisplayResolver {
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
     private static final String TRANQUILIZER_SLEEP_THRESHOLD_PARAM = "TranquilizerSleepThresholdSeconds";
     private static final String FOOD_FAVORITE_PARAM = "FoodFavorite";
+    private static final int MAX_ROLE_COMPONENT_VISITS = 512;
 
     private final String lovedItemsParamName;
 
@@ -166,6 +173,7 @@ public final class TameworkTameFoodDisplayResolver {
                 0.0,
                 paramResolver.getNumberParam(role, ctx, TRANQUILIZER_SLEEP_THRESHOLD_PARAM, 0.0)
         );
+        requiredSeconds = Math.max(requiredSeconds, resolveRoleInstructionTranquilizerThreshold(role));
         if (config == null || !config.isEnabled()) {
             return requiredSeconds;
         }
@@ -176,6 +184,74 @@ public final class TameworkTameFoodDisplayResolver {
             requiredSeconds = Math.max(requiredSeconds, resolveRequiredTranquilizerSeconds(entry.getRequires()));
         }
         return requiredSeconds;
+    }
+
+    private static double resolveRoleInstructionTranquilizerThreshold(@Nullable Role role) {
+        if (role == null) {
+            return 0.0;
+        }
+        try {
+            return resolveTranquilizerEffectThresholdFromComponentTree(role.getRootInstruction());
+        } catch (RuntimeException | LinkageError ignored) {
+            return 0.0;
+        }
+    }
+
+    static double resolveTranquilizerEffectThresholdFromComponentTreeForTests(@Nullable IAnnotatedComponent root) {
+        return resolveTranquilizerEffectThresholdFromComponentTree(root);
+    }
+
+    private static double resolveTranquilizerEffectThresholdFromComponentTree(@Nullable IAnnotatedComponent root) {
+        if (root == null) {
+            return 0.0;
+        }
+        IdentityHashMap<IAnnotatedComponent, Boolean> visited = new IdentityHashMap<>();
+        ArrayDeque<IAnnotatedComponent> pending = new ArrayDeque<>();
+        pending.add(root);
+        double requiredSeconds = 0.0;
+        int visits = 0;
+        while (!pending.isEmpty() && visits < MAX_ROLE_COMPONENT_VISITS) {
+            IAnnotatedComponent component = pending.removeFirst();
+            if (component == null || visited.put(component, Boolean.TRUE) != null) {
+                continue;
+            }
+            visits++;
+            if (component instanceof SensorTameworkEffectActive effectActive
+                    && TRANQUILIZER_EFFECT_ID.equalsIgnoreCase(safeTrim(effectActive.getEffectId()))) {
+                requiredSeconds = Math.max(requiredSeconds, effectActive.getMinRemainingSeconds());
+            }
+            if (component instanceof Instruction instruction) {
+                addComponent(pending, instruction.getSensor());
+            }
+            if (component instanceof IAnnotatedComponentCollection collection) {
+                addChildComponents(pending, collection);
+            }
+        }
+        return requiredSeconds;
+    }
+
+    private static void addChildComponents(@Nonnull ArrayDeque<IAnnotatedComponent> pending,
+                                           @Nonnull IAnnotatedComponentCollection collection) {
+        int count;
+        try {
+            count = collection.componentCount();
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        for (int i = 0; i < count; i++) {
+            try {
+                addComponent(pending, collection.getComponent(i));
+            } catch (RuntimeException ignored) {
+                // Ignore individual broken debug components; the HUD can still use other thresholds.
+            }
+        }
+    }
+
+    private static void addComponent(@Nonnull ArrayDeque<IAnnotatedComponent> pending,
+                                     @Nullable IAnnotatedComponent component) {
+        if (component != null) {
+            pending.add(component);
+        }
     }
 
     @Nullable

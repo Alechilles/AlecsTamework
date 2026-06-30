@@ -1,8 +1,12 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.npc.sensors.SensorTameworkEffectActive;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
+import com.hypixel.hytale.server.npc.util.ComponentInfo;
+import com.hypixel.hytale.server.npc.util.IAnnotatedComponent;
+import com.hypixel.hytale.server.npc.util.IAnnotatedComponentCollection;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.Assertions;
@@ -226,6 +230,30 @@ class TameworkTameFoodDisplayResolverTest {
         Assertions.assertEquals(110.0, seconds);
     }
 
+    @Test
+    void componentTreeCanResolveBuiltTranquilizerSensorThreshold() throws Exception {
+        IAnnotatedComponentCollection tree = new TestComponentCollection(
+                newTranquilizerSensorWithThreshold(110.0)
+        );
+
+        double seconds = TameworkTameFoodDisplayResolver
+                .resolveTranquilizerEffectThresholdFromComponentTreeForTests(tree);
+
+        Assertions.assertEquals(110.0, seconds);
+    }
+
+    @Test
+    void tranquilizerSensorTreeIgnoresUnrelatedEffects() throws Exception {
+        IAnnotatedComponentCollection tree = new TestComponentCollection(
+                newEffectSensorWithThreshold("Other_Status", 110.0)
+        );
+
+        double seconds = TameworkTameFoodDisplayResolver
+                .resolveTranquilizerEffectThresholdFromComponentTreeForTests(tree);
+
+        Assertions.assertEquals(0.0, seconds);
+    }
+
     private static TwInteractionConfig configWith(TwInteractionConfig.InteractionEntry... interactions) throws Exception {
         TwInteractionConfig config = (TwInteractionConfig) getUnsafe().allocateInstance(TwInteractionConfig.class);
         setField(TwInteractionConfig.class, config, "enabled", true);
@@ -249,6 +277,21 @@ class TameworkTameFoodDisplayResolverTest {
         return role;
     }
 
+    private static SensorTameworkEffectActive newTranquilizerSensorWithThreshold(double thresholdSeconds)
+            throws Exception {
+        return newEffectSensorWithThreshold("Tw_Status_Tranquilized", thresholdSeconds);
+    }
+
+    private static SensorTameworkEffectActive newEffectSensorWithThreshold(String effectId, double thresholdSeconds)
+            throws Exception {
+        Unsafe unsafe = getUnsafe();
+        SensorTameworkEffectActive sensor = (SensorTameworkEffectActive)
+                unsafe.allocateInstance(SensorTameworkEffectActive.class);
+        setField(SensorTameworkEffectActive.class, sensor, "effectId", effectId);
+        setField(SensorTameworkEffectActive.class, sensor, "minRemainingSeconds", thresholdSeconds);
+        return sensor;
+    }
+
     private static void setField(Class<?> owner, Object target, String fieldName, Object value) throws Exception {
         Field field = owner.getDeclaredField(fieldName);
         field.setAccessible(true);
@@ -259,5 +302,36 @@ class TameworkTameFoodDisplayResolverTest {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);
         return (Unsafe) field.get(null);
+    }
+
+    private record TestComponentCollection(IAnnotatedComponent... children)
+            implements IAnnotatedComponentCollection {
+        @Override
+        public int componentCount() {
+            return children.length;
+        }
+
+        @Override
+        public IAnnotatedComponent getComponent(int index) {
+            return children[index];
+        }
+
+        @Override
+        public void getInfo(Role role, ComponentInfo componentInfo) {
+        }
+
+        @Override
+        public void setContext(IAnnotatedComponent parent, int index) {
+        }
+
+        @Override
+        public IAnnotatedComponent getParent() {
+            return null;
+        }
+
+        @Override
+        public int getIndex() {
+            return 0;
+        }
     }
 }
