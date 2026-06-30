@@ -50,6 +50,18 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
                     TameworkMountedGlideComponent::setGlideState,
                     TameworkMountedGlideComponent::getGlideState)
             .add()
+            .append(new KeyedCodec<>("AnchorX", Codec.DOUBLE),
+                    TameworkMountedGlideComponent::setAnchorX,
+                    TameworkMountedGlideComponent::getAnchorX)
+            .add()
+            .append(new KeyedCodec<>("AnchorY", Codec.DOUBLE),
+                    TameworkMountedGlideComponent::setAnchorY,
+                    TameworkMountedGlideComponent::getAnchorY)
+            .add()
+            .append(new KeyedCodec<>("AnchorZ", Codec.DOUBLE),
+                    TameworkMountedGlideComponent::setAnchorZ,
+                    TameworkMountedGlideComponent::getAnchorZ)
+            .add()
             .append(new KeyedCodec<>("MountStartMs", Codec.LONG),
                     TameworkMountedGlideComponent::setMountStartMs,
                     TameworkMountedGlideComponent::getMountStartMs)
@@ -123,6 +135,9 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     private String previousMotionController = "";
     private String glideController = DEFAULT_GLIDE_CONTROLLER;
     private String glideState = DEFAULT_GLIDE_STATE;
+    private double anchorX;
+    private double anchorY;
+    private double anchorZ;
     private long mountStartMs;
     private long lastInputAtMs;
     private boolean hasMovementIntent;
@@ -199,6 +214,12 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         setLastInputAtMs(inputAtMs);
     }
 
+    public void setAnchor(double anchorX, double anchorY, double anchorZ) {
+        setAnchorX(anchorX);
+        setAnchorY(anchorY);
+        setAnchorZ(anchorZ);
+    }
+
     public void clearInputSnapshot() {
         hasMovementIntent = false;
         forwardIntent = 0.0;
@@ -231,6 +252,12 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     }
     public String getGlideState() { return glideState; }
     public void setGlideState(String glideState) { this.glideState = sanitizeString(glideState, DEFAULT_GLIDE_STATE); }
+    public double getAnchorX() { return anchorX; }
+    public void setAnchorX(double anchorX) { this.anchorX = finiteOrZero(anchorX); }
+    public double getAnchorY() { return anchorY; }
+    public void setAnchorY(double anchorY) { this.anchorY = finiteOrZero(anchorY); }
+    public double getAnchorZ() { return anchorZ; }
+    public void setAnchorZ(double anchorZ) { this.anchorZ = finiteOrZero(anchorZ); }
     public long getMountStartMs() { return mountStartMs; }
     public void setMountStartMs(long mountStartMs) { this.mountStartMs = mountStartMs; }
     public long getLastInputAtMs() { return lastInputAtMs; }
@@ -277,6 +304,9 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         clone.previousMotionController = previousMotionController;
         clone.glideController = glideController;
         clone.glideState = glideState;
+        clone.anchorX = anchorX;
+        clone.anchorY = anchorY;
+        clone.anchorZ = anchorZ;
         clone.mountStartMs = mountStartMs;
         clone.lastInputAtMs = lastInputAtMs;
         clone.hasMovementIntent = hasMovementIntent;

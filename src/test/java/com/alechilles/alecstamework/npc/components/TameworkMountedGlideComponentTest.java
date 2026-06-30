@@ -37,6 +37,7 @@ class TameworkMountedGlideComponentTest {
         TwMountedGlideConfig config = new TwMountedGlideConfig();
         TameworkMountedGlideComponent component = new TameworkMountedGlideComponent();
         component.initializePhysicsState(config);
+        component.setAnchor(0.25, 1.5, -0.75);
         component.setVerticalVelocity(3.25);
         component.setFlapCooldownRemainingSeconds(0.5);
         component.setBoostRemainingSeconds(0.2);
@@ -55,6 +56,9 @@ class TameworkMountedGlideComponentTest {
         TameworkMountedGlideComponent clone = component.clone();
 
         assertNotSame(component, clone);
+        assertEquals(0.25, clone.getAnchorX(), 0.0001);
+        assertEquals(1.5, clone.getAnchorY(), 0.0001);
+        assertEquals(-0.75, clone.getAnchorZ(), 0.0001);
         assertEquals(18.0, clone.getGlideSpeed(), 0.0001);
         assertEquals(-1.5, clone.getVerticalVelocity(), 0.0001);
         assertEquals(0.5, clone.getFlapCooldownRemainingSeconds(), 0.0001);
@@ -87,14 +91,20 @@ class TameworkMountedGlideComponentTest {
         TameworkMountedGlideRiderComponent rider = new TameworkMountedGlideRiderComponent(" mount-uuid ");
 
         assertEquals("mount-uuid", rider.getMountUuid());
+        assertFalse(rider.isClientCameraApplied());
+        assertEquals(-1.0, rider.getClientSpeedModifier(), 0.0001);
 
         rider.setMountUuid("  ");
         assertEquals("", rider.getMountUuid());
 
         rider.setMountUuid("other-mount");
+        rider.setClientCameraApplied(true);
+        rider.setClientSpeedModifier(16.0);
         TameworkMountedGlideRiderComponent clone = rider.clone();
 
         assertNotSame(rider, clone);
         assertEquals("other-mount", clone.getMountUuid());
+        assertTrue(clone.isClientCameraApplied());
+        assertEquals(16.0, clone.getClientSpeedModifier(), 0.0001);
     }
 }

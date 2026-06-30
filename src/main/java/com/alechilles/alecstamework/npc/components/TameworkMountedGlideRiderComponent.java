@@ -22,6 +22,8 @@ public final class TameworkMountedGlideRiderComponent implements Component<Entit
     ).add().build();
 
     private String mountUuid = "";
+    private boolean clientCameraApplied;
+    private double clientSpeedModifier = -1.0;
 
     public TameworkMountedGlideRiderComponent() {
     }
@@ -43,9 +45,30 @@ public final class TameworkMountedGlideRiderComponent implements Component<Entit
         this.mountUuid = sanitizeString(mountUuid);
     }
 
+    public boolean isClientCameraApplied() {
+        return clientCameraApplied;
+    }
+
+    public void setClientCameraApplied(boolean clientCameraApplied) {
+        this.clientCameraApplied = clientCameraApplied;
+    }
+
+    public double getClientSpeedModifier() {
+        return clientSpeedModifier;
+    }
+
+    public void setClientSpeedModifier(double clientSpeedModifier) {
+        this.clientSpeedModifier = Double.isFinite(clientSpeedModifier) && clientSpeedModifier > 0.0
+                ? clientSpeedModifier
+                : -1.0;
+    }
+
     @Override
     public TameworkMountedGlideRiderComponent clone() {
-        return new TameworkMountedGlideRiderComponent(mountUuid);
+        TameworkMountedGlideRiderComponent clone = new TameworkMountedGlideRiderComponent(mountUuid);
+        clone.clientCameraApplied = clientCameraApplied;
+        clone.clientSpeedModifier = clientSpeedModifier;
+        return clone;
     }
 
     private static String sanitizeString(String value) {

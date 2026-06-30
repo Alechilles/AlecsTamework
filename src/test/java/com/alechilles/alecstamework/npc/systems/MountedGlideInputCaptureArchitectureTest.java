@@ -39,6 +39,23 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(packetHandler.contains("delegate(mouseInteractionDelegate, packet)"));
     }
 
+    @Test
+    void mountedGlideInteractionAttachesRiderAndCleanupDetachesCamera() throws IOException {
+        String interaction = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        String cleanup = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideCleanupSystem.java"
+        ));
+        String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
+
+        assertTrue(interaction.contains("glideMount.setAnchor(anchorX, anchorY, anchorZ)"));
+        assertTrue(interaction.contains("MountedRideClientAttachment.placeRiderAtMountAnchor(store, playerRef, npcRef, glideMount)"));
+        assertTrue(interaction.contains("MountedRideClientAttachment.attach(store, playerRef, npcRef, glideMount"));
+        assertTrue(cleanup.contains("MountedRideClientAttachment.detach(bufferStore, riderRef)"));
+        assertTrue(plugin.contains("new MountedGlideRiderFollowSystem("));
+    }
+
     private static String readGlideInputStack() throws IOException {
         return Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"

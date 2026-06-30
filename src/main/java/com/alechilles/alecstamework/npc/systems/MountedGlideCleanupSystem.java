@@ -121,6 +121,7 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                 bufferStore.tryRemoveComponent(mountRef, mountComponentType);
             }
             if (riderRef != null && riderRef.isValid()) {
+                MountedRideClientAttachment.detach(bufferStore, riderRef);
                 bufferStore.tryRemoveComponent(riderRef, riderComponentType);
                 bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
             }
