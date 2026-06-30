@@ -10,6 +10,8 @@ import javax.annotation.Nullable;
 
 /**
  * Caches whether each player may currently be holding a command item for the inspector HUD.
+ * Event systems and the HUD tick service may touch this tracker from different runtime paths, so
+ * access is synchronized around the shared hand-state map and candidate set.
  */
 public final class CommandTargetHudActivationTracker {
     private static final long INACTIVE_SANITY_SCAN_INTERVAL_MS = 1_000L;
@@ -17,7 +19,7 @@ public final class CommandTargetHudActivationTracker {
     private final Map<UUID, HandState> statesByPlayer = new HashMap<>();
     private final LinkedHashSet<UUID> candidatePlayers = new LinkedHashSet<>();
 
-    boolean shouldInspectPlayer(@Nullable UUID playerUuid, long nowMs) {
+    synchronized boolean shouldInspectPlayer(@Nullable UUID playerUuid, long nowMs) {
         if (playerUuid == null) {
             return false;
         }
@@ -35,7 +37,7 @@ public final class CommandTargetHudActivationTracker {
     }
 
     @Nullable
-    String cachedCommandItemId(@Nullable UUID playerUuid) {
+    synchronized String cachedCommandItemId(@Nullable UUID playerUuid) {
         if (playerUuid == null) {
             return null;
         }
@@ -43,7 +45,7 @@ public final class CommandTargetHudActivationTracker {
         return state != null && state.commandItem() ? state.activeItemId() : null;
     }
 
-    boolean isDirty(@Nullable UUID playerUuid) {
+    synchronized boolean isDirty(@Nullable UUID playerUuid) {
         if (playerUuid == null) {
             return false;
         }
@@ -51,7 +53,7 @@ public final class CommandTargetHudActivationTracker {
         return state == null || state.dirty();
     }
 
-    void markDirty(@Nullable UUID playerUuid) {
+    synchronized void markDirty(@Nullable UUID playerUuid) {
         if (playerUuid == null) {
             return;
         }
@@ -65,10 +67,10 @@ public final class CommandTargetHudActivationTracker {
         ));
     }
 
-    void recordResolvedHand(@Nullable UUID playerUuid,
-                            @Nullable String activeItemId,
-                            boolean commandItem,
-                            long nowMs) {
+    synchronized void recordResolvedHand(@Nullable UUID playerUuid,
+                                         @Nullable String activeItemId,
+                                         boolean commandItem,
+                                         long nowMs) {
         if (playerUuid == null) {
             return;
         }
@@ -80,14 +82,14 @@ public final class CommandTargetHudActivationTracker {
         statesByPlayer.put(playerUuid, new HandState(activeItemId, commandItem, false, nowMs));
     }
 
-    void remove(@Nullable UUID playerUuid) {
+    synchronized void remove(@Nullable UUID playerUuid) {
         if (playerUuid != null) {
             candidatePlayers.remove(playerUuid);
             statesByPlayer.remove(playerUuid);
         }
     }
 
-    List<UUID> candidatePlayerUuids() {
+    synchronized List<UUID> candidatePlayerUuids() {
         return List.copyOf(candidatePlayers);
     }
 

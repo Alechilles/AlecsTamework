@@ -5,6 +5,9 @@
 ### Added
 - Added a beta Tamework mounted glide controller for opt-in flying mounts, with pitch-driven glide speed and lift conversion, cooldown-gated jump flaps, sprint forward flaps, and crouch airbraking.
 
+### Fixed
+- Fixed a rare command target HUD crash that could happen when inventory or hotbar events updated player candidates while the world tick was snapshotting them.
+
 ## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 
 ### Changed
