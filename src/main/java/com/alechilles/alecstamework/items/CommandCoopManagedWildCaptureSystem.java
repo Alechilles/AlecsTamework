@@ -41,7 +41,6 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -327,6 +326,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         ArrayList<ManagedCoopContext> out = new ArrayList<>();
         ComponentType<ChunkStore, ?> itemContainerType = resolveItemContainerComponentType();
         ComponentType<ChunkStore, ?> coopType = resolveCoopBlockComponentType();
+        ComponentType<ChunkStore, ?> infoType = resolveBlockStateInfoComponentType();
         if (itemContainerType == null && coopType == null) {
             diagnostics.containerTypeMissing = true;
             if (!missingScanComponentTypeWarningLogged) {
@@ -339,12 +339,24 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             }
             return out;
         }
+        if (infoType == null) {
+            diagnostics.containerTypeMissing = true;
+            if (!missingScanComponentTypeWarningLogged) {
+                missingScanComponentTypeWarningLogged = true;
+                LOGGER.log(
+                        Level.WARNING,
+                        "Managed coop runtime could not resolve block state info component type; "
+                                + "capture/release scans are disabled."
+                );
+            }
+            return out;
+        }
         HashSet<String> seen = new HashSet<>();
         if (itemContainerType != null) {
-            scanManagedCoopsByComponentType(chunkStore, itemContainerType, world, seen, out, diagnostics);
+            scanManagedCoopsByComponentType(chunkStore, itemContainerType, infoType, world, seen, out, diagnostics);
         }
         if (coopType != null && coopType != itemContainerType) {
-            scanManagedCoopsByComponentType(chunkStore, coopType, world, seen, out, diagnostics);
+            scanManagedCoopsByComponentType(chunkStore, coopType, infoType, world, seen, out, diagnostics);
         }
         if (itemContainerType != null || coopType != null) {
             missingScanComponentTypeWarningLogged = false;
@@ -354,20 +366,22 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
     private void scanManagedCoopsByComponentType(@Nonnull Store<ChunkStore> chunkStore,
                                                  @Nonnull ComponentType<ChunkStore, ?> blockStateType,
+                                                 @Nonnull ComponentType<ChunkStore, ?> infoType,
                                                  @Nonnull World world,
                                                  @Nonnull Set<String> seen,
                                                  @Nonnull ArrayList<ManagedCoopContext> out,
                                                  @Nonnull CoopScanDiagnostics diagnostics) {
         chunkStore.forEachChunk(
-                Query.and(castComponentTypeUnchecked(blockStateType)),
+                Query.and(castComponentTypeUnchecked(blockStateType), castComponentTypeUnchecked(infoType)),
                 (ArchetypeChunk<ChunkStore> chunk, CommandBuffer<ChunkStore> commandBuffer) ->
-                        collectManagedCoopsFromChunk(chunkStore, chunk, blockStateType, world, seen, out, diagnostics)
+                        collectManagedCoopsFromChunk(chunkStore, chunk, blockStateType, infoType, world, seen, out, diagnostics)
         );
     }
 
     private void collectManagedCoopsFromChunk(@Nonnull Store<ChunkStore> chunkStore,
                                               @Nonnull ArchetypeChunk<ChunkStore> chunk,
                                               @Nonnull ComponentType<ChunkStore, ?> blockStateType,
+                                              @Nonnull ComponentType<ChunkStore, ?> infoType,
                                               @Nonnull World world,
                                               @Nonnull Set<String> seen,
                                               @Nonnull ArrayList<ManagedCoopContext> out,
@@ -386,7 +400,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 continue;
             }
             diagnostics.withContainerState++;
-            CoopLocation location = resolveCoopLocation(reference, chunkStore);
+            Object info = chunk.getComponent(i, castComponentType(infoType));
+            CoopLocation location = resolveCoopLocation(info, chunkStore);
             if (location == null || location.blockTypeId() == null) {
                 diagnostics.missingLocation++;
                 continue;
@@ -1406,16 +1421,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     @Nullable
-    private CoopLocation resolveCoopLocation(@Nonnull Ref<ChunkStore> reference,
+    private CoopLocation resolveCoopLocation(@Nullable Object info,
                                              @Nonnull Store<ChunkStore> chunkStore) {
-        if (!reference.isValid()) {
-            return null;
-        }
-        ComponentType<ChunkStore, ?> infoType = resolveBlockStateInfoComponentType();
-        if (infoType == null) {
-            return null;
-        }
-        Object info = safeGetChunkComponent(chunkStore, reference, castComponentType(infoType));
         if (info == null) {
             return null;
         }
@@ -1530,6 +1537,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             @Nonnull Ref<ChunkStore> reference,
             @Nonnull ComponentType<ChunkStore, T> componentType
     ) {
+        if (!reference.isValid()) {
+            return null;
+        }
         try {
             return chunkStore.getComponent(reference, componentType);
         } catch (IllegalStateException ignored) {
@@ -1636,12 +1646,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
     @Nullable
     private Object invokeNoArg(@Nonnull Object target, @Nonnull String methodName) {
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
+        return TameworkReflectionAccessCache.invokeNoArg(target, methodName);
     }
 
     @Nullable
@@ -1745,19 +1750,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
     @Nullable
     private Object readField(@Nonnull Object target, @Nonnull String fieldName) {
-        Class<?> type = target.getClass();
-        while (type != null) {
-            try {
-                Field field = type.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return field.get(target);
-            } catch (NoSuchFieldException ignored) {
-                type = type.getSuperclass();
-            } catch (ReflectiveOperationException | SecurityException ignored) {
-                return null;
-            }
-        }
-        return null;
+        return TameworkReflectionAccessCache.readField(target, fieldName);
     }
 
     @Nullable

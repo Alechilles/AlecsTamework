@@ -6,6 +6,7 @@
 - Added a beta Tamework mounted glide controller for opt-in flying mounts, with pitch-driven glide speed and lift conversion, cooldown-gated jump flaps, sprint forward flaps, and crouch airbraking.
 
 ### Fixed
+- Fixed managed coop scans so optional block-state reflection misses are cached instead of throwing repeatedly on the world tick thread, and reduced stale-ref noise while resolving coop block locations.
 - Fixed a rare command target HUD crash that could happen when inventory or hotbar events updated player candidates while the world tick was snapshotting them.
 - Fixed command target HUD tame requirements showing one required tranquilizer stack even when the NPC role required more.
 - Fixed beta mounted glide mounts to use Hytale's native NPC mount attachment plus rider movement/head state, so riders stay attached to the dragon while glide physics controls the mount.
