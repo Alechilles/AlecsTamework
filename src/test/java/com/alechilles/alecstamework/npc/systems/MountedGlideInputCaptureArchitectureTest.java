@@ -44,8 +44,12 @@ class MountedGlideInputCaptureArchitectureTest {
         String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
         String source = readGlideInputStack();
 
-        assertTrue(interaction.contains("new MountedComponent(npcRef"));
-        assertTrue(interaction.contains("MountController.Minecart"));
+        assertTrue(interaction.contains("NPCMountComponent.getComponentType()"));
+        assertTrue(interaction.contains("store.ensureAndGetComponent(npcRef, npcMountType)"));
+        assertTrue(interaction.contains("npcMount.setOwnerPlayerRef(playerRefComponent)"));
+        assertTrue(interaction.contains("npcMount.setAnchor(anchorX, anchorY, anchorZ)"));
+        assertFalse(interaction.contains("new MountedComponent(npcRef"));
+        assertFalse(interaction.contains("MountController.Minecart"));
         assertFalse(interaction.contains("MountedGlidePacketHandler"));
         assertFalse(plugin.contains("MountedGlidePacketHandler::new"));
         assertFalse(source.contains("MountedGlidePacketHandler"));
@@ -57,13 +61,17 @@ class MountedGlideInputCaptureArchitectureTest {
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
         ));
 
-        assertTrue(inputCapture.contains("Order.BEFORE, MountSystems.HandleMountInput.class"));
-        assertTrue(inputCapture.contains("Query.and(playerInputComponentType, riderComponentType, mountedComponentType)"));
-        assertTrue(inputCapture.contains("PlayerInput.SetRiderMovementStates"));
-        assertTrue(inputCapture.contains("PlayerInput.SetHead"));
-        assertTrue(inputCapture.contains("PlayerInput.SetBody"));
-        assertTrue(inputCapture.contains("shouldConsumeBeforeVanillaMountHandling"));
-        assertTrue(inputCapture.contains("inputIterator.remove()"));
+        assertTrue(inputCapture.contains("MovementStatesComponent"));
+        assertTrue(inputCapture.contains("HeadRotation"));
+        assertTrue(inputCapture.contains("Order.BEFORE, com.hypixel.hytale.server.npc.systems.RoleSystems.BehaviourTickSystem.class"));
+        assertTrue(inputCapture.contains("Query.and(mountComponentType, npcMountComponentType)"));
+        assertTrue(inputCapture.contains("states.jumping || states.swimJumping"));
+        assertTrue(inputCapture.contains("states.sprinting || states.running"));
+        assertTrue(inputCapture.contains("states.crouching || states.forcedCrouching"));
+        assertTrue(inputCapture.contains("Math.toDegrees"));
+        assertFalse(inputCapture.contains("PlayerInput"));
+        assertFalse(inputCapture.contains("MountSystems.HandleMountInput"));
+        assertFalse(inputCapture.contains("inputIterator.remove()"));
         assertFalse(inputCapture.contains("playerInput.setMountId(0)"));
         assertFalse(inputCapture.contains("queue.clear()"));
     }
@@ -74,10 +82,12 @@ class MountedGlideInputCaptureArchitectureTest {
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideCleanupSystem.java"
         ));
 
-        assertTrue(cleanup.contains("nativeMountStillLinkedTo"));
-        assertTrue(cleanup.contains("store.getComponent(riderRef, mountedComponentType)"));
-        assertTrue(cleanup.contains("mounted.getMountedToEntity()"));
-        assertTrue(cleanup.contains("bufferStore.tryRemoveComponent(riderRef, mountedComponentType)"));
+        assertTrue(cleanup.contains("MountPlugin.checkDismountNpc(bufferStore, riderRef, player)"));
+        assertTrue(cleanup.contains("bufferStore.tryRemoveComponent(mountRef, npcMountComponentType)"));
+        assertTrue(cleanup.contains("bufferStore.ensureAndGetComponent(mountRef, Interactable.getComponentType())"));
+        assertTrue(cleanup.contains("npcMountStillLinkedToRider"));
+        assertFalse(cleanup.contains("mountedComponentType"));
+        assertFalse(cleanup.contains("mounted.getMountedToEntity()"));
     }
 
     private static String readGlideInputStack() throws IOException {

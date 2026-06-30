@@ -174,6 +174,7 @@ import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
@@ -637,6 +638,27 @@ public class Tamework extends JavaPlugin {
                     )
             );
             getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
+            getEntityStoreRegistry().registerSystem(
+                    new MountedGlideInputCaptureSystem(
+                            npcMountComponentType,
+                            MovementStatesComponent.getComponentType(),
+                            HeadRotation.getComponentType(),
+                            mountedGlideRiderComponentType,
+                            mountedGlideComponentType,
+                            UUIDComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedGlideCleanupSystem(
+                            npcMountComponentType,
+                            mountedGlideRiderComponentType,
+                            mountedGlideComponentType,
+                            UUIDComponent.getComponentType(),
+                            NPCEntity.getComponentType(),
+                            Player.getComponentType(),
+                            DeathComponent.getComponentType()
+                    )
+            );
         }
         ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
         if (mountedComponentType == null) {
@@ -662,25 +684,6 @@ public class Tamework extends JavaPlugin {
                             UUIDComponent.getComponentType(),
                             NPCEntity.getComponentType(),
                             TransformComponent.getComponentType(),
-                            DeathComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedGlideInputCaptureSystem(
-                            mountedComponentType,
-                            PlayerInput.getComponentType(),
-                            mountedGlideRiderComponentType,
-                            mountedGlideComponentType,
-                            UUIDComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedGlideCleanupSystem(
-                            mountedComponentType,
-                            mountedGlideRiderComponentType,
-                            mountedGlideComponentType,
-                            UUIDComponent.getComponentType(),
-                            NPCEntity.getComponentType(),
                             DeathComponent.getComponentType()
                     )
             );
