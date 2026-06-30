@@ -137,7 +137,6 @@ import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTranquilizerPeakSystem;
 import com.alechilles.alecstamework.npc.systems.FlyingCompanionControlSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
-import com.alechilles.alecstamework.npc.network.MountedGlidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedGlideCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlideInputCaptureSystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
@@ -398,7 +397,6 @@ public class Tamework extends JavaPlugin {
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
         assetPatchService.registerLoadHook();
         ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
-        ServerManager.get().registerSubPacketHandlers(MountedGlidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         // Register the custom item interaction used by naming items.

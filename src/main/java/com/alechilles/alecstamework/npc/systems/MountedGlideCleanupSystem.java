@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
-import com.alechilles.alecstamework.npc.network.MountedGlidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -80,7 +79,10 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
         boolean linkMismatch = riderRef != null
                 && riderRef.isValid()
                 && !riderStillLinkedTo(riderRef, mountRef, store);
-        if (mountDead || riderMissing || riderInvalid || riderDead || linkMismatch) {
+        boolean nativeMountMismatch = riderRef != null
+                && riderRef.isValid()
+                && !nativeMountStillLinkedTo(riderRef, mountRef, store);
+        if (mountDead || riderMissing || riderInvalid || riderDead || linkMismatch || nativeMountMismatch) {
             cleanupGlide(mountRef, riderRef, npc, mount, commandBuffer);
         }
     }
@@ -109,13 +111,27 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
         return mountUuid != null && mountUuid.getUuid() != null && rider.getMountUuid().equals(mountUuid.getUuid().toString());
     }
 
+    private boolean nativeMountStillLinkedTo(@Nonnull Ref<EntityStore> riderRef,
+                                             @Nonnull Ref<EntityStore> mountRef,
+                                             @Nonnull Store<EntityStore> store) {
+        MountedComponent mounted = store.getComponent(riderRef, mountedComponentType);
+        if (mounted == null || mounted.getMountedToEntity() == null || !mounted.getMountedToEntity().isValid()) {
+            return false;
+        }
+        UUIDComponent expectedMountUuid = store.getComponent(mountRef, uuidComponentType);
+        UUIDComponent actualMountUuid = store.getComponent(mounted.getMountedToEntity(), uuidComponentType);
+        return expectedMountUuid != null
+                && actualMountUuid != null
+                && expectedMountUuid.getUuid() != null
+                && expectedMountUuid.getUuid().equals(actualMountUuid.getUuid());
+    }
+
     private void cleanupGlide(@Nonnull Ref<EntityStore> mountRef,
                               @Nullable Ref<EntityStore> riderRef,
                               @Nonnull NPCEntity npc,
                               @Nonnull TameworkMountedGlideComponent mount,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         commandBuffer.run(bufferStore -> {
-            MountedGlidePacketHandler.unregisterGlide(mount.getRiderUuid());
             if (mountRef.isValid()) {
                 restoreNpcState(mountRef, npc, mount, bufferStore);
                 bufferStore.tryRemoveComponent(mountRef, mountComponentType);

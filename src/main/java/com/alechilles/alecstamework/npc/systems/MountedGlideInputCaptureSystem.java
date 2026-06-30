@@ -21,6 +21,7 @@ import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -52,7 +53,7 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
         this.riderComponentType = riderComponentType;
         this.mountComponentType = mountComponentType;
         this.uuidComponentType = uuidComponentType;
-        this.query = Query.and(playerInputComponentType, riderComponentType);
+        this.query = Query.and(playerInputComponentType, riderComponentType, mountedComponentType);
     }
 
     @Override
@@ -78,20 +79,23 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
             clearStaleState(riderRef, commandBuffer);
             return;
         }
-        playerInput.setMountId(0);
         List<PlayerInput.InputUpdate> queue = playerInput.getMovementUpdateQueue();
         if (queue.isEmpty()) {
             return;
         }
         long now = System.currentTimeMillis();
         boolean captured = false;
-        for (PlayerInput.InputUpdate inputUpdate : queue) {
+        ListIterator<PlayerInput.InputUpdate> inputIterator = queue.listIterator();
+        while (inputIterator.hasNext()) {
+            PlayerInput.InputUpdate inputUpdate = inputIterator.next();
             captured |= captureInputUpdate(mount, inputUpdate, now);
+            if (shouldConsumeBeforeVanillaMountHandling(inputUpdate)) {
+                inputIterator.remove();
+            }
         }
         if (captured) {
             commandBuffer.putComponent(mountRef, mountComponentType, mount);
         }
-        queue.clear();
     }
 
     private boolean captureInputUpdate(@Nonnull TameworkMountedGlideComponent mount,
@@ -126,6 +130,15 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
             return true;
         }
         return false;
+    }
+
+    private boolean shouldConsumeBeforeVanillaMountHandling(@Nonnull PlayerInput.InputUpdate inputUpdate) {
+        return inputUpdate instanceof PlayerInput.WishMovement
+                || inputUpdate instanceof PlayerInput.RelativeMovement
+                || inputUpdate instanceof PlayerInput.AbsoluteMovement
+                || inputUpdate instanceof PlayerInput.SetBody
+                || inputUpdate instanceof PlayerInput.SetMovementStates
+                || inputUpdate instanceof PlayerInput.SetRiderMovementStates;
     }
 
     private void captureWish(@Nonnull TameworkMountedGlideComponent mount, double strafe, double forward, long now) {
@@ -185,11 +198,8 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
             return;
         }
         commandBuffer.run(bufferStore -> {
-            UUIDComponent riderUuid = bufferStore.getComponent(riderRef, uuidComponentType);
-            if (riderUuid != null && riderUuid.getUuid() != null) {
-                com.alechilles.alecstamework.npc.network.MountedGlidePacketHandler.unregisterGlide(riderUuid.getUuid());
-            }
             bufferStore.tryRemoveComponent(riderRef, riderComponentType);
+            bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
         });
     }
 

@@ -6,7 +6,6 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
-import com.alechilles.alecstamework.npc.network.MountedGlidePacketHandler;
 import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
@@ -15,6 +14,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.AnimationSlot;
+import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
@@ -22,6 +22,7 @@ import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementMa
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.PhysicsValues;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -132,17 +133,18 @@ final class InteractionMountEffects {
                 TameworkMountedGlideComponent.getComponentType();
         ComponentType<EntityStore, TameworkMountedGlideRiderComponent> glideRiderType =
                 TameworkMountedGlideRiderComponent.getComponentType();
-        if (glideMountType == null || glideRiderType == null) {
+        ComponentType<EntityStore, MountedComponent> mountedType = MountedComponent.getComponentType();
+        if (glideMountType == null || glideRiderType == null || mountedType == null) {
             return false;
         }
         UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
         UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
-        PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
         NPCEntity npcComponent = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npcUuid == null || riderUuid == null || npcComponent == null) {
             return false;
         }
-        if (store.getComponent(npcRef, glideMountType) != null
+        if (store.getComponent(playerRef, mountedType) != null
+                || store.getComponent(npcRef, glideMountType) != null
                 || store.getComponent(playerRef, glideRiderType) != null) {
             return false;
         }
@@ -172,13 +174,15 @@ final class InteractionMountEffects {
 
         TameworkMountedGlideRiderComponent glideRider =
                 new TameworkMountedGlideRiderComponent(npcUuid.getUuid().toString());
+        float anchorX = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_X_PARAM, 0.0);
+        float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
+        float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
         store.putComponent(npcRef, glideMountType, glideMount);
         store.putComponent(playerRef, glideRiderType, glideRider);
-        MountedGlidePacketHandler.registerGlide(
-                playerRefComponent == null ? null : playerRefComponent.getUuid(),
-                riderUuid.getUuid(),
-                npcUuid.getUuid(),
-                store.getExternalData().getWorld()
+        store.putComponent(
+                playerRef,
+                mountedType,
+                new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)
         );
         clearStatusAnimation(npcRef, npcComponent, store);
         role.setActiveMotionController(npcRef, npcComponent, glideController, store);
