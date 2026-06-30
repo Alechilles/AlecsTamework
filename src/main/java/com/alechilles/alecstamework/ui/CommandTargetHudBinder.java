@@ -38,7 +38,7 @@ final class CommandTargetHudBinder {
     private static final int FOOD_ROW_FAVORITE_WIDTH = 112;
     private static final int FOOD_ROW_STRIP_WIDTH = 168;
     private static final int TAME_REQUIREMENT_WIDTH = 116;
-    private static final int TAME_REQUIREMENT_HEIGHT = 40;
+    private static final int TAME_REQUIREMENT_HEIGHT = 52;
     private static final int ATTACHMENT_ROW_HEIGHT = 18;
     private static final int OWNER_ROW_WIDTH = 180;
     private static final int OWNER_ROW_HEIGHT = 18;
@@ -385,15 +385,17 @@ final class CommandTargetHudBinder {
             return;
         }
         String value = LocalizedText.format(language, "tamework.ui.commandTargetHud.tameRequirement.stacks", row.requiredStacks());
-        if (row.currentStacksText() != null && !row.currentStacksText().isBlank()) {
-            value = value + " " + LocalizedText.format(
-                    language,
-                    "tamework.ui.commandTargetHud.tameRequirement.current",
-                    row.currentStacksText()
-            );
-        }
+        String current = row.currentStacksText() != null && !row.currentStacksText().isBlank()
+                ? LocalizedText.format(
+                        language,
+                        "tamework.ui.commandTargetHud.tameRequirement.current",
+                        row.currentStacksText()
+                )
+                : "";
         commandBuilder.set("#TameRequirementLabel.Text", LocalizedText.resolve(language, "tamework.ui.commandTargetHud.tameRequirement"));
         commandBuilder.set("#TameRequirementValue.Text", value);
+        commandBuilder.set("#TameRequirementCurrent.Visible", !current.isBlank());
+        commandBuilder.set("#TameRequirementCurrent.Text", current);
     }
 
     private static void bindOwner(@Nonnull UICommandBuilder commandBuilder,

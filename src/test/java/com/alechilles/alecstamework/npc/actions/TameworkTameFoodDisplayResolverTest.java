@@ -204,6 +204,28 @@ class TameworkTameFoodDisplayResolverTest {
         Assertions.assertEquals(80.0, seconds);
     }
 
+    @Test
+    void roleParameterThresholdBeatsStateRequirementFallbackWhenLiveRoleScopeMissing() throws Exception {
+        StdScope liveScope = new StdScope(null);
+        StdScope roleParameterScope = new StdScope(null);
+        roleParameterScope.addConst("TranquilizerSleepThresholdSeconds", 110.0);
+        Role role = newRoleWithScope(liveScope);
+        TwInteractionConfig.StringRequirement state = new TwInteractionConfig.StringRequirement();
+        setField(TwInteractionConfig.StringRequirement.class, state, "state", "Sleep");
+        setField(TwInteractionConfig.StringRequirement.class, state, "subState", "Tranquilized");
+        TwInteractionConfig.RequirementBucket bucket = new TwInteractionConfig.RequirementBucket();
+        setField(TwInteractionConfig.RequirementBucket.class, bucket, "npcState", new TwInteractionConfig.StringRequirement[] { state });
+        TwInteractionConfig.RequirementGroup group = new TwInteractionConfig.RequirementGroup();
+        setField(TwInteractionConfig.RequirementGroup.class, group, "all", bucket);
+        TwInteractionConfig.TameInteraction tame = new TwInteractionConfig.TameInteraction();
+        setField(TwInteractionConfig.InteractionEntry.class, tame, "requires", group);
+
+        double seconds = new TameworkTameFoodDisplayResolver("AttractiveItemSet")
+                .resolveRequiredTranquilizerSeconds(role, configWith(tame), roleParameterScope);
+
+        Assertions.assertEquals(110.0, seconds);
+    }
+
     private static TwInteractionConfig configWith(TwInteractionConfig.InteractionEntry... interactions) throws Exception {
         TwInteractionConfig config = (TwInteractionConfig) getUnsafe().allocateInstance(TwInteractionConfig.class);
         setField(TwInteractionConfig.class, config, "enabled", true);

@@ -33,6 +33,8 @@ class CommandTargetHudBinderTest {
         Assertions.assertTrue(source.contains("selector + \".Visible\""));
         Assertions.assertTrue(source.contains("#Text.Text"));
         Assertions.assertTrue(source.contains("#TameRequirementRow.Visible"));
+        Assertions.assertTrue(source.contains("#TameRequirementCurrent.Visible"));
+        Assertions.assertTrue(source.contains("#TameRequirementCurrent.Text"));
         Assertions.assertTrue(source.contains("LinkedNpcPanelVitalsBinder.bind"));
         Assertions.assertTrue(source.contains("HEALTH_FILL_MAX_WIDTH = 230"));
         Assertions.assertTrue(source.contains("LinkedNpcPanelVitalsBinder.bind(commandBuilder, \"#Root\", status, language, HEALTH_FILL_MAX_WIDTH)"));
@@ -79,6 +81,8 @@ class CommandTargetHudBinderTest {
         Assertions.assertTrue(ui.contains("AttachmentRow5"));
         Assertions.assertTrue(ui.contains("Label #Text"));
         Assertions.assertTrue(ui.contains("TameRequirementRow"));
+        Assertions.assertTrue(ui.contains("TameRequirementCurrent"));
+        Assertions.assertTrue(ui.contains("Anchor: (Top: 0, Right: 0, Width: 116, Height: 52);"));
         Assertions.assertTrue(ui.contains("HealthText"));
         Assertions.assertTrue(ui.contains("HealthTextShadow"));
         Assertions.assertTrue(ui.contains("HealthTooltip"));
@@ -155,6 +159,22 @@ class CommandTargetHudBinderTest {
         Assertions.assertTrue(layout.ownerVisible());
         Assertions.assertEquals(62, layout.ownerTop());
         Assertions.assertEquals(102, layout.rootHeight());
+    }
+
+    @Test
+    void tameRequirementRowUsesEnoughHeightForCurrentStackText() {
+        CommandTargetHudBinder.Layout layout = CommandTargetHudBinder.resolveLayout(new CommandTargetHudViewModel(
+                unloadedStatus("Wolf"),
+                new CommandTargetHudViewModel.FoodRow("Food_Wildmeat_Raw", "Raw Wildmeat", null, 6.0),
+                List.of(),
+                List.of(),
+                new CommandTargetHudViewModel.TameRequirementRow(true, 4, "2 (42s)"),
+                null
+        ));
+
+        Assertions.assertEquals(62, layout.foodTameTop());
+        Assertions.assertEquals(52, layout.foodTameHeight());
+        Assertions.assertEquals(136, layout.rootHeight());
     }
 
     private static LinkedNpcEntry unloadedStatus(String displayName) {

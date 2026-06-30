@@ -8,7 +8,11 @@ import com.alechilles.alecstamework.npc.progression.TranquilizerStackDisplayServ
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.asset.builder.Builder;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -140,15 +144,23 @@ public final class TameworkTameFoodDisplayResolver {
 
     public double resolveRequiredTranquilizerSeconds(@Nullable String roleId, @Nullable Role role) {
         TwInteractionConfig config = TwInteractionConfig.resolveForRole(roleId);
-        return resolveRequiredTranquilizerSecondsInternal(role, config);
+        return resolveRequiredTranquilizerSecondsInternal(role, config, resolveRoleParameterScope(roleId));
     }
 
     double resolveRequiredTranquilizerSeconds(@Nullable Role role, @Nullable TwInteractionConfig config) {
-        return resolveRequiredTranquilizerSecondsInternal(role, config);
+        return resolveRequiredTranquilizerSecondsInternal(role, config, null);
     }
 
-    private double resolveRequiredTranquilizerSecondsInternal(@Nullable Role role, @Nullable TwInteractionConfig config) {
-        InteractionParamResolver paramResolver = new InteractionParamResolver(null, null, null);
+    double resolveRequiredTranquilizerSeconds(@Nullable Role role,
+                                              @Nullable TwInteractionConfig config,
+                                              @Nullable StdScope roleParameterScope) {
+        return resolveRequiredTranquilizerSecondsInternal(role, config, roleParameterScope);
+    }
+
+    private double resolveRequiredTranquilizerSecondsInternal(@Nullable Role role,
+                                                             @Nullable TwInteractionConfig config,
+                                                             @Nullable StdScope roleParameterScope) {
+        InteractionParamResolver paramResolver = new InteractionParamResolver(roleParameterScope, null, null, null);
         InteractionContextSnapshot ctx = InteractionContextSnapshot.from(null, paramResolver.resolveRoleScopes(role, null));
         double requiredSeconds = Math.max(
                 0.0,
@@ -164,6 +176,28 @@ public final class TameworkTameFoodDisplayResolver {
             requiredSeconds = Math.max(requiredSeconds, resolveRequiredTranquilizerSeconds(entry.getRequires()));
         }
         return requiredSeconds;
+    }
+
+    @Nullable
+    private static StdScope resolveRoleParameterScope(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        try {
+            NPCPlugin npcPlugin = NPCPlugin.get();
+            if (npcPlugin == null) {
+                return null;
+            }
+            int roleIndex = npcPlugin.getIndex(roleId.trim());
+            if (roleIndex < 0) {
+                return null;
+            }
+            Builder<Role> roleBuilder = npcPlugin.tryGetCachedValidRole(roleIndex);
+            BuilderParameters builderParameters = roleBuilder != null ? roleBuilder.getBuilderParameters() : null;
+            return builderParameters != null ? builderParameters.createScope() : null;
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
     }
 
     @Nonnull

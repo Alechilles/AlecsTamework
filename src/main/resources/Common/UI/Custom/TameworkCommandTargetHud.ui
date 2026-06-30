@@ -250,10 +250,11 @@ Group #Root {
         }
 
         Group #TameRequirementRow {
-            Anchor: (Top: 0, Right: 0, Width: 116, Height: 40);
+            Anchor: (Top: 0, Right: 0, Width: 116, Height: 52);
             Visible: false;
             Label #TameRequirementLabel { Anchor: (Top: 2, Left: 0, Width: 116, Height: 14); Text: ""; Style: (FontSize: 10, RenderBold: true, TextColor: #ffc4c4, HorizontalAlignment: Start, VerticalAlignment: Center); }
-            Label #TameRequirementValue { Anchor: (Top: 16, Left: 0, Width: 116, Height: 20); Text: ""; Style: (FontSize: 10, TextColor: #ffe7e7, HorizontalAlignment: Start, VerticalAlignment: Center); }
+            Label #TameRequirementValue { Anchor: (Top: 16, Left: 0, Width: 116, Height: 16); Text: ""; Style: (FontSize: 10, TextColor: #ffe7e7, HorizontalAlignment: Start, VerticalAlignment: Center); }
+            Label #TameRequirementCurrent { Anchor: (Top: 32, Left: 0, Width: 116, Height: 16); Text: ""; Visible: false; Style: (FontSize: 10, TextColor: #ffe7e7, HorizontalAlignment: Start, VerticalAlignment: Center); }
         }
     }
 
