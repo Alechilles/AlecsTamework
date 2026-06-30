@@ -8,7 +8,6 @@
 ### Fixed
 - Fixed a rare command target HUD crash that could happen when inventory or hotbar events updated player candidates while the world tick was snapshotting them.
 - Fixed command target HUD tame requirements showing one required tranquilizer stack even when the NPC role required more.
-- Fixed beta mounted glide mounts so riders attach to the mount camera anchor instead of controlling the mount while left behind.
 
 ## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 

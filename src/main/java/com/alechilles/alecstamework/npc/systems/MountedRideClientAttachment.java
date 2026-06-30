@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
-import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -53,43 +52,6 @@ public final class MountedRideClientAttachment {
                                  @Nonnull Ref<EntityStore> mountRef,
                                  @Nonnull TameworkRideMountComponent mount,
                                  double speedModifier) {
-        return attach(
-                store,
-                riderRef,
-                mountRef,
-                mount.getAnchorX(),
-                mount.getAnchorY(),
-                mount.getAnchorZ(),
-                resolveCameraRotation(mount),
-                speedModifier
-        );
-    }
-
-    public static boolean attach(@Nonnull Store<EntityStore> store,
-                                 @Nonnull Ref<EntityStore> riderRef,
-                                 @Nonnull Ref<EntityStore> mountRef,
-                                 @Nonnull TameworkMountedGlideComponent mount,
-                                 double speedModifier) {
-        return attach(
-                store,
-                riderRef,
-                mountRef,
-                mount.getAnchorX(),
-                mount.getAnchorY(),
-                mount.getAnchorZ(),
-                resolveCameraRotation(mount),
-                speedModifier
-        );
-    }
-
-    private static boolean attach(@Nonnull Store<EntityStore> store,
-                                  @Nonnull Ref<EntityStore> riderRef,
-                                  @Nonnull Ref<EntityStore> mountRef,
-                                  double anchorX,
-                                  double anchorY,
-                                  double anchorZ,
-                                  @Nonnull Direction rotation,
-                                  double speedModifier) {
         // This proof path deliberately avoids all native mount identity. MountNPC/player.mountEntityId
         // re-enter the client ground-mount controller and override Tamework flight.
         PlayerInput playerInput = store.getComponent(riderRef, PlayerInput.getComponentType());
@@ -104,7 +66,7 @@ public final class MountedRideClientAttachment {
         if (mountNetworkId == null) {
             return false;
         }
-        return sendRideCamera(player, mountNetworkId.getId(), anchorX, anchorY, anchorZ, rotation, speedModifier);
+        return sendRideCamera(player, mountNetworkId.getId(), mount, speedModifier);
     }
 
     public static boolean updateCamera(@Nonnull Store<EntityStore> store,
@@ -118,27 +80,6 @@ public final class MountedRideClientAttachment {
         return sendRideCamera(player, riderMount.mountNetworkId(), riderMount.mount(), speedModifier);
     }
 
-    public static boolean updateCamera(@Nonnull Store<EntityStore> store,
-                                       @Nonnull Ref<EntityStore> riderRef,
-                                       @Nonnull Ref<EntityStore> mountRef,
-                                       @Nonnull TameworkMountedGlideComponent mount,
-                                       double speedModifier) {
-        Player player = store.getComponent(riderRef, Player.getComponentType());
-        NetworkId mountNetworkId = store.getComponent(mountRef, NetworkId.getComponentType());
-        if (player == null || mountNetworkId == null) {
-            return false;
-        }
-        return sendRideCamera(
-                player,
-                mountNetworkId.getId(),
-                mount.getAnchorX(),
-                mount.getAnchorY(),
-                mount.getAnchorZ(),
-                resolveCameraRotation(mount),
-                speedModifier
-        );
-    }
-
     private static boolean sendRideCamera(@Nonnull Player player,
                                           int mountEntityId,
                                           @Nonnull TameworkRideMountComponent mount,
@@ -146,41 +87,17 @@ public final class MountedRideClientAttachment {
         if (player.getPlayerRef() == null || player.getPlayerRef().getPacketHandler() == null) {
             return false;
         }
-        return sendRideCamera(
-                player,
-                mountEntityId,
-                mount.getAnchorX(),
-                mount.getAnchorY(),
-                mount.getAnchorZ(),
-                resolveCameraRotation(mount),
-                speedModifier
-        );
-    }
-
-    private static boolean sendRideCamera(@Nonnull Player player,
-                                          int mountEntityId,
-                                          double anchorX,
-                                          double anchorY,
-                                          double anchorZ,
-                                          @Nonnull Direction rotation,
-                                          double speedModifier) {
-        if (player.getPlayerRef() == null || player.getPlayerRef().getPacketHandler() == null) {
-            return false;
-        }
         player.getPlayerRef().getPacketHandler().writeNoCache(new SetServerCamera(
                 ClientCameraView.Custom,
                 false,
-                createRideCameraSettings(mountEntityId, anchorX, anchorY, anchorZ, rotation, speedModifier)
+                createRideCameraSettings(mountEntityId, mount, speedModifier)
         ));
         return true;
     }
 
     @Nonnull
     private static ServerCameraSettings createRideCameraSettings(int mountEntityId,
-                                                                 double anchorX,
-                                                                 double anchorY,
-                                                                 double anchorZ,
-                                                                 @Nonnull Direction rotation,
+                                                                 @Nonnull TameworkRideMountComponent mount,
                                                                  double speedModifier) {
         ServerCameraSettings settings = new ServerCameraSettings();
         settings.positionLerpSpeed = 1.0f;
@@ -199,14 +116,14 @@ public final class MountedRideClientAttachment {
         settings.eyeOffset = false;
         settings.positionDistanceOffsetType = PositionDistanceOffsetType.None;
         settings.positionOffset = new com.hypixel.hytale.protocol.Position(
-                anchorX,
-                anchorY + RIDE_CAMERA_EYE_HEIGHT,
-                anchorZ
+                mount.getAnchorX(),
+                mount.getAnchorY() + RIDE_CAMERA_EYE_HEIGHT,
+                mount.getAnchorZ()
         );
         settings.positionType = PositionType.AttachedToPlusOffset;
         settings.position = new com.hypixel.hytale.protocol.Position(0.0, 0.0, 0.0);
         settings.rotationType = RotationType.Custom;
-        settings.rotation = rotation;
+        settings.rotation = resolveCameraRotation(mount);
         settings.canMoveType = CanMoveType.Always;
         settings.applyMovementType = ApplyMovementType.CharacterController;
         settings.applyLookType = ApplyLookType.Rotation;
@@ -230,34 +147,17 @@ public final class MountedRideClientAttachment {
         return new Direction(0.0f, 0.0f, 0.0f);
     }
 
-    @Nonnull
-    private static Direction resolveCameraRotation(@Nonnull TameworkMountedGlideComponent mount) {
-        if (mount.hasLookRotation()) {
-            return new Direction(mount.getLookYawDegrees(), mount.getLookPitchDegrees(), mount.getLookRollDegrees());
-        }
-        return new Direction(0.0f, 0.0f, 0.0f);
-    }
-
     public static void placeRiderAtMountAnchor(@Nonnull ComponentAccessor<EntityStore> accessor,
                                                @Nonnull Ref<EntityStore> riderRef,
                                                @Nonnull Ref<EntityStore> mountRef,
                                                @Nonnull TameworkRideMountComponent mount) {
-        moveRiderToMountAnchor(accessor, riderRef, mountRef, mount.getAnchorX(), mount.getAnchorY(), mount.getAnchorZ(), 0.0);
-    }
-
-    public static void placeRiderAtMountAnchor(@Nonnull ComponentAccessor<EntityStore> accessor,
-                                               @Nonnull Ref<EntityStore> riderRef,
-                                               @Nonnull Ref<EntityStore> mountRef,
-                                               @Nonnull TameworkMountedGlideComponent mount) {
-        moveRiderToMountAnchor(accessor, riderRef, mountRef, mount.getAnchorX(), mount.getAnchorY(), mount.getAnchorZ(), 0.0);
+        moveRiderToMountAnchor(accessor, riderRef, mountRef, mount, 0.0);
     }
 
     private static boolean moveRiderToMountAnchor(@Nonnull ComponentAccessor<EntityStore> accessor,
                                                   @Nonnull Ref<EntityStore> riderRef,
                                                   @Nonnull Ref<EntityStore> mountRef,
-                                                  double anchorX,
-                                                  double anchorY,
-                                                  double anchorZ,
+                                                  @Nonnull TameworkRideMountComponent mount,
                                                   double minimumDistanceSquared) {
         Player player = accessor.getComponent(riderRef, Player.getComponentType());
         TransformComponent riderTransform = accessor.getComponent(riderRef, TransformComponent.getComponentType());
@@ -265,7 +165,7 @@ public final class MountedRideClientAttachment {
         if (player == null || mountTransform == null) {
             return false;
         }
-        Vector3d anchoredPosition = computeRiderAnchor(mountTransform, anchorX, anchorY, anchorZ);
+        Vector3d anchoredPosition = computeRiderAnchor(mountTransform, mount);
         if (riderTransform != null && distanceSquared(riderTransform.getPosition(), anchoredPosition) <= minimumDistanceSquared) {
             return false;
         }
@@ -281,19 +181,17 @@ public final class MountedRideClientAttachment {
 
     @Nonnull
     private static Vector3d computeRiderAnchor(@Nonnull TransformComponent mountTransform,
-                                               double anchorX,
-                                               double anchorY,
-                                               double anchorZ) {
+                                               @Nonnull TameworkRideMountComponent mount) {
         Vector3d mountPosition = mountTransform.getPosition();
         var mountRotation = mountTransform.getRotation();
         double yaw = mountRotation == null ? 0.0 : mountRotation.yaw();
         double sin = Math.sin(yaw);
         double cos = Math.cos(yaw);
-        double worldX = anchorX * cos - anchorZ * sin;
-        double worldZ = anchorX * sin + anchorZ * cos;
+        double worldX = mount.getAnchorX() * cos - mount.getAnchorZ() * sin;
+        double worldZ = mount.getAnchorX() * sin + mount.getAnchorZ() * cos;
         return new Vector3d(
                 mountPosition.x + worldX,
-                mountPosition.y + anchorY,
+                mountPosition.y + mount.getAnchorY(),
                 mountPosition.z + worldZ
         );
     }

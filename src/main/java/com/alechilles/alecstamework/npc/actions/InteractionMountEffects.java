@@ -160,9 +160,6 @@ final class InteractionMountEffects {
                 MOUNT_GLIDE_CONTROLLER_PARAM,
                 TameworkMountedGlideComponent.DEFAULT_GLIDE_CONTROLLER
         );
-        float anchorX = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_X_PARAM, 0.0);
-        float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
-        float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
         TameworkMountedGlideComponent glideMount = new TameworkMountedGlideComponent(riderUuid.getUuid().toString());
         glideMount.setConfigId(config.getId());
         glideMount.setPreviousState(resolveCurrentState(role));
@@ -170,7 +167,6 @@ final class InteractionMountEffects {
         glideMount.setPreviousMotionController(resolveCurrentMotionController(role));
         glideMount.setGlideState(glideState);
         glideMount.setGlideController(glideController);
-        glideMount.setAnchor(anchorX, anchorY, anchorZ);
         glideMount.setMountStartMs(System.currentTimeMillis());
         glideMount.initializePhysicsState(config);
 
@@ -184,23 +180,10 @@ final class InteractionMountEffects {
                 npcUuid.getUuid(),
                 store.getExternalData().getWorld()
         );
-        MountedRideClientAttachment.placeRiderAtMountAnchor(store, playerRef, npcRef, glideMount);
-        double clientSpeedModifier = resolveGlideClientSpeedModifier(glideMount);
-        if (MountedRideClientAttachment.attach(store, playerRef, npcRef, glideMount, clientSpeedModifier)) {
-            glideRider.setClientCameraApplied(true);
-            glideRider.setClientSpeedModifier(clientSpeedModifier);
-            store.putComponent(playerRef, glideRiderType, glideRider);
-        }
         clearStatusAnimation(npcRef, npcComponent, store);
         role.setActiveMotionController(npcRef, npcComponent, glideController, store);
         applyRideState(npcRef, role, store, glideState);
         return true;
-    }
-
-    private double resolveGlideClientSpeedModifier(TameworkMountedGlideComponent glideMount) {
-        return glideMount.getGlideSpeed() > 0.0
-                ? glideMount.getGlideSpeed()
-                : MountedRideClientAttachment.DEFAULT_RIDE_INPUT_SPEED_MODIFIER;
     }
 
     private boolean applyTameworkRideMount(Ref<EntityStore> npcRef,
