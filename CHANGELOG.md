@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added a beta Tamework mounted glide controller for opt-in flying mounts, with pitch-driven glide speed and lift conversion, cooldown-gated jump flaps, sprint forward flaps, and crouch airbraking.
+
 ## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 
 ### Changed

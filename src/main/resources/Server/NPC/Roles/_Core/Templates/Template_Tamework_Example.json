@@ -571,6 +571,18 @@
     "MountMovementConfig": {
       "Value": "Mount"
     },
+    "MountMode": {
+      "Value": "",
+      "Description": "Set to TameworkMountedGlide to use the clean-slate glide mount controller."
+    },
+    "MountGlideState": {
+      "Value": "Ridden",
+      "Description": "State used while this NPC is ridden by the Tamework mounted glide controller."
+    },
+    "MountGlideController": {
+      "Value": "TameworkMountedGlide",
+      "Description": "Motion controller used by the Tamework mounted glide controller."
+    },
     "IsHarvestable": {
       "Value": false,
       "Description": "Whether this NPC can be 'harvested'. This includes shearing, milking, etc."
@@ -707,6 +719,10 @@
       "DescendFlatness": {
         "Compute": "DescendFlatness"
       }
+    },
+    {
+      "$Comment": "Dormant mounted glide controller used when MountMode is TameworkMountedGlide.",
+      "Type": "TameworkMountedGlide"
     }
   ],
   "MaxHealth": {
@@ -844,6 +860,16 @@
     }
   ],
   "Instructions": [
+    {
+      "$Comment": "Mounted glide steering while the NPC is being ridden.",
+      "Sensor": {
+        "Type": "State",
+        "State": "Ridden"
+      },
+      "BodyMotion": {
+        "Type": "TameworkMountedGlide"
+      }
+    },
     {
       "$Comment": "Bridge command-item move hooks into NPC movement.",
       "Continue": true,

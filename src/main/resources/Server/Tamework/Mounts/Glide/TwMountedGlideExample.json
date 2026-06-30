@@ -1,0 +1,49 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "RoleIds": [
+    "Mob_Tamework_Example",
+    "Mob_Tamework_Example_Simple",
+    "Mob_Tamework_Example_Patch"
+  ],
+  "Input": {
+    "HeldJumpAutoFlap": true,
+    "SprintFlapMode": "FORWARD_BOOST",
+    "CrouchMode": "AIRBRAKE"
+  },
+  "Glide": {
+    "BaseSpeed": 10.0,
+    "MinSpeed": 4.0,
+    "MaxSpeed": 28.0,
+    "PassiveSinkRate": 0.8,
+    "PitchDownAcceleration": 8.0,
+    "PitchDownSink": 3.0,
+    "PitchUpLiftConversion": 7.0,
+    "PitchUpSpeedDrain": 9.0,
+    "StallThreshold": 5.0,
+    "StallSink": 4.5
+  },
+  "Flap": {
+    "CooldownSeconds": 0.85,
+    "UpwardBoostStrength": 6.0,
+    "ForwardBoostStrength": 7.0,
+    "BoostDurationSeconds": 0.25,
+    "InputGraceSeconds": 0.15
+  },
+  "Airbrake": {
+    "SpeedDecay": 6.0,
+    "SinkMultiplier": 1.75,
+    "ControlMultiplier": 1.2
+  },
+  "Safety": {
+    "StaleInputTimeoutSeconds": 0.5,
+    "MaxPitchDegrees": 55.0,
+    "MaxVerticalSpeed": 12.0,
+    "CollisionRecoveryTicks": 10
+  },
+  "Presentation": {
+    "GlideAnimation": "Fly",
+    "FlapAnimation": "FlyFast",
+    "AirbrakeAnimation": "FlyIdle"
+  }
+}
