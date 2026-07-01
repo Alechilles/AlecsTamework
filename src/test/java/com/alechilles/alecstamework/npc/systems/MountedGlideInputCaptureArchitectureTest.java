@@ -103,10 +103,13 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(isolation.contains("Order.AFTER, MountSystems.HandleMountInput.class"));
         assertTrue(isolation.contains("Order.BEFORE, RoleSystems.PreBehaviourSupportTickSystem.class"));
         assertTrue(isolation.contains("transform.getPosition().x = mount.getAuthoritativeX()"));
-        assertTrue(state.contains("Order.AFTER, MountedGlideNativeInputIsolationSystem.class"));
-        assertTrue(state.contains("Order.BEFORE, RoleSystems.PreBehaviourSupportTickSystem.class"));
+        assertTrue(state.contains("Order.AFTER, AvoidanceSystem.class"));
+        assertTrue(state.contains("Order.AFTER, RoleSystems.BehaviourTickSystem.class"));
+        assertTrue(state.contains("Order.BEFORE, SteeringSystem.class"));
         assertTrue(state.contains("support.setState(mountRef, state"));
         assertTrue(state.contains("role.setActiveMotionController(mountRef, npc, controller, commandBuffer)"));
+        assertTrue(state.contains("BodyMotionTameworkMountedGlide.applyGlideSteering"));
+        assertTrue(state.contains("TameworkGlide debug: stateSystem"));
         assertTrue(capture.contains("Order.AFTER, RoleSystems.PostBehaviourSupportTickSystem.class"));
         assertTrue(capture.contains("Order.BEFORE, TransformSystems.EntityTrackerUpdate.class"));
         assertTrue(capture.contains("mount.captureAuthoritativePose"));

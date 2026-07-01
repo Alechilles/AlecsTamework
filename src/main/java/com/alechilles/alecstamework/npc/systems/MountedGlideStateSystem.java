@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.movement.BodyMotionTameworkMountedGlide;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -17,8 +19,11 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import com.hypixel.hytale.server.npc.systems.AvoidanceSystem;
 import com.hypixel.hytale.server.npc.systems.RoleSystems;
+import com.hypixel.hytale.server.npc.systems.SteeringSystem;
 import java.util.Set;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
@@ -30,9 +35,11 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
     private final ComponentType<EntityStore, NPCEntity> npcEntityComponentType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
-            new SystemDependency<>(Order.AFTER, MountedGlideNativeInputIsolationSystem.class),
-            new SystemDependency<>(Order.BEFORE, RoleSystems.PreBehaviourSupportTickSystem.class)
+            new SystemDependency<>(Order.AFTER, AvoidanceSystem.class),
+            new SystemDependency<>(Order.AFTER, RoleSystems.BehaviourTickSystem.class),
+            new SystemDependency<>(Order.BEFORE, SteeringSystem.class)
     );
+    private long lastDebugMs;
 
     public MountedGlideStateSystem(
             @Nonnull ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType,
@@ -59,8 +66,18 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
         }
         Ref<EntityStore> mountRef = archetypeChunk.getReferenceTo(index);
         Role role = npc.getRole();
+        String controllerBefore = controllerName(role);
         ensureGlideState(mountRef, role, mount.getGlideState(), commandBuffer);
         ensureGlideController(mountRef, npc, role, mount.getGlideController(), commandBuffer);
+        BodyMotionTameworkMountedGlide.applyGlideSteering(
+                mountRef,
+                role,
+                mount,
+                dt,
+                role.getBodySteering(),
+                commandBuffer
+        );
+        logDebug(role, controllerBefore);
     }
 
     private void ensureGlideState(@Nonnull Ref<EntityStore> mountRef,
@@ -111,6 +128,34 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
             return false;
         }
         return mount.getRiderUuid().equals(npcMount.getOwnerPlayerRef().getUuid().toString());
+    }
+
+    private void logDebug(@Nonnull Role role, @Nonnull String controllerBefore) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastDebugMs < 1000) {
+            return;
+        }
+        lastDebugMs = now;
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkGlide debug: stateSystem state=%s controllerBefore=%s controllerAfter=%s bodyMotion=%s steering=%s/%s/%s",
+                role.getStateSupport() == null ? "<none>" : role.getStateSupport().getStateName(),
+                controllerBefore,
+                controllerName(role),
+                role.getSteeringMotionName() == null ? "<none>" : role.getSteeringMotionName(),
+                role.getBodySteering().getTranslation().x,
+                role.getBodySteering().getTranslation().y,
+                role.getBodySteering().getTranslation().z
+        );
+    }
+
+    @Nonnull
+    private String controllerName(@Nonnull Role role) {
+        MotionController active = role.getActiveMotionController();
+        return active == null ? "<none>" : active.getType();
     }
 
     @Nonnull

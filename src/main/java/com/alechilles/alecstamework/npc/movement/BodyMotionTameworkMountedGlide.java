@@ -46,6 +46,17 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         if (glide == null) {
             return true;
         }
+        applyGlideSteering(ref, role, glide, dt, desiredSteering, componentAccessor);
+        return true;
+    }
+
+    public static void applyGlideSteering(@Nonnull Ref<EntityStore> ref,
+                                          @Nonnull Role role,
+                                          @Nonnull TameworkMountedGlideComponent glide,
+                                          double dt,
+                                          @Nonnull Steering desiredSteering,
+                                          @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        desiredSteering.clear();
         TwMountedGlideConfig config = resolveConfig(role, glide);
         MotionController active = ensureGlideController(ref, role, glide, componentAccessor);
         maybeTakeOff(ref, glide, config, active, componentAccessor);
@@ -71,13 +82,12 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         desiredSteering.setYaw(yaw);
         desiredSteering.setPitch((float) -resolvePitchRadians(glide));
         desiredSteering.setRelativeTurnSpeed(1.0);
-        return true;
     }
 
-    private MotionController ensureGlideController(@Nonnull Ref<EntityStore> ref,
-                                                   @Nonnull Role role,
-                                                   @Nonnull TameworkMountedGlideComponent glide,
-                                                   @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+    private static MotionController ensureGlideController(@Nonnull Ref<EntityStore> ref,
+                                                          @Nonnull Role role,
+                                                          @Nonnull TameworkMountedGlideComponent glide,
+                                                          @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         MotionController active = role.getActiveMotionController();
         String controller = glide.getGlideController();
         if (isActiveController(active, controller)) {
@@ -91,11 +101,11 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         return role.getActiveMotionController();
     }
 
-    private void maybeTakeOff(@Nonnull Ref<EntityStore> ref,
-                              @Nonnull TameworkMountedGlideComponent glide,
-                              @Nonnull TwMountedGlideConfig config,
-                              @Nullable MotionController active,
-                              @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+    private static void maybeTakeOff(@Nonnull Ref<EntityStore> ref,
+                                     @Nonnull TameworkMountedGlideComponent glide,
+                                     @Nonnull TwMountedGlideConfig config,
+                                     @Nullable MotionController active,
+                                     @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         if (!(active instanceof MotionControllerTameworkMountedGlide glideController)
                 || !shouldTakeOffFromGround(glide, active.onGround())) {
             return;
@@ -113,7 +123,7 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
     }
 
     @Nonnull
-    private TwMountedGlideConfig resolveConfig(@Nonnull Role role, @Nonnull TameworkMountedGlideComponent glide) {
+    private static TwMountedGlideConfig resolveConfig(@Nonnull Role role, @Nonnull TameworkMountedGlideComponent glide) {
         if (!glide.getConfigId().isBlank()) {
             var assetMap = TwMountedGlideConfig.getAssetMap();
             if (assetMap != null && assetMap.getAssetMap() != null) {
@@ -127,8 +137,8 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         return byRole == null ? new TwMountedGlideConfig() : byRole;
     }
 
-    private float resolveFallbackYaw(@Nonnull Ref<EntityStore> ref,
-                                     @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+    private static float resolveFallbackYaw(@Nonnull Ref<EntityStore> ref,
+                                            @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         TransformComponent transform = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         Rotation3f rotation = transform == null ? null : transform.getRotation();
         return rotation == null ? 0.0f : rotation.yaw();
