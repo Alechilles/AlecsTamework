@@ -21,6 +21,7 @@
 - Fixed beta mounted glide mount prompts for legacy-tamed NPCs that had not yet been claimed into Tamework ownership, so pressing interact can claim and mount them instead of doing nothing.
 - Fixed beta mounted glide remounts being blocked by stale rider state left on the player after a failed or aborted mount attempt.
 - Fixed beta mounted glide mounts fighting Hytale's native mounted movement, which could make dragons walk normally at first and later surge unpredictably.
+- Fixed beta mounted glide riders inheriting the vanilla `Mount` rider movement profile, which made dragons keep ground-mount walking and jumping controls instead of handing movement to the glide controller.
 
 ## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 

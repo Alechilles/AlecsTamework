@@ -16,6 +16,7 @@ Add or override these role parameters:
 ```json
 "IsMountable": { "Value": true },
 "MountMode": { "Value": "TameworkMountedGlide" },
+"MountGlideMovementConfig": { "Value": "Tamework_Mounted_Glide_Rider" },
 "MountGlideState": { "Value": "Ridden" },
 "MountGlideController": { "Value": "TameworkMountedGlide" }
 ```
@@ -41,6 +42,8 @@ Add a ridden-state body motion:
 ```
 
 The bundled example templates include this dormant wiring. Set `MountMode` to `TameworkMountedGlide` and `IsMountable` to `true` on a role that uses those templates to opt in.
+
+`MountGlideMovementConfig` defaults to `Tamework_Mounted_Glide_Rider`, a Tamework movement config that suppresses the rider's vanilla ground-mount locomotion and jump while preserving the native mount attachment. This is separate from `MountMovementConfig`, which remains the default movement profile for normal ground mounts. Set `MountGlideMovementConfig` to `none`, `off`, or `disabled` only when testing without a rider movement override.
 
 ## Glide Config Assets
 Config assets live under:

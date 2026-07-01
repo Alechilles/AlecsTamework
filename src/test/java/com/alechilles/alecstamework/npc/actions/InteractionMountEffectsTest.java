@@ -46,6 +46,26 @@ class InteractionMountEffectsTest {
                 < mountSource.indexOf("\"existing_mount_state\""));
     }
 
+    @Test
+    void mountedGlideUsesDedicatedRiderMovementConfig() throws Exception {
+        String mountSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        int glideStart = mountSource.indexOf("private boolean applyTameworkMountedGlideMount");
+        int nativeAttachStart = mountSource.indexOf("private void attachNativeNpcMount");
+        String glideMountSource = mountSource.substring(glideStart, nativeAttachStart);
+
+        assertTrue(glideMountSource.contains("resolveGlideMovementConfigId(role)"));
+        assertTrue(mountSource.contains("MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = \"MountGlideMovementConfig\""));
+        assertTrue(mountSource.contains(
+                "DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = \"Tamework_Mounted_Glide_Rider\""
+        ));
+        assertFalse(glideMountSource.contains("DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM"));
+        assertTrue(Files.exists(Path.of(
+                "src/main/resources/Server/Entity/MovementConfig/Tamework_Mounted_Glide_Rider.json"
+        )));
+    }
+
     private static Player newPlayerWithoutServerInit() throws Exception {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);

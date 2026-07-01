@@ -1,0 +1,23 @@
+{
+  "Parent": "Mount",
+  "BaseSpeed": 0.0,
+  "JumpForce": 0.0,
+  "SwimJumpForce": 0.0,
+  "Acceleration": 0.0,
+  "HorizontalFlySpeed": 0.0,
+  "VerticalFlySpeed": 0.0,
+  "ForwardWalkSpeedMultiplier": 0.0,
+  "BackwardWalkSpeedMultiplier": 0.0,
+  "StrafeWalkSpeedMultiplier": 0.0,
+  "ForwardRunSpeedMultiplier": 0.0,
+  "BackwardRunSpeedMultiplier": 0.0,
+  "StrafeRunSpeedMultiplier": 0.0,
+  "ForwardCrouchSpeedMultiplier": 0.0,
+  "BackwardCrouchSpeedMultiplier": 0.0,
+  "StrafeCrouchSpeedMultiplier": 0.0,
+  "ForwardSprintSpeedMultiplier": 0.0,
+  "AirSpeedMultiplier": 0.0,
+  "AirControlMinMultiplier": 0.0,
+  "AirControlMaxMultiplier": 0.0,
+  "AutoJumpDisableJumping": true
+}

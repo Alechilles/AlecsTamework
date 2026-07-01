@@ -130,6 +130,10 @@
     "MountMovementConfig": {
       "Value": "Mount"
     },
+    "MountGlideMovementConfig": {
+      "Value": "Tamework_Mounted_Glide_Rider",
+      "Description": "Movement config applied to the rider while MountMode is TameworkMountedGlide. Use none/off/disabled to skip applying a rider movement config."
+    },
     "MountMode": {
       "Value": "",
       "Description": "Set to TameworkMountedGlide to use the clean-slate glide mount controller."

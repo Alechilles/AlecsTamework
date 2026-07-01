@@ -33,6 +33,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -45,6 +46,8 @@ final class InteractionMountEffects {
     private static final String DEFAULT_MOUNT_ANCHOR_Z_PARAM = "MountAnchorZ";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
+    private static final String MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = "MountGlideMovementConfig";
+    private static final String DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = "Tamework_Mounted_Glide_Rider";
     private static final String MOUNT_MODE_PARAM = "MountMode";
     private static final String MOUNT_MODE_TAMEWORK_RIDE = "TameworkRide";
     private static final String MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE = "TameworkMountedGlide";
@@ -245,10 +248,7 @@ final class InteractionMountEffects {
         float anchorX = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_X_PARAM, 0.0);
         float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
         float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
-        String movementConfigId = owner.getRoleStringParam(role, DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM);
-        if (movementConfigId == null || movementConfigId.isBlank()) {
-            movementConfigId = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
-        }
+        String movementConfigId = resolveGlideMovementConfigId(role);
         NPCMountComponent npcMount = store.ensureAndGetComponent(npcRef, npcMountType);
         if (npcMount == null) {
             return failMount(role, "mounted_glide", "ensure_npc_mount_failed");
@@ -261,10 +261,11 @@ final class InteractionMountEffects {
         clearStatusAnimation(npcRef, npcComponent, store);
         role.setActiveMotionController(npcRef, npcComponent, glideController, store);
         applyRideState(npcRef, role, store, glideState);
-        applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
+        boolean movementConfigApplied =
+                applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
         attachNativeNpcMount(playerComponent, playerRefComponent, npcNetworkId, anchorX, anchorY, anchorZ, npcRef, store);
         logMountDebug(role, "mounted_glide", "applied",
-                "npcUuid=%s riderUuid=%s networkId=%s state=%s controller=%s config=%s anchor=%s/%s/%s movementConfig=%s",
+                "npcUuid=%s riderUuid=%s networkId=%s state=%s controller=%s config=%s anchor=%s/%s/%s movementConfig=%s movementConfigApplied=%s",
                 npcUuid.getUuid(),
                 riderUuid.getUuid(),
                 npcNetworkId.getId(),
@@ -274,8 +275,17 @@ final class InteractionMountEffects {
                 anchorX,
                 anchorY,
                 anchorZ,
-                movementConfigId);
+                movementConfigId,
+                movementConfigApplied);
         return true;
+    }
+
+    private String resolveGlideMovementConfigId(Role role) {
+        String movementConfigId = owner.getRoleStringParam(role, MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM);
+        if (movementConfigId == null || movementConfigId.isBlank()) {
+            return DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID;
+        }
+        return movementConfigId.trim();
     }
 
     private void attachNativeNpcMount(Player playerComponent,
@@ -717,32 +727,40 @@ final class InteractionMountEffects {
         npcComponent.playAnimation(npcRef, AnimationSlot.Status, null, store);
     }
 
-    private void applyMovementConfig(Ref<EntityStore> playerRef,
-                                     PlayerRef playerRefComponent,
-                                     Player playerComponent,
-                                     Store<EntityStore> store,
-                                     String movementConfigId) {
+    private boolean applyMovementConfig(Ref<EntityStore> playerRef,
+                                        PlayerRef playerRefComponent,
+                                        Player playerComponent,
+                                        Store<EntityStore> store,
+                                        String movementConfigId) {
         if (playerRef == null || playerRefComponent == null || playerComponent == null || store == null) {
-            return;
+            return false;
         }
         PhysicsValues playerPhysicsValues = store.getComponent(playerRef, PhysicsValues.getComponentType());
         if (playerPhysicsValues == null) {
-            return;
+            return false;
         }
-        String resolvedMovementConfigId = movementConfigId;
-        if (resolvedMovementConfigId == null || resolvedMovementConfigId.isBlank()) {
-            resolvedMovementConfigId = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
+        String resolvedMovementConfigId = movementConfigId == null ? "" : movementConfigId.trim();
+        if (resolvedMovementConfigId.isBlank() || isMovementConfigDisabled(resolvedMovementConfigId)) {
+            return false;
         }
         MovementConfig movementConfig = MovementConfig.getAssetMap().getAsset(resolvedMovementConfigId);
         if (movementConfig == null) {
-            return;
+            return false;
         }
         MovementManager movementManager = store.getComponent(playerRef, MovementManager.getComponentType());
         if (movementManager == null) {
-            return;
+            return false;
         }
         movementManager.setDefaultSettings(movementConfig.toPacket(), playerPhysicsValues, playerComponent.getGameMode());
         movementManager.applyDefaultSettings();
         movementManager.update(playerRefComponent.getPacketHandler());
+        return true;
+    }
+
+    private static boolean isMovementConfigDisabled(String movementConfigId) {
+        return switch (movementConfigId.toLowerCase(Locale.ROOT)) {
+            case "none", "off", "disabled", "false", "0" -> true;
+            default -> false;
+        };
     }
 }
