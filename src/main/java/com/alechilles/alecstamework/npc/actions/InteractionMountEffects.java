@@ -14,13 +14,16 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.AnimationSlot;
+import com.hypixel.hytale.protocol.packets.interaction.MountNPC;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
+import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.PhysicsValues;
+import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -140,7 +143,9 @@ final class InteractionMountEffects {
         PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
         Player playerComponent = store.getComponent(playerRef, Player.getComponentType());
         NPCEntity npcComponent = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npcUuid == null || riderUuid == null || playerRefComponent == null || playerComponent == null || npcComponent == null) {
+        NetworkId npcNetworkId = store.getComponent(npcRef, NetworkId.getComponentType());
+        if (npcUuid == null || riderUuid == null || playerRefComponent == null || playerComponent == null
+                || npcComponent == null || npcNetworkId == null) {
             return false;
         }
         if (hasActiveNativeMount(playerComponent)
@@ -199,7 +204,21 @@ final class InteractionMountEffects {
         role.setActiveMotionController(npcRef, npcComponent, glideController, store);
         applyRideState(npcRef, role, store, glideState);
         applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
+        attachNativeNpcMount(playerComponent, playerRefComponent, npcNetworkId, anchorX, anchorY, anchorZ, npcRef, store);
         return true;
+    }
+
+    private void attachNativeNpcMount(Player playerComponent,
+                                      PlayerRef playerRefComponent,
+                                      NetworkId npcNetworkId,
+                                      float anchorX,
+                                      float anchorY,
+                                      float anchorZ,
+                                      Ref<EntityStore> npcRef,
+                                      Store<EntityStore> store) {
+        playerComponent.setMountEntityId(npcNetworkId.getId());
+        playerRefComponent.getPacketHandler().write(new MountNPC(anchorX, anchorY, anchorZ, npcNetworkId.getId()));
+        store.tryRemoveComponent(npcRef, Interactable.getComponentType());
     }
 
     static boolean hasActiveNativeMount(@Nonnull Player playerComponent) {

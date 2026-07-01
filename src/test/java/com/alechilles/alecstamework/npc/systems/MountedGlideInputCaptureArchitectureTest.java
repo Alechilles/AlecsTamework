@@ -48,6 +48,8 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(interaction.contains("store.ensureAndGetComponent(npcRef, npcMountType)"));
         assertTrue(interaction.contains("npcMount.setOwnerPlayerRef(playerRefComponent)"));
         assertTrue(interaction.contains("npcMount.setAnchor(anchorX, anchorY, anchorZ)"));
+        assertTrue(interaction.contains("new MountNPC(anchorX, anchorY, anchorZ, npcNetworkId.getId())"));
+        assertTrue(interaction.contains("playerComponent.setMountEntityId(npcNetworkId.getId())"));
         assertFalse(interaction.contains("new MountedComponent(npcRef"));
         assertFalse(interaction.contains("MountController.Minecart"));
         assertFalse(interaction.contains("MountedGlidePacketHandler"));
