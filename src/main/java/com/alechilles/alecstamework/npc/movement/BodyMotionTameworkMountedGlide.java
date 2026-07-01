@@ -78,6 +78,7 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         float fallbackYaw = resolveFallbackYaw(ref, componentAccessor);
         float yaw = resolveYawRadians(glide, fallbackYaw);
         Vector3d translation = resolveTranslation(yaw, input.forwardIntent(), input.strafeIntent(), output);
+        clampGroundedSink(translation, active != null && active.onGround());
         desiredSteering.setTranslation(translation);
         desiredSteering.setYaw(yaw);
         desiredSteering.setPitch((float) -resolvePitchRadians(glide));
@@ -116,6 +117,12 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
 
     static boolean shouldTakeOffFromGround(@Nonnull TameworkMountedGlideComponent glide, boolean grounded) {
         return grounded && glide.isJumpHeld();
+    }
+
+    static void clampGroundedSink(@Nonnull Vector3d translation, boolean grounded) {
+        if (grounded && translation.y < 0.0) {
+            translation.y = 0.0;
+        }
     }
 
     static boolean isActiveController(@Nullable MotionController active, @Nonnull String controller) {

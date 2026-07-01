@@ -45,6 +45,34 @@ class BodyMotionTameworkMountedGlideTest {
     }
 
     @Test
+    void groundedPassiveSinkIsClampedBeforeFlyCollision() {
+        Vector3d translation = new Vector3d(0.5, -0.05, 0.0);
+
+        BodyMotionTameworkMountedGlide.clampGroundedSink(translation, true);
+
+        assertEquals(0.5, translation.x, 0.0001);
+        assertEquals(0.0, translation.y, 0.0001);
+    }
+
+    @Test
+    void airbornePassiveSinkIsPreserved() {
+        Vector3d translation = new Vector3d(0.5, -0.05, 0.0);
+
+        BodyMotionTameworkMountedGlide.clampGroundedSink(translation, false);
+
+        assertEquals(-0.05, translation.y, 0.0001);
+    }
+
+    @Test
+    void groundedLiftIsPreservedForFlaps() {
+        Vector3d translation = new Vector3d(0.5, 0.25, 0.0);
+
+        BodyMotionTameworkMountedGlide.clampGroundedSink(translation, true);
+
+        assertEquals(0.25, translation.y, 0.0001);
+    }
+
+    @Test
     void heldJumpRemainsCooldownGatedFlapRequest() {
         TameworkMountedGlideComponent glide = new TameworkMountedGlideComponent();
         glide.captureControls(true, false, false, 10L);

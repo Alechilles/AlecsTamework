@@ -15,4 +15,11 @@ final class MountedGlideControllerSupport {
         }
         return glide.getGlideSpeed();
     }
+
+    static double resolveMountedSpeedLimit(boolean ridden, double activeGlideSpeed, double fallback) {
+        if (!ridden || activeGlideSpeed <= 0.0) {
+            return fallback;
+        }
+        return activeGlideSpeed;
+    }
 }

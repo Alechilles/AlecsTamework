@@ -121,7 +121,16 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
 
     @Override
     public double getMaximumSpeed() {
-        return ridden ? activeGlideSpeed : super.getMaximumSpeed();
+        return MountedGlideControllerSupport.resolveMountedSpeedLimit(ridden, activeGlideSpeed, super.getMaximumSpeed());
+    }
+
+    @Override
+    protected double computeMaxSpeedFromPitch(double pitch) {
+        return MountedGlideControllerSupport.resolveMountedSpeedLimit(
+                ridden,
+                activeGlideSpeed,
+                super.computeMaxSpeedFromPitch(pitch)
+        );
     }
 
     private TameworkMountedGlideComponent glideMount(@Nonnull Ref<EntityStore> ref,
