@@ -17,6 +17,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleI
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
+import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -98,6 +99,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             ctx = buildContextSnapshot(player, interactionTarget, role);
             config = resolveConfig(role, ctx);
             if (config != null && config.isEnabled()) {
+                claimLegacyOwnershipForPrompt(npcRef, store, player, ctx);
                 resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
             }
             if (resolved != null && resolved.entry instanceof HarvestInteraction) {
@@ -141,6 +143,21 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         );
         lastPrompts.put(playerId, prompt);
         return true;
+    }
+
+    private void claimLegacyOwnershipForPrompt(Ref<EntityStore> npcRef,
+                                               Store<EntityStore> store,
+                                               Player player,
+                                               InteractionContextSnapshot ctx) {
+        LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
+                LegacyTamedOwnershipBridge.claimForPlayerIfEligible(npcRef, store, player);
+        if (!ownerBridgeResult.isClaimed()) {
+            return;
+        }
+        ctx.cachedNpcTamed = null;
+        ctx.cachedNpcOwnerId = null;
+        ctx.cachedPlayerIsOwner = null;
+        logDebug("TameworkPrompt: claimed legacy tamed ownership for player prompt.");
     }
 
     private PromptSelectionFingerprint buildPromptSelectionFingerprint(Player player, Role role) {

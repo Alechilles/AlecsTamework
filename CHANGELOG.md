@@ -11,6 +11,7 @@
 - Fixed command target HUD tame requirements showing one required tranquilizer stack even when the NPC role required more.
 - Fixed beta mounted glide mounts to use Hytale's native NPC mount attachment plus rider movement/head state, so riders stay attached to the dragon while glide physics controls the mount.
 - Fixed beta mounted glide mount interactions being blocked when a player had a non-positive dismounted mount id from another mount implementation.
+- Fixed beta mounted glide mount prompts for legacy-tamed NPCs that had not yet been claimed into Tamework ownership, so pressing interact can claim and mount them instead of doing nothing.
 
 ## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 

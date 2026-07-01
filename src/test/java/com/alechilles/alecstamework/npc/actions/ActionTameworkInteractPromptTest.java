@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -35,6 +37,19 @@ class ActionTameworkInteractPromptTest {
 
         assertFalse((Boolean) readField(promptState, "interactable"));
         assertFalse((Boolean) readField(promptState, "showPrompt"));
+    }
+
+    @Test
+    void promptSelectionClaimsLegacyTamedOwnershipBeforeRequirements() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/ActionTameworkInteractPrompt.java"
+        ));
+
+        int claimIndex = source.indexOf("claimLegacyOwnershipForPrompt(npcRef, store, player, ctx)");
+        int selectIndex = source.indexOf("selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx)");
+
+        assertTrue(claimIndex >= 0, "Prompt path should claim legacy tamed ownership.");
+        assertTrue(selectIndex > claimIndex, "Prompt requirements must run after legacy ownership is claimed.");
     }
 
     private static ActionTameworkInteractPrompt newPrompt() throws Exception {
