@@ -8,6 +8,12 @@
 
 ### Fixed
 - Fixed managed coop scans so optional block-state reflection misses are cached instead of throwing repeatedly on the world tick thread, and reduced stale-ref noise while resolving coop block locations.
+- Fixed several server-freeze risks in high-activity worlds by keeping Tamework ticking-system sweep and cache state scoped to each active world store instead of sharing it across instances.
+- Moved legacy telemetry migration and compatibility metrics work onto dedicated daemon workers with HTTP timeouts, reducing startup and tick stalls when telemetry or metrics I/O is slow.
+- Fixed NPC profile persistence updates so partial state saves merge with existing profile data instead of clearing unrelated fields during revive, recall, and lost-recovery flows.
+- Fixed captured spawner edge cases so stacked spawner items cannot be capture targets, and failed spawn attempts roll back item consumption.
+- Fixed interaction inventory effects so full inventory or hand failures fail closed instead of partially applying incomplete item changes.
+- Fixed command selection UI refresh and navigation callbacks so delayed updates ignore unloaded worlds instead of throwing during unload races.
 - Fixed a rare command target HUD crash that could happen when inventory or hotbar events updated player candidates while the world tick was snapshotting them.
 - Fixed command target HUD tame requirements showing one required tranquilizer stack even when the NPC role required more.
 - Fixed beta mounted glide mounts to use Hytale's native NPC mount attachment plus rider movement/head state, so riders stay attached to the dragon while glide physics controls the mount.
