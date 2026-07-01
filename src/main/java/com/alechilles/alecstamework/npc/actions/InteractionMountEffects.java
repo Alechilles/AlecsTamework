@@ -66,45 +66,57 @@ final class InteractionMountEffects {
                        InfoProvider infoProvider,
                        Store<EntityStore> store) {
         if (npcRef == null || role == null || store == null) {
-            return false;
+            return failMount(role, "resolve", "missing_context",
+                    "npcRefPresent=%s rolePresent=%s storePresent=%s",
+                    npcRef != null,
+                    role != null,
+                    store != null);
         }
+        String mountMode = owner.getRoleStringParam(role, MOUNT_MODE_PARAM);
+        logMountDebug(role, "resolve", "begin", "mode=%s", safeValue(mountMode));
         Ref<EntityStore> playerRef = owner.resolveInteractionTarget(role, infoProvider);
         if (playerRef == null || !playerRef.isValid()) {
-            return false;
+            return failMount(role, "resolve", "invalid_interaction_target",
+                    "playerRefPresent=%s playerRefValid=%s",
+                    playerRef != null,
+                    playerRef != null && playerRef.isValid());
         }
         if (store.getArchetype(playerRef).contains(DeathComponent.getComponentType())) {
-            return false;
+            return failMount(role, "resolve", "player_dead");
         }
-        if (MOUNT_MODE_TAMEWORK_RIDE.equalsIgnoreCase(owner.getRoleStringParam(role, MOUNT_MODE_PARAM))) {
+        if (MOUNT_MODE_TAMEWORK_RIDE.equalsIgnoreCase(mountMode)) {
             return applyTameworkRideMount(npcRef, playerRef, role, store);
         }
-        if (MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE.equalsIgnoreCase(owner.getRoleStringParam(role, MOUNT_MODE_PARAM))) {
+        if (MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE.equalsIgnoreCase(mountMode)) {
             return applyTameworkMountedGlideMount(npcRef, playerRef, role, store);
         }
         ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
         if (mountType == null) {
-            return false;
+            return failMount(role, "native", "npc_mount_component_type_unavailable");
         }
         NPCMountComponent mountComponent = store.getComponent(npcRef, mountType);
         if (mountComponent != null) {
-            return false;
+            return failMount(role, "native", "npc_already_has_mount_component");
         }
         NPCEntity npcComponent = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npcComponent == null) {
-            return false;
+            return failMount(role, "native", "missing_npc_component");
         }
         int originalRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
         int emptyRoleIndex = NPCPlugin.get().getIndex(EMPTY_ROLE_ID);
         if (originalRoleIndex < 0 || emptyRoleIndex < 0) {
-            return false;
+            return failMount(role, "native", "missing_role_index",
+                    "originalRoleIndex=%s emptyRoleIndex=%s",
+                    originalRoleIndex,
+                    emptyRoleIndex);
         }
         Player playerComponent = store.getComponent(playerRef, Player.getComponentType());
         if (playerComponent == null) {
-            return false;
+            return failMount(role, "native", "missing_player_component");
         }
         PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
         if (playerRefComponent == null) {
-            return false;
+            return failMount(role, "native", "missing_player_ref_component");
         }
         float anchorX = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_X_PARAM, 0.0);
         float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
@@ -115,7 +127,7 @@ final class InteractionMountEffects {
         }
         NPCMountComponent createdMount = store.ensureAndGetComponent(npcRef, mountType);
         if (createdMount == null) {
-            return false;
+            return failMount(role, "native", "ensure_npc_mount_failed");
         }
         createdMount.setOriginalRoleIndex(originalRoleIndex);
         createdMount.setOwnerPlayerRef(playerRefComponent);
@@ -123,6 +135,12 @@ final class InteractionMountEffects {
         clearStatusAnimation(npcRef, npcComponent, store);
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
         applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
+        logMountDebug(role, "native", "applied",
+                "anchor=%s/%s/%s movementConfig=%s",
+                anchorX,
+                anchorY,
+                anchorZ,
+                movementConfigId);
         return true;
     }
 
@@ -136,7 +154,11 @@ final class InteractionMountEffects {
                 TameworkMountedGlideRiderComponent.getComponentType();
         ComponentType<EntityStore, NPCMountComponent> npcMountType = NPCMountComponent.getComponentType();
         if (glideMountType == null || glideRiderType == null || npcMountType == null) {
-            return false;
+            return failMount(role, "mounted_glide", "component_type_unavailable",
+                    "glideMountType=%s glideRiderType=%s npcMountType=%s",
+                    glideMountType != null,
+                    glideRiderType != null,
+                    npcMountType != null);
         }
         UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
         UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
@@ -146,17 +168,31 @@ final class InteractionMountEffects {
         NetworkId npcNetworkId = store.getComponent(npcRef, NetworkId.getComponentType());
         if (npcUuid == null || riderUuid == null || playerRefComponent == null || playerComponent == null
                 || npcComponent == null || npcNetworkId == null) {
-            return false;
+            return failMount(role, "mounted_glide", "missing_required_components",
+                    "npcUuid=%s riderUuid=%s playerRef=%s player=%s npc=%s networkId=%s",
+                    npcUuid != null,
+                    riderUuid != null,
+                    playerRefComponent != null,
+                    playerComponent != null,
+                    npcComponent != null,
+                    npcNetworkId != null);
         }
         if (hasActiveNativeMount(playerComponent)
                 || store.getComponent(npcRef, npcMountType) != null
                 || store.getComponent(npcRef, glideMountType) != null
                 || store.getComponent(playerRef, glideRiderType) != null) {
-            return false;
+            return failMount(role, "mounted_glide", "existing_mount_state",
+                    "playerMountEntityId=%s hasNpcMount=%s hasGlideMount=%s hasGlideRider=%s",
+                    playerComponent.getMountEntityId(),
+                    store.getComponent(npcRef, npcMountType) != null,
+                    store.getComponent(npcRef, glideMountType) != null,
+                    store.getComponent(playerRef, glideRiderType) != null);
         }
         int originalRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
         if (originalRoleIndex < 0) {
-            return false;
+            return failMount(role, "mounted_glide", "missing_original_role_index",
+                    "role=%s",
+                    safeValue(role.getRoleName()));
         }
         TwMountedGlideConfig config = TwMountedGlideConfig.resolveForRole(role.getRoleName());
         if (config == null) {
@@ -193,7 +229,7 @@ final class InteractionMountEffects {
         }
         NPCMountComponent npcMount = store.ensureAndGetComponent(npcRef, npcMountType);
         if (npcMount == null) {
-            return false;
+            return failMount(role, "mounted_glide", "ensure_npc_mount_failed");
         }
         npcMount.setOriginalRoleIndex(originalRoleIndex);
         npcMount.setOwnerPlayerRef(playerRefComponent);
@@ -205,6 +241,18 @@ final class InteractionMountEffects {
         applyRideState(npcRef, role, store, glideState);
         applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
         attachNativeNpcMount(playerComponent, playerRefComponent, npcNetworkId, anchorX, anchorY, anchorZ, npcRef, store);
+        logMountDebug(role, "mounted_glide", "applied",
+                "npcUuid=%s riderUuid=%s networkId=%s state=%s controller=%s config=%s anchor=%s/%s/%s movementConfig=%s",
+                npcUuid.getUuid(),
+                riderUuid.getUuid(),
+                npcNetworkId.getId(),
+                glideState,
+                glideController,
+                config.getId(),
+                anchorX,
+                anchorY,
+                anchorZ,
+                movementConfigId);
         return true;
     }
 
@@ -219,10 +267,52 @@ final class InteractionMountEffects {
         playerComponent.setMountEntityId(npcNetworkId.getId());
         playerRefComponent.getPacketHandler().write(new MountNPC(anchorX, anchorY, anchorZ, npcNetworkId.getId()));
         store.tryRemoveComponent(npcRef, Interactable.getComponentType());
+        logMountDebug(null, "mounted_glide", "native_attach",
+                "networkId=%s anchor=%s/%s/%s",
+                npcNetworkId.getId(),
+                anchorX,
+                anchorY,
+                anchorZ);
     }
 
     static boolean hasActiveNativeMount(@Nonnull Player playerComponent) {
         return playerComponent.getMountEntityId() > 0;
+    }
+
+    private boolean failMount(Role role, String stage, String reason) {
+        logMountDebug(role, stage, reason, null);
+        return false;
+    }
+
+    private boolean failMount(Role role, String stage, String reason, String detailFormat, Object... detailArgs) {
+        logMountDebug(role, stage, reason, detailFormat, detailArgs);
+        return false;
+    }
+
+    private void logMountDebug(Role role, String stage, String reason, String detailFormat, Object... detailArgs) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        String detail = "";
+        if (detailFormat != null && !detailFormat.isBlank()) {
+            detail = " " + String.format(detailFormat, detailArgs);
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkMount debug: stage=%s role=%s reason=%s%s",
+                stage,
+                role == null ? "<null>" : safeValue(role.getRoleName()),
+                reason,
+                detail
+        );
+    }
+
+    private static String safeValue(Object value) {
+        if (value == null) {
+            return "<null>";
+        }
+        String text = value.toString();
+        return text == null || text.isBlank() ? "<blank>" : text;
     }
 
     private boolean applyTameworkRideMount(Ref<EntityStore> npcRef,

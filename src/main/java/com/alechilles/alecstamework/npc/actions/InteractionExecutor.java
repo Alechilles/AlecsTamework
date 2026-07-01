@@ -151,7 +151,9 @@ final class InteractionExecutor {
             );
         }
         if (entry instanceof MountInteraction) {
+            effects.logMountExecution("selected", interactionConfigId, interactionIndex, role, ctx);
             boolean applied = effects.applyMount(npcRef, role, infoProvider, store);
+            effects.logMountExecution(applied ? "mount-applied" : "mount-blocked", interactionConfigId, interactionIndex, role, ctx);
             return applied
                     | effects.applyCustomEffects(
                     interactionConfigId,

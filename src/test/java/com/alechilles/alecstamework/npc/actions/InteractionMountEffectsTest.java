@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -23,6 +25,18 @@ class InteractionMountEffectsTest {
 
         player.setMountEntityId(42);
         assertTrue(InteractionMountEffects.hasActiveNativeMount(player));
+    }
+
+    @Test
+    void mountedGlideMountReportsActionableDebugStages() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+
+        assertTrue(source.contains("TameworkMount debug: stage=%s"));
+        assertTrue(source.contains("missing_required_components"));
+        assertTrue(source.contains("existing_mount_state"));
+        assertTrue(source.contains("native_attach"));
     }
 
     private static Player newPlayerWithoutServerInit() throws Exception {

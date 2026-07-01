@@ -4,6 +4,7 @@
 
 ### Added
 - Added a beta Tamework mounted glide controller for opt-in flying mounts, with pitch-driven glide speed and lift conversion, cooldown-gated jump flaps, sprint forward flaps, and crouch airbraking.
+- Added `/tw debugride on` diagnostics for beta mounted glide mount action selection, mount-state gates, and native attachment attempts.
 
 ### Fixed
 - Fixed managed coop scans so optional block-state reflection misses are cached instead of throwing repeatedly on the world tick thread, and reduced stale-ref noise while resolving coop block locations.

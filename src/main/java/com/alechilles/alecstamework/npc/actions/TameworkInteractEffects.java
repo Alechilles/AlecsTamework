@@ -315,6 +315,19 @@ final class TameworkInteractEffects {
                 + " held=" + heldItem(ctx));
     }
 
+    void logMountExecution(String stage,
+                           @Nullable String interactionConfigId,
+                           int interactionIndex,
+                           Role role,
+                           InteractionContextSnapshot ctx) {
+        logMountDebug("TameworkMount debug: execution"
+                + " stage=" + stage
+                + " config=" + text(interactionConfigId)
+                + " index=" + interactionIndex
+                + " role=" + roleName(role)
+                + " held=" + heldItem(ctx));
+    }
+
     private double resolveHarvestTimeoutSeconds(Role role, InteractionContextSnapshot ctx) {
         String[] timeoutRange = owner.getRoleStringArrayParam(role, ctx, HARVEST_TIMEOUT_PARAMETER);
         double rangeSeconds = HarvestAlarmTimeBasis.resolveTemporalRangeSeconds(
@@ -566,6 +579,13 @@ final class TameworkInteractEffects {
     private void logHarvestDebug(String message) {
         Tamework instance = Tamework.getInstance();
         if (instance != null && instance.isDebugHarvestEnabled() && instance.getLogger() != null) {
+            instance.getLogger().at(Level.INFO).log(message);
+        }
+    }
+
+    private void logMountDebug(String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance != null && instance.isDebugRideEnabled() && instance.getLogger() != null) {
             instance.getLogger().at(Level.INFO).log(message);
         }
     }
