@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -40,9 +41,8 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
     private static final long MALNOURISHMENT_WARNING_PRUNE_WINDOW_MS = 24L * 60L * 60L * 1000L;
     private static final String MALNOURISHMENT_WARNING_SUFFIX = " linked NPCs dying from malnourishment";
 
-    private long nextSweepAtMs;
     private final TameworkUiMessageService uiMessageService = new TameworkUiMessageService();
-    private final Map<UUID, Long> lastMalnourishmentWarningByOwner = new HashMap<>();
+    private final StoreScopedState<NeedsTickState> statesByStore = new StoreScopedState<>(NeedsTickState::new);
 
     @Nonnull
     @Override
@@ -55,11 +55,12 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        NeedsTickState tickState = statesByStore.get(store);
         CompanionRuntimeClock.advanceByDeltaSeconds(dt);
         long nowMs = System.currentTimeMillis();
-        boolean runNeedsSweep = nowMs >= nextSweepAtMs;
+        boolean runNeedsSweep = nowMs >= tickState.nextSweepAtMs;
         if (runNeedsSweep) {
-            nextSweepAtMs = nowMs + SYSTEM_SWEEP_INTERVAL_MS;
+            tickState.nextSweepAtMs = nowMs + SYSTEM_SWEEP_INTERVAL_MS;
         }
 
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
@@ -116,20 +117,21 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
                 }
         );
         if (runNeedsSweep && starvingLinkedByOwner != null && !starvingLinkedByOwner.isEmpty()) {
-            notifyOwnersOfMalnourishedLinkedNpcs(store, starvingLinkedByOwner, nowMs);
+            notifyOwnersOfMalnourishedLinkedNpcs(store, tickState, starvingLinkedByOwner, nowMs);
         }
         if (runNeedsSweep) {
-            pruneWarningThrottleEntries(nowMs);
+            pruneWarningThrottleEntries(tickState, nowMs);
         }
     }
 
     private void notifyOwnersOfMalnourishedLinkedNpcs(@Nonnull Store<EntityStore> store,
+                                                      @Nonnull NeedsTickState tickState,
                                                       @Nonnull Map<UUID, Integer> starvingLinkedByOwner,
                                                       long nowMs) {
         for (Map.Entry<UUID, Integer> entry : starvingLinkedByOwner.entrySet()) {
             UUID ownerId = entry.getKey();
             int count = entry.getValue() != null ? entry.getValue() : 0;
-            if (ownerId == null || count <= 0 || !shouldSendMalnourishmentWarning(ownerId, nowMs)) {
+            if (ownerId == null || count <= 0 || !shouldSendMalnourishmentWarning(tickState, ownerId, nowMs)) {
                 continue;
             }
             Player player = resolveOnlinePlayer(store, ownerId);
@@ -138,21 +140,23 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
             }
             String message = count + MALNOURISHMENT_WARNING_SUFFIX;
             if (uiMessageService.show(player, message, NotificationStyle.Danger)) {
-                lastMalnourishmentWarningByOwner.put(ownerId, nowMs);
+                tickState.lastMalnourishmentWarningByOwner.put(ownerId, nowMs);
             }
         }
     }
 
-    private boolean shouldSendMalnourishmentWarning(@Nonnull UUID ownerId, long nowMs) {
-        Long lastSentMs = lastMalnourishmentWarningByOwner.get(ownerId);
+    private boolean shouldSendMalnourishmentWarning(@Nonnull NeedsTickState tickState,
+                                                    @Nonnull UUID ownerId,
+                                                    long nowMs) {
+        Long lastSentMs = tickState.lastMalnourishmentWarningByOwner.get(ownerId);
         return lastSentMs == null || nowMs - lastSentMs >= MALNOURISHMENT_WARNING_THROTTLE_MS;
     }
 
-    private void pruneWarningThrottleEntries(long nowMs) {
-        if (lastMalnourishmentWarningByOwner.isEmpty()) {
+    private void pruneWarningThrottleEntries(@Nonnull NeedsTickState tickState, long nowMs) {
+        if (tickState.lastMalnourishmentWarningByOwner.isEmpty()) {
             return;
         }
-        lastMalnourishmentWarningByOwner.entrySet().removeIf(entry -> {
+        tickState.lastMalnourishmentWarningByOwner.entrySet().removeIf(entry -> {
             Long value = entry.getValue();
             if (value == null) {
                 return true;
@@ -179,6 +183,11 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
         } catch (IllegalStateException ignored) {
             return null;
         }
+    }
+
+    private static final class NeedsTickState {
+        private long nextSweepAtMs;
+        private final Map<UUID, Long> lastMalnourishmentWarningByOwner = new HashMap<>();
     }
 
 }
