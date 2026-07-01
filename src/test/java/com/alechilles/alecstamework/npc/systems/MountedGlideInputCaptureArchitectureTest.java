@@ -89,6 +89,9 @@ class MountedGlideInputCaptureArchitectureTest {
         String state = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideStateSystem.java"
         ));
+        String controller = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/movement/MotionControllerTameworkMountedGlide.java"
+        ));
         String capture = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideAuthoritativePoseSystem.java"
         ));
@@ -110,6 +113,12 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(state.contains("role.setActiveMotionController(mountRef, npc, controller, commandBuffer)"));
         assertTrue(state.contains("BodyMotionTameworkMountedGlide.applyGlideSteering"));
         assertTrue(state.contains("TameworkGlide debug: stateSystem"));
+        assertTrue(controller.contains("public boolean canSteer"));
+        assertTrue(controller.contains("glide == null"));
+        assertTrue(controller.contains("!isForcePushed()"));
+        assertTrue(controller.contains("effectHorizontalSpeedMultiplier != 0.0"));
+        assertFalse(controller.contains("moveProbe.isInAir()"));
+        assertTrue(controller.contains("TameworkGlide debug: controller"));
         assertTrue(capture.contains("Order.AFTER, RoleSystems.PostBehaviourSupportTickSystem.class"));
         assertTrue(capture.contains("Order.BEFORE, TransformSystems.EntityTrackerUpdate.class"));
         assertTrue(capture.contains("mount.captureAuthoritativePose"));
