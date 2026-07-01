@@ -86,6 +86,9 @@ class MountedGlideInputCaptureArchitectureTest {
         String isolation = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideNativeInputIsolationSystem.java"
         ));
+        String state = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideStateSystem.java"
+        ));
         String capture = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideAuthoritativePoseSystem.java"
         ));
@@ -100,6 +103,10 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(isolation.contains("Order.AFTER, MountSystems.HandleMountInput.class"));
         assertTrue(isolation.contains("Order.BEFORE, RoleSystems.PreBehaviourSupportTickSystem.class"));
         assertTrue(isolation.contains("transform.getPosition().x = mount.getAuthoritativeX()"));
+        assertTrue(state.contains("Order.AFTER, MountedGlideNativeInputIsolationSystem.class"));
+        assertTrue(state.contains("Order.BEFORE, RoleSystems.PreBehaviourSupportTickSystem.class"));
+        assertTrue(state.contains("support.setState(mountRef, state"));
+        assertTrue(state.contains("role.setActiveMotionController(mountRef, npc, controller, commandBuffer)"));
         assertTrue(capture.contains("Order.AFTER, RoleSystems.PostBehaviourSupportTickSystem.class"));
         assertTrue(capture.contains("Order.BEFORE, TransformSystems.EntityTrackerUpdate.class"));
         assertTrue(capture.contains("mount.captureAuthoritativePose"));
@@ -107,6 +114,7 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(component.contains("\"AuthoritativeX\""));
         assertTrue(interaction.contains("glideMount.captureAuthoritativePose"));
         assertTrue(plugin.contains("new MountedGlideNativeInputIsolationSystem"));
+        assertTrue(plugin.contains("new MountedGlideStateSystem"));
         assertTrue(plugin.contains("new MountedGlideAuthoritativePoseSystem"));
     }
 
@@ -129,6 +137,8 @@ class MountedGlideInputCaptureArchitectureTest {
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
         )) + Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideNativeInputIsolationSystem.java"
+        )) + Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideStateSystem.java"
         )) + Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideAuthoritativePoseSystem.java"
         )) + Files.readString(Path.of(
