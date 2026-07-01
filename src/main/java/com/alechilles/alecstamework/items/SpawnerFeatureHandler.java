@@ -403,9 +403,36 @@ public final class SpawnerFeatureHandler {
         }
         Ref<EntityStore> playerRef = player.getReference();
         Rotation3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
+        ItemStack updated = itemStack;
+        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
+            String emptyItemId = emptyItemIdOverride != null
+                    ? emptyItemIdOverride
+                    : itemStackMetadataService.resolveEmptyItemId(itemStack.getItemId());
+            if (emptyItemId != null && !emptyItemId.isBlank()) {
+                updated = itemStackMetadataService.swapItemId(updated, emptyItemId);
+            }
+            updated = itemStackMetadataService.clearCapturedMetadata(updated);
+        }
+        updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs());
+
+        boolean updatedOk = hotbarSlot != null
+                ? playerInventoryService.updateHotbarSlot(player, hotbarSlot, updated)
+                : playerInventoryService.updateHeldItem(player, updated);
+        if (!updatedOk) {
+            logger.at(Level.WARNING).log("Spawner spawn: failed to update held item.");
+            logSpawnerFlowDebug("spawn denied reason=update-held-item-failed player=" + playerUuid + " item=" + itemStack.getItemId());
+            return false;
+        }
+
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             logSpawnerFlowDebug("spawn denied reason=spawn-entity-failed player=" + playerUuid + " role=" + roleId);
+            boolean rollbackOk = hotbarSlot != null
+                    ? playerInventoryService.updateHotbarSlot(player, hotbarSlot, itemStack)
+                    : playerInventoryService.updateHeldItem(player, itemStack);
+            if (!rollbackOk) {
+                logger.at(Level.WARNING).log("Spawner spawn: failed to roll back held item after spawn failure.");
+            }
             return false;
         }
 
@@ -426,27 +453,6 @@ public final class SpawnerFeatureHandler {
         linkedNpcSyncService.clearCapturedSnapshotIfPresent(capturedNpcUuid);
         if (coopService != null && capturedNpcUuid != null) {
             coopService.clearCoopSnapshot(capturedNpcUuid);
-        }
-
-        ItemStack updated = itemStack;
-        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
-            String emptyItemId = emptyItemIdOverride != null
-                    ? emptyItemIdOverride
-                    : itemStackMetadataService.resolveEmptyItemId(itemStack.getItemId());
-            if (emptyItemId != null && !emptyItemId.isBlank()) {
-                updated = itemStackMetadataService.swapItemId(updated, emptyItemId);
-            }
-            updated = itemStackMetadataService.clearCapturedMetadata(updated);
-        }
-        updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs());
-
-        boolean updatedOk = hotbarSlot != null
-                ? playerInventoryService.updateHotbarSlot(player, hotbarSlot, updated)
-                : playerInventoryService.updateHeldItem(player, updated);
-        if (!updatedOk) {
-            logger.at(Level.WARNING).log("Spawner spawn: failed to update held item.");
-            logSpawnerFlowDebug("spawn denied reason=update-held-item-failed player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
         }
 
         effectService.playSpawnEffects(world, npcRef, config);
@@ -552,6 +558,14 @@ public final class SpawnerFeatureHandler {
         if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
             logger.at(Level.FINE).log(
                     "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
+            );
+            return false;
+        }
+        if (itemStack.getQuantity() != 1) {
+            logSpawnerFlowDebug(
+                    "capture denied reason=stacked-spawner-item player=" + player.getUuid()
+                            + " item=" + itemStack.getItemId()
+                            + " quantity=" + itemStack.getQuantity()
             );
             return false;
         }
