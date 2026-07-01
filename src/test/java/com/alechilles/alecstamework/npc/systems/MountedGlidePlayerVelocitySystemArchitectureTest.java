@@ -10,9 +10,11 @@ import org.junit.jupiter.api.Test;
 class MountedGlidePlayerVelocitySystemArchitectureTest {
     @Test
     void mountedGlideAppliesVelocityToRiderNotNpcMotionController() throws IOException {
-        String source = Files.readString(Path.of(
+        Path path = Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"
-        ));
+        );
+        assertTrue(Files.exists(path), "MountedGlidePlayerVelocitySystem.java should exist");
+        String source = Files.readString(path);
 
         assertTrue(source.contains("NPCMountComponent"));
         assertTrue(source.contains("Velocity.getComponentType()"));

@@ -41,9 +41,11 @@ class MountedGlideInputCaptureArchitectureTest {
         String interaction = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
-        int start = interaction.indexOf("private boolean applyTameworkMountedGlideMount");
-        int end = interaction.indexOf("private String resolveGlideMovementConfigId", start);
-        String method = interaction.substring(start, end);
+        String method = extractMethodSource(
+                interaction,
+                "private boolean applyTameworkMountedGlideMount",
+                "private String resolveGlideMovementConfigId"
+        );
 
         assertTrue(method.contains("NPCMountComponent.getComponentType()"));
         assertTrue(method.contains("createdMount.setOwnerPlayerRef(playerRefComponent)"));
@@ -163,5 +165,13 @@ class MountedGlideInputCaptureArchitectureTest {
         )) + Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideCleanupSystem.java"
         ));
+    }
+
+    private static String extractMethodSource(String source, String startMarker, String endMarker) {
+        int start = source.indexOf(startMarker);
+        assertTrue(start >= 0, "Expected source to contain start marker: " + startMarker);
+        int end = source.indexOf(endMarker, start);
+        assertTrue(end > start, "Expected source to contain end marker after start marker: " + endMarker);
+        return source.substring(start, end);
     }
 }
