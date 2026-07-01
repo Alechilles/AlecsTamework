@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
-import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -31,7 +31,7 @@ final class MountedGlideStaleStateCleanup {
             Role role,
             ComponentType<EntityStore, TameworkMountedGlideRiderComponent> riderType,
             ComponentType<EntityStore, TameworkMountedGlideComponent> mountType,
-            ComponentType<EntityStore, NPCMountComponent> npcMountType,
+            ComponentType<EntityStore, MountedComponent> mountedType,
             Store<EntityStore> store) {
         TameworkMountedGlideRiderComponent rider = store.getComponent(playerRef, riderType);
         if (rider == null || InteractionMountEffects.hasActiveNativeMount(playerComponent)) {
@@ -42,17 +42,18 @@ final class MountedGlideStaleStateCleanup {
         TameworkMountedGlideComponent mount = mountRef == null || !mountRef.isValid()
                 ? null
                 : store.getComponent(mountRef, mountType);
-        NPCMountComponent npcMount = mountRef == null || !mountRef.isValid()
-                ? null
-                : store.getComponent(mountRef, npcMountType);
-        CleanupState state = CleanupState.from(rider, mountRef, mount, npcMount, playerRef, store);
+        MountedComponent mounted = store.getComponent(playerRef, mountedType);
+        CleanupState state = CleanupState.from(rider, mountRef, mount, mounted, playerRef, store);
         if (!state.stale()) {
             return;
         }
 
-        logStaleCleanup(role, rider, playerComponent, mountRef, mount, npcMount, state);
+        logStaleCleanup(role, rider, playerComponent, mountRef, mount, mounted, state);
         if (mountRef != null && mountRef.isValid()) {
-            clearMountSideState(playerRef, mountRef, mount, npcMount, mountType, npcMountType, store);
+            clearMountSideState(playerRef, mountRef, mount, mountType, store);
+        }
+        if (mountedBelongsToMount(mounted, mountRef)) {
+            store.tryRemoveComponent(playerRef, mountedType);
         }
         store.tryRemoveComponent(playerRef, riderType);
     }
@@ -61,9 +62,7 @@ final class MountedGlideStaleStateCleanup {
             Ref<EntityStore> playerRef,
             Ref<EntityStore> mountRef,
             TameworkMountedGlideComponent mount,
-            NPCMountComponent npcMount,
             ComponentType<EntityStore, TameworkMountedGlideComponent> mountType,
-            ComponentType<EntityStore, NPCMountComponent> npcMountType,
             Store<EntityStore> store) {
         if (mount != null && mountMatchesRider(mount, playerRef, store)) {
             NPCEntity npc = store.getComponent(mountRef, NPCEntity.getComponentType());
@@ -71,9 +70,6 @@ final class MountedGlideStaleStateCleanup {
                 restoreNpcState(mountRef, npc, mount, store);
             }
             store.tryRemoveComponent(mountRef, mountType);
-        }
-        if (npcMount != null && npcMountBelongsToPlayer(npcMount, playerRef, store)) {
-            store.tryRemoveComponent(mountRef, npcMountType);
         }
     }
 
@@ -112,18 +108,6 @@ final class MountedGlideStaleStateCleanup {
         return uuid != null && uuid.getUuid() != null && expectedRiderUuid.equals(uuid.getUuid().toString());
     }
 
-    private static boolean npcMountBelongsToPlayer(NPCMountComponent npcMount,
-                                                   Ref<EntityStore> playerRef,
-                                                   Store<EntityStore> store) {
-        if (npcMount.getOwnerPlayerRef() == null || npcMount.getOwnerPlayerRef().getUuid() == null) {
-            return false;
-        }
-        UUIDComponent uuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
-        return uuid != null
-                && uuid.getUuid() != null
-                && uuid.getUuid().equals(npcMount.getOwnerPlayerRef().getUuid());
-    }
-
     private static void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,
                                         @Nonnull NPCEntity npc,
                                         @Nonnull TameworkMountedGlideComponent mount,
@@ -153,17 +137,17 @@ final class MountedGlideStaleStateCleanup {
                                         Player playerComponent,
                                         Ref<EntityStore> mountRef,
                                         TameworkMountedGlideComponent mount,
-                                        NPCMountComponent npcMount,
+                                        MountedComponent mounted,
                                         CleanupState state) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
             return;
         }
         instance.getLogger().at(Level.INFO).log(
-                "TameworkMount debug: stage=%s role=%s reason=%s " +
-                        "riderMountUuid=%s playerMountEntityId=%s mountRefValid=%s hasGlideMount=%s hasNpcMount=%s " +
-                        "mountMissing=%s mountInvalid=%s mountComponentMissing=%s npcMountMissing=%s " +
-                        "mountUuidMismatch=%s riderUuidMismatch=%s existingMountRider=%s",
+                        "TameworkMount debug: stage=%s role=%s reason=%s " +
+                        "riderMountUuid=%s playerMountEntityId=%s mountRefValid=%s hasGlideMount=%s hasMounted=%s " +
+                        "mountMissing=%s mountInvalid=%s mountComponentMissing=%s mountedComponentMissing=%s " +
+                        "mountUuidMismatch=%s riderUuidMismatch=%s mountedTargetMismatch=%s existingMountRider=%s",
                 "mounted_glide",
                 role == null ? "<null>" : safeValue(role.getRoleName()),
                 "stale_rider_cleanup",
@@ -171,13 +155,14 @@ final class MountedGlideStaleStateCleanup {
                 playerComponent.getMountEntityId(),
                 mountRef != null && mountRef.isValid(),
                 mount != null,
-                npcMount != null,
+                mounted != null,
                 state.mountMissing,
                 state.mountInvalid,
                 state.mountComponentMissing,
-                state.npcMountMissing,
+                state.mountedComponentMissing,
                 state.mountUuidMismatch,
                 state.riderUuidMismatch,
+                state.mountedTargetMismatch,
                 mount == null ? "<none>" : safeValue(mount.getRiderUuid())
         );
     }
@@ -194,25 +179,28 @@ final class MountedGlideStaleStateCleanup {
             boolean mountMissing,
             boolean mountInvalid,
             boolean mountComponentMissing,
-            boolean npcMountMissing,
+            boolean mountedComponentMissing,
             boolean mountUuidMismatch,
-            boolean riderUuidMismatch) {
+            boolean riderUuidMismatch,
+            boolean mountedTargetMismatch) {
         static CleanupState from(TameworkMountedGlideRiderComponent rider,
                                  Ref<EntityStore> mountRef,
                                  TameworkMountedGlideComponent mount,
-                                 NPCMountComponent npcMount,
+                                 MountedComponent mounted,
                                  Ref<EntityStore> playerRef,
                                  Store<EntityStore> store) {
             boolean hasValidMountRef = mountRef != null && mountRef.isValid();
             boolean mountUuidMismatch = hasValidMountRef && !riderMatchesMount(rider, mountRef, store);
             boolean riderUuidMismatch = mount != null && !mountMatchesRider(mount, playerRef, store);
+            boolean mountedTargetMismatch = hasValidMountRef && mounted != null && !mountRef.equals(mounted.getMountedToEntity());
             return new CleanupState(
                     mountRef == null,
                     mountRef != null && !mountRef.isValid(),
                     mount == null,
-                    npcMount == null,
+                    mounted == null,
                     mountUuidMismatch,
-                    riderUuidMismatch
+                    riderUuidMismatch,
+                    mountedTargetMismatch
             );
         }
 
@@ -220,9 +208,18 @@ final class MountedGlideStaleStateCleanup {
             return mountMissing
                     || mountInvalid
                     || mountComponentMissing
-                    || npcMountMissing
+                    || mountedComponentMissing
                     || mountUuidMismatch
-                    || riderUuidMismatch;
+                    || riderUuidMismatch
+                    || mountedTargetMismatch;
         }
+    }
+
+    private static boolean mountedBelongsToMount(MountedComponent mounted, Ref<EntityStore> mountRef) {
+        if (mounted == null) {
+            return false;
+        }
+        Ref<EntityStore> mountedTo = mounted.getMountedToEntity();
+        return mountedTo == null || !mountedTo.isValid() || mountedTo.equals(mountRef);
     }
 }

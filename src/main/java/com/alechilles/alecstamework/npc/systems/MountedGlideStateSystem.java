@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.npc.systems;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.movement.BodyMotionTameworkMountedGlide;
-import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -31,7 +30,6 @@ import javax.annotation.Nonnull;
  */
 public final class MountedGlideStateSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType;
-    private final ComponentType<EntityStore, NPCMountComponent> npcMountComponentType;
     private final ComponentType<EntityStore, NPCEntity> npcEntityComponentType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
@@ -43,12 +41,10 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
 
     public MountedGlideStateSystem(
             @Nonnull ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType,
-            @Nonnull ComponentType<EntityStore, NPCMountComponent> npcMountComponentType,
             @Nonnull ComponentType<EntityStore, NPCEntity> npcEntityComponentType) {
         this.mountComponentType = mountComponentType;
-        this.npcMountComponentType = npcMountComponentType;
         this.npcEntityComponentType = npcEntityComponentType;
-        this.query = Query.and(mountComponentType, npcMountComponentType, npcEntityComponentType);
+        this.query = Query.and(mountComponentType, npcEntityComponentType);
     }
 
     @Override
@@ -58,10 +54,8 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
                      @Nonnull Store<EntityStore> store,
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         TameworkMountedGlideComponent mount = archetypeChunk.getComponent(index, mountComponentType);
-        NPCMountComponent npcMount = archetypeChunk.getComponent(index, npcMountComponentType);
         NPCEntity npc = archetypeChunk.getComponent(index, npcEntityComponentType);
-        if (mount == null || npcMount == null || npc == null || npc.getRole() == null
-                || !npcMountStillOwnedByRider(npcMount, mount)) {
+        if (mount == null || npc == null || npc.getRole() == null || mount.getRiderUuid().isBlank()) {
             return;
         }
         Ref<EntityStore> mountRef = archetypeChunk.getReferenceTo(index);
@@ -120,14 +114,6 @@ public final class MountedGlideStateSystem extends EntityTickingSystem<EntitySto
 
     private boolean isActiveController(MotionController active, @Nonnull String controller) {
         return active != null && !controller.isBlank() && controller.equals(active.getType());
-    }
-
-    private boolean npcMountStillOwnedByRider(@Nonnull NPCMountComponent npcMount,
-                                              @Nonnull TameworkMountedGlideComponent mount) {
-        if (npcMount.getOwnerPlayerRef() == null || npcMount.getOwnerPlayerRef().getUuid() == null) {
-            return false;
-        }
-        return mount.getRiderUuid().equals(npcMount.getOwnerPlayerRef().getUuid().toString());
     }
 
     private void logDebug(@Nonnull Role role, @Nonnull String controllerBefore) {

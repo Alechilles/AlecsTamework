@@ -37,21 +37,22 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
-    void mountedGlideUsesNativeMountAttachmentInsteadOfPacketInterceptor() throws IOException {
+    void mountedGlideUsesBaseMountedComponentAttachmentInsteadOfLegacyNpcMount() throws IOException {
         String interaction = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
         String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
         String source = readGlideInputStack();
 
-        assertTrue(interaction.contains("NPCMountComponent.getComponentType()"));
-        assertTrue(interaction.contains("store.ensureAndGetComponent(npcRef, npcMountType)"));
-        assertTrue(interaction.contains("npcMount.setOwnerPlayerRef(playerRefComponent)"));
-        assertTrue(interaction.contains("npcMount.setAnchor(anchorX, anchorY, anchorZ)"));
-        assertTrue(interaction.contains("new MountNPC(anchorX, anchorY, anchorZ, npcNetworkId.getId())"));
-        assertTrue(interaction.contains("playerComponent.setMountEntityId(npcNetworkId.getId())"));
-        assertFalse(interaction.contains("new MountedComponent(npcRef"));
-        assertFalse(interaction.contains("MountController.Minecart"));
+        assertTrue(interaction.contains("MountedComponent.getComponentType()"));
+        assertTrue(interaction.contains("store.putComponent("));
+        assertTrue(interaction.contains("new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)"));
+        assertTrue(interaction.contains("mounted_component_attach"));
+        assertFalse(interaction.contains("store.ensureAndGetComponent(npcRef, npcMountType)"));
+        assertFalse(interaction.contains("npcMount.setOwnerPlayerRef(playerRefComponent)"));
+        assertFalse(interaction.contains("npcMount.setAnchor(anchorX, anchorY, anchorZ)"));
+        assertFalse(interaction.contains("new MountNPC(anchorX, anchorY, anchorZ, npcNetworkId.getId())"));
+        assertFalse(interaction.contains("playerComponent.setMountEntityId(npcNetworkId.getId())"));
         assertFalse(interaction.contains("MountedGlidePacketHandler"));
         assertFalse(plugin.contains("MountedGlidePacketHandler::new"));
         assertFalse(source.contains("MountedGlidePacketHandler"));
@@ -64,6 +65,7 @@ class MountedGlideInputCaptureArchitectureTest {
         ));
 
         assertTrue(inputCapture.contains("PlayerInput"));
+        assertTrue(inputCapture.contains("MountSystems.HandleMountInput.class"));
         assertTrue(inputCapture.contains("PlayerSystems.ProcessPlayerInput.class"));
         assertTrue(inputCapture.contains("MovementStatesComponent"));
         assertTrue(inputCapture.contains("HeadRotation"));
@@ -75,9 +77,8 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(inputCapture.contains("states.sprinting || states.running"));
         assertTrue(inputCapture.contains("states.crouching || states.forcedCrouching"));
         assertTrue(inputCapture.contains("Math.toDegrees"));
-        assertFalse(inputCapture.contains("MountSystems.HandleMountInput"));
         assertFalse(inputCapture.contains("inputIterator.remove()"));
-        assertTrue(inputCapture.contains("playerInput.setMountId(0)"));
+        assertFalse(inputCapture.contains("playerInput.setMountId(0)"));
         assertTrue(inputCapture.contains("queue.clear()"));
     }
 
@@ -136,12 +137,11 @@ class MountedGlideInputCaptureArchitectureTest {
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideCleanupSystem.java"
         ));
 
-        assertTrue(cleanup.contains("MountPlugin.checkDismountNpc(bufferStore, riderRef, player)"));
-        assertTrue(cleanup.contains("bufferStore.tryRemoveComponent(mountRef, npcMountComponentType)"));
+        assertTrue(cleanup.contains("bufferStore.tryRemoveComponent(riderRef, mountedComponentType)"));
         assertTrue(cleanup.contains("bufferStore.ensureAndGetComponent(mountRef, Interactable.getComponentType())"));
-        assertTrue(cleanup.contains("npcMountStillLinkedToRider"));
-        assertFalse(cleanup.contains("mountedComponentType"));
-        assertFalse(cleanup.contains("mounted.getMountedToEntity()"));
+        assertTrue(cleanup.contains("riderMountedToMount"));
+        assertFalse(cleanup.contains("MountPlugin.checkDismountNpc"));
+        assertFalse(cleanup.contains("npcMountComponentType"));
     }
 
     private static String readGlideInputStack() throws IOException {

@@ -39,7 +39,7 @@ class InteractionMountEffectsTest {
         assertTrue(mountSource.contains("TameworkMount debug: stage=%s"));
         assertTrue(mountSource.contains("missing_required_components"));
         assertTrue(mountSource.contains("existing_mount_state"));
-        assertTrue(mountSource.contains("native_attach"));
+        assertTrue(mountSource.contains("mounted_component_attach"));
         assertTrue(cleanupSource.contains("stale_rider_cleanup"));
         assertTrue(mountSource.contains("MountedGlideStaleStateCleanup.clearInvalidRiderState"));
         assertTrue(mountSource.indexOf("MountedGlideStaleStateCleanup.clearInvalidRiderState")
@@ -52,8 +52,8 @@ class InteractionMountEffectsTest {
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
         int glideStart = mountSource.indexOf("private boolean applyTameworkMountedGlideMount");
-        int nativeAttachStart = mountSource.indexOf("private void attachNativeNpcMount");
-        String glideMountSource = mountSource.substring(glideStart, nativeAttachStart);
+        int glideEnd = mountSource.indexOf("private String resolveGlideMovementConfigId");
+        String glideMountSource = mountSource.substring(glideStart, glideEnd);
 
         assertTrue(glideMountSource.contains("resolveGlideMovementConfigId(role)"));
         assertTrue(mountSource.contains("MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = \"MountGlideMovementConfig\""));
@@ -72,8 +72,8 @@ class InteractionMountEffectsTest {
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
         int glideStart = mountSource.indexOf("private boolean applyTameworkMountedGlideMount");
-        int nativeAttachStart = mountSource.indexOf("private void attachNativeNpcMount");
-        String glideMountSource = mountSource.substring(glideStart, nativeAttachStart);
+        int glideEnd = mountSource.indexOf("private String resolveGlideMovementConfigId");
+        String glideMountSource = mountSource.substring(glideStart, glideEnd);
 
         assertTrue(glideMountSource.indexOf("applyRideState(npcRef, role, store, glideState)")
                 < glideMountSource.indexOf(

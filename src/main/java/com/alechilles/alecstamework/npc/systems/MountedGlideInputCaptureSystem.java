@@ -2,7 +2,8 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
-import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.builtin.mounts.MountSystems;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentAccessor;
@@ -35,7 +36,7 @@ import org.joml.Vector3d;
  * Captures raw rider input for the mounted glide controller before vanilla player movement consumes it.
  */
 public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<EntityStore> {
-    private final ComponentType<EntityStore, NPCMountComponent> npcMountComponentType;
+    private final ComponentType<EntityStore, MountedComponent> mountedComponentType;
     private final ComponentType<EntityStore, PlayerInput> playerInputComponentType;
     private final ComponentType<EntityStore, MovementStatesComponent> movementStatesComponentType;
     private final ComponentType<EntityStore, HeadRotation> headRotationComponentType;
@@ -45,12 +46,13 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
     private final ComponentType<EntityStore, TransformComponent> transformComponentType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
+            new SystemDependency<>(Order.BEFORE, MountSystems.HandleMountInput.class),
             new SystemDependency<>(Order.BEFORE, PlayerSystems.ProcessPlayerInput.class),
             new SystemDependency<>(Order.BEFORE, RoleSystems.BehaviourTickSystem.class)
     );
 
     public MountedGlideInputCaptureSystem(
-            @Nonnull ComponentType<EntityStore, NPCMountComponent> npcMountComponentType,
+            @Nonnull ComponentType<EntityStore, MountedComponent> mountedComponentType,
             @Nonnull ComponentType<EntityStore, PlayerInput> playerInputComponentType,
             @Nonnull ComponentType<EntityStore, MovementStatesComponent> movementStatesComponentType,
             @Nonnull ComponentType<EntityStore, HeadRotation> headRotationComponentType,
@@ -58,7 +60,7 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
             @Nonnull ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType,
             @Nonnull ComponentType<EntityStore, UUIDComponent> uuidComponentType,
             @Nonnull ComponentType<EntityStore, TransformComponent> transformComponentType) {
-        this.npcMountComponentType = npcMountComponentType;
+        this.mountedComponentType = mountedComponentType;
         this.playerInputComponentType = playerInputComponentType;
         this.movementStatesComponentType = movementStatesComponentType;
         this.headRotationComponentType = headRotationComponentType;
@@ -86,13 +88,12 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
             return;
         }
         TameworkMountedGlideComponent mount = commandBuffer.getComponent(mountRef, mountComponentType);
-        NPCMountComponent npcMount = commandBuffer.getComponent(mountRef, npcMountComponentType);
-        if (mount == null || npcMount == null || !matchesMountUuid(rider, mountRef, commandBuffer)
-                || !npcMountStillOwnedByRider(npcMount, mount)) {
+        MountedComponent mounted = commandBuffer.getComponent(riderRef, mountedComponentType);
+        if (mount == null || mounted == null || !matchesMountUuid(rider, mountRef, commandBuffer)
+                || !mountedStillAttachedToMount(mounted, mountRef)) {
             return;
         }
 
-        playerInput.setMountId(0);
         long now = System.currentTimeMillis();
         boolean captured = captureQueuedInput(mount, playerInput, riderRef, index, archetypeChunk, commandBuffer, now);
         if (!captured) {
@@ -346,12 +347,10 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
         return mountUuid != null && mountUuid.getUuid() != null && rider.getMountUuid().equals(mountUuid.getUuid().toString());
     }
 
-    private boolean npcMountStillOwnedByRider(@Nonnull NPCMountComponent npcMount,
-                                              @Nonnull TameworkMountedGlideComponent mount) {
-        if (npcMount.getOwnerPlayerRef() == null || npcMount.getOwnerPlayerRef().getUuid() == null) {
-            return false;
-        }
-        return mount.getRiderUuid().equals(npcMount.getOwnerPlayerRef().getUuid().toString());
+    private boolean mountedStillAttachedToMount(@Nonnull MountedComponent mounted,
+                                                @Nonnull Ref<EntityStore> mountRef) {
+        Ref<EntityStore> mountedTo = mounted.getMountedToEntity();
+        return mountedTo != null && mountedTo.isValid() && mountedTo.equals(mountRef);
     }
 
     private static double clamp(double value, double min, double max) {

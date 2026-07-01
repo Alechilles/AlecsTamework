@@ -13,8 +13,9 @@ import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.AnimationSlot;
-import com.hypixel.hytale.protocol.packets.interaction.MountNPC;
+import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
@@ -155,13 +156,13 @@ final class InteractionMountEffects {
                 TameworkMountedGlideComponent.getComponentType();
         ComponentType<EntityStore, TameworkMountedGlideRiderComponent> glideRiderType =
                 TameworkMountedGlideRiderComponent.getComponentType();
-        ComponentType<EntityStore, NPCMountComponent> npcMountType = NPCMountComponent.getComponentType();
-        if (glideMountType == null || glideRiderType == null || npcMountType == null) {
+        ComponentType<EntityStore, MountedComponent> mountedType = MountedComponent.getComponentType();
+        if (glideMountType == null || glideRiderType == null || mountedType == null) {
             return failMount(role, "mounted_glide", "component_type_unavailable",
-                    "glideMountType=%s glideRiderType=%s npcMountType=%s",
+                    "glideMountType=%s glideRiderType=%s mountedType=%s",
                     glideMountType != null,
                     glideRiderType != null,
-                    npcMountType != null);
+                    mountedType != null);
         }
         UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
         UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
@@ -191,25 +192,19 @@ final class InteractionMountEffects {
                 role,
                 glideRiderType,
                 glideMountType,
-                npcMountType,
+                mountedType,
                 store
         );
         if (hasActiveNativeMount(playerComponent)
-                || store.getComponent(npcRef, npcMountType) != null
+                || store.getComponent(playerRef, mountedType) != null
                 || store.getComponent(npcRef, glideMountType) != null
                 || store.getComponent(playerRef, glideRiderType) != null) {
             return failMount(role, "mounted_glide", "existing_mount_state",
-                    "playerMountEntityId=%s hasNpcMount=%s hasGlideMount=%s hasGlideRider=%s",
+                    "playerMountEntityId=%s hasMounted=%s hasGlideMount=%s hasGlideRider=%s",
                     playerComponent.getMountEntityId(),
-                    store.getComponent(npcRef, npcMountType) != null,
+                    store.getComponent(playerRef, mountedType) != null,
                     store.getComponent(npcRef, glideMountType) != null,
                     store.getComponent(playerRef, glideRiderType) != null);
-        }
-        int originalRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
-        if (originalRoleIndex < 0) {
-            return failMount(role, "mounted_glide", "missing_original_role_index",
-                    "role=%s",
-                    safeValue(role.getRoleName()));
         }
         TwMountedGlideConfig config = TwMountedGlideConfig.resolveForRole(role.getRoleName());
         if (config == null) {
@@ -249,21 +244,26 @@ final class InteractionMountEffects {
         float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
         float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
         String movementConfigId = resolveGlideMovementConfigId(role);
-        NPCMountComponent npcMount = store.ensureAndGetComponent(npcRef, npcMountType);
-        if (npcMount == null) {
-            return failMount(role, "mounted_glide", "ensure_npc_mount_failed");
-        }
-        npcMount.setOriginalRoleIndex(originalRoleIndex);
-        npcMount.setOwnerPlayerRef(playerRefComponent);
-        npcMount.setAnchor(anchorX, anchorY, anchorZ);
         store.putComponent(npcRef, glideMountType, glideMount);
         store.putComponent(playerRef, glideRiderType, glideRider);
+        store.putComponent(
+                playerRef,
+                mountedType,
+                new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)
+        );
         clearStatusAnimation(npcRef, npcComponent, store);
         applyRideState(npcRef, role, store, glideState);
         role.setActiveMotionController(npcRef, npcComponent, glideController, store);
         boolean movementConfigApplied =
                 applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
-        attachNativeNpcMount(playerComponent, playerRefComponent, npcNetworkId, anchorX, anchorY, anchorZ, npcRef, store);
+        store.tryRemoveComponent(npcRef, Interactable.getComponentType());
+        logMountDebug(role, "mounted_glide", "mounted_component_attach",
+                "networkId=%s anchor=%s/%s/%s controller=%s",
+                npcNetworkId.getId(),
+                anchorX,
+                anchorY,
+                anchorZ,
+                MountController.Minecart);
         logMountDebug(role, "mounted_glide", "applied",
                 "npcUuid=%s riderUuid=%s networkId=%s state=%s controller=%s config=%s anchor=%s/%s/%s movementConfig=%s movementConfigApplied=%s",
                 npcUuid.getUuid(),
@@ -286,25 +286,6 @@ final class InteractionMountEffects {
             return DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID;
         }
         return movementConfigId.trim();
-    }
-
-    private void attachNativeNpcMount(Player playerComponent,
-                                      PlayerRef playerRefComponent,
-                                      NetworkId npcNetworkId,
-                                      float anchorX,
-                                      float anchorY,
-                                      float anchorZ,
-                                      Ref<EntityStore> npcRef,
-                                      Store<EntityStore> store) {
-        playerComponent.setMountEntityId(npcNetworkId.getId());
-        playerRefComponent.getPacketHandler().write(new MountNPC(anchorX, anchorY, anchorZ, npcNetworkId.getId()));
-        store.tryRemoveComponent(npcRef, Interactable.getComponentType());
-        logMountDebug(null, "mounted_glide", "native_attach",
-                "networkId=%s anchor=%s/%s/%s",
-                npcNetworkId.getId(),
-                anchorX,
-                anchorY,
-                anchorZ);
     }
 
     static boolean hasActiveNativeMount(@Nonnull Player playerComponent) {

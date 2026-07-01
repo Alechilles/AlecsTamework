@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
-import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -24,7 +23,6 @@ import javax.annotation.Nonnull;
  */
 public final class MountedGlideAuthoritativePoseSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType;
-    private final ComponentType<EntityStore, NPCMountComponent> npcMountComponentType;
     private final ComponentType<EntityStore, TransformComponent> transformComponentType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
@@ -34,12 +32,10 @@ public final class MountedGlideAuthoritativePoseSystem extends EntityTickingSyst
 
     public MountedGlideAuthoritativePoseSystem(
             @Nonnull ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType,
-            @Nonnull ComponentType<EntityStore, NPCMountComponent> npcMountComponentType,
             @Nonnull ComponentType<EntityStore, TransformComponent> transformComponentType) {
         this.mountComponentType = mountComponentType;
-        this.npcMountComponentType = npcMountComponentType;
         this.transformComponentType = transformComponentType;
-        this.query = Query.and(mountComponentType, npcMountComponentType, transformComponentType);
+        this.query = Query.and(mountComponentType, transformComponentType);
     }
 
     @Override
@@ -49,8 +45,7 @@ public final class MountedGlideAuthoritativePoseSystem extends EntityTickingSyst
                      @Nonnull Store<EntityStore> store,
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         TameworkMountedGlideComponent mount = archetypeChunk.getComponent(index, mountComponentType);
-        NPCMountComponent npcMount = archetypeChunk.getComponent(index, npcMountComponentType);
-        if (mount == null || npcMount == null || !npcMountStillOwnedByRider(npcMount, mount)) {
+        if (mount == null || mount.getRiderUuid().isBlank()) {
             return;
         }
         Ref<EntityStore> mountRef = archetypeChunk.getReferenceTo(index);
@@ -67,14 +62,6 @@ public final class MountedGlideAuthoritativePoseSystem extends EntityTickingSyst
                 transform.getRotation().roll()
         );
         commandBuffer.putComponent(mountRef, mountComponentType, mount);
-    }
-
-    private boolean npcMountStillOwnedByRider(@Nonnull NPCMountComponent npcMount,
-                                              @Nonnull TameworkMountedGlideComponent mount) {
-        if (npcMount.getOwnerPlayerRef() == null || npcMount.getOwnerPlayerRef().getUuid() == null) {
-            return false;
-        }
-        return mount.getRiderUuid().equals(npcMount.getOwnerPlayerRef().getUuid().toString());
     }
 
     @Nonnull
