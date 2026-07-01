@@ -324,7 +324,10 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
             store.tryRemoveComponent(riderRef, riderType);
         }
         if (mountRef != null && mountRef.isValid()) {
-            clearNativeMountOwner(mountRef, store);
+            removeNativeMountComponent(mountRef, store);
+            if (mount != null) {
+                restoreNpcState(mountRef, mount, store);
+            }
             if (mountType != null) {
                 store.tryRemoveComponent(mountRef, mountType);
             }
@@ -333,11 +336,12 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
         return true;
     }
 
-    private void clearNativeMountOwner(@Nonnull Ref<EntityStore> mountRef,
-                                       @Nonnull Store<EntityStore> store) {
+    private void removeNativeMountComponent(@Nonnull Ref<EntityStore> mountRef,
+                                            @Nonnull Store<EntityStore> store) {
         NPCMountComponent nativeMount = store.getComponent(mountRef, NPCMountComponent.getComponentType());
         if (nativeMount != null) {
             nativeMount.setOwnerPlayerRef(null);
+            store.tryRemoveComponent(mountRef, NPCMountComponent.getComponentType());
         }
     }
 
@@ -762,6 +766,21 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
 
     private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,
                                  @Nonnull TameworkRideMountComponent mount,
+                                 @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(mountRef, NPCEntity.getComponentType());
+        if (npc == null || npc.getRole() == null) {
+            return;
+        }
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
+        Role role = npc.getRole();
+        if (!mount.getPreviousMotionController().isBlank()) {
+            role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
+        }
+        applyState(role, mountRef, store, mount.getPreviousState(), mount.getPreviousSubState());
+    }
+
+    private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,
+                                 @Nonnull TameworkMountedGlideComponent mount,
                                  @Nonnull Store<EntityStore> store) {
         NPCEntity npc = store.getComponent(mountRef, NPCEntity.getComponentType());
         if (npc == null || npc.getRole() == null) {

@@ -140,10 +140,10 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                     MountPlugin.checkDismountNpc(bufferStore, riderRef, player);
                 }
                 if (mountRef.isValid()) {
-                    clearNativeMountOwner(mountRef, bufferStore);
+                    removeNativeMountComponent(mountRef, bufferStore);
                 }
             } else if (mountRef.isValid()) {
-                clearNativeMountOwner(mountRef, bufferStore);
+                removeNativeMountComponent(mountRef, bufferStore);
             }
             if (mountRef.isValid()) {
                 restoreNpcState(mountRef, npc, mount, bufferStore);
@@ -156,11 +156,12 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
         });
     }
 
-    private void clearNativeMountOwner(@Nonnull Ref<EntityStore> mountRef,
-                                       @Nonnull Store<EntityStore> store) {
-        NPCMountComponent nativeMount = store.getComponent(mountRef, nativeMountComponentType);
+    private void removeNativeMountComponent(@Nonnull Ref<EntityStore> mountRef,
+                                            @Nonnull Store<EntityStore> bufferStore) {
+        NPCMountComponent nativeMount = bufferStore.getComponent(mountRef, nativeMountComponentType);
         if (nativeMount != null) {
             nativeMount.setOwnerPlayerRef(null);
+            bufferStore.tryRemoveComponent(mountRef, nativeMountComponentType);
         }
     }
 

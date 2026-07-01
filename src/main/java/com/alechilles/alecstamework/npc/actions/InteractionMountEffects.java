@@ -162,7 +162,6 @@ final class InteractionMountEffects {
                     glideRiderType != null,
                     nativeMountType != null);
         }
-        ComponentType<EntityStore, MountedComponent> mountedType = MountedComponent.getComponentType();
         UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
         UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
         PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
@@ -191,7 +190,7 @@ final class InteractionMountEffects {
                 role,
                 glideRiderType,
                 glideMountType,
-                mountedType,
+                nativeMountType,
                 store
         );
         NPCMountComponent existingNativeMount = store.getComponent(npcRef, nativeMountType);

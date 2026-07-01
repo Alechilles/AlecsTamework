@@ -41,6 +41,7 @@ class InteractionMountEffectsTest {
         assertTrue(mountSource.contains("existing_mount_state"));
         assertTrue(mountSource.contains("native_npc_mount_attach"));
         assertTrue(cleanupSource.contains("stale_rider_cleanup"));
+        assertFalse(cleanupSource.contains("MountedComponent"));
         assertTrue(mountSource.contains("MountedGlideStaleStateCleanup.clearInvalidRiderState"));
         assertTrue(mountSource.indexOf("MountedGlideStaleStateCleanup.clearInvalidRiderState")
                 < mountSource.indexOf("\"existing_mount_state\""));
@@ -81,6 +82,21 @@ class InteractionMountEffectsTest {
         assertFalse(glideMountSource.contains(
                 "role.setActiveMotionController(npcRef, npcComponent, glideController, store)"
         ));
+    }
+
+    @Test
+    void mountedGlideMountDoesNotRequireLegacyMountedComponent() throws Exception {
+        String mountSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        int glideStart = mountSource.indexOf("private boolean applyTameworkMountedGlideMount");
+        int glideEnd = mountSource.indexOf("private String resolveGlideMovementConfigId");
+        String glideMountSource = mountSource.substring(glideStart, glideEnd);
+
+        assertFalse(glideMountSource.contains("MountedComponent.getComponentType()"));
+        assertFalse(glideMountSource.contains("mountedType"));
+        assertTrue(glideMountSource.contains("nativeMountType"));
+        assertTrue(glideMountSource.contains("MountedGlideStaleStateCleanup.clearInvalidRiderState"));
     }
 
     private static Player newPlayerWithoutServerInit() throws Exception {

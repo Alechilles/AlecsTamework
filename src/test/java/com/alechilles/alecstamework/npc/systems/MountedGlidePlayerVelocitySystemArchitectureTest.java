@@ -22,4 +22,19 @@ class MountedGlidePlayerVelocitySystemArchitectureTest {
         assertTrue(source.contains("ChangeVelocityType.Set"));
         assertTrue(source.contains("MountedGlidePhysics.update"));
     }
+
+    @Test
+    void mountedGlideVelocitySystemUsesBaseGameVelocityOrderingMarker() throws IOException {
+        Path path = Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"
+        );
+        String source = Files.readString(path);
+
+        assertTrue(source.contains(
+                "import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifyingSystem;"
+        ));
+        assertTrue(source.contains("implements IVelocityModifyingSystem"));
+        assertTrue(source.contains("Order.AFTER, MountedGlideInputCaptureSystem.class"));
+        assertTrue(source.contains("velocity.addInstruction"));
+    }
 }

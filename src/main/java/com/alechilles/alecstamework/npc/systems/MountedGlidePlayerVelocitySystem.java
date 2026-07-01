@@ -19,6 +19,7 @@ import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
+import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifyingSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -29,7 +30,9 @@ import org.joml.Vector3d;
  * Drives mounted glide by applying the computed glide velocity to the native mount rider through
  * {@code Velocity.addInstruction}.
  */
-public final class MountedGlidePlayerVelocitySystem extends EntityTickingSystem<EntityStore> {
+public final class MountedGlidePlayerVelocitySystem
+        extends EntityTickingSystem<EntityStore>
+        implements IVelocityModifyingSystem {
     private static final TwMountedGlideConfig DEFAULT_CONFIG = new TwMountedGlideConfig();
 
     private final ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType;

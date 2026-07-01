@@ -93,9 +93,11 @@ class MountedGlideInputCaptureArchitectureTest {
         String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
 
         assertTrue(velocity.contains("extends EntityTickingSystem<EntityStore>"));
+        assertTrue(velocity.contains("implements IVelocityModifyingSystem"));
         assertTrue(velocity.contains("NPCMountComponent"));
         assertTrue(velocity.contains("Velocity.getComponentType()"));
         assertTrue(velocity.contains("Order.AFTER, MountedGlideInputCaptureSystem.class"));
+        assertFalse(velocity.contains("PlayerVelocityInstructionSystem"));
         assertTrue(velocity.contains("Query.and(mountComponentType, nativeMountComponentType, transformComponentType)"));
         assertTrue(velocity.contains("nativeMount.getOwnerPlayerRef().getReference()"));
         assertTrue(velocity.contains("riderRef.getStore() != store"));
@@ -122,6 +124,7 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(cleanup.contains("riderNativeMountedToMount"));
         assertTrue(cleanup.contains("nativeMount.getOwnerPlayerRef().getReference()"));
         assertTrue(cleanup.contains("MountPlugin.checkDismountNpc(bufferStore, riderRef, player)"));
+        assertTrue(cleanup.contains("bufferStore.tryRemoveComponent(mountRef, nativeMountComponentType)"));
         assertTrue(cleanup.contains("bufferStore.ensureAndGetComponent(mountRef, Interactable.getComponentType())"));
         assertFalse(cleanup.contains("MountedComponent"));
         assertFalse(cleanup.contains("riderMountedToMount"));
@@ -141,6 +144,7 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(handler.contains("TameworkGlide debug: dismountPacket"));
         assertTrue(handler.contains("MountPlugin.checkDismountNpc(store, riderRef, player)"));
         assertTrue(handler.contains("store.tryRemoveComponent(riderRef, riderType)"));
+        assertTrue(handler.contains("store.tryRemoveComponent(mountRef, NPCMountComponent.getComponentType())"));
         assertTrue(handler.contains("store.tryRemoveComponent(mountRef, mountType)"));
         assertTrue(handler.contains("store.ensureAndGetComponent(mountRef, Interactable.getComponentType())"));
         String method = extractMethodSource(
@@ -148,6 +152,9 @@ class MountedGlideInputCaptureArchitectureTest {
                 "private boolean handleMountedGlideDismount",
                 "private RideSession resolveRegisteredRideSession"
         );
+        assertTrue(method.contains("restoreNpcState(mountRef, mount, store)"));
+        assertTrue(method.indexOf("restoreNpcState(mountRef, mount, store)")
+                < method.indexOf("store.tryRemoveComponent(mountRef, mountType)"));
         assertFalse(method.contains("MountedComponent.getComponentType()"));
     }
 
