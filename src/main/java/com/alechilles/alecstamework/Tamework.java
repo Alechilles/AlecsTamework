@@ -1101,6 +1101,10 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (hStatsIntegration != null) {
+            hStatsIntegration.close();
+            hStatsIntegration = null;
+        }
         if (crashTelemetryService != null) {
             crashTelemetryService.shutdown();
         }

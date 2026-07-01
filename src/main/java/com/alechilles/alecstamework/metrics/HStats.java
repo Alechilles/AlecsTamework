@@ -13,7 +13,6 @@
  */
 package com.alechilles.alecstamework.metrics;
 
-import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.universe.Universe;
 
 import java.io.IOException;
@@ -28,16 +27,20 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class HStats {
+public class HStats implements AutoCloseable {
 
     private final String URL_BASE = "https://api.hstats.dev/api/";
     private final boolean DEBUG = false; // This is for development purposes only
+    private static final int REQUEST_TIMEOUT_MS = 5_000;
 
     private final String modUUID;
     private final String modVersion;
     private final String serverUUID;
+    private final ScheduledExecutorService metricsExecutor;
 
     /**
      * Initializes HStats for your mod.
@@ -52,13 +55,19 @@ public class HStats {
         // Get or create the server UUID
         this.serverUUID = getServerUUID();
         if (this.serverUUID == null) {
+            this.metricsExecutor = null;
             System.out.println("[HStats] Metrics are disabled on this server.");
             return; // Metrics disabled by server owner
         }
 
-        logMetrics();
-        addModToServer();
-        HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(this::logMetrics, 5, 5, TimeUnit.MINUTES);
+        this.metricsExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "AlecTamework-HStats");
+            thread.setDaemon(true);
+            return thread;
+        });
+        metricsExecutor.execute(this::logMetrics);
+        metricsExecutor.execute(this::addModToServer);
+        metricsExecutor.scheduleAtFixedRate(this::logMetrics, 5, 5, TimeUnit.MINUTES);
     }
 
     public HStats(String modUUID) {
@@ -116,6 +125,8 @@ public class HStats {
             URL url = URI.create(urlString).toURL();
             HttpURLConnection http = (HttpURLConnection) url.openConnection();
 
+            http.setConnectTimeout(REQUEST_TIMEOUT_MS);
+            http.setReadTimeout(REQUEST_TIMEOUT_MS);
             http.setRequestMethod("POST");
             http.setDoOutput(true);
             http.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
@@ -149,6 +160,13 @@ public class HStats {
 
     private int getOnlinePlayerCount() {
         return Universe.get().getPlayerCount();
+    }
+
+    @Override
+    public void close() {
+        if (metricsExecutor != null) {
+            metricsExecutor.shutdownNow();
+        }
     }
 
 }
