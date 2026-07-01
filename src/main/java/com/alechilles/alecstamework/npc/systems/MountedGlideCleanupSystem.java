@@ -2,7 +2,8 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
-import com.hypixel.hytale.builtin.mounts.MountedComponent;
+import com.hypixel.hytale.builtin.mounts.MountPlugin;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -15,6 +16,7 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -31,30 +33,33 @@ import javax.annotation.Nullable;
  * Tears down stale mounted glide sessions and restores the NPC state captured at mount time.
  */
 public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityStore> {
-    private final ComponentType<EntityStore, MountedComponent> mountedComponentType;
+    private final ComponentType<EntityStore, NPCMountComponent> nativeMountComponentType;
     private final ComponentType<EntityStore, TameworkMountedGlideRiderComponent> riderComponentType;
     private final ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType;
     private final ComponentType<EntityStore, UUIDComponent> uuidComponentType;
     private final ComponentType<EntityStore, NPCEntity> npcComponentType;
     private final ComponentType<EntityStore, DeathComponent> deathComponentType;
+    private final ComponentType<EntityStore, Player> playerComponentType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, RoleSystems.BehaviourTickSystem.class)
     );
 
     public MountedGlideCleanupSystem(
-            @Nonnull ComponentType<EntityStore, MountedComponent> mountedComponentType,
+            @Nonnull ComponentType<EntityStore, NPCMountComponent> nativeMountComponentType,
             @Nonnull ComponentType<EntityStore, TameworkMountedGlideRiderComponent> riderComponentType,
             @Nonnull ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType,
             @Nonnull ComponentType<EntityStore, UUIDComponent> uuidComponentType,
             @Nonnull ComponentType<EntityStore, NPCEntity> npcComponentType,
-            @Nonnull ComponentType<EntityStore, DeathComponent> deathComponentType) {
-        this.mountedComponentType = mountedComponentType;
+            @Nonnull ComponentType<EntityStore, DeathComponent> deathComponentType,
+            @Nonnull ComponentType<EntityStore, Player> playerComponentType) {
+        this.nativeMountComponentType = nativeMountComponentType;
         this.riderComponentType = riderComponentType;
         this.mountComponentType = mountComponentType;
         this.uuidComponentType = uuidComponentType;
         this.npcComponentType = npcComponentType;
         this.deathComponentType = deathComponentType;
+        this.playerComponentType = playerComponentType;
         this.query = Query.and(mountComponentType, npcComponentType, uuidComponentType);
     }
 
@@ -82,7 +87,7 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                 && !riderStillLinkedTo(riderRef, mountRef, store);
         boolean mountedMismatch = riderRef != null
                 && riderRef.isValid()
-                && !riderMountedToMount(riderRef, mountRef, store);
+                && !riderNativeMountedToMount(riderRef, mountRef, store);
         if (mountDead || riderMissing || riderInvalid || riderDead || linkMismatch || mountedMismatch) {
             cleanupGlide(mountRef, riderRef, npc, mount, commandBuffer);
         }
@@ -112,15 +117,15 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
         return mountUuid != null && mountUuid.getUuid() != null && rider.getMountUuid().equals(mountUuid.getUuid().toString());
     }
 
-    private boolean riderMountedToMount(@Nonnull Ref<EntityStore> riderRef,
-                                        @Nonnull Ref<EntityStore> mountRef,
-                                        @Nonnull Store<EntityStore> store) {
-        MountedComponent mounted = store.getComponent(riderRef, mountedComponentType);
-        if (mounted == null || mounted.getMountedToEntity() == null) {
+    private boolean riderNativeMountedToMount(@Nonnull Ref<EntityStore> riderRef,
+                                              @Nonnull Ref<EntityStore> mountRef,
+                                              @Nonnull Store<EntityStore> store) {
+        NPCMountComponent nativeMount = store.getComponent(mountRef, nativeMountComponentType);
+        if (nativeMount == null || nativeMount.getOwnerPlayerRef() == null) {
             return false;
         }
-        Ref<EntityStore> mountedTo = mounted.getMountedToEntity();
-        return mountedTo.isValid() && mountedTo.equals(mountRef);
+        Ref<EntityStore> ownerRef = nativeMount.getOwnerPlayerRef().getReference();
+        return ownerRef != null && ownerRef.isValid() && ownerRef.equals(riderRef);
     }
 
     private void cleanupGlide(@Nonnull Ref<EntityStore> mountRef,
@@ -130,7 +135,15 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         commandBuffer.run(bufferStore -> {
             if (riderRef != null && riderRef.isValid()) {
-                bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
+                Player player = bufferStore.getComponent(riderRef, playerComponentType);
+                if (player != null) {
+                    MountPlugin.checkDismountNpc(bufferStore, riderRef, player);
+                }
+                if (mountRef.isValid()) {
+                    clearNativeMountOwner(mountRef, bufferStore);
+                }
+            } else if (mountRef.isValid()) {
+                clearNativeMountOwner(mountRef, bufferStore);
             }
             if (mountRef.isValid()) {
                 restoreNpcState(mountRef, npc, mount, bufferStore);
@@ -141,6 +154,14 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                 bufferStore.tryRemoveComponent(riderRef, riderComponentType);
             }
         });
+    }
+
+    private void clearNativeMountOwner(@Nonnull Ref<EntityStore> mountRef,
+                                       @Nonnull Store<EntityStore> store) {
+        NPCMountComponent nativeMount = store.getComponent(mountRef, nativeMountComponentType);
+        if (nativeMount != null) {
+            nativeMount.setOwnerPlayerRef(null);
+        }
     }
 
     private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,

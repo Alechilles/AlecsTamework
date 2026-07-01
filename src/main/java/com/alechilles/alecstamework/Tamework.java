@@ -660,23 +660,24 @@ public class Tamework extends JavaPlugin {
                             Velocity.getComponentType()
                     )
             );
-        }
-        ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
-        if (mountedComponentType == null) {
-            getLogger().at(Level.WARNING).log(
-                    "Mount plugin mounted component type unavailable during setup; skipping legacy Tamework ride systems and glide cleanup."
-            );
-        } else {
             getEntityStoreRegistry().registerSystem(
                     new MountedGlideCleanupSystem(
-                            mountedComponentType,
+                            npcMountComponentType,
                             mountedGlideRiderComponentType,
                             mountedGlideComponentType,
                             UUIDComponent.getComponentType(),
                             NPCEntity.getComponentType(),
-                            DeathComponent.getComponentType()
+                            DeathComponent.getComponentType(),
+                            Player.getComponentType()
                     )
             );
+        }
+        ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
+        if (mountedComponentType == null) {
+            getLogger().at(Level.WARNING).log(
+                    "Mount plugin mounted component type unavailable during setup; skipping legacy Tamework ride systems."
+            );
+        } else {
             getEntityStoreRegistry().registerSystem(
                     new MountedRideInputCaptureSystem(
                             mountedComponentType,

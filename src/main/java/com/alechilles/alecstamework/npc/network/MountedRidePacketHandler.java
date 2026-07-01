@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.alechilles.alecstamework.npc.systems.MountedRideInputProbeLogger;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -27,6 +28,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.io.handlers.IPacketHandler;
 import com.hypixel.hytale.server.core.io.handlers.SubPacketHandler;
+import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -314,8 +316,29 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
                 rider.getMountUuid(),
                 mount != null
         );
-        store.tryRemoveComponent(riderRef, MountedComponent.getComponentType());
+        Player player = store.getComponent(riderRef, Player.getComponentType());
+        if (player != null) {
+            MountPlugin.checkDismountNpc(store, riderRef, player);
+        }
+        if (riderType != null) {
+            store.tryRemoveComponent(riderRef, riderType);
+        }
+        if (mountRef != null && mountRef.isValid()) {
+            clearNativeMountOwner(mountRef, store);
+            if (mountType != null) {
+                store.tryRemoveComponent(mountRef, mountType);
+            }
+            store.ensureAndGetComponent(mountRef, Interactable.getComponentType());
+        }
         return true;
+    }
+
+    private void clearNativeMountOwner(@Nonnull Ref<EntityStore> mountRef,
+                                       @Nonnull Store<EntityStore> store) {
+        NPCMountComponent nativeMount = store.getComponent(mountRef, NPCMountComponent.getComponentType());
+        if (nativeMount != null) {
+            nativeMount.setOwnerPlayerRef(null);
+        }
     }
 
     @Nullable
