@@ -166,16 +166,21 @@ final class InteractionMountEffects {
         Player playerComponent = store.getComponent(playerRef, Player.getComponentType());
         NPCEntity npcComponent = store.getComponent(npcRef, NPCEntity.getComponentType());
         NetworkId npcNetworkId = store.getComponent(npcRef, NetworkId.getComponentType());
+        TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        boolean npcTransformReady = npcTransform != null
+                && npcTransform.getPosition() != null
+                && npcTransform.getRotation() != null;
         if (npcUuid == null || riderUuid == null || playerRefComponent == null || playerComponent == null
-                || npcComponent == null || npcNetworkId == null) {
+                || npcComponent == null || npcNetworkId == null || !npcTransformReady) {
             return failMount(role, "mounted_glide", "missing_required_components",
-                    "npcUuid=%s riderUuid=%s playerRef=%s player=%s npc=%s networkId=%s",
+                    "npcUuid=%s riderUuid=%s playerRef=%s player=%s npc=%s networkId=%s transform=%s",
                     npcUuid != null,
                     riderUuid != null,
                     playerRefComponent != null,
                     playerComponent != null,
                     npcComponent != null,
-                    npcNetworkId != null);
+                    npcNetworkId != null,
+                    npcTransformReady);
         }
         MountedGlideStaleStateCleanup.clearInvalidRiderState(
                 playerRef,
@@ -226,6 +231,14 @@ final class InteractionMountEffects {
         glideMount.setGlideController(glideController);
         glideMount.setMountStartMs(System.currentTimeMillis());
         glideMount.initializePhysicsState(config);
+        glideMount.captureAuthoritativePose(
+                npcTransform.getPosition().x,
+                npcTransform.getPosition().y,
+                npcTransform.getPosition().z,
+                npcTransform.getRotation().yaw(),
+                npcTransform.getRotation().pitch(),
+                npcTransform.getRotation().roll()
+        );
 
         TameworkMountedGlideRiderComponent glideRider =
                 new TameworkMountedGlideRiderComponent(npcUuid.getUuid().toString());

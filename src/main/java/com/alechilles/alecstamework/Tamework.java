@@ -137,8 +137,10 @@ import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTranquilizerPeakSystem;
 import com.alechilles.alecstamework.npc.systems.FlyingCompanionControlSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
+import com.alechilles.alecstamework.npc.systems.MountedGlideAuthoritativePoseSystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlideCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlideInputCaptureSystem;
+import com.alechilles.alecstamework.npc.systems.MountedGlideNativeInputIsolationSystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideCleanupSystem;
@@ -646,6 +648,20 @@ public class Tamework extends JavaPlugin {
                             mountedGlideRiderComponentType,
                             mountedGlideComponentType,
                             UUIDComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedGlideNativeInputIsolationSystem(
+                            mountedGlideComponentType,
+                            npcMountComponentType,
+                            TransformComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedGlideAuthoritativePoseSystem(
+                            mountedGlideComponentType,
+                            npcMountComponentType,
+                            TransformComponent.getComponentType()
                     )
             );
             getEntityStoreRegistry().registerSystem(

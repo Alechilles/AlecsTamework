@@ -70,6 +70,7 @@ class TameworkMountedGlideComponentTest {
         component.setGlideSpeed(14.0);
         component.setVerticalVelocity(2.0);
         component.setFlapCooldownRemainingSeconds(0.75);
+        component.captureAuthoritativePose(1.0, 2.0, 3.0, 0.4f, 0.5f, 0.6f);
 
         component.clearInputSnapshot();
 
@@ -80,6 +81,40 @@ class TameworkMountedGlideComponentTest {
         assertEquals(14.0, component.getGlideSpeed(), 0.0001);
         assertEquals(2.0, component.getVerticalVelocity(), 0.0001);
         assertEquals(0.75, component.getFlapCooldownRemainingSeconds(), 0.0001);
+        assertTrue(component.hasAuthoritativePose());
+        assertEquals(1.0, component.getAuthoritativeX(), 0.0001);
+    }
+
+    @Test
+    void authoritativePoseClampsInvalidValuesAndClones() {
+        TameworkMountedGlideComponent component = new TameworkMountedGlideComponent();
+
+        component.captureAuthoritativePose(
+                Double.NaN,
+                12.5,
+                Double.POSITIVE_INFINITY,
+                Float.NaN,
+                0.75f,
+                Float.NEGATIVE_INFINITY
+        );
+
+        assertTrue(component.hasAuthoritativePose());
+        assertEquals(0.0, component.getAuthoritativeX(), 0.0001);
+        assertEquals(12.5, component.getAuthoritativeY(), 0.0001);
+        assertEquals(0.0, component.getAuthoritativeZ(), 0.0001);
+        assertEquals(0.0f, component.getAuthoritativeYaw(), 0.0001f);
+        assertEquals(0.75f, component.getAuthoritativePitch(), 0.0001f);
+        assertEquals(0.0f, component.getAuthoritativeRoll(), 0.0001f);
+
+        TameworkMountedGlideComponent clone = component.clone();
+
+        assertTrue(clone.hasAuthoritativePose());
+        assertEquals(12.5, clone.getAuthoritativeY(), 0.0001);
+
+        component.clearAuthoritativePose();
+
+        assertFalse(component.hasAuthoritativePose());
+        assertEquals(0.0, component.getAuthoritativeY(), 0.0001);
     }
 
     @Test

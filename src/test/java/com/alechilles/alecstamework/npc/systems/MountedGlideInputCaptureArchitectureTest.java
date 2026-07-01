@@ -79,6 +79,35 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
+    void mountedGlideIsolatesNativeMountMovementBeforeNpcBehaviour() throws IOException {
+        String isolation = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideNativeInputIsolationSystem.java"
+        ));
+        String capture = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideAuthoritativePoseSystem.java"
+        ));
+        String component = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/components/TameworkMountedGlideComponent.java"
+        ));
+        String interaction = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
+
+        assertTrue(isolation.contains("Order.AFTER, MountSystems.HandleMountInput.class"));
+        assertTrue(isolation.contains("Order.BEFORE, RoleSystems.PreBehaviourSupportTickSystem.class"));
+        assertTrue(isolation.contains("transform.getPosition().x = mount.getAuthoritativeX()"));
+        assertTrue(capture.contains("Order.AFTER, RoleSystems.PostBehaviourSupportTickSystem.class"));
+        assertTrue(capture.contains("Order.BEFORE, TransformSystems.EntityTrackerUpdate.class"));
+        assertTrue(capture.contains("mount.captureAuthoritativePose"));
+        assertTrue(component.contains("\"HasAuthoritativePose\""));
+        assertTrue(component.contains("\"AuthoritativeX\""));
+        assertTrue(interaction.contains("glideMount.captureAuthoritativePose"));
+        assertTrue(plugin.contains("new MountedGlideNativeInputIsolationSystem"));
+        assertTrue(plugin.contains("new MountedGlideAuthoritativePoseSystem"));
+    }
+
+    @Test
     void mountedGlideCleanupTracksNativeDismountState() throws IOException {
         String cleanup = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideCleanupSystem.java"
@@ -95,6 +124,10 @@ class MountedGlideInputCaptureArchitectureTest {
     private static String readGlideInputStack() throws IOException {
         return Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
+        )) + Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideNativeInputIsolationSystem.java"
+        )) + Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideAuthoritativePoseSystem.java"
         )) + Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideCleanupSystem.java"
         ));

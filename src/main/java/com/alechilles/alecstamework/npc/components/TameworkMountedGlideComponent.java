@@ -114,6 +114,34 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
                     TameworkMountedGlideComponent::setBoostRemainingSeconds,
                     TameworkMountedGlideComponent::getBoostRemainingSeconds)
             .add()
+            .append(new KeyedCodec<>("HasAuthoritativePose", Codec.BOOLEAN),
+                    TameworkMountedGlideComponent::setHasAuthoritativePose,
+                    TameworkMountedGlideComponent::hasAuthoritativePose)
+            .add()
+            .append(new KeyedCodec<>("AuthoritativeX", Codec.DOUBLE),
+                    TameworkMountedGlideComponent::setAuthoritativeX,
+                    TameworkMountedGlideComponent::getAuthoritativeX)
+            .add()
+            .append(new KeyedCodec<>("AuthoritativeY", Codec.DOUBLE),
+                    TameworkMountedGlideComponent::setAuthoritativeY,
+                    TameworkMountedGlideComponent::getAuthoritativeY)
+            .add()
+            .append(new KeyedCodec<>("AuthoritativeZ", Codec.DOUBLE),
+                    TameworkMountedGlideComponent::setAuthoritativeZ,
+                    TameworkMountedGlideComponent::getAuthoritativeZ)
+            .add()
+            .append(new KeyedCodec<>("AuthoritativeYaw", Codec.FLOAT),
+                    TameworkMountedGlideComponent::setAuthoritativeYaw,
+                    TameworkMountedGlideComponent::getAuthoritativeYaw)
+            .add()
+            .append(new KeyedCodec<>("AuthoritativePitch", Codec.FLOAT),
+                    TameworkMountedGlideComponent::setAuthoritativePitch,
+                    TameworkMountedGlideComponent::getAuthoritativePitch)
+            .add()
+            .append(new KeyedCodec<>("AuthoritativeRoll", Codec.FLOAT),
+                    TameworkMountedGlideComponent::setAuthoritativeRoll,
+                    TameworkMountedGlideComponent::getAuthoritativeRoll)
+            .add()
             .build();
 
     private String riderUuid = "";
@@ -139,6 +167,13 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     private double verticalVelocity;
     private double flapCooldownRemainingSeconds;
     private double boostRemainingSeconds;
+    private boolean hasAuthoritativePose;
+    private double authoritativeX;
+    private double authoritativeY;
+    private double authoritativeZ;
+    private float authoritativeYaw;
+    private float authoritativePitch;
+    private float authoritativeRoll;
 
     public TameworkMountedGlideComponent() {
     }
@@ -213,6 +248,31 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         lastInputAtMs = 0L;
     }
 
+    public void captureAuthoritativePose(double x,
+                                         double y,
+                                         double z,
+                                         float yaw,
+                                         float pitch,
+                                         float roll) {
+        hasAuthoritativePose = true;
+        authoritativeX = finiteOrZero(x);
+        authoritativeY = finiteOrZero(y);
+        authoritativeZ = finiteOrZero(z);
+        authoritativeYaw = finiteOrZero(yaw);
+        authoritativePitch = finiteOrZero(pitch);
+        authoritativeRoll = finiteOrZero(roll);
+    }
+
+    public void clearAuthoritativePose() {
+        hasAuthoritativePose = false;
+        authoritativeX = 0.0;
+        authoritativeY = 0.0;
+        authoritativeZ = 0.0;
+        authoritativeYaw = 0.0f;
+        authoritativePitch = 0.0f;
+        authoritativeRoll = 0.0f;
+    }
+
     public String getRiderUuid() { return riderUuid; }
     public void setRiderUuid(String riderUuid) { this.riderUuid = sanitizeString(riderUuid); }
     public String getConfigId() { return configId; }
@@ -267,6 +327,22 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     public void setBoostRemainingSeconds(double boostRemainingSeconds) {
         this.boostRemainingSeconds = nonNegativeFinite(boostRemainingSeconds);
     }
+    public boolean hasAuthoritativePose() { return hasAuthoritativePose; }
+    public void setHasAuthoritativePose(boolean hasAuthoritativePose) {
+        this.hasAuthoritativePose = hasAuthoritativePose;
+    }
+    public double getAuthoritativeX() { return authoritativeX; }
+    public void setAuthoritativeX(double authoritativeX) { this.authoritativeX = finiteOrZero(authoritativeX); }
+    public double getAuthoritativeY() { return authoritativeY; }
+    public void setAuthoritativeY(double authoritativeY) { this.authoritativeY = finiteOrZero(authoritativeY); }
+    public double getAuthoritativeZ() { return authoritativeZ; }
+    public void setAuthoritativeZ(double authoritativeZ) { this.authoritativeZ = finiteOrZero(authoritativeZ); }
+    public float getAuthoritativeYaw() { return authoritativeYaw; }
+    public void setAuthoritativeYaw(float authoritativeYaw) { this.authoritativeYaw = finiteOrZero(authoritativeYaw); }
+    public float getAuthoritativePitch() { return authoritativePitch; }
+    public void setAuthoritativePitch(float authoritativePitch) { this.authoritativePitch = finiteOrZero(authoritativePitch); }
+    public float getAuthoritativeRoll() { return authoritativeRoll; }
+    public void setAuthoritativeRoll(float authoritativeRoll) { this.authoritativeRoll = finiteOrZero(authoritativeRoll); }
 
     @Override
     public TameworkMountedGlideComponent clone() {
@@ -293,6 +369,13 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         clone.verticalVelocity = verticalVelocity;
         clone.flapCooldownRemainingSeconds = flapCooldownRemainingSeconds;
         clone.boostRemainingSeconds = boostRemainingSeconds;
+        clone.hasAuthoritativePose = hasAuthoritativePose;
+        clone.authoritativeX = authoritativeX;
+        clone.authoritativeY = authoritativeY;
+        clone.authoritativeZ = authoritativeZ;
+        clone.authoritativeYaw = authoritativeYaw;
+        clone.authoritativePitch = authoritativePitch;
+        clone.authoritativeRoll = authoritativeRoll;
         return clone;
     }
 
