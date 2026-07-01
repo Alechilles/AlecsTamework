@@ -641,16 +641,9 @@ public class Tamework extends JavaPlugin {
                     )
             );
             getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
-        }
-        ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
-        if (mountedComponentType == null) {
-            getLogger().at(Level.WARNING).log(
-                    "Mount plugin mounted component type unavailable during setup; skipping Tamework ride/glide systems."
-            );
-        } else {
             getEntityStoreRegistry().registerSystem(
                     new MountedGlideInputCaptureSystem(
-                            mountedComponentType,
+                            npcMountComponentType,
                             PlayerInput.getComponentType(),
                             MovementStatesComponent.getComponentType(),
                             HeadRotation.getComponentType(),
@@ -678,6 +671,13 @@ public class Tamework extends JavaPlugin {
                             TransformComponent.getComponentType()
                     )
             );
+        }
+        ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
+        if (mountedComponentType == null) {
+            getLogger().at(Level.WARNING).log(
+                    "Mount plugin mounted component type unavailable during setup; skipping legacy Tamework ride systems and glide cleanup."
+            );
+        } else {
             getEntityStoreRegistry().registerSystem(
                     new MountedGlideCleanupSystem(
                             mountedComponentType,

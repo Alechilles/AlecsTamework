@@ -60,7 +60,10 @@ class MountedGlideInputCaptureArchitectureTest {
         String inputCapture = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
         ));
+        String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
 
+        assertTrue(inputCapture.contains("NPCMountComponent"));
+        assertTrue(inputCapture.contains("nativeMountStillOwnedByRider"));
         assertTrue(inputCapture.contains("PlayerInput"));
         assertTrue(inputCapture.contains("MountSystems.HandleMountInput.class"));
         assertTrue(inputCapture.contains("PlayerSystems.ProcessPlayerInput.class"));
@@ -74,8 +77,12 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(inputCapture.contains("states.sprinting || states.running"));
         assertTrue(inputCapture.contains("states.crouching || states.forcedCrouching"));
         assertTrue(inputCapture.contains("Math.toDegrees"));
+        assertFalse(inputCapture.contains("MountedComponent"));
+        assertFalse(inputCapture.contains("mountedStillAttachedToMount"));
         assertFalse(inputCapture.contains("playerInput.setMountId(0)"));
         assertFalse(inputCapture.contains("queue.clear()"));
+        assertTrue(plugin.contains("new MountedGlideInputCaptureSystem(\r\n                            npcMountComponentType,")
+                || plugin.contains("new MountedGlideInputCaptureSystem(\n                            npcMountComponentType,"));
     }
 
     @Test
