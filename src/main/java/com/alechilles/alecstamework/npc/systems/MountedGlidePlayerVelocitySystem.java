@@ -30,6 +30,8 @@ import org.joml.Vector3d;
  * {@code Velocity.addInstruction}.
  */
 public final class MountedGlidePlayerVelocitySystem extends EntityTickingSystem<EntityStore> {
+    private static final TwMountedGlideConfig DEFAULT_CONFIG = new TwMountedGlideConfig();
+
     private final ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType;
     private final ComponentType<EntityStore, NPCMountComponent> nativeMountComponentType;
     private final ComponentType<EntityStore, TransformComponent> transformComponentType;
@@ -123,7 +125,7 @@ public final class MountedGlidePlayerVelocitySystem extends EntityTickingSystem<
                 }
             }
         }
-        return new TwMountedGlideConfig();
+        return DEFAULT_CONFIG;
     }
 
     private double resolvePitchRadians(@Nonnull TameworkMountedGlideComponent mount) {

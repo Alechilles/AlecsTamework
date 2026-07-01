@@ -87,51 +87,27 @@ class MountedGlideInputCaptureArchitectureTest {
 
     @Test
     void mountedGlideIsolatesNativeMountMovementBeforeNpcBehaviour() throws IOException {
-        String isolation = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideNativeInputIsolationSystem.java"
-        ));
-        String state = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideStateSystem.java"
-        ));
-        String controller = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/movement/MotionControllerTameworkMountedGlide.java"
-        ));
-        String capture = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideAuthoritativePoseSystem.java"
-        ));
-        String component = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/components/TameworkMountedGlideComponent.java"
-        ));
-        String interaction = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        String velocity = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"
         ));
         String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
 
-        assertTrue(isolation.contains("Order.AFTER, MountSystems.HandleMountInput.class"));
-        assertTrue(isolation.contains("Order.BEFORE, RoleSystems.PreBehaviourSupportTickSystem.class"));
-        assertTrue(isolation.contains("transform.getPosition().x = mount.getAuthoritativeX()"));
-        assertTrue(state.contains("Order.AFTER, AvoidanceSystem.class"));
-        assertTrue(state.contains("Order.AFTER, RoleSystems.BehaviourTickSystem.class"));
-        assertTrue(state.contains("Order.BEFORE, SteeringSystem.class"));
-        assertTrue(state.contains("support.setState(mountRef, state"));
-        assertTrue(state.contains("role.setActiveMotionController(mountRef, npc, controller, commandBuffer)"));
-        assertTrue(state.contains("BodyMotionTameworkMountedGlide.applyGlideSteering"));
-        assertTrue(state.contains("TameworkGlide debug: stateSystem"));
-        assertTrue(controller.contains("public boolean canSteer"));
-        assertTrue(controller.contains("glide == null"));
-        assertTrue(controller.contains("!isForcePushed()"));
-        assertTrue(controller.contains("effectHorizontalSpeedMultiplier != 0.0"));
-        assertFalse(controller.contains("moveProbe.isInAir()"));
-        assertTrue(controller.contains("TameworkGlide debug: controller"));
-        assertTrue(capture.contains("Order.AFTER, RoleSystems.PostBehaviourSupportTickSystem.class"));
-        assertTrue(capture.contains("Order.BEFORE, TransformSystems.EntityTrackerUpdate.class"));
-        assertTrue(capture.contains("mount.captureAuthoritativePose"));
-        assertTrue(component.contains("\"HasAuthoritativePose\""));
-        assertTrue(component.contains("\"AuthoritativeX\""));
-        assertTrue(interaction.contains("glideMount.captureAuthoritativePose"));
-        assertTrue(plugin.contains("new MountedGlideNativeInputIsolationSystem"));
-        assertTrue(plugin.contains("new MountedGlideStateSystem"));
-        assertTrue(plugin.contains("new MountedGlideAuthoritativePoseSystem"));
+        assertTrue(velocity.contains("extends EntityTickingSystem<EntityStore>"));
+        assertTrue(velocity.contains("NPCMountComponent"));
+        assertTrue(velocity.contains("Velocity.getComponentType()"));
+        assertTrue(velocity.contains("Order.AFTER, MountedGlideInputCaptureSystem.class"));
+        assertTrue(velocity.contains("Query.and(mountComponentType, nativeMountComponentType, transformComponentType)"));
+        assertTrue(velocity.contains("nativeMount.getOwnerPlayerRef().getReference()"));
+        assertTrue(velocity.contains("riderRef.getStore() != store"));
+        assertTrue(velocity.contains("commandBuffer.getComponent(riderRef, velocityComponentType)"));
+        assertTrue(velocity.contains("MountedGlidePhysics.update"));
+        assertTrue(velocity.contains("velocity.addInstruction(velocityVector, null, ChangeVelocityType.Set)"));
+        assertTrue(plugin.contains("new MountedGlidePlayerVelocitySystem(\r\n                            mountedGlideComponentType,\r\n                            npcMountComponentType,")
+                || plugin.contains("new MountedGlidePlayerVelocitySystem(\n                            mountedGlideComponentType,\n                            npcMountComponentType,"));
+        assertTrue(plugin.contains("Velocity.getComponentType()"));
+        assertFalse(plugin.contains("new MountedGlideNativeInputIsolationSystem"));
+        assertFalse(plugin.contains("new MountedGlideStateSystem"));
+        assertFalse(plugin.contains("new MountedGlideAuthoritativePoseSystem"));
     }
 
     @Test
