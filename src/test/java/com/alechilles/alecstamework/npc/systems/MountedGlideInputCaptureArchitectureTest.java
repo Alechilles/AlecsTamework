@@ -46,7 +46,7 @@ class MountedGlideInputCaptureArchitectureTest {
 
         assertTrue(interaction.contains("MountedComponent.getComponentType()"));
         assertTrue(interaction.contains("store.putComponent("));
-        assertTrue(interaction.contains("new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)"));
+        assertTrue(interaction.contains("new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.BlockMount)"));
         assertTrue(interaction.contains("mounted_component_attach"));
         assertFalse(interaction.contains("store.ensureAndGetComponent(npcRef, npcMountType)"));
         assertFalse(interaction.contains("npcMount.setOwnerPlayerRef(playerRefComponent)"));
