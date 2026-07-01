@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.sql.Array;
@@ -265,11 +266,7 @@ public final class NpcProfileRepository {
         if (roleId == null && existingRow != null) {
             roleId = existingRow.roleId();
         }
-        JsonObject state = buildStateJson(update);
-        String stateJson = state.size() > 0 ? state.toString() : null;
-        if (stateJson == null && existingRow != null) {
-            stateJson = existingRow.stateJson();
-        }
+        String stateJson = buildMergedStateJson(existingRow, update);
         String stateHash = stateJson != null ? Integer.toHexString(stateJson.hashCode()) : null;
         boolean profileUnchanged = existingRow != null
                 && Objects.equals(existingRow.currentNpcUuid(), currentNpcUuid)
@@ -894,6 +891,21 @@ public final class NpcProfileRepository {
         }
         putString(state, "profile_json", update.profileJson());
         return state;
+    }
+
+    @Nullable
+    private String buildMergedStateJson(@Nullable ExistingProfileRow existingRow,
+                                        @Nonnull ProfileUpdate update) {
+        JsonObject merged = existingRow != null ? parseJsonObject(trimToNull(existingRow.stateJson())) : null;
+        if (merged == null) {
+            merged = new JsonObject();
+        }
+        JsonObject updateState = buildStateJson(update);
+        for (String key : updateState.keySet()) {
+            JsonElement value = updateState.get(key);
+            merged.add(key, value);
+        }
+        return merged.size() > 0 ? merged.toString() : null;
     }
 
     private void putString(@Nonnull JsonObject object, @Nonnull String key, @Nullable String value) {
