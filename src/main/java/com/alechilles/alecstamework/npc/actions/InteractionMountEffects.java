@@ -249,7 +249,7 @@ final class InteractionMountEffects {
         store.putComponent(
                 playerRef,
                 mountedType,
-                new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.BlockMount)
+                new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)
         );
         clearStatusAnimation(npcRef, npcComponent, store);
         applyRideState(npcRef, role, store, glideState);
@@ -263,7 +263,7 @@ final class InteractionMountEffects {
                 anchorX,
                 anchorY,
                 anchorZ,
-                MountController.BlockMount);
+                MountController.Minecart);
         logMountDebug(role, "mounted_glide", "applied",
                 "npcUuid=%s riderUuid=%s networkId=%s state=%s controller=%s config=%s anchor=%s/%s/%s movementConfig=%s movementConfigApplied=%s",
                 npcUuid.getUuid(),

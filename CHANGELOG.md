@@ -3,7 +3,7 @@
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
 ### Fixed
-- Fixed mounted glide attachment so dragons use Hytale's base mounted entity tracking with a dismount-capable rider controller instead of the legacy NPC mount packet path, allowing the rider to stay attached to server-authoritative glide movement.
+- Fixed mounted glide attachment so dragons use Hytale's base mounted entity tracking instead of the legacy NPC mount packet path, allowing the rider to stay attached to server-authoritative glide movement.
 - Fixed mounted glide controls so native-mounted dragons read rider movement input before vanilla mount handling and can launch into glide from the ground when jump/flap is held.
 - Fixed mounted glide controller ownership so native-mounted dragons keep their ridden state and dedicated glide controller during runtime instead of falling back to normal `TameworkFly` movement.
 - Fixed managed coop scans so optional block-state reflection misses are cached instead of throwing repeatedly on the world tick thread, and reduced stale-ref noise while resolving coop block locations.

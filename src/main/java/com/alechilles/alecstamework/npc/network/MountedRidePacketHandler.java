@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.network;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
 import com.alechilles.alecstamework.npc.movement.TameworkRideVelocityIntent;
@@ -285,7 +287,35 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
             store.tryRemoveComponent(riderRef, MountedComponent.getComponentType());
             return;
         }
+        if (handleMountedGlideDismount(riderRef, store, instance)) {
+            return;
+        }
         handleVanillaDismount(riderRef, store, player);
+    }
+
+    private boolean handleMountedGlideDismount(@Nonnull Ref<EntityStore> riderRef,
+                                               @Nonnull Store<EntityStore> store,
+                                               @Nullable Tamework instance) {
+        ComponentType<EntityStore, TameworkMountedGlideRiderComponent> riderType =
+                instance == null ? null : instance.getMountedGlideRiderComponentType();
+        ComponentType<EntityStore, TameworkMountedGlideComponent> mountType =
+                instance == null ? null : instance.getMountedGlideComponentType();
+        TameworkMountedGlideRiderComponent rider = riderType == null ? null : store.getComponent(riderRef, riderType);
+        if (rider == null) {
+            return false;
+        }
+        Ref<EntityStore> mountRef = resolveMountedGlideMountRef(rider, store);
+        TameworkMountedGlideComponent mount = mountRef == null || !mountRef.isValid() || mountType == null
+                ? null
+                : store.getComponent(mountRef, mountType);
+        logDebug(
+                "TameworkGlide debug: dismountPacket riderUuid=%s mountUuid=%s mountedGlide=%s",
+                riderRef,
+                rider.getMountUuid(),
+                mount != null
+        );
+        store.tryRemoveComponent(riderRef, MountedComponent.getComponentType());
+        return true;
     }
 
     @Nullable
@@ -740,6 +770,19 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     @Nullable
     private Ref<EntityStore> resolveMountRef(@Nonnull TameworkRideRiderComponent rider,
                                              @Nonnull Store<EntityStore> store) {
+        if (rider.getMountUuid().isBlank()) {
+            return null;
+        }
+        try {
+            return store.getExternalData().getWorld().getEntityRef(UUID.fromString(rider.getMountUuid()));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private Ref<EntityStore> resolveMountedGlideMountRef(@Nonnull TameworkMountedGlideRiderComponent rider,
+                                                         @Nonnull Store<EntityStore> store) {
         if (rider.getMountUuid().isBlank()) {
             return null;
         }

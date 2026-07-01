@@ -46,7 +46,7 @@ class MountedGlideInputCaptureArchitectureTest {
 
         assertTrue(interaction.contains("MountedComponent.getComponentType()"));
         assertTrue(interaction.contains("store.putComponent("));
-        assertTrue(interaction.contains("new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.BlockMount)"));
+        assertTrue(interaction.contains("new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)"));
         assertTrue(interaction.contains("mounted_component_attach"));
         assertFalse(interaction.contains("store.ensureAndGetComponent(npcRef, npcMountType)"));
         assertFalse(interaction.contains("npcMount.setOwnerPlayerRef(playerRefComponent)"));
@@ -77,9 +77,8 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(inputCapture.contains("states.sprinting || states.running"));
         assertTrue(inputCapture.contains("states.crouching || states.forcedCrouching"));
         assertTrue(inputCapture.contains("Math.toDegrees"));
-        assertFalse(inputCapture.contains("inputIterator.remove()"));
         assertFalse(inputCapture.contains("playerInput.setMountId(0)"));
-        assertTrue(inputCapture.contains("queue.clear()"));
+        assertFalse(inputCapture.contains("queue.clear()"));
     }
 
     @Test
@@ -142,6 +141,19 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(cleanup.contains("riderMountedToMount"));
         assertFalse(cleanup.contains("MountPlugin.checkDismountNpc"));
         assertFalse(cleanup.contains("npcMountComponentType"));
+    }
+
+    @Test
+    void mountedGlideDismountPacketRemovesNativeAttachment() throws IOException {
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedRidePacketHandler.java"
+        ));
+
+        assertTrue(handler.contains("getMountedGlideRiderComponentType()"));
+        assertTrue(handler.contains("getMountedGlideComponentType()"));
+        assertTrue(handler.contains("handleMountedGlideDismount"));
+        assertTrue(handler.contains("TameworkGlide debug: dismountPacket"));
+        assertTrue(handler.contains("store.tryRemoveComponent(riderRef, MountedComponent.getComponentType())"));
     }
 
     private static String readGlideInputStack() throws IOException {
