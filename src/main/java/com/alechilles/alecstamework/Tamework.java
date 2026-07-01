@@ -137,11 +137,9 @@ import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTranquilizerPeakSystem;
 import com.alechilles.alecstamework.npc.systems.FlyingCompanionControlSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
-import com.alechilles.alecstamework.npc.systems.MountedGlideAuthoritativePoseSystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlideCleanupSystem;
 import com.alechilles.alecstamework.npc.systems.MountedGlideInputCaptureSystem;
-import com.alechilles.alecstamework.npc.systems.MountedGlideNativeInputIsolationSystem;
-import com.alechilles.alecstamework.npc.systems.MountedGlideStateSystem;
+import com.alechilles.alecstamework.npc.systems.MountedGlidePlayerVelocitySystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
 import com.alechilles.alecstamework.npc.systems.MountedRideCleanupSystem;
@@ -184,6 +182,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
+import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
@@ -654,21 +653,11 @@ public class Tamework extends JavaPlugin {
                     )
             );
             getEntityStoreRegistry().registerSystem(
-                    new MountedGlideNativeInputIsolationSystem(
+                    new MountedGlidePlayerVelocitySystem(
                             mountedGlideComponentType,
-                            TransformComponent.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedGlideStateSystem(
-                            mountedGlideComponentType,
-                            NPCEntity.getComponentType()
-                    )
-            );
-            getEntityStoreRegistry().registerSystem(
-                    new MountedGlideAuthoritativePoseSystem(
-                            mountedGlideComponentType,
-                            TransformComponent.getComponentType()
+                            npcMountComponentType,
+                            TransformComponent.getComponentType(),
+                            Velocity.getComponentType()
                     )
             );
         }
