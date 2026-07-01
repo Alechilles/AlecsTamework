@@ -1,10 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Added
-- Added a beta Tamework mounted glide controller for opt-in flying mounts, with pitch-driven glide speed and lift conversion, cooldown-gated jump flaps, sprint forward flaps, and crouch airbraking.
-- Added `/tw debugride on` diagnostics for beta mounted glide mount action selection, mount-state gates, and native attachment attempts.
+## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
 ### Fixed
 - Fixed managed coop scans so optional block-state reflection misses are cached instead of throwing repeatedly on the world tick thread, and reduced stale-ref noise while resolving coop block locations.
@@ -16,12 +12,6 @@
 - Fixed command selection UI refresh and navigation callbacks so delayed updates ignore unloaded worlds instead of throwing during unload races.
 - Fixed a rare command target HUD crash that could happen when inventory or hotbar events updated player candidates while the world tick was snapshotting them.
 - Fixed command target HUD tame requirements showing one required tranquilizer stack even when the NPC role required more.
-- Fixed beta mounted glide mounts to use Hytale's native NPC mount attachment plus rider movement/head state, so riders stay attached to the dragon while glide physics controls the mount.
-- Fixed beta mounted glide mount interactions being blocked when a player had a non-positive dismounted mount id from another mount implementation.
-- Fixed beta mounted glide mount prompts for legacy-tamed NPCs that had not yet been claimed into Tamework ownership, so pressing interact can claim and mount them instead of doing nothing.
-- Fixed beta mounted glide remounts being blocked by stale rider state left on the player after a failed or aborted mount attempt.
-- Fixed beta mounted glide mounts fighting Hytale's native mounted movement, which could make dragons walk normally at first and later surge unpredictably.
-- Fixed beta mounted glide riders inheriting the vanilla `Mount` rider movement profile, which made dragons keep ground-mount walking and jumping controls instead of handing movement to the glide controller.
 
 ## 2.16.0 - Command Target HUD and Needs Performance - 2026-06-28
 
