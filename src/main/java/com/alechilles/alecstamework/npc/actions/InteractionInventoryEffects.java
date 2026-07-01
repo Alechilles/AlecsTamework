@@ -90,7 +90,7 @@ final class InteractionInventoryEffects {
                 ItemStackTransaction transaction = combined.addItemStack(new ItemStack(item.getItem(), quantity));
                 if (transaction != null) {
                     ItemStack remainder = transaction.getRemainder();
-                    if (remainder == null || remainder.isEmpty() || remainder.getQuantity() < quantity) {
+                    if (remainder == null || remainder.isEmpty()) {
                         placed = true;
                     }
                 }
@@ -128,7 +128,7 @@ final class InteractionInventoryEffects {
             ItemStackTransaction transaction = container.removeItemStack(new ItemStack(item.getItem(), quantity));
             if (transaction != null) {
                 ItemStack remainder = transaction.getRemainder();
-                if (remainder == null || remainder.isEmpty() || remainder.getQuantity() < quantity) {
+                if (remainder == null || remainder.isEmpty()) {
                     applied = true;
                 }
             }
@@ -164,12 +164,18 @@ final class InteractionInventoryEffects {
             ItemStackTransaction transaction = container.addItemStack(new ItemStack(item.getItem(), quantity));
             if (transaction != null) {
                 ItemStack remainder = transaction.getRemainder();
-                if (remainder == null || remainder.isEmpty() || remainder.getQuantity() < quantity) {
+                if (remainder == null || remainder.isEmpty()) {
+                    applied = true;
+                } else if (handleAddRemainder(player, remainder)) {
                     applied = true;
                 }
             }
         }
         return applied;
+    }
+
+    private boolean handleAddRemainder(Player player, ItemStack remainder) {
+        return false;
     }
 
     boolean replaceHeldItem(Player player,
