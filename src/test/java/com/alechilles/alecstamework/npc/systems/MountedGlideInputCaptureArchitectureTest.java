@@ -63,19 +63,22 @@ class MountedGlideInputCaptureArchitectureTest {
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
         ));
 
+        assertTrue(inputCapture.contains("PlayerInput"));
+        assertTrue(inputCapture.contains("PlayerSystems.ProcessPlayerInput.class"));
         assertTrue(inputCapture.contains("MovementStatesComponent"));
         assertTrue(inputCapture.contains("HeadRotation"));
-        assertTrue(inputCapture.contains("Order.BEFORE, com.hypixel.hytale.server.npc.systems.RoleSystems.BehaviourTickSystem.class"));
-        assertTrue(inputCapture.contains("Query.and(mountComponentType, npcMountComponentType)"));
+        assertTrue(inputCapture.contains("Order.BEFORE, RoleSystems.BehaviourTickSystem.class"));
+        assertTrue(inputCapture.contains("Query.and(playerInputComponentType, riderComponentType)"));
+        assertTrue(inputCapture.contains("PlayerInput.WishMovement"));
+        assertTrue(inputCapture.contains("mount.captureMovementIntent(wishZ * scale, wishX * scale, now)"));
         assertTrue(inputCapture.contains("states.jumping || states.swimJumping"));
         assertTrue(inputCapture.contains("states.sprinting || states.running"));
         assertTrue(inputCapture.contains("states.crouching || states.forcedCrouching"));
         assertTrue(inputCapture.contains("Math.toDegrees"));
-        assertFalse(inputCapture.contains("PlayerInput"));
         assertFalse(inputCapture.contains("MountSystems.HandleMountInput"));
         assertFalse(inputCapture.contains("inputIterator.remove()"));
-        assertFalse(inputCapture.contains("playerInput.setMountId(0)"));
-        assertFalse(inputCapture.contains("queue.clear()"));
+        assertTrue(inputCapture.contains("playerInput.setMountId(0)"));
+        assertTrue(inputCapture.contains("queue.clear()"));
     }
 
     @Test

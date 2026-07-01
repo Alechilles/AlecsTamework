@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.corecomponents.BodyMotionBase;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
 import com.hypixel.hytale.server.npc.movement.Steering;
+import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import javax.annotation.Nonnull;
@@ -45,6 +46,7 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
             return true;
         }
         TwMountedGlideConfig config = resolveConfig(role, glide);
+        maybeTakeOff(ref, role, glide, config, componentAccessor);
         MountedGlidePhysicsState state = glide.toPhysicsState();
         if (state.getGlideSpeed() <= 0.0) {
             state.setGlideSpeed(config.getGlide().getBaseSpeed());
@@ -68,6 +70,24 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         desiredSteering.setPitch((float) -resolvePitchRadians(glide));
         desiredSteering.setRelativeTurnSpeed(1.0);
         return true;
+    }
+
+    private void maybeTakeOff(@Nonnull Ref<EntityStore> ref,
+                              @Nonnull Role role,
+                              @Nonnull TameworkMountedGlideComponent glide,
+                              @Nonnull TwMountedGlideConfig config,
+                              @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        MotionController active = role.getActiveMotionController();
+        if (!(active instanceof MotionControllerTameworkMountedGlide glideController)
+                || !shouldTakeOffFromGround(glide, active.onGround())) {
+            return;
+        }
+        double launchSpeed = Math.max(2.0, Math.min(config.getGlide().getBaseSpeed(), active.getMaximumSpeed()) * 0.25);
+        glideController.takeOff(ref, launchSpeed, componentAccessor);
+    }
+
+    static boolean shouldTakeOffFromGround(@Nonnull TameworkMountedGlideComponent glide, boolean grounded) {
+        return grounded && glide.isJumpHeld();
     }
 
     @Nonnull

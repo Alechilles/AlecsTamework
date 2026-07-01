@@ -643,11 +643,13 @@ public class Tamework extends JavaPlugin {
             getEntityStoreRegistry().registerSystem(
                     new MountedGlideInputCaptureSystem(
                             npcMountComponentType,
+                            PlayerInput.getComponentType(),
                             MovementStatesComponent.getComponentType(),
                             HeadRotation.getComponentType(),
                             mountedGlideRiderComponentType,
                             mountedGlideComponentType,
-                            UUIDComponent.getComponentType()
+                            UUIDComponent.getComponentType(),
+                            TransformComponent.getComponentType()
                     )
             );
             getEntityStoreRegistry().registerSystem(

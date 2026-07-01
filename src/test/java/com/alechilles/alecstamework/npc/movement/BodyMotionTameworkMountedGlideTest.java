@@ -5,6 +5,7 @@ import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BodyMotionTameworkMountedGlideTest {
@@ -52,5 +53,17 @@ class BodyMotionTameworkMountedGlideTest {
 
         assertTrue(glide.isJumpHeld());
         assertEquals(0.4, glide.getFlapCooldownRemainingSeconds(), 0.0001);
+    }
+
+    @Test
+    void heldJumpRequestsGroundedFlyControllerTakeoff() {
+        TameworkMountedGlideComponent glide = new TameworkMountedGlideComponent();
+
+        assertFalse(BodyMotionTameworkMountedGlide.shouldTakeOffFromGround(glide, true));
+
+        glide.captureControls(true, false, false, 10L);
+
+        assertTrue(BodyMotionTameworkMountedGlide.shouldTakeOffFromGround(glide, true));
+        assertFalse(BodyMotionTameworkMountedGlide.shouldTakeOffFromGround(glide, false));
     }
 }
