@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
@@ -58,7 +59,7 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
     @Nullable
     private final ComponentType<EntityStore, UUIDComponent> uuidType;
 
-    private long nextSweepAtMs;
+    private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     public CommandCoopResidentSyncSystem(@Nonnull CommandLinkedNpcCoopService coopService,
                                          @Nullable CommandLinkedNpcCaptureService captureService,
@@ -85,11 +86,12 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
         if (!hasEnabledManagedCoopConfigs()) {
             return;
         }
+        TickState tickState = statesByStore.get(store);
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (nowMs < tickState.nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
         if (coopResidentType == null) {
             return;
         }
@@ -598,5 +600,9 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
             }
             return CoopResidentSlotResolver.resolveResidentSlotByUuid(coopBlock, secondaryUuid);
         }
+    }
+
+    private static final class TickState {
+        private long nextSweepAtMs;
     }
 }

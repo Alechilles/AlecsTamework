@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -25,15 +26,16 @@ public final class CompanionDespawnProtectionSystem extends TickingSystem<Entity
     private static final long SWEEP_INTERVAL_MS = 1_000L;
     private static final int DISABLE_DESPAWN_SPAWN_CONFIGURATION = Integer.MIN_VALUE;
 
-    private long nextSweepAtMs;
+    private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        TickState tickState = statesByStore.get(store);
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (nowMs < tickState.nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
 
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         if (npcType == null) {
@@ -104,5 +106,9 @@ public final class CompanionDespawnProtectionSystem extends TickingSystem<Entity
         }
         String value = named.getName();
         return value != null && !value.isBlank();
+    }
+
+    private static final class TickState {
+        private long nextSweepAtMs;
     }
 }

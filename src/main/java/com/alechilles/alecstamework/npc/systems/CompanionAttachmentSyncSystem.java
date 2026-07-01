@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentStateService;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -14,12 +15,12 @@ import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -29,16 +30,16 @@ import javax.annotation.Nullable;
 public final class CompanionAttachmentSyncSystem extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 750L;
 
-    private long nextSweepAtMs;
-    private final Map<UUID, AttachmentSyncFingerprint> lastSyncedFingerprintByNpc = new ConcurrentHashMap<>();
+    private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        TickState tickState = statesByStore.get(store);
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (nowMs < tickState.nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
 
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
@@ -67,7 +68,7 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
                     }
                 }
         );
-        pruneInactiveKeys(lastSyncedFingerprintByNpc, activeNpcIds);
+        pruneInactiveKeys(tickState.lastSyncedFingerprintByNpc, activeNpcIds);
         for (Ref<EntityStore> ref : candidates) {
             if (ref == null || !ref.isValid()) {
                 continue;
@@ -78,7 +79,7 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
             }
             TameworkAttachmentsComponent attachments = store.getComponent(ref, attachmentsType);
             AttachmentSyncFingerprint beforeSync = buildFingerprint(ref, store, npc, attachments);
-            if (beforeSync != null && beforeSync.equals(lastSyncedFingerprintByNpc.get(beforeSync.npcUuid()))) {
+            if (beforeSync != null && beforeSync.equals(tickState.lastSyncedFingerprintByNpc.get(beforeSync.npcUuid()))) {
                 continue;
             }
             CompanionAttachmentStateService.syncStoredAttachments(ref, store);
@@ -89,7 +90,7 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
                     store.getComponent(ref, attachmentsType)
             );
             if (afterSync != null) {
-                lastSyncedFingerprintByNpc.put(afterSync.npcUuid(), afterSync);
+                tickState.lastSyncedFingerprintByNpc.put(afterSync.npcUuid(), afterSync);
             }
         }
     }
@@ -151,5 +152,10 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
                                              int persistedAttachmentCount,
                                              int currentAttachmentsHash,
                                              int currentAttachmentCount) {
+    }
+
+    private static final class TickState {
+        private long nextSweepAtMs;
+        private final Map<UUID, AttachmentSyncFingerprint> lastSyncedFingerprintByNpc = new HashMap<>();
     }
 }

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.assetstore.map.IndexedLookupTableAssetMap;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -28,7 +29,7 @@ public final class CompanionTranquilizerPeakSystem extends TickingSystem<EntityS
     private final ComponentType<EntityStore, NPCEntity> npcType;
     private final ComponentType<EntityStore, EffectControllerComponent> effectControllerType;
     private final ComponentType<EntityStore, TameworkTranquilizerPeakComponent> peakType;
-    private long nextSweepAtMs;
+    private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
     private volatile int tranquilizerEffectIndex = UNRESOLVED_EFFECT_INDEX;
 
     public CompanionTranquilizerPeakSystem(ComponentType<EntityStore, NPCEntity> npcType,
@@ -44,15 +45,16 @@ public final class CompanionTranquilizerPeakSystem extends TickingSystem<EntityS
         if (npcType == null || effectControllerType == null || peakType == null) {
             return;
         }
+        TickState tickState = statesByStore.get(store);
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (nowMs < tickState.nextSweepAtMs) {
             return;
         }
         int effectIndex = resolveTranquilizerEffectIndex();
         if (effectIndex == UNRESOLVED_EFFECT_INDEX) {
             return;
         }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
         store.forEachChunk(
                 Query.and(npcType, effectControllerType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
@@ -119,5 +121,9 @@ public final class CompanionTranquilizerPeakSystem extends TickingSystem<EntityS
             tranquilizerEffectIndex = resolved;
         }
         return resolved;
+    }
+
+    private static final class TickState {
+        private long nextSweepAtMs;
     }
 }

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -110,13 +111,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private final Map<String, Integer> debugThrottleSuppressedCountByKey = new ConcurrentHashMap<>();
     private final Set<String> inFlightSlots = ConcurrentHashMap.newKeySet();
 
-    private long nextSweepAtMs;
-    private long nextRemovedCoopReleaseCheckAtMs;
-    private long nextDebugStatusAtMs;
-    @Nullable
-    private String lastDebugStatusMessage;
-    private long lastDebugStatusLoggedAtMs;
-    private int suppressedUnchangedStatusCount;
+    private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     @Nullable
     private volatile ComponentType<ChunkStore, ?> itemContainerComponentType;
@@ -146,21 +141,23 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         if (!hasEnabledManagedCoopConfigs()) {
             return;
         }
+        TickState tickState = statesByStore.get(chunkStore);
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (nowMs < tickState.nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
         pruneDebugThrottleState(nowMs);
 
         World world = chunkStore.getExternalData() != null ? chunkStore.getExternalData().getWorld() : null;
         if (world == null || world.getEntityStore() == null || world.getChunkStore() == null) {
-            maybeLogStatus(nowMs, "status skip=world_or_store_missing");
+            maybeLogStatus(tickState, nowMs, "status skip=world_or_store_missing");
             return;
         }
         Store<EntityStore> entityStore = world.getEntityStore().getStore();
         if (entityStore == null) {
             maybeLogStatus(
+                    tickState,
                     nowMs,
                     "world=" + firstNonBlank(world.getName(), "<unknown>") + " status skip=entity_store_missing"
             );
@@ -169,6 +166,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         WorldTimeResource worldTime = entityStore.getResource(WorldTimeResource.getResourceType());
         if (worldTime == null) {
             maybeLogStatus(
+                    tickState,
                     nowMs,
                     "world=" + firstNonBlank(world.getName(), "<unknown>") + " status skip=world_time_missing"
             );
@@ -183,15 +181,16 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         }
         pruneRuntimeState(activeCoopKeys);
         boolean shouldCheckRemovedCoops = !scanDiagnostics.containerTypeMissing
-                && nowMs >= nextRemovedCoopReleaseCheckAtMs;
+                && nowMs >= tickState.nextRemovedCoopReleaseCheckAtMs;
         int removedCoopReleased = !shouldCheckRemovedCoops
                 ? 0
                 : releaseResidentsFromRemovedCoops(world, chunkStore, entityStore, activeCoopKeys, nowMs);
         if (shouldCheckRemovedCoops) {
-            nextRemovedCoopReleaseCheckAtMs = nowMs + REMOVED_COOP_RELEASE_CHECK_INTERVAL_MS;
+            tickState.nextRemovedCoopReleaseCheckAtMs = nowMs + REMOVED_COOP_RELEASE_CHECK_INTERVAL_MS;
         }
         if (managedCoops.isEmpty()) {
             maybeLogStatus(
+                    tickState,
                     nowMs,
                     "world=" + firstNonBlank(world.getName(), "<unknown>")
                             + " status coops=0 candidates=0 scan=" + scanDiagnostics.toSummary()
@@ -225,6 +224,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             syncCoopInteractionState(world, coop);
         }
         maybeLogStatus(
+                tickState,
                 nowMs,
                 "world=" + firstNonBlank(world.getName(), "<unknown>")
                         + " status coops=" + managedCoops.size()
@@ -1838,32 +1838,32 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         return x + "," + y + "," + z;
     }
 
-    private void maybeLogStatus(long nowMs, @Nonnull String message) {
+    private void maybeLogStatus(@Nonnull TickState tickState, long nowMs, @Nonnull String message) {
         if (!CoopDebugLogger.isEnabled()) {
             return;
         }
-        if (nowMs < nextDebugStatusAtMs) {
+        if (nowMs < tickState.nextDebugStatusAtMs) {
             return;
         }
-        nextDebugStatusAtMs = nowMs + DEBUG_STATUS_INTERVAL_MS;
-        if (message.equals(lastDebugStatusMessage)) {
-            suppressedUnchangedStatusCount++;
-            long unchangedDurationMs = nowMs - lastDebugStatusLoggedAtMs;
+        tickState.nextDebugStatusAtMs = nowMs + DEBUG_STATUS_INTERVAL_MS;
+        if (message.equals(tickState.lastDebugStatusMessage)) {
+            tickState.suppressedUnchangedStatusCount++;
+            long unchangedDurationMs = nowMs - tickState.lastDebugStatusLoggedAtMs;
             if (unchangedDurationMs < DEBUG_STATUS_UNCHANGED_HEARTBEAT_MS) {
                 return;
             }
             CoopDebugLogger.log(
                     message
-                            + " unchangedRepeats=" + suppressedUnchangedStatusCount
+                            + " unchangedRepeats=" + tickState.suppressedUnchangedStatusCount
                             + " unchangedForMs=" + unchangedDurationMs
             );
-            suppressedUnchangedStatusCount = 0;
-            lastDebugStatusLoggedAtMs = nowMs;
+            tickState.suppressedUnchangedStatusCount = 0;
+            tickState.lastDebugStatusLoggedAtMs = nowMs;
             return;
         }
-        suppressedUnchangedStatusCount = 0;
-        lastDebugStatusMessage = message;
-        lastDebugStatusLoggedAtMs = nowMs;
+        tickState.suppressedUnchangedStatusCount = 0;
+        tickState.lastDebugStatusMessage = message;
+        tickState.lastDebugStatusLoggedAtMs = nowMs;
         CoopDebugLogger.log(message);
     }
 
@@ -1949,6 +1949,16 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                                 @Nullable String[] toolIds,
                                 @Nullable String displayName,
                                 boolean tamed) {
+    }
+
+    private static final class TickState {
+        private long nextSweepAtMs;
+        private long nextRemovedCoopReleaseCheckAtMs;
+        private long nextDebugStatusAtMs;
+        @Nullable
+        private String lastDebugStatusMessage;
+        private long lastDebugStatusLoggedAtMs;
+        private int suppressedUnchangedStatusCount;
     }
 
     private static final class CoopScanDiagnostics {

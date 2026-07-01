@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.actions.PassiveBreedingSweepService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
@@ -21,11 +22,7 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     private static final long RUNTIME_SETTINGS_REFRESH_INTERVAL_MS = 5_000L;
 
     private final PassiveBreedingSweepService sweepService;
-    private long nextSweepAtMs;
-    private long lastSchedulerNowMs;
-    @Nullable
-    private SweepRuntimeSettings cachedRuntimeSettings;
-    private long nextRuntimeSettingsRefreshAtMs;
+    private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     public CompanionPassiveBreedingSystem() {
         this.sweepService = new PassiveBreedingSweepService();
@@ -33,16 +30,17 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        SweepRuntimeSettings runtimeSettings = resolveRuntimeSettings(store);
+        TickState tickState = statesByStore.get(store);
+        SweepRuntimeSettings runtimeSettings = resolveRuntimeSettings(tickState, store);
         long schedulerNowMs = resolveSchedulerNowMs(store, runtimeSettings.basis());
-        if (lastSchedulerNowMs > 0L && schedulerNowMs < lastSchedulerNowMs) {
-            nextSweepAtMs = 0L;
+        if (tickState.lastSchedulerNowMs > 0L && schedulerNowMs < tickState.lastSchedulerNowMs) {
+            tickState.nextSweepAtMs = 0L;
         }
-        lastSchedulerNowMs = schedulerNowMs;
-        if (schedulerNowMs < nextSweepAtMs) {
+        tickState.lastSchedulerNowMs = schedulerNowMs;
+        if (schedulerNowMs < tickState.nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = schedulerNowMs + resolveIntervalMs(runtimeSettings, store);
+        tickState.nextSweepAtMs = schedulerNowMs + resolveIntervalMs(runtimeSettings, store);
         try {
             sweepService.runSweep(store, BreedingTimeService.resolveCurrentTimeMs(store));
         } catch (Throwable throwable) {
@@ -51,15 +49,16 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     }
 
     @Nonnull
-    private SweepRuntimeSettings resolveRuntimeSettings(@Nonnull Store<EntityStore> store) {
+    private SweepRuntimeSettings resolveRuntimeSettings(@Nonnull TickState tickState,
+                                                        @Nonnull Store<EntityStore> store) {
         long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
-        SweepRuntimeSettings cached = cachedRuntimeSettings;
-        if (cached != null && nowMs < nextRuntimeSettingsRefreshAtMs) {
+        SweepRuntimeSettings cached = tickState.cachedRuntimeSettings;
+        if (cached != null && nowMs < tickState.nextRuntimeSettingsRefreshAtMs) {
             return cached;
         }
         SweepRuntimeSettings resolved = computeRuntimeSettings();
-        cachedRuntimeSettings = resolved;
-        nextRuntimeSettingsRefreshAtMs = nowMs + RUNTIME_SETTINGS_REFRESH_INTERVAL_MS;
+        tickState.cachedRuntimeSettings = resolved;
+        tickState.nextRuntimeSettingsRefreshAtMs = nowMs + RUNTIME_SETTINGS_REFRESH_INTERVAL_MS;
         return resolved;
     }
 
@@ -117,6 +116,14 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     }
 
     private record SweepRuntimeSettings(int intervalSeconds, TwBreedingConfig.TimerBasis basis) {
+    }
+
+    private static final class TickState {
+        private long nextSweepAtMs;
+        private long lastSchedulerNowMs;
+        @Nullable
+        private SweepRuntimeSettings cachedRuntimeSettings;
+        private long nextRuntimeSettingsRefreshAtMs;
     }
 
     private static void log(@Nonnull Level level, @Nullable String message) {

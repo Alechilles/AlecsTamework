@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -31,7 +32,7 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
     private final CommandItemFeatureHandler featureHandler;
     private final Set<UUID> queuedPlayers = ConcurrentHashMap.newKeySet();
 
-    private long nextSweepAtMs;
+    private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
 
     public CommandTeleportArrivalRelocationSystem(CommandItemFeatureHandler featureHandler) {
         this.featureHandler = featureHandler;
@@ -42,11 +43,12 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
         if (featureHandler == null) {
             return;
         }
+        TickState tickState = statesByStore.get(store);
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (nowMs < tickState.nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = nowMs + SYSTEM_SWEEP_INTERVAL_MS;
+        tickState.nextSweepAtMs = nowMs + SYSTEM_SWEEP_INTERVAL_MS;
 
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null) {
@@ -135,5 +137,9 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
         String leftName = left.getName();
         String rightName = right.getName();
         return leftName != null && leftName.equals(rightName);
+    }
+
+    private static final class TickState {
+        private long nextSweepAtMs;
     }
 }
