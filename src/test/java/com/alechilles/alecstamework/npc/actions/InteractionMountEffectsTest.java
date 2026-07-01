@@ -39,7 +39,7 @@ class InteractionMountEffectsTest {
         assertTrue(mountSource.contains("TameworkMount debug: stage=%s"));
         assertTrue(mountSource.contains("missing_required_components"));
         assertTrue(mountSource.contains("existing_mount_state"));
-        assertTrue(mountSource.contains("mounted_component_attach"));
+        assertTrue(mountSource.contains("native_npc_mount_attach"));
         assertTrue(cleanupSource.contains("stale_rider_cleanup"));
         assertTrue(mountSource.contains("MountedGlideStaleStateCleanup.clearInvalidRiderState"));
         assertTrue(mountSource.indexOf("MountedGlideStaleStateCleanup.clearInvalidRiderState")
@@ -67,7 +67,7 @@ class InteractionMountEffectsTest {
     }
 
     @Test
-    void mountedGlideSelectsControllerAfterRideState() throws Exception {
+    void mountedGlideRequestsNativeRoleChangeAfterClearingStatusAnimation() throws Exception {
         String mountSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
@@ -75,8 +75,10 @@ class InteractionMountEffectsTest {
         int glideEnd = mountSource.indexOf("private String resolveGlideMovementConfigId");
         String glideMountSource = mountSource.substring(glideStart, glideEnd);
 
-        assertTrue(glideMountSource.indexOf("applyRideState(npcRef, role, store, glideState)")
-                < glideMountSource.indexOf(
+        assertTrue(glideMountSource.indexOf("clearStatusAnimation(npcRef, npcComponent, store)")
+                < glideMountSource.indexOf("RoleChangeSystem.requestRoleChange"));
+        assertFalse(glideMountSource.contains("applyRideState(npcRef, role, store, glideState)"));
+        assertFalse(glideMountSource.contains(
                 "role.setActiveMotionController(npcRef, npcComponent, glideController, store)"
         ));
     }

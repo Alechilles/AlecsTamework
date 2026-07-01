@@ -13,9 +13,7 @@ import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.AnimationSlot;
-import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
@@ -156,14 +154,15 @@ final class InteractionMountEffects {
                 TameworkMountedGlideComponent.getComponentType();
         ComponentType<EntityStore, TameworkMountedGlideRiderComponent> glideRiderType =
                 TameworkMountedGlideRiderComponent.getComponentType();
-        ComponentType<EntityStore, MountedComponent> mountedType = MountedComponent.getComponentType();
-        if (glideMountType == null || glideRiderType == null || mountedType == null) {
+        ComponentType<EntityStore, NPCMountComponent> nativeMountType = NPCMountComponent.getComponentType();
+        if (glideMountType == null || glideRiderType == null || nativeMountType == null) {
             return failMount(role, "mounted_glide", "component_type_unavailable",
-                    "glideMountType=%s glideRiderType=%s mountedType=%s",
+                    "glideMountType=%s glideRiderType=%s nativeMountType=%s",
                     glideMountType != null,
                     glideRiderType != null,
-                    mountedType != null);
+                    nativeMountType != null);
         }
+        ComponentType<EntityStore, MountedComponent> mountedType = MountedComponent.getComponentType();
         UUIDComponent npcUuid = store.getComponent(npcRef, UUIDComponent.getComponentType());
         UUIDComponent riderUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
         PlayerRef playerRefComponent = store.getComponent(playerRef, PlayerRef.getComponentType());
@@ -195,14 +194,15 @@ final class InteractionMountEffects {
                 mountedType,
                 store
         );
+        NPCMountComponent existingNativeMount = store.getComponent(npcRef, nativeMountType);
         if (hasActiveNativeMount(playerComponent)
-                || store.getComponent(playerRef, mountedType) != null
+                || existingNativeMount != null
                 || store.getComponent(npcRef, glideMountType) != null
                 || store.getComponent(playerRef, glideRiderType) != null) {
             return failMount(role, "mounted_glide", "existing_mount_state",
-                    "playerMountEntityId=%s hasMounted=%s hasGlideMount=%s hasGlideRider=%s",
+                    "playerMountEntityId=%s hasNativeMount=%s hasGlideMount=%s hasGlideRider=%s",
                     playerComponent.getMountEntityId(),
-                    store.getComponent(playerRef, mountedType) != null,
+                    existingNativeMount != null,
                     store.getComponent(npcRef, glideMountType) != null,
                     store.getComponent(playerRef, glideRiderType) != null);
         }
@@ -244,26 +244,35 @@ final class InteractionMountEffects {
         float anchorY = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Y_PARAM, 0.0);
         float anchorZ = (float) owner.getRoleNumberParam(role, DEFAULT_MOUNT_ANCHOR_Z_PARAM, 0.0);
         String movementConfigId = resolveGlideMovementConfigId(role);
+        int originalRoleIndex = NPCPlugin.get().getIndex(role.getRoleName());
+        int emptyRoleIndex = NPCPlugin.get().getIndex(EMPTY_ROLE_ID);
+        if (originalRoleIndex < 0 || emptyRoleIndex < 0) {
+            return failMount(role, "mounted_glide", "missing_role_index",
+                    "originalRoleIndex=%s emptyRoleIndex=%s", originalRoleIndex, emptyRoleIndex);
+        }
+
+        NPCMountComponent createdMount = store.ensureAndGetComponent(npcRef, nativeMountType);
+        if (createdMount == null) {
+            return failMount(role, "mounted_glide", "ensure_npc_mount_failed");
+        }
+        createdMount.setOriginalRoleIndex(originalRoleIndex);
+        createdMount.setOwnerPlayerRef(playerRefComponent);
+        createdMount.setAnchor(anchorX, anchorY, anchorZ);
+
         store.putComponent(npcRef, glideMountType, glideMount);
         store.putComponent(playerRef, glideRiderType, glideRider);
-        store.putComponent(
-                playerRef,
-                mountedType,
-                new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)
-        );
         clearStatusAnimation(npcRef, npcComponent, store);
-        applyRideState(npcRef, role, store, glideState);
-        role.setActiveMotionController(npcRef, npcComponent, glideController, store);
+        RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
         boolean movementConfigApplied =
                 applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
         store.tryRemoveComponent(npcRef, Interactable.getComponentType());
-        logMountDebug(role, "mounted_glide", "mounted_component_attach",
-                "networkId=%s anchor=%s/%s/%s controller=%s",
+        logMountDebug(role, "mounted_glide", "native_npc_mount_attach",
+                "networkId=%s anchor=%s/%s/%s nativeMount=%s",
                 npcNetworkId.getId(),
                 anchorX,
                 anchorY,
                 anchorZ,
-                MountController.Minecart);
+                true);
         logMountDebug(role, "mounted_glide", "applied",
                 "npcUuid=%s riderUuid=%s networkId=%s state=%s controller=%s config=%s anchor=%s/%s/%s movementConfig=%s movementConfigApplied=%s",
                 npcUuid.getUuid(),
