@@ -259,8 +259,8 @@ final class InteractionMountEffects {
         store.putComponent(npcRef, glideMountType, glideMount);
         store.putComponent(playerRef, glideRiderType, glideRider);
         clearStatusAnimation(npcRef, npcComponent, store);
-        role.setActiveMotionController(npcRef, npcComponent, glideController, store);
         applyRideState(npcRef, role, store, glideState);
+        role.setActiveMotionController(npcRef, npcComponent, glideController, store);
         boolean movementConfigApplied =
                 applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
         attachNativeNpcMount(playerComponent, playerRefComponent, npcNetworkId, anchorX, anchorY, anchorZ, npcRef, store);

@@ -4,6 +4,7 @@
 
 ### Fixed
 - Fixed mounted glide controls so native-mounted dragons read rider movement input before vanilla mount handling and can launch into glide from the ground when jump/flap is held.
+- Fixed mounted glide controller ownership so entering the ridden state cannot leave dragons on their normal `TameworkFly` controller instead of the dedicated glide controller.
 - Fixed managed coop scans so optional block-state reflection misses are cached instead of throwing repeatedly on the world tick thread, and reduced stale-ref noise while resolving coop block locations.
 - Fixed several server-freeze risks in high-activity worlds by keeping Tamework ticking-system sweep and cache state scoped to each active world store instead of sharing it across instances.
 - Moved legacy telemetry migration and compatibility metrics work onto dedicated daemon workers with HTTP timeouts, reducing startup and tick stalls when telemetry or metrics I/O is slow.

@@ -66,6 +66,21 @@ class InteractionMountEffectsTest {
         )));
     }
 
+    @Test
+    void mountedGlideSelectsControllerAfterRideState() throws Exception {
+        String mountSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        int glideStart = mountSource.indexOf("private boolean applyTameworkMountedGlideMount");
+        int nativeAttachStart = mountSource.indexOf("private void attachNativeNpcMount");
+        String glideMountSource = mountSource.substring(glideStart, nativeAttachStart);
+
+        assertTrue(glideMountSource.indexOf("applyRideState(npcRef, role, store, glideState)")
+                < glideMountSource.indexOf(
+                "role.setActiveMotionController(npcRef, npcComponent, glideController, store)"
+        ));
+    }
+
     private static Player newPlayerWithoutServerInit() throws Exception {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);

@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.corecomponents.BodyMotionBase;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.Steering;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -46,7 +47,8 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
             return true;
         }
         TwMountedGlideConfig config = resolveConfig(role, glide);
-        maybeTakeOff(ref, role, glide, config, componentAccessor);
+        MotionController active = ensureGlideController(ref, role, glide, componentAccessor);
+        maybeTakeOff(ref, glide, config, active, componentAccessor);
         MountedGlidePhysicsState state = glide.toPhysicsState();
         if (state.getGlideSpeed() <= 0.0) {
             state.setGlideSpeed(config.getGlide().getBaseSpeed());
@@ -72,12 +74,28 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         return true;
     }
 
+    private MotionController ensureGlideController(@Nonnull Ref<EntityStore> ref,
+                                                   @Nonnull Role role,
+                                                   @Nonnull TameworkMountedGlideComponent glide,
+                                                   @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        MotionController active = role.getActiveMotionController();
+        String controller = glide.getGlideController();
+        if (isActiveController(active, controller)) {
+            return active;
+        }
+        NPCEntity npc = componentAccessor.getComponent(ref, NPCEntity.getComponentType());
+        if (npc == null || controller.isBlank()) {
+            return active;
+        }
+        role.setActiveMotionController(ref, npc, controller, componentAccessor);
+        return role.getActiveMotionController();
+    }
+
     private void maybeTakeOff(@Nonnull Ref<EntityStore> ref,
-                              @Nonnull Role role,
                               @Nonnull TameworkMountedGlideComponent glide,
                               @Nonnull TwMountedGlideConfig config,
+                              @Nullable MotionController active,
                               @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
-        MotionController active = role.getActiveMotionController();
         if (!(active instanceof MotionControllerTameworkMountedGlide glideController)
                 || !shouldTakeOffFromGround(glide, active.onGround())) {
             return;
@@ -88,6 +106,10 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
 
     static boolean shouldTakeOffFromGround(@Nonnull TameworkMountedGlideComponent glide, boolean grounded) {
         return grounded && glide.isJumpHeld();
+    }
+
+    static boolean isActiveController(@Nullable MotionController active, @Nonnull String controller) {
+        return active != null && !controller.isBlank() && controller.equals(active.getType());
     }
 
     @Nonnull

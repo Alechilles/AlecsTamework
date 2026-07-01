@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.movement;
 
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
@@ -65,5 +67,16 @@ class BodyMotionTameworkMountedGlideTest {
 
         assertTrue(BodyMotionTameworkMountedGlide.shouldTakeOffFromGround(glide, true));
         assertFalse(BodyMotionTameworkMountedGlide.shouldTakeOffFromGround(glide, false));
+    }
+
+    @Test
+    void mountedGlideBodyMotionOwnsActiveController() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/movement/BodyMotionTameworkMountedGlide.java"
+        ));
+
+        assertTrue(source.contains("ensureGlideController(ref, role, glide, componentAccessor)"));
+        assertTrue(source.contains("role.setActiveMotionController(ref, npc, controller, componentAccessor)"));
+        assertTrue(source.contains("maybeTakeOff(ref, glide, config, active, componentAccessor)"));
     }
 }
