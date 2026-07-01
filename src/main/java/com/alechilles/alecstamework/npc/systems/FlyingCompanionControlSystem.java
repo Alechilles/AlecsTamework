@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionComponent;
+import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
@@ -50,17 +51,16 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
     private static final double LANDING_VERTICAL_MIN_SPEED = 0.035;
     private static final double LANDING_VERTICAL_EASE_DISTANCE = 1.0;
 
-    private long nextSweepAtMs;
-    private final Map<Ref<EntityStore>, Vector3d> landingTargets = new HashMap<>();
-    private final Map<Ref<EntityStore>, String> debugSignatures = new HashMap<>();
+    private final StoreScopedState<FlyingTickState> statesByStore = new StoreScopedState<>(FlyingTickState::new);
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        FlyingTickState tickState = statesByStore.get(store);
         long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
+        if (nowMs < tickState.nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        tickState.nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
 
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
@@ -89,12 +89,13 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             if (ref == null || !ref.isValid()) {
                 continue;
             }
-            tickCompanion(ref, store, npcType, transformType, flyingType);
+            tickCompanion(ref, store, tickState, npcType, transformType, flyingType);
         }
     }
 
     private void tickCompanion(@Nonnull Ref<EntityStore> ref,
                                @Nonnull Store<EntityStore> store,
+                               @Nonnull FlyingTickState tickState,
                                @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
                                @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
                                @Nonnull ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingType) {
@@ -106,13 +107,13 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         }
 
         if (component.isSettledMode()) {
-            landingTargets.remove(ref);
+            tickState.landingTargets.remove(ref);
             return;
         }
 
         if (!component.isHoldMode()) {
-            landingTargets.remove(ref);
-            debugSignatures.remove(ref);
+            tickState.landingTargets.remove(ref);
+            tickState.debugSignatures.remove(ref);
             if (!TameworkFlyingCompanionComponent.PHASE_FOLLOWING.equals(component.getPhase())
                     || component.getStableTickCount() != 0
                     || component.getNextCommandAtMs() != 0L) {
@@ -124,14 +125,14 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         Vector3d currentPosition = transform.getPosition();
         double currentY = currentPosition.y;
         String currentState = resolveCurrentStateSpec(npc);
-        Vector3d standPosition = resolveLandingTarget(ref, store, npc, component, currentPosition);
+        Vector3d standPosition = resolveLandingTarget(ref, store, tickState, npc, component, currentPosition);
         double horizontalDistanceToStand = standPosition == null
                 ? Double.MAX_VALUE
                 : horizontalDistance(currentPosition, standPosition);
         boolean horizontallyReadyToLand = standPosition != null
                 && horizontalDistanceToStand <= LANDING_HORIZONTAL_HANDOFF_DISTANCE;
         boolean groundedByController = isGroundedByController(npc.getRole());
-        logDebugSignature(ref, store, npc, component, currentState, currentY, standPosition, groundedByController);
+        logDebugSignature(ref, store, tickState, npc, component, currentState, currentY, standPosition, groundedByController);
         double groundedHeightTolerance = Math.max(
                 MIN_GROUNDED_HEIGHT_TOLERANCE,
                 component.getVerticalMovementEpsilon() * 4.0
@@ -145,7 +146,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             if (!component.isSettledMode()) {
                 component.setMode(TameworkFlyingCompanionComponent.MODE_SETTLED);
             }
-            landingTargets.remove(ref);
+            tickState.landingTargets.remove(ref);
             component.setLastObservedY(currentY);
             return;
         }
@@ -171,7 +172,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                     logDebugEvent(ref, store, npc, "reapplyGroundedState state=" + safeValue(component.getGroundedState()));
                     applyState(npc.getRole(), ref, store, component.getGroundedState());
                 }
-                landingTargets.remove(ref);
+                tickState.landingTargets.remove(ref);
                 component.setLastObservedY(currentY);
                 return;
             }
@@ -180,13 +181,13 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                     logDebugEvent(ref, store, npc, "reapplyGroundedState state=" + safeValue(component.getGroundedState()));
                     applyState(npc.getRole(), ref, store, component.getGroundedState());
                 }
-                landingTargets.remove(ref);
+                tickState.landingTargets.remove(ref);
                 component.setLastObservedY(currentY);
                 return;
             }
             prepareGroundedHandoff(ref, store, npc, standPosition);
             if (isGroundedByController(npc.getRole())) {
-                finalizeGroundedHandoff(ref, store, npc, component, standPosition);
+                finalizeGroundedHandoff(ref, store, tickState, npc, component, standPosition);
             }
             return;
         }
@@ -253,12 +254,13 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
 
     private void finalizeGroundedHandoff(@Nonnull Ref<EntityStore> ref,
                                          @Nonnull Store<EntityStore> store,
+                                         @Nonnull FlyingTickState tickState,
                                          @Nonnull NPCEntity npc,
                                          @Nonnull TameworkFlyingCompanionComponent component,
                                          @Nonnull Vector3d standPosition) {
         logDebugEvent(ref, store, npc, "finalizeGroundedHandoff targetY=" + formatDouble(standPosition.y));
         Role role = npc.getRole();
-        landingTargets.remove(ref);
+        tickState.landingTargets.remove(ref);
         component.enterGroundedPhase(standPosition.y);
         component.setMode(TameworkFlyingCompanionComponent.MODE_SETTLED);
         stopMotion(npc);
@@ -332,6 +334,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
     @Nullable
     private Vector3d resolveLandingTarget(@Nonnull Ref<EntityStore> ref,
                                           @Nonnull Store<EntityStore> store,
+                                          @Nonnull FlyingTickState tickState,
                                           @Nonnull NPCEntity npc,
                                           @Nonnull TameworkFlyingCompanionComponent component,
                                           @Nonnull Vector3d currentPosition) {
@@ -346,13 +349,13 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
             return null;
         }
 
-        Vector3d existing = landingTargets.get(ref);
+        Vector3d existing = tickState.landingTargets.get(ref);
         if (existing != null) {
             return existing;
         }
         Vector3d resolved = resolveNearestSafeStandPosition(store, currentPosition);
         if (resolved != null) {
-            landingTargets.put(ref, resolved);
+            tickState.landingTargets.put(ref, resolved);
         }
         return resolved;
     }
@@ -434,6 +437,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
 
     private void logDebugSignature(@Nonnull Ref<EntityStore> ref,
                                    @Nonnull Store<EntityStore> store,
+                                   @Nonnull FlyingTickState tickState,
                                    @Nonnull NPCEntity npc,
                                    @Nonnull TameworkFlyingCompanionComponent component,
                                    @Nullable String currentState,
@@ -454,11 +458,11 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
                 formatDouble(currentY),
                 standPosition == null ? "<none>" : formatDouble(standPosition.y)
         );
-        String previous = debugSignatures.get(ref);
+        String previous = tickState.debugSignatures.get(ref);
         if (signature.equals(previous)) {
             return;
         }
-        debugSignatures.put(ref, signature);
+        tickState.debugSignatures.put(ref, signature);
         logDebugEvent(ref, store, npc, signature);
     }
 
@@ -656,5 +660,11 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         } catch (IndexOutOfBoundsException | IllegalArgumentException ex) {
             return null;
         }
+    }
+
+    private static final class FlyingTickState {
+        private long nextSweepAtMs;
+        private final Map<Ref<EntityStore>, Vector3d> landingTargets = new HashMap<>();
+        private final Map<Ref<EntityStore>, String> debugSignatures = new HashMap<>();
     }
 }
