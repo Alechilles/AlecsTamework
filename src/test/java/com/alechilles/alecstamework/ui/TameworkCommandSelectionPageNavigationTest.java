@@ -135,4 +135,13 @@ class TameworkCommandSelectionPageNavigationTest {
                 "Dismissing a linked panel should clear ownership for that page generation."
         );
     }
+
+    @Test
+    void delayedRefreshGuardsWorldExecute() throws IOException {
+        String content = Files.readString(SELECTION_PAGE, StandardCharsets.UTF_8);
+
+        assertTrue(content.contains("safeExecuteOnWorld("), "delayed refreshes should use safe world execution helper");
+        assertTrue(content.contains("world.isAlive()"), "world execution helper should check world liveness");
+        assertTrue(content.contains("catch (RuntimeException ignored)"), "world execution helper should absorb unload races");
+    }
 }

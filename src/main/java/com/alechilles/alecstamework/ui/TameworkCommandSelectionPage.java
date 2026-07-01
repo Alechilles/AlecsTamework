@@ -33,6 +33,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Interactive command-selection page for command items.
@@ -694,7 +695,7 @@ public final class TameworkCommandSelectionPage
         if (world == null) {
             return;
         }
-        world.execute(this::runRefreshTickOnWorldThread);
+        safeExecuteOnWorld(world, this::runRefreshTickOnWorldThread);
     }
 
     private void scheduleDebouncedFilterTextApply() {
@@ -721,7 +722,7 @@ public final class TameworkCommandSelectionPage
         if (world == null) {
             return;
         }
-        world.execute(() -> runDebouncedFilterTextApplyOnWorldThread(version));
+        safeExecuteOnWorld(world, () -> runDebouncedFilterTextApplyOnWorldThread(version));
     }
 
     private void runDebouncedFilterTextApplyOnWorldThread(long version) {
@@ -881,13 +882,25 @@ public final class TameworkCommandSelectionPage
         if (world == null) {
             return;
         }
-        world.execute(() -> {
+        safeExecuteOnWorld(world, () -> {
             Ref<EntityStore> activeRef = playerRef.getReference();
             if (activeRef == null || !activeRef.isValid()) {
                 return;
             }
             action.run();
         });
+    }
+
+    private static boolean safeExecuteOnWorld(@Nullable World world, @Nonnull Runnable task) {
+        if (world == null || !world.isAlive()) {
+            return false;
+        }
+        try {
+            world.execute(task);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private void bindCommandButtonEvents(@Nonnull UIEventBuilder eventBuilder) {
