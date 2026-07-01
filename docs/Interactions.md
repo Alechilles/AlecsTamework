@@ -108,7 +108,8 @@ Behavior:
 - Attempts mount via `NPCMountComponent`.
 - Uses mount anchor params.
 - Hides active custom nameplates while mounted and restores on dismount.
-- Roles can opt into Tamework's beta mounted glide controller by setting role param `MountMode` to `TameworkMountedGlide`, adding the `TameworkMountedGlide` motion controller and body motion wiring, using the glide rider movement config `MountGlideMovementConfig` (default `Tamework_Mounted_Glide_Rider`), and providing an optional `TwMountedGlideConfig` under `Server/Tamework/Mounts/Glide`.
+- Roles can opt into Tamework's beta mounted glide controller by setting role param `MountMode` to `TameworkMountedGlide` and using the glide rider movement config `MountGlideMovementConfig` (default `Tamework_Mounted_Glide_Rider`). Mounted glide still attaches through `NPCMountComponent`, while flight movement is applied to the rider's velocity from mounted rider input and look direction.
+- Existing legacy `TameworkMountedGlide` motion controller or body motion entries may remain in older templates for compatibility, but current mounted glide behavior does not require authors to add them.
 - See [Mounted Glide Controller](Mounted-Glide.md) for the full setup and tuning fields.
 
 ### ModeCycle

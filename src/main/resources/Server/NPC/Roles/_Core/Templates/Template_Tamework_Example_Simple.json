@@ -140,11 +140,11 @@
     },
     "MountGlideState": {
       "Value": "Ridden",
-      "Description": "State used while this NPC is ridden by the Tamework mounted glide controller."
+      "Description": "Legacy compatibility state name for older mounted glide template wiring. Current native mounted glide does not require a ridden-state body motion."
     },
     "MountGlideController": {
       "Value": "TameworkMountedGlide",
-      "Description": "Motion controller used by the Tamework mounted glide controller."
+      "Description": "Legacy compatibility parameter for older mounted glide motion-controller wiring. Current native mounted glide uses rider velocity for active flight."
     }
   },
   "MotionControllerList": [
@@ -175,7 +175,7 @@
       }
     },
     {
-      "$Comment": "Dormant mounted glide controller used when MountMode is TameworkMountedGlide.",
+      "$Comment": "Legacy compatibility entry; current native mounted glide does not require this motion controller.",
       "Type": "TameworkMountedGlide"
     }
   ],
@@ -224,7 +224,7 @@
   ],
   "Instructions": [
     {
-      "$Comment": "Mounted glide steering while the NPC is being ridden.",
+      "$Comment": "Legacy compatibility body motion entry; current native mounted glide uses rider velocity instead of NPC body motion.",
       "Sensor": {
         "Type": "State",
         "State": "Ridden"

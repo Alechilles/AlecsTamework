@@ -8,6 +8,14 @@ Tamework's mounted glide controller is an opt-in beta mount mode for flying moun
 - Holding jump requests flaps repeatedly, but each flap is still limited by `Flap.CooldownSeconds`.
 - Holding sprint while a flap fires converts that flap into a forward boost.
 - Holding crouch applies an airbrake that drains speed and increases sink.
+- Q/drop, left-click, and right-click are not consumed for flight controls.
+
+## Architecture
+Mounted glide uses Hytale's native NPC mount flow for attachment. `TameworkMountedGlide` applies `NPCMountComponent` to the NPC and lets the base mount attachment system keep the rider seated.
+
+Flight movement is driven on the rider, not by an NPC body motion or motion controller. `MountedGlidePlayerVelocitySystem` reads the native-mounted rider's movement, jump, sprint, crouch, and look state, then applies rider `Velocity` instructions for glide, flap, boost, airbrake, and pitch behavior.
+
+`MountGlideMovementConfig` still applies to the rider while mounted. The bundled `Tamework_Mounted_Glide_Rider` movement config suppresses vanilla ground-mount locomotion and jump while preserving native NPC mount attachment. This is separate from `MountMovementConfig`, which remains the default movement profile for normal ground mounts.
 
 ## Required Role Wiring
 The NPC role must still pass the normal mount interaction requirements, including `IsMountable`.
@@ -16,34 +24,12 @@ Add or override these role parameters:
 ```json
 "IsMountable": { "Value": true },
 "MountMode": { "Value": "TameworkMountedGlide" },
-"MountGlideMovementConfig": { "Value": "Tamework_Mounted_Glide_Rider" },
-"MountGlideState": { "Value": "Ridden" },
-"MountGlideController": { "Value": "TameworkMountedGlide" }
+"MountGlideMovementConfig": { "Value": "Tamework_Mounted_Glide_Rider" }
 ```
 
-Add a dormant motion controller entry:
-```json
-{
-  "Type": "TameworkMountedGlide"
-}
-```
+Set `MountGlideMovementConfig` to `none`, `off`, or `disabled` only when testing without a rider movement override.
 
-Add a ridden-state body motion:
-```json
-{
-  "Sensor": {
-    "Type": "State",
-    "State": "Ridden"
-  },
-  "BodyMotion": {
-    "Type": "TameworkMountedGlide"
-  }
-}
-```
-
-The bundled example templates include this dormant wiring. Set `MountMode` to `TameworkMountedGlide` and `IsMountable` to `true` on a role that uses those templates to opt in.
-
-`MountGlideMovementConfig` defaults to `Tamework_Mounted_Glide_Rider`, a Tamework movement config that suppresses the rider's vanilla ground-mount locomotion and jump while preserving the native mount attachment. This is separate from `MountMovementConfig`, which remains the default movement profile for normal ground mounts. Set `MountGlideMovementConfig` to `none`, `off`, or `disabled` only when testing without a rider movement override.
+Older templates may still include `MountGlideState`, `MountGlideController`, a `TameworkMountedGlide` motion controller entry, or a ridden-state body motion for compatibility with earlier experimental builds. Current mounted glide attachment and flight do not require authors to add those entries for active behavior.
 
 ## Glide Config Assets
 Config assets live under:
@@ -92,3 +78,5 @@ The bundled `TwMountedGlideExample` profile shows the full field set.
 
 ## Input Notes
 The current implementation reads mounted movement, jump, sprint, crouch, and look rotation. It does not consume Q/drop, left-click, or right-click for flight controls.
+
+Tamework does not currently install an F/use packet filter for mounted glide. If post-pivot manual testing shows the use key re-enters the interaction prompt while mounted, that should be handled as a separate runtime fix.
