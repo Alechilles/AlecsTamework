@@ -37,25 +37,20 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
-    void mountedGlideUsesBaseMountedComponentAttachmentInsteadOfLegacyNpcMount() throws IOException {
+    void mountedGlideUsesNativeNpcMountComponentInsteadOfMountedComponent() throws IOException {
         String interaction = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
-        String plugin = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/Tamework.java"));
-        String source = readGlideInputStack();
+        int start = interaction.indexOf("private boolean applyTameworkMountedGlideMount");
+        int end = interaction.indexOf("private String resolveGlideMovementConfigId", start);
+        String method = interaction.substring(start, end);
 
-        assertTrue(interaction.contains("MountedComponent.getComponentType()"));
-        assertTrue(interaction.contains("store.putComponent("));
-        assertTrue(interaction.contains("new MountedComponent(npcRef, new Rotation3f(anchorX, anchorY, anchorZ), MountController.Minecart)"));
-        assertTrue(interaction.contains("mounted_component_attach"));
-        assertFalse(interaction.contains("store.ensureAndGetComponent(npcRef, npcMountType)"));
-        assertFalse(interaction.contains("npcMount.setOwnerPlayerRef(playerRefComponent)"));
-        assertFalse(interaction.contains("npcMount.setAnchor(anchorX, anchorY, anchorZ)"));
-        assertFalse(interaction.contains("new MountNPC(anchorX, anchorY, anchorZ, npcNetworkId.getId())"));
-        assertFalse(interaction.contains("playerComponent.setMountEntityId(npcNetworkId.getId())"));
-        assertFalse(interaction.contains("MountedGlidePacketHandler"));
-        assertFalse(plugin.contains("MountedGlidePacketHandler::new"));
-        assertFalse(source.contains("MountedGlidePacketHandler"));
+        assertTrue(method.contains("NPCMountComponent.getComponentType()"));
+        assertTrue(method.contains("createdMount.setOwnerPlayerRef(playerRefComponent)"));
+        assertTrue(method.contains("createdMount.setAnchor(anchorX, anchorY, anchorZ)"));
+        assertTrue(method.contains("RoleChangeSystem.requestRoleChange"));
+        assertFalse(method.contains("new MountedComponent("));
+        assertFalse(method.contains("MountController.Minecart"));
     }
 
     @Test
