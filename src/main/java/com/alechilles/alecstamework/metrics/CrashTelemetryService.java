@@ -20,6 +20,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.stream.Stream;
@@ -33,6 +35,7 @@ public final class CrashTelemetryService {
     private static final String LEGACY_SETTINGS_FILE_NAME = "crash-telemetry.json";
 
     private final EmbeddedRuntime telemetry;
+    private final ExecutorService legacyMigrationExecutor;
     private final AtomicBoolean enabled;
     private final AtomicBoolean breadcrumbsEnabled;
     private final AtomicBoolean started = new AtomicBoolean(false);
@@ -56,19 +59,33 @@ public final class CrashTelemetryService {
                 TameworkSettingsStore.loadGlobalSettings(globalSettingsPath, logger);
         boolean telemetryEnabled = settings.telemetryEnabled();
         boolean breadcrumbsEnabled = settings.telemetryBreadcrumbsEnabled();
-        migrateLegacyTelemetryData(
+        EmbeddedTelemetryService embeddedTelemetry = EmbeddedTelemetryBootstrap.bootstrap(plugin);
+        CrashTelemetryService service = new CrashTelemetryService(
+                telemetryEnabled,
+                breadcrumbsEnabled,
+                new EmbeddedServiceRuntime(embeddedTelemetry),
+                createLegacyMigrationExecutor()
+        );
+        service.migrateLegacyTelemetryDataAsync(
                 pluginDataDirectory.resolve("Telemetry"),
                 legacyTelemetryRootCandidates(pluginDataDirectory, tameworkUniverseRoot),
                 logger
         );
-        EmbeddedTelemetryService embeddedTelemetry = EmbeddedTelemetryBootstrap.bootstrap(plugin);
-        return new CrashTelemetryService(telemetryEnabled, breadcrumbsEnabled, new EmbeddedServiceRuntime(embeddedTelemetry));
+        return service;
     }
 
     CrashTelemetryService(boolean enabled,
                           boolean breadcrumbsEnabled,
                           @Nonnull EmbeddedRuntime telemetry) {
+        this(enabled, breadcrumbsEnabled, telemetry, createLegacyMigrationExecutor());
+    }
+
+    CrashTelemetryService(boolean enabled,
+                          boolean breadcrumbsEnabled,
+                          @Nonnull EmbeddedRuntime telemetry,
+                          @Nonnull ExecutorService legacyMigrationExecutor) {
         this.telemetry = Objects.requireNonNull(telemetry, "telemetry");
+        this.legacyMigrationExecutor = Objects.requireNonNull(legacyMigrationExecutor, "legacyMigrationExecutor");
         this.enabled = new AtomicBoolean(enabled);
         this.breadcrumbsEnabled = new AtomicBoolean(breadcrumbsEnabled);
         telemetry.setBreadcrumbsEnabled(breadcrumbsEnabled);
@@ -95,6 +112,7 @@ public final class CrashTelemetryService {
     }
 
     public synchronized void shutdown() {
+        legacyMigrationExecutor.shutdownNow();
         if (!started.compareAndSet(true, false)) {
             return;
         }
@@ -103,6 +121,14 @@ public final class CrashTelemetryService {
         }
         telemetry.shutdown();
         syncLastFlushStatus();
+    }
+
+    private void migrateLegacyTelemetryDataAsync(@Nonnull Path newTelemetryRoot,
+                                                 @Nonnull List<Path> legacyTelemetryRootCandidates,
+                                                 @Nullable HytaleLogger logger) {
+        legacyMigrationExecutor.execute(() ->
+                migrateLegacyTelemetryData(newTelemetryRoot, legacyTelemetryRootCandidates, logger)
+        );
     }
 
     public synchronized void applyEnabledSetting(boolean enabled) {
@@ -500,6 +526,15 @@ public final class CrashTelemetryService {
         if (logger != null) {
             logger.at(Level.WARNING).withCause(throwable).log(message);
         }
+    }
+
+    @Nonnull
+    private static ExecutorService createLegacyMigrationExecutor() {
+        return Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "AlecTamework-CrashTelemetryMigration");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     interface EmbeddedRuntime {
