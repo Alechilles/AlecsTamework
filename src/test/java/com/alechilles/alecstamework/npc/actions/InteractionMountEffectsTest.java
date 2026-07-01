@@ -29,14 +29,21 @@ class InteractionMountEffectsTest {
 
     @Test
     void mountedGlideMountReportsActionableDebugStages() throws Exception {
-        String source = Files.readString(Path.of(
+        String mountSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
+        String cleanupSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/MountedGlideStaleStateCleanup.java"
+        ));
 
-        assertTrue(source.contains("TameworkMount debug: stage=%s"));
-        assertTrue(source.contains("missing_required_components"));
-        assertTrue(source.contains("existing_mount_state"));
-        assertTrue(source.contains("native_attach"));
+        assertTrue(mountSource.contains("TameworkMount debug: stage=%s"));
+        assertTrue(mountSource.contains("missing_required_components"));
+        assertTrue(mountSource.contains("existing_mount_state"));
+        assertTrue(mountSource.contains("native_attach"));
+        assertTrue(cleanupSource.contains("stale_rider_cleanup"));
+        assertTrue(mountSource.contains("MountedGlideStaleStateCleanup.clearInvalidRiderState"));
+        assertTrue(mountSource.indexOf("MountedGlideStaleStateCleanup.clearInvalidRiderState")
+                < mountSource.indexOf("\"existing_mount_state\""));
     }
 
     private static Player newPlayerWithoutServerInit() throws Exception {

@@ -177,6 +177,15 @@ final class InteractionMountEffects {
                     npcComponent != null,
                     npcNetworkId != null);
         }
+        MountedGlideStaleStateCleanup.clearInvalidRiderState(
+                playerRef,
+                playerComponent,
+                role,
+                glideRiderType,
+                glideMountType,
+                npcMountType,
+                store
+        );
         if (hasActiveNativeMount(playerComponent)
                 || store.getComponent(npcRef, npcMountType) != null
                 || store.getComponent(npcRef, glideMountType) != null
