@@ -123,11 +123,22 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(cleanup.contains("nativeMountComponentType"));
         assertTrue(cleanup.contains("riderNativeMountedToMount"));
         assertTrue(cleanup.contains("nativeMount.getOwnerPlayerRef().getReference()"));
-        assertTrue(cleanup.contains("MountPlugin.checkDismountNpc(bufferStore, riderRef, player)"));
+        assertFalse(cleanup.contains("MountPlugin.checkDismountNpc"));
+        assertTrue(cleanup.contains("player.setMountEntityId(0)"));
+        assertTrue(cleanup.contains("MountPlugin.resetOriginalPlayerMovementSettings(riderRef, bufferStore)"));
         assertTrue(cleanup.contains("bufferStore.tryRemoveComponent(mountRef, nativeMountComponentType)"));
         assertTrue(cleanup.contains("bufferStore.ensureAndGetComponent(mountRef, Interactable.getComponentType())"));
         assertFalse(cleanup.contains("MountedComponent"));
         assertFalse(cleanup.contains("riderMountedToMount"));
+        String cleanupMethod = extractMethodSource(
+                cleanup,
+                "private void cleanupGlide",
+                "private void removeNativeMountComponent"
+        );
+        assertTrue(cleanupMethod.indexOf("restoreNpcState(mountRef, npc, mount, bufferStore)")
+                < cleanupMethod.indexOf("bufferStore.tryRemoveComponent(mountRef, mountComponentType)"));
+        assertTrue(cleanupMethod.indexOf("removeNativeMountComponent(mountRef, bufferStore)")
+                < cleanupMethod.indexOf("restoreNpcState(mountRef, npc, mount, bufferStore)"));
         assertTrue(plugin.contains("new MountedGlideCleanupSystem(\r\n                            npcMountComponentType,")
                 || plugin.contains("new MountedGlideCleanupSystem(\n                            npcMountComponentType,"));
     }
@@ -142,7 +153,6 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(handler.contains("getMountedGlideComponentType()"));
         assertTrue(handler.contains("handleMountedGlideDismount"));
         assertTrue(handler.contains("TameworkGlide debug: dismountPacket"));
-        assertTrue(handler.contains("MountPlugin.checkDismountNpc(store, riderRef, player)"));
         assertTrue(handler.contains("store.tryRemoveComponent(riderRef, riderType)"));
         assertTrue(handler.contains("store.tryRemoveComponent(mountRef, NPCMountComponent.getComponentType())"));
         assertTrue(handler.contains("store.tryRemoveComponent(mountRef, mountType)"));
@@ -152,7 +162,12 @@ class MountedGlideInputCaptureArchitectureTest {
                 "private boolean handleMountedGlideDismount",
                 "private RideSession resolveRegisteredRideSession"
         );
+        assertFalse(method.contains("MountPlugin.checkDismountNpc"));
+        assertTrue(method.contains("player.setMountEntityId(0)"));
+        assertTrue(method.contains("MountPlugin.resetOriginalPlayerMovementSettings(riderRef, store)"));
         assertTrue(method.contains("restoreNpcState(mountRef, mount, store)"));
+        assertTrue(method.indexOf("removeNativeMountComponent(mountRef, store)")
+                < method.indexOf("restoreNpcState(mountRef, mount, store)"));
         assertTrue(method.indexOf("restoreNpcState(mountRef, mount, store)")
                 < method.indexOf("store.tryRemoveComponent(mountRef, mountType)"));
         assertFalse(method.contains("MountedComponent.getComponentType()"));

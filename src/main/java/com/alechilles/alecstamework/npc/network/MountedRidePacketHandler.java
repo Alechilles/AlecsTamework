@@ -318,20 +318,21 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
         );
         Player player = store.getComponent(riderRef, Player.getComponentType());
         if (player != null) {
-            MountPlugin.checkDismountNpc(store, riderRef, player);
-        }
-        if (riderType != null) {
-            store.tryRemoveComponent(riderRef, riderType);
+            player.setMountEntityId(0);
+            MountPlugin.resetOriginalPlayerMovementSettings(riderRef, store);
         }
         if (mountRef != null && mountRef.isValid()) {
             removeNativeMountComponent(mountRef, store);
             if (mount != null) {
                 restoreNpcState(mountRef, mount, store);
             }
+            store.ensureAndGetComponent(mountRef, Interactable.getComponentType());
             if (mountType != null) {
                 store.tryRemoveComponent(mountRef, mountType);
             }
-            store.ensureAndGetComponent(mountRef, Interactable.getComponentType());
+        }
+        if (riderType != null) {
+            store.tryRemoveComponent(riderRef, riderType);
         }
         return true;
     }

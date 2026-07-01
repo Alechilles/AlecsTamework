@@ -137,18 +137,15 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
             if (riderRef != null && riderRef.isValid()) {
                 Player player = bufferStore.getComponent(riderRef, playerComponentType);
                 if (player != null) {
-                    MountPlugin.checkDismountNpc(bufferStore, riderRef, player);
+                    player.setMountEntityId(0);
+                    MountPlugin.resetOriginalPlayerMovementSettings(riderRef, bufferStore);
                 }
-                if (mountRef.isValid()) {
-                    removeNativeMountComponent(mountRef, bufferStore);
-                }
-            } else if (mountRef.isValid()) {
-                removeNativeMountComponent(mountRef, bufferStore);
             }
             if (mountRef.isValid()) {
+                removeNativeMountComponent(mountRef, bufferStore);
                 restoreNpcState(mountRef, npc, mount, bufferStore);
-                bufferStore.tryRemoveComponent(mountRef, mountComponentType);
                 bufferStore.ensureAndGetComponent(mountRef, Interactable.getComponentType());
+                bufferStore.tryRemoveComponent(mountRef, mountComponentType);
             }
             if (riderRef != null && riderRef.isValid()) {
                 bufferStore.tryRemoveComponent(riderRef, riderComponentType);
