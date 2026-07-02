@@ -48,10 +48,10 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
     @Override
     public boolean canSteer(@Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         TameworkMountedGlideComponent glide = glideMount(ref, componentAccessor);
-        if (glide == null) {
-            lastCanSteer = super.canSteer(ref, componentAccessor);
-            lastCanSteerReason = lastCanSteer ? "" : String.valueOf(super.canSteerFailReason(ref, componentAccessor));
-            return lastCanSteer;
+        if (!shouldRunFlyController(glide)) {
+            lastCanSteer = false;
+            lastCanSteerReason = "NO_ACTIVE_GLIDE";
+            return false;
         }
         lastCanSteer = isAlive(ref, componentAccessor)
                 && role != null
@@ -67,8 +67,8 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
     public String canSteerFailReason(@Nonnull Ref<EntityStore> ref,
                                      @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         TameworkMountedGlideComponent glide = glideMount(ref, componentAccessor);
-        if (glide == null) {
-            return super.canSteerFailReason(ref, componentAccessor);
+        if (!shouldRunFlyController(glide)) {
+            return "NO_ACTIVE_GLIDE";
         }
         return mountedGlideCanSteerFailReason(ref, componentAccessor);
     }
@@ -81,7 +81,15 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
                                  @Nonnull Vector3d translation,
                                  @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         TameworkMountedGlideComponent glide = glideMount(ref, componentAccessor);
-        ridden = glide != null && glide.isFlightActive();
+        if (!shouldRunFlyController(glide)) {
+            ridden = false;
+            activeGlideSpeed = 0.0;
+            lastSteering.set(steering.getTranslation());
+            translation.set(0.0);
+            lastComputedMove.set(translation);
+            return dt;
+        }
+        ridden = true;
         activeGlideSpeed = MountedGlideControllerSupport.resolveMountedClientSpeed(glide, maxHorizontalSpeed);
         lastSteering.set(steering.getTranslation());
         double remaining = super.computeMove(ref, role, steering, dt, translation, componentAccessor);
@@ -96,6 +104,15 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
                                  @Nonnull Vector3d translation,
                                  @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         Vector3d requestedMove = new Vector3d(translation);
+        TameworkMountedGlideComponent glide = glideMount(ref, componentAccessor);
+        if (!shouldRunFlyController(glide)) {
+            ridden = false;
+            activeGlideSpeed = 0.0;
+            translation.set(0.0);
+            lastComputedMove.set(translation);
+            maybeLogDebug(requestedMove, dt);
+            return dt;
+        }
         double remaining = super.executeMove(ref, role, dt, translation, componentAccessor);
         maybeLogDebug(requestedMove, remaining);
         return remaining;
@@ -107,11 +124,15 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
                                     @Nonnull Steering steering,
                                     @Nonnull Vector3d velocity,
                                     @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
-        super.updateMovementState(ref, movementStates, steering, velocity, componentAccessor);
         TameworkMountedGlideComponent glide = glideMount(ref, componentAccessor);
-        if (glide == null || !glide.isFlightActive()) {
+        if (!shouldRunFlyController(glide)) {
+            movementStates.flying = false;
+            movementStates.horizontalIdle = true;
+            movementStates.sprinting = false;
+            clearMovementAnimation(ref, componentAccessor);
             return;
         }
+        super.updateMovementState(ref, movementStates, steering, velocity, componentAccessor);
         movementStates.onGround = false;
         movementStates.flying = true;
         movementStates.horizontalIdle = false;
@@ -131,6 +152,10 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
                 activeGlideSpeed,
                 super.computeMaxSpeedFromPitch(pitch)
         );
+    }
+
+    static boolean shouldRunFlyController(@Nullable TameworkMountedGlideComponent glide) {
+        return MountedGlideControllerSupport.shouldRunFlyController(glide);
     }
 
     private TameworkMountedGlideComponent glideMount(@Nonnull Ref<EntityStore> ref,
@@ -212,5 +237,17 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
             npc.playAnimation(ref, AnimationSlot.Movement, animation, componentAccessor);
         }
         lastAnimation = animation;
+    }
+
+    private void clearMovementAnimation(@Nonnull Ref<EntityStore> ref,
+                                        @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        if (lastAnimation.isBlank()) {
+            return;
+        }
+        NPCEntity npc = componentAccessor.getComponent(ref, NPCEntity.getComponentType());
+        if (npc != null) {
+            npc.playAnimation(ref, AnimationSlot.Movement, null, componentAccessor);
+        }
+        lastAnimation = "";
     }
 }
