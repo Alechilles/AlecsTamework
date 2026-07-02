@@ -27,6 +27,8 @@ import javax.annotation.Nullable;
 final class MountedGlidePacketInputCapture {
     private long lastClientMovementDebugMs;
     private long lastMountMovementDebugMs;
+    private String lastClientMovementInputProbeSignature = "";
+    private String lastMountMovementInputProbeSignature = "";
 
     void capture(@Nonnull ClientMovement packet, @Nonnull IPacketHandler packetHandler) {
         PlayerRef playerRef = packetHandler.getPlayerRef();
@@ -107,6 +109,7 @@ final class MountedGlidePacketInputCapture {
         mount.setLastPacketInputAtMs(now);
         mount.setLastInputAtMs(now);
         logDebug(packet, mount);
+        logInputProbe(packet, mount);
         store.putComponent(mountRef, mountType, mount);
     }
 
@@ -150,6 +153,7 @@ final class MountedGlidePacketInputCapture {
         mount.setLastPacketInputAtMs(now);
         mount.setLastInputAtMs(now);
         logDebug(packet, mount);
+        logInputProbe(packet, mount);
         store.putComponent(mountRef, mountType, mount);
     }
 
@@ -298,6 +302,59 @@ final class MountedGlidePacketInputCapture {
         );
     }
 
+    private void logInputProbe(@Nonnull ClientMovement packet, @Nonnull TameworkMountedGlideComponent mount) {
+        String signature = "movement=" + formatProbeStates(packet.movementStates)
+                + "|rider=" + formatProbeStates(packet.riderMovementStates)
+                + "|wish=" + formatProbePositionBucket(packet.wishMovement)
+                + "|velocity=" + formatProbeVectorBucket(packet.velocity)
+                + "|body=" + formatProbeDirectionBucket(packet.bodyOrientation)
+                + "|look=" + formatProbeDirectionBucket(packet.lookOrientation)
+                + "|snapshot=" + formatProbeSnapshot(mount);
+        if (signature.equals(lastClientMovementInputProbeSignature)) {
+            return;
+        }
+        lastClientMovementInputProbeSignature = signature;
+        logInputProbe(
+                "TameworkGlide inputProbe source=clientMovement rawWish=%s rawVelocity=%s body=%s look=%s " +
+                        "movementStates=%s riderStates=%s snapshot=%s signature=%s",
+                formatPosition(packet.wishMovement),
+                formatVector(packet.velocity),
+                formatDirection(packet.bodyOrientation),
+                formatDirection(packet.lookOrientation),
+                formatProbeStates(packet.movementStates),
+                formatProbeStates(packet.riderMovementStates),
+                formatProbeSnapshot(mount),
+                signature
+        );
+    }
+
+    private void logInputProbe(@Nonnull MountMovement packet, @Nonnull TameworkMountedGlideComponent mount) {
+        String signature = "states=" + formatProbeStates(packet.movementStates)
+                + "|body=" + formatProbeDirectionBucket(packet.bodyOrientation)
+                + "|snapshot=" + formatProbeSnapshot(mount);
+        if (signature.equals(lastMountMovementInputProbeSignature)) {
+            return;
+        }
+        lastMountMovementInputProbeSignature = signature;
+        logInputProbe(
+                "TameworkGlide inputProbe source=mountMovement absolute=%s body=%s movementStates=%s " +
+                        "snapshot=%s signature=%s",
+                formatPosition(packet.absolutePosition),
+                formatDirection(packet.bodyOrientation),
+                formatProbeStates(packet.movementStates),
+                formatProbeSnapshot(mount),
+                signature
+        );
+    }
+
+    private void logInputProbe(@Nonnull String message, Object... args) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(String.format(message, args));
+    }
+
     @Nonnull
     private String formatPosition(@Nullable Position position) {
         return position == null ? "<none>" : position.x + "/" + position.y + "/" + position.z;
@@ -325,6 +382,79 @@ final class MountedGlidePacketInputCapture {
                 ",ground=" + states.onGround +
                 ",run=" + states.running +
                 ",mounting=" + states.mounting;
+    }
+
+    @Nonnull
+    private String formatProbeStates(@Nullable MovementStates states) {
+        if (states == null) {
+            return "<none>";
+        }
+        return "jump=" + states.jumping +
+                ",swimJump=" + states.swimJumping +
+                ",crouch=" + states.crouching +
+                ",forcedCrouch=" + states.forcedCrouching +
+                ",sprint=" + states.sprinting +
+                ",run=" + states.running +
+                ",fly=" + states.flying +
+                ",ground=" + states.onGround +
+                ",idle=" + states.horizontalIdle +
+                ",mounting=" + states.mounting;
+    }
+
+    @Nonnull
+    private String formatProbeSnapshot(@Nonnull TameworkMountedGlideComponent mount) {
+        return "intent=" + formatProbeDouble(mount.getForwardIntent()) + "/" +
+                formatProbeDouble(mount.getStrafeIntent()) +
+                ",hasIntent=" + mount.hasMovementIntent() +
+                ",look=" + formatProbeAngle(mount.getLookYawDegrees()) + "/" +
+                formatProbeAngle(mount.getLookPitchDegrees()) +
+                ",hasLook=" + mount.hasLookRotation() +
+                ",held=jump:" + mount.isJumpHeld() +
+                ",sprint:" + mount.isSprinting() +
+                ",crouch:" + mount.isCrouching() +
+                ",flight=" + mount.isFlightActive() +
+                ",speed=" + formatProbeDouble(mount.getGlideSpeed()) +
+                ",vertical=" + formatProbeDouble(mount.getVerticalVelocity()) +
+                ",cooldown=" + formatProbeDouble(mount.getFlapCooldownRemainingSeconds()) +
+                ",boost=" + formatProbeDouble(mount.getBoostRemainingSeconds());
+    }
+
+    @Nonnull
+    private String formatProbePositionBucket(@Nullable Position position) {
+        return position == null ? "<none>" : formatProbeDouble(position.x) + "/" +
+                formatProbeDouble(position.y) + "/" + formatProbeDouble(position.z);
+    }
+
+    @Nonnull
+    private String formatProbeVectorBucket(@Nullable Vector3d vector) {
+        return vector == null ? "<none>" : formatProbeDouble(vector.x) + "/" +
+                formatProbeDouble(vector.y) + "/" + formatProbeDouble(vector.z);
+    }
+
+    @Nonnull
+    private String formatProbeDirectionBucket(@Nullable com.hypixel.hytale.protocol.Direction direction) {
+        if (direction == null) {
+            return "<none>";
+        }
+        return formatProbeAngle(Math.toDegrees(direction.yaw)) + "/" +
+                formatProbeAngle(Math.toDegrees(direction.pitch)) + "/" +
+                formatProbeAngle(Math.toDegrees(direction.roll));
+    }
+
+    @Nonnull
+    private String formatProbeDouble(double value) {
+        if (!Double.isFinite(value)) {
+            return "0.0";
+        }
+        return Double.toString(Math.round(value * 10.0) / 10.0);
+    }
+
+    @Nonnull
+    private String formatProbeAngle(double degrees) {
+        if (!Double.isFinite(degrees)) {
+            return "0";
+        }
+        return Long.toString(Math.round(degrees / 15.0) * 15L);
     }
 
     private static double clamp(double value, double min, double max) {

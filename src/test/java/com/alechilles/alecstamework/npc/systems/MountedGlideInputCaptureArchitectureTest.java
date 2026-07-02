@@ -148,6 +148,19 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
+    void mountedGlidePacketCaptureLogsRawInputProbeTransitions() throws IOException {
+        String helper = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedGlidePacketInputCapture.java"
+        ));
+
+        assertTrue(helper.contains("TameworkGlide inputProbe"));
+        assertTrue(helper.contains("lastClientMovementInputProbeSignature"));
+        assertTrue(helper.contains("lastMountMovementInputProbeSignature"));
+        assertTrue(helper.contains("formatProbeStates"));
+        assertTrue(helper.contains("formatProbeSnapshot"));
+    }
+
+    @Test
     void mountedGlideIsolatesNativeMountMovementBeforeNpcBehaviour() throws IOException {
         String velocity = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"
