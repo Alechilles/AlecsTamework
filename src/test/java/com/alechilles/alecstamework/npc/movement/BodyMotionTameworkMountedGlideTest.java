@@ -98,6 +98,18 @@ class BodyMotionTameworkMountedGlideTest {
     }
 
     @Test
+    void inactiveFlightDoesNotApplyLegacyBodyGlideSteering() {
+        TameworkMountedGlideComponent glide = new TameworkMountedGlideComponent();
+        glide.setFlightActive(false);
+
+        assertFalse(BodyMotionTameworkMountedGlide.shouldApplyGlideSteering(glide));
+
+        glide.setFlightActive(true);
+
+        assertTrue(BodyMotionTameworkMountedGlide.shouldApplyGlideSteering(glide));
+    }
+
+    @Test
     void mountedGlideBodyMotionOwnsActiveController() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/movement/BodyMotionTameworkMountedGlide.java"

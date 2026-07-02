@@ -18,7 +18,6 @@ import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
-import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.PhysicsValues;
@@ -264,7 +263,6 @@ final class InteractionMountEffects {
         RoleChangeSystem.requestRoleChange(npcRef, role, emptyRoleIndex, false, null, null, store);
         boolean movementConfigApplied =
                 applyMovementConfig(playerRef, playerRefComponent, playerComponent, store, movementConfigId);
-        store.tryRemoveComponent(npcRef, Interactable.getComponentType());
         logMountDebug(role, "mounted_glide", "native_npc_mount_attach",
                 "networkId=%s anchor=%s/%s/%s nativeMount=%s",
                 npcNetworkId.getId(),

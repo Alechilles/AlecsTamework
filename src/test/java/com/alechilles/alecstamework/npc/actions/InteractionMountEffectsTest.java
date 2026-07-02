@@ -85,6 +85,18 @@ class InteractionMountEffectsTest {
     }
 
     @Test
+    void mountedGlideLeavesInteractableForNativeMountRoleChange() throws Exception {
+        String mountSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
+        ));
+        int glideStart = mountSource.indexOf("private boolean applyTameworkMountedGlideMount");
+        int glideEnd = mountSource.indexOf("private String resolveGlideMovementConfigId");
+        String glideMountSource = mountSource.substring(glideStart, glideEnd);
+
+        assertFalse(glideMountSource.contains("tryRemoveComponent(npcRef, Interactable.getComponentType())"));
+    }
+
+    @Test
     void mountedGlideMountDoesNotRequireLegacyMountedComponent() throws Exception {
         String mountSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"

@@ -10,14 +10,25 @@ class MotionControllerTameworkMountedGlideTest {
     @Test
     void mountedClientSpeedUsesActiveGlideSpeed() {
         TameworkMountedGlideComponent glide = new TameworkMountedGlideComponent();
+        glide.setFlightActive(true);
         glide.setGlideSpeed(18.0);
 
         assertEquals(18.0, MountedGlideControllerSupport.resolveMountedClientSpeed(glide, 10.0), 0.0001);
     }
 
     @Test
+    void mountedClientSpeedFallsBackWhenFlightInactive() {
+        TameworkMountedGlideComponent glide = new TameworkMountedGlideComponent();
+        glide.setFlightActive(false);
+        glide.setGlideSpeed(18.0);
+
+        assertEquals(10.0, MountedGlideControllerSupport.resolveMountedClientSpeed(glide, 10.0), 0.0001);
+    }
+
+    @Test
     void mountedClientSpeedFallsBackWhenStateIsUnset() {
         TameworkMountedGlideComponent glide = new TameworkMountedGlideComponent();
+        glide.setFlightActive(true);
 
         assertEquals(10.0, MountedGlideControllerSupport.resolveMountedClientSpeed(glide, 10.0), 0.0001);
     }

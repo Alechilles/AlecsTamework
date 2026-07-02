@@ -81,7 +81,7 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
                                  @Nonnull Vector3d translation,
                                  @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         TameworkMountedGlideComponent glide = glideMount(ref, componentAccessor);
-        ridden = glide != null;
+        ridden = glide != null && glide.isFlightActive();
         activeGlideSpeed = MountedGlideControllerSupport.resolveMountedClientSpeed(glide, maxHorizontalSpeed);
         lastSteering.set(steering.getTranslation());
         double remaining = super.computeMove(ref, role, steering, dt, translation, componentAccessor);
@@ -109,7 +109,7 @@ public final class MotionControllerTameworkMountedGlide extends MotionController
                                     @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         super.updateMovementState(ref, movementStates, steering, velocity, componentAccessor);
         TameworkMountedGlideComponent glide = glideMount(ref, componentAccessor);
-        if (glide == null) {
+        if (glide == null || !glide.isFlightActive()) {
             return;
         }
         movementStates.onGround = false;

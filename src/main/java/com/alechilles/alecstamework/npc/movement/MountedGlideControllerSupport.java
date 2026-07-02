@@ -10,7 +10,7 @@ final class MountedGlideControllerSupport {
     }
 
     static double resolveMountedClientSpeed(TameworkMountedGlideComponent glide, double fallback) {
-        if (glide == null || glide.getGlideSpeed() <= 0.0) {
+        if (glide == null || !glide.isFlightActive() || glide.getGlideSpeed() <= 0.0) {
             return fallback;
         }
         return glide.getGlideSpeed();

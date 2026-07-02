@@ -46,6 +46,9 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         if (glide == null) {
             return true;
         }
+        if (!shouldApplyGlideSteering(glide)) {
+            return true;
+        }
         applyGlideSteering(ref, role, glide, dt, desiredSteering, componentAccessor);
         return true;
     }
@@ -57,6 +60,9 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
                                           @Nonnull Steering desiredSteering,
                                           @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         desiredSteering.clear();
+        if (!shouldApplyGlideSteering(glide)) {
+            return;
+        }
         TwMountedGlideConfig config = resolveConfig(role, glide);
         MotionController active = ensureGlideController(ref, role, glide, componentAccessor);
         maybeTakeOff(ref, glide, config, active, componentAccessor);
@@ -117,6 +123,10 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
 
     static boolean shouldTakeOffFromGround(@Nonnull TameworkMountedGlideComponent glide, boolean grounded) {
         return grounded && glide.isJumpHeld();
+    }
+
+    static boolean shouldApplyGlideSteering(@Nonnull TameworkMountedGlideComponent glide) {
+        return glide.isFlightActive();
     }
 
     static void clampGroundedSink(@Nonnull Vector3d translation, boolean grounded) {
