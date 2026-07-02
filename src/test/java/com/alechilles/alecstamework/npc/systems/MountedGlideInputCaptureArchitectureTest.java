@@ -95,6 +95,7 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(velocity.contains("extends EntityTickingSystem<EntityStore>"));
         assertTrue(velocity.contains("implements IVelocityModifyingSystem"));
         assertTrue(velocity.contains("NPCMountComponent"));
+        assertTrue(velocity.contains("MovementStatesComponent"));
         assertTrue(velocity.contains("Velocity.getComponentType()"));
         assertTrue(velocity.contains("Order.AFTER, MountedGlideInputCaptureSystem.class"));
         assertFalse(velocity.contains("PlayerVelocityInstructionSystem"));
@@ -126,6 +127,8 @@ class MountedGlideInputCaptureArchitectureTest {
         assertFalse(cleanup.contains("MountPlugin.checkDismountNpc"));
         assertTrue(cleanup.contains("player.setMountEntityId(0)"));
         assertTrue(cleanup.contains("MountPlugin.resetOriginalPlayerMovementSettings(riderRef, bufferStore)"));
+        assertTrue(cleanup.contains("RoleChangeSystem.requestRoleChange"));
+        assertTrue(cleanup.contains("nativeMount.getOriginalRoleIndex()"));
         assertTrue(cleanup.contains("bufferStore.tryRemoveComponent(mountRef, nativeMountComponentType)"));
         assertTrue(cleanup.contains("bufferStore.ensureAndGetComponent(mountRef, Interactable.getComponentType())"));
         assertFalse(cleanup.contains("MountedComponent"));
@@ -135,10 +138,10 @@ class MountedGlideInputCaptureArchitectureTest {
                 "private void cleanupGlide",
                 "private void removeNativeMountComponent"
         );
-        assertTrue(cleanupMethod.indexOf("restoreNpcState(mountRef, npc, mount, bufferStore)")
+        assertTrue(cleanupMethod.indexOf("restoreNpcRole(mountRef, npc, mount, nativeMount, bufferStore)")
                 < cleanupMethod.indexOf("bufferStore.tryRemoveComponent(mountRef, mountComponentType)"));
-        assertTrue(cleanupMethod.indexOf("removeNativeMountComponent(mountRef, bufferStore)")
-                < cleanupMethod.indexOf("restoreNpcState(mountRef, npc, mount, bufferStore)"));
+        assertTrue(cleanupMethod.indexOf("restoreNpcRole(mountRef, npc, mount, nativeMount, bufferStore)")
+                < cleanupMethod.indexOf("removeNativeMountComponent(mountRef, bufferStore)"));
         assertTrue(plugin.contains("new MountedGlideCleanupSystem(\r\n                            npcMountComponentType,")
                 || plugin.contains("new MountedGlideCleanupSystem(\n                            npcMountComponentType,"));
     }
@@ -157,6 +160,8 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(handler.contains("store.tryRemoveComponent(mountRef, NPCMountComponent.getComponentType())"));
         assertTrue(handler.contains("store.tryRemoveComponent(mountRef, mountType)"));
         assertTrue(handler.contains("store.ensureAndGetComponent(mountRef, Interactable.getComponentType())"));
+        assertTrue(handler.contains("RoleChangeSystem.requestRoleChange"));
+        assertTrue(handler.contains("nativeMount.getOriginalRoleIndex()"));
         String method = extractMethodSource(
                 handler,
                 "private boolean handleMountedGlideDismount",
@@ -165,10 +170,10 @@ class MountedGlideInputCaptureArchitectureTest {
         assertFalse(method.contains("MountPlugin.checkDismountNpc"));
         assertTrue(method.contains("player.setMountEntityId(0)"));
         assertTrue(method.contains("MountPlugin.resetOriginalPlayerMovementSettings(riderRef, store)"));
-        assertTrue(method.contains("restoreNpcState(mountRef, mount, store)"));
-        assertTrue(method.indexOf("removeNativeMountComponent(mountRef, store)")
-                < method.indexOf("restoreNpcState(mountRef, mount, store)"));
-        assertTrue(method.indexOf("restoreNpcState(mountRef, mount, store)")
+        assertTrue(method.contains("restoreNpcRole(mountRef, mount, nativeMount, store)"));
+        assertTrue(method.indexOf("restoreNpcRole(mountRef, mount, nativeMount, store)")
+                < method.indexOf("removeNativeMountComponent(mountRef, store)"));
+        assertTrue(method.indexOf("restoreNpcRole(mountRef, mount, nativeMount, store)")
                 < method.indexOf("store.tryRemoveComponent(mountRef, mountType)"));
         assertFalse(method.contains("MountedComponent.getComponentType()"));
     }

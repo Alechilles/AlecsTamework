@@ -36,6 +36,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.lang.reflect.Field;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -322,10 +323,11 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
             MountPlugin.resetOriginalPlayerMovementSettings(riderRef, store);
         }
         if (mountRef != null && mountRef.isValid()) {
-            removeNativeMountComponent(mountRef, store);
+            NPCMountComponent nativeMount = store.getComponent(mountRef, NPCMountComponent.getComponentType());
             if (mount != null) {
-                restoreNpcState(mountRef, mount, store);
+                restoreNpcRole(mountRef, mount, nativeMount, store);
             }
+            removeNativeMountComponent(mountRef, store);
             store.ensureAndGetComponent(mountRef, Interactable.getComponentType());
             if (mountType != null) {
                 store.tryRemoveComponent(mountRef, mountType);
@@ -778,6 +780,32 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
             role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
         }
         applyState(role, mountRef, store, mount.getPreviousState(), mount.getPreviousSubState());
+    }
+
+    private void restoreNpcRole(@Nonnull Ref<EntityStore> mountRef,
+                                @Nonnull TameworkMountedGlideComponent mount,
+                                @Nullable NPCMountComponent nativeMount,
+                                @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(mountRef, NPCEntity.getComponentType());
+        if (npc == null || npc.getRole() == null) {
+            return;
+        }
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
+        if (nativeMount != null) {
+            String state = mount.getPreviousState().isBlank() ? "Idle" : mount.getPreviousState();
+            String subState = mount.getPreviousSubState().isBlank() ? null : mount.getPreviousSubState();
+            RoleChangeSystem.requestRoleChange(
+                    mountRef,
+                    npc.getRole(),
+                    nativeMount.getOriginalRoleIndex(),
+                    false,
+                    state,
+                    subState,
+                    store
+            );
+            return;
+        }
+        restoreNpcState(mountRef, mount, store);
     }
 
     private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,

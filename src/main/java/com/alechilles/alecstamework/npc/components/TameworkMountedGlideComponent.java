@@ -114,6 +114,10 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
                     TameworkMountedGlideComponent::setBoostRemainingSeconds,
                     TameworkMountedGlideComponent::getBoostRemainingSeconds)
             .add()
+            .append(new KeyedCodec<>("FlightActive", Codec.BOOLEAN),
+                    TameworkMountedGlideComponent::setFlightActive,
+                    TameworkMountedGlideComponent::isFlightActive)
+            .add()
             .append(new KeyedCodec<>("HasAuthoritativePose", Codec.BOOLEAN),
                     TameworkMountedGlideComponent::setHasAuthoritativePose,
                     TameworkMountedGlideComponent::hasAuthoritativePose)
@@ -167,6 +171,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     private double verticalVelocity;
     private double flapCooldownRemainingSeconds;
     private double boostRemainingSeconds;
+    private boolean flightActive;
     private boolean hasAuthoritativePose;
     private double authoritativeX;
     private double authoritativeY;
@@ -327,6 +332,8 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     public void setBoostRemainingSeconds(double boostRemainingSeconds) {
         this.boostRemainingSeconds = nonNegativeFinite(boostRemainingSeconds);
     }
+    public boolean isFlightActive() { return flightActive; }
+    public void setFlightActive(boolean flightActive) { this.flightActive = flightActive; }
     public boolean hasAuthoritativePose() { return hasAuthoritativePose; }
     public void setHasAuthoritativePose(boolean hasAuthoritativePose) {
         this.hasAuthoritativePose = hasAuthoritativePose;
@@ -369,6 +376,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         clone.verticalVelocity = verticalVelocity;
         clone.flapCooldownRemainingSeconds = flapCooldownRemainingSeconds;
         clone.boostRemainingSeconds = boostRemainingSeconds;
+        clone.flightActive = flightActive;
         clone.hasAuthoritativePose = hasAuthoritativePose;
         clone.authoritativeX = authoritativeX;
         clone.authoritativeY = authoritativeY;

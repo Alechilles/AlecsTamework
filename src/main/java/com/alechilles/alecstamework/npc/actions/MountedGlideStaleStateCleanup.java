@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -53,7 +54,7 @@ final class MountedGlideStaleStateCleanup {
 
         logStaleCleanup(role, rider, playerComponent, mountRef, mount, nativeMount, state);
         if (mountRef != null && mountRef.isValid()) {
-            clearMountSideState(playerRef, mountRef, mount, mountType, nativeMountType, store);
+            clearMountSideState(playerRef, mountRef, mount, nativeMount, mountType, nativeMountType, store);
         }
         store.tryRemoveComponent(playerRef, riderType);
     }
@@ -62,13 +63,14 @@ final class MountedGlideStaleStateCleanup {
             Ref<EntityStore> playerRef,
             Ref<EntityStore> mountRef,
             TameworkMountedGlideComponent mount,
+            NPCMountComponent nativeMount,
             ComponentType<EntityStore, TameworkMountedGlideComponent> mountType,
             ComponentType<EntityStore, NPCMountComponent> nativeMountType,
             Store<EntityStore> store) {
         if (mount != null && mountMatchesRider(mount, playerRef, store)) {
             NPCEntity npc = store.getComponent(mountRef, NPCEntity.getComponentType());
             if (npc != null) {
-                restoreNpcState(mountRef, npc, mount, store);
+                restoreNpcRole(mountRef, npc, mount, nativeMount, store);
             }
             store.tryRemoveComponent(mountRef, mountType);
         }
@@ -133,6 +135,34 @@ final class MountedGlideStaleStateCleanup {
             return;
         }
         support.setState(mountRef, mount.getPreviousState(), mount.getPreviousSubState(), store);
+    }
+
+    private static void restoreNpcRole(@Nonnull Ref<EntityStore> mountRef,
+                                       @Nonnull NPCEntity npc,
+                                       @Nonnull TameworkMountedGlideComponent mount,
+                                       NPCMountComponent nativeMount,
+                                       @Nonnull Store<EntityStore> store) {
+        Role role = npc.getRole();
+        if (role == null) {
+            return;
+        }
+        npc.playAnimation(mountRef, AnimationSlot.Status, null, store);
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
+        if (nativeMount != null) {
+            String state = mount.getPreviousState().isBlank() ? "Idle" : mount.getPreviousState();
+            String subState = mount.getPreviousSubState().isBlank() ? null : mount.getPreviousSubState();
+            RoleChangeSystem.requestRoleChange(
+                    mountRef,
+                    role,
+                    nativeMount.getOriginalRoleIndex(),
+                    false,
+                    state,
+                    subState,
+                    store
+            );
+            return;
+        }
+        restoreNpcState(mountRef, npc, mount, store);
     }
 
     private static void logStaleCleanup(Role role,

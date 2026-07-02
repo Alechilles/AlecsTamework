@@ -46,7 +46,7 @@ final class InteractionMountEffects {
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final String MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = "MountGlideMovementConfig";
-    private static final String DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = "Tamework_Mounted_Glide_Rider";
+    private static final String DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
     private static final String MOUNT_MODE_PARAM = "MountMode";
     private static final String MOUNT_MODE_TAMEWORK_RIDE = "TameworkRide";
     private static final String MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE = "TameworkMountedGlide";

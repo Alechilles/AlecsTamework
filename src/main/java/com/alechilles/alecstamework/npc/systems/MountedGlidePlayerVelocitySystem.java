@@ -17,6 +17,8 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
+import com.hypixel.hytale.protocol.MovementStates;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifyingSystem;
@@ -39,6 +41,7 @@ public final class MountedGlidePlayerVelocitySystem
     private final ComponentType<EntityStore, NPCMountComponent> nativeMountComponentType;
     private final ComponentType<EntityStore, TransformComponent> transformComponentType;
     private final ComponentType<EntityStore, Velocity> velocityComponentType;
+    private final ComponentType<EntityStore, MovementStatesComponent> movementStatesComponentType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, MountedGlideInputCaptureSystem.class)
@@ -48,11 +51,13 @@ public final class MountedGlidePlayerVelocitySystem
             @Nonnull ComponentType<EntityStore, TameworkMountedGlideComponent> mountComponentType,
             @Nonnull ComponentType<EntityStore, NPCMountComponent> nativeMountComponentType,
             @Nonnull ComponentType<EntityStore, TransformComponent> transformComponentType,
-            @Nullable ComponentType<EntityStore, Velocity> velocityComponentType) {
+            @Nullable ComponentType<EntityStore, Velocity> velocityComponentType,
+            @Nonnull ComponentType<EntityStore, MovementStatesComponent> movementStatesComponentType) {
         this.mountComponentType = mountComponentType;
         this.nativeMountComponentType = nativeMountComponentType;
         this.transformComponentType = transformComponentType;
         this.velocityComponentType = velocityComponentType == null ? Velocity.getComponentType() : velocityComponentType;
+        this.movementStatesComponentType = movementStatesComponentType;
         this.query = Query.and(mountComponentType, nativeMountComponentType, transformComponentType);
     }
 
@@ -74,12 +79,25 @@ public final class MountedGlidePlayerVelocitySystem
         if (riderRef == null) {
             return;
         }
+        TwMountedGlideConfig config = resolveConfig(mount);
+        boolean riderOnGround = isRiderOnGround(riderRef, commandBuffer);
+        if (!mount.isFlightActive()) {
+            if (!shouldActivateFlight(mount, riderOnGround)) {
+                return;
+            }
+            mount.setFlightActive(true);
+        }
+        if (shouldReturnToGroundMode(mount, riderOnGround)) {
+            mount.setFlightActive(false);
+            mount.initializePhysicsState(config);
+            commandBuffer.putComponent(mountRef, mountComponentType, mount);
+            return;
+        }
         Velocity velocity = commandBuffer.getComponent(riderRef, velocityComponentType);
         if (velocity == null) {
             return;
         }
 
-        TwMountedGlideConfig config = resolveConfig(mount);
         MountedGlidePhysicsState state = mount.toPhysicsState();
         MountedGlidePhysics.Input input = new MountedGlidePhysics.Input(
                 resolvePitchRadians(mount),
@@ -104,6 +122,14 @@ public final class MountedGlidePlayerVelocitySystem
         velocity.addInstruction(velocityVector, null, ChangeVelocityType.Set);
     }
 
+    static boolean shouldActivateFlight(@Nonnull TameworkMountedGlideComponent mount, boolean riderOnGround) {
+        return mount.isFlightActive() || !riderOnGround || mount.shouldRequestFlap();
+    }
+
+    static boolean shouldReturnToGroundMode(@Nonnull TameworkMountedGlideComponent mount, boolean riderOnGround) {
+        return mount.isFlightActive() && riderOnGround && !mount.isJumpHeld();
+    }
+
     @Nullable
     private Ref<EntityStore> resolveRiderRef(@Nonnull NPCMountComponent nativeMount,
                                              @Nonnull Store<EntityStore> store) {
@@ -115,6 +141,17 @@ public final class MountedGlidePlayerVelocitySystem
             return null;
         }
         return riderRef;
+    }
+
+    private boolean isRiderOnGround(@Nonnull Ref<EntityStore> riderRef,
+                                    @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        MovementStatesComponent movementStatesComponent =
+                commandBuffer.getComponent(riderRef, movementStatesComponentType);
+        if (movementStatesComponent == null) {
+            return false;
+        }
+        MovementStates states = movementStatesComponent.getMovementStates();
+        return states != null && states.onGround;
     }
 
     @Nonnull

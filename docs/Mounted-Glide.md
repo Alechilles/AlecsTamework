@@ -3,19 +3,24 @@
 Tamework's mounted glide controller is an opt-in beta mount mode for flying mounts. It is separate from the older `TameworkRide`/`TameworkFly` path.
 
 ## Behavior
-- The mount naturally glides forward while ridden and slowly loses altitude.
+- The mount uses normal native mount movement while grounded.
+- Pressing jump while grounded launches the mount into glide flight. Mounting in mid-air also starts in glide flight.
+- While flight is active, the mount naturally glides forward and slowly loses altitude.
 - Mouse pitch has a strong effect on the glide path. Looking down gains stored speed and sinks faster. Looking up spends stored speed for lift and can stall if speed is too low.
 - Holding jump requests flaps repeatedly, but each flap is still limited by `Flap.CooldownSeconds`.
 - Holding sprint while a flap fires converts that flap into a forward boost.
 - Holding crouch applies an airbrake that drains speed and increases sink.
+- Landing without holding jump returns the mount to native grounded movement.
 - Q/drop, left-click, and right-click are not consumed for flight controls.
 
 ## Architecture
 Mounted glide uses Hytale's native NPC mount flow for attachment. `TameworkMountedGlide` applies `NPCMountComponent` to the NPC and lets the base mount attachment system keep the rider seated.
 
-Flight movement is driven on the rider, not by an NPC body motion or motion controller. `MountedGlidePlayerVelocitySystem` reads the native-mounted rider's movement, jump, sprint, crouch, and look state, then applies rider `Velocity` instructions for glide, flap, boost, airbrake, and pitch behavior.
+Flight movement is driven on the rider, not by an NPC body motion or motion controller. `MountedGlidePlayerVelocitySystem` reads the native-mounted rider's movement, jump, sprint, crouch, look, and grounded state. It leaves native movement alone while grounded, then applies rider `Velocity` instructions after jump launch or mid-air mounting.
 
-`MountGlideMovementConfig` still applies to the rider while mounted. The bundled `Tamework_Mounted_Glide_Rider` movement config suppresses vanilla ground-mount locomotion and jump while preserving native NPC mount attachment. This is separate from `MountMovementConfig`, which remains the default movement profile for normal ground mounts.
+`MountGlideMovementConfig` still applies to the rider while mounted. By default, mounted glide uses the normal `Mount` movement config so grounded walking remains available. The bundled `Tamework_Mounted_Glide_Rider` movement config is still available for experiments that need to suppress vanilla locomotion, but it should not be used for mounts that need grounded walking.
+
+On dismount, Tamework removes native mount state, resets the rider movement settings, and requests the NPC's original native role before clearing glide markers. This is required so the NPC can be mounted again.
 
 ## Required Role Wiring
 The NPC role must still pass the normal mount interaction requirements, including `IsMountable`.
@@ -23,11 +28,10 @@ The NPC role must still pass the normal mount interaction requirements, includin
 Add or override these role parameters:
 ```json
 "IsMountable": { "Value": true },
-"MountMode": { "Value": "TameworkMountedGlide" },
-"MountGlideMovementConfig": { "Value": "Tamework_Mounted_Glide_Rider" }
+"MountMode": { "Value": "TameworkMountedGlide" }
 ```
 
-Set `MountGlideMovementConfig` to `none`, `off`, or `disabled` only when testing without a rider movement override.
+Optionally set `MountGlideMovementConfig` when a role needs a non-default rider movement profile. Omit it to use `Mount`. Set it to `none`, `off`, or `disabled` only when testing without a rider movement override.
 
 Older templates may still include `MountGlideState`, `MountGlideController`, a `TameworkMountedGlide` motion controller entry, or a ridden-state body motion for compatibility with earlier experimental builds. Current mounted glide attachment and flight do not require authors to add those entries for active behavior.
 

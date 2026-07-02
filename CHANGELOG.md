@@ -3,8 +3,9 @@
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
 ### Fixed
-- Reworked experimental NordicDrake mounted glide to use Hytale's native NPC mount flow and rider velocity, improving attachment and input behavior.
+- Reworked experimental NordicDrake mounted glide to use Hytale's native NPC mount flow and rider velocity, with native grounded walking, jump-to-launch flight, and pitch-based glide behavior.
 - Fixed mounted glide dismount cleanup so glide mounts remove native mount state, restore Tamework NPC state, and return the interaction prompt cleanly.
+- Fixed mounted glide remounting after dismount by restoring the NPC's original native role instead of leaving it in the temporary mounted role.
 - Fixed managed coop scans so optional block-state reflection misses are cached instead of throwing repeatedly on the world tick thread, and reduced stale-ref noise while resolving coop block locations.
 - Fixed several server-freeze risks in high-activity worlds by keeping Tamework ticking-system sweep and cache state scoped to each active world store instead of sharing it across instances.
 - Moved legacy telemetry migration and compatibility metrics work onto dedicated daemon workers with HTTP timeouts, reducing startup and tick stalls when telemetry or metrics I/O is slow.

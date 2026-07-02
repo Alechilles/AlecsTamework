@@ -48,7 +48,7 @@ class InteractionMountEffectsTest {
     }
 
     @Test
-    void mountedGlideUsesDedicatedRiderMovementConfig() throws Exception {
+    void mountedGlideDefaultsToNativeMountMovementConfig() throws Exception {
         String mountSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/actions/InteractionMountEffects.java"
         ));
@@ -59,7 +59,7 @@ class InteractionMountEffectsTest {
         assertTrue(glideMountSource.contains("resolveGlideMovementConfigId(role)"));
         assertTrue(mountSource.contains("MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = \"MountGlideMovementConfig\""));
         assertTrue(mountSource.contains(
-                "DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = \"Tamework_Mounted_Glide_Rider\""
+                "DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID"
         ));
         assertFalse(glideMountSource.contains("DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM"));
         assertTrue(Files.exists(Path.of(
@@ -97,6 +97,26 @@ class InteractionMountEffectsTest {
         assertFalse(glideMountSource.contains("mountedType"));
         assertTrue(glideMountSource.contains("nativeMountType"));
         assertTrue(glideMountSource.contains("MountedGlideStaleStateCleanup.clearInvalidRiderState"));
+    }
+
+    @Test
+    void mountedGlideCleanupRequestsOriginalNativeRoleForRemounting() throws Exception {
+        String cleanupSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideCleanupSystem.java"
+        ));
+        String packetSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedRidePacketHandler.java"
+        ));
+        String staleCleanupSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/actions/MountedGlideStaleStateCleanup.java"
+        ));
+
+        assertTrue(cleanupSource.contains("RoleChangeSystem.requestRoleChange"));
+        assertTrue(cleanupSource.contains("nativeMount.getOriginalRoleIndex()"));
+        assertTrue(packetSource.contains("RoleChangeSystem.requestRoleChange"));
+        assertTrue(packetSource.contains("nativeMount.getOriginalRoleIndex()"));
+        assertTrue(staleCleanupSource.contains("RoleChangeSystem.requestRoleChange"));
+        assertTrue(staleCleanupSource.contains("nativeMount.getOriginalRoleIndex()"));
     }
 
     private static Player newPlayerWithoutServerInit() throws Exception {

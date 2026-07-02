@@ -657,7 +657,8 @@ public class Tamework extends JavaPlugin {
                             mountedGlideComponentType,
                             npcMountComponentType,
                             TransformComponent.getComponentType(),
-                            Velocity.getComponentType()
+                            Velocity.getComponentType(),
+                            MovementStatesComponent.getComponentType()
                     )
             );
             getEntityStoreRegistry().registerSystem(

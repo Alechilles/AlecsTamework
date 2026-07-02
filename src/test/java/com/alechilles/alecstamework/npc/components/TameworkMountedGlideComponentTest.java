@@ -37,6 +37,7 @@ class TameworkMountedGlideComponentTest {
         TwMountedGlideConfig config = new TwMountedGlideConfig();
         TameworkMountedGlideComponent component = new TameworkMountedGlideComponent();
         component.initializePhysicsState(config);
+        component.setFlightActive(true);
         component.setVerticalVelocity(3.25);
         component.setFlapCooldownRemainingSeconds(0.5);
         component.setBoostRemainingSeconds(0.2);
@@ -55,6 +56,7 @@ class TameworkMountedGlideComponentTest {
         TameworkMountedGlideComponent clone = component.clone();
 
         assertNotSame(component, clone);
+        assertTrue(clone.isFlightActive());
         assertEquals(18.0, clone.getGlideSpeed(), 0.0001);
         assertEquals(-1.5, clone.getVerticalVelocity(), 0.0001);
         assertEquals(0.5, clone.getFlapCooldownRemainingSeconds(), 0.0001);
@@ -83,6 +85,19 @@ class TameworkMountedGlideComponentTest {
         assertEquals(0.75, component.getFlapCooldownRemainingSeconds(), 0.0001);
         assertTrue(component.hasAuthoritativePose());
         assertEquals(1.0, component.getAuthoritativeX(), 0.0001);
+    }
+
+    @Test
+    void flightActiveStartsFalseAndCanResetToGroundMode() {
+        TameworkMountedGlideComponent component = new TameworkMountedGlideComponent();
+
+        assertFalse(component.isFlightActive());
+
+        component.setFlightActive(true);
+        assertTrue(component.isFlightActive());
+
+        component.setFlightActive(false);
+        assertFalse(component.isFlightActive());
     }
 
     @Test

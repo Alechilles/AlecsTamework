@@ -23,6 +23,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import com.hypixel.hytale.server.npc.systems.RoleSystems;
 import java.util.Set;
 import java.util.UUID;
@@ -75,6 +76,7 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
         if (mountRef == null || mount == null || npc == null) {
             return;
         }
+        NPCMountComponent nativeMount = store.getComponent(mountRef, nativeMountComponentType);
         Ref<EntityStore> riderRef = resolveRiderRef(mount, store);
         boolean mountDead = store.getComponent(mountRef, deathComponentType) != null;
         boolean riderMissing = riderRef == null;
@@ -89,7 +91,7 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                 && riderRef.isValid()
                 && !riderNativeMountedToMount(riderRef, mountRef, store);
         if (mountDead || riderMissing || riderInvalid || riderDead || linkMismatch || mountedMismatch) {
-            cleanupGlide(mountRef, riderRef, npc, mount, commandBuffer);
+            cleanupGlide(mountRef, riderRef, npc, mount, nativeMount, commandBuffer);
         }
     }
 
@@ -132,6 +134,7 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                               @Nullable Ref<EntityStore> riderRef,
                               @Nonnull NPCEntity npc,
                               @Nonnull TameworkMountedGlideComponent mount,
+                              @Nullable NPCMountComponent nativeMount,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         commandBuffer.run(bufferStore -> {
             if (riderRef != null && riderRef.isValid()) {
@@ -142,8 +145,8 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
                 }
             }
             if (mountRef.isValid()) {
+                restoreNpcRole(mountRef, npc, mount, nativeMount, bufferStore);
                 removeNativeMountComponent(mountRef, bufferStore);
-                restoreNpcState(mountRef, npc, mount, bufferStore);
                 bufferStore.ensureAndGetComponent(mountRef, Interactable.getComponentType());
                 bufferStore.tryRemoveComponent(mountRef, mountComponentType);
             }
@@ -160,6 +163,33 @@ public final class MountedGlideCleanupSystem extends EntityTickingSystem<EntityS
             nativeMount.setOwnerPlayerRef(null);
             bufferStore.tryRemoveComponent(mountRef, nativeMountComponentType);
         }
+    }
+
+    private void restoreNpcRole(@Nonnull Ref<EntityStore> mountRef,
+                                @Nonnull NPCEntity npc,
+                                @Nonnull TameworkMountedGlideComponent mount,
+                                @Nullable NPCMountComponent nativeMount,
+                                @Nonnull Store<EntityStore> store) {
+        Role role = npc.getRole();
+        if (role == null) {
+            return;
+        }
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
+        if (nativeMount != null) {
+            String state = mount.getPreviousState().isBlank() ? "Idle" : mount.getPreviousState();
+            String subState = mount.getPreviousSubState().isBlank() ? null : mount.getPreviousSubState();
+            RoleChangeSystem.requestRoleChange(
+                    mountRef,
+                    role,
+                    nativeMount.getOriginalRoleIndex(),
+                    false,
+                    state,
+                    subState,
+                    store
+            );
+            return;
+        }
+        restoreNpcState(mountRef, npc, mount, store);
     }
 
     private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,
