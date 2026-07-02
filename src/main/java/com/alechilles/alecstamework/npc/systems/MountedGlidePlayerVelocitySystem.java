@@ -88,7 +88,7 @@ public final class MountedGlidePlayerVelocitySystem
             }
             mount.setFlightActive(true);
         }
-        if (shouldReturnToGroundMode(mount, riderOnGround)) {
+        if (shouldReturnToGroundMode(mount, mountOnGround)) {
             mount.setFlightActive(false);
             mount.initializePhysicsState(config);
             commandBuffer.putComponent(mountRef, mountComponentType, mount);
@@ -131,8 +131,8 @@ public final class MountedGlidePlayerVelocitySystem
         return mountOnGround == null || mountOnGround;
     }
 
-    static boolean shouldReturnToGroundMode(@Nonnull TameworkMountedGlideComponent mount, boolean riderOnGround) {
-        return mount.isFlightActive() && riderOnGround && !mount.isJumpHeld();
+    static boolean shouldReturnToGroundMode(@Nonnull TameworkMountedGlideComponent mount, boolean mountOnGround) {
+        return mount.isFlightActive() && mountOnGround && !mount.isJumpHeld();
     }
 
     @Nullable

@@ -42,6 +42,17 @@ class MountedGlidePlayerVelocitySystemArchitectureTest {
     }
 
     @Test
+    void mountedGlideReturnToGroundUsesMountGroundStateInsteadOfAnchoredRider() throws IOException {
+        Path path = Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"
+        );
+        String source = Files.readString(path);
+
+        assertTrue(source.contains("shouldReturnToGroundMode(mount, mountOnGround)"));
+        assertFalse(source.contains("shouldReturnToGroundMode(mount, riderOnGround)"));
+    }
+
+    @Test
     void groundModeDoesNotApplyGlideVelocityUntilJumpLaunchesFlight() {
         TameworkMountedGlideComponent mount = new TameworkMountedGlideComponent();
 
