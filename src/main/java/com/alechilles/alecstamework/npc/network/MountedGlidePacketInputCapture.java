@@ -10,6 +10,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.Position;
 import com.hypixel.hytale.protocol.Vector3d;
+import com.hypixel.hytale.protocol.packets.entities.MountMovement;
 import com.hypixel.hytale.protocol.packets.player.ClientMovement;
 import com.hypixel.hytale.server.core.io.handlers.IPacketHandler;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -25,8 +26,23 @@ import javax.annotation.Nullable;
  */
 final class MountedGlidePacketInputCapture {
     private long lastClientMovementDebugMs;
+    private long lastMountMovementDebugMs;
 
     void capture(@Nonnull ClientMovement packet, @Nonnull IPacketHandler packetHandler) {
+        PlayerRef playerRef = packetHandler.getPlayerRef();
+        if (playerRef == null) {
+            return;
+        }
+        Ref<EntityStore> riderRef = playerRef.getReference();
+        if (riderRef == null || !riderRef.isValid()) {
+            return;
+        }
+        Store<EntityStore> store = riderRef.getStore();
+        World world = store.getExternalData().getWorld();
+        world.execute(() -> captureOnWorld(packet, riderRef, store));
+    }
+
+    void capture(@Nonnull MountMovement packet, @Nonnull IPacketHandler packetHandler) {
         PlayerRef playerRef = packetHandler.getPlayerRef();
         if (playerRef == null) {
             return;
@@ -83,6 +99,49 @@ final class MountedGlidePacketInputCapture {
             captured = true;
         } else if (packet.velocity != null) {
             captureVelocityMovement(mount, packet.velocity.x, packet.velocity.z, now);
+            captured = true;
+        }
+        if (!captured) {
+            return;
+        }
+        mount.setLastPacketInputAtMs(now);
+        mount.setLastInputAtMs(now);
+        logDebug(packet, mount);
+        store.putComponent(mountRef, mountType, mount);
+    }
+
+    private void captureOnWorld(@Nonnull MountMovement packet,
+                                @Nonnull Ref<EntityStore> riderRef,
+                                @Nonnull Store<EntityStore> store) {
+        Tamework instance = Tamework.getInstance();
+        ComponentType<EntityStore, TameworkMountedGlideRiderComponent> riderType =
+                instance == null ? null : instance.getMountedGlideRiderComponentType();
+        ComponentType<EntityStore, TameworkMountedGlideComponent> mountType =
+                instance == null ? null : instance.getMountedGlideComponentType();
+        if (riderType == null || mountType == null) {
+            return;
+        }
+        TameworkMountedGlideRiderComponent rider = store.getComponent(riderRef, riderType);
+        if (rider == null) {
+            return;
+        }
+        Ref<EntityStore> mountRef = resolveMountRef(rider, store);
+        if (mountRef == null || !mountRef.isValid() || !stillOwnedByRider(riderRef, mountRef, store)) {
+            return;
+        }
+        TameworkMountedGlideComponent mount = store.getComponent(mountRef, mountType);
+        if (mount == null) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        boolean captured = false;
+        if (packet.movementStates != null) {
+            captureStates(mount, packet.movementStates, now);
+            captured = true;
+        }
+        if (packet.bodyOrientation != null) {
+            captureLook(mount, packet.bodyOrientation, now);
             captured = true;
         }
         if (!captured) {
@@ -203,6 +262,32 @@ final class MountedGlidePacketInputCapture {
                 mount.getForwardIntent(),
                 mount.getStrafeIntent(),
                 mount.hasMovementIntent(),
+                mount.getLookYawDegrees(),
+                mount.getLookPitchDegrees(),
+                mount.hasLookRotation(),
+                mount.isJumpHeld(),
+                mount.isSprinting(),
+                mount.isCrouching(),
+                mount.getLastPacketInputAtMs()
+        );
+    }
+
+    private void logDebug(@Nonnull MountMovement packet, @Nonnull TameworkMountedGlideComponent mount) {
+        long now = System.currentTimeMillis();
+        if (now - lastMountMovementDebugMs < 1000) {
+            return;
+        }
+        lastMountMovementDebugMs = now;
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkGlide debug: packet source=mountMovement absolute=%s body=%s movementStates=%s " +
+                        "snapshotLook=%s/%s hasLook=%s jump=%s sprint=%s crouch=%s lastPacketInputAtMs=%s",
+                formatPosition(packet.absolutePosition),
+                formatDirection(packet.bodyOrientation),
+                formatStates(packet.movementStates),
                 mount.getLookYawDegrees(),
                 mount.getLookPitchDegrees(),
                 mount.hasLookRotation(),

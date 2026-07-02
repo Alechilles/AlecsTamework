@@ -126,6 +126,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleMountMovement(@Nonnull MountMovement packet) {
+        glidePacketInputCapture.capture(packet, packetHandler);
         if (!tryHandleTameworkMountMovement(packet)) {
             delegate(mountMovementDelegate, packet);
         }

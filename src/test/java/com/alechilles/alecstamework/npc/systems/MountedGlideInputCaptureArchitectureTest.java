@@ -126,6 +126,28 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
+    void mountedGlideCapturesJumpFromMountMovementPacketsWithoutConsumingNativeMountPackets() throws IOException {
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedRidePacketHandler.java"
+        ));
+        String helper = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedGlidePacketInputCapture.java"
+        ));
+
+        String method = extractMethodSource(
+                handler,
+                "private void handleMountMovement",
+                "private void handleMouseInteraction"
+        );
+        assertTrue(method.contains("glidePacketInputCapture.capture(packet, packetHandler);"));
+        assertTrue(method.indexOf("glidePacketInputCapture.capture(packet, packetHandler);")
+                < method.indexOf("if (!tryHandleTameworkMountMovement(packet))"));
+        assertTrue(helper.contains("void capture(@Nonnull MountMovement packet"));
+        assertTrue(helper.contains("captureStates(mount, packet.movementStates, now);"));
+        assertTrue(helper.contains("\"TameworkGlide debug: packet source=mountMovement"));
+    }
+
+    @Test
     void mountedGlideIsolatesNativeMountMovementBeforeNpcBehaviour() throws IOException {
         String velocity = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"
