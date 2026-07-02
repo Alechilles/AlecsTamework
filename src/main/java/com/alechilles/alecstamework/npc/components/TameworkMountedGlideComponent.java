@@ -58,6 +58,10 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
                     TameworkMountedGlideComponent::setLastInputAtMs,
                     TameworkMountedGlideComponent::getLastInputAtMs)
             .add()
+            .append(new KeyedCodec<>("LastPacketInputAtMs", Codec.LONG),
+                    TameworkMountedGlideComponent::setLastPacketInputAtMs,
+                    TameworkMountedGlideComponent::getLastPacketInputAtMs)
+            .add()
             .append(new KeyedCodec<>("HasMovementIntent", Codec.BOOLEAN),
                     TameworkMountedGlideComponent::setHasMovementIntent,
                     TameworkMountedGlideComponent::hasMovementIntent)
@@ -157,6 +161,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     private String glideState = DEFAULT_GLIDE_STATE;
     private long mountStartMs;
     private long lastInputAtMs;
+    private long lastPacketInputAtMs;
     private boolean hasMovementIntent;
     private double forwardIntent;
     private double strafeIntent;
@@ -251,6 +256,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         sprinting = false;
         crouching = false;
         lastInputAtMs = 0L;
+        lastPacketInputAtMs = 0L;
     }
 
     public void captureAuthoritativePose(double x,
@@ -300,6 +306,8 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     public void setMountStartMs(long mountStartMs) { this.mountStartMs = mountStartMs; }
     public long getLastInputAtMs() { return lastInputAtMs; }
     public void setLastInputAtMs(long lastInputAtMs) { this.lastInputAtMs = lastInputAtMs; }
+    public long getLastPacketInputAtMs() { return lastPacketInputAtMs; }
+    public void setLastPacketInputAtMs(long lastPacketInputAtMs) { this.lastPacketInputAtMs = lastPacketInputAtMs; }
     public boolean hasMovementIntent() { return hasMovementIntent; }
     public void setHasMovementIntent(boolean hasMovementIntent) { this.hasMovementIntent = hasMovementIntent; }
     public double getForwardIntent() { return forwardIntent; }
@@ -362,6 +370,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         clone.glideState = glideState;
         clone.mountStartMs = mountStartMs;
         clone.lastInputAtMs = lastInputAtMs;
+        clone.lastPacketInputAtMs = lastPacketInputAtMs;
         clone.hasMovementIntent = hasMovementIntent;
         clone.forwardIntent = forwardIntent;
         clone.strafeIntent = strafeIntent;

@@ -98,6 +98,34 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
+    void mountedGlideCapturesJumpFromClientMovementPacketsWithoutConsumingNativeMountPackets() throws IOException {
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedRidePacketHandler.java"
+        ));
+        String helper = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedGlidePacketInputCapture.java"
+        ));
+        String inputCapture = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
+        ));
+        String component = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/components/TameworkMountedGlideComponent.java"
+        ));
+
+        assertTrue(handler.contains("glidePacketInputCapture.capture(packet, packetHandler);"));
+        assertTrue(handler.indexOf("glidePacketInputCapture.capture(packet, packetHandler);")
+                < handler.indexOf("if (!tryHandleTameworkClientMovement(packet))"));
+        assertTrue(helper.contains("TameworkMountedGlideComponent"));
+        assertTrue(helper.contains("packet.riderMovementStates != null ? packet.riderMovementStates : packet.movementStates"));
+        assertTrue(helper.contains("captureStates(mount,"));
+        assertTrue(helper.contains("mount.setLastPacketInputAtMs(now);"));
+        assertTrue(inputCapture.contains("PACKET_SNAPSHOT_GRACE_MS"));
+        assertTrue(inputCapture.contains("hasRecentPacketSnapshot(mount, now)"));
+        assertTrue(inputCapture.contains("mount.getLastPacketInputAtMs()"));
+        assertTrue(component.contains("LastPacketInputAtMs"));
+    }
+
+    @Test
     void mountedGlideIsolatesNativeMountMovementBeforeNpcBehaviour() throws IOException {
         String velocity = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"

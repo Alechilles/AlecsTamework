@@ -36,6 +36,8 @@ import org.joml.Vector3d;
  * Captures raw rider input for the mounted glide controller before vanilla player movement consumes it.
  */
 public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<EntityStore> {
+    private static final long PACKET_SNAPSHOT_GRACE_MS = 250L;
+
     private final ComponentType<EntityStore, NPCMountComponent> nativeMountComponentType;
     private final ComponentType<EntityStore, PlayerInput> playerInputComponentType;
     private final ComponentType<EntityStore, MovementStatesComponent> movementStatesComponentType;
@@ -95,7 +97,7 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
 
         long now = System.currentTimeMillis();
         boolean captured = captureQueuedInput(mount, playerInput, riderRef, index, archetypeChunk, commandBuffer, now);
-        if (!captured) {
+        if (!captured && !hasRecentPacketSnapshot(mount, now)) {
             captured = captureCurrentRiderSnapshot(mount, riderRef, store, now);
         }
         if (captured) {
@@ -118,6 +120,7 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
         boolean sawMovementIntent = false;
         boolean sawLook = false;
         boolean sawControls = false;
+        boolean hasRecentPacketSnapshot = hasRecentPacketSnapshot(mount, now);
         for (PlayerInput.InputUpdate inputUpdate : queue) {
             if (inputUpdate instanceof PlayerInput.WishMovement wish) {
                 captureWish(mount, wish.getX(), wish.getZ(), now);
@@ -154,16 +157,21 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
             }
             applyRiderLocalInput(inputUpdate, index, archetypeChunk, commandBuffer);
         }
-        if (!sawMovementIntent) {
+        if (!sawMovementIntent && !hasRecentPacketSnapshot) {
             clearMovementIntent(mount, now);
         }
-        if (!sawLook) {
+        if (!sawLook && !hasRecentPacketSnapshot) {
             captureRiderLook(mount, riderRef, commandBuffer, now);
         }
-        if (!sawControls) {
+        if (!sawControls && !hasRecentPacketSnapshot) {
             captureRiderControls(mount, riderRef, commandBuffer, now);
         }
         return captured;
+    }
+
+    private boolean hasRecentPacketSnapshot(@Nonnull TameworkMountedGlideComponent mount, long now) {
+        return mount.getLastPacketInputAtMs() != 0L
+                && now - mount.getLastPacketInputAtMs() <= PACKET_SNAPSHOT_GRACE_MS;
     }
 
     private void applyRiderLocalInput(@Nonnull PlayerInput.InputUpdate inputUpdate,

@@ -64,6 +64,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     private Consumer<ToServerPacket> clientMovementDelegate;
     private Consumer<ToServerPacket> mountMovementDelegate;
     private Consumer<ToServerPacket> mouseInteractionDelegate;
+    private final MountedGlidePacketInputCapture glidePacketInputCapture = new MountedGlidePacketInputCapture();
     private long lastClientMovementDebugMs;
     private long lastMountMovementDebugMs;
     private long lastMouseMovementDebugMs;
@@ -118,6 +119,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleClientMovement(@Nonnull ClientMovement packet) {
+        glidePacketInputCapture.capture(packet, packetHandler);
         if (!tryHandleTameworkClientMovement(packet)) {
             delegate(clientMovementDelegate, packet);
         }

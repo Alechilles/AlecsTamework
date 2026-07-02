@@ -18,9 +18,11 @@ class TameworkMountedGlideComponentTest {
         component.captureMovementIntent(2.0, -2.0, -1250L);
         component.captureLookRotation(45.0f, -30.0f, 0.0f, -1250L);
         component.captureControls(true, true, false, -1250L);
+        component.setLastPacketInputAtMs(-1240L);
 
         assertEquals("rider-uuid", component.getRiderUuid());
         assertEquals(-1250L, component.getLastInputAtMs());
+        assertEquals(-1240L, component.getLastPacketInputAtMs());
         assertEquals(1.0, component.getForwardIntent(), 0.0001);
         assertEquals(-1.0, component.getStrafeIntent(), 0.0001);
         assertEquals(-30.0f, component.getLookPitchDegrees(), 0.0001f);
@@ -41,6 +43,7 @@ class TameworkMountedGlideComponentTest {
         component.setVerticalVelocity(3.25);
         component.setFlapCooldownRemainingSeconds(0.5);
         component.setBoostRemainingSeconds(0.2);
+        component.setLastPacketInputAtMs(55L);
 
         MountedGlidePhysicsState state = component.toPhysicsState();
 
@@ -61,6 +64,7 @@ class TameworkMountedGlideComponentTest {
         assertEquals(-1.5, clone.getVerticalVelocity(), 0.0001);
         assertEquals(0.5, clone.getFlapCooldownRemainingSeconds(), 0.0001);
         assertEquals(0.2, clone.getBoostRemainingSeconds(), 0.0001);
+        assertEquals(55L, clone.getLastPacketInputAtMs());
     }
 
     @Test
@@ -72,6 +76,7 @@ class TameworkMountedGlideComponentTest {
         component.setGlideSpeed(14.0);
         component.setVerticalVelocity(2.0);
         component.setFlapCooldownRemainingSeconds(0.75);
+        component.setLastPacketInputAtMs(25L);
         component.captureAuthoritativePose(1.0, 2.0, 3.0, 0.4f, 0.5f, 0.6f);
 
         component.clearInputSnapshot();
@@ -80,6 +85,7 @@ class TameworkMountedGlideComponentTest {
         assertFalse(component.hasLookRotation());
         assertFalse(component.isJumpHeld());
         assertFalse(component.isCrouching());
+        assertEquals(0L, component.getLastPacketInputAtMs());
         assertEquals(14.0, component.getGlideSpeed(), 0.0001);
         assertEquals(2.0, component.getVerticalVelocity(), 0.0001);
         assertEquals(0.75, component.getFlapCooldownRemainingSeconds(), 0.0001);
