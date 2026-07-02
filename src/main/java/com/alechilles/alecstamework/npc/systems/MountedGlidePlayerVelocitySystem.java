@@ -100,15 +100,19 @@ public final class MountedGlidePlayerVelocitySystem
         }
 
         MountedGlidePhysicsState state = mount.toPhysicsState();
+        boolean flapRequested = mount.shouldRequestFlap();
         MountedGlidePhysics.Input input = new MountedGlidePhysics.Input(
                 resolvePitchRadians(mount),
                 mount.getForwardIntent(),
                 mount.getStrafeIntent(),
-                mount.isJumpHeld(),
+                flapRequested,
                 mount.isSprinting(),
                 mount.isCrouching()
         );
         MountedGlidePhysics.Output output = MountedGlidePhysics.update(state, config, input, dt);
+        if (output.flapped()) {
+            mount.consumeFlapRequest();
+        }
         mount.applyPhysicsState(state);
         commandBuffer.putComponent(mountRef, mountComponentType, mount);
 
@@ -132,7 +136,7 @@ public final class MountedGlidePlayerVelocitySystem
     }
 
     static boolean shouldReturnToGroundMode(@Nonnull TameworkMountedGlideComponent mount, boolean mountOnGround) {
-        return mount.isFlightActive() && mountOnGround && !mount.isJumpHeld();
+        return mount.isFlightActive() && mountOnGround && !mount.isFlapRequested();
     }
 
     @Nullable

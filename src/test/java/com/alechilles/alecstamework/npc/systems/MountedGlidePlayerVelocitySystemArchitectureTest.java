@@ -59,13 +59,13 @@ class MountedGlidePlayerVelocitySystemArchitectureTest {
         mount.setJumpHeld(false);
         assertFalse(MountedGlidePlayerVelocitySystem.shouldActivateFlight(mount, true));
 
-        mount.setJumpHeld(true);
+        mount.captureControls(true, false, false, 10L);
         assertTrue(MountedGlidePlayerVelocitySystem.shouldActivateFlight(mount, true));
 
         mount.setFlightActive(true);
         assertFalse(MountedGlidePlayerVelocitySystem.shouldReturnToGroundMode(mount, true));
 
-        mount.setJumpHeld(false);
+        mount.consumeFlapRequest();
         assertTrue(MountedGlidePlayerVelocitySystem.shouldReturnToGroundMode(mount, true));
     }
 

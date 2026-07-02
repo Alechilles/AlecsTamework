@@ -35,6 +35,39 @@ class TameworkMountedGlideComponentTest {
     }
 
     @Test
+    void singleJumpPressProducesOneFlapRequestUntilJumpReleased() {
+        TameworkMountedGlideComponent component = new TameworkMountedGlideComponent();
+
+        component.captureControls(true, false, false, 10L);
+
+        assertTrue(component.shouldRequestFlap());
+        assertTrue(component.consumeFlapRequest());
+        assertFalse(component.shouldRequestFlap());
+
+        component.captureControls(true, false, false, 20L);
+        assertFalse(component.shouldRequestFlap());
+
+        component.captureControls(false, false, false, 30L);
+        component.captureControls(true, false, false, 40L);
+
+        assertTrue(component.shouldRequestFlap());
+    }
+
+    @Test
+    void jumpPressDuringCooldownQueuesOneFlapAfterCooldownExpires() {
+        TameworkMountedGlideComponent component = new TameworkMountedGlideComponent();
+        component.setFlapCooldownRemainingSeconds(0.5);
+
+        component.captureControls(true, false, false, 10L);
+
+        assertFalse(component.shouldRequestFlap());
+
+        component.setFlapCooldownRemainingSeconds(0.0);
+
+        assertTrue(component.shouldRequestFlap());
+    }
+
+    @Test
     void physicsStateRoundTripsAndCloneCopiesValues() {
         TwMountedGlideConfig config = new TwMountedGlideConfig();
         TameworkMountedGlideComponent component = new TameworkMountedGlideComponent();

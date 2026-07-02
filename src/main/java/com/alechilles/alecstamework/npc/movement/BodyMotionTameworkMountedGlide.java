@@ -70,15 +70,19 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
         if (state.getGlideSpeed() <= 0.0) {
             state.setGlideSpeed(config.getGlide().getBaseSpeed());
         }
+        boolean flapRequested = glide.shouldRequestFlap();
         MountedGlidePhysics.Input input = new MountedGlidePhysics.Input(
                 resolvePitchRadians(glide),
                 glide.hasMovementIntent() ? glide.getForwardIntent() : 1.0,
                 glide.hasMovementIntent() ? glide.getStrafeIntent() : 0.0,
-                glide.isJumpHeld(),
+                flapRequested,
                 glide.isSprinting(),
                 glide.isCrouching()
         );
         MountedGlidePhysics.Output output = MountedGlidePhysics.update(state, config, input, dt);
+        if (output.flapped()) {
+            glide.consumeFlapRequest();
+        }
         glide.applyPhysicsState(state);
 
         float fallbackYaw = resolveFallbackYaw(ref, componentAccessor);
@@ -122,7 +126,7 @@ public final class BodyMotionTameworkMountedGlide extends BodyMotionBase {
     }
 
     static boolean shouldTakeOffFromGround(@Nonnull TameworkMountedGlideComponent glide, boolean grounded) {
-        return grounded && glide.isJumpHeld();
+        return grounded && glide.shouldRequestFlap();
     }
 
     static boolean shouldApplyGlideSteering(@Nonnull TameworkMountedGlideComponent glide) {

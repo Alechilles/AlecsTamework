@@ -78,7 +78,7 @@ public final class TwMountedGlideConfig implements
                     (settings, value) -> settings.heldJumpAutoFlap = value == null || value,
                     settings -> settings.heldJumpAutoFlap
             )
-            .documentation("If true, holding jump requests a new flap whenever cooldown allows.")
+            .documentation("If true, jump input can queue one flap request; mounted jump packets may latch, so repeat flaps require a fresh release/press.")
             .add()
             .<String>append(
                     new KeyedCodec<>("SprintFlapMode", Codec.STRING),

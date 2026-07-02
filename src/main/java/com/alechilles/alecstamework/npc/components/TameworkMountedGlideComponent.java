@@ -170,6 +170,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     private float lookPitchDegrees;
     private float lookRollDegrees;
     private boolean jumpHeld;
+    private boolean flapRequested;
     private boolean sprinting;
     private boolean crouching;
     private double glideSpeed;
@@ -219,7 +220,15 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     }
 
     public boolean shouldRequestFlap() {
-        return jumpHeld && flapCooldownRemainingSeconds <= 0.0;
+        return flapRequested && flapCooldownRemainingSeconds <= 0.0;
+    }
+
+    public boolean consumeFlapRequest() {
+        if (!shouldRequestFlap()) {
+            return false;
+        }
+        flapRequested = false;
+        return true;
     }
 
     public void captureMovementIntent(double forwardIntent, double strafeIntent, long inputAtMs) {
@@ -238,6 +247,9 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     }
 
     public void captureControls(boolean jumpHeld, boolean sprinting, boolean crouching, long inputAtMs) {
+        if (jumpHeld && !this.jumpHeld) {
+            flapRequested = true;
+        }
         this.jumpHeld = jumpHeld;
         this.sprinting = sprinting;
         this.crouching = crouching;
@@ -253,6 +265,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         lookPitchDegrees = 0.0f;
         lookRollDegrees = 0.0f;
         jumpHeld = false;
+        flapRequested = false;
         sprinting = false;
         crouching = false;
         lastInputAtMs = 0L;
@@ -324,6 +337,8 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
     public void setLookRollDegrees(float lookRollDegrees) { this.lookRollDegrees = finiteOrZero(lookRollDegrees); }
     public boolean isJumpHeld() { return jumpHeld; }
     public void setJumpHeld(boolean jumpHeld) { this.jumpHeld = jumpHeld; }
+    public boolean isFlapRequested() { return flapRequested; }
+    public void setFlapRequested(boolean flapRequested) { this.flapRequested = flapRequested; }
     public boolean isSprinting() { return sprinting; }
     public void setSprinting(boolean sprinting) { this.sprinting = sprinting; }
     public boolean isCrouching() { return crouching; }
@@ -379,6 +394,7 @@ public final class TameworkMountedGlideComponent implements Component<EntityStor
         clone.lookPitchDegrees = lookPitchDegrees;
         clone.lookRollDegrees = lookRollDegrees;
         clone.jumpHeld = jumpHeld;
+        clone.flapRequested = flapRequested;
         clone.sprinting = sprinting;
         clone.crouching = crouching;
         clone.glideSpeed = glideSpeed;
