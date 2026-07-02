@@ -81,7 +81,7 @@ public final class MountedGlidePlayerVelocitySystem
         }
         TwMountedGlideConfig config = resolveConfig(mount);
         boolean riderOnGround = isRiderOnGround(riderRef, commandBuffer);
-        boolean mountOnGround = isMountOnGround(mountRef, commandBuffer, riderOnGround);
+        boolean mountOnGround = isMountOnGround(mountRef, commandBuffer);
         if (!mount.isFlightActive()) {
             if (!shouldActivateFlight(mount, mountOnGround)) {
                 return;
@@ -127,6 +127,10 @@ public final class MountedGlidePlayerVelocitySystem
         return mount.isFlightActive() || !mountOnGround || mount.shouldRequestFlap();
     }
 
+    static boolean resolveMountOnGroundForActivation(@Nullable Boolean mountOnGround) {
+        return mountOnGround == null || mountOnGround;
+    }
+
     static boolean shouldReturnToGroundMode(@Nonnull TameworkMountedGlideComponent mount, boolean riderOnGround) {
         return mount.isFlightActive() && riderOnGround && !mount.isJumpHeld();
     }
@@ -151,10 +155,9 @@ public final class MountedGlidePlayerVelocitySystem
     }
 
     private boolean isMountOnGround(@Nonnull Ref<EntityStore> mountRef,
-                                    @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                    boolean riderOnGround) {
+                                    @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Boolean onGround = isOnGround(mountRef, commandBuffer);
-        return onGround == null ? riderOnGround : onGround;
+        return resolveMountOnGroundForActivation(onGround);
     }
 
     @Nullable

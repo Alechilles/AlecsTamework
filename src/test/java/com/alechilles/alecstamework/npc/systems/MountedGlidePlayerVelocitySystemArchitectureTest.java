@@ -75,4 +75,16 @@ class MountedGlidePlayerVelocitySystemArchitectureTest {
 
         assertFalse(MountedGlidePlayerVelocitySystem.shouldActivateFlight(mount, true));
     }
+
+    @Test
+    void missingMountGroundStateDoesNotStartFlightFromAnchoredRiderState() {
+        TameworkMountedGlideComponent mount = new TameworkMountedGlideComponent();
+
+        mount.setJumpHeld(false);
+
+        boolean mountOnGround = MountedGlidePlayerVelocitySystem.resolveMountOnGroundForActivation(null);
+
+        assertTrue(mountOnGround);
+        assertFalse(MountedGlidePlayerVelocitySystem.shouldActivateFlight(mount, mountOnGround));
+    }
 }
