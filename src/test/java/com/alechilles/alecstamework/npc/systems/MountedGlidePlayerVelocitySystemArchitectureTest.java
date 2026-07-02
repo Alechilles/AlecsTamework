@@ -66,4 +66,13 @@ class MountedGlidePlayerVelocitySystemArchitectureTest {
 
         assertTrue(MountedGlidePlayerVelocitySystem.shouldActivateFlight(mount, false));
     }
+
+    @Test
+    void groundedMountDoesNotStartFlightJustBecauseAnchoredRiderIsAirborne() {
+        TameworkMountedGlideComponent mount = new TameworkMountedGlideComponent();
+
+        mount.setJumpHeld(false);
+
+        assertFalse(MountedGlidePlayerVelocitySystem.shouldActivateFlight(mount, true));
+    }
 }

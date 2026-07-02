@@ -5,6 +5,7 @@
 ### Fixed
 - Reworked experimental NordicDrake mounted glide to use Hytale's native NPC mount flow and rider velocity, with native grounded walking, jump-to-launch flight, and pitch-based glide behavior.
 - Fixed mounted glide ground handling so NordicDrakes no longer force forward glide before flight is active.
+- Fixed mounted glide launch detection so a grounded NordicDrake does not start flight just because the rider is attached above ground at the mount anchor.
 - Fixed mounted glide motion cleanup so the experimental flight controller no longer keeps driving NordicDrakes after flight is inactive or the rider has dismounted.
 - Fixed mounted glide dismount cleanup so glide mounts remove native mount state, restore Tamework NPC state, and return the interaction prompt cleanly.
 - Fixed mounted glide remounting after dismount by restoring the NPC's original native role instead of leaving it in the temporary mounted role.

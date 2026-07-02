@@ -81,8 +81,9 @@ public final class MountedGlidePlayerVelocitySystem
         }
         TwMountedGlideConfig config = resolveConfig(mount);
         boolean riderOnGround = isRiderOnGround(riderRef, commandBuffer);
+        boolean mountOnGround = isMountOnGround(mountRef, commandBuffer, riderOnGround);
         if (!mount.isFlightActive()) {
-            if (!shouldActivateFlight(mount, riderOnGround)) {
+            if (!shouldActivateFlight(mount, mountOnGround)) {
                 return;
             }
             mount.setFlightActive(true);
@@ -122,8 +123,8 @@ public final class MountedGlidePlayerVelocitySystem
         velocity.addInstruction(velocityVector, null, ChangeVelocityType.Set);
     }
 
-    static boolean shouldActivateFlight(@Nonnull TameworkMountedGlideComponent mount, boolean riderOnGround) {
-        return mount.isFlightActive() || !riderOnGround || mount.shouldRequestFlap();
+    static boolean shouldActivateFlight(@Nonnull TameworkMountedGlideComponent mount, boolean mountOnGround) {
+        return mount.isFlightActive() || !mountOnGround || mount.shouldRequestFlap();
     }
 
     static boolean shouldReturnToGroundMode(@Nonnull TameworkMountedGlideComponent mount, boolean riderOnGround) {
@@ -145,13 +146,27 @@ public final class MountedGlidePlayerVelocitySystem
 
     private boolean isRiderOnGround(@Nonnull Ref<EntityStore> riderRef,
                                     @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        Boolean onGround = isOnGround(riderRef, commandBuffer);
+        return onGround != null && onGround;
+    }
+
+    private boolean isMountOnGround(@Nonnull Ref<EntityStore> mountRef,
+                                    @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                    boolean riderOnGround) {
+        Boolean onGround = isOnGround(mountRef, commandBuffer);
+        return onGround == null ? riderOnGround : onGround;
+    }
+
+    @Nullable
+    private Boolean isOnGround(@Nonnull Ref<EntityStore> ref,
+                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         MovementStatesComponent movementStatesComponent =
-                commandBuffer.getComponent(riderRef, movementStatesComponentType);
+                commandBuffer.getComponent(ref, movementStatesComponentType);
         if (movementStatesComponent == null) {
-            return false;
+            return null;
         }
         MovementStates states = movementStatesComponent.getMovementStates();
-        return states != null && states.onGround;
+        return states == null ? null : states.onGround;
     }
 
     @Nonnull
