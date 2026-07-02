@@ -86,6 +86,18 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
+    void mountedGlidePreservesQueuedRiderMovementStatesForHeldFlapInput() throws IOException {
+        String inputCapture = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
+        ));
+
+        assertTrue(inputCapture.contains("applyRiderLocalInput"));
+        assertTrue(inputCapture.contains("PlayerInput.SetRiderMovementStates riderStates"));
+        assertTrue(inputCapture.contains("movementStates.setMovementStates(riderStates.movementStates())"));
+        assertFalse(inputCapture.contains("queue.clear()"));
+    }
+
+    @Test
     void mountedGlideIsolatesNativeMountMovementBeforeNpcBehaviour() throws IOException {
         String velocity = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlidePlayerVelocitySystem.java"

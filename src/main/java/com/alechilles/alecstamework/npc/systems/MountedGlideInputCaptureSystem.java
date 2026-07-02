@@ -94,7 +94,7 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
         }
 
         long now = System.currentTimeMillis();
-        boolean captured = captureQueuedInput(mount, playerInput, riderRef, commandBuffer, now);
+        boolean captured = captureQueuedInput(mount, playerInput, riderRef, index, archetypeChunk, commandBuffer, now);
         if (!captured) {
             captured = captureCurrentRiderSnapshot(mount, riderRef, store, now);
         }
@@ -106,6 +106,8 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
     private boolean captureQueuedInput(@Nonnull TameworkMountedGlideComponent mount,
                                        @Nonnull PlayerInput playerInput,
                                        @Nonnull Ref<EntityStore> riderRef,
+                                       int index,
+                                       @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
                                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                        long now) {
         List<PlayerInput.InputUpdate> queue = playerInput.getMovementUpdateQueue();
@@ -150,6 +152,7 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
                 sawControls = true;
                 captured = true;
             }
+            applyRiderLocalInput(inputUpdate, index, archetypeChunk, commandBuffer);
         }
         if (!sawMovementIntent) {
             clearMovementIntent(mount, now);
@@ -161,6 +164,25 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
             captureRiderControls(mount, riderRef, commandBuffer, now);
         }
         return captured;
+    }
+
+    private void applyRiderLocalInput(@Nonnull PlayerInput.InputUpdate inputUpdate,
+                                      int index,
+                                      @Nonnull ArchetypeChunk<EntityStore> archetypeChunk,
+                                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        if (inputUpdate instanceof PlayerInput.SetBody
+                || inputUpdate instanceof PlayerInput.SetHead
+                || inputUpdate instanceof PlayerInput.SetMovementStates) {
+            inputUpdate.apply(commandBuffer, archetypeChunk, index);
+            return;
+        }
+        if (inputUpdate instanceof PlayerInput.SetRiderMovementStates riderStates) {
+            MovementStatesComponent movementStates =
+                    archetypeChunk.getComponent(index, movementStatesComponentType);
+            if (movementStates != null) {
+                movementStates.setMovementStates(riderStates.movementStates());
+            }
+        }
     }
 
     private boolean captureCurrentRiderSnapshot(@Nonnull TameworkMountedGlideComponent mount,
