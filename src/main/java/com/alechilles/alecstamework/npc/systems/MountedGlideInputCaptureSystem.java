@@ -242,7 +242,7 @@ public final class MountedGlideInputCaptureSystem extends EntityTickingSystem<En
         }
         mount.captureControls(
                 states.jumping || states.swimJumping,
-                states.sprinting || states.running,
+                states.sprinting,
                 states.crouching || states.forcedCrouching,
                 now
         );

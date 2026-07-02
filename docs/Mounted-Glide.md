@@ -8,7 +8,7 @@ Tamework's mounted glide controller is an opt-in beta mount mode for flying moun
 - While flight is active, the mount naturally glides forward and slowly loses altitude.
 - Mouse pitch has a strong effect on the glide path. Looking down gains stored speed and sinks faster. Looking up spends stored speed for lift and can stall if speed is too low.
 - Pressing jump queues one flap request. Mounted jump packets may remain latched after a press, so repeat flaps currently require a fresh release/press instead of hold-to-repeat.
-- Holding sprint while a flap fires converts that flap into a forward boost.
+- Holding sprint while a flap fires converts that flap into a forward boost. Normal forward/run input does not convert flaps.
 - Holding crouch applies an airbrake that drains speed and increases sink.
 - Landing after the queued flap is spent returns the mount to native grounded movement.
 - Q/drop, left-click, and right-click are not consumed for flight controls.
@@ -81,6 +81,6 @@ Example:
 The bundled `TwMountedGlideExample` profile shows the full field set.
 
 ## Input Notes
-The current implementation reads mounted movement, jump, sprint, crouch, and look rotation. Jump is treated as a press edge because native mounted jump packets may keep reporting `true` after a single press while airborne. It does not consume Q/drop, left-click, or right-click for flight controls.
+The current implementation reads mounted movement, jump, sprint, crouch, and look rotation. Jump is treated as a press edge because native mounted jump packets may keep reporting `true` after a single press while airborne. Forward/run movement is only movement intent; only the native sprint flag selects a forward flap. It does not consume Q/drop, left-click, or right-click for flight controls.
 
 Tamework does not currently install an F/use packet filter for mounted glide. If post-pivot manual testing shows the use key re-enters the interaction prompt while mounted, that should be handled as a separate runtime fix.

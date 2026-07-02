@@ -190,7 +190,7 @@ final class MountedGlidePacketInputCapture {
         }
         mount.captureControls(
                 states.jumping || states.swimJumping,
-                states.sprinting || states.running,
+                states.sprinting,
                 states.crouching || states.forcedCrouching,
                 now
         );

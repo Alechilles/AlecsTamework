@@ -74,7 +74,7 @@ class MountedGlideInputCaptureArchitectureTest {
         assertTrue(inputCapture.contains("PlayerInput.WishMovement"));
         assertTrue(inputCapture.contains("mount.captureMovementIntent(wishZ * scale, wishX * scale, now)"));
         assertTrue(inputCapture.contains("states.jumping || states.swimJumping"));
-        assertTrue(inputCapture.contains("states.sprinting || states.running"));
+        assertTrue(inputCapture.contains("states.sprinting"));
         assertTrue(inputCapture.contains("states.crouching || states.forcedCrouching"));
         assertTrue(inputCapture.contains("Math.toDegrees"));
         assertFalse(inputCapture.contains("MountedComponent"));
@@ -83,6 +83,19 @@ class MountedGlideInputCaptureArchitectureTest {
         assertFalse(inputCapture.contains("queue.clear()"));
         assertTrue(plugin.contains("new MountedGlideInputCaptureSystem(\r\n                            npcMountComponentType,")
                 || plugin.contains("new MountedGlideInputCaptureSystem(\n                            npcMountComponentType,"));
+    }
+
+    @Test
+    void mountedGlideDoesNotTreatNativeRunAsSprintFlapModifier() throws IOException {
+        String systemCapture = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/MountedGlideInputCaptureSystem.java"
+        ));
+        String packetCapture = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedGlidePacketInputCapture.java"
+        ));
+
+        assertFalse(systemCapture.contains("states.sprinting || states.running"));
+        assertFalse(packetCapture.contains("states.sprinting || states.running"));
     }
 
     @Test
