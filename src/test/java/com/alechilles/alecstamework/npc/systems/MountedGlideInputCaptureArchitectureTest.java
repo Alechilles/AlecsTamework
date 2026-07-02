@@ -152,12 +152,27 @@ class MountedGlideInputCaptureArchitectureTest {
         String helper = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/network/MountedGlidePacketInputCapture.java"
         ));
+        String clientProbe = extractMethodSource(
+                helper,
+                "private void logInputProbe(@Nonnull ClientMovement packet",
+                "private void logInputProbe(@Nonnull MountMovement packet"
+        );
+        String mountProbe = extractMethodSource(
+                helper,
+                "private void logInputProbe(@Nonnull MountMovement packet",
+                "private void logInputProbe(@Nonnull String message"
+        );
 
         assertTrue(helper.contains("TameworkGlide inputProbe"));
         assertTrue(helper.contains("lastClientMovementInputProbeSignature"));
         assertTrue(helper.contains("lastMountMovementInputProbeSignature"));
         assertTrue(helper.contains("formatProbeStates"));
         assertTrue(helper.contains("formatProbeSnapshot"));
+        assertTrue(helper.contains("formatProbeControlSnapshot"));
+        assertTrue(clientProbe.contains("formatProbeControlSnapshot(mount)"));
+        assertTrue(mountProbe.contains("formatProbeControlSnapshot(mount)"));
+        assertFalse(clientProbe.contains("|snapshot=\" + formatProbeSnapshot(mount)"));
+        assertFalse(mountProbe.contains("|snapshot=\" + formatProbeSnapshot(mount)"));
     }
 
     @Test

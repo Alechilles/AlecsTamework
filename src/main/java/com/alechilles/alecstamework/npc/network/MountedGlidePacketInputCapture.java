@@ -305,11 +305,11 @@ final class MountedGlidePacketInputCapture {
     private void logInputProbe(@Nonnull ClientMovement packet, @Nonnull TameworkMountedGlideComponent mount) {
         String signature = "movement=" + formatProbeStates(packet.movementStates)
                 + "|rider=" + formatProbeStates(packet.riderMovementStates)
-                + "|wish=" + formatProbePositionBucket(packet.wishMovement)
-                + "|velocity=" + formatProbeVectorBucket(packet.velocity)
+                + "|wish=" + formatProbePositionIntentBucket(packet.wishMovement)
+                + "|velocity=" + formatProbeVectorIntentBucket(packet.velocity)
                 + "|body=" + formatProbeDirectionBucket(packet.bodyOrientation)
                 + "|look=" + formatProbeDirectionBucket(packet.lookOrientation)
-                + "|snapshot=" + formatProbeSnapshot(mount);
+                + "|snapshot=" + formatProbeControlSnapshot(mount);
         if (signature.equals(lastClientMovementInputProbeSignature)) {
             return;
         }
@@ -331,7 +331,7 @@ final class MountedGlidePacketInputCapture {
     private void logInputProbe(@Nonnull MountMovement packet, @Nonnull TameworkMountedGlideComponent mount) {
         String signature = "states=" + formatProbeStates(packet.movementStates)
                 + "|body=" + formatProbeDirectionBucket(packet.bodyOrientation)
-                + "|snapshot=" + formatProbeSnapshot(mount);
+                + "|snapshot=" + formatProbeControlSnapshot(mount);
         if (signature.equals(lastMountMovementInputProbeSignature)) {
             return;
         }
@@ -420,15 +420,29 @@ final class MountedGlidePacketInputCapture {
     }
 
     @Nonnull
-    private String formatProbePositionBucket(@Nullable Position position) {
-        return position == null ? "<none>" : formatProbeDouble(position.x) + "/" +
-                formatProbeDouble(position.y) + "/" + formatProbeDouble(position.z);
+    private String formatProbeControlSnapshot(@Nonnull TameworkMountedGlideComponent mount) {
+        return "intent=" + formatProbeIntent(mount.getForwardIntent()) + "/" +
+                formatProbeIntent(mount.getStrafeIntent()) +
+                ",hasIntent=" + mount.hasMovementIntent() +
+                ",look=" + formatProbeAngle(mount.getLookYawDegrees()) + "/" +
+                formatProbeAngle(mount.getLookPitchDegrees()) +
+                ",hasLook=" + mount.hasLookRotation() +
+                ",held=jump:" + mount.isJumpHeld() +
+                ",sprint:" + mount.isSprinting() +
+                ",crouch:" + mount.isCrouching() +
+                ",flight=" + mount.isFlightActive();
     }
 
     @Nonnull
-    private String formatProbeVectorBucket(@Nullable Vector3d vector) {
-        return vector == null ? "<none>" : formatProbeDouble(vector.x) + "/" +
-                formatProbeDouble(vector.y) + "/" + formatProbeDouble(vector.z);
+    private String formatProbePositionIntentBucket(@Nullable Position position) {
+        return position == null ? "<none>" : formatProbeIntent(position.x) + "/" +
+                formatProbeIntent(position.y) + "/" + formatProbeIntent(position.z);
+    }
+
+    @Nonnull
+    private String formatProbeVectorIntentBucket(@Nullable Vector3d vector) {
+        return vector == null ? "<none>" : formatProbeIntent(vector.x) + "/" +
+                formatProbeIntent(vector.y) + "/" + formatProbeIntent(vector.z);
     }
 
     @Nonnull
@@ -447,6 +461,14 @@ final class MountedGlidePacketInputCapture {
             return "0.0";
         }
         return Double.toString(Math.round(value * 10.0) / 10.0);
+    }
+
+    @Nonnull
+    private String formatProbeIntent(double value) {
+        if (!Double.isFinite(value) || Math.abs(value) < 0.2) {
+            return "0";
+        }
+        return value > 0.0 ? "1" : "-1";
     }
 
     @Nonnull
