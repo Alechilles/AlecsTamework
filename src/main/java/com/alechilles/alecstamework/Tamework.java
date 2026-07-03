@@ -57,6 +57,8 @@ import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectCompone
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
 import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
+import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
+import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
@@ -177,6 +179,7 @@ import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
+import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
@@ -608,6 +611,17 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
+        getEntityStoreRegistry().registerSystem(
+                new PlayerInputDebugSystem(
+                        PlayerInput.getComponentType(),
+                        UUIDComponent.getComponentType(),
+                        MovementStatesComponent.getComponentType(),
+                        HeadRotation.getComponentType(),
+                        TransformComponent.getComponentType(),
+                        Velocity.getComponentType(),
+                        ModelComponent.getComponentType()
+                )
+        );
         ComponentType<EntityStore, NPCMountComponent> npcMountComponentType = resolveNpcMountComponentTypeOrNull();
         if (npcMountComponentType == null) {
             getLogger().at(Level.WARNING).log(
@@ -927,6 +941,12 @@ public class Tamework extends JavaPlugin {
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerInteractEvent.class,
+                PlayerInputDebugProbe::logPlayerInteract,
+                "player input debug interaction logging"
+        );
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
                 PlayerInteractEvent.class,

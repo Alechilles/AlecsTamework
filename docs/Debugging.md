@@ -65,6 +65,7 @@
 - `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debugplayermodel [ModelId] [scale] | reset | status`
+- `/tw debugplayerinput [on|off|status]`
 - `/tw debuglag [on|off]`
 - `/tw debugharvest [on|off]`
 - `/tw debugxpevents [on|off]`
@@ -72,6 +73,9 @@
 `/tw debugplayermodel` temporarily replaces the executing player's `ModelComponent` for player-driven
 mount-control experiments. With no model id it tries `Endgame_Pet_Dragon_Frost`; use `reset` to restore
 the saved player model.
+
+`/tw debugplayerinput` logs movement packets, mouse packets, interaction events, and per-tick player
+input/state snapshots for the executing player. Use it only during short input experiments; it is intentionally verbose.
 
 `/tw debugdespawn` notes:
 - Default (no role filter) tracks all tamed companions.

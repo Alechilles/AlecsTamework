@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.network;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
@@ -119,6 +120,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleClientMovement(@Nonnull ClientMovement packet) {
+        PlayerInputDebugProbe.logClientMovement(packetHandler.getPlayerRef(), packet);
         glidePacketInputCapture.capture(packet, packetHandler);
         if (!tryHandleTameworkClientMovement(packet)) {
             delegate(clientMovementDelegate, packet);
@@ -126,6 +128,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleMountMovement(@Nonnull MountMovement packet) {
+        PlayerInputDebugProbe.logMountMovement(packetHandler.getPlayerRef(), packet);
         glidePacketInputCapture.capture(packet, packetHandler);
         if (!tryHandleTameworkMountMovement(packet)) {
             delegate(mountMovementDelegate, packet);
@@ -133,6 +136,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     }
 
     private void handleMouseInteraction(@Nonnull MouseInteraction packet) {
+        PlayerInputDebugProbe.logMouseInteraction(packetHandler.getPlayerRef(), packet);
         tryHandleTameworkMouseInteraction(packet);
         delegate(mouseInteractionDelegate, packet);
     }

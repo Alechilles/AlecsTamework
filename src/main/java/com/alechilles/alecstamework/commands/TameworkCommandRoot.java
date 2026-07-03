@@ -45,6 +45,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugPromptCommand());
         addSubCommand(new TameworkDebugRideCommand());
         addSubCommand(new TameworkDebugPlayerModelCommand());
+        addSubCommand(new TameworkDebugPlayerInputCommand());
         addSubCommand(new TameworkDebugDespawnCommand());
         addSubCommand(new TameworkDebugLagCommand());
         addSubCommand(new TameworkDebugTargetHudCommand());
