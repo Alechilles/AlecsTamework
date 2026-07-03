@@ -33,6 +33,9 @@ import javax.annotation.Nullable;
 public final class PlayerInputDebugProbe {
     private static final Set<UUID> ENABLED_PLAYERS = ConcurrentHashMap.newKeySet();
     private static final ConcurrentHashMap<UUID, String> LAST_PACKET_SIGNATURES = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, PositionSnapshot> LAST_ABSOLUTE_POSITIONS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, DirectionSnapshot> LAST_BODY_DIRECTIONS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, DirectionSnapshot> LAST_LOOK_DIRECTIONS = new ConcurrentHashMap<>();
 
     private PlayerInputDebugProbe() {
     }
@@ -43,6 +46,9 @@ public final class PlayerInputDebugProbe {
 
     public static boolean disable(@Nonnull UUID playerUuid) {
         LAST_PACKET_SIGNATURES.keySet().removeIf(key -> key.equals(playerUuid));
+        LAST_ABSOLUTE_POSITIONS.remove(playerUuid);
+        LAST_BODY_DIRECTIONS.remove(playerUuid);
+        LAST_LOOK_DIRECTIONS.remove(playerUuid);
         return ENABLED_PLAYERS.remove(playerUuid);
     }
 
@@ -59,16 +65,19 @@ public final class PlayerInputDebugProbe {
         if (!isEnabled(playerUuid)) {
             return;
         }
+        updateDirectionSnapshots(playerUuid, packet.bodyOrientation, packet.lookOrientation);
+        MovementAxisProbe axisProbe = resolveMovementAxisProbe(playerUuid, packet);
         String signature = "client|" + formatPosition(packet.wishMovement)
                 + "|" + formatVector(packet.velocity)
                 + "|" + formatPosition(packet.absolutePosition)
                 + "|" + formatDirection(packet.bodyOrientation)
                 + "|" + formatDirection(packet.lookOrientation)
                 + "|" + formatStates(packet.movementStates)
-                + "|" + formatStates(packet.riderMovementStates);
+                + "|" + formatStates(packet.riderMovementStates)
+                + "|" + axisProbe.signature();
         logChanged(playerUuid, signature, String.format(
                 "TameworkInput debug: packet=ClientMovement player=%s wish=%s velocity=%s absolute=%s "
-                        + "relative=%s mountedTo=%s body=%s look=%s states=%s riderStates=%s",
+                        + "relative=%s mountedTo=%s body=%s look=%s states=%s riderStates=%s axisProbe=%s",
                 playerUuid,
                 formatPosition(packet.wishMovement),
                 formatVector(packet.velocity),
@@ -78,7 +87,8 @@ public final class PlayerInputDebugProbe {
                 formatDirection(packet.bodyOrientation),
                 formatDirection(packet.lookOrientation),
                 formatStates(packet.movementStates),
-                formatStates(packet.riderMovementStates)
+                formatStates(packet.riderMovementStates),
+                axisProbe.summary()
         ));
     }
 
@@ -155,6 +165,95 @@ public final class PlayerInputDebugProbe {
             return;
         }
         instance.getLogger().at(Level.INFO).log(message);
+    }
+
+    private static void updateDirectionSnapshots(@Nonnull UUID playerUuid,
+                                                 @Nullable Direction bodyOrientation,
+                                                 @Nullable Direction lookOrientation) {
+        if (bodyOrientation != null) {
+            LAST_BODY_DIRECTIONS.put(playerUuid, DirectionSnapshot.from(bodyOrientation));
+        }
+        if (lookOrientation != null) {
+            LAST_LOOK_DIRECTIONS.put(playerUuid, DirectionSnapshot.from(lookOrientation));
+        }
+    }
+
+    @Nonnull
+    private static MovementAxisProbe resolveMovementAxisProbe(@Nonnull UUID playerUuid,
+                                                              @Nonnull ClientMovement packet) {
+        DirectionSnapshot basis = LAST_LOOK_DIRECTIONS.get(playerUuid);
+        String basisName = "look";
+        if (basis == null) {
+            basis = LAST_BODY_DIRECTIONS.get(playerUuid);
+            basisName = "body";
+        }
+        if (basis == null) {
+            basis = new DirectionSnapshot(0.0, 0.0, 0.0);
+            basisName = "default";
+        }
+
+        AxisProjection wish = packet.wishMovement == null
+                ? AxisProjection.none()
+                : project(packet.wishMovement.x, packet.wishMovement.z, basis);
+        AxisProjection velocity = packet.velocity == null
+                ? AxisProjection.none()
+                : project(packet.velocity.x, packet.velocity.z, basis);
+        AxisProjection absolute = resolveAbsoluteProjection(playerUuid, packet.absolutePosition, basis);
+        return new MovementAxisProbe(basisName, basis, wish, velocity, absolute);
+    }
+
+    @Nonnull
+    private static AxisProjection resolveAbsoluteProjection(@Nonnull UUID playerUuid,
+                                                            @Nullable Position absolutePosition,
+                                                            @Nonnull DirectionSnapshot basis) {
+        if (absolutePosition == null) {
+            return AxisProjection.none();
+        }
+        PositionSnapshot current = PositionSnapshot.from(absolutePosition);
+        PositionSnapshot previous = LAST_ABSOLUTE_POSITIONS.put(playerUuid, current);
+        if (previous == null) {
+            return AxisProjection.first();
+        }
+        return project(current.x() - previous.x(), current.z() - previous.z(), basis);
+    }
+
+    @Nonnull
+    private static AxisProjection project(double worldX, double worldZ, @Nonnull DirectionSnapshot basis) {
+        double horizontalLength = Math.sqrt(worldX * worldX + worldZ * worldZ);
+        if (horizontalLength <= 0.0001) {
+            return AxisProjection.idle();
+        }
+        double normalizedX = worldX / horizontalLength;
+        double normalizedZ = worldZ / horizontalLength;
+        double forwardX = -Math.sin(basis.yaw());
+        double forwardZ = -Math.cos(basis.yaw());
+        double rightX = -Math.sin(basis.yaw() - Math.PI / 2.0);
+        double rightZ = -Math.cos(basis.yaw() - Math.PI / 2.0);
+        double strafe = clamp(normalizedX * rightX + normalizedZ * rightZ, -1.0, 1.0);
+        double forward = clamp(normalizedX * forwardX + normalizedZ * forwardZ, -1.0, 1.0);
+        return new AxisProjection(forward, strafe, horizontalLength, label(forward, strafe));
+    }
+
+    @Nonnull
+    private static String label(double forward, double strafe) {
+        double absForward = Math.abs(forward);
+        double absStrafe = Math.abs(strafe);
+        if (absForward < 0.25 && absStrafe < 0.25) {
+            return "idle";
+        }
+        if (absForward >= absStrafe * 1.25) {
+            return forward > 0.0 ? "forward" : "back";
+        }
+        if (absStrafe >= absForward * 1.25) {
+            return strafe > 0.0 ? "right" : "left";
+        }
+        String vertical = forward > 0.0 ? "forward" : "back";
+        String horizontal = strafe > 0.0 ? "right" : "left";
+        return vertical + "+" + horizontal;
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Nonnull
@@ -236,5 +335,73 @@ public final class PlayerInputDebugProbe {
     @Nonnull
     private static String formatBlock(@Nullable BlockPosition position) {
         return position == null ? "<none>" : position.x + "/" + position.y + "/" + position.z;
+    }
+
+    private record PositionSnapshot(double x, double y, double z) {
+        private static PositionSnapshot from(@Nonnull Position position) {
+            return new PositionSnapshot(position.x, position.y, position.z);
+        }
+    }
+
+    private record DirectionSnapshot(double yaw, double pitch, double roll) {
+        private static DirectionSnapshot from(@Nonnull Direction direction) {
+            return new DirectionSnapshot(direction.yaw, direction.pitch, direction.roll);
+        }
+    }
+
+    private record AxisProjection(double forward, double strafe, double magnitude, @Nonnull String label) {
+        private static AxisProjection none() {
+            return new AxisProjection(0.0, 0.0, 0.0, "<none>");
+        }
+
+        private static AxisProjection first() {
+            return new AxisProjection(0.0, 0.0, 0.0, "<first>");
+        }
+
+        private static AxisProjection idle() {
+            return new AxisProjection(0.0, 0.0, 0.0, "idle");
+        }
+
+        @Nonnull
+        private String summary(@Nonnull String source) {
+            return source + ":" + label + "(f=" + formatAxis(forward) +
+                    ",s=" + formatAxis(strafe) +
+                    ",mag=" + formatMagnitude(magnitude) + ")";
+        }
+
+        @Nonnull
+        private String signature() {
+            return label + ":" + formatAxis(forward) + ":" + formatAxis(strafe);
+        }
+
+        @Nonnull
+        private static String formatAxis(double value) {
+            return String.format("%.2f", value);
+        }
+
+        @Nonnull
+        private static String formatMagnitude(double value) {
+            return String.format("%.3f", value);
+        }
+    }
+
+    private record MovementAxisProbe(@Nonnull String basisName,
+                                     @Nonnull DirectionSnapshot basis,
+                                     @Nonnull AxisProjection wish,
+                                     @Nonnull AxisProjection velocity,
+                                     @Nonnull AxisProjection absolute) {
+        @Nonnull
+        private String summary() {
+            return "basis=" + basisName + "(yaw=" + String.format("%.3f", basis.yaw()) + ") " +
+                    wish.summary("wish") + " " +
+                    velocity.summary("velocity") + " " +
+                    absolute.summary("absoluteDelta");
+        }
+
+        @Nonnull
+        private String signature() {
+            return basisName + ":" + String.format("%.2f", basis.yaw()) + "|" +
+                    wish.signature() + "|" + velocity.signature() + "|" + absolute.signature();
+        }
     }
 }
