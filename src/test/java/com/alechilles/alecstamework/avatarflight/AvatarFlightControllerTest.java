@@ -274,6 +274,22 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void sharpPitchUpTurnDoesNotCreateExtraHorizontalSpeed() {
+        AvatarFlightController.Output output = AvatarFlightController.update(
+                new AvatarFlightController.State(10.0, 0.0, 0.0, 0L, 0L),
+                input(1.0, false, false, false, false, Math.toRadians(45.0)),
+                CONFIG,
+                0.1,
+                1000L
+        );
+
+        double horizontalSpeed = Math.sqrt(output.velocityX() * output.velocityX()
+                + output.velocityZ() * output.velocityZ());
+        assertTrue(horizontalSpeed <= 10.0,
+                "sharp pitch-up turns should redirect existing speed, not create extra horizontal speed");
+    }
+
+    @Test
     void pitchUpTradesMomentumForAltitudeWithoutFreshForwardInput() {
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),

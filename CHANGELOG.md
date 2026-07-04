@@ -20,6 +20,7 @@
 - Fixed avatar flight input projection so passive glide momentum after a sharp turn no longer gets misread as held-backward input and traps the player in slow reverse flight.
 - Reworked avatar flight pitch-up handling so looking upward redirects dive momentum into a sharper climbing arc, preserving stronger forward motion while trading speed for noticeable altitude before stalling.
 - Fixed avatar flight animation and pose sync so the owner client receives the same saved flying-state update used by native flight, pitch follows look pitch directly, turn banking applies from trajectory changes, and stale roll/pitch clears when landing or disabling avatar flight.
+- Fixed a sharp-turn avatar flight bug that could create runaway horizontal speed and leave airbraking unable to recover.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 

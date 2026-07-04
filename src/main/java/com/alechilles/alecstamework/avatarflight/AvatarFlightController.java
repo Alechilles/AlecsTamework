@@ -128,8 +128,17 @@ public final class AvatarFlightController {
         vertical = Math.max(-movement.getMaxFallSpeed(), Math.min(movement.getMaxFallSpeed(), vertical));
         double x = forwardX * targetForwardSpeed + rightX * targetStrafeSpeed;
         double z = forwardZ * targetForwardSpeed + rightZ * targetStrafeSpeed;
+        double horizontalSpeedLimit = resolveHorizontalSpeedLimit(
+                currentHorizontalSpeed,
+                targetForwardSpeed,
+                targetStrafeSpeed,
+                movement
+        );
+        HorizontalVelocity horizontalVelocity = capHorizontalVelocity(x, z, horizontalSpeedLimit);
+        x = horizontalVelocity.x();
+        z = horizontalVelocity.z();
         boolean applyVelocity = mode != AvatarFlightMode.GROUNDED;
-        double horizontalSpeed = Math.sqrt(x * x + z * z);
+        double horizontalSpeed = horizontalVelocity.speed();
         boolean horizontalIdle = horizontalSpeed < HORIZONTAL_IDLE_SPEED;
         boolean fastFlight = !horizontalIdle && input.sprint() && mode == AvatarFlightMode.FORWARD_FLIGHT;
         double visualPitch = input.pitchRadians();
@@ -143,6 +152,25 @@ public final class AvatarFlightController {
         );
         return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, applyVelocity, jumpApplied, boostApplied,
                 horizontalIdle, fastFlight, visualPitch, visualRoll);
+    }
+
+    private static double resolveHorizontalSpeedLimit(double currentHorizontalSpeed,
+                                                      double targetForwardSpeed,
+                                                      double targetStrafeSpeed,
+                                                      TwAvatarFlightConfig.MovementSettings movement) {
+        double configuredLimit = Math.max(movement.getMaxForwardSpeed(), movement.getMaxBackwardSpeed());
+        double intendedSpeed = Math.max(Math.abs(targetForwardSpeed), Math.abs(targetStrafeSpeed));
+        return Math.max(0.0, Math.min(configuredLimit, Math.max(currentHorizontalSpeed, intendedSpeed)));
+    }
+
+    @Nonnull
+    private static HorizontalVelocity capHorizontalVelocity(double x, double z, double maxSpeed) {
+        double speed = Math.hypot(x, z);
+        if (speed <= maxSpeed || speed <= 0.0) {
+            return new HorizontalVelocity(x, z, speed);
+        }
+        double scale = maxSpeed / speed;
+        return new HorizontalVelocity(x * scale, z * scale, maxSpeed);
     }
 
     @Nonnull
@@ -240,6 +268,9 @@ public final class AvatarFlightController {
     }
 
     private record PitchAdjustment(double forwardSpeed, double verticalSpeed) {
+    }
+
+    private record HorizontalVelocity(double x, double z, double speed) {
     }
 
     public record State(double velocityX,
