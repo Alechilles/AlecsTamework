@@ -14,8 +14,10 @@ import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
 import com.hypixel.hytale.protocol.MovementStates;
+import com.hypixel.hytale.protocol.SavedMovementStates;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesSystems;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
@@ -100,7 +102,9 @@ public final class AvatarFlightMovementSystem
         flight.setVelocity(output.velocityX(), output.velocityY(), output.velocityZ());
         flight.setNextJumpAtMs(output.nextJumpAtMs());
         flight.setNextBoostAtMs(output.nextBoostAtMs());
+        syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
         commandBuffer.putComponent(ref, flightType, flight);
+        applyVisualPose(ref, commandBuffer, controllerInput, output);
         if (output.applyVelocity()) {
             velocity.addInstruction(
                     new Vector3d(output.velocityX(), output.velocityY(), output.velocityZ()),
@@ -108,9 +112,27 @@ public final class AvatarFlightMovementSystem
                     ChangeVelocityType.Set
             );
             applyFlightMovementState(ref, commandBuffer, output);
-            applyVisualPose(ref, commandBuffer, controllerInput, output);
         }
         maybeLogDebug(config, ref, controllerInput, output, movementStates);
+    }
+
+    private void syncOwnerClientFlyingState(@Nonnull Ref<EntityStore> ref,
+                                            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                            @Nonnull AvatarFlightComponent flight,
+                                            boolean desiredFlying) {
+        if (flight.isClientFlyingSynced() != desiredFlying) {
+            MovementStatesComponent component = commandBuffer.getComponent(ref, movementStatesType);
+            if (component == null || component.getMovementStates() == null) {
+                return;
+            }
+            Player.applyMovementStates(
+                    ref,
+                    new SavedMovementStates(desiredFlying),
+                    component.getMovementStates(),
+                    commandBuffer
+            );
+            flight.setClientFlyingSynced(desiredFlying);
+        }
     }
 
     private void applyFlightMovementState(@Nonnull Ref<EntityStore> ref,

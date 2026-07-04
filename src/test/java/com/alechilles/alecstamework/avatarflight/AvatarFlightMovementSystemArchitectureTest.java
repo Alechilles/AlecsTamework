@@ -43,7 +43,7 @@ class AvatarFlightMovementSystemArchitectureTest {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("applyVisualPose(ref, commandBuffer, controllerInput, output)"),
-                "avatar flight must update the transformed model pose when velocity is authoritative");
+                "avatar flight must update the transformed model pose each active tick, including grounded reset ticks");
         assertTrue(source.contains("if (transform != null && transform.getRotation() != null)"),
                 "missing transform rotation must not block the HeadRotation pose write");
         assertTrue(source.contains("transform.getRotation().setPitch((float) output.visualPitchRadians())"));
@@ -54,6 +54,31 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "visible player-model pitch may follow HeadRotation rather than Transform rotation");
         assertTrue(source.contains("headRotation.getRotation().setRoll((float) output.visualRollRadians())"));
         assertTrue(source.contains("commandBuffer.putComponent(ref, headRotationType, headRotation)"));
+    }
+
+    @Test
+    void visualPoseIsNotGuardedByVelocityApplication() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        int poseIndex = source.indexOf("applyVisualPose(ref, commandBuffer, controllerInput, output)");
+        int velocityGuardIndex = source.indexOf("if (output.applyVelocity())");
+
+        assertTrue(poseIndex >= 0, "avatar flight must write visual pose while the component is active");
+        assertTrue(velocityGuardIndex >= 0, "test expects the velocity guard to remain present");
+        assertTrue(poseIndex < velocityGuardIndex,
+                "pose writes must also run on grounded ticks so stale pitch/roll cannot stick after landing");
+    }
+
+    @Test
+    void ownerClientFlyingStateIsSyncedThroughPlayerApplyMovementStates() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("Player.applyMovementStates"),
+                "self-client animation state needs the same saved flying-state packet creative flight uses");
+        assertTrue(source.contains("new SavedMovementStates(desiredFlying)"),
+                "avatar flight should sync true while flying and false when returning to grounded");
+        assertTrue(source.contains("flight.isClientFlyingSynced() != desiredFlying"),
+                "the self-client saved flight packet should only be sent when the desired flying state changes");
     }
 
     @Test

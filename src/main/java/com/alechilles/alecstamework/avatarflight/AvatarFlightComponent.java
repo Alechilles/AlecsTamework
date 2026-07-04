@@ -50,6 +50,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setEnabledAtMs,
                     AvatarFlightComponent::getEnabledAtMs)
             .add()
+            .<Boolean>append(new KeyedCodec<>("ClientFlyingSynced", Codec.BOOLEAN),
+                    AvatarFlightComponent::setClientFlyingSynced,
+                    AvatarFlightComponent::isClientFlyingSynced)
+            .add()
             .build();
 
     private String configId = "";
@@ -60,6 +64,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextJumpAtMs;
     private long nextBoostAtMs;
     private long enabledAtMs;
+    private boolean clientFlyingSynced;
 
     public AvatarFlightComponent() {
     }
@@ -158,6 +163,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         this.enabledAtMs = enabledAtMs == null ? 0L : enabledAtMs;
     }
 
+    public boolean isClientFlyingSynced() {
+        return clientFlyingSynced;
+    }
+
+    public void setClientFlyingSynced(@Nullable Boolean clientFlyingSynced) {
+        this.clientFlyingSynced = clientFlyingSynced != null && clientFlyingSynced;
+    }
+
     public void setVelocity(double x, double y, double z) {
         velocityX = finiteOrZero(x);
         velocityY = finiteOrZero(y);
@@ -173,6 +186,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.velocityZ = velocityZ;
         clone.nextJumpAtMs = nextJumpAtMs;
         clone.nextBoostAtMs = nextBoostAtMs;
+        clone.clientFlyingSynced = clientFlyingSynced;
         return clone;
     }
 

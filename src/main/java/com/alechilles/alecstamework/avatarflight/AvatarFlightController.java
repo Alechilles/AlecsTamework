@@ -10,7 +10,6 @@ public final class AvatarFlightController {
     private static final double MIN_FORWARD_FOR_BRAKE = 0.15;
     private static final double MIN_FORWARD_FOR_PITCH_TRADE = 0.5;
     private static final double HORIZONTAL_IDLE_SPEED = 0.25;
-    private static final double MAX_VISUAL_PITCH_RADIANS = Math.toRadians(35.0);
     private static final double MAX_PHYSICAL_PITCH_UP_RADIANS = Math.toRadians(60.0);
     private static final double MAX_VISUAL_ROLL_RADIANS = Math.toRadians(20.0);
     private static final double PITCH_UP_FORWARD_DRAG_MULTIPLIER = 4.0;
@@ -133,8 +132,15 @@ public final class AvatarFlightController {
         double horizontalSpeed = Math.sqrt(x * x + z * z);
         boolean horizontalIdle = horizontalSpeed < HORIZONTAL_IDLE_SPEED;
         boolean fastFlight = !horizontalIdle && input.sprint() && mode == AvatarFlightMode.FORWARD_FLIGHT;
-        double visualPitch = clamp(input.pitchRadians(), -MAX_VISUAL_PITCH_RADIANS, MAX_VISUAL_PITCH_RADIANS);
-        double visualRoll = resolveVisualRoll(targetStrafeSpeed, movement.getMaxForwardSpeed());
+        double visualPitch = input.pitchRadians();
+        double visualRoll = resolveVisualRoll(
+                state.velocityX(),
+                state.velocityZ(),
+                x,
+                z,
+                targetStrafeSpeed,
+                movement.getMaxForwardSpeed()
+        );
         return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, applyVelocity, jumpApplied, boostApplied,
                 horizontalIdle, fastFlight, visualPitch, visualRoll);
     }
@@ -192,12 +198,41 @@ public final class AvatarFlightController {
         return current;
     }
 
-    private static double resolveVisualRoll(double strafeSpeed, double maxForwardSpeed) {
+    private static double resolveVisualRoll(double previousX,
+                                            double previousZ,
+                                            double nextX,
+                                            double nextZ,
+                                            double strafeSpeed,
+                                            double maxForwardSpeed) {
+        double strafeRoll = resolveStrafeRoll(strafeSpeed, maxForwardSpeed);
+        double turnRoll = resolveTurnRoll(previousX, previousZ, nextX, nextZ);
+        return Math.abs(turnRoll) > Math.abs(strafeRoll) ? turnRoll : strafeRoll;
+    }
+
+    private static double resolveStrafeRoll(double strafeSpeed, double maxForwardSpeed) {
         if (maxForwardSpeed <= 0.0) {
             return 0.0;
         }
         double amount = clamp(strafeSpeed / maxForwardSpeed, -1.0, 1.0);
         return -amount * MAX_VISUAL_ROLL_RADIANS;
+    }
+
+    private static double resolveTurnRoll(double previousX, double previousZ, double nextX, double nextZ) {
+        double previousSpeed = Math.hypot(previousX, previousZ);
+        double nextSpeed = Math.hypot(nextX, nextZ);
+        if (previousSpeed < HORIZONTAL_IDLE_SPEED || nextSpeed < HORIZONTAL_IDLE_SPEED) {
+            return 0.0;
+        }
+        double normalizedPreviousX = previousX / previousSpeed;
+        double normalizedPreviousZ = previousZ / previousSpeed;
+        double normalizedNextX = nextX / nextSpeed;
+        double normalizedNextZ = nextZ / nextSpeed;
+        double signedTurn = clamp(
+                normalizedPreviousX * normalizedNextZ - normalizedPreviousZ * normalizedNextX,
+                -1.0,
+                1.0
+        );
+        return -signedTurn * MAX_VISUAL_ROLL_RADIANS;
     }
 
     private static double clamp(double value, double min, double max) {

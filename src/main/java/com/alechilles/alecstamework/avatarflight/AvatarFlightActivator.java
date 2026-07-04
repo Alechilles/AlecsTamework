@@ -4,7 +4,12 @@ import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.SavedMovementStates;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -59,6 +64,8 @@ public final class AvatarFlightActivator {
         if (inputType != null) {
             store.tryRemoveComponent(ref, inputType);
         }
+        restoreClientFlyingState(store, ref);
+        resetVisualPose(store, ref);
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
         boolean hadSavedModel = modelService.hasSavedModel(playerUuid);
@@ -67,6 +74,31 @@ public final class AvatarFlightActivator {
                 ? Result.ok("Avatar flight disabled" + (hadSavedModel
                 ? " and model restored." : "."))
                 : Result.fail("Avatar flight disabled, but no saved model or skin fallback was available.");
+    }
+
+    private void restoreClientFlyingState(@Nonnull Store<EntityStore> store,
+                                          @Nonnull Ref<EntityStore> ref) {
+        MovementStatesComponent component = store.getComponent(ref, MovementStatesComponent.getComponentType());
+        if (component == null || component.getMovementStates() == null) {
+            return;
+        }
+        Player.applyMovementStates(ref, new SavedMovementStates(false), component.getMovementStates(), store);
+    }
+
+    private void resetVisualPose(@Nonnull Store<EntityStore> store,
+                                 @Nonnull Ref<EntityStore> ref) {
+        TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+        if (transform != null && transform.getRotation() != null) {
+            transform.getRotation().setPitch(0.0f);
+            transform.getRotation().setRoll(0.0f);
+            store.putComponent(ref, TransformComponent.getComponentType(), transform);
+        }
+        HeadRotation headRotation = store.getComponent(ref, HeadRotation.getComponentType());
+        if (headRotation != null && headRotation.getRotation() != null) {
+            headRotation.getRotation().setPitch(0.0f);
+            headRotation.getRotation().setRoll(0.0f);
+            store.putComponent(ref, HeadRotation.getComponentType(), headRotation);
+        }
     }
 
     public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {

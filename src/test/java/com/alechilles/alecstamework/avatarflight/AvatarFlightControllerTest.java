@@ -336,9 +336,36 @@ class AvatarFlightControllerTest {
                 input(0.0, 1.0, false, false, false, false, Math.toRadians(80.0))
         );
 
-        assertEquals(Math.toRadians(35.0), output.visualPitchRadians(), 0.00001);
+        assertEquals(Math.toRadians(80.0), output.visualPitchRadians(), 0.00001);
         assertTrue(Math.abs(output.visualRollRadians()) > 0.0);
         assertTrue(Math.abs(output.visualRollRadians()) <= Math.toRadians(20.0));
+    }
+
+    @Test
+    void yawTurnBanksModelEvenWithoutStrafeInput() {
+        AvatarFlightController.Output rightTurn = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
+                new AvatarFlightController.Input(1.0, 0.0, 0.0, false, false, false,
+                        false, false, Math.toRadians(-90.0), 0.0),
+                CONFIG,
+                0.1,
+                1000L
+        );
+        AvatarFlightController.Output leftTurn = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
+                new AvatarFlightController.Input(1.0, 0.0, 0.0, false, false, false,
+                        false, false, Math.toRadians(90.0), 0.0),
+                CONFIG,
+                0.1,
+                1000L
+        );
+
+        assertTrue(Math.abs(rightTurn.visualRollRadians()) > 0.0,
+                "turning right relative to current trajectory should bank the transformed model");
+        assertTrue(Math.abs(leftTurn.visualRollRadians()) > 0.0,
+                "turning left relative to current trajectory should bank the transformed model");
+        assertTrue(Math.signum(rightTurn.visualRollRadians()) != Math.signum(leftTurn.visualRollRadians()),
+                "left and right turns should bank in opposite directions");
     }
 
     @Test

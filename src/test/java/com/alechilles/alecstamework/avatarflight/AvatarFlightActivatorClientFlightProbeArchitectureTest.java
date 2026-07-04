@@ -39,6 +39,17 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     }
 
     @Test
+    void disablingAvatarFlightResetsVisualPoseAndSavedFlyingState() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String disableBody = methodBody(source, "public Result disable", "public void onPlayerDisconnect");
+
+        assertTrue(disableBody.contains("restoreClientFlyingState(store, ref)"),
+                "disable must send the owner client back to non-flying animation state");
+        assertTrue(disableBody.contains("resetVisualPose(store, ref)"),
+                "disable must clear any pitch/roll left on the transformed player pose");
+    }
+
+    @Test
     void disconnectCleanupDoesNotTouchThreadBoundPlayerComponents() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
         String disconnectBody = source.substring(source.indexOf("public void onPlayerDisconnect"));
