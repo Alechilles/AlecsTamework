@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.config.overrides;
 
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
+import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -31,6 +32,7 @@ public enum TwConfigFamily {
     GLOBAL("global", "Global", "Tamework/Global", true, true),
     COMPANION("companion", "Companion", "Tamework/Companion", true, true),
     INTERACTION("interaction", "Interaction", "Tamework/Interactions", true, true),
+    AVATAR_FLIGHT("avatar-flight", "Avatar Flight", "Tamework/AvatarFlight", true, true),
     SPAWNER("spawner", "Spawner Items", "Tamework/Items/Spawners", true, true),
     NAME_ITEM("name-item", "Name Items", "Tamework/Items/Naming", true, true),
     NAMES("names", "Names", "Tamework/Names", true, true),
@@ -128,6 +130,7 @@ public enum TwConfigFamily {
             case GLOBAL -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwGlobalConfig.getAssetStore();
             case COMPANION -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwCompanionConfig.getAssetStore();
             case INTERACTION -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwInteractionConfig.getAssetStore();
+            case AVATAR_FLIGHT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAvatarFlightConfig.getAssetStore();
             case SPAWNER -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwSpawnerConfig.getAssetStore();
             case NAME_ITEM -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwNameItemConfig.getAssetStore();
             case NAMES -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwNamesConfig.getAssetStore();

@@ -4,6 +4,7 @@ public enum TameworkConfigFamily {
     GLOBAL,
     INTERACTION,
     MOUNTED_GLIDE,
+    AVATAR_FLIGHT,
     COMPANION,
     SPAWNER,
     NAME_ITEM,

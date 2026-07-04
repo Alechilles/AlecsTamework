@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.overrides.TwConfigAssetDescriptor;
 import com.alechilles.alecstamework.config.overrides.TwConfigFamily;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
+import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -140,6 +141,7 @@ final class TwConfigSchemaAdapter {
             case GLOBAL -> TwGlobalConfig.CODEC;
             case COMPANION -> TwCompanionConfig.CODEC;
             case INTERACTION -> TwInteractionConfig.CODEC;
+            case AVATAR_FLIGHT -> TwAvatarFlightConfig.CODEC;
             case SPAWNER -> TwSpawnerConfig.CODEC;
             case NAME_ITEM -> TwNameItemConfig.CODEC;
             case NAMES -> TwNamesConfig.CODEC;

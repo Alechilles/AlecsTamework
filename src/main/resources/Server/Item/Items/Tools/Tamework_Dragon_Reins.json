@@ -1,0 +1,46 @@
+{
+  "$Comment": "Prototype Dragon Reins item for avatar-flight mouse controls.",
+  "TranslationProperties": {
+    "Name": "server.items.Tamework_Dragon_Reins.name",
+    "Description": "server.items.Tamework_Dragon_Reins.description"
+  },
+  "Quality": "Tool",
+  "PlayerAnimationsId": "Item",
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "TameworkFlightFlap"
+        }
+      ]
+    },
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "TameworkFlightAirbrake",
+          "DurationMs": 350
+        }
+      ]
+    }
+  },
+  "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
+  "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
+  "IconProperties": {
+    "Scale": 0.76,
+    "Translation": [
+      -1,
+      5
+    ],
+    "Rotation": [
+      135,
+      135,
+      0
+    ]
+  },
+  "MaxStack": 1,
+  "UsePlayerAnimations": true,
+  "Categories": [
+    "Items.Tools"
+  ]
+}

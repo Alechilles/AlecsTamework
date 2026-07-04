@@ -53,19 +53,27 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
             return;
         }
 
-        String modelId = args.length > 0 ? args[0] : DEFAULT_MODEL_ID;
-        ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(modelId);
-        if (modelAsset == null) {
+        if (args.length == 0 || !"unsafe".equals(args[0].toLowerCase(Locale.ROOT))) {
             commandContext.sender().sendMessage(Message.raw(
-                    "Model asset not found: " + modelId
-                            + ". Usage: /tw debugplayermodel [ModelId] [scale] | reset | status"
+                    "Player model debug can crash the current client when non-player models animate. "
+                            + "Use /tw debugplayermodel unsafe [ModelId] [scale] only for isolated probes."
             ));
             return;
         }
 
-        Float requestedScale = args.length > 1 ? parseScale(args[1]) : null;
-        if (args.length > 1 && requestedScale == null) {
-            commandContext.sender().sendMessage(Message.raw("Invalid scale: " + args[1]));
+        String modelId = args.length > 1 ? args[1] : DEFAULT_MODEL_ID;
+        ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(modelId);
+        if (modelAsset == null) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "Model asset not found: " + modelId
+                            + ". Usage: /tw debugplayermodel unsafe [ModelId] [scale] | reset | status"
+            ));
+            return;
+        }
+
+        Float requestedScale = args.length > 2 ? parseScale(args[2]) : null;
+        if (args.length > 2 && requestedScale == null) {
+            commandContext.sender().sendMessage(Message.raw("Invalid scale: " + args[2]));
             return;
         }
 

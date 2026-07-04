@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added an experimental transformed-player dragon flight debug prototype behind `/tw debugdragonflight`, with configurable avatar flight settings for jump lift, sprint boost, crouch descent, backward airbrake, hover damping, and pitch-based speed/altitude tradeoffs.
+- Added a creative-available Dragon Reins prototype item for transformed dragon flight controls, with left click mapped to upward flaps and right click mapped to airbraking while avatar flight is active.
+- Added `/tw debugdragonflight flightprobe` for temporarily enabling non-creative client flight and player input logging while testing avatar-flight controls.
+- Avatar flight can read client flight vertical velocity during diagnostics, but the native client flight capability remains a standalone probe because it overrides custom avatar movement.
+
+### Changed
+- Avatar flight no longer swaps the player model by default; `Model.ApplyModel` can re-enable the unsafe model-swap probe while flight controls are tested separately from client renderer crashes.
+- `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
+
+### Fixed
+- Fixed avatar flight input capture so stale movement-state fallback no longer makes jump, crouch, or sprint appear held after the packet state is gone.
+- Fixed Dragon Reins airbraking so right-click takes priority over forward input, damps horizontal and vertical velocity toward hover, and avatar flight pitch trading continues while gliding on existing momentum.
+- Tuned Dragon Reins airbraking to slow down more gradually, and forced avatar flight movement states so hovering, normal flight, and shift-boost flight can use flying animations instead of fall animation.
+- Fixed avatar flight hover restart after a full Dragon Reins airbrake stop, restored obvious held-crouch descent, corrected pitch speed/altitude trading so looking down dives and looking up spends momentum, and moved animation/pose overrides later in the tick order so flying animations and dragon pitch/roll are applied after base movement states.
+- Fixed avatar flight input projection so passive glide momentum after a sharp turn no longer gets misread as held-backward input and traps the player in slow reverse flight.
+- Reworked avatar flight pitch-up handling so looking upward redirects dive momentum into a sharper climbing arc, preserving stronger forward motion while trading speed for noticeable altitude before stalling.
+
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
 ### Fixed

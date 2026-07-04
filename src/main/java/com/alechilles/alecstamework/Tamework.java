@@ -20,6 +20,10 @@ import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
 import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightActivator;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -27,6 +31,7 @@ import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
+import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -61,6 +66,8 @@ import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
+import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteraction;
+import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
@@ -241,6 +248,7 @@ public class Tamework extends JavaPlugin {
     private CrashTelemetryService crashTelemetryService;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
+    private final AvatarFlightActivator avatarFlightActivator = new AvatarFlightActivator();
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -249,6 +257,7 @@ public class Tamework extends JavaPlugin {
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private boolean mountedGlideAssetsRegistered;
+    private boolean avatarFlightAssetsRegistered;
     private boolean coopAssetsRegistered;
     private boolean foodAssetsRegistered;
     private boolean happinessAssetsRegistered;
@@ -282,6 +291,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkRideRiderComponent> rideRiderComponentType;
     private ComponentType<EntityStore, TameworkMountedGlideComponent> mountedGlideComponentType;
     private ComponentType<EntityStore, TameworkMountedGlideRiderComponent> mountedGlideRiderComponentType;
+    private ComponentType<EntityStore, AvatarFlightComponent> avatarFlightComponentType;
+    private ComponentType<EntityStore, AvatarFlightInputComponent> avatarFlightInputComponentType;
     private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
@@ -409,6 +420,17 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class, TameworkNameNpcInteraction.CODEC);
         // Register the custom item interaction used by command items.
         Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class, TameworkCommandInteraction.CODEC);
+        // Register the custom item interactions used by Dragon Reins flight controls.
+        Interaction.CODEC.register(
+                "TameworkFlightFlap",
+                TameworkFlightFlapInteraction.class,
+                TameworkFlightFlapInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                "TameworkFlightAirbrake",
+                TameworkFlightAirbrakeInteraction.class,
+                TameworkFlightAirbrakeInteraction.CODEC
+        );
         // Register the custom block interaction used to empty water trough states.
         Interaction.CODEC.register(
                 "TameworkClearFeedTroughWater",
@@ -431,6 +453,7 @@ public class Tamework extends JavaPlugin {
         registerCommandItemAssets();
         registerInteractionAssets();
         registerMountedGlideAssets();
+        registerAvatarFlightAssets();
         registerFoodAssets();
         registerHappinessAssets();
         registerNeedsAssets();
@@ -542,6 +565,18 @@ public class Tamework extends JavaPlugin {
                 TameworkMountedGlideRiderComponent.CODEC
         );
 
+        avatarFlightComponentType = getEntityStoreRegistry().registerComponent(
+                AvatarFlightComponent.class,
+                "TameworkAvatarFlight",
+                AvatarFlightComponent.CODEC
+        );
+
+        avatarFlightInputComponentType = getEntityStoreRegistry().registerComponent(
+                AvatarFlightInputComponent.class,
+                "TameworkAvatarFlightInput",
+                AvatarFlightInputComponent.CODEC
+        );
+
         levelingComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkLevelingComponent.class,
                 "TameworkLeveling",
@@ -620,6 +655,16 @@ public class Tamework extends JavaPlugin {
                         TransformComponent.getComponentType(),
                         Velocity.getComponentType(),
                         ModelComponent.getComponentType()
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightMovementSystem(
+                        avatarFlightComponentType,
+                        avatarFlightInputComponentType,
+                        Velocity.getComponentType(),
+                        MovementStatesComponent.getComponentType(),
+                        HeadRotation.getComponentType(),
+                        TransformComponent.getComponentType()
                 )
         );
         ComponentType<EntityStore, NPCMountComponent> npcMountComponentType = resolveNpcMountComponentTypeOrNull();
@@ -965,6 +1010,12 @@ public class Tamework extends JavaPlugin {
                 PlayerDisconnectEvent.class,
                 ownerPresenceTimelineService::onPlayerDisconnect,
                 "owner presence disconnect tracking"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PlayerDisconnectEvent.class,
+                avatarFlightActivator::onPlayerDisconnect,
+                "avatar flight disconnect cleanup"
         );
         if (settingsAnnouncementService != null) {
             TameworkEventRegistrationSupport.registerGlobal(
@@ -1694,6 +1745,22 @@ public class Tamework extends JavaPlugin {
         mountedGlideAssetsRegistered = true;
     }
 
+    private void registerAvatarFlightAssets() {
+        if (avatarFlightAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwAvatarFlightConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/AvatarFlight")
+                        .setCodec(TwAvatarFlightConfig.CODEC)
+                        .setKeyFunction(TwAvatarFlightConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwAvatarFlightConfig.class, this::onAvatarFlightAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwAvatarFlightConfig.class, this::onAvatarFlightAssetsRemoved);
+        avatarFlightAssetsRegistered = true;
+    }
+
     private void registerCoopAssets() {
         if (coopAssetsRegistered) {
             return;
@@ -2096,6 +2163,20 @@ public class Tamework extends JavaPlugin {
         emitExperimentalConfigReload(TameworkConfigFamily.MOUNTED_GLIDE, event.getRemovedAssets());
     }
 
+    private void onAvatarFlightAssetsLoaded(
+            LoadedAssetsEvent<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> event) {
+        TwAvatarFlightConfig.clearCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.AVATAR_FLIGHT, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onAvatarFlightAssetsRemoved(
+            RemovedAssetsEvent<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> event) {
+        TwAvatarFlightConfig.clearCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.AVATAR_FLIGHT, event.getRemovedAssets());
+    }
+
     private void emitExperimentalConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Iterable<String> changedIds) {
         if (apiEventBus == null || changedIds == null) {
             return;
@@ -2423,6 +2504,14 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkMountedGlideRiderComponent> getMountedGlideRiderComponentType() {
         return mountedGlideRiderComponentType;
+    }
+
+    public ComponentType<EntityStore, AvatarFlightComponent> getAvatarFlightComponentType() {
+        return avatarFlightComponentType;
+    }
+
+    public ComponentType<EntityStore, AvatarFlightInputComponent> getAvatarFlightInputComponentType() {
+        return avatarFlightInputComponentType;
     }
 
     public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {

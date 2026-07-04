@@ -1,0 +1,41 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "Model": {
+    "ApplyModel": false,
+    "ModelId": "NordicDrake",
+    "Scale": 1.0
+  },
+  "Input": {
+    "IntentTimeoutMs": 750.0,
+    "ForwardDeadzone": 0.25,
+    "StrafeDeadzone": 0.25
+  },
+  "Movement": {
+    "MaxForwardSpeed": 14.0,
+    "ForwardAcceleration": 18.0,
+    "MaxBackwardSpeed": 3.0,
+    "BackwardAcceleration": 8.0,
+    "AirbrakeDeceleration": 18.0,
+    "HoverHorizontalDamping": 10.0,
+    "HoverVerticalDamping": 8.0,
+    "DescendSpeed": 7.0,
+    "MaxFallSpeed": 14.0,
+    "PitchUpLiftScale": 5.0,
+    "PitchUpSpeedCost": 3.0,
+    "PitchDownDiveScale": 5.0,
+    "PitchDownSpeedGain": 8.0
+  },
+  "Jump": {
+    "UpwardImpulse": 7.0,
+    "CooldownSeconds": 0.75
+  },
+  "Boost": {
+    "ForwardImpulse": 7.0,
+    "CooldownSeconds": 1.0
+  },
+  "Debug": {
+    "LogControllerTicks": true,
+    "LogInputTransitions": false
+  }
+}

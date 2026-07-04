@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.network;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightPacketInputCapture;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideRiderComponent;
@@ -65,6 +66,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     private Consumer<ToServerPacket> clientMovementDelegate;
     private Consumer<ToServerPacket> mountMovementDelegate;
     private Consumer<ToServerPacket> mouseInteractionDelegate;
+    private final AvatarFlightPacketInputCapture avatarFlightPacketInputCapture = new AvatarFlightPacketInputCapture();
     private final MountedGlidePacketInputCapture glidePacketInputCapture = new MountedGlidePacketInputCapture();
     private long lastClientMovementDebugMs;
     private long lastMountMovementDebugMs;
@@ -121,6 +123,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
 
     private void handleClientMovement(@Nonnull ClientMovement packet) {
         PlayerInputDebugProbe.logClientMovement(packetHandler.getPlayerRef(), packet);
+        avatarFlightPacketInputCapture.capture(packet, packetHandler);
         glidePacketInputCapture.capture(packet, packetHandler);
         if (!tryHandleTameworkClientMovement(packet)) {
             delegate(clientMovementDelegate, packet);

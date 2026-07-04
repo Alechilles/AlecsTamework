@@ -1,0 +1,566 @@
+package com.alechilles.alecstamework.config.assets;
+
+import com.hypixel.hytale.assetstore.AssetExtraInfo;
+import com.hypixel.hytale.assetstore.AssetRegistry;
+import com.hypixel.hytale.assetstore.AssetStore;
+import com.hypixel.hytale.assetstore.codec.AssetBuilderCodec;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
+import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
+import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.KeyedCodec;
+import com.hypixel.hytale.codec.builder.BuilderCodec;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * Asset-backed tuning for transformed-player avatar flight.
+ *
+ * <p>Stored under {@code Server/Tamework/AvatarFlight}.
+ */
+public final class TwAvatarFlightConfig implements
+        JsonAssetWithMap<String, DefaultAssetMap<String, TwAvatarFlightConfig>>,
+        TwParentFallbackAsset<TwAvatarFlightConfig> {
+    private static final String DEFAULT_MODEL_ID = "NordicDrake";
+
+    private static final BuilderCodec<ModelSettings> MODEL_CODEC = BuilderCodec.builder(
+            ModelSettings.class,
+            ModelSettings::new
+    )
+            .<Boolean>append(new KeyedCodec<>("ApplyModel", Codec.BOOLEAN),
+                    (settings, value) -> settings.applyModel = value != null && value,
+                    settings -> settings.applyModel)
+            .documentation("Whether to replace the player's ModelComponent while avatar flight is active. Disabled by default because non-player models can crash the current client during movement. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("ModelId", Codec.STRING),
+                    (settings, value) -> settings.modelId = stringOrDefault(value, DEFAULT_MODEL_ID),
+                    settings -> settings.modelId)
+            .documentation("Model used when ApplyModel is enabled. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("Scale", Codec.DOUBLE),
+                    (settings, value) -> settings.scale = positiveOrDefault(value, 1.0),
+                    settings -> settings.scale)
+            .documentation("Requested model scale before model-asset min/max clamping. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
+    private static final BuilderCodec<InputSettings> INPUT_CODEC = BuilderCodec.builder(
+            InputSettings.class,
+            InputSettings::new
+    )
+            .<Double>append(new KeyedCodec<>("IntentTimeoutMs", Codec.DOUBLE),
+                    (settings, value) -> settings.intentTimeoutMs = positiveOrDefault(value, 250.0),
+                    settings -> settings.intentTimeoutMs)
+            .documentation("Milliseconds before packet-derived movement intent decays to neutral. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("ForwardDeadzone", Codec.DOUBLE),
+                    (settings, value) -> settings.forwardDeadzone = clamp01(value, 0.25),
+                    settings -> settings.forwardDeadzone)
+            .documentation("Absolute forward-axis threshold for W/S intent. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("StrafeDeadzone", Codec.DOUBLE),
+                    (settings, value) -> settings.strafeDeadzone = clamp01(value, 0.25),
+                    settings -> settings.strafeDeadzone)
+            .documentation("Absolute strafe-axis threshold for future A/D tuning. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
+    private static final BuilderCodec<MovementSettings> MOVEMENT_CODEC = BuilderCodec.builder(
+            MovementSettings.class,
+            MovementSettings::new
+    )
+            .<Double>append(new KeyedCodec<>("MaxForwardSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.maxForwardSpeed = positiveOrDefault(value, 14.0),
+                    settings -> settings.maxForwardSpeed)
+            .documentation("Maximum forward flight speed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("ForwardAcceleration", Codec.DOUBLE),
+                    (settings, value) -> settings.forwardAcceleration = nonNegativeOrDefault(value, 18.0),
+                    settings -> settings.forwardAcceleration)
+            .documentation("Forward acceleration while W intent is active. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("MaxBackwardSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.maxBackwardSpeed = positiveOrDefault(value, 3.0),
+                    settings -> settings.maxBackwardSpeed)
+            .documentation("Maximum reverse hover speed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("BackwardAcceleration", Codec.DOUBLE),
+                    (settings, value) -> settings.backwardAcceleration = nonNegativeOrDefault(value, 8.0),
+                    settings -> settings.backwardAcceleration)
+            .documentation("Reverse acceleration once S is no longer braking forward speed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("AirbrakeDeceleration", Codec.DOUBLE),
+                    (settings, value) -> settings.airbrakeDeceleration = nonNegativeOrDefault(value, 18.0),
+                    settings -> settings.airbrakeDeceleration)
+            .documentation("Forward-speed loss per second while S is braking. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("HoverHorizontalDamping", Codec.DOUBLE),
+                    (settings, value) -> settings.hoverHorizontalDamping = nonNegativeOrDefault(value, 10.0),
+                    settings -> settings.hoverHorizontalDamping)
+            .documentation("Horizontal speed damping while airborne with no forward/back intent. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("HoverVerticalDamping", Codec.DOUBLE),
+                    (settings, value) -> settings.hoverVerticalDamping = nonNegativeOrDefault(value, 8.0),
+                    settings -> settings.hoverVerticalDamping)
+            .documentation("Vertical speed damping while hovering. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("DescendSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.descendSpeed = positiveOrDefault(value, 7.0),
+                    settings -> settings.descendSpeed)
+            .documentation("Direct downward speed while crouch is held. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("MaxFallSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.maxFallSpeed = positiveOrDefault(value, 14.0),
+                    settings -> settings.maxFallSpeed)
+            .documentation("Downward velocity clamp. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("PitchUpLiftScale", Codec.DOUBLE),
+                    (settings, value) -> settings.pitchUpLiftScale = nonNegativeOrDefault(value, 5.0),
+                    settings -> settings.pitchUpLiftScale)
+            .documentation("Lift generated by pitching up while moving forward. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("PitchUpSpeedCost", Codec.DOUBLE),
+                    (settings, value) -> settings.pitchUpSpeedCost = nonNegativeOrDefault(value, 3.0),
+                    settings -> settings.pitchUpSpeedCost)
+            .documentation("Forward speed spent by pitching up. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("PitchDownDiveScale", Codec.DOUBLE),
+                    (settings, value) -> settings.pitchDownDiveScale = nonNegativeOrDefault(value, 5.0),
+                    settings -> settings.pitchDownDiveScale)
+            .documentation("Downward speed generated by pitching down. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("PitchDownSpeedGain", Codec.DOUBLE),
+                    (settings, value) -> settings.pitchDownSpeedGain = nonNegativeOrDefault(value, 8.0),
+                    settings -> settings.pitchDownSpeedGain)
+            .documentation("Forward speed gained from pitching down. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
+    private static final BuilderCodec<JumpSettings> JUMP_CODEC = BuilderCodec.builder(
+            JumpSettings.class,
+            JumpSettings::new
+    )
+            .<Double>append(new KeyedCodec<>("UpwardImpulse", Codec.DOUBLE),
+                    (settings, value) -> settings.upwardImpulse = nonNegativeOrDefault(value, 7.0),
+                    settings -> settings.upwardImpulse)
+            .documentation("Vertical impulse applied by jump/flap. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("CooldownSeconds", Codec.DOUBLE),
+                    (settings, value) -> settings.cooldownSeconds = positiveOrDefault(value, 0.75),
+                    settings -> settings.cooldownSeconds)
+            .documentation("Seconds between jump/flap impulses, including held jump repeats. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
+    private static final BuilderCodec<BoostSettings> BOOST_CODEC = BuilderCodec.builder(
+            BoostSettings.class,
+            BoostSettings::new
+    )
+            .<Double>append(new KeyedCodec<>("ForwardImpulse", Codec.DOUBLE),
+                    (settings, value) -> settings.forwardImpulse = nonNegativeOrDefault(value, 7.0),
+                    settings -> settings.forwardImpulse)
+            .documentation("Forward velocity impulse applied by sprint/shift. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("CooldownSeconds", Codec.DOUBLE),
+                    (settings, value) -> settings.cooldownSeconds = positiveOrDefault(value, 1.0),
+                    settings -> settings.cooldownSeconds)
+            .documentation("Seconds between sprint/shift boosts. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
+    private static final BuilderCodec<DebugSettings> DEBUG_CODEC = BuilderCodec.builder(
+            DebugSettings.class,
+            DebugSettings::new
+    )
+            .<Boolean>append(new KeyedCodec<>("LogControllerTicks", Codec.BOOLEAN),
+                    (settings, value) -> settings.logControllerTicks = value != null && value,
+                    settings -> settings.logControllerTicks)
+            .documentation("Verbose throttled controller diagnostics. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("LogInputTransitions", Codec.BOOLEAN),
+                    (settings, value) -> settings.logInputTransitions = value != null && value,
+                    settings -> settings.logInputTransitions)
+            .documentation("Logs meaningful input state transitions. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
+    public static final AssetBuilderCodec<String, TwAvatarFlightConfig> CODEC = AssetBuilderCodec.builder(
+            TwAvatarFlightConfig.class,
+            TwAvatarFlightConfig::new,
+            Codec.STRING,
+            (asset, id) -> asset.id = id,
+            asset -> asset.id,
+            (asset, data) -> asset.data = data,
+            asset -> asset.data
+    )
+            .documentation("Transformed-player avatar flight tuning.")
+            .<Boolean>append(new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (asset, value) -> asset.enabled = value == null || value,
+                    asset -> asset.enabled)
+            .documentation("Enables this avatar-flight profile.")
+            .add()
+            .<Integer>append(new KeyedCodec<>("Priority", Codec.INTEGER),
+                    (asset, value) -> asset.priority = value == null ? 0 : value,
+                    asset -> asset.priority)
+            .documentation("Priority used when no explicit config id is requested; higher values win.")
+            .add()
+            .<ModelSettings>append(new KeyedCodec<>("Model", MODEL_CODEC),
+                    (asset, value) -> asset.model = value == null ? new ModelSettings() : value,
+                    asset -> asset.model)
+            .documentation("Avatar model settings. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
+            .<InputSettings>append(new KeyedCodec<>("Input", INPUT_CODEC),
+                    (asset, value) -> asset.input = value == null ? new InputSettings() : value,
+                    asset -> asset.input)
+            .documentation("Packet-derived input interpretation. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
+            .<MovementSettings>append(new KeyedCodec<>("Movement", MOVEMENT_CODEC),
+                    (asset, value) -> asset.movement = value == null ? new MovementSettings() : value,
+                    asset -> asset.movement)
+            .documentation("Avatar flight movement values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
+            .<JumpSettings>append(new KeyedCodec<>("Jump", JUMP_CODEC),
+                    (asset, value) -> asset.jump = value == null ? new JumpSettings() : value,
+                    asset -> asset.jump)
+            .documentation("Cooldown-gated upward jump/flap values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
+            .<BoostSettings>append(new KeyedCodec<>("Boost", BOOST_CODEC),
+                    (asset, value) -> asset.boost = value == null ? new BoostSettings() : value,
+                    asset -> asset.boost)
+            .documentation("Sprint/shift forward boost values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
+            .<DebugSettings>append(new KeyedCodec<>("Debug", DEBUG_CODEC),
+                    (asset, value) -> asset.debug = value == null ? new DebugSettings() : value,
+                    asset -> asset.debug)
+            .documentation("Avatar-flight diagnostics. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
+            .build();
+
+    private static AssetStore<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> ASSET_STORE;
+    private static final Object CACHE_LOCK = new Object();
+    private static volatile boolean CACHE_DIRTY = true;
+    private static volatile TwAvatarFlightConfig ACTIVE_CONFIG;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
+
+    private AssetExtraInfo.Data data;
+    private String id;
+    private boolean enabled = true;
+    private int priority;
+    private ModelSettings model = new ModelSettings();
+    private InputSettings input = new InputSettings();
+    private MovementSettings movement = new MovementSettings();
+    private JumpSettings jump = new JumpSettings();
+    private BoostSettings boost = new BoostSettings();
+    private DebugSettings debug = new DebugSettings();
+
+    protected TwAvatarFlightConfig() {
+    }
+
+    @Nullable
+    public static AssetStore<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> getAssetStore() {
+        if (ASSET_STORE == null) {
+            ASSET_STORE = AssetRegistry.getAssetStore(TwAvatarFlightConfig.class);
+        }
+        return ASSET_STORE;
+    }
+
+    @Nullable
+    public static DefaultAssetMap<String, TwAvatarFlightConfig> getAssetMap() {
+        AssetStore<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> store = getAssetStore();
+        if (store == null) {
+            return null;
+        }
+        DefaultAssetMap<String, TwAvatarFlightConfig> assetMap =
+                (DefaultAssetMap<String, TwAvatarFlightConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
+    }
+
+    public static void clearCache() {
+        CACHE_DIRTY = true;
+        INHERITANCE_CACHE_DIRTY = true;
+    }
+
+    @Nonnull
+    public static TwAvatarFlightConfig resolveActive() {
+        DefaultAssetMap<String, TwAvatarFlightConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return defaultConfig();
+        }
+        TwAvatarFlightConfig cached = ACTIVE_CONFIG;
+        if (CACHE_DIRTY || cached == null) {
+            synchronized (CACHE_LOCK) {
+                if (CACHE_DIRTY || ACTIVE_CONFIG == null) {
+                    ACTIVE_CONFIG = selectBest(assetMap.getAssetMap().values());
+                    CACHE_DIRTY = false;
+                }
+                cached = ACTIVE_CONFIG;
+            }
+        }
+        return cached == null ? defaultConfig() : cached;
+    }
+
+    @Nonnull
+    public static TwAvatarFlightConfig resolve(@Nullable String configId) {
+        if (configId == null || configId.isBlank()) {
+            return resolveActive();
+        }
+        DefaultAssetMap<String, TwAvatarFlightConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return defaultConfig();
+        }
+        TwAvatarFlightConfig direct = assetMap.getAssetMap().get(configId);
+        if (direct != null && direct.isEnabled()) {
+            return direct;
+        }
+        for (TwAvatarFlightConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate != null && candidate.isEnabled()
+                    && candidate.getId() != null && candidate.getId().equalsIgnoreCase(configId.trim())) {
+                return candidate;
+            }
+        }
+        return resolveActive();
+    }
+
+    @Nonnull
+    public static TwAvatarFlightConfig defaultConfig() {
+        return new TwAvatarFlightConfig();
+    }
+
+    @Nullable
+    private static TwAvatarFlightConfig selectBest(@Nullable Iterable<TwAvatarFlightConfig> candidates) {
+        TwAvatarFlightConfig best = null;
+        if (candidates == null) {
+            return null;
+        }
+        for (TwAvatarFlightConfig candidate : candidates) {
+            if (candidate == null || !candidate.isEnabled()) {
+                continue;
+            }
+            if (best == null || candidate.getPriority() > best.getPriority()
+                    || (candidate.getPriority() == best.getPriority()
+                    && safe(candidate.getId()).compareToIgnoreCase(safe(best.getId())) < 0)) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private static void ensureInheritanceFallbackApplied(
+            @Nullable DefaultAssetMap<String, TwAvatarFlightConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwAvatarFlightConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwAvatarFlightConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
+        if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
+        inheritOrCopyModel(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Model"), explicitTopLevelKeys);
+        inheritOrCopyInput(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Input"), explicitTopLevelKeys);
+        inheritOrCopyMovement(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Movement"), explicitTopLevelKeys);
+        inheritOrCopyJump(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Jump"), explicitTopLevelKeys);
+        inheritOrCopyBoost(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Boost"), explicitTopLevelKeys);
+        inheritOrCopyDebug(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Debug"), explicitTopLevelKeys);
+    }
+
+    private void inheritOrCopyModel(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Model")) model = parent.model;
+        else if (keys != null && model != null && parent.model != null) {
+            if (!keys.contains("ApplyModel")) model.applyModel = parent.model.applyModel;
+            if (!keys.contains("ModelId")) model.modelId = parent.model.modelId;
+            if (!keys.contains("Scale")) model.scale = parent.model.scale;
+        }
+    }
+
+    private void inheritOrCopyInput(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Input")) input = parent.input;
+        else if (keys != null && input != null && parent.input != null) {
+            if (!keys.contains("IntentTimeoutMs")) input.intentTimeoutMs = parent.input.intentTimeoutMs;
+            if (!keys.contains("ForwardDeadzone")) input.forwardDeadzone = parent.input.forwardDeadzone;
+            if (!keys.contains("StrafeDeadzone")) input.strafeDeadzone = parent.input.strafeDeadzone;
+        }
+    }
+
+    private void inheritOrCopyMovement(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Movement")) movement = parent.movement;
+        else if (keys != null && movement != null && parent.movement != null) {
+            if (!keys.contains("MaxForwardSpeed")) movement.maxForwardSpeed = parent.movement.maxForwardSpeed;
+            if (!keys.contains("ForwardAcceleration")) movement.forwardAcceleration = parent.movement.forwardAcceleration;
+            if (!keys.contains("MaxBackwardSpeed")) movement.maxBackwardSpeed = parent.movement.maxBackwardSpeed;
+            if (!keys.contains("BackwardAcceleration")) movement.backwardAcceleration = parent.movement.backwardAcceleration;
+            if (!keys.contains("AirbrakeDeceleration")) movement.airbrakeDeceleration = parent.movement.airbrakeDeceleration;
+            if (!keys.contains("HoverHorizontalDamping")) movement.hoverHorizontalDamping = parent.movement.hoverHorizontalDamping;
+            if (!keys.contains("HoverVerticalDamping")) movement.hoverVerticalDamping = parent.movement.hoverVerticalDamping;
+            if (!keys.contains("DescendSpeed")) movement.descendSpeed = parent.movement.descendSpeed;
+            if (!keys.contains("MaxFallSpeed")) movement.maxFallSpeed = parent.movement.maxFallSpeed;
+            if (!keys.contains("PitchUpLiftScale")) movement.pitchUpLiftScale = parent.movement.pitchUpLiftScale;
+            if (!keys.contains("PitchUpSpeedCost")) movement.pitchUpSpeedCost = parent.movement.pitchUpSpeedCost;
+            if (!keys.contains("PitchDownDiveScale")) movement.pitchDownDiveScale = parent.movement.pitchDownDiveScale;
+            if (!keys.contains("PitchDownSpeedGain")) movement.pitchDownSpeedGain = parent.movement.pitchDownSpeedGain;
+        }
+    }
+
+    private void inheritOrCopyJump(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Jump")) jump = parent.jump;
+        else if (keys != null && jump != null && parent.jump != null) {
+            if (!keys.contains("UpwardImpulse")) jump.upwardImpulse = parent.jump.upwardImpulse;
+            if (!keys.contains("CooldownSeconds")) jump.cooldownSeconds = parent.jump.cooldownSeconds;
+        }
+    }
+
+    private void inheritOrCopyBoost(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Boost")) boost = parent.boost;
+        else if (keys != null && boost != null && parent.boost != null) {
+            if (!keys.contains("ForwardImpulse")) boost.forwardImpulse = parent.boost.forwardImpulse;
+            if (!keys.contains("CooldownSeconds")) boost.cooldownSeconds = parent.boost.cooldownSeconds;
+        }
+    }
+
+    private void inheritOrCopyDebug(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Debug")) debug = parent.debug;
+        else if (keys != null && debug != null && parent.debug != null) {
+            if (!keys.contains("LogControllerTicks")) debug.logControllerTicks = parent.debug.logControllerTicks;
+            if (!keys.contains("LogInputTransitions")) debug.logInputTransitions = parent.debug.logInputTransitions;
+        }
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        return explicitNestedKeysByTopLevel == null ? null : explicitNestedKeysByTopLevel.get(topLevelKey);
+    }
+
+    public String getId() { return id; }
+    public boolean isEnabled() { return enabled; }
+    public int getPriority() { return priority; }
+    public ModelSettings getModel() { return model == null ? new ModelSettings() : model; }
+    public InputSettings getInput() { return input == null ? new InputSettings() : input; }
+    public MovementSettings getMovement() { return movement == null ? new MovementSettings() : movement; }
+    public JumpSettings getJump() { return jump == null ? new JumpSettings() : jump; }
+    public BoostSettings getBoost() { return boost == null ? new BoostSettings() : boost; }
+    public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
+
+    private static String stringOrDefault(@Nullable String value, @Nonnull String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private static double positiveOrDefault(@Nullable Double value, double fallback) {
+        return value != null && Double.isFinite(value) && value > 0.0 ? value : fallback;
+    }
+
+    private static double nonNegativeOrDefault(@Nullable Double value, double fallback) {
+        return value != null && Double.isFinite(value) && value >= 0.0 ? value : fallback;
+    }
+
+    private static double clamp01(@Nullable Double value, double fallback) {
+        double resolved = value != null && Double.isFinite(value) ? value : fallback;
+        return Math.max(0.0, Math.min(1.0, resolved));
+    }
+
+    private static String safe(@Nullable String value) {
+        return value == null ? "" : value;
+    }
+
+    public static final class ModelSettings {
+        private boolean applyModel;
+        private String modelId = DEFAULT_MODEL_ID;
+        private double scale = 1.0;
+
+        public boolean isApplyModel() { return applyModel; }
+        public String getModelId() { return modelId; }
+        public double getScale() { return scale; }
+    }
+
+    public static final class InputSettings {
+        private double intentTimeoutMs = 750.0;
+        private double forwardDeadzone = 0.25;
+        private double strafeDeadzone = 0.25;
+
+        public long getIntentTimeoutMs() { return Math.round(intentTimeoutMs); }
+        public double getForwardDeadzone() { return forwardDeadzone; }
+        public double getStrafeDeadzone() { return strafeDeadzone; }
+    }
+
+    public static final class MovementSettings {
+        private double maxForwardSpeed = 14.0;
+        private double forwardAcceleration = 18.0;
+        private double maxBackwardSpeed = 3.0;
+        private double backwardAcceleration = 8.0;
+        private double airbrakeDeceleration = 18.0;
+        private double hoverHorizontalDamping = 10.0;
+        private double hoverVerticalDamping = 8.0;
+        private double descendSpeed = 7.0;
+        private double maxFallSpeed = 14.0;
+        private double pitchUpLiftScale = 5.0;
+        private double pitchUpSpeedCost = 3.0;
+        private double pitchDownDiveScale = 5.0;
+        private double pitchDownSpeedGain = 8.0;
+
+        public double getMaxForwardSpeed() { return maxForwardSpeed; }
+        public double getForwardAcceleration() { return forwardAcceleration; }
+        public double getMaxBackwardSpeed() { return maxBackwardSpeed; }
+        public double getBackwardAcceleration() { return backwardAcceleration; }
+        public double getAirbrakeDeceleration() { return airbrakeDeceleration; }
+        public double getHoverHorizontalDamping() { return hoverHorizontalDamping; }
+        public double getHoverVerticalDamping() { return hoverVerticalDamping; }
+        public double getDescendSpeed() { return descendSpeed; }
+        public double getMaxFallSpeed() { return maxFallSpeed; }
+        public double getPitchUpLiftScale() { return pitchUpLiftScale; }
+        public double getPitchUpSpeedCost() { return pitchUpSpeedCost; }
+        public double getPitchDownDiveScale() { return pitchDownDiveScale; }
+        public double getPitchDownSpeedGain() { return pitchDownSpeedGain; }
+    }
+
+    public static final class JumpSettings {
+        private double upwardImpulse = 7.0;
+        private double cooldownSeconds = 0.75;
+
+        public double getUpwardImpulse() { return upwardImpulse; }
+        public double getCooldownSeconds() { return cooldownSeconds; }
+    }
+
+    public static final class BoostSettings {
+        private double forwardImpulse = 7.0;
+        private double cooldownSeconds = 1.0;
+
+        public double getForwardImpulse() { return forwardImpulse; }
+        public double getCooldownSeconds() { return cooldownSeconds; }
+    }
+
+    public static final class DebugSettings {
+        private boolean logControllerTicks;
+        private boolean logInputTransitions;
+
+        public boolean isLogControllerTicks() { return logControllerTicks; }
+        public boolean isLogInputTransitions() { return logInputTransitions; }
+    }
+}

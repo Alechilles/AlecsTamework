@@ -90,7 +90,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `/tw debugspawner [on|off]`
 - `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
-- `/tw debugplayermodel [ModelId] [scale] | reset | status`
+- `/tw debugplayermodel unsafe [ModelId] [scale] | reset | status`
 - `/tw debugplayerinput [on|off|status]`
 - `/tw debuglag [on|off]`
 - `/tw showspawnmarkers [radius|off]`
