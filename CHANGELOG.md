@@ -36,6 +36,7 @@
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.
 - Improved transformed avatar flight bank sensitivity so sharp turns and full lateral input can reach stronger bank poses.
+- Improved avatar-flight mount form visuals so transformed players can hide their equipped gear while showing a visual rider copy with the player's normal equipment.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
