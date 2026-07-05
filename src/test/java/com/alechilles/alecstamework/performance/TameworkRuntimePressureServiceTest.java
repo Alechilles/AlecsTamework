@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.performance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -48,5 +49,23 @@ class TameworkRuntimePressureServiceTest {
 
         assertTrue(service.scaleTtlMs(RuntimePressureDomain.NEEDS_RESOURCE_SEARCH, 1_000L, nowMs) > 1_000L);
         assertEquals(1_000L, service.scaleTtlMs(RuntimePressureDomain.NEEDS_PATH_PREFLIGHT, 1_000L, nowMs));
+    }
+
+    @Test
+    void exposesCurrentPressureLevel() {
+        TameworkRuntimePressureService service = new TameworkRuntimePressureService();
+        long nowMs = 10_000L;
+
+        assertEquals(RuntimePressureLevel.NORMAL, service.level(RuntimePressureDomain.NEEDS_RESOURCE_SEARCH, nowMs));
+
+        for (int i = 0; i < 512; i++) {
+            service.recordWork(RuntimePressureDomain.NEEDS_RESOURCE_SEARCH, 100_000L, nowMs);
+        }
+
+        assertEquals(RuntimePressureLevel.HOT, service.level(RuntimePressureDomain.NEEDS_RESOURCE_SEARCH, nowMs));
+        assertTrue(service.isAtLeast(
+                RuntimePressureDomain.NEEDS_RESOURCE_SEARCH, RuntimePressureLevel.WARM, nowMs));
+        assertFalse(service.isAtLeast(
+                RuntimePressureDomain.NEEDS_PATH_PREFLIGHT, RuntimePressureLevel.WARM, nowMs));
     }
 }

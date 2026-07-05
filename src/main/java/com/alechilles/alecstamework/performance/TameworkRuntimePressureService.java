@@ -49,35 +49,20 @@ public final class TameworkRuntimePressureService {
         return Math.max(baseTtlMs, Math.min(MAX_SCALED_TTL_MS, scaled));
     }
 
+    @Nonnull
+    public RuntimePressureLevel level(@Nonnull RuntimePressureDomain domain, long nowMs) {
+        DomainState state = states.get(domain);
+        return state != null ? state.level(nowMs) : RuntimePressureLevel.NORMAL;
+    }
+
+    public boolean isAtLeast(
+            @Nonnull RuntimePressureDomain domain, @Nonnull RuntimePressureLevel minimum, long nowMs) {
+        return level(domain, nowMs).isAtLeast(minimum);
+    }
+
     public void clearForTests() {
         for (DomainState state : states.values()) {
             state.clear();
-        }
-    }
-
-    private enum PressureLevel {
-        NORMAL(1.0),
-        WARM(1.5),
-        HOT(2.5),
-        EMERGENCY(4.0);
-
-        private final double multiplier;
-
-        PressureLevel(double multiplier) {
-            this.multiplier = multiplier;
-        }
-
-        private double multiplier() {
-            return multiplier;
-        }
-
-        @Nonnull
-        private PressureLevel decayOneStep() {
-            int index = ordinal();
-            if (index <= 0) {
-                return NORMAL;
-            }
-            return values()[index - 1];
         }
     }
 
@@ -85,7 +70,7 @@ public final class TameworkRuntimePressureService {
         private long windowStartMs = Long.MIN_VALUE;
         private long workNanos;
         private long operations;
-        private PressureLevel level = PressureLevel.NORMAL;
+        private RuntimePressureLevel level = RuntimePressureLevel.NORMAL;
 
         private synchronized void recordWork(long elapsedNanos, long nowMs) {
             rolloverIfNeeded(nowMs);
@@ -99,11 +84,17 @@ public final class TameworkRuntimePressureService {
             return level.multiplier();
         }
 
+        @Nonnull
+        private synchronized RuntimePressureLevel level(long nowMs) {
+            rolloverIfNeeded(nowMs);
+            return level;
+        }
+
         private synchronized void clear() {
             windowStartMs = Long.MIN_VALUE;
             workNanos = 0L;
             operations = 0L;
-            level = PressureLevel.NORMAL;
+            level = RuntimePressureLevel.NORMAL;
         }
 
         private void rolloverIfNeeded(long nowMs) {
@@ -121,28 +112,29 @@ public final class TameworkRuntimePressureService {
             windowStartMs = window;
             for (long i = 0L; i < skippedWindows; i++) {
                 level = level.decayOneStep();
-                if (level == PressureLevel.NORMAL) {
+                if (level == RuntimePressureLevel.NORMAL) {
                     break;
                 }
             }
         }
 
         @Nonnull
-        private static PressureLevel classify(long workNanos, long operations) {
+        private static RuntimePressureLevel classify(long workNanos, long operations) {
             if (workNanos >= EMERGENCY_NANOS_PER_WINDOW || operations >= EMERGENCY_OPERATIONS_PER_WINDOW) {
-                return PressureLevel.EMERGENCY;
+                return RuntimePressureLevel.EMERGENCY;
             }
             if (workNanos >= HOT_NANOS_PER_WINDOW || operations >= HOT_OPERATIONS_PER_WINDOW) {
-                return PressureLevel.HOT;
+                return RuntimePressureLevel.HOT;
             }
             if (workNanos >= WARM_NANOS_PER_WINDOW || operations >= WARM_OPERATIONS_PER_WINDOW) {
-                return PressureLevel.WARM;
+                return RuntimePressureLevel.WARM;
             }
-            return PressureLevel.NORMAL;
+            return RuntimePressureLevel.NORMAL;
         }
 
         @Nonnull
-        private static PressureLevel max(@Nonnull PressureLevel left, @Nonnull PressureLevel right) {
+        private static RuntimePressureLevel max(
+                @Nonnull RuntimePressureLevel left, @Nonnull RuntimePressureLevel right) {
             return left.ordinal() >= right.ordinal() ? left : right;
         }
     }
