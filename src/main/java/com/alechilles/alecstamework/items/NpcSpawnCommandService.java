@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.actions.TameClaimLimitPolicyService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -53,6 +54,7 @@ public final class NpcSpawnCommandService {
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
+    private final TameClaimLimitPolicyService tameClaimLimitPolicyService;
 
     public NpcSpawnCommandService(@Nonnull Tamework plugin) {
         this.spawnPositionService = new SpawnerSpawnPositionService(plugin.getLogger());
@@ -60,6 +62,7 @@ public final class NpcSpawnCommandService {
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
         this.npcNameResolver = new CommandNpcNameResolver();
         this.linkPolicyService = new CommandLinkPolicyService();
+        this.tameClaimLimitPolicyService = new TameClaimLimitPolicyService();
     }
 
     @Nonnull
@@ -100,6 +103,7 @@ public final class NpcSpawnCommandService {
         AttachmentResolution attachmentResolution = null;
 
         for (int index = 0; index < quantity; index++) {
+            Vector3d spawnPosition = offsetSpawnPosition(baseSpawnPosition, index);
             OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(store, ownerUuid);
             if (!decision.allowed()) {
                 OwnerMessageUtil.sendPopulationCapReached(
@@ -111,8 +115,20 @@ public final class NpcSpawnCommandService {
                 stoppedReason = "Owner population cap reached.";
                 break;
             }
+            TameClaimLimitPolicyService.TameLimitDecision claimDecision =
+                    tameClaimLimitPolicyService.evaluateForTame(store, spawnPosition);
+            if (!claimDecision.allowed()) {
+                if (claimDecision.claimCapReached()) {
+                    OwnerMessageUtil.sendClaimPopulationCapReached(
+                            player,
+                            claimDecision.currentCount(),
+                            claimDecision.effectiveCap()
+                    );
+                }
+                stoppedReason = "Claim population cap reached.";
+                break;
+            }
 
-            Vector3d spawnPosition = offsetSpawnPosition(baseSpawnPosition, index);
             Rotation3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
             Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
             if (spawned == null || spawned.first() == null || spawned.second() == null) {

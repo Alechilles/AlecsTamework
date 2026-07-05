@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.actions.TameClaimLimitPolicyService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
@@ -54,6 +55,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerNpcIdentityService npcIdentityService;
     private final SpawnerCaptureFinalizerService captureFinalizerService;
     private final SpawnerCapturePolicyService capturePolicyService;
+    private final TameClaimLimitPolicyService tameClaimLimitPolicyService;
     @Nullable
     private final CommandNpcRelocationService relocationService;
     @Nullable
@@ -95,6 +97,7 @@ public final class SpawnerFeatureHandler {
                 ownershipPolicyService,
                 npcIdentityService
         );
+        this.tameClaimLimitPolicyService = new TameClaimLimitPolicyService();
         this.coopService = coopService;
         this.relocationService = relocationService;
         this.lostService = lostService;
@@ -366,12 +369,14 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         boolean tamed = Boolean.TRUE.equals(itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TAMED, Codec.BOOLEAN));
+        Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+        if (store == null) {
+            logSpawnerFlowDebug("spawn denied reason=missing-store player=" + playerUuid);
+            return false;
+        }
         if (ownerUuid == null && config.isSpawnAssignsOwner()) {
             UUID playerId = playerUuid;
-            OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(
-                    world.getEntityStore() != null ? world.getEntityStore().getStore() : null,
-                    playerId
-            );
+            OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(store, playerId);
             if (!decision.allowed()) {
                 OwnerMessageUtil.sendPopulationCapReached(
                         player,
@@ -387,10 +392,26 @@ public final class SpawnerFeatureHandler {
                 );
                 return false;
             }
+            TameClaimLimitPolicyService.TameLimitDecision claimDecision =
+                    tameClaimLimitPolicyService.evaluateForTame(store, spawnPosition);
+            if (!claimDecision.allowed()) {
+                if (claimDecision.claimCapReached()) {
+                    OwnerMessageUtil.sendClaimPopulationCapReached(
+                            player,
+                            claimDecision.currentCount(),
+                            claimDecision.effectiveCap()
+                    );
+                }
+                logSpawnerFlowDebug(
+                        "spawn denied reason=claim-cap player=" + playerUuid
+                                + " current=" + claimDecision.currentCount()
+                                + " limit=" + claimDecision.effectiveCap()
+                );
+                return false;
+            }
             ownerUuid = playerId;
         }
 
-        Store<EntityStore> store = world.getEntityStore().getStore();
         NPCPlugin npcPlugin = NPCPlugin.get();
         if (npcPlugin == null) {
             logSpawnerFlowDebug("spawn denied reason=npc-plugin-missing player=" + playerUuid);
