@@ -96,6 +96,10 @@ public final class AvatarFlightController {
         boolean boostApplied = false;
         long nextJumpAtMs = state.nextJumpAtMs();
         long nextBoostAtMs = state.nextBoostAtMs();
+        double boostDurationSeconds = config.getBoost().getDurationSeconds();
+        long boostDurationMs = Math.round(boostDurationSeconds * 1000.0);
+        long boostCooldownMs = Math.round(config.getBoost().getCooldownSeconds() * 1000.0);
+        boolean boostActive = isBoostActive(nextBoostAtMs, boostCooldownMs, boostDurationMs, nowMs);
         if (jumpIntent && (nextJumpAtMs == 0L || nowMs >= nextJumpAtMs)) {
             vertical = Math.max(vertical, 0.0) + config.getJump().getUpwardImpulse();
             nextJumpAtMs = nowMs + Math.round(config.getJump().getCooldownSeconds() * 1000.0);
@@ -108,8 +112,19 @@ public final class AvatarFlightController {
                     Math.max(Math.max(targetForwardSpeed, currentForwardSpeed), 0.0)
                             + config.getBoost().getForwardImpulse()
             );
-            nextBoostAtMs = nowMs + Math.round(config.getBoost().getCooldownSeconds() * 1000.0);
+            nextBoostAtMs = nowMs + boostCooldownMs;
+            boostActive = true;
             boostApplied = true;
+            mode = AvatarFlightMode.FORWARD_FLIGHT;
+        }
+        if (!explicitAirbrakeIntent && boostActive) {
+            double boostSpeedLimit = movement.getMaxForwardSpeed() + config.getBoost().getForwardImpulse();
+            double boostAcceleration = config.getBoost().getForwardImpulse() / Math.max(0.001, boostDurationSeconds);
+            targetForwardSpeed = approach(
+                    Math.max(targetForwardSpeed, currentForwardSpeed),
+                    boostSpeedLimit,
+                    boostAcceleration * dt
+            );
             mode = AvatarFlightMode.FORWARD_FLIGHT;
         }
 
@@ -136,7 +151,7 @@ public final class AvatarFlightController {
                 targetStrafeSpeed,
                 movement,
                 config.getBoost(),
-                boostApplied
+                boostActive
         );
         HorizontalVelocity horizontalVelocity = capHorizontalVelocity(x, z, horizontalSpeedLimit);
         x = horizontalVelocity.x();
@@ -144,7 +159,7 @@ public final class AvatarFlightController {
         boolean applyVelocity = mode != AvatarFlightMode.GROUNDED;
         double horizontalSpeed = horizontalVelocity.speed();
         boolean horizontalIdle = horizontalSpeed < HORIZONTAL_IDLE_SPEED;
-        boolean fastFlight = !horizontalIdle && input.sprint() && mode == AvatarFlightMode.FORWARD_FLIGHT;
+        boolean fastFlight = !horizontalIdle && boostActive && mode == AvatarFlightMode.FORWARD_FLIGHT;
         double visualPitch = input.pitchRadians();
         double visualRoll = resolveVisualRoll(
                 state.velocityX(),
@@ -163,11 +178,11 @@ public final class AvatarFlightController {
                                                       double targetStrafeSpeed,
                                                       TwAvatarFlightConfig.MovementSettings movement,
                                                       TwAvatarFlightConfig.BoostSettings boost,
-                                                      boolean boostApplied) {
+                                                      boolean boostActive) {
         double configuredLimit = Math.max(movement.getMaxForwardSpeed(), movement.getMaxBackwardSpeed());
         double boostLimit = movement.getMaxForwardSpeed() + boost.getForwardImpulse();
         double intendedSpeed = Math.max(Math.abs(targetForwardSpeed), Math.abs(targetStrafeSpeed));
-        if (boostApplied) {
+        if (boostActive) {
             return Math.max(0.0, Math.min(boostLimit, Math.max(currentHorizontalSpeed, intendedSpeed)));
         }
         if (currentHorizontalSpeed > configuredLimit) {
@@ -229,6 +244,14 @@ public final class AvatarFlightController {
             return 0.0;
         }
         return Math.min(1.0, pitchRadians / Math.toRadians(70.0));
+    }
+
+    private static boolean isBoostActive(long nextBoostAtMs, long cooldownMs, long durationMs, long nowMs) {
+        if (nextBoostAtMs == 0L || cooldownMs <= 0L || durationMs <= 0L || nowMs >= nextBoostAtMs) {
+            return false;
+        }
+        long boostStartedAtMs = nextBoostAtMs - cooldownMs;
+        return nowMs - boostStartedAtMs <= durationMs;
     }
 
     private static double approach(double current, double target, double maxDelta) {

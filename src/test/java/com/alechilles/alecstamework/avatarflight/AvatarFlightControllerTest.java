@@ -424,6 +424,38 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void sprintPulseKeepsBoostActiveAfterClientClearsAirborneSprint() {
+        AvatarFlightController.Output pulse = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, -CONFIG.getMovement().getMaxForwardSpeed(), 0L, 0L),
+                input(1.0, false, false, true, false, 0.0),
+                CONFIG,
+                0.1,
+                1000L
+        );
+        AvatarFlightController.Output heldWindow = AvatarFlightController.update(
+                new AvatarFlightController.State(
+                        pulse.velocityX(),
+                        pulse.velocityY(),
+                        pulse.velocityZ(),
+                        pulse.nextJumpAtMs(),
+                        pulse.nextBoostAtMs()
+                ),
+                input(1.0, false, false, false, false, 0.0),
+                CONFIG,
+                0.1,
+                1100L
+        );
+
+        assertTrue(pulse.boostApplied());
+        assertFalse(heldWindow.boostApplied());
+        assertTrue(heldWindow.fastFlight(),
+                "one-frame airborne sprint pulses should remain visibly boosted for the configured duration");
+        assertTrue(Math.hypot(heldWindow.velocityX(), heldWindow.velocityZ())
+                        > CONFIG.getMovement().getMaxForwardSpeed(),
+                "boost window should keep accelerating above cruise even after the raw sprint flag clears");
+    }
+
+    @Test
     void boostedSpeedDecaysTowardCruiseInsteadOfHardClamping() {
         double boostedSpeed = CONFIG.getMovement().getMaxForwardSpeed() + CONFIG.getBoost().getForwardImpulse();
         AvatarFlightController.Output output = update(

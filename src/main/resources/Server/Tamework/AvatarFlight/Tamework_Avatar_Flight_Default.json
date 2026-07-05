@@ -32,7 +32,8 @@
   },
   "Boost": {
     "ForwardImpulse": 7.0,
-    "CooldownSeconds": 1.0
+    "CooldownSeconds": 1.0,
+    "DurationSeconds": 0.45
   },
   "Debug": {
     "LogControllerTicks": true,

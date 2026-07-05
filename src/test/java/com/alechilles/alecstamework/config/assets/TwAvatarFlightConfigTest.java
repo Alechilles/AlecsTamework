@@ -22,6 +22,7 @@ class TwAvatarFlightConfigTest {
         assertTrue(config.getMovement().getMaxForwardSpeed() > 0.0);
         assertEquals(18.0, config.getMovement().getAirbrakeDeceleration(), 0.00001);
         assertTrue(config.getJump().getCooldownSeconds() > 0.0);
+        assertEquals(0.45, config.getBoost().getDurationSeconds(), 0.00001);
         assertEquals("FlyIdle", config.getAnimation().getIdleAnimation());
         assertEquals("Fly", config.getAnimation().getFlightAnimation());
         assertEquals("FlyFast", config.getAnimation().getFastFlightAnimation());
@@ -98,6 +99,28 @@ class TwAvatarFlightConfigTest {
 
         assertFalse(child.getDebug().isLogControllerTicks());
         assertTrue(child.getDebug().isLogInputTransitions());
+    }
+
+    @Test
+    void explicitBoostSectionInheritsMissingDuration() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "boost", "forwardImpulse", 11.0);
+        setNestedField(parent, "boost", "cooldownSeconds", 2.0);
+        setNestedField(parent, "boost", "durationSeconds", 0.8);
+        setNestedField(child, "boost", "forwardImpulse", 5.0);
+        setNestedField(child, "boost", "cooldownSeconds", 0.5);
+        setNestedField(child, "boost", "durationSeconds", 0.2);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Boost"),
+                Map.of("Boost", Set.of("ForwardImpulse"))
+        );
+
+        assertEquals(5.0, child.getBoost().getForwardImpulse(), 0.00001);
+        assertEquals(2.0, child.getBoost().getCooldownSeconds(), 0.00001);
+        assertEquals(0.8, child.getBoost().getDurationSeconds(), 0.00001);
     }
 
     @Test

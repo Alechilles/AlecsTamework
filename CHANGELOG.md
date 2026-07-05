@@ -25,6 +25,7 @@
 - Fixed Dragon Reins sprint boost detection when client movement packets omit movement-state payloads but the current player movement state still reports sprinting.
 - Fixed avatar-flight sprint boost speed so shift can exceed normal cruise speed instead of being immediately clamped back to the regular forward cap.
 - Fixed airborne avatar-flight sprint detection by preserving and reading the live movement-state sprint flag instead of overwriting it during custom flight-state updates.
+- Fixed avatar-flight shift boosts feeling inactive when Hytale only exposes a one-frame airborne sprint pulse by keeping detected boost pulses active for a short configurable duration.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 

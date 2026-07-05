@@ -170,6 +170,11 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.cooldownSeconds)
             .documentation("Seconds between sprint/shift boosts. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Double>append(new KeyedCodec<>("DurationSeconds", Codec.DOUBLE),
+                    (settings, value) -> settings.durationSeconds = positiveOrDefault(value, 0.45),
+                    settings -> settings.durationSeconds)
+            .documentation("Seconds a detected sprint/shift pulse remains an active forward boost. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private static final BuilderCodec<AnimationSettings> ANIMATION_CODEC = BuilderCodec.builder(
@@ -478,6 +483,7 @@ public final class TwAvatarFlightConfig implements
         else if (keys != null && boost != null && parent.boost != null) {
             if (!keys.contains("ForwardImpulse")) boost.forwardImpulse = parent.boost.forwardImpulse;
             if (!keys.contains("CooldownSeconds")) boost.cooldownSeconds = parent.boost.cooldownSeconds;
+            if (!keys.contains("DurationSeconds")) boost.durationSeconds = parent.boost.durationSeconds;
         }
     }
 
@@ -600,9 +606,11 @@ public final class TwAvatarFlightConfig implements
     public static final class BoostSettings {
         private double forwardImpulse = 7.0;
         private double cooldownSeconds = 1.0;
+        private double durationSeconds = 0.45;
 
         public double getForwardImpulse() { return forwardImpulse; }
         public double getCooldownSeconds() { return cooldownSeconds; }
+        public double getDurationSeconds() { return durationSeconds; }
     }
 
     public static final class AnimationSettings {
