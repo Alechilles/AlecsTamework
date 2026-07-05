@@ -3,12 +3,14 @@
 ## Unreleased
 
 ### Added
+- Added optional QuestLines Claims support for claim-aware companion population limits, with `/tw settings` able to select Auto, SimpleClaims, QuestLinesClaims, or Off as the claim provider.
 - Added an experimental transformed-player dragon flight debug prototype behind `/tw debugdragonflight`, with configurable avatar flight settings for jump lift, sprint boost, crouch descent, backward airbrake, hover damping, and pitch-based speed/altitude tradeoffs.
 - Added a creative-available Dragon Reins prototype item for transformed dragon flight controls, with left click mapped to upward flaps and right click mapped to airbraking while avatar flight is active.
 - Added `/tw debugdragonflight flightprobe` for temporarily enabling non-creative client flight and player input logging while testing avatar-flight controls.
 - Avatar flight can read client flight vertical velocity during diagnostics, but the native client flight capability remains a standalone probe because it overrides custom avatar movement.
 
 ### Changed
+- Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.
 - Avatar flight no longer swaps the player model by default; `Model.ApplyModel` can re-enable the unsafe model-swap probe while flight controls are tested separately from client renderer crashes.
 - `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
 
