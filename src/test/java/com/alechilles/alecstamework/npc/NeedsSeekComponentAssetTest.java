@@ -173,8 +173,8 @@ class NeedsSeekComponentAssetTest {
     void needsSeekMovementLogsStateTransitionsAndTerminalBranches() {
         String content = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Needs_Seek_Resource.json");
 
-        assertEquals(13, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
-                "Needs seek movement diagnostics should cover transition, active probe, and terminal movement branches");
+        assertEquals(14, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceMovementDiagnostic\""),
+                "Needs seek movement diagnostics should cover transition, fast consume, active probe, and terminal movement branches");
         assertTrue(content.contains("\"Stage\": \"move_start\""));
         assertTrue(content.contains("\"Stage\": \"move_probe\""));
         assertTrue(content.contains("\"Stage\": \"target_lost\""));
@@ -184,6 +184,7 @@ class NeedsSeekComponentAssetTest {
         assertTrue(content.contains("\"Stage\": \"move_timeout\""));
         assertTrue(content.contains("\"Stage\": \"consume_delay_start\""));
         assertTrue(content.contains("\"Stage\": \"consume_delay_timeout\""));
+        assertTrue(content.contains("\"Stage\": \"fast_consume\""));
         assertTrue(content.contains("\"Detail\": \"strict_band\""));
         assertTrue(content.contains("\"Detail\": \"fallback_close_range\""));
         assertTrue(content.contains("\"Stage\": \"consume_repeat\""));
@@ -195,8 +196,8 @@ class NeedsSeekComponentAssetTest {
 
         assertTrue(content.contains("\"State\": \".PostConsume\""),
                 "Needs seek must inspect the need after each consume before completing");
-        assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsume\""),
-                "Strict and fallback close-range branches should remain the only consume entry points");
+        assertEquals(3, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsume\""),
+                "Fast mode, strict, and fallback close-range branches should remain the consume entry points");
         assertEquals(2, countOccurrences(content, "\"ReleaseTarget\": false"),
                 "Consume attempts must keep the active reservation while repeat checks run");
         assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsumeSucceeded\""),

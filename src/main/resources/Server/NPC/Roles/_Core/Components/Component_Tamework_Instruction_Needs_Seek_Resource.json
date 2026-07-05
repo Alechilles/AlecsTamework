@@ -754,6 +754,50 @@
             ]
           },
           {
+            "$Comment": "Fast mode: consume directly from the stored resource target.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkNeedsResourceFastMode"
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekActiveTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekReadRange"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkNeedsResourceMovementDiagnostic",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "Stage": "fast_consume",
+                "Detail": "pathing_bypassed"
+              },
+              {
+                "Type": "TameworkNeedsResourceConsume",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "FoodItemIDs": {
+                  "Compute": "NeedsSeekFoodItemIDs"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".PostConsume"
+              }
+            ]
+          },
+          {
             "$Comment": "Seek toward the stored destination.",
             "Sensor": {
               "Type": "ReadPosition",
