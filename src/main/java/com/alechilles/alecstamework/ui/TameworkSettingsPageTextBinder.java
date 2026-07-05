@@ -58,6 +58,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsPopulationLimitLabel", "tamework.ui.settings.label.populationLimit"},
             {"#TwSettingsPopulationScopeLabel", "tamework.ui.settings.label.populationScope"},
             {"#TwSettingsSimpleClaimsSectionLabel", "tamework.ui.settings.label.simpleClaims"},
+            {"#TwSettingsClaimProviderLabel", "tamework.ui.settings.label.claimProvider"},
             {"#TwSettingsSimpleClaimsEnabledLabel", "tamework.ui.settings.label.simpleClaimsEnabled"},
             {"#TwSettingsClaimLimitChunkLabel", "tamework.ui.settings.label.claimLimitChunk"},
             {"#TwSettingsClaimLimitTotalLabel", "tamework.ui.settings.label.claimLimitTotal"},
@@ -112,6 +113,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsPopulationLimitTooltip", "tamework.ui.settings.tooltip.populationLimit"},
             {"#TwSettingsPopulationScopeTooltip", "tamework.ui.settings.tooltip.populationScope"},
             {"#TwSettingsSimpleClaimsSectionTooltip", "tamework.ui.settings.tooltip.simpleClaims"},
+            {"#TwSettingsClaimProviderTooltip", "tamework.ui.settings.tooltip.claimProvider"},
             {"#TwSettingsSimpleClaimsEnabledTooltip", "tamework.ui.settings.tooltip.simpleClaimsEnabled"},
             {"#TwSettingsClaimLimitChunkTooltip", "tamework.ui.settings.tooltip.claimLimitChunk"},
             {"#TwSettingsClaimLimitTotalTooltip", "tamework.ui.settings.tooltip.claimLimitTotal"},
@@ -125,7 +127,8 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsNeedsTickPolicyModeDropdown", "tamework.ui.settings.noItems.policy"},
             {"#TwSettingsNeedsDamageModelDropdown", "tamework.ui.settings.noItems.model"},
             {"#TwSettingsNeedsDamageDualNeedRuleDropdown", "tamework.ui.settings.noItems.rule"},
-            {"#TwSettingsPopulationScopeDropdown", "tamework.ui.settings.noItems.scope"}
+            {"#TwSettingsPopulationScopeDropdown", "tamework.ui.settings.noItems.scope"},
+            {"#TwSettingsClaimProviderDropdown", "tamework.ui.settings.noItems.provider"}
     };
 
     private TameworkSettingsPageTextBinder() {

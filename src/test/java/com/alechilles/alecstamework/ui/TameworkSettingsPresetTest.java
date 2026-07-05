@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ class TameworkSettingsPresetTest {
         assertEquals(false, presetValues.talentsEnabled());
         assertEquals(TameworkSettingsPreset.SIMPLIFIED, TameworkSettingsPreset.match(presetValues));
         assertEquals(values.simpleClaimsEnabled(), presetValues.simpleClaimsEnabled());
+        assertEquals(values.simpleClaimsProvider(), presetValues.simpleClaimsProvider());
     }
 
     @Test
@@ -67,6 +69,7 @@ class TameworkSettingsPresetTest {
         return new TameworkSettingsValues(
                 12,
                 TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
+                ClaimIntegrationProvider.QUESTLINES_CLAIMS,
                 true,
                 3,
                 7,

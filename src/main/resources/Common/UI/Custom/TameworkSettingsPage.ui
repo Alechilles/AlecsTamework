@@ -1123,6 +1123,31 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
+              Label #TwSettingsClaimProviderLabel {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Claim Provider";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsClaimProviderTooltip {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "";
+                TooltipText: "Chooses which claim plugin provides claim-aware population limits.";
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsClaimProviderDropdown {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: "No provider";
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
               Label #TwSettingsSimpleClaimsEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Simple Claims Integration";

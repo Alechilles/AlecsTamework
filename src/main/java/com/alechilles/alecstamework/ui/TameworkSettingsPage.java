@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -48,6 +49,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_PRESET = "@Preset";
     private static final String KEY_POP_LIMIT = "@PopulationLimit";
     private static final String KEY_POP_SCOPE = "@PopulationScope";
+    private static final String KEY_CLAIM_PROVIDER = "@ClaimProvider";
     private static final String KEY_SIMPLE_CLAIMS_ENABLED = "@SimpleClaimsEnabled";
     private static final String KEY_CLAIM_LIMIT_CHUNK = "@ClaimLimitChunk";
     private static final String KEY_CLAIM_LIMIT_TOTAL = "@ClaimLimitTotal";
@@ -181,6 +183,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_PRESET, "#TwSettingsPresetDropdown.Value")
                 .append(KEY_POP_LIMIT, "#TwSettingsPopulationLimitInput.Value")
                 .append(KEY_POP_SCOPE, "#TwSettingsPopulationScopeDropdown.Value")
+                .append(KEY_CLAIM_PROVIDER, "#TwSettingsClaimProviderDropdown.Value")
                 .append(KEY_SIMPLE_CLAIMS_ENABLED, "#TwSettingsSimpleClaimsEnabledCheck.Value")
                 .append(KEY_CLAIM_LIMIT_CHUNK, "#TwSettingsClaimLimitChunkInput.Value")
                 .append(KEY_CLAIM_LIMIT_TOTAL, "#TwSettingsClaimLimitTotalInput.Value")
@@ -230,6 +233,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsPopulationLimitInput.Value", String.valueOf(currentValues.populationLimitPerPlayerOwnedTotal()));
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Entries", populationScopeEntries());
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Value", currentValues.populationPerPlayerLimitScope().configValue());
+        commandBuilder.set("#TwSettingsClaimProviderDropdown.Entries", claimProviderEntries());
+        commandBuilder.set("#TwSettingsClaimProviderDropdown.Value", currentValues.simpleClaimsProvider().configValue());
         commandBuilder.set("#TwSettingsSimpleClaimsEnabledCheck.Value", currentValues.simpleClaimsEnabled());
         commandBuilder.set("#TwSettingsClaimLimitChunkInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimChunk()));
         commandBuilder.set("#TwSettingsClaimLimitTotalInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimTotal()));
@@ -431,6 +436,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         }
 
         TwGlobalConfig.PerPlayerLimitScope scope = TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(payload.populationScope);
+        String providerValue = trim(payload.claimProvider);
+        if (providerValue.isBlank()) {
+            providerValue = currentValues.simpleClaimsProvider().configValue();
+        }
+        ClaimIntegrationProvider claimProvider = ClaimIntegrationProvider.fromConfigValue(providerValue);
         String tickPolicyModeValue = trim(payload.needsTickPolicyMode);
         if (tickPolicyModeValue.isBlank()) {
             tickPolicyModeValue = currentValues.needsTickPolicyMode().toConfigValue();
@@ -451,6 +461,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         TameworkSettingsValues values = new TameworkSettingsValues(
                 populationLimit,
                 scope,
+                claimProvider,
                 boolOrDefault(payload.simpleClaimsEnabled, currentValues.simpleClaimsEnabled()),
                 claimLimitChunk,
                 claimLimitTotal,
@@ -550,6 +561,27 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         );
     }
 
+    private List<DropdownEntryInfo> claimProviderEntries() {
+        return List.of(
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.auto")),
+                        ClaimIntegrationProvider.AUTO.configValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.questLinesClaims")),
+                        ClaimIntegrationProvider.QUESTLINES_CLAIMS.configValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.simpleClaims")),
+                        ClaimIntegrationProvider.SIMPLE_CLAIMS.configValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.off")),
+                        ClaimIntegrationProvider.OFF.configValue()
+                )
+        );
+    }
+
     private List<DropdownEntryInfo> needsTickPolicyModeEntries() {
         return List.of(
                 new DropdownEntryInfo(
@@ -640,6 +672,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(KEY_PRESET, Codec.STRING), (x, v) -> x.preset = v, x -> x.preset).add()
                 .<String>append(new KeyedCodec<>(KEY_POP_LIMIT, Codec.STRING), (x, v) -> x.populationLimit = v, x -> x.populationLimit).add()
                 .<String>append(new KeyedCodec<>(KEY_POP_SCOPE, Codec.STRING), (x, v) -> x.populationScope = v, x -> x.populationScope).add()
+                .<String>append(new KeyedCodec<>(KEY_CLAIM_PROVIDER, Codec.STRING), (x, v) -> x.claimProvider = v, x -> x.claimProvider).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_SIMPLE_CLAIMS_ENABLED, Codec.BOOLEAN), (x, v) -> x.simpleClaimsEnabled = v, x -> x.simpleClaimsEnabled).add()
                 .<String>append(new KeyedCodec<>(KEY_CLAIM_LIMIT_CHUNK, Codec.STRING), (x, v) -> x.claimLimitChunk = v, x -> x.claimLimitChunk).add()
                 .<String>append(new KeyedCodec<>(KEY_CLAIM_LIMIT_TOTAL, Codec.STRING), (x, v) -> x.claimLimitTotal = v, x -> x.claimLimitTotal).add()
@@ -679,6 +712,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private String preset;
         private String populationLimit;
         private String populationScope;
+        private String claimProvider;
         private Boolean simpleClaimsEnabled;
         private String claimLimitChunk;
         private String claimLimitTotal;
