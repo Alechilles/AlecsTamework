@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
  */
 public final class AvatarFlightActivator {
     private final AvatarFlightModelService modelService = new AvatarFlightModelService();
+    private final AvatarFlightRiderVisualService riderVisualService = new AvatarFlightRiderVisualService();
 
     @Nonnull
     public Result enable(@Nonnull Store<EntityStore> store,
@@ -36,10 +37,14 @@ public final class AvatarFlightActivator {
         if (applyModel && !modelService.apply(store, ref, playerUuid, config)) {
             return Result.fail("Avatar flight model asset not found: " + config.getModel().getModelId());
         }
+        if (applyModel) {
+            riderVisualService.spawn(store, ref, playerUuid, config, modelService.savedModelCopy(playerUuid));
+        }
         ComponentType<EntityStore, AvatarFlightComponent> flightType = AvatarFlightComponent.getComponentType();
         ComponentType<EntityStore, AvatarFlightInputComponent> inputType = AvatarFlightInputComponent.getComponentType();
         if (flightType == null || inputType == null) {
             if (applyModel) {
+                riderVisualService.remove(store, ref);
                 modelService.restore(store, ref, playerUuid);
             }
             return Result.fail("Avatar flight component types are not registered.");
@@ -69,6 +74,7 @@ public final class AvatarFlightActivator {
         restoreClientFlyingState(store, ref);
         resetVisualPose(store, ref);
         clearForcedAnimations(store, ref);
+        riderVisualService.remove(store, ref);
         AvatarFlightEquipmentVisualSystem.restoreCurrentEquipment(ref, store);
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
