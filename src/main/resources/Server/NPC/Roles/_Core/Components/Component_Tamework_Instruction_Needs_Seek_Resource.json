@@ -755,7 +755,6 @@
           },
           {
             "$Comment": "Fast mode: consume directly from the stored resource target.",
-            "Continue": true,
             "Sensor": {
               "Type": "And",
               "Sensors": [
@@ -789,7 +788,8 @@
                 },
                 "FoodItemIDs": {
                   "Compute": "NeedsSeekFoodItemIDs"
-                }
+                },
+                "ReleaseTarget": false
               },
               {
                 "Type": "State",

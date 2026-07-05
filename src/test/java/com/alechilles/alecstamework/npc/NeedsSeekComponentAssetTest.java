@@ -198,7 +198,7 @@ class NeedsSeekComponentAssetTest {
                 "Needs seek must inspect the need after each consume before completing");
         assertEquals(3, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsume\""),
                 "Fast mode, strict, and fallback close-range branches should remain the consume entry points");
-        assertEquals(2, countOccurrences(content, "\"ReleaseTarget\": false"),
+        assertEquals(3, countOccurrences(content, "\"ReleaseTarget\": false"),
                 "Consume attempts must keep the active reservation while repeat checks run");
         assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsumeSucceeded\""),
                 "Food and water repeat branches must only loop after a successful consume attempt");

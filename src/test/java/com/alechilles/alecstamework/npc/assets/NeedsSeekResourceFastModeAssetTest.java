@@ -21,7 +21,17 @@ class NeedsSeekResourceFastModeAssetTest {
         assertTrue(fastBranch >= 0, "Needs seek asset must include a fast consume branch.");
         assertTrue(seekBranch >= 0, "Needs seek asset must keep the accurate movement branch.");
         assertTrue(fastBranch < seekBranch, "Fast consume branch must run before movement.");
+        String fastBranchBody = asset.substring(fastBranch, seekBranch);
         assertTrue(asset.contains("\"Type\": \"TameworkNeedsResourceFastMode\""));
         assertTrue(asset.contains("\"Type\": \"TameworkNeedsResourceConsume\""));
+        assertTrue(
+                !fastBranchBody.contains("\"Continue\": true"),
+                "Fast consume branch must be terminal and must not continue into normal Seek."
+        );
+        assertTrue(
+                fastBranchBody.contains("\"Stage\": \"fast_consume\"")
+                        && fastBranchBody.contains("\"ReleaseTarget\": false"),
+                "Fast consume must preserve the active target for the shared post-consume release flow."
+        );
     }
 }
