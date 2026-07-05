@@ -2,7 +2,8 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -16,29 +17,31 @@ import org.joml.Vector3d;
 /**
  * Evaluates SimpleClaims population caps when a wild NPC is tamed into player ownership.
  */
-final class TameClaimLimitPolicyService {
+public final class TameClaimLimitPolicyService {
     private static final long WARNING_THROTTLE_MS = 60_000L;
 
-    private final SimpleClaimsBreedingBridge simpleClaimsBridge;
+    private final ClaimIntegrationBridge claimBridge;
     private final BreedingClaimLimitPolicyService claimPolicyService;
     private long nextWarningAtMs;
 
-    TameClaimLimitPolicyService() {
-        this(SimpleClaimsBreedingBridge.initialize());
+    public TameClaimLimitPolicyService() {
+        this(null);
     }
 
-    TameClaimLimitPolicyService(@Nullable SimpleClaimsBreedingBridge simpleClaimsBridge) {
-        this.simpleClaimsBridge = simpleClaimsBridge == null
-                ? SimpleClaimsBreedingBridge.initialize()
-                : simpleClaimsBridge;
-        this.claimPolicyService = new BreedingClaimLimitPolicyService(this.simpleClaimsBridge);
+    TameClaimLimitPolicyService(@Nullable ClaimIntegrationBridge claimBridge) {
+        this.claimBridge = claimBridge == null
+                ? BreedingClaimLimitPolicyService.resolveConfiguredClaimBridge()
+                : claimBridge;
+        this.claimPolicyService = new BreedingClaimLimitPolicyService(this.claimBridge);
     }
 
     @Nonnull
-    BreedingClaimLimitPolicyService.Decision evaluate(@Nullable Store<EntityStore> store,
-                                                      @Nullable Vector3d tamePosition) {
+    public BreedingClaimLimitPolicyService.Decision evaluate(@Nullable Store<EntityStore> store,
+                                                             @Nullable Vector3d tamePosition) {
         TwGlobalConfig simpleClaimsConfig = resolveSimpleClaimsConfig();
         if (!TameworkRuntimeSettings.simpleClaimsEnabled(simpleClaimsConfig.isSimpleClaimsEnabled())
+                || TameworkRuntimeSettings.simpleClaimsProvider(simpleClaimsConfig.getSimpleClaimsProvider())
+                == ClaimIntegrationProvider.OFF
                 || !hasSimpleClaimsClaimCap(simpleClaimsConfig)) {
             return BreedingClaimLimitPolicyService.Decision.allowNoPopulationChecks();
         }
@@ -51,13 +54,13 @@ final class TameClaimLimitPolicyService {
             warnFailClosed("SimpleClaims tame limit check failed: world name was missing.");
             return BreedingClaimLimitPolicyService.Decision.deny("missing-world-name");
         }
-        if (!simpleClaimsBridge.isAvailable()) {
+        if (!claimBridge.isAvailable()) {
             warnFailClosed(
-                    "SimpleClaims tame limit check failed: dependency unavailable ("
-                            + simpleClaimsBridge.getUnavailableReason()
+                    "Claim integration tame limit check failed: dependency unavailable ("
+                            + claimBridge.getUnavailableReason()
                             + ")."
             );
-            return BreedingClaimLimitPolicyService.Decision.deny("simpleclaims-unavailable");
+            return BreedingClaimLimitPolicyService.Decision.deny("claim-provider-unavailable");
         }
         BreedingClaimLimitPolicyService.ResolvedClaim resolvedClaim =
                 claimPolicyService.resolveClaim(worldName, tamePosition);
@@ -71,7 +74,7 @@ final class TameClaimLimitPolicyService {
             return BreedingClaimLimitPolicyService.Decision.deny("simpleclaims-lookup-error");
         }
         BreedingClaimLimitPolicyService.CountResult countResult =
-                claimPolicyService.countOwnedPopulationInClaim(store, worldName, resolvedClaim.key().partyId());
+                claimPolicyService.countOwnedPopulationInClaim(store, worldName, resolvedClaim.key());
         if (!countResult.success()) {
             warnFailClosed(
                     "SimpleClaims tame limit check failed: could not count claim population ("
@@ -89,6 +92,8 @@ final class TameClaimLimitPolicyService {
             @Nonnull BreedingClaimLimitPolicyService.ResolvedClaim resolvedClaim,
             int currentCount) {
         if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())
+                || TameworkRuntimeSettings.simpleClaimsProvider(globalConfig.getSimpleClaimsProvider())
+                == ClaimIntegrationProvider.OFF
                 || !hasSimpleClaimsClaimCap(globalConfig)) {
             return BreedingClaimLimitPolicyService.Decision.allowNoPopulationChecks();
         }

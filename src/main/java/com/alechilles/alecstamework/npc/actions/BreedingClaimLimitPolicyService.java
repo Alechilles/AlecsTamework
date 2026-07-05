@@ -3,6 +3,12 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProviderSelector;
+import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
+import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
+import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesClaimsBridge;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
@@ -36,17 +42,32 @@ import javax.annotation.Nullable;
 final class BreedingClaimLimitPolicyService {
     private static final long WARNING_THROTTLE_MS = 60_000L;
 
-    private final SimpleClaimsBreedingBridge simpleClaimsBridge;
+    private final ClaimIntegrationBridge claimBridge;
     private long nextWarningAtMs;
 
     BreedingClaimLimitPolicyService() {
-        this(SimpleClaimsBreedingBridge.initialize());
+        this(resolveConfiguredClaimBridge());
     }
 
-    BreedingClaimLimitPolicyService(@Nullable SimpleClaimsBreedingBridge simpleClaimsBridge) {
-        this.simpleClaimsBridge = simpleClaimsBridge == null
-                ? SimpleClaimsBreedingBridge.initialize()
-                : simpleClaimsBridge;
+    BreedingClaimLimitPolicyService(@Nullable ClaimIntegrationBridge claimBridge) {
+        this.claimBridge = claimBridge == null ? resolveConfiguredClaimBridge() : claimBridge;
+    }
+
+    @Nonnull
+    static ClaimIntegrationBridge resolveConfiguredClaimBridge() {
+        TwGlobalConfig config = TwGlobalConfig.resolveSimpleClaimsSettingsConfig();
+        if (config == null) {
+            config = TwGlobalConfig.resolveActive();
+        }
+        if (config == null) {
+            config = TwGlobalConfig.defaultConfig();
+        }
+        ClaimIntegrationProvider provider = TameworkRuntimeSettings.simpleClaimsProvider(config.getSimpleClaimsProvider());
+        return ClaimIntegrationProviderSelector.select(
+                provider,
+                QuestLinesClaimsBridge.initialize(),
+                SimpleClaimsBreedingBridge.initialize()
+        );
     }
 
     @Nonnull
@@ -67,7 +88,9 @@ final class BreedingClaimLimitPolicyService {
             simpleClaimsConfig = activeGlobalConfig;
         }
 
-        boolean simpleClaimsEnabled = TameworkRuntimeSettings.simpleClaimsEnabled(simpleClaimsConfig.isSimpleClaimsEnabled());
+        boolean simpleClaimsEnabled = TameworkRuntimeSettings.simpleClaimsEnabled(simpleClaimsConfig.isSimpleClaimsEnabled())
+                && TameworkRuntimeSettings.simpleClaimsProvider(simpleClaimsConfig.getSimpleClaimsProvider())
+                != ClaimIntegrationProvider.OFF;
         int perPlayerLimit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
                 activeGlobalConfig.getPopulationLimitPerPlayerOwnedTotal()
         );
@@ -90,13 +113,13 @@ final class BreedingClaimLimitPolicyService {
                 warnFailClosed("SimpleClaims breeding limit check failed: world name was missing.");
                 return Decision.deny("missing-world-name");
             }
-            if (!simpleClaimsBridge.isAvailable()) {
+            if (!claimBridge.isAvailable()) {
                 warnFailClosed(
-                        "SimpleClaims breeding limit check failed: dependency unavailable ("
-                                + simpleClaimsBridge.getUnavailableReason()
+                        "Claim integration breeding limit check failed: dependency unavailable ("
+                                + claimBridge.getUnavailableReason()
                                 + ")."
                 );
-                return Decision.deny("simpleclaims-unavailable");
+                return Decision.deny("claim-provider-unavailable");
             }
             ResolvedClaim resolvedClaim = resolveClaim(worldName, spawnPosition);
             if (resolvedClaim.status() == ClaimResolutionStatus.UNAVAILABLE
@@ -122,7 +145,7 @@ final class BreedingClaimLimitPolicyService {
                 CountResult countResult = countOwnedPopulationInClaim(
                         store,
                         worldName,
-                        claimReservationKey.partyId()
+                        claimReservationKey
                 );
                 if (!countResult.success()) {
                     warnFailClosed(
@@ -228,6 +251,10 @@ final class BreedingClaimLimitPolicyService {
         if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
             return Decision.allowNoPopulationChecks();
         }
+        if (TameworkRuntimeSettings.simpleClaimsProvider(globalConfig.getSimpleClaimsProvider())
+                == ClaimIntegrationProvider.OFF) {
+            return Decision.allowNoPopulationChecks();
+        }
         if (resolvedClaim.status() == ClaimResolutionStatus.UNAVAILABLE
                 || resolvedClaim.status() == ClaimResolutionStatus.ERROR) {
             return Decision.deny("simpleclaims-lookup-error");
@@ -314,6 +341,10 @@ final class BreedingClaimLimitPolicyService {
         if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
             return null;
         }
+        if (TameworkRuntimeSettings.simpleClaimsProvider(globalConfig.getSimpleClaimsProvider())
+                == ClaimIntegrationProvider.OFF) {
+            return null;
+        }
         if (resolvedClaim.status() != ClaimResolutionStatus.CLAIM_FOUND || resolvedClaim.key() == null) {
             return null;
         }
@@ -385,20 +416,19 @@ final class BreedingClaimLimitPolicyService {
         if (worldName == null || worldName.isBlank() || position == null) {
             return new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "missing-world-or-position");
         }
-        SimpleClaimsBreedingBridge.LookupResult lookup = simpleClaimsBridge.lookupSimpleClaimsClaim(worldName, position);
+        ClaimLookupResult lookup = claimBridge.lookupClaim(worldName, position);
         if (lookup == null) {
             return new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "lookup-result-null");
         }
         return switch (lookup.status()) {
             case CLAIM_FOUND -> {
-                SimpleClaimsBreedingBridge.ClaimInfo claimInfo = lookup.claimInfo();
-                if (claimInfo == null || claimInfo.partyId() == null) {
-                    yield new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "claim-info-missing");
+                if (lookup.key() == null) {
+                    yield new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "claim-key-missing");
                 }
                 yield new ResolvedClaim(
                         ClaimResolutionStatus.CLAIM_FOUND,
-                        new ClaimReservationKey(worldName, claimInfo.partyId()),
-                        Math.max(0, claimInfo.claimChunkCount()),
+                        ClaimReservationKey.fromPopulationKey(lookup.key()),
+                        Math.max(0, lookup.claimChunkCount()),
                         null
                 );
             }
@@ -411,7 +441,7 @@ final class BreedingClaimLimitPolicyService {
     @Nonnull
     CountResult countOwnedPopulationInClaim(@Nonnull Store<EntityStore> store,
                                             @Nonnull String worldName,
-                                            @Nonnull UUID claimPartyId) {
+                                            @Nonnull ClaimReservationKey targetClaim) {
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
@@ -433,7 +463,7 @@ final class BreedingClaimLimitPolicyService {
                                 transformType,
                                 ownerType,
                                 worldName,
-                                claimPartyId,
+                                targetClaim,
                                 count,
                                 failed,
                                 failureMessage,
@@ -452,7 +482,7 @@ final class BreedingClaimLimitPolicyService {
                                                   @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
                                                   @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
                                                   @Nonnull String worldName,
-                                                  @Nonnull UUID claimPartyId,
+                                                  @Nonnull ClaimReservationKey targetClaim,
                                                   @Nonnull int[] count,
                                                   @Nonnull boolean[] failed,
                                                   @Nonnull String[] failureMessage,
@@ -496,7 +526,7 @@ final class BreedingClaimLimitPolicyService {
             if (resolvedClaim.status() != ClaimResolutionStatus.CLAIM_FOUND || resolvedClaim.key() == null) {
                 continue;
             }
-            if (claimPartyId.equals(resolvedClaim.key().partyId())) {
+            if (targetClaim.equals(resolvedClaim.key())) {
                 count[0]++;
             }
         }
@@ -604,7 +634,34 @@ final class BreedingClaimLimitPolicyService {
         }
     }
 
-    record ClaimReservationKey(String worldName, UUID partyId) {
+    record ClaimReservationKey(String providerId,
+                               String worldName,
+                               String ownerType,
+                               UUID ownerId,
+                               @Nullable String claimId) {
+        ClaimReservationKey(String worldName, UUID partyId) {
+            this("simpleclaims", worldName, "PARTY", partyId, partyId == null ? null : partyId.toString());
+        }
+
+        @Nonnull
+        static ClaimReservationKey fromPopulationKey(@Nonnull ClaimPopulationKey key) {
+            return new ClaimReservationKey(
+                    key.providerId(),
+                    key.worldName(),
+                    key.ownerType(),
+                    key.ownerId(),
+                    key.claimId()
+            );
+        }
+
+        @Nonnull
+        static ClaimReservationKey simpleClaims(@Nonnull String worldName, @Nonnull UUID partyId) {
+            return fromPopulationKey(ClaimPopulationKey.simpleClaims(worldName, partyId));
+        }
+
+        UUID partyId() {
+            return ownerId;
+        }
     }
 
     record PlayerReservationKey(TwGlobalConfig.PerPlayerLimitScope scope,
