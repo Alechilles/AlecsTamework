@@ -41,6 +41,7 @@ class TameworkSettingsStoreTest {
                 false,
                 true,
                 false,
+                "AlwaysFast",
                 "OWNER_ONLINE_GRACE_THEN_DECAY",
                 48.0,
                 1.25,
@@ -84,6 +85,7 @@ class TameworkSettingsStoreTest {
         assertEquals(false, overrides.interactionRequiresOwner());
         assertEquals(true, overrides.linkingRequiresOwner());
         assertEquals(false, overrides.needsEnabled());
+        assertEquals("AlwaysFast", overrides.needsResourceMode());
         assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", overrides.needsTickPolicyMode());
         assertEquals(48.0, overrides.needsOwnerOfflineGraceHours());
         assertEquals(1.25, overrides.needsOwnerOfflineDecayMultiplier());
@@ -117,6 +119,7 @@ class TameworkSettingsStoreTest {
         assertTrue(raw.contains("\"linkingRequiresOwner\""));
         assertTrue(raw.contains("\"needs\""));
         assertTrue(raw.contains("\"enabled\""));
+        assertTrue(raw.contains("\"resourceMode\""));
         assertTrue(raw.contains("\"happiness\""));
         assertTrue(raw.contains("\"breeding\""));
         assertTrue(raw.contains("\"genderEnabled\""));
@@ -158,6 +161,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.interactionRequiresOwner());
         assertEquals(true, overrides.linkingRequiresOwner());
         assertEquals(true, overrides.needsEnabled());
+        assertEquals("Accurate", overrides.needsResourceMode());
         assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", overrides.needsTickPolicyMode());
         assertEquals(72.0, overrides.needsOwnerOfflineGraceHours());
         assertEquals(1.0, overrides.needsOwnerOfflineDecayMultiplier());
@@ -200,6 +204,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, settings.interactionRequiresOwner());
         assertEquals(true, settings.linkingRequiresOwner());
         assertEquals(true, settings.needsEnabled());
+        assertEquals("Accurate", settings.needsResourceMode());
         assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", settings.needsTickPolicyMode());
         assertEquals(72.0, settings.needsOwnerOfflineGraceHours());
         assertEquals(true, settings.needsDamageEnabled());
@@ -244,6 +249,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.interactionRequiresOwner());
         assertEquals(true, overrides.linkingRequiresOwner());
         assertEquals(true, overrides.needsEnabled());
+        assertEquals("Accurate", overrides.needsResourceMode());
         assertEquals(true, overrides.happinessEnabled());
         assertEquals(true, overrides.passiveBreedingEnabled());
         assertEquals(true, overrides.breedingGenderEnabled());
@@ -266,6 +272,62 @@ class TameworkSettingsStoreTest {
         assertNotNull(overrides);
         assertEquals(false, overrides.telemetryEnabled());
         assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+    }
+
+    @Test
+    void defaultGlobalSettingsUsesAccurateNeedsResourceMode() {
+        assertEquals("Accurate", TameworkSettingsStore.defaultGlobalSettings().needsResourceMode());
+    }
+
+    @Test
+    void saveAndLoadGlobalSettingsRoundTripsNeedsResourceModeThroughResolvedSnapshot() {
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tempDir.resolve("universe").resolve("Tamework"));
+        ResolvedTameworkSettings settings = TameworkSettingsStore.defaultGlobalSettings();
+        ResolvedTameworkSettings custom = new ResolvedTameworkSettings(
+                settings.populationLimitPerPlayerOwnedTotal(),
+                settings.populationPerPlayerLimitScope(),
+                settings.simpleClaimsEnabled(),
+                settings.simpleClaimsLimitPerClaimChunk(),
+                settings.simpleClaimsLimitPerClaimTotal(),
+                settings.simpleClaimsBreedingRequiresClaim(),
+                settings.simpleClaimsProtectTamedFromNonMembers(),
+                settings.blockOwnerDamage(),
+                settings.blockAllPlayerDamageIfOwned(),
+                settings.invulnerableIfOwned(),
+                settings.captureClearsOwner(),
+                settings.spawnSetsOwner(),
+                settings.captureRequiresOwner(),
+                settings.spawnRequiresOwner(),
+                settings.interactionRequiresOwner(),
+                settings.linkingRequiresOwner(),
+                settings.needsEnabled(),
+                "AlwaysFast",
+                settings.needsTickPolicyMode(),
+                settings.needsOwnerOfflineGraceHours(),
+                settings.needsOwnerOfflineDecayMultiplier(),
+                settings.needsDamageEnabled(),
+                settings.needsDamageModel(),
+                settings.needsDamageDualNeedRule(),
+                settings.needsStarvationDamagePerMinute(),
+                settings.needsDehydrationDamagePerMinute(),
+                settings.needsDamageLethal(),
+                settings.happinessEnabled(),
+                settings.passiveBreedingEnabled(),
+                settings.breedingRequiresHappiness(),
+                settings.breedingGenderEnabled(),
+                settings.traitsEnabled(),
+                settings.levelingEnabled(),
+                settings.talentsEnabled(),
+                settings.reviveSystemEnabled(),
+                settings.recallTeleportingEnabled(),
+                settings.telemetryEnabled(),
+                settings.telemetryBreadcrumbsEnabled()
+        );
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, custom.toSnapshot(), null));
+
+        ResolvedTameworkSettings loaded = TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals("AlwaysFast", loaded.needsResourceMode());
     }
 
     @Test

@@ -468,6 +468,7 @@ class CompanionNeedsServiceDamageTest {
                 defaults.interactionRequiresOwner(),
                 defaults.linkingRequiresOwner(),
                 enabled,
+                defaults.needsResourceMode(),
                 defaults.needsTickPolicyMode(),
                 defaults.needsOwnerOfflineGraceHours(),
                 defaults.needsOwnerOfflineDecayMultiplier(),

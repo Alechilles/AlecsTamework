@@ -126,6 +126,7 @@ class TameworkRuntimeSettingsTest {
                 defaults.interactionRequiresOwner(),
                 defaults.linkingRequiresOwner(),
                 defaults.needsEnabled(),
+                defaults.needsResourceMode(),
                 defaults.needsTickPolicyMode(),
                 defaults.needsOwnerOfflineGraceHours(),
                 defaults.needsOwnerOfflineDecayMultiplier(),

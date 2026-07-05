@@ -44,6 +44,8 @@ public final class TameworkSettingsResolver {
                 resolveBoolean(values.interactionRequiresOwner(), defaults.interactionRequiresOwner()),
                 resolveBoolean(values.linkingRequiresOwner(), defaults.linkingRequiresOwner()),
                 resolveBoolean(values.needsEnabled(), defaults.needsEnabled()),
+                NeedsResourceMode.fromConfigValue(resolveString(values.needsResourceMode(), defaults.needsResourceMode()))
+                        .toConfigValue(),
                 resolveString(values.needsTickPolicyMode(), defaults.needsTickPolicyMode()),
                 resolveNonNegativeDouble(values.needsOwnerOfflineGraceHours(), defaults.needsOwnerOfflineGraceHours()),
                 resolveNonNegativeDouble(values.needsOwnerOfflineDecayMultiplier(), defaults.needsOwnerOfflineDecayMultiplier()),

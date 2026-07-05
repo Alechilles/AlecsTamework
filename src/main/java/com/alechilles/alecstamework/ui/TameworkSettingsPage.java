@@ -466,6 +466,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 boolOrDefault(payload.interactionRequiresOwner, currentValues.interactionRequiresOwner()),
                 boolOrDefault(payload.linkingRequiresOwner, currentValues.linkingRequiresOwner()),
                 boolOrDefault(payload.needsEnabled, currentValues.needsEnabled()),
+                currentValues.needsResourceMode(),
                 boolOrDefault(payload.needsDamageEnabled, currentValues.needsDamageEnabled()),
                 tickPolicyMode,
                 needsOwnerOfflineGraceHours,

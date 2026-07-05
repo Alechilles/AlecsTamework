@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
 import com.google.gson.Gson;
@@ -203,6 +204,7 @@ public final class TameworkSettingsStore {
 
         document.needs = new NeedsSection();
         document.needs.enabled = snapshot.needsEnabled();
+        document.needs.resourceMode = NeedsResourceMode.fromConfigValue(snapshot.needsResourceMode()).toConfigValue();
         document.needs.tickPolicy = new NeedsTickPolicySection();
         document.needs.tickPolicy.mode = trimToNull(snapshot.needsTickPolicyMode());
         document.needs.tickPolicy.ownerOfflineGraceHours = Math.max(0.0, snapshot.needsOwnerOfflineGraceHours());
@@ -410,6 +412,7 @@ public final class TameworkSettingsStore {
 
         document.needs = new NeedsSection();
         document.needs.enabled = true;
+        document.needs.resourceMode = "Accurate";
         document.needs.tickPolicy = new NeedsTickPolicySection();
         document.needs.tickPolicy.mode = "OWNER_ONLINE_GRACE_THEN_DECAY";
         document.needs.tickPolicy.ownerOfflineGraceHours = 72.0;
@@ -605,6 +608,7 @@ public final class TameworkSettingsStore {
                         ? ownership.linkingRequiresOwner
                         : null,
                 needs != null ? needs.enabled : null,
+                needs != null ? trimToNull(needs.resourceMode) : null,
                 needsTickPolicy != null ? trimToNull(needsTickPolicy.mode) : null,
                 needsTickPolicy != null ? needsTickPolicy.ownerOfflineGraceHours : null,
                 needsTickPolicy != null ? needsTickPolicy.ownerOfflineDecayMultiplier : null,
@@ -757,6 +761,7 @@ public final class TameworkSettingsStore {
                                           boolean interactionRequiresOwner,
                                           boolean linkingRequiresOwner,
                                           boolean needsEnabled,
+                                          @Nonnull String needsResourceMode,
                                           @Nonnull String needsTickPolicyMode,
                                           double needsOwnerOfflineGraceHours,
                                           double needsOwnerOfflineDecayMultiplier,
@@ -799,6 +804,7 @@ public final class TameworkSettingsStore {
                                    @Nullable Boolean interactionRequiresOwner,
                                    @Nullable Boolean linkingRequiresOwner,
                                    @Nullable Boolean needsEnabled,
+                                   @Nullable String needsResourceMode,
                                    @Nullable String needsTickPolicyMode,
                                    @Nullable Double needsOwnerOfflineGraceHours,
                                    @Nullable Double needsOwnerOfflineDecayMultiplier,
@@ -891,6 +897,7 @@ public final class TameworkSettingsStore {
 
     private static final class NeedsSection {
         private Boolean enabled;
+        private String resourceMode;
         private NeedsTickPolicySection tickPolicy;
         private NeedsDamageSection damage;
     }

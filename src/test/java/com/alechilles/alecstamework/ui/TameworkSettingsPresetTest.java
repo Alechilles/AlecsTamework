@@ -82,6 +82,7 @@ class TameworkSettingsPresetTest {
                 true,
                 true,
                 true,
+                "Accurate",
                 true,
                 TwNeedsConfig.TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY,
                 72.0,

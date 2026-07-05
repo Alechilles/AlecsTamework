@@ -114,6 +114,16 @@ public final class TameworkRuntimeSettings {
     }
 
     @Nonnull
+    public String needsResourceMode() {
+        return values.needsResourceMode();
+    }
+
+    @Nonnull
+    public NeedsResourceMode needsResourceModeValue() {
+        return NeedsResourceMode.fromConfigValue(values.needsResourceMode());
+    }
+
+    @Nonnull
     public String needsTickPolicyMode() {
         return values.needsTickPolicyMode();
     }
@@ -308,6 +318,12 @@ public final class TameworkRuntimeSettings {
     public static boolean needsEnabled(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.needsEnabled() : configEnabled;
+    }
+
+    @Nonnull
+    public static NeedsResourceMode needsResourceMode(@Nullable String configMode) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.needsResourceModeValue() : NeedsResourceMode.fromConfigValue(configMode);
     }
 
     public static boolean happinessEnabled(boolean configEnabled) {
