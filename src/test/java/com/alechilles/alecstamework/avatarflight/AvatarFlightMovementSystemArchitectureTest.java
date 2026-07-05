@@ -91,7 +91,18 @@ class AvatarFlightMovementSystemArchitectureTest {
         assertTrue(source.contains("states.falling = false"));
         assertTrue(source.contains("states.fallingFar = false"));
         assertTrue(source.contains("states.horizontalIdle = output.horizontalIdle()"));
-        assertTrue(source.contains("states.sprinting = output.fastFlight()"));
+        assertTrue(source.contains("states.sprinting = states.sprinting || output.fastFlight()"),
+                "avatar flight must not erase live client sprint before packet-capture fallback can observe it");
+    }
+
+    @Test
+    void liveMovementStateSprintCanDriveBoostIntent() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("boolean liveSprint = states != null && states.sprinting"),
+                "movement system should read the live post-vanilla sprint flag because packet capture runs before vanilla queues can apply");
+        assertTrue(source.contains("liveSprint || (!stale && input.isSprinting())"),
+                "airborne shift can arrive through MovementStatesComponent even when the avatar input snapshot missed it");
     }
 
     @Test

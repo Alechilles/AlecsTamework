@@ -153,7 +153,7 @@ public final class AvatarFlightMovementSystem
         states.idle = output.horizontalIdle();
         states.horizontalIdle = output.horizontalIdle();
         states.flying = true;
-        states.sprinting = output.fastFlight();
+        states.sprinting = states.sprinting || output.fastFlight();
         states.walking = false;
         states.running = false;
         states.onGround = false;
@@ -222,6 +222,7 @@ public final class AvatarFlightMovementSystem
         double yaw = stale ? resolveYaw(ref, commandBuffer) : input.getYawRadians();
         double pitch = stale ? resolvePitch(ref, commandBuffer) : input.getPitchRadians();
         boolean onGround = stale ? states == null || states.onGround : input.isOnGround();
+        boolean liveSprint = states != null && states.sprinting;
         boolean reinsFlap = input != null && input.consumeReinsFlap(
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
@@ -233,7 +234,7 @@ public final class AvatarFlightMovementSystem
                 stale ? 0.0 : input.getVerticalAxis(),
                 reinsFlap || (!stale && input.isJumping()),
                 !stale && input.isCrouching(),
-                !stale && input.isSprinting(),
+                liveSprint || (!stale && input.isSprinting()),
                 reinsAirbrake,
                 onGround,
                 yaw,
