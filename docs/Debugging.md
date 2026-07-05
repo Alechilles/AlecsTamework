@@ -71,9 +71,10 @@
 - `/tw debugxpevents [on|off]`
 
 `/tw debugplayermodel unsafe` temporarily replaces the executing player's `ModelComponent` for isolated
-model-swap probes. Non-player models can crash the current client once movement animations update, so the
-unsafe token is required. With no model id it tries `Endgame_Pet_Dragon_Frost`; use `reset` to restore the
-saved player model.
+model-swap probes. Non-player models can crash the current client once movement animations update, and
+extreme positive scales can produce unstable visuals or physics, so the unsafe token is required. The
+requested scale is passed through without clamping to the model asset's authored min/max. With no model id
+it tries `Endgame_Pet_Dragon_Frost`; use `reset` to restore the saved player model.
 
 `/tw debugplayerinput` logs movement packets, mouse packets, interaction events, and per-tick player
 input/state snapshots for the executing player. Use it only during short input experiments; it is intentionally verbose.

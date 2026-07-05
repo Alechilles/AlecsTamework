@@ -82,7 +82,7 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
             SAVED_MODELS.putIfAbsent(playerUuid, new Model(currentModel.getModel()));
         }
 
-        float scale = requestedScale != null ? clampScale(modelAsset, requestedScale) : clampScale(modelAsset, 1.0f);
+        float scale = requestedScale != null ? requestedScale : 1.0f;
         store.putComponent(ref, ModelComponent.getComponentType(),
                 new ModelComponent(Model.createScaledModel(modelAsset, scale)));
 
@@ -151,13 +151,10 @@ public final class TameworkDebugPlayerModelCommand extends AbstractPlayerCommand
 
     private static Float parseScale(String raw) {
         try {
-            return Float.parseFloat(raw);
+            float scale = Float.parseFloat(raw);
+            return Float.isFinite(scale) && scale > 0.0f ? scale : null;
         } catch (NumberFormatException ignored) {
             return null;
         }
-    }
-
-    private static float clampScale(ModelAsset modelAsset, float scale) {
-        return Math.max(modelAsset.getMinScale(), Math.min(modelAsset.getMaxScale(), scale));
     }
 }
