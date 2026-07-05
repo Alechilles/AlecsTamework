@@ -28,6 +28,7 @@ import com.hypixel.hytale.server.core.modules.entity.system.TransformSystems;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifyingSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -108,6 +109,7 @@ public final class AvatarFlightMovementSystem
         syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
         applyVisualPose(ref, commandBuffer, controllerInput, output);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);
+        applyPoseAnimations(ref, commandBuffer, flight, config, output);
         if (output.applyVelocity()) {
             velocity.addInstruction(
                     new Vector3d(output.velocityX(), output.velocityY(), output.velocityZ()),
@@ -196,26 +198,120 @@ public final class AvatarFlightMovementSystem
                                                  @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                                  @Nonnull AvatarFlightComponent flight,
                                                  @Nonnull TwAvatarFlightConfig config) {
-        if (!config.getAnimation().isSuppressNonMovementAnimations()) {
+        TwAvatarFlightConfig.AnimationSettings animation = config.getAnimation();
+        if (!animation.isSuppressNonMovementAnimations()) {
             return;
         }
         long now = System.currentTimeMillis();
         if (now < flight.getNextSuppressedAnimationAtMs()) {
             return;
         }
-        if (config.getAnimation().isSuppressActionAnimation()) {
+        AnimationSlot pitchSlot = animation.isPoseAnimationsEnabled()
+                ? resolveAnimationSlot(animation.getPitchPoseSlot(), AnimationSlot.Status) : null;
+        AnimationSlot rollSlot = animation.isPoseAnimationsEnabled()
+                ? resolveAnimationSlot(animation.getRollPoseSlot(), AnimationSlot.Emote) : null;
+        if (animation.isSuppressActionAnimation() && !isPoseSlot(AnimationSlot.Action, pitchSlot, rollSlot)) {
             AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, commandBuffer);
         }
-        if (config.getAnimation().isSuppressStatusAnimation()) {
+        if (animation.isSuppressStatusAnimation() && !isPoseSlot(AnimationSlot.Status, pitchSlot, rollSlot)) {
             AnimationUtils.stopAnimation(ref, AnimationSlot.Status, true, commandBuffer);
         }
-        if (config.getAnimation().isSuppressEmoteAnimation()) {
+        if (animation.isSuppressEmoteAnimation() && !isPoseSlot(AnimationSlot.Emote, pitchSlot, rollSlot)) {
             AnimationUtils.stopAnimation(ref, AnimationSlot.Emote, true, commandBuffer);
         }
-        if (config.getAnimation().isSuppressFaceAnimation()) {
+        if (animation.isSuppressFaceAnimation() && !isPoseSlot(AnimationSlot.Face, pitchSlot, rollSlot)) {
             AnimationUtils.stopAnimation(ref, AnimationSlot.Face, true, commandBuffer);
         }
-        flight.setNextSuppressedAnimationAtMs(now + config.getAnimation().getSuppressionIntervalMs());
+        flight.setNextSuppressedAnimationAtMs(now + animation.getSuppressionIntervalMs());
+    }
+
+    private void applyPoseAnimations(@Nonnull Ref<EntityStore> ref,
+                                     @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                     @Nonnull AvatarFlightComponent flight,
+                                     @Nonnull TwAvatarFlightConfig config,
+                                     @Nonnull AvatarFlightController.Output output) {
+        TwAvatarFlightConfig.AnimationSettings animation = config.getAnimation();
+        AnimationSlot pitchSlot = resolveAnimationSlot(animation.getPitchPoseSlot(), AnimationSlot.Status);
+        AnimationSlot rollSlot = resolveAnimationSlot(animation.getRollPoseSlot(), AnimationSlot.Emote);
+        if (!animation.isPoseAnimationsEnabled()) {
+            clearPoseAnimation(ref, commandBuffer, flight, true, pitchSlot);
+            clearPoseAnimation(ref, commandBuffer, flight, false, rollSlot);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        drivePoseAnimation(ref, commandBuffer, flight, true, pitchSlot,
+                animation.pitchPoseAnimationFor(Math.toDegrees(output.visualPitchRadians())),
+                now, animation.getPoseResendIntervalMs());
+        drivePoseAnimation(ref, commandBuffer, flight, false, rollSlot,
+                animation.rollPoseAnimationFor(Math.toDegrees(output.visualRollRadians())),
+                now, animation.getPoseResendIntervalMs());
+    }
+
+    private void drivePoseAnimation(@Nonnull Ref<EntityStore> ref,
+                                    @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                    @Nonnull AvatarFlightComponent flight,
+                                    boolean pitch,
+                                    @Nonnull AnimationSlot slot,
+                                    @Nonnull String animationId,
+                                    long now,
+                                    long resendIntervalMs) {
+        String current = pitch ? flight.getPitchPoseAnimationId() : flight.getRollPoseAnimationId();
+        long nextAt = pitch ? flight.getNextPitchPoseAnimationAtMs() : flight.getNextRollPoseAnimationAtMs();
+        if (animationId.isBlank()) {
+            clearPoseAnimation(ref, commandBuffer, flight, pitch, slot);
+            return;
+        }
+        if (animationId.equals(current) && now < nextAt) {
+            return;
+        }
+        AnimationUtils.playAnimation(ref, slot, animationId, true, commandBuffer);
+        setPoseAnimationState(flight, pitch, animationId, now + resendIntervalMs);
+    }
+
+    private void clearPoseAnimation(@Nonnull Ref<EntityStore> ref,
+                                    @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                    @Nonnull AvatarFlightComponent flight,
+                                    boolean pitch,
+                                    @Nonnull AnimationSlot slot) {
+        String current = pitch ? flight.getPitchPoseAnimationId() : flight.getRollPoseAnimationId();
+        if (current.isBlank()) {
+            return;
+        }
+        AnimationUtils.stopAnimation(ref, slot, true, commandBuffer);
+        setPoseAnimationState(flight, pitch, "", 0L);
+    }
+
+    private void setPoseAnimationState(@Nonnull AvatarFlightComponent flight,
+                                       boolean pitch,
+                                       @Nonnull String animationId,
+                                       long nextAtMs) {
+        if (pitch) {
+            flight.setPitchPoseAnimationId(animationId);
+            flight.setNextPitchPoseAnimationAtMs(nextAtMs);
+        } else {
+            flight.setRollPoseAnimationId(animationId);
+            flight.setNextRollPoseAnimationAtMs(nextAtMs);
+        }
+    }
+
+    private static boolean isPoseSlot(@Nonnull AnimationSlot slot,
+                                      @Nullable AnimationSlot pitchSlot,
+                                      @Nullable AnimationSlot rollSlot) {
+        return slot == pitchSlot || slot == rollSlot;
+    }
+
+    @Nonnull
+    private static AnimationSlot resolveAnimationSlot(@Nullable String name, @Nonnull AnimationSlot fallback) {
+        if (name == null || name.isBlank()) {
+            return fallback;
+        }
+        String normalized = name.trim().toUpperCase(Locale.ROOT);
+        for (AnimationSlot slot : AnimationSlot.VALUES) {
+            if (slot.name().toUpperCase(Locale.ROOT).equals(normalized)) {
+                return slot;
+            }
+        }
+        return fallback;
     }
 
     private void applyVisualPose(@Nonnull Ref<EntityStore> ref,

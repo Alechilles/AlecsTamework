@@ -125,16 +125,34 @@ class AvatarFlightMovementSystemArchitectureTest {
 
         assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config)"),
                 "transformed-player flight should suppress held-item/combat overlay slots while active");
-        assertTrue(source.contains("config.getAnimation().isSuppressNonMovementAnimations()"),
+        assertTrue(source.contains("animation.isSuppressNonMovementAnimations()"),
                 "suppression should be config-driven for unsafe model-swap experiments");
+        assertTrue(source.contains("!isPoseSlot(AnimationSlot.Status, pitchSlot, rollSlot)"),
+                "configured pose-animation slots must not be erased by overlay suppression");
         assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, commandBuffer)"),
                 "Action slot is where item/combat animations can be applied to the wrong transformed model");
         assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Status, true, commandBuffer)"),
                 "Status slot should be cleared so held-item/status overlays do not persist on the transformed model");
         assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Emote, true, commandBuffer)"),
                 "Emote slot should be cleared by default because player emotes are authored for the player rig");
-        assertTrue(source.contains("flight.setNextSuppressedAnimationAtMs(now + config.getAnimation().getSuppressionIntervalMs())"),
+        assertTrue(source.contains("flight.setNextSuppressedAnimationAtMs(now + animation.getSuppressionIntervalMs())"),
                 "slot suppression should be throttled instead of spamming packets every tick");
+    }
+
+    @Test
+    void avatarFlightCanDriveOwnerSafePoseAnimationSlots() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("applyPoseAnimations(ref, commandBuffer, flight, config, output)"),
+                "owner-visible pitch/bank must use animation packets instead of self TransformUpdate correction");
+        assertTrue(source.contains("animation.pitchPoseAnimationFor(Math.toDegrees(output.visualPitchRadians()))"),
+                "pitch pose selection should stay config-driven from controller visual pitch");
+        assertTrue(source.contains("animation.rollPoseAnimationFor(Math.toDegrees(output.visualRollRadians()))"),
+                "roll pose selection should stay config-driven from controller visual roll");
+        assertTrue(source.contains("AnimationUtils.playAnimation(ref, slot, animationId, true, commandBuffer)"),
+                "pose animations must be sent to the owner client through the safe animation channel");
+        assertTrue(source.contains("AnimationSlot.VALUES"),
+                "pose animation slots should be parsed from config without hardcoding only one slot");
     }
 
     @Test

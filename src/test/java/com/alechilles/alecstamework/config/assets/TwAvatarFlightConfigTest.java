@@ -36,6 +36,16 @@ class TwAvatarFlightConfigTest {
         assertTrue(config.getAnimation().isSuppressEmoteAnimation());
         assertFalse(config.getAnimation().isSuppressFaceAnimation());
         assertTrue(config.getAnimation().getSuppressionIntervalMs() > 0L);
+        assertFalse(config.getAnimation().isPoseAnimationsEnabled());
+        assertEquals("Status", config.getAnimation().getPitchPoseSlot());
+        assertEquals("Emote", config.getAnimation().getRollPoseSlot());
+        assertEquals("", config.getAnimation().getPitchUpPoseAnimation());
+        assertEquals("", config.getAnimation().getPitchDownPoseAnimation());
+        assertEquals("", config.getAnimation().getBankLeftPoseAnimation());
+        assertEquals("", config.getAnimation().getBankRightPoseAnimation());
+        assertEquals("", config.getAnimation().pitchPoseAnimationFor(80.0));
+        assertEquals("", config.getAnimation().rollPoseAnimationFor(20.0));
+        assertTrue(config.getAnimation().getPoseResendIntervalMs() > 0L);
     }
 
     @Test
@@ -164,17 +174,37 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "animation", "suppressEmoteAnimation", true);
         setNestedField(parent, "animation", "suppressFaceAnimation", true);
         setNestedField(parent, "animation", "suppressionIntervalMs", 125.0);
+        setNestedField(parent, "animation", "poseAnimationsEnabled", true);
+        setNestedField(parent, "animation", "pitchPoseSlot", "Status");
+        setNestedField(parent, "animation", "rollPoseSlot", "Emote");
+        setNestedField(parent, "animation", "pitchUpPoseAnimation", "ParentPitchUp");
+        setNestedField(parent, "animation", "pitchDownPoseAnimation", "ParentPitchDown");
+        setNestedField(parent, "animation", "bankLeftPoseAnimation", "ParentBankLeft");
+        setNestedField(parent, "animation", "bankRightPoseAnimation", "ParentBankRight");
+        setNestedField(parent, "animation", "pitchPoseThresholdDegrees", 12.0);
+        setNestedField(parent, "animation", "rollPoseThresholdDegrees", 9.0);
+        setNestedField(parent, "animation", "poseResendIntervalMs", 333.0);
         setNestedField(child, "animation", "suppressNonMovementAnimations", false);
         setNestedField(child, "animation", "suppressActionAnimation", false);
         setNestedField(child, "animation", "suppressStatusAnimation", false);
         setNestedField(child, "animation", "suppressEmoteAnimation", false);
         setNestedField(child, "animation", "suppressFaceAnimation", false);
         setNestedField(child, "animation", "suppressionIntervalMs", 500.0);
+        setNestedField(child, "animation", "poseAnimationsEnabled", false);
+        setNestedField(child, "animation", "pitchPoseSlot", "Action");
+        setNestedField(child, "animation", "rollPoseSlot", "Face");
+        setNestedField(child, "animation", "pitchUpPoseAnimation", "ChildPitchUp");
+        setNestedField(child, "animation", "pitchDownPoseAnimation", "ChildPitchDown");
+        setNestedField(child, "animation", "bankLeftPoseAnimation", "ChildBankLeft");
+        setNestedField(child, "animation", "bankRightPoseAnimation", "ChildBankRight");
+        setNestedField(child, "animation", "pitchPoseThresholdDegrees", 1.0);
+        setNestedField(child, "animation", "rollPoseThresholdDegrees", 2.0);
+        setNestedField(child, "animation", "poseResendIntervalMs", 50.0);
 
         child.inheritMissingTopLevelFrom(
                 parent,
                 Set.of("Animation"),
-                Map.of("Animation", Set.of("SuppressActionAnimation"))
+                Map.of("Animation", Set.of("SuppressActionAnimation", "PitchPoseSlot", "PitchUpPoseAnimation"))
         );
 
         assertTrue(child.getAnimation().isSuppressNonMovementAnimations());
@@ -183,6 +213,18 @@ class TwAvatarFlightConfigTest {
         assertTrue(child.getAnimation().isSuppressEmoteAnimation());
         assertTrue(child.getAnimation().isSuppressFaceAnimation());
         assertEquals(125L, child.getAnimation().getSuppressionIntervalMs());
+        assertTrue(child.getAnimation().isPoseAnimationsEnabled());
+        assertEquals("Action", child.getAnimation().getPitchPoseSlot());
+        assertEquals("Emote", child.getAnimation().getRollPoseSlot());
+        assertEquals("ChildPitchUp", child.getAnimation().getPitchUpPoseAnimation());
+        assertEquals("ParentPitchDown", child.getAnimation().getPitchDownPoseAnimation());
+        assertEquals("ParentBankLeft", child.getAnimation().getBankLeftPoseAnimation());
+        assertEquals("ParentBankRight", child.getAnimation().getBankRightPoseAnimation());
+        assertEquals(12.0, child.getAnimation().getPitchPoseThresholdDegrees(), 0.00001);
+        assertEquals(9.0, child.getAnimation().getRollPoseThresholdDegrees(), 0.00001);
+        assertEquals(333L, child.getAnimation().getPoseResendIntervalMs());
+        assertEquals("ChildPitchUp", child.getAnimation().pitchPoseAnimationFor(80.0));
+        assertEquals("ParentBankLeft", child.getAnimation().rollPoseAnimationFor(-20.0));
     }
 
     private static void setNestedField(Object target, String nestedFieldName, String fieldName, Object value)

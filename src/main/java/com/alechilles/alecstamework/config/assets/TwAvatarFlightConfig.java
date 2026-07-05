@@ -231,6 +231,56 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.suppressionIntervalMs)
             .documentation("Minimum milliseconds between non-movement animation suppression packets. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Boolean>append(new KeyedCodec<>("PoseAnimationsEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.poseAnimationsEnabled = value != null && value,
+                    settings -> settings.poseAnimationsEnabled)
+            .documentation("Whether avatar flight drives optional self-visible pitch/bank pose animations through non-movement animation slots. Disabled by default. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("PitchPoseSlot", Codec.STRING),
+                    (settings, value) -> settings.pitchPoseSlot = stringOrDefault(value, "Status"),
+                    settings -> settings.pitchPoseSlot)
+            .documentation("Animation slot used for pitch-up/down pose animations. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("RollPoseSlot", Codec.STRING),
+                    (settings, value) -> settings.rollPoseSlot = stringOrDefault(value, "Emote"),
+                    settings -> settings.rollPoseSlot)
+            .documentation("Animation slot used for bank-left/right pose animations. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("PitchUpPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.pitchUpPoseAnimation = blankOrTrim(value),
+                    settings -> settings.pitchUpPoseAnimation)
+            .documentation("Optional animation id played on PitchPoseSlot when look pitch is above the pitch threshold. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("PitchDownPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.pitchDownPoseAnimation = blankOrTrim(value),
+                    settings -> settings.pitchDownPoseAnimation)
+            .documentation("Optional animation id played on PitchPoseSlot when look pitch is below the negative pitch threshold. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("BankLeftPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.bankLeftPoseAnimation = blankOrTrim(value),
+                    settings -> settings.bankLeftPoseAnimation)
+            .documentation("Optional animation id played on RollPoseSlot while the controller requests a left bank. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("BankRightPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.bankRightPoseAnimation = blankOrTrim(value),
+                    settings -> settings.bankRightPoseAnimation)
+            .documentation("Optional animation id played on RollPoseSlot while the controller requests a right bank. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("PitchPoseThresholdDegrees", Codec.DOUBLE),
+                    (settings, value) -> settings.pitchPoseThresholdDegrees = positiveOrDefault(value, 8.0),
+                    settings -> settings.pitchPoseThresholdDegrees)
+            .documentation("Absolute look-pitch degrees required before pitch pose animation changes from neutral. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("RollPoseThresholdDegrees", Codec.DOUBLE),
+                    (settings, value) -> settings.rollPoseThresholdDegrees = positiveOrDefault(value, 5.0),
+                    settings -> settings.rollPoseThresholdDegrees)
+            .documentation("Absolute bank degrees required before roll pose animation changes from neutral. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("PoseResendIntervalMs", Codec.DOUBLE),
+                    (settings, value) -> settings.poseResendIntervalMs = positiveOrDefault(value, 250.0),
+                    settings -> settings.poseResendIntervalMs)
+            .documentation("Minimum milliseconds between forced pose-animation packets while the same pose remains active. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private static final BuilderCodec<DebugSettings> DEBUG_CODEC = BuilderCodec.builder(
@@ -544,6 +594,32 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("SuppressionIntervalMs")) {
                 animation.suppressionIntervalMs = parent.animation.suppressionIntervalMs;
             }
+            if (!keys.contains("PoseAnimationsEnabled")) {
+                animation.poseAnimationsEnabled = parent.animation.poseAnimationsEnabled;
+            }
+            if (!keys.contains("PitchPoseSlot")) animation.pitchPoseSlot = parent.animation.pitchPoseSlot;
+            if (!keys.contains("RollPoseSlot")) animation.rollPoseSlot = parent.animation.rollPoseSlot;
+            if (!keys.contains("PitchUpPoseAnimation")) {
+                animation.pitchUpPoseAnimation = parent.animation.pitchUpPoseAnimation;
+            }
+            if (!keys.contains("PitchDownPoseAnimation")) {
+                animation.pitchDownPoseAnimation = parent.animation.pitchDownPoseAnimation;
+            }
+            if (!keys.contains("BankLeftPoseAnimation")) {
+                animation.bankLeftPoseAnimation = parent.animation.bankLeftPoseAnimation;
+            }
+            if (!keys.contains("BankRightPoseAnimation")) {
+                animation.bankRightPoseAnimation = parent.animation.bankRightPoseAnimation;
+            }
+            if (!keys.contains("PitchPoseThresholdDegrees")) {
+                animation.pitchPoseThresholdDegrees = parent.animation.pitchPoseThresholdDegrees;
+            }
+            if (!keys.contains("RollPoseThresholdDegrees")) {
+                animation.rollPoseThresholdDegrees = parent.animation.rollPoseThresholdDegrees;
+            }
+            if (!keys.contains("PoseResendIntervalMs")) {
+                animation.poseResendIntervalMs = parent.animation.poseResendIntervalMs;
+            }
         }
     }
 
@@ -574,6 +650,11 @@ public final class TwAvatarFlightConfig implements
 
     private static String stringOrDefault(@Nullable String value, @Nonnull String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    @Nonnull
+    private static String blankOrTrim(@Nullable String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static double positiveOrDefault(@Nullable Double value, double fallback) {
@@ -672,6 +753,16 @@ public final class TwAvatarFlightConfig implements
         private boolean suppressEmoteAnimation = true;
         private boolean suppressFaceAnimation;
         private double suppressionIntervalMs = 100.0;
+        private boolean poseAnimationsEnabled;
+        private String pitchPoseSlot = "Status";
+        private String rollPoseSlot = "Emote";
+        private String pitchUpPoseAnimation = "";
+        private String pitchDownPoseAnimation = "";
+        private String bankLeftPoseAnimation = "";
+        private String bankRightPoseAnimation = "";
+        private double pitchPoseThresholdDegrees = 8.0;
+        private double rollPoseThresholdDegrees = 5.0;
+        private double poseResendIntervalMs = 250.0;
 
         public String getIdleAnimation() { return stringOrDefault(idleAnimation, DEFAULT_IDLE_ANIMATION); }
         public String getFlightAnimation() { return stringOrDefault(flightAnimation, DEFAULT_FLIGHT_ANIMATION); }
@@ -685,12 +776,50 @@ public final class TwAvatarFlightConfig implements
         public boolean isSuppressEmoteAnimation() { return suppressEmoteAnimation; }
         public boolean isSuppressFaceAnimation() { return suppressFaceAnimation; }
         public long getSuppressionIntervalMs() { return Math.round(Math.max(1.0, suppressionIntervalMs)); }
+        public boolean isPoseAnimationsEnabled() { return poseAnimationsEnabled; }
+        public String getPitchPoseSlot() { return stringOrDefault(pitchPoseSlot, "Status"); }
+        public String getRollPoseSlot() { return stringOrDefault(rollPoseSlot, "Emote"); }
+        public String getPitchUpPoseAnimation() { return blankOrTrim(pitchUpPoseAnimation); }
+        public String getPitchDownPoseAnimation() { return blankOrTrim(pitchDownPoseAnimation); }
+        public String getBankLeftPoseAnimation() { return blankOrTrim(bankLeftPoseAnimation); }
+        public String getBankRightPoseAnimation() { return blankOrTrim(bankRightPoseAnimation); }
+        public double getPitchPoseThresholdDegrees() { return Math.max(0.1, pitchPoseThresholdDegrees); }
+        public double getRollPoseThresholdDegrees() { return Math.max(0.1, rollPoseThresholdDegrees); }
+        public long getPoseResendIntervalMs() { return Math.round(Math.max(1.0, poseResendIntervalMs)); }
 
         public String animationFor(boolean horizontalIdle, boolean fastFlight) {
             if (horizontalIdle) {
                 return getIdleAnimation();
             }
             return fastFlight ? getFastFlightAnimation() : getFlightAnimation();
+        }
+
+        @Nonnull
+        public String pitchPoseAnimationFor(double pitchDegrees) {
+            if (!isPoseAnimationsEnabled()) {
+                return "";
+            }
+            if (pitchDegrees > getPitchPoseThresholdDegrees()) {
+                return getPitchUpPoseAnimation();
+            }
+            if (pitchDegrees < -getPitchPoseThresholdDegrees()) {
+                return getPitchDownPoseAnimation();
+            }
+            return "";
+        }
+
+        @Nonnull
+        public String rollPoseAnimationFor(double rollDegrees) {
+            if (!isPoseAnimationsEnabled()) {
+                return "";
+            }
+            if (rollDegrees > getRollPoseThresholdDegrees()) {
+                return getBankRightPoseAnimation();
+            }
+            if (rollDegrees < -getRollPoseThresholdDegrees()) {
+                return getBankLeftPoseAnimation();
+            }
+            return "";
         }
     }
 
