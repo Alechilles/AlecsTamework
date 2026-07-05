@@ -26,6 +26,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSyst
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualCleanupSystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -682,6 +683,12 @@ public class Tamework extends JavaPlugin {
                         avatarFlightComponentType,
                         avatarFlightRiderVisualComponentType,
                         EntityTrackerSystems.Visible.getComponentType()
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightRiderVisualCleanupSystem(
+                        avatarFlightRiderVisualComponentType,
+                        avatarFlightComponentType
                 )
         );
         ComponentType<EntityStore, NPCMountComponent> npcMountComponentType = resolveNpcMountComponentTypeOrNull();
