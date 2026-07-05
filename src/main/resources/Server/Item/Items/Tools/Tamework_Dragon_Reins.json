@@ -39,7 +39,7 @@
     ]
   },
   "MaxStack": 1,
-  "UsePlayerAnimations": true,
+  "UsePlayerAnimations": false,
   "Categories": [
     "Items.Tools"
   ]

@@ -69,6 +69,7 @@ public final class AvatarFlightActivator {
         restoreClientFlyingState(store, ref);
         resetVisualPose(store, ref);
         clearForcedAnimations(store, ref);
+        AvatarFlightEquipmentVisualSystem.restoreCurrentEquipment(ref, store);
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
         boolean hadSavedModel = modelService.hasSavedModel(playerUuid);

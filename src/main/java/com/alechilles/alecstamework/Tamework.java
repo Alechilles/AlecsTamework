@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightActivator;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
@@ -192,6 +193,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
+import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -665,6 +667,12 @@ public class Tamework extends JavaPlugin {
                         MovementStatesComponent.getComponentType(),
                         HeadRotation.getComponentType(),
                         TransformComponent.getComponentType()
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightEquipmentVisualSystem(
+                        avatarFlightComponentType,
+                        EntityTrackerSystems.Visible.getComponentType()
                 )
         );
         ComponentType<EntityStore, NPCMountComponent> npcMountComponentType = resolveNpcMountComponentTypeOrNull();
