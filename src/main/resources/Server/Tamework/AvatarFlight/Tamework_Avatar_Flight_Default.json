@@ -61,6 +61,16 @@
     "RollPoseThresholdDegrees": 5.0,
     "PoseResendIntervalMs": 250.0
   },
+  "RiderVisual": {
+    "HideOwnerEquipment": true,
+    "HideOwnerArmor": true,
+    "HideOwnerHands": true,
+    "ShowRider": true,
+    "SeatOffsetX": 0.0,
+    "SeatOffsetY": 1.35,
+    "SeatOffsetZ": -0.25,
+    "EquipmentResendIntervalMs": 250.0
+  },
   "Debug": {
     "LogControllerTicks": true,
     "LogInputTransitions": false

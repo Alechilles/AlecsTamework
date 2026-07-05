@@ -303,6 +303,52 @@ public final class TwAvatarFlightConfig implements
             .add()
             .build();
 
+    private static final BuilderCodec<RiderVisualSettings> RIDER_VISUAL_CODEC = BuilderCodec.builder(
+            RiderVisualSettings.class,
+            RiderVisualSettings::new
+    )
+            .<Boolean>append(new KeyedCodec<>("HideOwnerEquipment", Codec.BOOLEAN),
+                    (settings, value) -> settings.hideOwnerEquipment = value == null || value,
+                    settings -> settings.hideOwnerEquipment)
+            .documentation("Whether avatar flight sends equipment packets that hide the transformed player's equipped visuals. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("HideOwnerArmor", Codec.BOOLEAN),
+                    (settings, value) -> settings.hideOwnerArmor = value == null || value,
+                    settings -> settings.hideOwnerArmor)
+            .documentation("Whether hidden owner equipment also blanks armor slots. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("HideOwnerHands", Codec.BOOLEAN),
+                    (settings, value) -> settings.hideOwnerHands = value == null || value,
+                    settings -> settings.hideOwnerHands)
+            .documentation("Whether hidden owner equipment blanks right-hand and left-hand item visuals. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("ShowRider", Codec.BOOLEAN),
+                    (settings, value) -> settings.showRider = value == null || value,
+                    settings -> settings.showRider)
+            .documentation("Whether avatar flight spawns a visual-only copy of the player's saved model as a rider. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("SeatOffsetX", Codec.DOUBLE),
+                    (settings, value) -> settings.seatOffsetX = finiteOrDefault(value, 0.0),
+                    settings -> settings.seatOffsetX)
+            .documentation("Fake rider attachment offset X relative to the transformed player entity. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("SeatOffsetY", Codec.DOUBLE),
+                    (settings, value) -> settings.seatOffsetY = finiteOrDefault(value, 1.35),
+                    settings -> settings.seatOffsetY)
+            .documentation("Fake rider attachment offset Y relative to the transformed player entity. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("SeatOffsetZ", Codec.DOUBLE),
+                    (settings, value) -> settings.seatOffsetZ = finiteOrDefault(value, -0.25),
+                    settings -> settings.seatOffsetZ)
+            .documentation("Fake rider attachment offset Z relative to the transformed player entity. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("EquipmentResendIntervalMs", Codec.DOUBLE),
+                    (settings, value) -> settings.equipmentResendIntervalMs = positiveOrDefault(value, 250.0),
+                    settings -> settings.equipmentResendIntervalMs)
+            .documentation("Minimum milliseconds between repeated fake-rider equipment packets when the signature is unchanged. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
     private static final BuilderCodec<DebugSettings> DEBUG_CODEC = BuilderCodec.builder(
             DebugSettings.class,
             DebugSettings::new
@@ -369,6 +415,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.animation)
             .documentation("Transformed-player movement animation names. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<RiderVisualSettings>append(new KeyedCodec<>("RiderVisual", RIDER_VISUAL_CODEC),
+                    (asset, value) -> asset.riderVisual = value == null ? new RiderVisualSettings() : value,
+                    asset -> asset.riderVisual)
+            .documentation("Avatar-flight rider visual and transformed-owner equipment visibility settings. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<DebugSettings>append(new KeyedCodec<>("Debug", DEBUG_CODEC),
                     (asset, value) -> asset.debug = value == null ? new DebugSettings() : value,
                     asset -> asset.debug)
@@ -393,6 +444,7 @@ public final class TwAvatarFlightConfig implements
     private JumpSettings jump = new JumpSettings();
     private BoostSettings boost = new BoostSettings();
     private AnimationSettings animation = new AnimationSettings();
+    private RiderVisualSettings riderVisual = new RiderVisualSettings();
     private DebugSettings debug = new DebugSettings();
 
     protected TwAvatarFlightConfig() {
@@ -530,6 +582,7 @@ public final class TwAvatarFlightConfig implements
         inheritOrCopyJump(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Jump"), explicitTopLevelKeys);
         inheritOrCopyBoost(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Boost"), explicitTopLevelKeys);
         inheritOrCopyAnimation(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Animation"), explicitTopLevelKeys);
+        inheritOrCopyRiderVisual(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "RiderVisual"), explicitTopLevelKeys);
         inheritOrCopyDebug(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Debug"), explicitTopLevelKeys);
     }
 
@@ -663,6 +716,24 @@ public final class TwAvatarFlightConfig implements
         }
     }
 
+    private void inheritOrCopyRiderVisual(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("RiderVisual")) riderVisual = parent.riderVisual;
+        else if (keys != null && riderVisual != null && parent.riderVisual != null) {
+            if (!keys.contains("HideOwnerEquipment")) {
+                riderVisual.hideOwnerEquipment = parent.riderVisual.hideOwnerEquipment;
+            }
+            if (!keys.contains("HideOwnerArmor")) riderVisual.hideOwnerArmor = parent.riderVisual.hideOwnerArmor;
+            if (!keys.contains("HideOwnerHands")) riderVisual.hideOwnerHands = parent.riderVisual.hideOwnerHands;
+            if (!keys.contains("ShowRider")) riderVisual.showRider = parent.riderVisual.showRider;
+            if (!keys.contains("SeatOffsetX")) riderVisual.seatOffsetX = parent.riderVisual.seatOffsetX;
+            if (!keys.contains("SeatOffsetY")) riderVisual.seatOffsetY = parent.riderVisual.seatOffsetY;
+            if (!keys.contains("SeatOffsetZ")) riderVisual.seatOffsetZ = parent.riderVisual.seatOffsetZ;
+            if (!keys.contains("EquipmentResendIntervalMs")) {
+                riderVisual.equipmentResendIntervalMs = parent.riderVisual.equipmentResendIntervalMs;
+            }
+        }
+    }
+
     @Nullable
     private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
                                                      @Nonnull String topLevelKey) {
@@ -678,6 +749,7 @@ public final class TwAvatarFlightConfig implements
     public JumpSettings getJump() { return jump == null ? new JumpSettings() : jump; }
     public BoostSettings getBoost() { return boost == null ? new BoostSettings() : boost; }
     public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
+    public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }
     public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
 
     private static String stringOrDefault(@Nullable String value, @Nonnull String fallback) {
@@ -695,6 +767,10 @@ public final class TwAvatarFlightConfig implements
 
     private static double nonNegativeOrDefault(@Nullable Double value, double fallback) {
         return value != null && Double.isFinite(value) && value >= 0.0 ? value : fallback;
+    }
+
+    private static double finiteOrDefault(@Nullable Double value, double fallback) {
+        return value != null && Double.isFinite(value) ? value : fallback;
     }
 
     private static double clamp01(@Nullable Double value, double fallback) {
@@ -772,6 +848,28 @@ public final class TwAvatarFlightConfig implements
         public double getForwardImpulse() { return forwardImpulse; }
         public double getCooldownSeconds() { return cooldownSeconds; }
         public double getDurationSeconds() { return durationSeconds; }
+    }
+
+    public static final class RiderVisualSettings {
+        private boolean hideOwnerEquipment = true;
+        private boolean hideOwnerArmor = true;
+        private boolean hideOwnerHands = true;
+        private boolean showRider = true;
+        private double seatOffsetX;
+        private double seatOffsetY = 1.35;
+        private double seatOffsetZ = -0.25;
+        private double equipmentResendIntervalMs = 250.0;
+
+        public boolean isHideOwnerEquipment() { return hideOwnerEquipment; }
+        public boolean isHideOwnerArmor() { return hideOwnerArmor; }
+        public boolean isHideOwnerHands() { return hideOwnerHands; }
+        public boolean isShowRider() { return showRider; }
+        public double getSeatOffsetX() { return seatOffsetX; }
+        public double getSeatOffsetY() { return seatOffsetY; }
+        public double getSeatOffsetZ() { return seatOffsetZ; }
+        public long getEquipmentResendIntervalMs() {
+            return Math.round(Math.max(1.0, equipmentResendIntervalMs));
+        }
     }
 
     public static final class AnimationSettings {
