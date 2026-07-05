@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentAccessor;
@@ -13,11 +14,7 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.protocol.EquipmentUpdate;
-import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
-import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.InventorySystems;
-import com.hypixel.hytale.server.core.inventory.InventoryUtils;
-import com.hypixel.hytale.server.core.modules.entity.player.PlayerSettings;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Map;
@@ -26,7 +23,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Keeps transformed avatar-flight players from rendering normal player held-item equipment.
+ * Keeps transformed avatar-flight players from rendering normal player equipment.
  */
 public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
@@ -51,11 +48,13 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
                      @Nonnull Store<EntityStore> store,
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Ref<EntityStore> ref = archetypeChunk.getReferenceTo(index);
+        AvatarFlightComponent flight = archetypeChunk.getComponent(index, flightType);
         EntityTrackerSystems.Visible visible = archetypeChunk.getComponent(index, visibleType);
-        if (ref == null || visible == null) {
+        if (ref == null || visible == null || flight == null) {
             return;
         }
-        queueHiddenHandUpdate(ref, commandBuffer, visible);
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
+        queueHiddenOwnerUpdate(ref, commandBuffer, visible, config.getRiderVisual());
     }
 
     public static void restoreCurrentEquipment(@Nonnull Ref<EntityStore> ref,
@@ -67,28 +66,22 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         if (visible == null) {
             return;
         }
-        EquipmentUpdate update = createCurrentEquipmentUpdate(ref, accessor);
+        EquipmentUpdate update = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, accessor);
         queue(ref, update, visible.visibleTo);
         queue(ref, update, visible.newlyVisibleTo);
     }
 
-    private static void queueHiddenHandUpdate(@Nonnull Ref<EntityStore> ref,
-                                              @Nonnull ComponentAccessor<EntityStore> accessor,
-                                              @Nonnull EntityTrackerSystems.Visible visible) {
-        EquipmentUpdate update = createCurrentEquipmentUpdate(ref, accessor);
-        update.rightHandItemId = BlockType.EMPTY_KEY;
-        update.leftHandItemId = BlockType.EMPTY_KEY;
+    private static void queueHiddenOwnerUpdate(@Nonnull Ref<EntityStore> ref,
+                                               @Nonnull ComponentAccessor<EntityStore> accessor,
+                                               @Nonnull EntityTrackerSystems.Visible visible,
+                                               @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
+        EquipmentUpdate update = AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate(
+                ref,
+                accessor,
+                settings
+        );
         queue(ref, update, visible.visibleTo);
         queue(ref, update, visible.newlyVisibleTo);
-    }
-
-    @Nonnull
-    private static EquipmentUpdate createCurrentEquipmentUpdate(@Nonnull Ref<EntityStore> ref,
-                                                               @Nonnull ComponentAccessor<EntityStore> accessor) {
-        PlayerSettings playerSettings = accessor.getComponent(ref, PlayerSettings.getComponentType());
-        InventoryComponent.Armor armor = accessor.getComponent(ref, InventoryComponent.Armor.getComponentType());
-        InventoryComponent.Utility utility = accessor.getComponent(ref, InventoryComponent.Utility.getComponentType());
-        return InventoryUtils.createEquipmentUpdate(ref, accessor, playerSettings, armor, utility);
     }
 
     private static void queue(@Nonnull Ref<EntityStore> ref,
