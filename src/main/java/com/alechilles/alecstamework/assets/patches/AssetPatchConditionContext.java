@@ -316,6 +316,8 @@ public final class AssetPatchConditionContext {
                 "linkingRequiresOwner", "ownership.linkingRequiresOwner");
         put(values, settings.needsEnabled(),
                 "needsEnabled", "needs.enabled");
+        put(values, settings.needsResourceMode(),
+                "needsResourceMode", "needs.resourceMode");
         put(values, settings.needsTickPolicyMode(),
                 "needsTickPolicyMode", "needs.tickPolicy.mode", "needs.tickPolicyMode");
         put(values, settings.needsOwnerOfflineGraceHours(),

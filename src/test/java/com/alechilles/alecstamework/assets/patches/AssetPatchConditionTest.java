@@ -449,6 +449,8 @@ final class AssetPatchConditionTest {
                 setting("ownership.linkingRequiresOwner", settings.linkingRequiresOwner()),
                 setting("needsEnabled", settings.needsEnabled()),
                 setting("needs.enabled", settings.needsEnabled()),
+                setting("needsResourceMode", settings.needsResourceMode()),
+                setting("needs.resourceMode", settings.needsResourceMode()),
                 setting("needsTickPolicyMode", settings.needsTickPolicyMode()),
                 setting("needs.tickPolicy.mode", settings.needsTickPolicyMode()),
                 setting("needs.tickPolicyMode", settings.needsTickPolicyMode()),

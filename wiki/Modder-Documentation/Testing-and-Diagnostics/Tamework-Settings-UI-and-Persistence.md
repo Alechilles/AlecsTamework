@@ -70,7 +70,7 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 | Population | Owned NPC limits and per-player counting scope |
 | SimpleClaims | Enablement, claim limits, breeding-claim requirement, and tamed damage protection |
 | Ownership | Owner damage protection, capture/spawn/interaction/linking owner requirements, capture owner clearing, and spawn owner assignment |
-| Needs | Master enable, owner-offline tick policy, damage model/rates/lethal |
+| Needs | Master enable, resource seeking mode, owner-offline tick policy, damage model/rates/lethal |
 | Progression | Happiness master enable, passive breeding master enable, breeding happiness requirement, breeding gender master toggle, traits master enable, leveling master enable, and talent tree master enable |
 | Commands | Revive system master enable and recall/return-home teleporting master enable |
 | Telemetry | Crash telemetry and breadcrumb enablement |
@@ -99,6 +99,7 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 
 ### Needs and Revive
 - Needs system enabled toggle
+- Needs resource mode (`Accurate`, `AutoFast`, or `AlwaysFast`) for food/water seeking and consumption performance
 - Needs tick policy and needs-damage values (including model/rates/lethal)
 - Happiness system enabled toggle
 - Passive breeding enabled toggle
