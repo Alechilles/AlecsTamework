@@ -25,6 +25,7 @@ import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -295,6 +296,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkMountedGlideRiderComponent> mountedGlideRiderComponentType;
     private ComponentType<EntityStore, AvatarFlightComponent> avatarFlightComponentType;
     private ComponentType<EntityStore, AvatarFlightInputComponent> avatarFlightInputComponentType;
+    private ComponentType<EntityStore, AvatarFlightRiderVisualComponent> avatarFlightRiderVisualComponentType;
     private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
@@ -577,6 +579,12 @@ public class Tamework extends JavaPlugin {
                 AvatarFlightInputComponent.class,
                 "TameworkAvatarFlightInput",
                 AvatarFlightInputComponent.CODEC
+        );
+
+        avatarFlightRiderVisualComponentType = getEntityStoreRegistry().registerComponent(
+                AvatarFlightRiderVisualComponent.class,
+                "TameworkAvatarFlightRiderVisual",
+                AvatarFlightRiderVisualComponent.CODEC
         );
 
         levelingComponentType = getEntityStoreRegistry().registerComponent(
@@ -2520,6 +2528,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, AvatarFlightInputComponent> getAvatarFlightInputComponentType() {
         return avatarFlightInputComponentType;
+    }
+
+    public ComponentType<EntityStore, AvatarFlightRiderVisualComponent> getAvatarFlightRiderVisualComponentType() {
+        return avatarFlightRiderVisualComponentType;
     }
 
     public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {

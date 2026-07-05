@@ -69,6 +69,12 @@ public final class AvatarFlightModelService {
         return saved == null ? null : saved.getModelAssetId();
     }
 
+    @Nullable
+    public Model savedModelCopy(@Nonnull UUID playerUuid) {
+        Model saved = SAVED_MODELS.get(playerUuid);
+        return saved == null ? null : new Model(saved);
+    }
+
     public boolean hasSavedModel(@Nonnull UUID playerUuid) {
         return SAVED_MODELS.containsKey(playerUuid);
     }
