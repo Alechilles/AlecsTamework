@@ -385,7 +385,7 @@ final class BreedingClaimLimitPolicyService {
         if (worldName == null || worldName.isBlank() || position == null) {
             return new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "missing-world-or-position");
         }
-        SimpleClaimsBreedingBridge.LookupResult lookup = simpleClaimsBridge.lookupClaim(worldName, position);
+        SimpleClaimsBreedingBridge.LookupResult lookup = simpleClaimsBridge.lookupSimpleClaimsClaim(worldName, position);
         if (lookup == null) {
             return new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "lookup-result-null");
         }

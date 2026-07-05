@@ -1,14 +1,18 @@
 package com.alechilles.alecstamework.integration.simpleclaims;
 
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
+import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
 import org.joml.Vector3d;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Reflective bridge to SimpleClaims for optional Tamework claim integrations.
  */
-public final class SimpleClaimsBreedingBridge {
+public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge {
     @Nullable
     private static volatile SimpleClaimsBreedingBridge cachedBridge;
 
@@ -146,14 +150,41 @@ public final class SimpleClaimsBreedingBridge {
         return unavailableReason;
     }
 
-    public LookupResult lookupClaim(@Nullable String worldName, @Nullable Vector3d position) {
-        if (position == null) {
-            return lookupClaim(worldName, 0.0, 0.0);
-        }
-        return lookupClaim(worldName, position.x, position.z);
+    @Nonnull
+    @Override
+    public String providerId() {
+        return "simpleclaims";
     }
 
-    public LookupResult lookupClaim(@Nullable String worldName, double blockX, double blockZ) {
+    @Nonnull
+    @Override
+    public ClaimLookupResult lookupClaim(@Nullable String worldName, double blockX, double blockZ) {
+        LookupResult lookup = lookupSimpleClaimsClaim(worldName, blockX, blockZ);
+        return switch (lookup.status()) {
+            case CLAIM_FOUND -> {
+                ClaimInfo claimInfo = lookup.claimInfo();
+                if (claimInfo == null || claimInfo.partyId() == null) {
+                    yield ClaimLookupResult.error("SimpleClaims claim info was missing.");
+                }
+                yield ClaimLookupResult.found(
+                        ClaimPopulationKey.simpleClaims(worldName, claimInfo.partyId()),
+                        claimInfo.claimChunkCount()
+                );
+            }
+            case NO_CLAIM -> ClaimLookupResult.noClaim();
+            case UNAVAILABLE -> ClaimLookupResult.unavailable(lookup.message());
+            case ERROR -> ClaimLookupResult.error(lookup.message());
+        };
+    }
+
+    public LookupResult lookupSimpleClaimsClaim(@Nullable String worldName, @Nullable Vector3d position) {
+        if (position == null) {
+            return lookupSimpleClaimsClaim(worldName, 0.0, 0.0);
+        }
+        return lookupSimpleClaimsClaim(worldName, position.x, position.z);
+    }
+
+    public LookupResult lookupSimpleClaimsClaim(@Nullable String worldName, double blockX, double blockZ) {
         if (!available) {
             return new LookupResult(LookupStatus.UNAVAILABLE, null, unavailableReason);
         }

@@ -813,7 +813,7 @@ public final class TameworkApiImpl
             );
         }
 
-        SimpleClaimsBreedingBridge.LookupResult lookup = simpleClaimsBridge.lookupClaim(
+        SimpleClaimsBreedingBridge.LookupResult lookup = simpleClaimsBridge.lookupSimpleClaimsClaim(
                 liveContext.worldName(),
                 toVector(liveContext.currentPosition())
         );
