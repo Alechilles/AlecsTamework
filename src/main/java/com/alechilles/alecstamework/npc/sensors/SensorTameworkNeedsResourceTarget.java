@@ -50,6 +50,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static final double TARGET_RESERVATION_TTL_SECONDS = PositionTargetReservationCache.DEFAULT_TTL_SECONDS;
     private static final double DEFAULT_APPROACH_RADIUS = 2.0;
     private static final double EPSILON = 0.000001;
+    private static final ConcurrentHashMap<UUID, FastConsumeTarget> FAST_CONSUME_TARGETS = new ConcurrentHashMap<>();
 
     private final ResourceType resourceType;
     @Nullable
@@ -135,6 +136,15 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                 return false;
             }
             positionInfo.setTarget(cached.target().x, cached.target().y, cached.target().z);
+            if (cached.fastConsume()) {
+                rememberFastConsumeTarget(
+                        npcUuid,
+                        worldName,
+                        resourceType,
+                        cached.target(),
+                        nowMs + TARGET_CACHE_HIT_TTL_MS
+                );
+            }
             maybeLog(
                     ref,
                     store,
@@ -175,7 +185,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         }
         if (target == null) {
             if (npcUuid != null) {
-                cacheTarget(npcUuid, null, resolution.reason(), DEFAULT_APPROACH_RADIUS, currentCacheBlock, nowMs);
+                cacheTarget(npcUuid, null, resolution.reason(), DEFAULT_APPROACH_RADIUS, currentCacheBlock, nowMs, false);
+                clearFastConsumeTarget(npcUuid, worldName, resourceType, null);
             }
             maybeLog(
                     ref,
@@ -194,7 +205,23 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (shouldBypassPathPreflight(fastModeActive, target != null)) {
             String reason = fastModeReason(resolution.reason());
             if (npcUuid != null) {
-                cacheTarget(npcUuid, target, reason, resolution.approachRadius(), currentCacheBlock, nowMs);
+                if (!reserveTarget(npcUuid, worldName, resourceType, target, nowMs)) {
+                    maybeLog(
+                            ref,
+                            store,
+                            npcId,
+                            roleId,
+                            resolveResourceLabel(),
+                            "miss",
+                            "fast_consume_target_reserved",
+                            false,
+                            eligibility.currentRatio(),
+                            target
+                    );
+                    return false;
+                }
+                cacheTarget(npcUuid, target, reason, resolution.approachRadius(), currentCacheBlock, nowMs, true);
+                rememberFastConsumeTarget(npcUuid, worldName, resourceType, target, nowMs + TARGET_CACHE_HIT_TTL_MS);
                 if (resourceType == ResourceType.WATER) {
                     recentTargetCache.remember(npcUuid, target, nowMs);
                 }
@@ -270,7 +297,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             return false;
         }
         if (npcUuid != null) {
-            cacheTarget(npcUuid, target, resolution.reason(), resolution.approachRadius(), currentCacheBlock, nowMs);
+            cacheTarget(npcUuid, target, resolution.reason(), resolution.approachRadius(), currentCacheBlock, nowMs, false);
+            clearFastConsumeTarget(npcUuid, worldName, resourceType, target);
             if (resourceType == ResourceType.WATER) {
                 recentTargetCache.remember(npcUuid, target, nowMs);
             }
@@ -312,9 +340,13 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                 @Nullable String worldName,
                                                 long nowMs,
                                                 boolean fastModeActive) {
-        TargetRejector targetRejector = fastModeActive
-                ? null
-                : createTargetRejector(npcUuid, ResourceType.WATER, worldName, nowMs);
+        TargetRejector targetRejector = createTargetRejector(
+                npcUuid,
+                ResourceType.WATER,
+                worldName,
+                nowMs,
+                !fastModeActive
+        );
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, range),
@@ -408,9 +440,13 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (effectiveItemIds == null || effectiveItemIds.length == 0) {
             return TargetResolution.none("food_item_ids_empty");
         }
-        TargetRejector targetRejector = fastModeActive
-                ? null
-                : createTargetRejector(npcUuid, ResourceType.FOOD_CONTAINER, worldName, nowMs);
+        TargetRejector targetRejector = createTargetRejector(
+                npcUuid,
+                ResourceType.FOOD_CONTAINER,
+                worldName,
+                nowMs,
+                !fastModeActive
+        );
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, range, effectiveItemIds),
@@ -713,7 +749,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                              @Nonnull String reason,
                              double approachRadius,
                              @Nullable TargetCacheBlock currentCacheBlock,
-                             long nowMs) {
+                             long nowMs,
+                             boolean fastConsume) {
         if (currentCacheBlock == null) {
             return;
         }
@@ -725,7 +762,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                         reason,
                         sanitizeApproachRadius(approachRadius),
                         currentCacheBlock,
-                        nowMs + ttlMs
+                        nowMs + ttlMs,
+                        fastConsume
                 )
         );
     }
@@ -773,6 +811,32 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     @Nonnull
     static String fastModeReasonForTests(@Nonnull String reason) {
         return fastModeReason(reason);
+    }
+
+    static void rememberFastConsumeTargetForTests(@Nullable UUID npcUuid,
+                                                  @Nullable String worldName,
+                                                  @Nullable String rawResourceType,
+                                                  @Nullable Vector3d target,
+                                                  long expiresAtMs) {
+        if (npcUuid == null || target == null || !isFinite(target)) {
+            return;
+        }
+        rememberFastConsumeTarget(npcUuid, worldName, ResourceType.from(rawResourceType), target, expiresAtMs);
+    }
+
+    static boolean isFastConsumeTargetForTests(@Nullable UUID npcUuid,
+                                               @Nullable String worldName,
+                                               @Nullable String rawResourceType,
+                                               @Nullable Vector3d target,
+                                               long nowMs) {
+        if (npcUuid == null || target == null || !isFinite(target)) {
+            return false;
+        }
+        return isFastConsumeTarget(npcUuid, worldName, ResourceType.from(rawResourceType), target, nowMs);
+    }
+
+    static void clearFastConsumeTargetsForTests() {
+        FAST_CONSUME_TARGETS.clear();
     }
 
     private boolean shouldUseRecentTargetFallback(@Nonnull String reason) {
@@ -888,12 +952,15 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private static TargetRejector createTargetRejector(@Nullable UUID npcUuid,
                                                        @Nonnull ResourceType type,
                                                        @Nullable String worldName,
-                                                       long nowMs) {
-        boolean hasRejectedTargets = hasRejectedTargetFor(npcUuid, type, nowMs);
-        if (!hasRejectedTargets) {
+                                                       long nowMs,
+                                                       boolean includeRejectedTargets) {
+        boolean hasRejectedTargets = includeRejectedTargets && hasRejectedTargetFor(npcUuid, type, nowMs);
+        boolean hasReservedTargets = PositionTargetReservationCache.hasReservationFor(worldName, typeLabel(type), nowMs);
+        if (!hasRejectedTargets && !hasReservedTargets) {
             return null;
         }
-        return target -> isTargetRejected(npcUuid, type, target, nowMs);
+        return target -> (includeRejectedTargets && isTargetRejected(npcUuid, type, target, nowMs))
+                || isTargetReservedByOther(npcUuid, worldName, type, target, nowMs);
     }
 
     private static boolean hasRejectedTargetFor(@Nullable UUID npcUuid,
@@ -984,6 +1051,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                       @Nonnull ResourceType type,
                                       @Nullable Vector3d target) {
         PositionTargetReservationCache.release(npcUuid, worldName, typeLabel(type), target);
+        clearFastConsumeTarget(npcUuid, worldName, type, target);
     }
 
     private static boolean reserveTarget(@Nullable UUID npcUuid,
@@ -1007,6 +1075,68 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                    @Nullable Vector3d target,
                                                    long nowMs) {
         return PositionTargetReservationCache.isReservedByOther(npcUuid, worldName, typeLabel(type), target, nowMs);
+    }
+
+    public static boolean hasFastConsumeTarget(@Nullable Ref<EntityStore> npcRef,
+                                               @Nullable Store<EntityStore> store,
+                                               long nowMs) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        UUID npcUuid = resolveNpcUuid(npcRef, store);
+        if (npcUuid == null) {
+            return false;
+        }
+        FastConsumeTarget marker = FAST_CONSUME_TARGETS.get(npcUuid);
+        if (marker == null) {
+            return false;
+        }
+        if (nowMs >= marker.expiresAtMs()) {
+            FAST_CONSUME_TARGETS.remove(npcUuid, marker);
+            return false;
+        }
+        return marker.matchesWorld(resolveWorldName(store));
+    }
+
+    private static void rememberFastConsumeTarget(@Nullable UUID npcUuid,
+                                                  @Nullable String worldName,
+                                                  @Nonnull ResourceType type,
+                                                  @Nullable Vector3d target,
+                                                  long expiresAtMs) {
+        FastConsumeTarget marker = FastConsumeTarget.from(worldName, type, target, expiresAtMs);
+        if (npcUuid == null || marker == null) {
+            return;
+        }
+        FAST_CONSUME_TARGETS.put(npcUuid, marker);
+    }
+
+    private static boolean isFastConsumeTarget(@Nonnull UUID npcUuid,
+                                               @Nullable String worldName,
+                                               @Nonnull ResourceType type,
+                                               @Nullable Vector3d target,
+                                               long nowMs) {
+        FastConsumeTarget marker = FAST_CONSUME_TARGETS.get(npcUuid);
+        if (marker == null) {
+            return false;
+        }
+        if (nowMs >= marker.expiresAtMs()) {
+            FAST_CONSUME_TARGETS.remove(npcUuid, marker);
+            return false;
+        }
+        return marker.matches(worldName, type, target);
+    }
+
+    private static void clearFastConsumeTarget(@Nullable UUID npcUuid,
+                                               @Nullable String worldName,
+                                               @Nonnull ResourceType type,
+                                               @Nullable Vector3d target) {
+        if (npcUuid == null) {
+            return;
+        }
+        FastConsumeTarget marker = FAST_CONSUME_TARGETS.get(npcUuid);
+        if (marker != null && marker.matchesClear(worldName, type, target)) {
+            FAST_CONSUME_TARGETS.remove(npcUuid, marker);
+        }
     }
 
     private long resolveCurrentTimeMs() {
@@ -1037,6 +1167,14 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         return world != null ? world.getName() : null;
     }
 
+    @Nonnull
+    private static String normalizeWorldName(@Nullable String worldName) {
+        if (worldName == null || worldName.isBlank()) {
+            return "global";
+        }
+        return worldName.trim().toLowerCase(Locale.ROOT);
+    }
+
     @Nullable
     private static TargetCacheBlock resolveCurrentCacheBlock(@Nonnull Ref<EntityStore> ref,
                                                              @Nonnull Store<EntityStore> store) {
@@ -1051,7 +1189,8 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                       @Nonnull String reason,
                                       double approachRadius,
                                       @Nonnull TargetCacheBlock scanBlock,
-                                      long expiresAtMs) {
+                                      long expiresAtMs,
+                                      boolean fastConsume) {
     }
 
     private record TargetCacheBlock(int x, int y, int z) {
@@ -1068,6 +1207,55 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     (int) Math.floor(position.y),
                     (int) Math.floor(position.z)
             );
+        }
+    }
+
+    private record FastConsumeTarget(@Nonnull String worldName,
+                                     @Nonnull ResourceType type,
+                                     int x,
+                                     int y,
+                                     int z,
+                                     long expiresAtMs) {
+        @Nullable
+        private static FastConsumeTarget from(@Nullable String worldName,
+                                              @Nonnull ResourceType type,
+                                              @Nullable Vector3d target,
+                                              long expiresAtMs) {
+            if (target == null || !isFinite(target)) {
+                return null;
+            }
+            return new FastConsumeTarget(
+                    normalizeWorldName(worldName),
+                    type,
+                    (int) Math.floor(target.x),
+                    (int) Math.floor(target.y),
+                    (int) Math.floor(target.z),
+                    expiresAtMs
+            );
+        }
+
+        private boolean matchesWorld(@Nullable String otherWorldName) {
+            return worldName.equals(normalizeWorldName(otherWorldName));
+        }
+
+        private boolean matches(@Nullable String otherWorldName,
+                                @Nonnull ResourceType otherType,
+                                @Nullable Vector3d target) {
+            return target != null
+                    && isFinite(target)
+                    && matchesWorld(otherWorldName)
+                    && type == otherType
+                    && x == (int) Math.floor(target.x)
+                    && y == (int) Math.floor(target.y)
+                    && z == (int) Math.floor(target.z);
+        }
+
+        private boolean matchesClear(@Nullable String otherWorldName,
+                                     @Nonnull ResourceType otherType,
+                                     @Nullable Vector3d target) {
+            return matchesWorld(otherWorldName)
+                    && type == otherType
+                    && (target == null || matches(otherWorldName, otherType, target));
         }
     }
 

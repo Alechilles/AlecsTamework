@@ -202,8 +202,8 @@ class NeedsSeekComponentAssetTest {
                 "Consume attempts must keep the active reservation while repeat checks run");
         assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceConsumeSucceeded\""),
                 "Food and water repeat branches must only loop after a successful consume attempt");
-        assertEquals(1, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceReleaseTarget\""),
-                "Successful post-consume completion must release Tamework's internal approach-point reservation");
+        assertEquals(2, countOccurrences(content, "\"Type\": \"TameworkNeedsResourceReleaseTarget\""),
+                "Move failure and successful post-consume completion must release Tamework's internal approach-point reservation");
         assertTrue(content.contains("\"Need\": \"Hunger\""));
         assertTrue(content.contains("\"Need\": \"Thirst\""));
         assertTrue(content.contains("\"Compute\": \"NeedsSeekWhenHungerBelowRatio\""));

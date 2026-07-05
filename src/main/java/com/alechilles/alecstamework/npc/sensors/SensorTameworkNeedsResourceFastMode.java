@@ -23,11 +23,18 @@ public final class SensorTameworkNeedsResourceFastMode extends TameworkSensorBas
                            double dt,
                            @Nonnull Store<EntityStore> store) {
         return super.matches(ref, role, dt, store)
-                && NeedsResourceFastModePolicy.isFastModeActive(System.currentTimeMillis());
+                && isFastModeActive(ref, store);
     }
 
     @Override
     public InfoProvider getSensorInfo() {
         return null;
+    }
+
+    private static boolean isFastModeActive(@Nonnull Ref<EntityStore> ref,
+                                            @Nonnull Store<EntityStore> store) {
+        long nowMs = System.currentTimeMillis();
+        return NeedsResourceFastModePolicy.isFastModeActive(nowMs)
+                || SensorTameworkNeedsResourceTarget.hasFastConsumeTarget(ref, store, nowMs);
     }
 }
