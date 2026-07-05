@@ -165,7 +165,7 @@ class NeedsSeekComponentAssetTest {
                 "Needs seek must copy the planner target into the active movement slot exactly once");
         assertTrue(countOccurrences(content, "\"Compute\": \"NeedsSeekActiveTargetSlot\"") > 10,
                 "Runtime movement, consume, and failure branches must use the locked active target slot");
-        assertEquals(8, countOccurrences(content, "\"Type\": \"ReleaseTarget\""),
+        assertEquals(9, countOccurrences(content, "\"Type\": \"ReleaseTarget\""),
                 "Every terminal movement branch must clear the locked active target");
     }
 

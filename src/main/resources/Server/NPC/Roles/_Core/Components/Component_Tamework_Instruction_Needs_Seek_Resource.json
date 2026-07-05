@@ -1242,7 +1242,13 @@
           },
           {
             "Sensor": {
-              "Type": "Any"
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "NeedsSeekActiveTargetSlot"
+              },
+              "Range": {
+                "Compute": "NeedsSeekReadRange"
+              }
             },
             "Actions": [
               {
@@ -1267,6 +1273,45 @@
                 "Type": "TameworkNeedsResourceReleaseTarget",
                 "ResourceType": {
                   "Compute": "NeedsSeekResourceType"
+                }
+              },
+              {
+                "Type": "ReleaseTarget",
+                "TargetSlot": {
+                  "Compute": "NeedsSeekActiveTargetSlot"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "Any"
+            },
+            "Actions": [
+              {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
                 }
               },
               {

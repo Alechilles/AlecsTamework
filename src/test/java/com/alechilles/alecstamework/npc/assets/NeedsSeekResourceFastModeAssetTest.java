@@ -36,10 +36,16 @@ class NeedsSeekResourceFastModeAssetTest {
         int postConsume = asset.indexOf("\"$Comment\": \"After consuming once");
         assertTrue(postConsume > seekBranch, "Needs seek asset must keep the shared post-consume branch.");
         String postConsumeBody = asset.substring(postConsume);
+        int postConsumeReadPosition = postConsumeBody.indexOf("\"Type\": \"ReadPosition\"");
         int releaseReservation = postConsumeBody.indexOf("\"Type\": \"TameworkNeedsResourceReleaseTarget\"");
         int releaseTarget = postConsumeBody.indexOf("\"Type\": \"ReleaseTarget\"");
+        assertTrue(postConsumeReadPosition >= 0, "Post-consume release must read the active target position.");
         assertTrue(releaseReservation >= 0, "Post-consume completion must release the Tamework reservation.");
         assertTrue(releaseTarget >= 0, "Post-consume completion must clear the active target slot.");
+        assertTrue(
+                postConsumeReadPosition < releaseReservation,
+                "The Tamework reservation release branch must have target position info available."
+        );
         assertTrue(
                 releaseReservation < releaseTarget,
                 "The Tamework reservation must be released before clearing the active target slot."
