@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -12,10 +13,8 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
-import com.hypixel.hytale.math.vector.Rotation3fc;
 import com.hypixel.hytale.protocol.ModelTransform;
 import com.hypixel.hytale.protocol.TransformUpdate;
-import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.system.TransformSystems;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
@@ -30,8 +29,8 @@ import javax.annotation.Nullable;
  */
 public final class AvatarFlightOwnerPoseVisualSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
+    private final ComponentType<EntityStore, AvatarFlightInputComponent> inputType;
     private final ComponentType<EntityStore, TransformComponent> transformType;
-    private final ComponentType<EntityStore, HeadRotation> headRotationType;
     private final ComponentType<EntityStore, EntityTrackerSystems.EntityViewer> viewerType;
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
@@ -40,14 +39,14 @@ public final class AvatarFlightOwnerPoseVisualSystem extends EntityTickingSystem
 
     public AvatarFlightOwnerPoseVisualSystem(
             @Nonnull ComponentType<EntityStore, AvatarFlightComponent> flightType,
+            @Nonnull ComponentType<EntityStore, AvatarFlightInputComponent> inputType,
             @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
-            @Nonnull ComponentType<EntityStore, HeadRotation> headRotationType,
             @Nonnull ComponentType<EntityStore, EntityTrackerSystems.EntityViewer> viewerType) {
         this.flightType = flightType;
+        this.inputType = inputType;
         this.transformType = transformType;
-        this.headRotationType = headRotationType;
         this.viewerType = viewerType;
-        this.query = Query.and(flightType, transformType, viewerType);
+        this.query = Query.and(flightType, inputType, transformType, viewerType);
     }
 
     @Override
@@ -57,32 +56,43 @@ public final class AvatarFlightOwnerPoseVisualSystem extends EntityTickingSystem
                      @Nonnull Store<EntityStore> store,
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Ref<EntityStore> ref = archetypeChunk.getReferenceTo(index);
+        AvatarFlightComponent flight = archetypeChunk.getComponent(index, flightType);
+        AvatarFlightInputComponent input = archetypeChunk.getComponent(index, inputType);
         TransformComponent transform = archetypeChunk.getComponent(index, transformType);
         EntityTrackerSystems.EntityViewer viewer = archetypeChunk.getComponent(index, viewerType);
-        if (ref == null || transform == null || viewer == null) {
+        if (ref == null || flight == null || input == null || transform == null || viewer == null
+                || input.isStale(System.currentTimeMillis(), resolveIntentTimeoutMs(flight))) {
             return;
         }
-        viewer.queueUpdate(ref, new TransformUpdate(createTransform(transform, resolveHeadRotation(ref, commandBuffer))));
+        viewer.queueUpdate(ref, new TransformUpdate(createTransform(transform, input)));
     }
 
     @Nonnull
     private ModelTransform createTransform(@Nonnull TransformComponent transform,
-                                           @Nonnull Rotation3fc headRotation) {
+                                           @Nonnull AvatarFlightInputComponent input) {
         ModelTransform modelTransform = new ModelTransform();
         modelTransform.position = PositionUtil.toPositionPacket(transform.getPosition());
-        modelTransform.bodyOrientation = PositionUtil.toDirectionPacket(transform.getRotation());
-        modelTransform.lookOrientation = PositionUtil.toDirectionPacket(new Rotation3f(headRotation));
+        modelTransform.bodyOrientation = PositionUtil.toDirectionPacket(createBodyRotation(transform, input));
+        modelTransform.lookOrientation = PositionUtil.toDirectionPacket(createLookRotation(input));
         return modelTransform;
     }
 
     @Nonnull
-    private Rotation3fc resolveHeadRotation(@Nonnull Ref<EntityStore> ref,
-                                            @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        HeadRotation headRotation = commandBuffer.getComponent(ref, headRotationType);
-        if (headRotation == null || headRotation.getRotation() == null) {
-            return Rotation3f.IDENTITY;
-        }
-        return headRotation.getRotation();
+    private Rotation3f createBodyRotation(@Nonnull TransformComponent transform,
+                                          @Nonnull AvatarFlightInputComponent input) {
+        Rotation3f bodyRotation = new Rotation3f(transform.getRotation());
+        bodyRotation.setYaw((float) input.getYawRadians());
+        return bodyRotation;
+    }
+
+    @Nonnull
+    private Rotation3f createLookRotation(@Nonnull AvatarFlightInputComponent input) {
+        return new Rotation3f((float) input.getPitchRadians(), (float) input.getYawRadians(), 0.0f);
+    }
+
+    private long resolveIntentTimeoutMs(@Nonnull AvatarFlightComponent flight) {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
+        return Math.round(config.getInput().getIntentTimeoutMs());
     }
 
     @Nullable

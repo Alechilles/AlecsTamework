@@ -25,12 +25,20 @@ class AvatarFlightOwnerPoseVisualSystemArchitectureTest {
 
         assertTrue(source.contains("EntityTrackerSystems.EntityViewer"),
                 "avatar flight must bypass vanilla transform sync's self-update skip");
+        assertTrue(source.contains("AvatarFlightInputComponent"),
+                "owner pose sync must use fresh packet-derived look input instead of stale transform yaw");
+        assertTrue(source.contains("input.isStale(System.currentTimeMillis(), resolveIntentTimeoutMs(flight))"),
+                "owner pose sync should skip stale look input instead of fighting mouse look");
         assertTrue(source.contains("viewer.queueUpdate(ref, new TransformUpdate"),
                 "the owner client needs an explicit transform update for pitch and roll");
-        assertTrue(source.contains("modelTransform.bodyOrientation = PositionUtil.toDirectionPacket(transform.getRotation())"),
-                "body orientation must carry the server-authored roll and pitch");
-        assertTrue(source.contains("modelTransform.lookOrientation = PositionUtil.toDirectionPacket(new Rotation3f(headRotation))"),
-                "look orientation should match the avatar-flight head rotation");
+        assertTrue(source.contains("modelTransform.bodyOrientation = PositionUtil.toDirectionPacket(createBodyRotation(transform, input))"),
+                "body orientation must carry the server-authored roll and pitch while preserving live look yaw");
+        assertTrue(source.contains("modelTransform.lookOrientation = PositionUtil.toDirectionPacket(createLookRotation(input))"),
+                "look orientation should use live pitch/yaw with no injected visual roll");
+        assertTrue(source.contains("bodyRotation.setYaw((float) input.getYawRadians())"),
+                "body yaw should come from fresh owner input to avoid mouse snapback");
+        assertTrue(source.contains("new Rotation3f((float) input.getPitchRadians(), (float) input.getYawRadians(), 0.0f)"),
+                "look roll should stay zero so model banking does not become camera roll");
     }
 
     @Test
