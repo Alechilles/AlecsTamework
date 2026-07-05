@@ -120,6 +120,24 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void avatarFlightSuppressesPlayerOverlayAnimationSlotsWhileActive() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config)"),
+                "transformed-player flight should suppress held-item/combat overlay slots while active");
+        assertTrue(source.contains("config.getAnimation().isSuppressNonMovementAnimations()"),
+                "suppression should be config-driven for unsafe model-swap experiments");
+        assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, commandBuffer)"),
+                "Action slot is where item/combat animations can be applied to the wrong transformed model");
+        assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Status, true, commandBuffer)"),
+                "Status slot should be cleared so held-item/status overlays do not persist on the transformed model");
+        assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Emote, true, commandBuffer)"),
+                "Emote slot should be cleared by default because player emotes are authored for the player rig");
+        assertTrue(source.contains("flight.setNextSuppressedAnimationAtMs(now + config.getAnimation().getSuppressionIntervalMs())"),
+                "slot suppression should be throttled instead of spamming packets every tick");
+    }
+
+    @Test
     void debugLogFormatsMovementStateFlags() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

@@ -68,7 +68,7 @@ public final class AvatarFlightActivator {
         }
         restoreClientFlyingState(store, ref);
         resetVisualPose(store, ref);
-        clearMovementAnimation(store, ref);
+        clearForcedAnimations(store, ref);
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
         boolean hadSavedModel = modelService.hasSavedModel(playerUuid);
@@ -104,9 +104,12 @@ public final class AvatarFlightActivator {
         }
     }
 
-    private void clearMovementAnimation(@Nonnull Store<EntityStore> store,
-                                        @Nonnull Ref<EntityStore> ref) {
+    private void clearForcedAnimations(@Nonnull Store<EntityStore> store,
+                                       @Nonnull Ref<EntityStore> ref) {
         AnimationUtils.stopAnimation(ref, AnimationSlot.Movement, true, store);
+        AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, store);
+        AnimationUtils.stopAnimation(ref, AnimationSlot.Status, true, store);
+        AnimationUtils.stopAnimation(ref, AnimationSlot.Emote, true, store);
     }
 
     public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {

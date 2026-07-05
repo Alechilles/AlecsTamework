@@ -35,6 +35,18 @@
     "CooldownSeconds": 1.0,
     "DurationSeconds": 0.45
   },
+  "Animation": {
+    "IdleAnimation": "FlyIdle",
+    "FlightAnimation": "Fly",
+    "FastFlightAnimation": "FlyFast",
+    "ResendIntervalMs": 250.0,
+    "SuppressNonMovementAnimations": true,
+    "SuppressActionAnimation": true,
+    "SuppressStatusAnimation": true,
+    "SuppressEmoteAnimation": true,
+    "SuppressFaceAnimation": false,
+    "SuppressionIntervalMs": 100.0
+  },
   "Debug": {
     "LogControllerTicks": true,
     "LogInputTransitions": false

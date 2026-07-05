@@ -68,6 +68,8 @@ Initial controller intents:
 - `ForwardBoost`: uses the existing shift/sprint path if reliable.
 - `AbilitySlot`: reserved for later actions once Q, E, and R are validated.
 
+While avatar flight is active, the controller should own transformed-dragon movement animations and suppress player-rig overlay animation slots that do not fit the dragon model. The default config clears Action, Status, and Emote slots at a throttled interval, leaves Face untouched, and clears forced slots again when avatar flight is disabled.
+
 ### Ability Configuration
 
 Abilities belong in avatar flight config, not on Dragon Reins. This lets NordicDrake, future dragons, and non-dragon flying forms share the same control item while defining different abilities.

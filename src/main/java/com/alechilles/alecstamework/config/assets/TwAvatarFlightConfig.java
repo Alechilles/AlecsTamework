@@ -201,6 +201,36 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.resendIntervalMs)
             .documentation("Minimum milliseconds between forced movement-animation packets while the same animation remains active. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Boolean>append(new KeyedCodec<>("SuppressNonMovementAnimations", Codec.BOOLEAN),
+                    (settings, value) -> settings.suppressNonMovementAnimations = value == null || value,
+                    settings -> settings.suppressNonMovementAnimations)
+            .documentation("Whether avatar flight periodically clears non-movement player animation slots that are authored for the player rig. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("SuppressActionAnimation", Codec.BOOLEAN),
+                    (settings, value) -> settings.suppressActionAnimation = value == null || value,
+                    settings -> settings.suppressActionAnimation)
+            .documentation("Whether avatar flight clears the Action animation slot, commonly used by item/combat animations. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("SuppressStatusAnimation", Codec.BOOLEAN),
+                    (settings, value) -> settings.suppressStatusAnimation = value == null || value,
+                    settings -> settings.suppressStatusAnimation)
+            .documentation("Whether avatar flight clears the Status animation slot while transformed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("SuppressEmoteAnimation", Codec.BOOLEAN),
+                    (settings, value) -> settings.suppressEmoteAnimation = value == null || value,
+                    settings -> settings.suppressEmoteAnimation)
+            .documentation("Whether avatar flight clears player emotes while transformed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("SuppressFaceAnimation", Codec.BOOLEAN),
+                    (settings, value) -> settings.suppressFaceAnimation = value != null && value,
+                    settings -> settings.suppressFaceAnimation)
+            .documentation("Whether avatar flight clears the Face animation slot while transformed. Disabled by default. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("SuppressionIntervalMs", Codec.DOUBLE),
+                    (settings, value) -> settings.suppressionIntervalMs = positiveOrDefault(value, 100.0),
+                    settings -> settings.suppressionIntervalMs)
+            .documentation("Minimum milliseconds between non-movement animation suppression packets. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private static final BuilderCodec<DebugSettings> DEBUG_CODEC = BuilderCodec.builder(
@@ -496,6 +526,24 @@ public final class TwAvatarFlightConfig implements
                 animation.fastFlightAnimation = parent.animation.fastFlightAnimation;
             }
             if (!keys.contains("ResendIntervalMs")) animation.resendIntervalMs = parent.animation.resendIntervalMs;
+            if (!keys.contains("SuppressNonMovementAnimations")) {
+                animation.suppressNonMovementAnimations = parent.animation.suppressNonMovementAnimations;
+            }
+            if (!keys.contains("SuppressActionAnimation")) {
+                animation.suppressActionAnimation = parent.animation.suppressActionAnimation;
+            }
+            if (!keys.contains("SuppressStatusAnimation")) {
+                animation.suppressStatusAnimation = parent.animation.suppressStatusAnimation;
+            }
+            if (!keys.contains("SuppressEmoteAnimation")) {
+                animation.suppressEmoteAnimation = parent.animation.suppressEmoteAnimation;
+            }
+            if (!keys.contains("SuppressFaceAnimation")) {
+                animation.suppressFaceAnimation = parent.animation.suppressFaceAnimation;
+            }
+            if (!keys.contains("SuppressionIntervalMs")) {
+                animation.suppressionIntervalMs = parent.animation.suppressionIntervalMs;
+            }
         }
     }
 
@@ -618,6 +666,12 @@ public final class TwAvatarFlightConfig implements
         private String flightAnimation = DEFAULT_FLIGHT_ANIMATION;
         private String fastFlightAnimation = DEFAULT_FAST_FLIGHT_ANIMATION;
         private double resendIntervalMs = 250.0;
+        private boolean suppressNonMovementAnimations = true;
+        private boolean suppressActionAnimation = true;
+        private boolean suppressStatusAnimation = true;
+        private boolean suppressEmoteAnimation = true;
+        private boolean suppressFaceAnimation;
+        private double suppressionIntervalMs = 100.0;
 
         public String getIdleAnimation() { return stringOrDefault(idleAnimation, DEFAULT_IDLE_ANIMATION); }
         public String getFlightAnimation() { return stringOrDefault(flightAnimation, DEFAULT_FLIGHT_ANIMATION); }
@@ -625,6 +679,12 @@ public final class TwAvatarFlightConfig implements
             return stringOrDefault(fastFlightAnimation, DEFAULT_FAST_FLIGHT_ANIMATION);
         }
         public long getResendIntervalMs() { return Math.round(Math.max(1.0, resendIntervalMs)); }
+        public boolean isSuppressNonMovementAnimations() { return suppressNonMovementAnimations; }
+        public boolean isSuppressActionAnimation() { return suppressActionAnimation; }
+        public boolean isSuppressStatusAnimation() { return suppressStatusAnimation; }
+        public boolean isSuppressEmoteAnimation() { return suppressEmoteAnimation; }
+        public boolean isSuppressFaceAnimation() { return suppressFaceAnimation; }
+        public long getSuppressionIntervalMs() { return Math.round(Math.max(1.0, suppressionIntervalMs)); }
 
         public String animationFor(boolean horizontalIdle, boolean fastFlight) {
             if (horizontalIdle) {

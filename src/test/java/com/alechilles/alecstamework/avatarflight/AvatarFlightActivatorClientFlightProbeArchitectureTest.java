@@ -50,14 +50,20 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     }
 
     @Test
-    void disablingAvatarFlightClearsMovementAnimationSlot() throws Exception {
+    void disablingAvatarFlightClearsForcedAnimationSlots() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
         String disableBody = methodBody(source, "public Result disable", "public void onPlayerDisconnect");
 
-        assertTrue(disableBody.contains("clearMovementAnimation(store, ref)"),
-                "disabling avatar flight must clear any forced transformed-player movement animation");
+        assertTrue(disableBody.contains("clearForcedAnimations(store, ref)"),
+                "disabling avatar flight must clear any forced transformed-player and overlay animations");
         assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Movement, true, store)"),
                 "cleanup must send the stop packet to the player itself as well as other viewers");
+        assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, store)"),
+                "cleanup must clear item/combat overlay animations from the transformed player");
+        assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Status, true, store)"),
+                "cleanup must clear status overlay animations from the transformed player");
+        assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Emote, true, store)"),
+                "cleanup must clear player emotes from the transformed player");
     }
 
     @Test

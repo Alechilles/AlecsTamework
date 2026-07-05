@@ -107,6 +107,7 @@ public final class AvatarFlightMovementSystem
         flight.setNextBoostAtMs(output.nextBoostAtMs());
         syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
         applyVisualPose(ref, commandBuffer, controllerInput, output);
+        suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);
         if (output.applyVelocity()) {
             velocity.addInstruction(
                     new Vector3d(output.velocityX(), output.velocityY(), output.velocityZ()),
@@ -189,6 +190,32 @@ public final class AvatarFlightMovementSystem
         AnimationUtils.stopAnimation(ref, AnimationSlot.Movement, true, commandBuffer);
         flight.setMovementAnimationId("");
         flight.setNextMovementAnimationAtMs(0L);
+    }
+
+    private void suppressPlayerOverlayAnimations(@Nonnull Ref<EntityStore> ref,
+                                                 @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                                 @Nonnull AvatarFlightComponent flight,
+                                                 @Nonnull TwAvatarFlightConfig config) {
+        if (!config.getAnimation().isSuppressNonMovementAnimations()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now < flight.getNextSuppressedAnimationAtMs()) {
+            return;
+        }
+        if (config.getAnimation().isSuppressActionAnimation()) {
+            AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, commandBuffer);
+        }
+        if (config.getAnimation().isSuppressStatusAnimation()) {
+            AnimationUtils.stopAnimation(ref, AnimationSlot.Status, true, commandBuffer);
+        }
+        if (config.getAnimation().isSuppressEmoteAnimation()) {
+            AnimationUtils.stopAnimation(ref, AnimationSlot.Emote, true, commandBuffer);
+        }
+        if (config.getAnimation().isSuppressFaceAnimation()) {
+            AnimationUtils.stopAnimation(ref, AnimationSlot.Face, true, commandBuffer);
+        }
+        flight.setNextSuppressedAnimationAtMs(now + config.getAnimation().getSuppressionIntervalMs());
     }
 
     private void applyVisualPose(@Nonnull Ref<EntityStore> ref,

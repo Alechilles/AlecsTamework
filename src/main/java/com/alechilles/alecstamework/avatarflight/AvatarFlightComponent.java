@@ -62,6 +62,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setNextMovementAnimationAtMs,
                     AvatarFlightComponent::getNextMovementAnimationAtMs)
             .add()
+            .<Long>append(new KeyedCodec<>("NextSuppressedAnimationAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextSuppressedAnimationAtMs,
+                    AvatarFlightComponent::getNextSuppressedAnimationAtMs)
+            .add()
             .build();
 
     private String configId = "";
@@ -75,6 +79,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private boolean clientFlyingSynced;
     private String movementAnimationId = "";
     private long nextMovementAnimationAtMs;
+    private long nextSuppressedAnimationAtMs;
 
     public AvatarFlightComponent() {
     }
@@ -198,6 +203,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         this.nextMovementAnimationAtMs = nextMovementAnimationAtMs == null ? 0L : nextMovementAnimationAtMs;
     }
 
+    public long getNextSuppressedAnimationAtMs() {
+        return nextSuppressedAnimationAtMs;
+    }
+
+    public void setNextSuppressedAnimationAtMs(@Nullable Long nextSuppressedAnimationAtMs) {
+        this.nextSuppressedAnimationAtMs = nextSuppressedAnimationAtMs == null ? 0L : nextSuppressedAnimationAtMs;
+    }
+
     public void setVelocity(double x, double y, double z) {
         velocityX = finiteOrZero(x);
         velocityY = finiteOrZero(y);
@@ -216,6 +229,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.clientFlyingSynced = clientFlyingSynced;
         clone.movementAnimationId = getMovementAnimationId();
         clone.nextMovementAnimationAtMs = nextMovementAnimationAtMs;
+        clone.nextSuppressedAnimationAtMs = nextSuppressedAnimationAtMs;
         return clone;
     }
 

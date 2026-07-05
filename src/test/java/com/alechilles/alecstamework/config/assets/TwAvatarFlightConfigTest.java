@@ -30,6 +30,12 @@ class TwAvatarFlightConfigTest {
         assertEquals("FlyIdle", config.getAnimation().animationFor(true, false));
         assertEquals("Fly", config.getAnimation().animationFor(false, false));
         assertEquals("FlyFast", config.getAnimation().animationFor(false, true));
+        assertTrue(config.getAnimation().isSuppressNonMovementAnimations());
+        assertTrue(config.getAnimation().isSuppressActionAnimation());
+        assertTrue(config.getAnimation().isSuppressStatusAnimation());
+        assertTrue(config.getAnimation().isSuppressEmoteAnimation());
+        assertFalse(config.getAnimation().isSuppressFaceAnimation());
+        assertTrue(config.getAnimation().getSuppressionIntervalMs() > 0L);
     }
 
     @Test
@@ -146,6 +152,37 @@ class TwAvatarFlightConfigTest {
         assertEquals("ParentFly", child.getAnimation().getFlightAnimation());
         assertEquals("ParentFast", child.getAnimation().getFastFlightAnimation());
         assertEquals(400L, child.getAnimation().getResendIntervalMs());
+    }
+
+    @Test
+    void explicitAnimationSectionInheritsMissingSuppressionKeys() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "animation", "suppressNonMovementAnimations", true);
+        setNestedField(parent, "animation", "suppressActionAnimation", true);
+        setNestedField(parent, "animation", "suppressStatusAnimation", true);
+        setNestedField(parent, "animation", "suppressEmoteAnimation", true);
+        setNestedField(parent, "animation", "suppressFaceAnimation", true);
+        setNestedField(parent, "animation", "suppressionIntervalMs", 125.0);
+        setNestedField(child, "animation", "suppressNonMovementAnimations", false);
+        setNestedField(child, "animation", "suppressActionAnimation", false);
+        setNestedField(child, "animation", "suppressStatusAnimation", false);
+        setNestedField(child, "animation", "suppressEmoteAnimation", false);
+        setNestedField(child, "animation", "suppressFaceAnimation", false);
+        setNestedField(child, "animation", "suppressionIntervalMs", 500.0);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Animation"),
+                Map.of("Animation", Set.of("SuppressActionAnimation"))
+        );
+
+        assertTrue(child.getAnimation().isSuppressNonMovementAnimations());
+        assertFalse(child.getAnimation().isSuppressActionAnimation());
+        assertTrue(child.getAnimation().isSuppressStatusAnimation());
+        assertTrue(child.getAnimation().isSuppressEmoteAnimation());
+        assertTrue(child.getAnimation().isSuppressFaceAnimation());
+        assertEquals(125L, child.getAnimation().getSuppressionIntervalMs());
     }
 
     private static void setNestedField(Object target, String nestedFieldName, String fieldName, Object value)
