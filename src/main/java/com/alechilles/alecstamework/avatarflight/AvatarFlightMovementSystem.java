@@ -241,7 +241,8 @@ public final class AvatarFlightMovementSystem
         long now = System.currentTimeMillis();
         if (pitchSlot == rollSlot) {
             drivePoseAnimation(ref, commandBuffer, flight, true, pitchSlot,
-                    animation.sharedPoseAnimationFor(
+                    AvatarFlightPoseAnimationCatalog.sharedPoseAnimationFor(
+                            animation,
                             Math.toDegrees(output.visualPitchRadians()),
                             Math.toDegrees(output.visualRollRadians())
                     ),
@@ -251,10 +252,14 @@ public final class AvatarFlightMovementSystem
             return;
         }
         drivePoseAnimation(ref, commandBuffer, flight, true, pitchSlot,
-                animation.pitchPoseAnimationFor(Math.toDegrees(output.visualPitchRadians())),
+                AvatarFlightPoseAnimationCatalog.pitchPoseAnimationFor(
+                        animation,
+                        Math.toDegrees(output.visualPitchRadians())),
                 now, animation.getPoseResendIntervalMs());
         drivePoseAnimation(ref, commandBuffer, flight, false, rollSlot,
-                animation.rollPoseAnimationFor(Math.toDegrees(output.visualRollRadians())),
+                AvatarFlightPoseAnimationCatalog.rollPoseAnimationFor(
+                        animation,
+                        Math.toDegrees(output.visualRollRadians())),
                 now, animation.getPoseResendIntervalMs());
     }
 

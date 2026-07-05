@@ -145,13 +145,13 @@ class AvatarFlightMovementSystemArchitectureTest {
 
         assertTrue(source.contains("applyPoseAnimations(ref, commandBuffer, flight, config, output)"),
                 "owner-visible pitch/bank must use animation packets instead of self TransformUpdate correction");
-        assertTrue(source.contains("animation.pitchPoseAnimationFor(Math.toDegrees(output.visualPitchRadians()))"),
-                "pitch pose selection should stay config-driven from controller visual pitch");
-        assertTrue(source.contains("animation.rollPoseAnimationFor(Math.toDegrees(output.visualRollRadians()))"),
-                "roll pose selection should stay config-driven from controller visual roll");
+        assertTrue(source.contains("AvatarFlightPoseAnimationCatalog.pitchPoseAnimationFor("),
+                "pitch pose selection should use the standard/catalog-driven breakpoint grid");
+        assertTrue(source.contains("AvatarFlightPoseAnimationCatalog.rollPoseAnimationFor("),
+                "roll pose selection should use the standard/catalog-driven breakpoint grid");
         assertTrue(source.contains("if (pitchSlot == rollSlot)"),
                 "same-slot pose configs must drive one combined pose animation instead of two competing packets");
-        assertTrue(source.contains("animation.sharedPoseAnimationFor("),
+        assertTrue(source.contains("AvatarFlightPoseAnimationCatalog.sharedPoseAnimationFor("),
                 "shared pose slots should preserve pitch and bank through a single selected animation");
         assertTrue(source.contains("AnimationUtils.playAnimation(ref, slot, animationId, true, commandBuffer)"),
                 "pose animations must be sent to the owner client through the safe animation channel");

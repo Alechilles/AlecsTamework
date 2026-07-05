@@ -121,32 +121,16 @@ public final class AvatarFlightModelService {
             @Nonnull Model baseModel,
             @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
         Map<String, ModelAsset.AnimationSet> animations = new LinkedHashMap<>(baseModel.getAnimationSetMap());
-        addStandardPoseAnimation(animations, animation.getPitchUpPoseAnimation(),
-                "TameworkPitchUp", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Up_20.blockyanim");
-        addStandardPoseAnimation(animations, animation.getPitchDownPoseAnimation(),
-                "TameworkPitchDown", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Down_20.blockyanim");
-        addStandardPoseAnimation(animations, animation.getBankLeftPoseAnimation(),
-                "TameworkBankLeft", "NPC/Tamework/AvatarFlight/Animations/Origin/Bank_Left_20.blockyanim");
-        addStandardPoseAnimation(animations, animation.getBankRightPoseAnimation(),
-                "TameworkBankRight", "NPC/Tamework/AvatarFlight/Animations/Origin/Bank_Right_20.blockyanim");
-        addStandardPoseAnimation(animations, animation.getPitchUpBankLeftPoseAnimation(),
-                "TameworkPitchUpBankLeft", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Up_Bank_Left_20.blockyanim");
-        addStandardPoseAnimation(animations, animation.getPitchUpBankRightPoseAnimation(),
-                "TameworkPitchUpBankRight", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Up_Bank_Right_20.blockyanim");
-        addStandardPoseAnimation(animations, animation.getPitchDownBankLeftPoseAnimation(),
-                "TameworkPitchDownBankLeft", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Down_Bank_Left_20.blockyanim");
-        addStandardPoseAnimation(animations, animation.getPitchDownBankRightPoseAnimation(),
-                "TameworkPitchDownBankRight", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Down_Bank_Right_20.blockyanim");
+        for (AvatarFlightPoseAnimationCatalog.Definition definition
+                : AvatarFlightPoseAnimationCatalog.standardDefinitionsFor(animation)) {
+            addStandardPoseAnimation(animations, definition.id(), definition.path());
+        }
         return animations;
     }
 
     private static void addStandardPoseAnimation(@Nonnull Map<String, ModelAsset.AnimationSet> animations,
-                                                 @Nullable String configuredId,
                                                  @Nonnull String standardId,
                                                  @Nonnull String animationPath) {
-        if (!standardId.equals(configuredId)) {
-            return;
-        }
         animations.putIfAbsent(standardId, new ModelAsset.AnimationSet(
                 new ModelAsset.Animation[]{
                         new ModelAsset.Animation(

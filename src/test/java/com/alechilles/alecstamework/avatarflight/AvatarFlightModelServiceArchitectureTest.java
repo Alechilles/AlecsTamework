@@ -34,6 +34,8 @@ class AvatarFlightModelServiceArchitectureTest {
                 "existing model animation sets must be carried forward");
         assertTrue(source.contains("animations.putIfAbsent(standardId"),
                 "modder-provided animation set ids should win over the generic Tamework defaults");
+        assertTrue(source.contains("AvatarFlightPoseAnimationCatalog.standardDefinitionsFor(animation)"),
+                "runtime injection should use the shared standard pose catalog");
     }
 
     @Test
@@ -50,15 +52,29 @@ class AvatarFlightModelServiceArchitectureTest {
     void avatarFlightInjectsOnlyStandardTameworkPoseIds() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("\"TameworkPitchUp\""));
-        assertTrue(source.contains("\"TameworkPitchDown\""));
-        assertTrue(source.contains("\"TameworkBankLeft\""));
-        assertTrue(source.contains("\"TameworkBankRight\""));
-        assertTrue(source.contains("\"TameworkPitchUpBankLeft\""));
-        assertTrue(source.contains("\"TameworkPitchUpBankRight\""));
-        assertTrue(source.contains("\"TameworkPitchDownBankLeft\""));
-        assertTrue(source.contains("\"TameworkPitchDownBankRight\""));
-        assertTrue(source.contains("if (!standardId.equals(configuredId))"),
+        assertTrue(source.contains("addStandardPoseAnimation(animations, definition.id(), definition.path())"));
+        assertFalse(source.contains("if (!standardId.equals(configuredId))"),
+                "the model service should delegate standard-root filtering to the catalog");
+    }
+
+    @Test
+    void avatarFlightCatalogIncludesExpandedPitchRollBreakpoints() throws Exception {
+        String source = Files.readString(Path.of(
+                "src",
+                "main",
+                "java",
+                "com",
+                "alechilles",
+                "alecstamework",
+                "avatarflight",
+                "AvatarFlightPoseAnimationCatalog.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("private static final int[] PITCH_LEVELS = {15, 20, 30, 40}"));
+        assertTrue(source.contains("private static final int[] ROLL_LEVELS = {10, 20, 30}"));
+        assertTrue(source.contains("return (up ? \"TameworkPitchUp\" : \"TameworkPitchDown\") + degrees"));
+        assertTrue(source.contains("return (left ? \"TameworkBankLeft\" : \"TameworkBankRight\") + degrees"));
+        assertTrue(source.contains("return \"Tamework\""),
                 "custom animation ids should remain custom and require the model asset to define them");
     }
 }
