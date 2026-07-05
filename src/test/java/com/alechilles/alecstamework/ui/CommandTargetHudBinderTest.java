@@ -56,7 +56,7 @@ class CommandTargetHudBinderTest {
     void uiAssetContainsExpectedSelectors() throws Exception {
         String ui = Files.readString(Path.of(
                 "src/main/resources/Common/UI/Custom/TameworkCommandTargetHud.ui"
-        ));
+        )).replace("\r\n", "\n");
 
         Assertions.assertTrue(ui.contains("FoodRow"));
         Assertions.assertTrue(ui.contains("FavoriteFoodBlock"));
