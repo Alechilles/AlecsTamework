@@ -32,7 +32,6 @@
 - Fixed `/tw debugplayermodel unsafe` so positive test scales are no longer clamped to the model asset's authored min/max range.
 - Fixed transformed avatar flight trying to layer player item/combat/emote animations onto dragon models by periodically suppressing non-movement animation slots while flight is active.
 - Fixed transformed avatar flight still rendering held player equipment on dragon models by hiding hand equipment visuals while avatar flight is active and restoring them on disable.
-- Fixed transformed avatar flight pitch and roll not appearing on the controlling client by explicitly syncing the server-authored transform back to the owner while flight is active.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
