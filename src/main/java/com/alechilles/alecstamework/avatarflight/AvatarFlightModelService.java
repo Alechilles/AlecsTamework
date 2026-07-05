@@ -9,6 +9,8 @@ import com.hypixel.hytale.server.core.cosmetics.CosmeticsModule;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSkinComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
@@ -19,6 +21,10 @@ import javax.annotation.Nullable;
  */
 public final class AvatarFlightModelService {
     private static final ConcurrentHashMap<UUID, Model> SAVED_MODELS = new ConcurrentHashMap<>();
+    private static final float POSE_ANIMATION_SPEED = 1.0f;
+    private static final float POSE_ANIMATION_BLEND_SECONDS = 0.75f;
+    private static final float POSE_ANIMATION_WEIGHT = 1.0f;
+    private static final int[] NO_FOOTSTEPS = new int[0];
 
     public boolean apply(@Nonnull Store<EntityStore> store,
                          @Nonnull Ref<EntityStore> ref,
@@ -35,7 +41,7 @@ public final class AvatarFlightModelService {
         }
         float scale = clampScale(modelAsset, (float) modelSettings.getScale());
         store.putComponent(ref, ModelComponent.getComponentType(),
-                new ModelComponent(Model.createScaledModel(modelAsset, scale)));
+                new ModelComponent(createAvatarFlightModel(modelAsset, scale, config.getAnimation())));
         return true;
     }
 
@@ -73,5 +79,88 @@ public final class AvatarFlightModelService {
 
     private static float clampScale(@Nonnull ModelAsset modelAsset, float scale) {
         return Math.max(modelAsset.getMinScale(), Math.min(modelAsset.getMaxScale(), scale));
+    }
+
+    @Nonnull
+    private static Model createAvatarFlightModel(@Nonnull ModelAsset modelAsset,
+                                                 float scale,
+                                                 @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
+        Model baseModel = Model.createScaledModel(modelAsset, scale);
+        if (!animation.isPoseAnimationsEnabled()) {
+            return baseModel;
+        }
+        Map<String, ModelAsset.AnimationSet> enrichedAnimations = injectedPoseAnimationSets(baseModel, animation);
+        return new Model(
+                baseModel.getModelAssetId(),
+                baseModel.getScale(),
+                baseModel.getRandomAttachmentIds(),
+                baseModel.getAttachments(),
+                baseModel.getBoundingBox(),
+                baseModel.getModel(),
+                baseModel.getTexture(),
+                baseModel.getGradientSet(),
+                baseModel.getGradientId(),
+                baseModel.getEyeHeight(),
+                baseModel.getCrouchOffset(),
+                baseModel.getSittingOffset(),
+                baseModel.getSleepingOffset(),
+                enrichedAnimations,
+                baseModel.getCamera(),
+                baseModel.getLight(),
+                baseModel.getParticles(),
+                baseModel.getTrails(),
+                baseModel.getPhysicsValues(),
+                baseModel.getDetailBoxes(),
+                baseModel.getPhobia(),
+                baseModel.getPhobiaModelAssetId()
+        );
+    }
+
+    @Nonnull
+    private static Map<String, ModelAsset.AnimationSet> injectedPoseAnimationSets(
+            @Nonnull Model baseModel,
+            @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
+        Map<String, ModelAsset.AnimationSet> animations = new LinkedHashMap<>(baseModel.getAnimationSetMap());
+        addStandardPoseAnimation(animations, animation.getPitchUpPoseAnimation(),
+                "TameworkPitchUp", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Up_20.blockyanim");
+        addStandardPoseAnimation(animations, animation.getPitchDownPoseAnimation(),
+                "TameworkPitchDown", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Down_20.blockyanim");
+        addStandardPoseAnimation(animations, animation.getBankLeftPoseAnimation(),
+                "TameworkBankLeft", "NPC/Tamework/AvatarFlight/Animations/Origin/Bank_Left_20.blockyanim");
+        addStandardPoseAnimation(animations, animation.getBankRightPoseAnimation(),
+                "TameworkBankRight", "NPC/Tamework/AvatarFlight/Animations/Origin/Bank_Right_20.blockyanim");
+        addStandardPoseAnimation(animations, animation.getPitchUpBankLeftPoseAnimation(),
+                "TameworkPitchUpBankLeft", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Up_Bank_Left_20.blockyanim");
+        addStandardPoseAnimation(animations, animation.getPitchUpBankRightPoseAnimation(),
+                "TameworkPitchUpBankRight", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Up_Bank_Right_20.blockyanim");
+        addStandardPoseAnimation(animations, animation.getPitchDownBankLeftPoseAnimation(),
+                "TameworkPitchDownBankLeft", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Down_Bank_Left_20.blockyanim");
+        addStandardPoseAnimation(animations, animation.getPitchDownBankRightPoseAnimation(),
+                "TameworkPitchDownBankRight", "NPC/Tamework/AvatarFlight/Animations/Origin/Pitch_Down_Bank_Right_20.blockyanim");
+        return animations;
+    }
+
+    private static void addStandardPoseAnimation(@Nonnull Map<String, ModelAsset.AnimationSet> animations,
+                                                 @Nullable String configuredId,
+                                                 @Nonnull String standardId,
+                                                 @Nonnull String animationPath) {
+        if (!standardId.equals(configuredId)) {
+            return;
+        }
+        animations.putIfAbsent(standardId, new ModelAsset.AnimationSet(
+                new ModelAsset.Animation[]{
+                        new ModelAsset.Animation(
+                                standardId,
+                                animationPath,
+                                POSE_ANIMATION_SPEED,
+                                POSE_ANIMATION_BLEND_SECONDS,
+                                true,
+                                POSE_ANIMATION_WEIGHT,
+                                NO_FOOTSTEPS,
+                                null
+                        )
+                },
+                ModelAsset.AnimationSet.DEFAULT_NEXT_ANIMATION_DELAY
+        ));
     }
 }

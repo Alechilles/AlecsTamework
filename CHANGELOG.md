@@ -33,6 +33,7 @@
 - Fixed transformed avatar flight trying to layer player item/combat/emote animations onto dragon models by periodically suppressing non-movement animation slots while flight is active.
 - Fixed transformed avatar flight still rendering held player equipment on dragon models by hiding hand equipment visuals while avatar flight is active and restoring them on disable.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
+- Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
