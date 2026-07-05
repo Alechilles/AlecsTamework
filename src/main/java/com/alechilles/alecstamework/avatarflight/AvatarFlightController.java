@@ -102,9 +102,11 @@ public final class AvatarFlightController {
             jumpApplied = true;
         }
         if (!explicitAirbrakeIntent && input.sprint() && (nextBoostAtMs == 0L || nowMs >= nextBoostAtMs)) {
+            double boostSpeedLimit = movement.getMaxForwardSpeed() + config.getBoost().getForwardImpulse();
             targetForwardSpeed = Math.min(
-                    movement.getMaxForwardSpeed(),
-                    Math.max(targetForwardSpeed, 0.0) + config.getBoost().getForwardImpulse()
+                    boostSpeedLimit,
+                    Math.max(Math.max(targetForwardSpeed, currentForwardSpeed), 0.0)
+                            + config.getBoost().getForwardImpulse()
             );
             nextBoostAtMs = nowMs + Math.round(config.getBoost().getCooldownSeconds() * 1000.0);
             boostApplied = true;
@@ -132,7 +134,9 @@ public final class AvatarFlightController {
                 currentHorizontalSpeed,
                 targetForwardSpeed,
                 targetStrafeSpeed,
-                movement
+                movement,
+                config.getBoost(),
+                boostApplied
         );
         HorizontalVelocity horizontalVelocity = capHorizontalVelocity(x, z, horizontalSpeedLimit);
         x = horizontalVelocity.x();
@@ -157,10 +161,21 @@ public final class AvatarFlightController {
     private static double resolveHorizontalSpeedLimit(double currentHorizontalSpeed,
                                                       double targetForwardSpeed,
                                                       double targetStrafeSpeed,
-                                                      TwAvatarFlightConfig.MovementSettings movement) {
+                                                      TwAvatarFlightConfig.MovementSettings movement,
+                                                      TwAvatarFlightConfig.BoostSettings boost,
+                                                      boolean boostApplied) {
         double configuredLimit = Math.max(movement.getMaxForwardSpeed(), movement.getMaxBackwardSpeed());
+        double boostLimit = movement.getMaxForwardSpeed() + boost.getForwardImpulse();
         double intendedSpeed = Math.max(Math.abs(targetForwardSpeed), Math.abs(targetStrafeSpeed));
-        return Math.max(0.0, Math.min(configuredLimit, Math.max(currentHorizontalSpeed, intendedSpeed)));
+        if (boostApplied) {
+            return Math.max(0.0, Math.min(boostLimit, Math.max(currentHorizontalSpeed, intendedSpeed)));
+        }
+        if (currentHorizontalSpeed > configuredLimit) {
+            return Math.max(0.0, Math.min(boostLimit,
+                    Math.max(currentHorizontalSpeed, Math.min(intendedSpeed, configuredLimit))));
+        }
+        return Math.max(0.0, Math.min(boostLimit,
+                Math.min(configuredLimit, Math.max(currentHorizontalSpeed, intendedSpeed))));
     }
 
     @Nonnull

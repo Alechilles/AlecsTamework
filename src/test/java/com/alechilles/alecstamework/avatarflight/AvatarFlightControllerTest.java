@@ -407,6 +407,36 @@ class AvatarFlightControllerTest {
         assertTrue(fast.fastFlight());
     }
 
+    @Test
+    void sprintBoostCanExceedCruiseSpeed() {
+        AvatarFlightController.Output output = update(
+                new AvatarFlightController.State(0.0, 0.0, -CONFIG.getMovement().getMaxForwardSpeed(), 0L, 0L),
+                input(1.0, false, false, true, false, 0.0)
+        );
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(output.boostApplied());
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxForwardSpeed(),
+                "sprint boost must not be clamped to the normal cruise speed");
+        assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxForwardSpeed()
+                        + CONFIG.getBoost().getForwardImpulse(),
+                "sprint boost should still respect the configured boosted speed ceiling");
+    }
+
+    @Test
+    void boostedSpeedDecaysTowardCruiseInsteadOfHardClamping() {
+        double boostedSpeed = CONFIG.getMovement().getMaxForwardSpeed() + CONFIG.getBoost().getForwardImpulse();
+        AvatarFlightController.Output output = update(
+                new AvatarFlightController.State(0.0, 0.0, -boostedSpeed, 0L, 0L),
+                input(1.0, false, false, false, false, 0.0)
+        );
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxForwardSpeed(),
+                "boosted speed should bleed down through acceleration/drag instead of disappearing in one tick");
+        assertTrue(horizontalSpeed < boostedSpeed);
+    }
+
     private static AvatarFlightController.Output update(AvatarFlightController.State state,
                                                         AvatarFlightController.Input input) {
         return AvatarFlightController.update(state, input, CONFIG, 0.1, 1000L);

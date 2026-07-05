@@ -23,6 +23,7 @@
 - Fixed a sharp-turn avatar flight bug that could create runaway horizontal speed and leave airbraking unable to recover.
 - Fixed transformed dragon flight animations by explicitly sending configurable movement-slot animations (`FlyIdle`, `Fly`, and `FlyFast` by default) to the owner client while avatar flight is active.
 - Fixed Dragon Reins sprint boost detection when client movement packets omit movement-state payloads but the current player movement state still reports sprinting.
+- Fixed avatar-flight sprint boost speed so shift can exceed normal cruise speed instead of being immediately clamped back to the regular forward cap.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 
