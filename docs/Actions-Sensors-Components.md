@@ -28,6 +28,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkHook`
 - `TameworkEffectActive` (checks active `EntityEffect` with optional `MinRemainingSeconds`)
 - `TameworkNeedBelow`
+- `TameworkNeedsResourceFastMode`: Matches while `/tw settings` has active needs fast-consume behavior.
 - `TameworkNeedsResourceTarget`
 - `TameworkReachableBlockTarget` (finds a matching block set or exact block type, exposes a projected and path-preflighted approach position)
 
