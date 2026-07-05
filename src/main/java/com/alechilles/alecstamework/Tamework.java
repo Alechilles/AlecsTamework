@@ -680,6 +680,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new AvatarFlightEquipmentVisualSystem(
                         avatarFlightComponentType,
+                        avatarFlightRiderVisualComponentType,
                         EntityTrackerSystems.Visible.getComponentType()
                 )
         );

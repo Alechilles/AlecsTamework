@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.modules.entity.player.PlayerSettings;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Builds packet-only avatar-flight equipment visuals without mutating player inventory.
@@ -45,5 +46,16 @@ public final class AvatarFlightEquipmentPacketService {
             Arrays.fill(update.armorIds, "");
         }
         return update;
+    }
+
+    @Nonnull
+    public static String equipmentSignature(@Nonnull EquipmentUpdate update) {
+        String armor = update.armorIds == null ? "" : String.join(",", update.armorIds);
+        return safe(update.rightHandItemId) + "|" + safe(update.leftHandItemId) + "|" + armor;
+    }
+
+    @Nonnull
+    private static String safe(@Nullable String value) {
+        return value == null ? "" : value;
     }
 }
