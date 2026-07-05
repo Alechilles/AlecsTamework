@@ -87,6 +87,12 @@ public final class TameClaimLimitPolicyService {
     }
 
     @Nonnull
+    public TameLimitDecision evaluateForTame(@Nullable Store<EntityStore> store,
+                                             @Nullable Vector3d tamePosition) {
+        return TameLimitDecision.from(evaluate(store, tamePosition));
+    }
+
+    @Nonnull
     static BreedingClaimLimitPolicyService.Decision evaluateResolved(
             @Nonnull TwGlobalConfig globalConfig,
             @Nonnull BreedingClaimLimitPolicyService.ResolvedClaim resolvedClaim,
@@ -175,5 +181,25 @@ public final class TameClaimLimitPolicyService {
         }
         nextWarningAtMs = now + WARNING_THROTTLE_MS;
         plugin.getLogger().at(Level.WARNING).log(warning);
+    }
+
+    /** Public tame-limit decision view for ownership-package acquisition gates. */
+    public record TameLimitDecision(boolean allowed,
+                                    @Nullable String reason,
+                                    int currentCount,
+                                    int effectiveCap) {
+        @Nonnull
+        static TameLimitDecision from(@Nonnull BreedingClaimLimitPolicyService.Decision decision) {
+            return new TameLimitDecision(
+                    decision.allowed(),
+                    decision.reason(),
+                    decision.currentCount(),
+                    decision.effectiveCap()
+            );
+        }
+
+        public boolean claimCapReached() {
+            return "claim-cap-reached".equals(reason);
+        }
     }
 }

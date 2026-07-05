@@ -1,14 +1,17 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.actions.TameClaimLimitPolicyService;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import org.joml.Vector3d;
 
 /**
  * Bridges legacy vanilla-tamed NPCs into Tamework ownership when mods are added mid-playthrough.
@@ -58,6 +61,18 @@ public final class LegacyTamedOwnershipBridge {
             );
             return ClaimResult.none();
         }
+        TameClaimLimitPolicyService.TameLimitDecision claimDecision =
+                new TameClaimLimitPolicyService().evaluateForTame(store, resolvePosition(npcRef, store));
+        if (!claimDecision.allowed()) {
+            if (claimDecision.claimCapReached()) {
+                OwnerMessageUtil.sendClaimPopulationCapReached(
+                        player,
+                        claimDecision.currentCount(),
+                        claimDecision.effectiveCap()
+                );
+            }
+            return ClaimResult.none();
+        }
 
         String ownerName = OwnerNameUtil.resolve(player);
         store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(playerId, ownerName));
@@ -81,6 +96,12 @@ public final class LegacyTamedOwnershipBridge {
             return ClaimResult.none();
         }
         return new ClaimResult(owner.getOwnerId(), owner.getOwnerName(), false);
+    }
+
+    private static Vector3d resolvePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
+        TransformComponent transform = transformType == null ? null : store.getComponent(npcRef, transformType);
+        return transform == null ? null : transform.getPosition();
     }
 
     private static void ensureTamedComponent(Store<EntityStore> store, Ref<EntityStore> npcRef) {

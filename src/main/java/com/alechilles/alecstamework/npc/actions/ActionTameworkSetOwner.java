@@ -8,16 +8,19 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
+import org.joml.Vector3d;
 
 /**
  * Sets owner component data based on the interacting player.
  */
 public final class ActionTameworkSetOwner extends TameworkActionBase {
+    private final TameClaimLimitPolicyService claimLimitPolicyService = new TameClaimLimitPolicyService();
 
     public ActionTameworkSetOwner(BuilderActionTameworkSetOwner builder, BuilderSupport support) {
         super(builder);
@@ -65,10 +68,28 @@ public final class ActionTameworkSetOwner extends TameworkActionBase {
                 );
                 return false;
             }
+            BreedingClaimLimitPolicyService.Decision claimDecision =
+                    claimLimitPolicyService.evaluate(store, resolvePosition(npcRef, store));
+            if (!claimDecision.allowed()) {
+                if ("claim-cap-reached".equals(claimDecision.reason())) {
+                    OwnerMessageUtil.sendClaimPopulationCapReached(
+                            player,
+                            claimDecision.currentCount(),
+                            claimDecision.effectiveCap()
+                    );
+                }
+                return false;
+            }
         }
         // Store owner UUID and a best-effort display name on the NPC.
         String ownerName = OwnerNameUtil.resolve(player);
         store.putComponent(npcRef, type, new TameworkOwnerComponent(playerId, ownerName));
         return true;
+    }
+
+    private static Vector3d resolvePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
+        TransformComponent transform = transformType == null ? null : store.getComponent(npcRef, transformType);
+        return transform == null ? null : transform.getPosition();
     }
 }
