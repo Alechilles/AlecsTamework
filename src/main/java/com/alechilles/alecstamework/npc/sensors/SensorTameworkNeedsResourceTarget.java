@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentSer
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.TargetRejector;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsEnvironmentService.WaterTargetSearchResult;
 import com.alechilles.alecstamework.npc.progression.NeedsRecentTargetCache;
+import com.alechilles.alecstamework.npc.progression.NeedsResourceFastModePolicy;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService;
 import com.alechilles.alecstamework.npc.progression.NeedsResourcePathPreflightService.PathPreflightResult;
 import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
@@ -104,6 +105,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             return false;
         }
         long nowMs = resolveCurrentTimeMs();
+        boolean fastModeActive = NeedsResourceFastModePolicy.isFastModeActive(nowMs);
         UUID npcUuid = resolveNpcUuid(ref, store);
         String worldName = resolveWorldName(store);
         TargetCacheBlock currentCacheBlock = resolveCurrentCacheBlock(ref, store);
@@ -152,8 +154,17 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             needsConfig = resolveNeedsConfig(ref, store);
         }
         TargetResolution resolution = switch (resourceType) {
-            case WATER -> resolveWaterTarget(ref, role, store, needsConfig, npcUuid, worldName, nowMs);
-            case FOOD_CONTAINER -> resolveFoodTarget(ref, role, store, needsConfig, npcUuid, worldName, nowMs);
+            case WATER -> resolveWaterTarget(ref, role, store, needsConfig, npcUuid, worldName, nowMs, fastModeActive);
+            case FOOD_CONTAINER -> resolveFoodTarget(
+                    ref,
+                    role,
+                    store,
+                    needsConfig,
+                    npcUuid,
+                    worldName,
+                    nowMs,
+                    fastModeActive
+            );
         };
         Vector3d target = resolution.target();
         if (target == null && shouldUseRecentTargetFallback(resolution.reason())) {
@@ -179,6 +190,29 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                     null
             );
             return false;
+        }
+        if (shouldBypassPathPreflight(fastModeActive, target != null)) {
+            String reason = fastModeReason(resolution.reason());
+            if (npcUuid != null) {
+                cacheTarget(npcUuid, target, reason, resolution.approachRadius(), currentCacheBlock, nowMs);
+                if (resourceType == ResourceType.WATER) {
+                    recentTargetCache.remember(npcUuid, target, nowMs);
+                }
+            }
+            positionInfo.setTarget(target.x, target.y, target.z);
+            maybeLog(
+                    ref,
+                    store,
+                    npcId,
+                    roleId,
+                    resolveResourceLabel(),
+                    "target_found",
+                    reason,
+                    false,
+                    eligibility.currentRatio(),
+                    target
+            );
+            return true;
         }
         if (npcUuid == null) {
             maybeLog(
@@ -272,12 +306,15 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     @Nullable
     private TargetResolution resolveWaterTarget(@Nonnull Ref<EntityStore> ref,
                                                 @Nonnull Role role,
-                                                 @Nonnull Store<EntityStore> store,
-                                                 @Nullable TwNeedsConfig needsConfig,
-                                                 @Nullable UUID npcUuid,
-                                                 @Nullable String worldName,
-                                                 long nowMs) {
-        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.WATER, worldName, nowMs);
+                                                @Nonnull Store<EntityStore> store,
+                                                @Nullable TwNeedsConfig needsConfig,
+                                                @Nullable UUID npcUuid,
+                                                @Nullable String worldName,
+                                                long nowMs,
+                                                boolean fastModeActive) {
+        TargetRejector targetRejector = fastModeActive
+                ? null
+                : createTargetRejector(npcUuid, ResourceType.WATER, worldName, nowMs);
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, range),
@@ -365,12 +402,15 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
                                                @Nullable TwNeedsConfig needsConfig,
                                                @Nullable UUID npcUuid,
                                                @Nullable String worldName,
-                                               long nowMs) {
+                                               long nowMs,
+                                               boolean fastModeActive) {
         String[] effectiveItemIds = resolveFoodItemIds(needsConfig);
         if (effectiveItemIds == null || effectiveItemIds.length == 0) {
             return TargetResolution.none("food_item_ids_empty");
         }
-        TargetRejector targetRejector = createTargetRejector(npcUuid, ResourceType.FOOD_CONTAINER, worldName, nowMs);
+        TargetRejector targetRejector = fastModeActive
+                ? null
+                : createTargetRejector(npcUuid, ResourceType.FOOD_CONTAINER, worldName, nowMs);
         if (needsConfig == null) {
             return TargetResolution.of(
                     ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, range, effectiveItemIds),
@@ -715,6 +755,24 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     static double preflightRejectTtlSecondsForTests() {
         return PREFLIGHT_REJECT_TTL_SECONDS;
+    }
+
+    private static boolean shouldBypassPathPreflight(boolean fastModeActive, boolean hasTarget) {
+        return fastModeActive && hasTarget;
+    }
+
+    @Nonnull
+    private static String fastModeReason(@Nonnull String reason) {
+        return reason.endsWith("_fast_consume") ? reason : reason + "_fast_consume";
+    }
+
+    static boolean shouldBypassPathPreflightForTests(boolean fastModeActive, boolean hasTarget) {
+        return shouldBypassPathPreflight(fastModeActive, hasTarget);
+    }
+
+    @Nonnull
+    static String fastModeReasonForTests(@Nonnull String reason) {
+        return fastModeReason(reason);
     }
 
     private boolean shouldUseRecentTargetFallback(@Nonnull String reason) {
