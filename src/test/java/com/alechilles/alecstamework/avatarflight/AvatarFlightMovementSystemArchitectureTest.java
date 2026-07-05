@@ -149,6 +149,10 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "pitch pose selection should stay config-driven from controller visual pitch");
         assertTrue(source.contains("animation.rollPoseAnimationFor(Math.toDegrees(output.visualRollRadians()))"),
                 "roll pose selection should stay config-driven from controller visual roll");
+        assertTrue(source.contains("if (pitchSlot == rollSlot)"),
+                "same-slot pose configs must drive one combined pose animation instead of two competing packets");
+        assertTrue(source.contains("animation.sharedPoseAnimationFor("),
+                "shared pose slots should preserve pitch and bank through a single selected animation");
         assertTrue(source.contains("AnimationUtils.playAnimation(ref, slot, animationId, true, commandBuffer)"),
                 "pose animations must be sent to the owner client through the safe animation channel");
         assertTrue(source.contains("AnimationSlot.VALUES"),

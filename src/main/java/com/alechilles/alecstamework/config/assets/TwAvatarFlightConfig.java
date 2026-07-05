@@ -266,6 +266,26 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.bankRightPoseAnimation)
             .documentation("Optional animation id played on RollPoseSlot while the controller requests a right bank. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<String>append(new KeyedCodec<>("PitchUpBankLeftPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.pitchUpBankLeftPoseAnimation = blankOrTrim(value),
+                    settings -> settings.pitchUpBankLeftPoseAnimation)
+            .documentation("Optional single-slot pose animation used when pitch-up and left-bank are both active. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("PitchUpBankRightPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.pitchUpBankRightPoseAnimation = blankOrTrim(value),
+                    settings -> settings.pitchUpBankRightPoseAnimation)
+            .documentation("Optional single-slot pose animation used when pitch-up and right-bank are both active. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("PitchDownBankLeftPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.pitchDownBankLeftPoseAnimation = blankOrTrim(value),
+                    settings -> settings.pitchDownBankLeftPoseAnimation)
+            .documentation("Optional single-slot pose animation used when pitch-down and left-bank are both active. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("PitchDownBankRightPoseAnimation", Codec.STRING),
+                    (settings, value) -> settings.pitchDownBankRightPoseAnimation = blankOrTrim(value),
+                    settings -> settings.pitchDownBankRightPoseAnimation)
+            .documentation("Optional single-slot pose animation used when pitch-down and right-bank are both active. Inheritance: missing nested key inherits parent value.")
+            .add()
             .<Double>append(new KeyedCodec<>("PitchPoseThresholdDegrees", Codec.DOUBLE),
                     (settings, value) -> settings.pitchPoseThresholdDegrees = positiveOrDefault(value, 8.0),
                     settings -> settings.pitchPoseThresholdDegrees)
@@ -611,6 +631,18 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("BankRightPoseAnimation")) {
                 animation.bankRightPoseAnimation = parent.animation.bankRightPoseAnimation;
             }
+            if (!keys.contains("PitchUpBankLeftPoseAnimation")) {
+                animation.pitchUpBankLeftPoseAnimation = parent.animation.pitchUpBankLeftPoseAnimation;
+            }
+            if (!keys.contains("PitchUpBankRightPoseAnimation")) {
+                animation.pitchUpBankRightPoseAnimation = parent.animation.pitchUpBankRightPoseAnimation;
+            }
+            if (!keys.contains("PitchDownBankLeftPoseAnimation")) {
+                animation.pitchDownBankLeftPoseAnimation = parent.animation.pitchDownBankLeftPoseAnimation;
+            }
+            if (!keys.contains("PitchDownBankRightPoseAnimation")) {
+                animation.pitchDownBankRightPoseAnimation = parent.animation.pitchDownBankRightPoseAnimation;
+            }
             if (!keys.contains("PitchPoseThresholdDegrees")) {
                 animation.pitchPoseThresholdDegrees = parent.animation.pitchPoseThresholdDegrees;
             }
@@ -760,6 +792,10 @@ public final class TwAvatarFlightConfig implements
         private String pitchDownPoseAnimation = "";
         private String bankLeftPoseAnimation = "";
         private String bankRightPoseAnimation = "";
+        private String pitchUpBankLeftPoseAnimation = "";
+        private String pitchUpBankRightPoseAnimation = "";
+        private String pitchDownBankLeftPoseAnimation = "";
+        private String pitchDownBankRightPoseAnimation = "";
         private double pitchPoseThresholdDegrees = 8.0;
         private double rollPoseThresholdDegrees = 5.0;
         private double poseResendIntervalMs = 250.0;
@@ -783,6 +819,10 @@ public final class TwAvatarFlightConfig implements
         public String getPitchDownPoseAnimation() { return blankOrTrim(pitchDownPoseAnimation); }
         public String getBankLeftPoseAnimation() { return blankOrTrim(bankLeftPoseAnimation); }
         public String getBankRightPoseAnimation() { return blankOrTrim(bankRightPoseAnimation); }
+        public String getPitchUpBankLeftPoseAnimation() { return blankOrTrim(pitchUpBankLeftPoseAnimation); }
+        public String getPitchUpBankRightPoseAnimation() { return blankOrTrim(pitchUpBankRightPoseAnimation); }
+        public String getPitchDownBankLeftPoseAnimation() { return blankOrTrim(pitchDownBankLeftPoseAnimation); }
+        public String getPitchDownBankRightPoseAnimation() { return blankOrTrim(pitchDownBankRightPoseAnimation); }
         public double getPitchPoseThresholdDegrees() { return Math.max(0.1, pitchPoseThresholdDegrees); }
         public double getRollPoseThresholdDegrees() { return Math.max(0.1, rollPoseThresholdDegrees); }
         public long getPoseResendIntervalMs() { return Math.round(Math.max(1.0, poseResendIntervalMs)); }
@@ -818,6 +858,40 @@ public final class TwAvatarFlightConfig implements
             }
             if (rollDegrees < -getRollPoseThresholdDegrees()) {
                 return getBankLeftPoseAnimation();
+            }
+            return "";
+        }
+
+        @Nonnull
+        public String sharedPoseAnimationFor(double pitchDegrees, double rollDegrees) {
+            String pitchAnimation = pitchPoseAnimationFor(pitchDegrees);
+            String rollAnimation = rollPoseAnimationFor(rollDegrees);
+            if (!pitchAnimation.isBlank() && !rollAnimation.isBlank()) {
+                String combinedAnimation = combinedPoseAnimationFor(pitchDegrees, rollDegrees);
+                if (!combinedAnimation.isBlank()) {
+                    return combinedAnimation;
+                }
+            }
+            return !rollAnimation.isBlank() ? rollAnimation : pitchAnimation;
+        }
+
+        @Nonnull
+        private String combinedPoseAnimationFor(double pitchDegrees, double rollDegrees) {
+            boolean pitchUp = pitchDegrees > getPitchPoseThresholdDegrees();
+            boolean pitchDown = pitchDegrees < -getPitchPoseThresholdDegrees();
+            boolean bankRight = rollDegrees > getRollPoseThresholdDegrees();
+            boolean bankLeft = rollDegrees < -getRollPoseThresholdDegrees();
+            if (pitchUp && bankLeft) {
+                return getPitchUpBankLeftPoseAnimation();
+            }
+            if (pitchUp && bankRight) {
+                return getPitchUpBankRightPoseAnimation();
+            }
+            if (pitchDown && bankLeft) {
+                return getPitchDownBankLeftPoseAnimation();
+            }
+            if (pitchDown && bankRight) {
+                return getPitchDownBankRightPoseAnimation();
             }
             return "";
         }

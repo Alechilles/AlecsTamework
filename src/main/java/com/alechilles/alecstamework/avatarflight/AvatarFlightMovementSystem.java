@@ -239,6 +239,17 @@ public final class AvatarFlightMovementSystem
             return;
         }
         long now = System.currentTimeMillis();
+        if (pitchSlot == rollSlot) {
+            drivePoseAnimation(ref, commandBuffer, flight, true, pitchSlot,
+                    animation.sharedPoseAnimationFor(
+                            Math.toDegrees(output.visualPitchRadians()),
+                            Math.toDegrees(output.visualRollRadians())
+                    ),
+                    now, animation.getPoseResendIntervalMs());
+            flight.setRollPoseAnimationId("");
+            flight.setNextRollPoseAnimationAtMs(0L);
+            return;
+        }
         drivePoseAnimation(ref, commandBuffer, flight, true, pitchSlot,
                 animation.pitchPoseAnimationFor(Math.toDegrees(output.visualPitchRadians())),
                 now, animation.getPoseResendIntervalMs());

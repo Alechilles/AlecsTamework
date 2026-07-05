@@ -53,6 +53,10 @@
     "PitchDownPoseAnimation": "",
     "BankLeftPoseAnimation": "",
     "BankRightPoseAnimation": "",
+    "PitchUpBankLeftPoseAnimation": "",
+    "PitchUpBankRightPoseAnimation": "",
+    "PitchDownBankLeftPoseAnimation": "",
+    "PitchDownBankRightPoseAnimation": "",
     "PitchPoseThresholdDegrees": 8.0,
     "RollPoseThresholdDegrees": 5.0,
     "PoseResendIntervalMs": 250.0

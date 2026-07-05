@@ -43,8 +43,13 @@ class TwAvatarFlightConfigTest {
         assertEquals("", config.getAnimation().getPitchDownPoseAnimation());
         assertEquals("", config.getAnimation().getBankLeftPoseAnimation());
         assertEquals("", config.getAnimation().getBankRightPoseAnimation());
+        assertEquals("", config.getAnimation().getPitchUpBankLeftPoseAnimation());
+        assertEquals("", config.getAnimation().getPitchUpBankRightPoseAnimation());
+        assertEquals("", config.getAnimation().getPitchDownBankLeftPoseAnimation());
+        assertEquals("", config.getAnimation().getPitchDownBankRightPoseAnimation());
         assertEquals("", config.getAnimation().pitchPoseAnimationFor(80.0));
         assertEquals("", config.getAnimation().rollPoseAnimationFor(20.0));
+        assertEquals("", config.getAnimation().sharedPoseAnimationFor(80.0, 20.0));
         assertTrue(config.getAnimation().getPoseResendIntervalMs() > 0L);
     }
 
@@ -181,6 +186,10 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "animation", "pitchDownPoseAnimation", "ParentPitchDown");
         setNestedField(parent, "animation", "bankLeftPoseAnimation", "ParentBankLeft");
         setNestedField(parent, "animation", "bankRightPoseAnimation", "ParentBankRight");
+        setNestedField(parent, "animation", "pitchUpBankLeftPoseAnimation", "ParentPitchUpBankLeft");
+        setNestedField(parent, "animation", "pitchUpBankRightPoseAnimation", "ParentPitchUpBankRight");
+        setNestedField(parent, "animation", "pitchDownBankLeftPoseAnimation", "ParentPitchDownBankLeft");
+        setNestedField(parent, "animation", "pitchDownBankRightPoseAnimation", "ParentPitchDownBankRight");
         setNestedField(parent, "animation", "pitchPoseThresholdDegrees", 12.0);
         setNestedField(parent, "animation", "rollPoseThresholdDegrees", 9.0);
         setNestedField(parent, "animation", "poseResendIntervalMs", 333.0);
@@ -197,6 +206,10 @@ class TwAvatarFlightConfigTest {
         setNestedField(child, "animation", "pitchDownPoseAnimation", "ChildPitchDown");
         setNestedField(child, "animation", "bankLeftPoseAnimation", "ChildBankLeft");
         setNestedField(child, "animation", "bankRightPoseAnimation", "ChildBankRight");
+        setNestedField(child, "animation", "pitchUpBankLeftPoseAnimation", "ChildPitchUpBankLeft");
+        setNestedField(child, "animation", "pitchUpBankRightPoseAnimation", "ChildPitchUpBankRight");
+        setNestedField(child, "animation", "pitchDownBankLeftPoseAnimation", "ChildPitchDownBankLeft");
+        setNestedField(child, "animation", "pitchDownBankRightPoseAnimation", "ChildPitchDownBankRight");
         setNestedField(child, "animation", "pitchPoseThresholdDegrees", 1.0);
         setNestedField(child, "animation", "rollPoseThresholdDegrees", 2.0);
         setNestedField(child, "animation", "poseResendIntervalMs", 50.0);
@@ -220,11 +233,17 @@ class TwAvatarFlightConfigTest {
         assertEquals("ParentPitchDown", child.getAnimation().getPitchDownPoseAnimation());
         assertEquals("ParentBankLeft", child.getAnimation().getBankLeftPoseAnimation());
         assertEquals("ParentBankRight", child.getAnimation().getBankRightPoseAnimation());
+        assertEquals("ParentPitchUpBankLeft", child.getAnimation().getPitchUpBankLeftPoseAnimation());
+        assertEquals("ParentPitchUpBankRight", child.getAnimation().getPitchUpBankRightPoseAnimation());
+        assertEquals("ParentPitchDownBankLeft", child.getAnimation().getPitchDownBankLeftPoseAnimation());
+        assertEquals("ParentPitchDownBankRight", child.getAnimation().getPitchDownBankRightPoseAnimation());
         assertEquals(12.0, child.getAnimation().getPitchPoseThresholdDegrees(), 0.00001);
         assertEquals(9.0, child.getAnimation().getRollPoseThresholdDegrees(), 0.00001);
         assertEquals(333L, child.getAnimation().getPoseResendIntervalMs());
         assertEquals("ChildPitchUp", child.getAnimation().pitchPoseAnimationFor(80.0));
         assertEquals("ParentBankLeft", child.getAnimation().rollPoseAnimationFor(-20.0));
+        assertEquals("ParentPitchUpBankLeft", child.getAnimation().sharedPoseAnimationFor(80.0, -20.0));
+        assertEquals("ParentBankRight", child.getAnimation().sharedPoseAnimationFor(0.0, 20.0));
     }
 
     private static void setNestedField(Object target, String nestedFieldName, String fieldName, Object value)
