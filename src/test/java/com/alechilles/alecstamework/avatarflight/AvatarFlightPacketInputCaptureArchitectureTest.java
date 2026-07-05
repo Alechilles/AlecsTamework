@@ -56,12 +56,18 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "jump must not be latched from MovementStatesComponent fallback");
         assertTrue(source.contains("input.setCrouching(packetStates != null && (packetStates.crouching || packetStates.forcedCrouching))"),
                 "crouch must not be latched from MovementStatesComponent fallback");
-        assertTrue(source.contains("input.setSprinting(packetStates != null && packetStates.sprinting)"),
-                "sprint must not be latched from MovementStatesComponent fallback");
         assertTrue(!source.contains("states == null ? !stale && input.isJumping()"),
                 "stateless packets must clear jump instead of preserving stale jump");
         assertTrue(!source.contains("states == null ? !stale && input.isCrouching()"),
                 "stateless packets must clear crouch instead of preserving stale crouch");
+    }
+
+    @Test
+    void heldSprintCanComeFromMovementStateFallback() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("input.setSprinting(movementStates != null && movementStates.sprinting)"),
+                "logs showed packets can omit states while MovementStatesComponent has sprint=true; sprint is held intent, not a one-shot flap");
     }
 
     @Test
