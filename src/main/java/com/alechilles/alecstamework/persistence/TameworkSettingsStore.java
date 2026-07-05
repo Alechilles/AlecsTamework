@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
@@ -183,6 +184,7 @@ public final class TameworkSettingsStore {
         document.population.perPlayerLimitScope = normalizeScope(snapshot.populationPerPlayerLimitScope());
 
         document.simpleClaims = new SimpleClaimsSection();
+        document.simpleClaims.provider = normalizeClaimProvider(snapshot.simpleClaimsProvider());
         document.simpleClaims.simpleClaimsEnabled = snapshot.simpleClaimsEnabled();
         document.simpleClaims.limitPerClaimChunk = Math.max(0, snapshot.simpleClaimsLimitPerClaimChunk());
         document.simpleClaims.limitPerClaimTotal = Math.max(0, snapshot.simpleClaimsLimitPerClaimTotal());
@@ -391,6 +393,7 @@ public final class TameworkSettingsStore {
         document.population.perPlayerLimitScope = "PerWorld";
 
         document.simpleClaims = new SimpleClaimsSection();
+        document.simpleClaims.provider = "Auto";
         document.simpleClaims.simpleClaimsEnabled = false;
         document.simpleClaims.limitPerClaimChunk = 0;
         document.simpleClaims.limitPerClaimTotal = 0;
@@ -554,6 +557,11 @@ public final class TameworkSettingsStore {
     }
 
     @Nonnull
+    private static String normalizeClaimProvider(@Nullable String provider) {
+        return ClaimIntegrationProvider.fromConfigValue(provider).configValue();
+    }
+
+    @Nonnull
     private static GlobalOverrides toOverrides(@Nonnull GlobalSettingsDocument document) {
         PopulationSection population = document.population;
         SimpleClaimsSection simpleClaims = document.simpleClaims;
@@ -575,6 +583,7 @@ public final class TameworkSettingsStore {
         return new GlobalOverrides(
                 population != null ? population.limitPerPlayerOwnedTotal : null,
                 population != null ? trimToNull(population.perPlayerLimitScope) : null,
+                simpleClaims != null ? trimToNull(simpleClaims.provider) : null,
                 simpleClaims != null ? simpleClaims.simpleClaimsEnabled : null,
                 simpleClaims != null ? simpleClaims.limitPerClaimChunk : null,
                 simpleClaims != null ? simpleClaims.limitPerClaimTotal : null,
@@ -746,6 +755,7 @@ public final class TameworkSettingsStore {
      */
     public record GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
                                          @Nonnull String populationPerPlayerLimitScope,
+                                         @Nonnull String simpleClaimsProvider,
                                          boolean simpleClaimsEnabled,
                                          int simpleClaimsLimitPerClaimChunk,
                                          int simpleClaimsLimitPerClaimTotal,
@@ -789,6 +799,7 @@ public final class TameworkSettingsStore {
      */
     public record GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
                                   @Nullable String populationPerPlayerLimitScope,
+                                  @Nullable String simpleClaimsProvider,
                                   @Nullable Boolean simpleClaimsEnabled,
                                   @Nullable Integer simpleClaimsLimitPerClaimChunk,
                                   @Nullable Integer simpleClaimsLimitPerClaimTotal,
@@ -867,6 +878,7 @@ public final class TameworkSettingsStore {
     }
 
     private static final class SimpleClaimsSection {
+        private String provider;
         private Boolean simpleClaimsEnabled;
         private Integer limitPerClaimChunk;
         private Integer limitPerClaimTotal;

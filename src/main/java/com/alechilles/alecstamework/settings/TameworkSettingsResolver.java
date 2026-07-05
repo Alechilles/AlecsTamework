@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.settings;
 
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,6 +30,7 @@ public final class TameworkSettingsResolver {
         return new ResolvedTameworkSettings(
                 resolveNonNegativeInt(values.populationLimitPerPlayerOwnedTotal(), defaults.populationLimitPerPlayerOwnedTotal()),
                 normalizeScope(resolveString(values.populationPerPlayerLimitScope(), defaults.populationPerPlayerLimitScope())),
+                normalizeClaimProvider(resolveString(values.simpleClaimsProvider(), defaults.simpleClaimsProvider())),
                 resolveBoolean(values.simpleClaimsEnabled(), defaults.simpleClaimsEnabled()),
                 resolveNonNegativeInt(values.simpleClaimsLimitPerClaimChunk(), defaults.simpleClaimsLimitPerClaimChunk()),
                 resolveNonNegativeInt(values.simpleClaimsLimitPerClaimTotal(), defaults.simpleClaimsLimitPerClaimTotal()),
@@ -101,6 +103,11 @@ public final class TameworkSettingsResolver {
             return "Global";
         }
         return "PerWorld";
+    }
+
+    @Nonnull
+    private static String normalizeClaimProvider(@Nullable String provider) {
+        return ClaimIntegrationProvider.fromConfigValue(provider).configValue();
     }
 
     @Nullable

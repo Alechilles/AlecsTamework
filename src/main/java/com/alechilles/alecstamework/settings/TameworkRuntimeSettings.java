@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.settings;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -51,6 +52,11 @@ public final class TameworkRuntimeSettings {
     @Nonnull
     public String populationPerPlayerLimitScope() {
         return values.populationPerPlayerLimitScope();
+    }
+
+    @Nonnull
+    public ClaimIntegrationProvider simpleClaimsProvider() {
+        return ClaimIntegrationProvider.fromConfigValue(values.simpleClaimsProvider());
     }
 
     public boolean simpleClaimsEnabled() {
@@ -253,6 +259,14 @@ public final class TameworkRuntimeSettings {
     public static boolean simpleClaimsEnabled(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
         return settings != null ? settings.simpleClaimsEnabled() : configEnabled;
+    }
+
+    @Nonnull
+    public static ClaimIntegrationProvider simpleClaimsProvider(@Nullable ClaimIntegrationProvider configProvider) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null
+                ? settings.simpleClaimsProvider()
+                : (configProvider == null ? ClaimIntegrationProvider.AUTO : configProvider);
     }
 
     public static int simpleClaimsLimitPerClaimChunk(int configLimit) {

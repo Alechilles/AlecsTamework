@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
@@ -130,6 +131,7 @@ class TwGlobalConfigInheritanceTest {
 
         assertEquals(0, config.getPopulationLimitPerPlayerOwnedTotal());
         assertEquals(TwGlobalConfig.PerPlayerLimitScope.PER_WORLD, config.getPopulationPerPlayerLimitScope());
+        assertEquals(ClaimIntegrationProvider.AUTO, config.getSimpleClaimsProvider());
         assertFalse(config.isSimpleClaimsEnabled());
         assertFalse(config.isSimpleClaimsBreedingRequiresClaim());
         assertEquals(0, config.getSimpleClaimsBreedingLimitPerClaimChunk());
@@ -256,12 +258,14 @@ class TwGlobalConfigInheritanceTest {
         TwGlobalConfig child = new TwGlobalConfig();
 
         setField(parent, "simpleClaimsSectionDefined", true);
+        setField(parent, "simpleClaimsProvider", ClaimIntegrationProvider.QUESTLINES_CLAIMS);
         setField(parent, "simpleClaimsEnabled", true);
         setField(parent, "simpleClaimsBreedingLimitPerClaimChunk", 3);
         setField(parent, "simpleClaimsBreedingLimitPerClaimTotal", 40);
         setField(parent, "simpleClaimsBreedingRequiresClaim", true);
 
         setField(child, "simpleClaimsSectionDefined", true);
+        setField(child, "simpleClaimsProvider", ClaimIntegrationProvider.AUTO);
         setField(child, "simpleClaimsEnabled", false);
         setField(child, "simpleClaimsBreedingLimitPerClaimChunk", 0);
         setField(child, "simpleClaimsBreedingLimitPerClaimTotal", 0);
@@ -273,6 +277,7 @@ class TwGlobalConfigInheritanceTest {
         child.inheritMissingTopLevelFrom(parent, Set.of("SimpleClaims"), explicitNestedKeysByTopLevel);
 
         assertFalse(child.isSimpleClaimsEnabled());
+        assertEquals(ClaimIntegrationProvider.QUESTLINES_CLAIMS, child.getSimpleClaimsProvider());
         assertEquals(3, child.getSimpleClaimsBreedingLimitPerClaimChunk());
         assertEquals(40, child.getSimpleClaimsBreedingLimitPerClaimTotal());
         assertTrue(child.isSimpleClaimsBreedingRequiresClaim());

@@ -53,6 +53,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         return new TameworkSettingsStore.GlobalSettingsSnapshot(
                 populationLimitPerPlayerOwnedTotal,
                 populationPerPlayerLimitScope.configValue(),
+                "Auto",
                 simpleClaimsEnabled,
                 simpleClaimsLimitPerClaimChunk,
                 simpleClaimsLimitPerClaimTotal,

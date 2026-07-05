@@ -8,6 +8,7 @@ import javax.annotation.Nonnull;
  */
 public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
                                        @Nonnull String populationPerPlayerLimitScope,
+                                       @Nonnull String simpleClaimsProvider,
                                        boolean simpleClaimsEnabled,
                                        int simpleClaimsLimitPerClaimChunk,
                                        int simpleClaimsLimitPerClaimTotal,
@@ -50,6 +51,7 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
         return new TameworkSettingsStore.GlobalSettingsSnapshot(
                 populationLimitPerPlayerOwnedTotal,
                 populationPerPlayerLimitScope,
+                simpleClaimsProvider,
                 simpleClaimsEnabled,
                 simpleClaimsLimitPerClaimChunk,
                 simpleClaimsLimitPerClaimTotal,
