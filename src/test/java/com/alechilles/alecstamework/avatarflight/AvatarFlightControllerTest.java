@@ -354,7 +354,9 @@ class AvatarFlightControllerTest {
 
         assertEquals(Math.toRadians(80.0), output.visualPitchRadians(), 0.00001);
         assertTrue(Math.abs(output.visualRollRadians()) > 0.0);
-        assertTrue(Math.abs(output.visualRollRadians()) <= Math.toRadians(20.0));
+        assertTrue(Math.abs(output.visualRollRadians()) <= Math.toRadians(30.0));
+        assertTrue(Math.abs(output.visualRollRadians()) > Math.toRadians(10.0),
+                "full lateral input should bank visibly enough to leave the shallow pose bucket");
     }
 
     @Test
@@ -382,6 +384,20 @@ class AvatarFlightControllerTest {
                 "turning left relative to current trajectory should bank the transformed model");
         assertTrue(Math.signum(rightTurn.visualRollRadians()) != Math.signum(leftTurn.visualRollRadians()),
                 "left and right turns should bank in opposite directions");
+    }
+
+    @Test
+    void sharpYawTurnCanReachHighestBankPoseBucket() {
+        AvatarFlightController.Output output = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
+                new AvatarFlightController.Input(1.0, 0.0, 0.0, false, false, false,
+                        false, false, Math.toRadians(-90.0), 0.0),
+                CONFIG,
+                0.1,
+                1000L
+        );
+
+        assertEquals(Math.toRadians(30.0), Math.abs(output.visualRollRadians()), 0.00001);
     }
 
     @Test

@@ -35,6 +35,7 @@
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.
+- Improved transformed avatar flight bank sensitivity so sharp turns and full lateral input can reach stronger bank poses.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 

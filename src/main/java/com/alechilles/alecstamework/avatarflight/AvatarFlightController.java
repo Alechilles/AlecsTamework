@@ -11,8 +11,10 @@ public final class AvatarFlightController {
     private static final double MIN_FORWARD_FOR_PITCH_TRADE = 0.5;
     private static final double HORIZONTAL_IDLE_SPEED = 0.25;
     private static final double MAX_PHYSICAL_PITCH_UP_RADIANS = Math.toRadians(60.0);
-    private static final double MAX_VISUAL_ROLL_RADIANS = Math.toRadians(20.0);
+    private static final double MAX_VISUAL_ROLL_RADIANS = Math.toRadians(30.0);
     private static final double PITCH_UP_FORWARD_DRAG_MULTIPLIER = 4.0;
+    private static final double STRAFE_ROLL_GAIN = 1.5;
+    private static final double TURN_ROLL_GAIN = 1.35;
 
     private AvatarFlightController() {
     }
@@ -167,7 +169,7 @@ public final class AvatarFlightController {
                 x,
                 z,
                 targetStrafeSpeed,
-                movement.getMaxForwardSpeed()
+                movement.getMaxBackwardSpeed()
         );
         return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, applyVelocity, jumpApplied, boostApplied,
                 horizontalIdle, fastFlight, visualPitch, visualRoll);
@@ -269,17 +271,17 @@ public final class AvatarFlightController {
                                             double nextX,
                                             double nextZ,
                                             double strafeSpeed,
-                                            double maxForwardSpeed) {
-        double strafeRoll = resolveStrafeRoll(strafeSpeed, maxForwardSpeed);
+                                            double maxStrafeSpeed) {
+        double strafeRoll = resolveStrafeRoll(strafeSpeed, maxStrafeSpeed);
         double turnRoll = resolveTurnRoll(previousX, previousZ, nextX, nextZ);
         return Math.abs(turnRoll) > Math.abs(strafeRoll) ? turnRoll : strafeRoll;
     }
 
-    private static double resolveStrafeRoll(double strafeSpeed, double maxForwardSpeed) {
-        if (maxForwardSpeed <= 0.0) {
+    private static double resolveStrafeRoll(double strafeSpeed, double maxStrafeSpeed) {
+        if (maxStrafeSpeed <= 0.0) {
             return 0.0;
         }
-        double amount = clamp(strafeSpeed / maxForwardSpeed, -1.0, 1.0);
+        double amount = clamp(strafeSpeed / maxStrafeSpeed * STRAFE_ROLL_GAIN, -1.0, 1.0);
         return -amount * MAX_VISUAL_ROLL_RADIANS;
     }
 
@@ -298,6 +300,7 @@ public final class AvatarFlightController {
                 -1.0,
                 1.0
         );
+        signedTurn = clamp(signedTurn * TURN_ROLL_GAIN, -1.0, 1.0);
         return -signedTurn * MAX_VISUAL_ROLL_RADIANS;
     }
 
