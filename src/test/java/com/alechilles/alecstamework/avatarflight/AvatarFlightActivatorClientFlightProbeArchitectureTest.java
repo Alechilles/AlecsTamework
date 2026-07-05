@@ -50,6 +50,17 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     }
 
     @Test
+    void disablingAvatarFlightClearsMovementAnimationSlot() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String disableBody = methodBody(source, "public Result disable", "public void onPlayerDisconnect");
+
+        assertTrue(disableBody.contains("clearMovementAnimation(store, ref)"),
+                "disabling avatar flight must clear any forced transformed-player movement animation");
+        assertTrue(source.contains("AnimationUtils.stopAnimation(ref, AnimationSlot.Movement, true, store)"),
+                "cleanup must send the stop packet to the player itself as well as other viewers");
+    }
+
+    @Test
     void disconnectCleanupDoesNotTouchThreadBoundPlayerComponents() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
         String disconnectBody = source.substring(source.indexOf("public void onPlayerDisconnect"));

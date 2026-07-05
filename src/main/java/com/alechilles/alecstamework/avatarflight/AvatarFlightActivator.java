@@ -4,7 +4,9 @@ import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.SavedMovementStates;
+import com.hypixel.hytale.server.core.entity.AnimationUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -66,6 +68,7 @@ public final class AvatarFlightActivator {
         }
         restoreClientFlyingState(store, ref);
         resetVisualPose(store, ref);
+        clearMovementAnimation(store, ref);
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
         boolean hadSavedModel = modelService.hasSavedModel(playerUuid);
@@ -99,6 +102,11 @@ public final class AvatarFlightActivator {
             headRotation.getRotation().setRoll(0.0f);
             store.putComponent(ref, HeadRotation.getComponentType(), headRotation);
         }
+    }
+
+    private void clearMovementAnimation(@Nonnull Store<EntityStore> store,
+                                        @Nonnull Ref<EntityStore> ref) {
+        AnimationUtils.stopAnimation(ref, AnimationSlot.Movement, true, store);
     }
 
     public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {

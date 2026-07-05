@@ -22,6 +22,13 @@ class TwAvatarFlightConfigTest {
         assertTrue(config.getMovement().getMaxForwardSpeed() > 0.0);
         assertEquals(18.0, config.getMovement().getAirbrakeDeceleration(), 0.00001);
         assertTrue(config.getJump().getCooldownSeconds() > 0.0);
+        assertEquals("FlyIdle", config.getAnimation().getIdleAnimation());
+        assertEquals("Fly", config.getAnimation().getFlightAnimation());
+        assertEquals("FlyFast", config.getAnimation().getFastFlightAnimation());
+        assertTrue(config.getAnimation().getResendIntervalMs() > 0L);
+        assertEquals("FlyIdle", config.getAnimation().animationFor(true, false));
+        assertEquals("Fly", config.getAnimation().animationFor(false, false));
+        assertEquals("FlyFast", config.getAnimation().animationFor(false, true));
     }
 
     @Test
@@ -91,6 +98,31 @@ class TwAvatarFlightConfigTest {
 
         assertFalse(child.getDebug().isLogControllerTicks());
         assertTrue(child.getDebug().isLogInputTransitions());
+    }
+
+    @Test
+    void explicitAnimationSectionInheritsMissingNames() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "animation", "idleAnimation", "ParentIdle");
+        setNestedField(parent, "animation", "flightAnimation", "ParentFly");
+        setNestedField(parent, "animation", "fastFlightAnimation", "ParentFast");
+        setNestedField(parent, "animation", "resendIntervalMs", 400.0);
+        setNestedField(child, "animation", "idleAnimation", "ChildIdle");
+        setNestedField(child, "animation", "flightAnimation", "ChildFly");
+        setNestedField(child, "animation", "fastFlightAnimation", "ChildFast");
+        setNestedField(child, "animation", "resendIntervalMs", 100.0);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Animation"),
+                Map.of("Animation", Set.of("IdleAnimation"))
+        );
+
+        assertEquals("ChildIdle", child.getAnimation().getIdleAnimation());
+        assertEquals("ParentFly", child.getAnimation().getFlightAnimation());
+        assertEquals("ParentFast", child.getAnimation().getFastFlightAnimation());
+        assertEquals(400L, child.getAnimation().getResendIntervalMs());
     }
 
     private static void setNestedField(Object target, String nestedFieldName, String fieldName, Object value)

@@ -12,9 +12,11 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.SavedMovementStates;
+import com.hypixel.hytale.server.core.entity.AnimationUtils;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesSystems;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -90,20 +92,20 @@ public final class AvatarFlightMovementSystem
         if (input != null) {
             commandBuffer.putComponent(ref, inputType, input);
         }
+        long now = System.currentTimeMillis();
         AvatarFlightController.State state = AvatarFlightController.State.from(flight);
         AvatarFlightController.Output output = AvatarFlightController.update(
                 state,
                 controllerInput,
                 config,
                 Math.max(0.0, dt),
-                System.currentTimeMillis()
+                now
         );
         flight.setMode(output.mode());
         flight.setVelocity(output.velocityX(), output.velocityY(), output.velocityZ());
         flight.setNextJumpAtMs(output.nextJumpAtMs());
         flight.setNextBoostAtMs(output.nextBoostAtMs());
         syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
-        commandBuffer.putComponent(ref, flightType, flight);
         applyVisualPose(ref, commandBuffer, controllerInput, output);
         if (output.applyVelocity()) {
             velocity.addInstruction(
@@ -112,7 +114,11 @@ public final class AvatarFlightMovementSystem
                     ChangeVelocityType.Set
             );
             applyFlightMovementState(ref, commandBuffer, output);
+            applyMovementAnimation(ref, commandBuffer, flight, config, output);
+        } else {
+            clearMovementAnimation(ref, commandBuffer, flight);
         }
+        commandBuffer.putComponent(ref, flightType, flight);
         maybeLogDebug(config, ref, controllerInput, output, movementStates);
     }
 
@@ -157,6 +163,32 @@ public final class AvatarFlightMovementSystem
         states.fallingFar = false;
         component.setMovementStates(states);
         commandBuffer.putComponent(ref, movementStatesType, component);
+    }
+
+    private void applyMovementAnimation(@Nonnull Ref<EntityStore> ref,
+                                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                        @Nonnull AvatarFlightComponent flight,
+                                        @Nonnull TwAvatarFlightConfig config,
+                                        @Nonnull AvatarFlightController.Output output) {
+        String animationId = config.getAnimation().animationFor(output.horizontalIdle(), output.fastFlight());
+        long now = System.currentTimeMillis();
+        if (animationId.equals(flight.getMovementAnimationId()) && now < flight.getNextMovementAnimationAtMs()) {
+            return;
+        }
+        AnimationUtils.playAnimation(ref, AnimationSlot.Movement, animationId, true, commandBuffer);
+        flight.setMovementAnimationId(animationId);
+        flight.setNextMovementAnimationAtMs(now + config.getAnimation().getResendIntervalMs());
+    }
+
+    private void clearMovementAnimation(@Nonnull Ref<EntityStore> ref,
+                                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                        @Nonnull AvatarFlightComponent flight) {
+        if (flight.getMovementAnimationId().isBlank()) {
+            return;
+        }
+        AnimationUtils.stopAnimation(ref, AnimationSlot.Movement, true, commandBuffer);
+        flight.setMovementAnimationId("");
+        flight.setNextMovementAnimationAtMs(0L);
     }
 
     private void applyVisualPose(@Nonnull Ref<EntityStore> ref,
@@ -282,8 +314,29 @@ public final class AvatarFlightMovementSystem
                 output.fastFlight(),
                 Math.toDegrees(output.visualPitchRadians()),
                 Math.toDegrees(output.visualRollRadians()),
-                states == null ? "<none>" : states.toString()
+                formatMovementStates(states)
         ));
+    }
+
+    @Nonnull
+    private static String formatMovementStates(@Nullable MovementStates states) {
+        if (states == null) {
+            return "<none>";
+        }
+        return String.format(
+                "fly=%s ground=%s idle=%s hIdle=%s sprint=%s run=%s walk=%s jump=%s crouch=%s fall=%s far=%s",
+                states.flying,
+                states.onGround,
+                states.idle,
+                states.horizontalIdle,
+                states.sprinting,
+                states.running,
+                states.walking,
+                states.jumping,
+                states.crouching,
+                states.falling,
+                states.fallingFar
+        );
     }
 
     @Nonnull

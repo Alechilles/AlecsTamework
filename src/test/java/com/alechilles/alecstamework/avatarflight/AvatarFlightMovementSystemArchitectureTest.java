@@ -95,6 +95,30 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void avatarFlightExplicitlyDrivesTransformedPlayerMovementAnimation() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("applyMovementAnimation(ref, commandBuffer, flight, config, output)"),
+                "movement-state flags alone do not reliably drive the owner client's transformed-player animation");
+        assertTrue(source.contains("AnimationUtils.playAnimation(ref, AnimationSlot.Movement"),
+                "avatar flight must use the generic entity animation packet, not NPC-only helpers");
+        assertTrue(source.contains("config.getAnimation().animationFor(output.horizontalIdle(), output.fastFlight())"),
+                "animation names should stay config-driven instead of hardcoded in the system");
+        assertTrue(source.contains("flight.setMovementAnimationId(animationId)"),
+                "repeated movement animation packets should be gated by tracked avatar-flight state");
+    }
+
+    @Test
+    void debugLogFormatsMovementStateFlags() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("formatMovementStates(states)"),
+                "debug logs should print movement-state flags, not MovementStates object identities");
+        assertFalse(source.contains("states.toString()"),
+                "object identity logs do not help diagnose client animation state");
+    }
+
+    @Test
     void avatarFlightRunsAfterBaseMovementStatesBeforeAnimationTracking() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

@@ -23,6 +23,9 @@ public final class TwAvatarFlightConfig implements
         JsonAssetWithMap<String, DefaultAssetMap<String, TwAvatarFlightConfig>>,
         TwParentFallbackAsset<TwAvatarFlightConfig> {
     private static final String DEFAULT_MODEL_ID = "NordicDrake";
+    private static final String DEFAULT_IDLE_ANIMATION = "FlyIdle";
+    private static final String DEFAULT_FLIGHT_ANIMATION = "Fly";
+    private static final String DEFAULT_FAST_FLIGHT_ANIMATION = "FlyFast";
 
     private static final BuilderCodec<ModelSettings> MODEL_CODEC = BuilderCodec.builder(
             ModelSettings.class,
@@ -169,6 +172,32 @@ public final class TwAvatarFlightConfig implements
             .add()
             .build();
 
+    private static final BuilderCodec<AnimationSettings> ANIMATION_CODEC = BuilderCodec.builder(
+            AnimationSettings.class,
+            AnimationSettings::new
+    )
+            .<String>append(new KeyedCodec<>("IdleAnimation", Codec.STRING),
+                    (settings, value) -> settings.idleAnimation = stringOrDefault(value, DEFAULT_IDLE_ANIMATION),
+                    settings -> settings.idleAnimation)
+            .documentation("Movement-slot animation used while hovering or horizontally idle. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("FlightAnimation", Codec.STRING),
+                    (settings, value) -> settings.flightAnimation = stringOrDefault(value, DEFAULT_FLIGHT_ANIMATION),
+                    settings -> settings.flightAnimation)
+            .documentation("Movement-slot animation used during normal avatar flight. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("FastFlightAnimation", Codec.STRING),
+                    (settings, value) -> settings.fastFlightAnimation = stringOrDefault(value, DEFAULT_FAST_FLIGHT_ANIMATION),
+                    settings -> settings.fastFlightAnimation)
+            .documentation("Movement-slot animation used while the forward boost/fast-flight state is active. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("ResendIntervalMs", Codec.DOUBLE),
+                    (settings, value) -> settings.resendIntervalMs = positiveOrDefault(value, 250.0),
+                    settings -> settings.resendIntervalMs)
+            .documentation("Minimum milliseconds between forced movement-animation packets while the same animation remains active. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
     private static final BuilderCodec<DebugSettings> DEBUG_CODEC = BuilderCodec.builder(
             DebugSettings.class,
             DebugSettings::new
@@ -230,6 +259,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.boost)
             .documentation("Sprint/shift forward boost values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AnimationSettings>append(new KeyedCodec<>("Animation", ANIMATION_CODEC),
+                    (asset, value) -> asset.animation = value == null ? new AnimationSettings() : value,
+                    asset -> asset.animation)
+            .documentation("Transformed-player movement animation names. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<DebugSettings>append(new KeyedCodec<>("Debug", DEBUG_CODEC),
                     (asset, value) -> asset.debug = value == null ? new DebugSettings() : value,
                     asset -> asset.debug)
@@ -253,6 +287,7 @@ public final class TwAvatarFlightConfig implements
     private MovementSettings movement = new MovementSettings();
     private JumpSettings jump = new JumpSettings();
     private BoostSettings boost = new BoostSettings();
+    private AnimationSettings animation = new AnimationSettings();
     private DebugSettings debug = new DebugSettings();
 
     protected TwAvatarFlightConfig() {
@@ -389,6 +424,7 @@ public final class TwAvatarFlightConfig implements
         inheritOrCopyMovement(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Movement"), explicitTopLevelKeys);
         inheritOrCopyJump(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Jump"), explicitTopLevelKeys);
         inheritOrCopyBoost(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Boost"), explicitTopLevelKeys);
+        inheritOrCopyAnimation(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Animation"), explicitTopLevelKeys);
         inheritOrCopyDebug(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Debug"), explicitTopLevelKeys);
     }
 
@@ -445,6 +481,18 @@ public final class TwAvatarFlightConfig implements
         }
     }
 
+    private void inheritOrCopyAnimation(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Animation")) animation = parent.animation;
+        else if (keys != null && animation != null && parent.animation != null) {
+            if (!keys.contains("IdleAnimation")) animation.idleAnimation = parent.animation.idleAnimation;
+            if (!keys.contains("FlightAnimation")) animation.flightAnimation = parent.animation.flightAnimation;
+            if (!keys.contains("FastFlightAnimation")) {
+                animation.fastFlightAnimation = parent.animation.fastFlightAnimation;
+            }
+            if (!keys.contains("ResendIntervalMs")) animation.resendIntervalMs = parent.animation.resendIntervalMs;
+        }
+    }
+
     private void inheritOrCopyDebug(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
         if (!top.contains("Debug")) debug = parent.debug;
         else if (keys != null && debug != null && parent.debug != null) {
@@ -467,6 +515,7 @@ public final class TwAvatarFlightConfig implements
     public MovementSettings getMovement() { return movement == null ? new MovementSettings() : movement; }
     public JumpSettings getJump() { return jump == null ? new JumpSettings() : jump; }
     public BoostSettings getBoost() { return boost == null ? new BoostSettings() : boost; }
+    public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
     public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
 
     private static String stringOrDefault(@Nullable String value, @Nonnull String fallback) {
@@ -554,6 +603,27 @@ public final class TwAvatarFlightConfig implements
 
         public double getForwardImpulse() { return forwardImpulse; }
         public double getCooldownSeconds() { return cooldownSeconds; }
+    }
+
+    public static final class AnimationSettings {
+        private String idleAnimation = DEFAULT_IDLE_ANIMATION;
+        private String flightAnimation = DEFAULT_FLIGHT_ANIMATION;
+        private String fastFlightAnimation = DEFAULT_FAST_FLIGHT_ANIMATION;
+        private double resendIntervalMs = 250.0;
+
+        public String getIdleAnimation() { return stringOrDefault(idleAnimation, DEFAULT_IDLE_ANIMATION); }
+        public String getFlightAnimation() { return stringOrDefault(flightAnimation, DEFAULT_FLIGHT_ANIMATION); }
+        public String getFastFlightAnimation() {
+            return stringOrDefault(fastFlightAnimation, DEFAULT_FAST_FLIGHT_ANIMATION);
+        }
+        public long getResendIntervalMs() { return Math.round(Math.max(1.0, resendIntervalMs)); }
+
+        public String animationFor(boolean horizontalIdle, boolean fastFlight) {
+            if (horizontalIdle) {
+                return getIdleAnimation();
+            }
+            return fastFlight ? getFastFlightAnimation() : getFlightAnimation();
+        }
     }
 
     public static final class DebugSettings {

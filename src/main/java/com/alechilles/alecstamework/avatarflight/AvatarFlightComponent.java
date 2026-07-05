@@ -54,6 +54,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setClientFlyingSynced,
                     AvatarFlightComponent::isClientFlyingSynced)
             .add()
+            .<String>append(new KeyedCodec<>("MovementAnimationId", Codec.STRING),
+                    AvatarFlightComponent::setMovementAnimationId,
+                    AvatarFlightComponent::getMovementAnimationId)
+            .add()
+            .<Long>append(new KeyedCodec<>("NextMovementAnimationAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextMovementAnimationAtMs,
+                    AvatarFlightComponent::getNextMovementAnimationAtMs)
+            .add()
             .build();
 
     private String configId = "";
@@ -65,6 +73,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextBoostAtMs;
     private long enabledAtMs;
     private boolean clientFlyingSynced;
+    private String movementAnimationId = "";
+    private long nextMovementAnimationAtMs;
 
     public AvatarFlightComponent() {
     }
@@ -171,6 +181,23 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         this.clientFlyingSynced = clientFlyingSynced != null && clientFlyingSynced;
     }
 
+    @Nonnull
+    public String getMovementAnimationId() {
+        return movementAnimationId == null ? "" : movementAnimationId;
+    }
+
+    public void setMovementAnimationId(@Nullable String movementAnimationId) {
+        this.movementAnimationId = movementAnimationId == null ? "" : movementAnimationId.trim();
+    }
+
+    public long getNextMovementAnimationAtMs() {
+        return nextMovementAnimationAtMs;
+    }
+
+    public void setNextMovementAnimationAtMs(@Nullable Long nextMovementAnimationAtMs) {
+        this.nextMovementAnimationAtMs = nextMovementAnimationAtMs == null ? 0L : nextMovementAnimationAtMs;
+    }
+
     public void setVelocity(double x, double y, double z) {
         velocityX = finiteOrZero(x);
         velocityY = finiteOrZero(y);
@@ -187,6 +214,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.nextJumpAtMs = nextJumpAtMs;
         clone.nextBoostAtMs = nextBoostAtMs;
         clone.clientFlyingSynced = clientFlyingSynced;
+        clone.movementAnimationId = getMovementAnimationId();
+        clone.nextMovementAnimationAtMs = nextMovementAnimationAtMs;
         return clone;
     }
 
