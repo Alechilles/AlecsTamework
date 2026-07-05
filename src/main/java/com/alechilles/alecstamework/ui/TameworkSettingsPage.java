@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -65,6 +66,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_INTERACTION_REQUIRES_OWNER = "@InteractionRequiresOwner";
     private static final String KEY_LINKING_REQUIRES_OWNER = "@LinkingRequiresOwner";
     private static final String KEY_NEEDS_ENABLED = "@NeedsEnabled";
+    private static final String KEY_NEEDS_RESOURCE_MODE = "@NeedsResourceMode";
     private static final String KEY_NEEDS_DAMAGE_ENABLED = "@NeedsDamageEnabled";
     private static final String KEY_NEEDS_TICK_POLICY_MODE = "@NeedsTickPolicyMode";
     private static final String KEY_NEEDS_OWNER_OFFLINE_GRACE_HOURS = "@NeedsOwnerOfflineGraceHours";
@@ -199,6 +201,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_INTERACTION_REQUIRES_OWNER, "#TwSettingsInteractionRequiresOwnerCheck.Value")
                 .append(KEY_LINKING_REQUIRES_OWNER, "#TwSettingsLinkingRequiresOwnerCheck.Value")
                 .append(KEY_NEEDS_ENABLED, "#TwSettingsNeedsEnabledCheck.Value")
+                .append(KEY_NEEDS_RESOURCE_MODE, "#TwSettingsNeedsResourceModeDropdown.Value")
                 .append(KEY_NEEDS_DAMAGE_ENABLED, "#TwSettingsNeedsDamageEnabledCheck.Value")
                 .append(KEY_NEEDS_TICK_POLICY_MODE, "#TwSettingsNeedsTickPolicyModeDropdown.Value")
                 .append(KEY_NEEDS_OWNER_OFFLINE_GRACE_HOURS, "#TwSettingsNeedsOwnerOfflineGraceHoursInput.Value")
@@ -250,6 +253,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsInteractionRequiresOwnerCheck.Value", currentValues.interactionRequiresOwner());
         commandBuilder.set("#TwSettingsLinkingRequiresOwnerCheck.Value", currentValues.linkingRequiresOwner());
         commandBuilder.set("#TwSettingsNeedsEnabledCheck.Value", currentValues.needsEnabled());
+        commandBuilder.set("#TwSettingsNeedsResourceModeDropdown.Entries", needsResourceModeEntries());
+        commandBuilder.set("#TwSettingsNeedsResourceModeDropdown.Value", currentValues.needsResourceMode());
         commandBuilder.set("#TwSettingsNeedsDamageEnabledCheck.Value", currentValues.needsDamageEnabled());
         commandBuilder.set("#TwSettingsNeedsTickPolicyModeDropdown.Entries", needsTickPolicyModeEntries());
         commandBuilder.set("#TwSettingsNeedsTickPolicyModeDropdown.Value", currentValues.needsTickPolicyMode().toConfigValue());
@@ -446,6 +451,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             tickPolicyModeValue = currentValues.needsTickPolicyMode().toConfigValue();
         }
         TwNeedsConfig.TickPolicyMode tickPolicyMode = TwNeedsConfig.TickPolicyMode.fromConfigValue(tickPolicyModeValue);
+        String needsResourceModeValue = trim(payload.needsResourceMode);
+        if (needsResourceModeValue.isBlank()) {
+            needsResourceModeValue = currentValues.needsResourceMode();
+        }
+        String needsResourceMode = NeedsResourceMode.fromConfigValue(needsResourceModeValue).toConfigValue();
         String damageModelValue = trim(payload.needsDamageModel);
         if (damageModelValue.isBlank()) {
             damageModelValue = currentValues.needsDamageModel().toConfigValue();
@@ -477,7 +487,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 boolOrDefault(payload.interactionRequiresOwner, currentValues.interactionRequiresOwner()),
                 boolOrDefault(payload.linkingRequiresOwner, currentValues.linkingRequiresOwner()),
                 boolOrDefault(payload.needsEnabled, currentValues.needsEnabled()),
-                currentValues.needsResourceMode(),
+                needsResourceMode,
                 boolOrDefault(payload.needsDamageEnabled, currentValues.needsDamageEnabled()),
                 tickPolicyMode,
                 needsOwnerOfflineGraceHours,
@@ -621,6 +631,23 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         );
     }
 
+    private List<DropdownEntryInfo> needsResourceModeEntries() {
+        return List.of(
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.needsResourceMode.accurate")),
+                        NeedsResourceMode.ACCURATE.toConfigValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.needsResourceMode.autoFast")),
+                        NeedsResourceMode.AUTO_FAST.toConfigValue()
+                ),
+                new DropdownEntryInfo(
+                        LocalizableString.fromString(resolveText("tamework.ui.settings.needsResourceMode.alwaysFast")),
+                        NeedsResourceMode.ALWAYS_FAST.toConfigValue()
+                )
+        );
+    }
+
     @Nullable
     private String resolveLanguage() {
         return playerRef != null ? playerRef.getLanguage() : null;
@@ -688,6 +715,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_INTERACTION_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.interactionRequiresOwner = v, x -> x.interactionRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_LINKING_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.linkingRequiresOwner = v, x -> x.linkingRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsEnabled = v, x -> x.needsEnabled).add()
+                .<String>append(new KeyedCodec<>(KEY_NEEDS_RESOURCE_MODE, Codec.STRING), (x, v) -> x.needsResourceMode = v, x -> x.needsResourceMode).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_DAMAGE_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsDamageEnabled = v, x -> x.needsDamageEnabled).add()
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_TICK_POLICY_MODE, Codec.STRING), (x, v) -> x.needsTickPolicyMode = v, x -> x.needsTickPolicyMode).add()
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_OWNER_OFFLINE_GRACE_HOURS, Codec.STRING), (x, v) -> x.needsOwnerOfflineGraceHours = v, x -> x.needsOwnerOfflineGraceHours).add()
@@ -728,6 +756,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private Boolean interactionRequiresOwner;
         private Boolean linkingRequiresOwner;
         private Boolean needsEnabled;
+        private String needsResourceMode;
         private Boolean needsDamageEnabled;
         private String needsTickPolicyMode;
         private String needsOwnerOfflineGraceHours;

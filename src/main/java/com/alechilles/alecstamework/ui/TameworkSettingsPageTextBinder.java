@@ -29,6 +29,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsBreedingGenderEnabledLabel", "tamework.ui.settings.label.breedingGenderEnabled"},
             {"#TwSettingsTraitsEnabledLabel", "tamework.ui.settings.label.traitsEnabled"},
             {"#TwSettingsNeedsSectionLabel", "tamework.ui.settings.label.needsSection"},
+            {"#TwSettingsNeedsResourceModeLabel", "tamework.ui.settings.label.needsResourceMode"},
             {"#TwSettingsNeedsDamageEnabledLabel", "tamework.ui.settings.label.needsDamageEnabled"},
             {"#TwSettingsNeedsTickPolicyModeLabel", "tamework.ui.settings.label.needsTickPolicy"},
             {"#TwSettingsNeedsOwnerOfflineGraceHoursLabel", "tamework.ui.settings.label.ownerOfflineGraceHours"},
@@ -84,6 +85,7 @@ final class TameworkSettingsPageTextBinder {
             {"#TwSettingsBreedingGenderTooltip", "tamework.ui.settings.tooltip.breedingGenderEnabled"},
             {"#TwSettingsTraitsEnabledTooltip", "tamework.ui.settings.tooltip.traitsEnabled"},
             {"#TwSettingsNeedsSectionTooltip", "tamework.ui.settings.tooltip.needsSection"},
+            {"#TwSettingsNeedsResourceModeTooltip", "tamework.ui.settings.tooltip.needsResourceMode"},
             {"#TwSettingsNeedsDamageEnabledTooltip", "tamework.ui.settings.tooltip.needsDamageEnabled"},
             {"#TwSettingsNeedsTickPolicyTooltip", "tamework.ui.settings.tooltip.needsTickPolicy"},
             {"#TwSettingsNeedsOfflineGraceTooltip", "tamework.ui.settings.tooltip.ownerOfflineGraceHours"},
@@ -124,6 +126,7 @@ final class TameworkSettingsPageTextBinder {
 
     private static final String[][] NO_ITEMS_BINDINGS = {
             {"#TwSettingsPresetDropdown", "tamework.ui.settings.noItems.preset"},
+            {"#TwSettingsNeedsResourceModeDropdown", "tamework.ui.settings.noItems.needsResourceMode"},
             {"#TwSettingsNeedsTickPolicyModeDropdown", "tamework.ui.settings.noItems.policy"},
             {"#TwSettingsNeedsDamageModelDropdown", "tamework.ui.settings.noItems.model"},
             {"#TwSettingsNeedsDamageDualNeedRuleDropdown", "tamework.ui.settings.noItems.rule"},

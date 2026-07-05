@@ -81,6 +81,35 @@ class TameworkSettingsPageLocalizationTest {
         }
     }
 
+    @Test
+    void needsResourceModeUsesLocalizedSettingsBindings() throws Exception {
+        String page = Files.readString(
+                Path.of("src/main/java/com/alechilles/alecstamework/ui/TameworkSettingsPage.java"),
+                StandardCharsets.UTF_8
+        );
+        String binder = Files.readString(
+                Path.of("src/main/java/com/alechilles/alecstamework/ui/TameworkSettingsPageTextBinder.java"),
+                StandardCharsets.UTF_8
+        );
+        String ui = Files.readString(
+                Path.of("src/main/resources/Common/UI/Custom/TameworkSettingsPage.ui"),
+                StandardCharsets.UTF_8
+        );
+        String lang = Files.readString(
+                Path.of("src/main/resources/Server/Languages/en-US/server.lang"),
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(page.contains("KEY_NEEDS_RESOURCE_MODE"));
+        assertTrue(page.contains("needsResourceModeEntries()"));
+        assertTrue(binder.contains("#TwSettingsNeedsResourceModeLabel"));
+        assertTrue(binder.contains("#TwSettingsNeedsResourceModeTooltip"));
+        assertTrue(binder.contains("#TwSettingsNeedsResourceModeDropdown"));
+        assertTrue(ui.contains("TwSettingsNeedsResourceModeDropdown"));
+        assertTrue(lang.contains("tamework.ui.settings.label.needsResourceMode="));
+        assertTrue(lang.contains("tamework.ui.settings.needsResourceMode.autoFast="));
+    }
+
     private static LinkedHashSet<String> extractLanguageKeys(String source) {
         LinkedHashSet<String> keys = new LinkedHashSet<>();
         Matcher matcher = Pattern.compile("\"(tamework\\.ui\\.[^\"]+)\"").matcher(source);

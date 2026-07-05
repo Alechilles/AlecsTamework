@@ -431,6 +431,31 @@ $C.@PageOverlay {
             Group {
               Anchor: (Height: 26);
 
+              Label #TwSettingsNeedsResourceModeLabel {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Needs Resource Mode";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsNeedsResourceModeTooltip {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "";
+                TooltipText: "Controls how hungry or thirsty companions reach food and water.";
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              DropdownBox #TwSettingsNeedsResourceModeDropdown {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: "No resource modes";
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
               Label #TwSettingsNeedsDamageEnabledLabel {
                 Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Hunger/Thirst Damage";

@@ -34,6 +34,7 @@ class TameworkSettingsPresetTest {
         assertEquals(TameworkSettingsPreset.SIMPLIFIED, TameworkSettingsPreset.match(presetValues));
         assertEquals(values.simpleClaimsEnabled(), presetValues.simpleClaimsEnabled());
         assertEquals(values.simpleClaimsProvider(), presetValues.simpleClaimsProvider());
+        assertEquals(values.needsResourceMode(), presetValues.needsResourceMode());
     }
 
     @Test
