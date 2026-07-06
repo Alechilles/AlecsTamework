@@ -42,10 +42,21 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemDoesNotSendEquipmentPacketsToTheTargetPlayersOwnViewer() throws Exception {
+    void visualSystemThrottlesSelfEquipmentPacketsWithVisualMarker() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("visibleTo.entrySet()"));
+        assertTrue(source.contains("queueSelfIfChanged("));
+        assertTrue(source.contains("equipmentSignature(currentUpdate)"));
+        assertTrue(source.contains("signature.equals(riderVisual.getEquipmentSignature())"));
+        assertTrue(source.contains("updated.setEquipmentSignature(signature)"));
+        assertTrue(source.contains("queueSelf(ref, hiddenUpdate"));
+    }
+
+    @Test
+    void visualSystemKeepsNormalOwnerPacketsOffOtherViewerQueue() throws Exception {
+        String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("private static void queueOthers("));
         assertTrue(source.contains("sameEntity(ref, entry.getKey())"));
         assertTrue(source.contains("continue;"));
         assertTrue(source.contains("private static boolean sameEntity("));

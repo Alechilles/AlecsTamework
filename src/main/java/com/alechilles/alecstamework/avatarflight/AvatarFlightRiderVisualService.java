@@ -32,15 +32,16 @@ public final class AvatarFlightRiderVisualService {
                          @Nonnull TwAvatarFlightConfig config,
                          @Nullable Model savedModel) {
         TwAvatarFlightConfig.RiderVisualSettings settings = config.getRiderVisual();
-        if (!settings.isShowRider() || savedModel == null) {
-            return false;
-        }
         ComponentType<EntityStore, AvatarFlightRiderVisualComponent> visualType =
                 AvatarFlightRiderVisualComponent.getComponentType();
         if (visualType == null) {
             return false;
         }
         remove(store, ownerRef);
+        store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false));
+        if (!settings.isShowRider() || savedModel == null) {
+            return false;
+        }
 
         TransformComponent ownerTransform = store.getComponent(ownerRef, TransformComponent.getComponentType());
         if (ownerTransform == null || ownerTransform.getTransform() == null) {
@@ -108,11 +109,11 @@ public final class AvatarFlightRiderVisualService {
 
     @Nonnull
     private static AvatarFlightRiderVisualComponent marker(@Nonnull UUID ownerUuid,
-                                                          @Nonnull UUID riderUuid,
+                                                          @Nullable UUID riderUuid,
                                                           boolean riderEntity) {
         AvatarFlightRiderVisualComponent visual = new AvatarFlightRiderVisualComponent();
         visual.setOwnerUuid(ownerUuid.toString());
-        visual.setRiderEntityUuid(riderUuid.toString());
+        visual.setRiderEntityUuid(riderUuid == null ? "" : riderUuid.toString());
         visual.setRiderEntity(riderEntity);
         return visual;
     }

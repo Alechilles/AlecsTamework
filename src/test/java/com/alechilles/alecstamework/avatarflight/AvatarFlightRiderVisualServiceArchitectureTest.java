@@ -22,6 +22,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
     void riderVisualServiceCreatesNonSerializedMountedModelEntity() throws Exception {
         String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
 
+        assertTrue(source.contains("store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false))"));
         assertTrue(source.contains("new NonSerialized()"));
         assertTrue(source.contains("new NetworkId("));
         assertTrue(source.contains("new ModelComponent(new Model(savedModel))"));
