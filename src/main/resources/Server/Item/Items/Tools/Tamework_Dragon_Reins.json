@@ -1,5 +1,5 @@
 {
-  "$Comment": "Prototype Dragon Reins item for avatar-flight mouse controls.",
+  "$Comment": "Flightmaster's Reins item for avatar-flight mouse controls.",
   "TranslationProperties": {
     "Name": "server.items.Tamework_Dragon_Reins.name",
     "Description": "server.items.Tamework_Dragon_Reins.description"
@@ -23,19 +23,19 @@
       ]
     }
   },
-  "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
-  "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
-  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
+  "Model": "Items/Tamework/FlightmasterReins/Flightmaster_Reins.blockymodel",
+  "Texture": "Items/Tamework/FlightmasterReins/Flightmaster_Reins_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Flightmaster_Reins.png",
   "IconProperties": {
-    "Scale": 0.76,
+    "Scale": 0.82,
     "Translation": [
-      -1,
-      5
+      2,
+      1
     ],
     "Rotation": [
-      135,
-      135,
-      0
+      18,
+      205,
+      330
     ]
   },
   "MaxStack": 1,

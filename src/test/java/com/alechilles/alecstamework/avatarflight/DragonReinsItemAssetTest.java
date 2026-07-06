@@ -8,7 +8,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Verifies the prototype Dragon Reins item is available as a normal Tamework item. */
+/** Verifies Flightmaster's Reins are available as a normal Tamework item. */
 class DragonReinsItemAssetTest {
     private static final Path ITEM = Path.of(
             "src",
@@ -29,18 +29,43 @@ class DragonReinsItemAssetTest {
             "en-US",
             "server.lang"
     );
+    private static final Path MODEL = Path.of(
+            "src",
+            "main",
+            "resources",
+            "Common",
+            "Items",
+            "Tamework",
+            "FlightmasterReins",
+            "Flightmaster_Reins.blockymodel"
+    );
+    private static final Path TEXTURE = Path.of(
+            "src",
+            "main",
+            "resources",
+            "Common",
+            "Items",
+            "Tamework",
+            "FlightmasterReins",
+            "Flightmaster_Reins_Texture.png"
+    );
 
     @Test
-    void dragonReinsItemIsCreativeToolWithLocalizedName() throws Exception {
+    void flightmasterReinsItemIsCreativeToolWithLocalizedModel() throws Exception {
         String item = Files.readString(ITEM, StandardCharsets.UTF_8);
         String lang = Files.readString(EN_US, StandardCharsets.UTF_8);
 
         assertTrue(item.contains("\"Name\": \"server.items.Tamework_Dragon_Reins.name\""));
         assertTrue(item.contains("\"Description\": \"server.items.Tamework_Dragon_Reins.description\""));
+        assertTrue(item.contains("\"Model\": \"Items/Tamework/FlightmasterReins/Flightmaster_Reins.blockymodel\""));
+        assertTrue(item.contains("\"Texture\": \"Items/Tamework/FlightmasterReins/Flightmaster_Reins_Texture.png\""));
+        assertTrue(item.contains("\"Icon\": \"Icons/ItemsGenerated/Flightmaster_Reins.png\""));
         assertTrue(item.contains("\"MaxStack\": 1"));
         assertTrue(item.contains("\"Items.Tools\""));
-        assertTrue(lang.contains("items.Tamework_Dragon_Reins.name=Dragon Reins"));
-        assertTrue(lang.contains("items.Tamework_Dragon_Reins.description="));
+        assertTrue(lang.contains("items.Tamework_Dragon_Reins.name=Flightmaster's Reins"));
+        assertTrue(lang.contains("items.Tamework_Dragon_Reins.description=Rider-held flight reins"));
+        assertTrue(Files.exists(MODEL), "Flightmaster's Reins model must exist");
+        assertTrue(Files.exists(TEXTURE), "Flightmaster's Reins texture must exist");
     }
 
     @Test

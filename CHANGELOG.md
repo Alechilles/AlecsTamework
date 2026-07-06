@@ -12,6 +12,7 @@
 
 ### Changed
 - Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.
+- Renamed the Dragon Reins prototype to Flightmaster's Reins and replaced the recipe-page placeholder with a dedicated reins model and texture.
 - Avatar flight no longer swaps the player model by default; `Model.ApplyModel` can re-enable the unsafe model-swap probe while flight controls are tested separately from client renderer crashes.
 - `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
 
