@@ -143,6 +143,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSy
 import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnDiagnosticsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnProtectionSystem;
+import com.alechilles.alecstamework.npc.systems.DynamicAttachmentEvaluationSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandLinkedRevivableDropSuppressionSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
@@ -692,6 +693,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new AvatarFlightEquipmentVisualSystem(
                         avatarFlightComponentType,
+                        avatarFlightRiderVisualComponentType,
                         EntityTrackerSystems.Visible.getComponentType()
                 )
         );
@@ -840,6 +842,20 @@ public class Tamework extends JavaPlugin {
         );
         registerOptionalCommandLinkedRevivableDropSuppressionSystem();
         getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
+        getEntityStoreRegistry().registerSystem(
+                new DynamicAttachmentEvaluationSystem(
+                        NPCEntity.getComponentType(),
+                        attachmentsComponentType,
+                        dynamicAttachmentsComponentType,
+                        ownerComponentType,
+                        tamedComponentType,
+                        lifeStageComponentType,
+                        happinessComponentType,
+                        needsComponentType,
+                        traitsComponentType,
+                        commandLinksComponentType
+                )
+        );
         getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
         getEntityStoreRegistry().registerSystem(new FlyingCompanionControlSystem());
         getEntityStoreRegistry().registerSystem(
