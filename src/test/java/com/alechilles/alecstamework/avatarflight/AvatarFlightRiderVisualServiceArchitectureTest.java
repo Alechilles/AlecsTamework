@@ -38,6 +38,9 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("equipment.hiddenCosmetics()"));
         assertTrue(source.contains("appearanceAttachments"));
         assertTrue(source.contains("equipment.attachments()"));
+        assertTrue(source.contains("PLAYER_ARMOR_ANCHOR_MODEL"));
+        assertTrue(source.contains("armorAnchorAttachment(riderModel, texture, equipment.attachments())"));
+        assertTrue(source.contains("attachments[equipmentStart] = armorAnchorAttachment"));
         assertTrue(source.contains("System.arraycopy(appearanceAttachments, 0, attachments, 1"));
         assertTrue(source.contains("System.arraycopy("));
         assertTrue(source.contains("System.arraycopy(riderAttachments, 0, attachments, baseCount"));
@@ -95,6 +98,26 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(json.contains("\"x\": -0.461749"));
         assertTrue(json.contains("\"x\": -0.300706"));
         assertTrue(json.split("\"isPiece\": true", -1).length - 1 == 1);
+    }
+
+    @Test
+    void playerRiderArmorAnchorModelKeepsLegacyIdsWithoutVisibleGeometry() throws Exception {
+        Path anchorModel = Path.of(
+                "src", "main", "resources", "Common", "Tamework", "AvatarFlight",
+                "Rider", "Player_MountAnchor_ArmorAnchors.blockymodel"
+        );
+        String json = Files.readString(anchorModel, StandardCharsets.UTF_8).replace("\r\n", "\n");
+
+        assertTrue(json.contains("\"name\": \"MountAnchor\""));
+        assertTrue(json.contains("\"id\": \"146\""));
+        assertTrue(json.contains("\"id\": \"1\""));
+        assertTrue(json.contains("\"name\": \"Head\""));
+        assertTrue(json.contains("\"name\": \"R-Attachment\""));
+        assertTrue(json.contains("\"name\": \"L-Attachment\""));
+        assertTrue(json.contains("\"name\": \"Back-Attachment\""));
+        assertTrue(json.contains("\"type\": \"none\""));
+        assertFalse(json.contains("\"type\": \"box\""));
+        assertFalse(json.contains("\"id\": \"tw_rider_"));
     }
 
     @Test
