@@ -33,11 +33,16 @@ public final class AvatarFlightRiderVisualService {
         }
         remove(store, ownerRef);
         store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false));
-        if (!settings.isShowRider() || savedModel == null) {
+        if (!settings.isShowRider()) {
+            logRiderAttachmentSkipped("show_rider_disabled", null, null);
+            return false;
+        }
+        if (savedModel == null) {
+            logRiderAttachmentSkipped("missing_saved_model", null, null);
             return false;
         }
 
-        return appendRiderAttachment(store, ownerRef, savedModel, config);
+        return appendRiderAttachment(store, ownerRef, savedModel);
     }
 
     public void remove(@Nonnull Store<EntityStore> store,
@@ -60,18 +65,19 @@ public final class AvatarFlightRiderVisualService {
 
     private static boolean appendRiderAttachment(@Nonnull Store<EntityStore> store,
                                                  @Nonnull Ref<EntityStore> ownerRef,
-                                                 @Nonnull Model savedModel,
-                                                 @Nonnull TwAvatarFlightConfig config) {
+                                                 @Nonnull Model savedModel) {
         ModelComponent component = store.getComponent(ownerRef, ModelComponent.getComponentType());
         if (component == null || component.getModel() == null) {
+            logRiderAttachmentSkipped("missing_owner_model", null, savedModel);
             return false;
         }
         Model withRider = modelWithRiderAttachment(component.getModel(), savedModel);
         if (withRider == null) {
+            logRiderAttachmentSkipped("missing_rider_model_texture", component.getModel(), savedModel);
             return false;
         }
         store.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
-        logRiderAttachment(component.getModel(), savedModel, config);
+        logRiderAttachment(component.getModel(), savedModel);
         return true;
     }
 
@@ -130,11 +136,7 @@ public final class AvatarFlightRiderVisualService {
     }
 
     private static void logRiderAttachment(@Nonnull Model baseModel,
-                                           @Nonnull Model savedModel,
-                                           @Nonnull TwAvatarFlightConfig config) {
-        if (!config.getDebug().isLogControllerTicks() && !config.getDebug().isLogInputTransitions()) {
-            return;
-        }
+                                           @Nonnull Model savedModel) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || instance.getLogger() == null) {
             return;
@@ -148,6 +150,24 @@ public final class AvatarFlightRiderVisualService {
                 savedModel.getTexture(),
                 savedModel.getGradientSet(),
                 savedModel.getGradientId()
+        ));
+    }
+
+    private static void logRiderAttachmentSkipped(@Nonnull String reason,
+                                                  @Nullable Model baseModel,
+                                                  @Nullable Model savedModel) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(String.format(
+                "TameworkAvatarFlight debug: riderAttachmentSkipped reason=%s baseModelAsset=%s "
+                        + "riderModelAsset=%s riderModel=%s riderTexture=%s",
+                reason,
+                baseModel == null ? "<null>" : baseModel.getModelAssetId(),
+                savedModel == null ? "<null>" : savedModel.getModelAssetId(),
+                savedModel == null ? "<null>" : savedModel.getModel(),
+                savedModel == null ? "<null>" : savedModel.getTexture()
         ));
     }
 
