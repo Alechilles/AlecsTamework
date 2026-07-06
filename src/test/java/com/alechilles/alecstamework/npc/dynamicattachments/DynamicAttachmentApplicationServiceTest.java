@@ -124,6 +124,37 @@ class DynamicAttachmentApplicationServiceTest {
     }
 
     @Test
+    void applyResolutionRestoresStaleThenAppliesPermanentThenTemporary() {
+        TameworkAttachmentsComponent stored = new TameworkAttachmentsComponent(
+                "cfg",
+                Map.of("head", "crown", "tail", "plain_tail")
+        );
+        TameworkDynamicAttachmentsComponent overlay = overlay(
+                slot("head", "cap", true, "crown", "rule:old")
+        );
+        DynamicAttachmentResolution resolution = new DynamicAttachmentResolution(
+                Map.of("head", "helmet", "neck", "collar"),
+                Map.of("tail", temporary("ribbon", "rule:new"))
+        );
+
+        DynamicAttachmentApplicationService.ApplyResult result =
+                DynamicAttachmentApplicationService.applyResolution(stored, overlay, resolution);
+
+        assertTrue(result.changed());
+        assertEquals("cfg", result.attachments().getConfigId());
+        assertEquals(
+                Map.of("head", "helmet", "neck", "collar", "tail", "ribbon"),
+                result.attachments().getAttachmentIds()
+        );
+        TameworkDynamicAttachmentsComponent.ActiveSlot active = result.overlay().getActiveSlots()[0];
+        assertEquals("tail", active.getSlot());
+        assertEquals("plain_tail", active.getPreviousValue());
+        assertTrue(active.isHasPreviousValue());
+        assertEquals("ribbon", active.getAppliedValue());
+        assertEquals("rule:new", active.getRuleKey());
+    }
+
+    @Test
     void filterSupportedSelectionsDropsUnsupportedSlots() {
         Map<String, String> filtered = DynamicAttachmentApplicationService.filterSupportedSelections(
                 Map.of("head", "crown", "tail", "ribbon", "neck", "collar"),
