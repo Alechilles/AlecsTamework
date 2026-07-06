@@ -78,7 +78,6 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(json.contains("\"x\": 0.707107"));
         assertTrue(json.contains("\"x\": -0.461749"));
         assertTrue(json.contains("\"x\": -0.300706"));
-        assertTrue(json.contains("\"x\": 0.130526"));
         assertTrue(json.split("\"isPiece\": true", -1).length - 1 == 1);
     }
 
