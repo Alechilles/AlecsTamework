@@ -34,8 +34,6 @@ public final class AvatarFlightEquipmentAttachmentResolver {
         EquipmentUpdate update = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, accessor);
         ArrayList<ModelAttachment> attachments = new ArrayList<>();
         EnumSet<Cosmetic> hiddenCosmetics = EnumSet.noneOf(Cosmetic.class);
-        appendItemAttachment(attachments, hiddenCosmetics, update.rightHandItemId);
-        appendItemAttachment(attachments, hiddenCosmetics, update.leftHandItemId);
         if (update.armorIds != null) {
             for (String armorId : update.armorIds) {
                 appendItemAttachment(attachments, hiddenCosmetics, armorId);

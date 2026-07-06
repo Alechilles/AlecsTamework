@@ -48,14 +48,14 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     }
 
     @Test
-    void equipmentAttachmentResolverSnapshotsVisibleEquipmentAsModelAttachments() throws Exception {
+    void equipmentAttachmentResolverSnapshotsArmorEquipmentAsModelAttachments() throws Exception {
         String source = Files.readString(ATTACHMENT_RESOLVER, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("createCurrentEquipmentUpdate(ref, accessor)"));
         assertTrue(source.contains("resolveSnapshot("));
         assertTrue(source.contains("EquipmentSnapshot"));
-        assertTrue(source.contains("update.rightHandItemId"));
-        assertTrue(source.contains("update.leftHandItemId"));
+        assertFalse(source.contains("update.rightHandItemId"));
+        assertFalse(source.contains("update.leftHandItemId"));
         assertTrue(source.contains("update.armorIds"));
         assertTrue(source.contains("EnumSet.noneOf(Cosmetic.class)"));
         assertTrue(source.contains("collectHiddenCosmetics("));
