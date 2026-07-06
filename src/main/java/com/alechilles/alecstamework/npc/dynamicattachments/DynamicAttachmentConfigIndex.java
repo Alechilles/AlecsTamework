@@ -86,7 +86,7 @@ public final class DynamicAttachmentConfigIndex {
             return List.of();
         }
         List<TwDynamicAttachmentsConfig.RoleRuleEntry> entries = roleResolver.apply(roleKey);
-        return entries == null || entries.isEmpty() ? List.of() : List.copyOf(entries);
+        return entries == null || entries.isEmpty() ? List.of() : entries;
     }
 
     @Nonnull
