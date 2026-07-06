@@ -65,6 +65,9 @@ public final class AvatarFlightActivator {
                           @Nonnull UUID playerUuid) {
         ComponentType<EntityStore, AvatarFlightComponent> flightType = AvatarFlightComponent.getComponentType();
         ComponentType<EntityStore, AvatarFlightInputComponent> inputType = AvatarFlightInputComponent.getComponentType();
+        AvatarFlightComponent flight = flightType == null ? null : store.getComponent(ref, flightType);
+        boolean restoreEquipment = flight != null
+                && TwAvatarFlightConfig.resolve(flight.getConfigId()).getRiderVisual().isHideOwnerEquipment();
         if (flightType != null) {
             store.tryRemoveComponent(ref, flightType);
         }
@@ -75,7 +78,9 @@ public final class AvatarFlightActivator {
         resetVisualPose(store, ref);
         clearForcedAnimations(store, ref);
         riderVisualService.remove(store, ref);
-        AvatarFlightEquipmentVisualSystem.restoreCurrentEquipment(ref, store);
+        if (restoreEquipment) {
+            AvatarFlightEquipmentVisualSystem.restoreCurrentEquipment(ref, store);
+        }
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
         boolean hadSavedModel = modelService.hasSavedModel(playerUuid);

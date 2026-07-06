@@ -33,8 +33,8 @@ class AvatarFlightRiderVisualConfigArchitectureTest {
         String json = Files.readString(DEFAULT_JSON, StandardCharsets.UTF_8);
 
         assertTrue(json.contains("\"RiderVisual\""));
-        assertTrue(json.contains("\"HideOwnerEquipment\": true"));
-        assertTrue(json.contains("\"ShowRider\": true"));
+        assertTrue(json.contains("\"HideOwnerEquipment\": false"));
+        assertTrue(json.contains("\"ShowRider\": false"));
         assertTrue(json.contains("\"SeatOffsetX\": 0.0"));
         assertTrue(json.contains("\"SeatOffsetY\": 1.35"));
         assertTrue(json.contains("\"SeatOffsetZ\": -0.25"));

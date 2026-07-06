@@ -51,6 +51,10 @@ class TwAvatarFlightConfigTest {
         assertEquals("", config.getAnimation().rollPoseAnimationFor(20.0));
         assertEquals("", config.getAnimation().sharedPoseAnimationFor(80.0, 20.0));
         assertTrue(config.getAnimation().getPoseResendIntervalMs() > 0L);
+        assertFalse(config.getRiderVisual().isHideOwnerEquipment());
+        assertFalse(config.getRiderVisual().isHideOwnerArmor());
+        assertFalse(config.getRiderVisual().isHideOwnerHands());
+        assertFalse(config.getRiderVisual().isShowRider());
     }
 
     @Test

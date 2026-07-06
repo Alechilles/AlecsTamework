@@ -36,6 +36,7 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
 
         assertTrue(source.contains("TwAvatarFlightConfig.resolve(flight.getConfigId())"));
         assertTrue(source.contains("config.getRiderVisual()"));
+        assertTrue(source.contains("settings.isHideOwnerEquipment()"));
         assertTrue(source.contains("AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate("));
         assertTrue(source.contains("AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate("));
     }

@@ -62,10 +62,10 @@
     "PoseResendIntervalMs": 250.0
   },
   "RiderVisual": {
-    "HideOwnerEquipment": true,
-    "HideOwnerArmor": true,
-    "HideOwnerHands": true,
-    "ShowRider": true,
+    "HideOwnerEquipment": false,
+    "HideOwnerArmor": false,
+    "HideOwnerHands": false,
+    "ShowRider": false,
     "SeatOffsetX": 0.0,
     "SeatOffsetY": 1.35,
     "SeatOffsetZ": -0.25,

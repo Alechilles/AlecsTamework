@@ -57,10 +57,13 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
             return;
         }
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
-        queueHiddenOwnerUpdate(ref, commandBuffer, visible, config.getRiderVisual());
+        TwAvatarFlightConfig.RiderVisualSettings settings = config.getRiderVisual();
+        if (settings.isHideOwnerEquipment()) {
+            queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings);
+        }
         AvatarFlightRiderVisualComponent riderVisual = commandBuffer.getComponent(ref, riderVisualType);
-        if (riderVisual != null && config.getRiderVisual().isShowRider()) {
-            queueRiderEquipmentUpdate(ref, commandBuffer, riderVisual, config.getRiderVisual());
+        if (riderVisual != null && settings.isShowRider()) {
+            queueRiderEquipmentUpdate(ref, commandBuffer, riderVisual, settings);
         }
     }
 

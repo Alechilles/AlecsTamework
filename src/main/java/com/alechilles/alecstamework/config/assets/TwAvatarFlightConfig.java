@@ -308,24 +308,24 @@ public final class TwAvatarFlightConfig implements
             RiderVisualSettings::new
     )
             .<Boolean>append(new KeyedCodec<>("HideOwnerEquipment", Codec.BOOLEAN),
-                    (settings, value) -> settings.hideOwnerEquipment = value == null || value,
+                    (settings, value) -> settings.hideOwnerEquipment = value != null && value,
                     settings -> settings.hideOwnerEquipment)
-            .documentation("Whether avatar flight sends equipment packets that hide the transformed player's equipped visuals. Inheritance: missing nested key inherits parent value.")
+            .documentation("Whether avatar flight sends equipment packets that hide the transformed player's equipped visuals. Disabled by default because local-player equipment packets can crash the current client. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Boolean>append(new KeyedCodec<>("HideOwnerArmor", Codec.BOOLEAN),
-                    (settings, value) -> settings.hideOwnerArmor = value == null || value,
+                    (settings, value) -> settings.hideOwnerArmor = value != null && value,
                     settings -> settings.hideOwnerArmor)
             .documentation("Whether hidden owner equipment also blanks armor slots. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Boolean>append(new KeyedCodec<>("HideOwnerHands", Codec.BOOLEAN),
-                    (settings, value) -> settings.hideOwnerHands = value == null || value,
+                    (settings, value) -> settings.hideOwnerHands = value != null && value,
                     settings -> settings.hideOwnerHands)
             .documentation("Whether hidden owner equipment blanks right-hand and left-hand item visuals. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Boolean>append(new KeyedCodec<>("ShowRider", Codec.BOOLEAN),
-                    (settings, value) -> settings.showRider = value == null || value,
+                    (settings, value) -> settings.showRider = value != null && value,
                     settings -> settings.showRider)
-            .documentation("Whether avatar flight spawns a visual-only copy of the player's saved model as a rider. Inheritance: missing nested key inherits parent value.")
+            .documentation("Whether avatar flight spawns a visual-only copy of the player's saved model as a rider. Disabled by default while the native mounted visual-rider path is unstable. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("SeatOffsetX", Codec.DOUBLE),
                     (settings, value) -> settings.seatOffsetX = finiteOrDefault(value, 0.0),
@@ -851,10 +851,10 @@ public final class TwAvatarFlightConfig implements
     }
 
     public static final class RiderVisualSettings {
-        private boolean hideOwnerEquipment = true;
-        private boolean hideOwnerArmor = true;
-        private boolean hideOwnerHands = true;
-        private boolean showRider = true;
+        private boolean hideOwnerEquipment;
+        private boolean hideOwnerArmor;
+        private boolean hideOwnerHands;
+        private boolean showRider;
         private double seatOffsetX;
         private double seatOffsetY = 1.35;
         private double seatOffsetZ = -0.25;
