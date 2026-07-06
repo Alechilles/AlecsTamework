@@ -18,11 +18,6 @@ import javax.annotation.Nullable;
  * Applies and removes avatar-flight rider visuals from the transformed player model.
  */
 public final class AvatarFlightRiderVisualService {
-    private static final String RIDER_PROXY_MODEL =
-            "NPC/Tamework/AvatarFlight/RiderProxy.blockymodel";
-    private static final String RIDER_PROXY_TEXTURE =
-            "NPC/Tamework/AvatarFlight/RiderProxy_Texture.png";
-
     public boolean spawn(@Nonnull Store<EntityStore> store,
                          @Nonnull Ref<EntityStore> ownerRef,
                          @Nonnull UUID ownerUuid,
@@ -36,7 +31,7 @@ public final class AvatarFlightRiderVisualService {
         }
         remove(store, ownerRef);
         store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false));
-        if (!settings.isShowRider()) {
+        if (!settings.isShowRider() || savedModel == null) {
             return false;
         }
 
@@ -63,7 +58,7 @@ public final class AvatarFlightRiderVisualService {
 
     private static boolean appendRiderAttachment(@Nonnull Store<EntityStore> store,
                                                  @Nonnull Ref<EntityStore> ownerRef,
-                                                 @Nullable Model savedModel) {
+                                                 @Nonnull Model savedModel) {
         ModelComponent component = store.getComponent(ownerRef, ModelComponent.getComponentType());
         if (component == null || component.getModel() == null) {
             return false;
@@ -78,7 +73,7 @@ public final class AvatarFlightRiderVisualService {
 
     @Nullable
     private static Model modelWithRiderAttachment(@Nonnull Model baseModel,
-                                                 @Nullable Model savedModel) {
+                                                 @Nonnull Model savedModel) {
         ModelAttachment riderAttachment = riderAttachment(savedModel);
         if (riderAttachment == null) {
             return null;
@@ -115,14 +110,17 @@ public final class AvatarFlightRiderVisualService {
     }
 
     @Nullable
-    private static ModelAttachment riderAttachment(@Nullable Model savedModel) {
-        String gradientSet = savedModel == null ? null : savedModel.getGradientSet();
-        String gradientId = savedModel == null ? null : savedModel.getGradientId();
+    private static ModelAttachment riderAttachment(@Nonnull Model savedModel) {
+        String model = savedModel.getModel();
+        String texture = savedModel.getTexture();
+        if (model == null || model.isBlank() || texture == null || texture.isBlank()) {
+            return null;
+        }
         return new ModelAttachment(
-                RIDER_PROXY_MODEL,
-                RIDER_PROXY_TEXTURE,
-                gradientSet,
-                gradientId,
+                model,
+                texture,
+                savedModel.getGradientSet(),
+                savedModel.getGradientId(),
                 1.0
         );
     }
