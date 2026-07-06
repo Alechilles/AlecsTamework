@@ -51,13 +51,19 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
                 "src", "main", "resources", "Common", "Tamework", "AvatarFlight",
                 "Rider", "Player_MountAnchor.blockymodel"
         );
-        String json = Files.readString(riderModel, StandardCharsets.UTF_8);
+        String json = Files.readString(riderModel, StandardCharsets.UTF_8).replace("\r\n", "\n");
 
         assertTrue(json.contains("\"name\": \"MountAnchor\""));
         assertTrue(json.contains("\"isPiece\": true"));
         assertTrue(json.contains("\"name\": \"Origin\""));
         assertTrue(json.contains("\"name\": \"R-Attachment\""));
         assertTrue(json.contains("\"name\": \"L-Attachment\""));
+        int pelvis = json.indexOf("\"name\": \"Pelvis\"");
+        int pelvisOrientation = json.indexOf("\"orientation\"", pelvis);
+        assertTrue(pelvis >= 0);
+        assertTrue(json.indexOf("\"y\": 0", pelvis) < pelvisOrientation);
+        assertTrue(json.contains("\"x\": -0.707107"));
+        assertTrue(json.contains("\"x\": 0.707107"));
         assertTrue(json.split("\"isPiece\": true", -1).length - 1 == 1);
     }
 
