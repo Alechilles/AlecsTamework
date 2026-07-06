@@ -1,14 +1,17 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.hypixel.hytale.protocol.PlayerSkin;
+import com.hypixel.hytale.protocol.Cosmetic;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAttachment;
 import com.hypixel.hytale.server.core.cosmetics.CosmeticRegistry;
 import com.hypixel.hytale.server.core.cosmetics.CosmeticsModule;
 import com.hypixel.hytale.server.core.cosmetics.PlayerSkinPart;
 import com.hypixel.hytale.server.core.cosmetics.PlayerSkinPartTexture;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -25,6 +28,17 @@ public final class AvatarFlightPlayerSkinAttachmentResolver {
                                              @Nonnull String fallbackBodyTexture,
                                              @Nullable String fallbackGradientSet,
                                              @Nullable String fallbackGradientId) {
+        return resolve(skin, fallbackBodyModel, fallbackBodyTexture, fallbackGradientSet, fallbackGradientId,
+                Collections.emptySet());
+    }
+
+    @Nullable
+    public static ResolvedAppearance resolve(@Nullable PlayerSkin skin,
+                                             @Nonnull String fallbackBodyModel,
+                                             @Nonnull String fallbackBodyTexture,
+                                             @Nullable String fallbackGradientSet,
+                                             @Nullable String fallbackGradientId,
+                                             @Nonnull Set<Cosmetic> hiddenCosmetics) {
         CosmeticsModule cosmetics = CosmeticsModule.get();
         if (skin == null || cosmetics == null || cosmetics.getRegistry() == null) {
             return null;
@@ -55,24 +69,45 @@ public final class AvatarFlightPlayerSkinAttachmentResolver {
         ArrayList<ModelAttachment> attachments = new ArrayList<>();
         append(attachments, registry.getUnderwear(), skin.underwear, skinTone);
         append(attachments, registry.getFaces(), skin.face, skinTone);
-        append(attachments, registry.getEars(), skin.ears, skinTone);
+        appendUnlessHidden(attachments, registry.getEars(), skin.ears, skinTone, hiddenCosmetics, Cosmetic.Ear);
         append(attachments, registry.getMouths(), skin.mouth, skinTone);
         append(attachments, registry.getEyes(), skin.eyes, skinTone);
         append(attachments, registry.getEyebrows(), skin.eyebrows, skinTone);
         append(attachments, registry.getSkinFeatures(), skin.skinFeature, skinTone);
-        append(attachments, registry.getFacialHairs(), skin.facialHair, skinTone);
-        appendHaircut(attachments, registry, skin.haircut, skin.headAccessory, skinTone);
-        append(attachments, registry.getPants(), skin.pants, skinTone);
-        append(attachments, registry.getOverpants(), skin.overpants, skinTone);
-        append(attachments, registry.getUndertops(), skin.undertop, skinTone);
-        append(attachments, registry.getOvertops(), skin.overtop, skinTone);
-        append(attachments, registry.getShoes(), skin.shoes, skinTone);
-        append(attachments, registry.getGloves(), skin.gloves, skinTone);
-        append(attachments, registry.getHeadAccessories(), skin.headAccessory, skinTone);
-        append(attachments, registry.getFaceAccessories(), skin.faceAccessory, skinTone);
-        append(attachments, registry.getEarAccessories(), skin.earAccessory, skinTone);
-        append(attachments, registry.getCapes(), skin.cape, skinTone);
+        appendUnlessHidden(attachments, registry.getFacialHairs(), skin.facialHair, skinTone,
+                hiddenCosmetics, Cosmetic.FacialHair);
+        if (!hiddenCosmetics.contains(Cosmetic.Haircut)) {
+            String headAccessory = hiddenCosmetics.contains(Cosmetic.HeadAccessory) ? null : skin.headAccessory;
+            appendHaircut(attachments, registry, skin.haircut, headAccessory, skinTone);
+        }
+        appendUnlessHidden(attachments, registry.getPants(), skin.pants, skinTone, hiddenCosmetics, Cosmetic.Pants);
+        appendUnlessHidden(attachments, registry.getOverpants(), skin.overpants, skinTone,
+                hiddenCosmetics, Cosmetic.Overpants);
+        appendUnlessHidden(attachments, registry.getUndertops(), skin.undertop, skinTone,
+                hiddenCosmetics, Cosmetic.Undertop);
+        appendUnlessHidden(attachments, registry.getOvertops(), skin.overtop, skinTone,
+                hiddenCosmetics, Cosmetic.Overtop);
+        appendUnlessHidden(attachments, registry.getShoes(), skin.shoes, skinTone, hiddenCosmetics, Cosmetic.Shoes);
+        appendUnlessHidden(attachments, registry.getGloves(), skin.gloves, skinTone, hiddenCosmetics, Cosmetic.Gloves);
+        appendUnlessHidden(attachments, registry.getHeadAccessories(), skin.headAccessory, skinTone,
+                hiddenCosmetics, Cosmetic.HeadAccessory);
+        appendUnlessHidden(attachments, registry.getFaceAccessories(), skin.faceAccessory, skinTone,
+                hiddenCosmetics, Cosmetic.FaceAccessory);
+        appendUnlessHidden(attachments, registry.getEarAccessories(), skin.earAccessory, skinTone,
+                hiddenCosmetics, Cosmetic.EarAccessory);
+        appendUnlessHidden(attachments, registry.getCapes(), skin.cape, skinTone, hiddenCosmetics, Cosmetic.Cape);
         return new ResolvedAppearance(body, attachments.toArray(ModelAttachment[]::new));
+    }
+
+    private static void appendUnlessHidden(@Nonnull List<ModelAttachment> attachments,
+                                           @Nonnull Map<String, PlayerSkinPart> parts,
+                                           @Nullable String id,
+                                           @Nullable String fallbackGradientId,
+                                           @Nonnull Set<Cosmetic> hiddenCosmetics,
+                                           @Nonnull Cosmetic cosmetic) {
+        if (!hiddenCosmetics.contains(cosmetic)) {
+            append(attachments, parts, id, fallbackGradientId);
+        }
     }
 
     private static void append(@Nonnull List<ModelAttachment> attachments,

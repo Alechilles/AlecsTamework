@@ -45,6 +45,7 @@
 - Expanded experimental avatar-flight fake rider appearance matching by resolving the player's skin cosmetics into rider attachments for hair, clothing, accessories, and selected facial parts.
 - Adjusted the experimental avatar-flight fake rider seated pose so the rider's arms reach forward while the hands stay flush with the forearms.
 - Added an experimental avatar-flight fake rider equipment snapshot that tries to mirror currently visible hand and armor items as rider model attachments.
+- Fixed experimental avatar-flight fake rider equipment snapshots to honor armor cosmetic hiding, so helmets, chest pieces, gloves, leggings, and boots can hide the same hair, accessories, and clothing slots they hide on normal players.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.

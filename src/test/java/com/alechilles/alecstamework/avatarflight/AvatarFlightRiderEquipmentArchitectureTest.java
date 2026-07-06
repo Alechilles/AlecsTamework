@@ -52,9 +52,17 @@ class AvatarFlightRiderEquipmentArchitectureTest {
         String source = Files.readString(ATTACHMENT_RESOLVER, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("createCurrentEquipmentUpdate(ref, accessor)"));
+        assertTrue(source.contains("resolveSnapshot("));
+        assertTrue(source.contains("EquipmentSnapshot"));
         assertTrue(source.contains("update.rightHandItemId"));
         assertTrue(source.contains("update.leftHandItemId"));
         assertTrue(source.contains("update.armorIds"));
+        assertTrue(source.contains("EnumSet.noneOf(Cosmetic.class)"));
+        assertTrue(source.contains("collectHiddenCosmetics("));
+        assertTrue(source.contains("item.getArmor()"));
+        assertTrue(source.contains("item.getArmor().toPacket()"));
+        assertTrue(source.contains("armor.cosmeticsToHide"));
+        assertTrue(source.contains("hiddenCosmetics.add(cosmetic)"));
         assertTrue(source.contains("BlockType.EMPTY_KEY"));
         assertTrue(source.contains("Item.getAssetMap().getAsset(itemId)"));
         assertTrue(source.contains("item.getModel()"));
