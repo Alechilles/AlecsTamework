@@ -42,13 +42,16 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemQueuesHiddenOwnerEquipmentToEveryViewerLikeKnownGoodPath() throws Exception {
+    void visualSystemQueuesHiddenOwnerEquipmentOnlyWhenSignatureRequiresIt() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings)"));
+        assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings, riderVisual)"));
+        assertTrue(source.contains("queueIfEquipmentChanged("));
+        assertTrue(source.contains("\"owner\""));
+        assertTrue(source.contains("readSignature("));
+        assertTrue(source.contains("writeSignature("));
         assertTrue(source.contains("queueAll(ref, update, visible.visibleTo)"));
         assertTrue(source.contains("queueAll(ref, update, visible.newlyVisibleTo)"));
-        assertFalse(source.contains("queueSelfIfChanged("));
         assertFalse(source.contains("queueSelf(ref, hiddenUpdate"));
     }
 

@@ -13,8 +13,11 @@ import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.modules.entity.EntityModule;
+import com.hypixel.hytale.server.core.modules.entity.component.BoundingBox;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.PersistentModel;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -58,7 +61,11 @@ public final class AvatarFlightRiderVisualService {
         holder.putComponent(EntityStore.REGISTRY.getNonSerializedComponentType(), new NonSerialized());
         holder.putComponent(TransformComponent.getComponentType(), ownerTransform.clone());
         holder.putComponent(HeadRotation.getComponentType(), new HeadRotation(ownerTransform.getRotation()));
-        holder.putComponent(ModelComponent.getComponentType(), new ModelComponent(new Model(savedModel)));
+        Model riderModel = new Model(savedModel);
+        holder.putComponent(ModelComponent.getComponentType(), new ModelComponent(riderModel));
+        holder.putComponent(PersistentModel.getComponentType(), new PersistentModel(riderModel.toReference()));
+        holder.putComponent(BoundingBox.getComponentType(), new BoundingBox(riderModel.getBoundingBox()));
+        holder.ensureComponent(EntityModule.get().getVisibleComponentType());
         holder.putComponent(MountedComponent.getComponentType(), new MountedComponent(ownerRef,
                 new Rotation3f(
                         (float) settings.getSeatOffsetX(),

@@ -25,7 +25,11 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false))"));
         assertTrue(source.contains("new NonSerialized()"));
         assertTrue(source.contains("new NetworkId("));
-        assertTrue(source.contains("new ModelComponent(new Model(savedModel))"));
+        assertTrue(source.contains("Model riderModel = new Model(savedModel)"));
+        assertTrue(source.contains("new ModelComponent(riderModel)"));
+        assertTrue(source.contains("new PersistentModel(riderModel.toReference())"));
+        assertTrue(source.contains("new BoundingBox(riderModel.getBoundingBox())"));
+        assertTrue(source.contains("EntityModule.get().getVisibleComponentType()"));
         assertTrue(source.contains("new MountedComponent(ownerRef"));
         assertTrue(source.contains("MountController.BlockMount"));
         assertTrue(source.contains("AddReason.SPAWN"));

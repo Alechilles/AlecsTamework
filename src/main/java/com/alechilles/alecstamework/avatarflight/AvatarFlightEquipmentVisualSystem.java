@@ -59,8 +59,8 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
         TwAvatarFlightConfig.RiderVisualSettings settings = config.getRiderVisual();
         AvatarFlightRiderVisualComponent riderVisual = commandBuffer.getComponent(ref, riderVisualType);
-        if (settings.isHideOwnerEquipment()) {
-            queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings);
+        if (riderVisual != null && settings.isHideOwnerEquipment()) {
+            riderVisual = queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings, riderVisual);
         }
         if (riderVisual != null && settings.isShowRider()) {
             queueRiderEquipmentUpdate(ref, commandBuffer, riderVisual, settings);
@@ -81,17 +81,30 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         queueAll(ref, update, visible.newlyVisibleTo);
     }
 
-    private static void queueHiddenOwnerUpdate(@Nonnull Ref<EntityStore> ref,
-                                               @Nonnull ComponentAccessor<EntityStore> accessor,
-                                               @Nonnull EntityTrackerSystems.Visible visible,
-                                               @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
+    @Nonnull
+    private AvatarFlightRiderVisualComponent queueHiddenOwnerUpdate(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull EntityTrackerSystems.Visible visible,
+            @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings,
+            @Nonnull AvatarFlightRiderVisualComponent riderVisual) {
         EquipmentUpdate update = AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate(
                 ref,
-                accessor,
+                commandBuffer,
                 settings
         );
-        queueAll(ref, update, visible.visibleTo);
-        queueAll(ref, update, visible.newlyVisibleTo);
+        String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
+        AvatarFlightRiderVisualComponent updated = queueIfEquipmentChanged(
+                ref,
+                commandBuffer,
+                riderVisual,
+                "owner",
+                signature,
+                settings.getEquipmentResendIntervalMs(),
+                () -> queueAll(ref, update, visible.visibleTo),
+                () -> queueAll(ref, update, visible.newlyVisibleTo)
+        );
+        return updated == null ? riderVisual : updated;
     }
 
     private void queueRiderEquipmentUpdate(@Nonnull Ref<EntityStore> ref,
@@ -108,19 +121,84 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         }
         EquipmentUpdate update = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, commandBuffer);
         String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
-        long now = System.currentTimeMillis();
-        boolean changed = !signature.equals(riderVisual.getEquipmentSignature());
-        boolean expired = now - riderVisual.getLastEquipmentSentAtMs() >= settings.getEquipmentResendIntervalMs();
-        if (!changed && !expired) {
-            return;
-        }
+        queueIfEquipmentChanged(
+                ref,
+                commandBuffer,
+                riderVisual,
+                "rider",
+                signature,
+                settings.getEquipmentResendIntervalMs(),
+                () -> queueOthers(riderRef, update, riderVisible.visibleTo),
+                () -> queueOthers(riderRef, update, riderVisible.newlyVisibleTo)
+        );
+    }
 
+    @Nullable
+    private AvatarFlightRiderVisualComponent queueIfEquipmentChanged(
+            @Nonnull Ref<EntityStore> ownerRef,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull AvatarFlightRiderVisualComponent riderVisual,
+            @Nonnull String key,
+            @Nonnull String signature,
+            long resendIntervalMs,
+            @Nonnull Runnable queueVisible,
+            @Nonnull Runnable queueNewlyVisible) {
+        long now = System.currentTimeMillis();
+        boolean changed = !signature.equals(readSignature(riderVisual.getEquipmentSignature(), key));
+        boolean expired = now - riderVisual.getLastEquipmentSentAtMs() >= resendIntervalMs;
+        if (changed || expired) {
+            queueVisible.run();
+        }
+        queueNewlyVisible.run();
+        if (!changed && !expired) {
+            return null;
+        }
         AvatarFlightRiderVisualComponent updated = riderVisual.clone();
-        updated.setEquipmentSignature(signature);
+        updated.setEquipmentSignature(writeSignature(riderVisual.getEquipmentSignature(), key, signature));
         updated.setLastEquipmentSentAtMs(now);
-        commandBuffer.putComponent(ref, riderVisualType, updated);
-        queueOthers(riderRef, update, riderVisible.visibleTo);
-        queueOthers(riderRef, update, riderVisible.newlyVisibleTo);
+        commandBuffer.putComponent(ownerRef, riderVisualType, updated);
+        return updated;
+    }
+
+    @Nonnull
+    private static String readSignature(@Nonnull String composite, @Nonnull String key) {
+        String prefix = key + "=";
+        for (String part : composite.split("\\n")) {
+            if (part.startsWith(prefix)) {
+                return part.substring(prefix.length());
+            }
+        }
+        return "";
+    }
+
+    @Nonnull
+    private static String writeSignature(@Nonnull String composite,
+                                         @Nonnull String key,
+                                         @Nonnull String signature) {
+        String prefix = key + "=";
+        StringBuilder result = new StringBuilder();
+        boolean replaced = false;
+        for (String part : composite.split("\\n")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (result.length() > 0) {
+                result.append('\n');
+            }
+            if (part.startsWith(prefix)) {
+                result.append(prefix).append(signature);
+                replaced = true;
+            } else {
+                result.append(part);
+            }
+        }
+        if (!replaced) {
+            if (result.length() > 0) {
+                result.append('\n');
+            }
+            result.append(prefix).append(signature);
+        }
+        return result.toString();
     }
 
     private static void queueOthers(@Nonnull Ref<EntityStore> ref,

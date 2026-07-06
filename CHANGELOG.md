@@ -35,6 +35,7 @@
 - Fixed transformed avatar flight still rendering held player equipment on dragon models by hiding hand equipment visuals while avatar flight is active, restoring them on disable, and throttling local equipment packets to activation/equipment-change moments.
 - Fixed avatar-flight equipment hiding staying inactive when fake rider visuals are disabled by preserving the owner-only visual marker for the active flight session.
 - Fixed avatar-flight owner equipment hiding no longer reaching the local transformed player by restoring the known-good hidden equipment packet broadcast path.
+- Fixed avatar-flight equipment visual updates so hidden owner equipment and fake rider equipment are sent only when their signatures change, avoiding per-tick local equipment packet spam while testing rider visuals.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.
