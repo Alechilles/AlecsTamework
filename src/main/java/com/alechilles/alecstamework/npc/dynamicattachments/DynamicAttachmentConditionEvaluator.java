@@ -37,7 +37,7 @@ public final class DynamicAttachmentConditionEvaluator {
                     snapshot.getNeed(condition.getNeed()),
                     threshold(snapshot.getNeed(condition.getNeed()), condition)
             );
-            case "stateequals", "commandstateequals" -> stringEquals(
+            case "stateequals" -> stringEquals(
                     snapshot.getCommandState(condition.getState()),
                     condition.getValue(),
                     condition.isIgnoreCase()

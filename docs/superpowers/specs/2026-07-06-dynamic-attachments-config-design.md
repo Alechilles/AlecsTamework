@@ -129,7 +129,7 @@ The first version supports:
 - `HappinessBelow`: checks happiness value.
 - `NeedAtLeast`: checks a named need value.
 - `NeedBelow`: checks a named need value.
-- `CommandStateEquals`: checks Tamework command state when command links/state are present.
+- `StateEquals`: checks Tamework NPC state when command links/state are present.
 
 Condition parsing should be strict enough to warn on malformed rules, but runtime evaluation should skip invalid rules gracefully and include asset ID/rule ID context in warnings.
 

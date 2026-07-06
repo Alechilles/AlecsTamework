@@ -84,7 +84,6 @@ Condition type matching ignores case, spaces, underscores, and hyphens.
 | `NeedAtLeast` | `Need`, plus `Number` or `Percent` | Matches a named need at or above the threshold. |
 | `NeedBelow` | `Need`, plus `Number` or `Percent` | Matches a named need below the threshold. |
 | `StateEquals` | `State`, `Value` | Matches an NPC state value captured by Tamework. |
-| `CommandStateEquals` | `State`, `Value` | Backward-compatible alias for `StateEquals`. |
 
 String conditions default `IgnoreCase` to `true`. Boolean conditions default `Expected` to `true`.
 
@@ -178,7 +177,7 @@ This applies a temporary blanket only while the NPC's owner is one of the listed
 ```
 
 ## Example: State Match
-Use `StateEquals` for NPC state values captured by Tamework. `CommandStateEquals` still works for older configs, but new configs should use `StateEquals`.
+Use `StateEquals` for NPC state values captured by Tamework.
 
 ```json
 {

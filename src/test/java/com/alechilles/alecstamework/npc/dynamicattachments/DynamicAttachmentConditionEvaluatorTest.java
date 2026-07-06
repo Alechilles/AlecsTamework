@@ -130,7 +130,7 @@ class DynamicAttachmentConditionEvaluatorTest {
     }
 
     @Test
-    void commandStateEqualsRemainsBackwardCompatibleAlias() throws Exception {
+    void commandStateEqualsIsNotAcceptedBecauseItWasNeverReleased() throws Exception {
         TwDynamicAttachmentsConfig.Condition condition = condition("CommandStateEquals");
         setField(condition, "state", "mode");
         setField(condition, "value", "follow");
@@ -138,7 +138,7 @@ class DynamicAttachmentConditionEvaluatorTest {
                 .commandState("MODE", "Follow")
                 .build();
 
-        assertTrue(DynamicAttachmentConditionEvaluator.matches(condition, snapshot));
+        assertFalse(DynamicAttachmentConditionEvaluator.matches(condition, snapshot));
     }
 
     @Test
