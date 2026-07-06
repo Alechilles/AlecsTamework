@@ -48,7 +48,7 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     }
 
     @Test
-    void equipmentAttachmentResolverSnapshotsArmorEquipmentAsModelAttachments() throws Exception {
+    void equipmentAttachmentResolverUsesArmorOnlyForCosmeticHiding() throws Exception {
         String source = Files.readString(ATTACHMENT_RESOLVER, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("createCurrentEquipmentUpdate(ref, accessor)"));
@@ -65,9 +65,10 @@ class AvatarFlightRiderEquipmentArchitectureTest {
         assertTrue(source.contains("hiddenCosmetics.add(cosmetic)"));
         assertTrue(source.contains("BlockType.EMPTY_KEY"));
         assertTrue(source.contains("Item.getAssetMap().getAsset(itemId)"));
-        assertTrue(source.contains("item.getModel()"));
-        assertTrue(source.contains("item.getTexture()"));
-        assertTrue(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
+        assertTrue(source.contains("NO_ATTACHMENTS"));
+        assertFalse(source.contains("item.getModel()"));
+        assertFalse(source.contains("item.getTexture()"));
+        assertFalse(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
     }
 
     @Test
