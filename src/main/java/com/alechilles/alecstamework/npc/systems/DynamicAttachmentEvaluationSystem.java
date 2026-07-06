@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentNpcS
 import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentResolution;
 import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentRuleResolver;
 import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentSnapshotReader;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -33,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -143,6 +145,12 @@ public final class DynamicAttachmentEvaluationSystem extends TickingSystem<Entit
 
         DynamicAttachmentNpcSnapshot snapshot = snapshotReader.read(ref, store);
         DynamicAttachmentResolution resolution = DynamicAttachmentRuleResolver.resolve(snapshot, rules);
+        resolution = filterResolutionForSupportedModelOptions(
+                resolution,
+                CompanionModelAttachmentService.resolveAttachmentOptionIds(
+                        CompanionModelAttachmentService.resolveModelAsset(ref, store)
+                )
+        );
         TameworkAttachmentsComponent storedAttachments = store.getComponent(ref, attachmentsComponentType);
         TameworkDynamicAttachmentsComponent dynamicOverlay = store.getComponent(ref, dynamicAttachmentsComponentType);
         DynamicAttachmentFingerprint fingerprint = fingerprint(snapshot, resolution, storedAttachments, dynamicOverlay);
@@ -197,6 +205,55 @@ public final class DynamicAttachmentEvaluationSystem extends TickingSystem<Entit
                 dynamicOverlay,
                 EMPTY_RESOLUTION
         );
+    }
+
+    @Nonnull
+    static DynamicAttachmentResolution filterResolutionForTest(@Nullable DynamicAttachmentResolution resolution,
+                                                               @Nullable Map<String, Set<String>> attachmentOptions) {
+        return filterResolutionForSupportedModelOptions(resolution, attachmentOptions);
+    }
+
+    @Nonnull
+    private static DynamicAttachmentResolution filterResolutionForSupportedModelOptions(
+            @Nullable DynamicAttachmentResolution resolution,
+            @Nullable Map<String, Set<String>> attachmentOptions) {
+        if (resolution == null || resolution.isEmpty() || attachmentOptions == null || attachmentOptions.isEmpty()) {
+            return EMPTY_RESOLUTION;
+        }
+        Map<String, String> permanent = DynamicAttachmentApplicationService.filterSupportedSelections(
+                resolution.permanentAttachments(),
+                attachmentOptions
+        );
+        Map<String, DynamicAttachmentResolution.TemporaryAttachment> temporary =
+                filterTemporarySelections(resolution.temporaryAttachments(), attachmentOptions);
+        if (permanent.isEmpty() && temporary.isEmpty()) {
+            return EMPTY_RESOLUTION;
+        }
+        return new DynamicAttachmentResolution(permanent, temporary);
+    }
+
+    @Nonnull
+    private static Map<String, DynamicAttachmentResolution.TemporaryAttachment> filterTemporarySelections(
+            @Nullable Map<String, DynamicAttachmentResolution.TemporaryAttachment> temporary,
+            @Nonnull Map<String, Set<String>> attachmentOptions) {
+        if (temporary == null || temporary.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, DynamicAttachmentResolution.TemporaryAttachment> filtered = new HashMap<>();
+        for (Map.Entry<String, DynamicAttachmentResolution.TemporaryAttachment> entry : temporary.entrySet()) {
+            if (entry == null || entry.getKey() == null || entry.getKey().isBlank()) {
+                continue;
+            }
+            DynamicAttachmentResolution.TemporaryAttachment attachment = entry.getValue();
+            if (attachment == null || attachment.value() == null || attachment.value().isBlank()) {
+                continue;
+            }
+            Set<String> supportedValues = attachmentOptions.get(entry.getKey());
+            if (supportedValues != null && supportedValues.contains(attachment.value())) {
+                filtered.put(entry.getKey(), attachment);
+            }
+        }
+        return filtered.isEmpty() ? Map.of() : Map.copyOf(filtered);
     }
 
     @Nonnull

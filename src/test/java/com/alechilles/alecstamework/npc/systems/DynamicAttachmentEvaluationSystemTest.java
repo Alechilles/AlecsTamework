@@ -4,10 +4,12 @@ import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentConf
 import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentNpcSnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkDynamicAttachmentsComponent;
+import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentResolution;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -77,6 +79,43 @@ class DynamicAttachmentEvaluationSystemTest {
         assertTrue(result.changed());
         assertEquals(Map.of("blanket", "Blanket_Red"), result.attachments().getAttachmentIds());
         assertEquals(0, result.overlay().getActiveSlots().length);
+    }
+
+    @Test
+    void filterResolutionDropsUnsupportedAttachmentSelections() {
+        DynamicAttachmentResolution resolution = new DynamicAttachmentResolution(
+                Map.of("blanket", "Blanket_Canada", "saddle", "Saddle_Red"),
+                Map.of(
+                        "badge",
+                        new DynamicAttachmentResolution.TemporaryAttachment("Badge_Gold", "cfg/badge"),
+                        "collar",
+                        new DynamicAttachmentResolution.TemporaryAttachment("Collar_Red", "cfg/collar")
+                )
+        );
+
+        DynamicAttachmentResolution filtered = DynamicAttachmentEvaluationSystem.filterResolutionForTest(
+                resolution,
+                Map.of(
+                        "blanket", Set.of("Blanket_Canada"),
+                        "badge", Set.of("Badge_Gold")
+                )
+        );
+
+        assertEquals(Map.of("blanket", "Blanket_Canada"), filtered.permanentAttachments());
+        assertEquals(Set.of("badge"), filtered.temporaryAttachments().keySet());
+        assertEquals("Badge_Gold", filtered.temporaryAttachments().get("badge").value());
+        assertEquals("cfg/badge", filtered.temporaryAttachments().get("badge").ruleKey());
+    }
+
+    @Test
+    void filterResolutionReturnsEmptyWhenModelOptionsAreUnavailable() {
+        DynamicAttachmentResolution resolution = new DynamicAttachmentResolution(
+                Map.of("blanket", "Blanket_Canada"),
+                Map.of("badge", new DynamicAttachmentResolution.TemporaryAttachment("Badge_Gold", "cfg/badge"))
+        );
+
+        assertTrue(DynamicAttachmentEvaluationSystem.filterResolutionForTest(resolution, Map.of()).isEmpty());
+        assertTrue(DynamicAttachmentEvaluationSystem.filterResolutionForTest(resolution, null).isEmpty());
     }
 
     @Test
