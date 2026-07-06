@@ -31,6 +31,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("new ModelAttachment("));
         assertTrue(source.contains("RIDER_PROXY_MODEL"));
         assertTrue(source.contains("RIDER_PROXY_TEXTURE"));
+        assertTrue(source.contains("NPC/Tamework/AvatarFlight/RiderProxy_Texture.png"));
         assertFalse(source.contains("savedModel.getModel()"));
         assertFalse(source.contains("savedModel.getTexture()"));
         assertTrue(source.contains("Arrays.copyOf("));
@@ -60,6 +61,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("\"name\": \"Chest\""));
         assertTrue(source.contains("\"isPiece\": true"));
         assertTrue(source.contains("\"name\": \"RiderProxyAnchor\""));
+        assertTrue(source.contains("\"position\": {\"x\": 0, \"y\": 8, \"z\": 24}"));
         assertTrue(source.contains("\"name\": \"RiderProxyTorso\""));
         assertTrue(source.contains("\"name\": \"RiderProxyHead\""));
     }

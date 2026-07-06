@@ -21,7 +21,7 @@ public final class AvatarFlightRiderVisualService {
     private static final String RIDER_PROXY_MODEL =
             "NPC/Tamework/AvatarFlight/RiderProxy.blockymodel";
     private static final String RIDER_PROXY_TEXTURE =
-            "Items/Tamework/FlightmasterReins/Flightmaster_Reins_Texture.png";
+            "NPC/Tamework/AvatarFlight/RiderProxy_Texture.png";
 
     public boolean spawn(@Nonnull Store<EntityStore> store,
                          @Nonnull Ref<EntityStore> ownerRef,
