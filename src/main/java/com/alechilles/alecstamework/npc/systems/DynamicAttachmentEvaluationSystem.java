@@ -43,6 +43,8 @@ import javax.annotation.Nullable;
 public final class DynamicAttachmentEvaluationSystem extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 1_500L;
     private static final int SWEEP_JITTER_MS = 500;
+    private static final DynamicAttachmentResolution EMPTY_RESOLUTION =
+            new DynamicAttachmentResolution(Map.of(), Map.of());
 
     private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
     private final ComponentType<EntityStore, NPCEntity> npcComponentType;
@@ -135,6 +137,7 @@ public final class DynamicAttachmentEvaluationSystem extends TickingSystem<Entit
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
         List<TwDynamicAttachmentsConfig.RoleRuleEntry> rules = configIndex.rulesForRole(roleId);
         if (rules.isEmpty()) {
+            restoreInactiveOverlayForUnconfiguredRole(ref, commandBuffer, store, tickState, npcUuid);
             return;
         }
 
@@ -156,6 +159,26 @@ public final class DynamicAttachmentEvaluationSystem extends TickingSystem<Entit
         tickState.lastFingerprintByNpc.put(npcUuid, fingerprint);
     }
 
+    private void restoreInactiveOverlayForUnconfiguredRole(@Nonnull Ref<EntityStore> ref,
+                                                           @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                                           @Nonnull Store<EntityStore> store,
+                                                           @Nonnull TickState tickState,
+                                                           @Nonnull UUID npcUuid) {
+        TameworkDynamicAttachmentsComponent dynamicOverlay = store.getComponent(ref, dynamicAttachmentsComponentType);
+        if (dynamicOverlay == null || !dynamicOverlay.hasActiveSlots()) {
+            tickState.lastFingerprintByNpc.remove(npcUuid);
+            return;
+        }
+        TameworkAttachmentsComponent storedAttachments = store.getComponent(ref, attachmentsComponentType);
+        DynamicAttachmentApplicationService.ApplyResult result =
+                restoreUnconfiguredRoleForTest(storedAttachments, dynamicOverlay);
+        if (result.changed()) {
+            commandBuffer.putComponent(ref, attachmentsComponentType, result.attachments());
+            commandBuffer.putComponent(ref, dynamicAttachmentsComponentType, result.overlay());
+        }
+        tickState.lastFingerprintByNpc.remove(npcUuid);
+    }
+
     static boolean shouldEvaluateRole(@Nullable String roleId, @Nullable DynamicAttachmentConfigIndex index) {
         return index != null && index.hasRulesForRole(roleId);
     }
@@ -163,6 +186,17 @@ public final class DynamicAttachmentEvaluationSystem extends TickingSystem<Entit
     @Nonnull
     static DynamicAttachmentFingerprint fingerprintForTest(@Nullable DynamicAttachmentNpcSnapshot snapshot) {
         return fingerprint(snapshot, null, null, null);
+    }
+
+    @Nonnull
+    static DynamicAttachmentApplicationService.ApplyResult restoreUnconfiguredRoleForTest(
+            @Nullable TameworkAttachmentsComponent storedAttachments,
+            @Nullable TameworkDynamicAttachmentsComponent dynamicOverlay) {
+        return DynamicAttachmentApplicationService.applyResolution(
+                storedAttachments,
+                dynamicOverlay,
+                EMPTY_RESOLUTION
+        );
     }
 
     @Nonnull

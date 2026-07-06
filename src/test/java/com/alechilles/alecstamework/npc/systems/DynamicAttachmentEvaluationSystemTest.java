@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentConfigIndex;
 import com.alechilles.alecstamework.npc.dynamicattachments.DynamicAttachmentNpcSnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkDynamicAttachmentsComponent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,6 +52,31 @@ class DynamicAttachmentEvaluationSystemTest {
         assertNotEquals(baseline, DynamicAttachmentEvaluationSystem.fingerprintForTest(
                 baseSnapshot().commandState("has_home", "false").build()
         ));
+    }
+
+    @Test
+    void restoreUnconfiguredRoleClearsStaleTemporaryOverlay() {
+        TameworkAttachmentsComponent stored = new TameworkAttachmentsComponent(
+                "cfg",
+                Map.of("blanket", "Blanket_Canada")
+        );
+        TameworkDynamicAttachmentsComponent overlay = new TameworkDynamicAttachmentsComponent(
+                new TameworkDynamicAttachmentsComponent.ActiveSlot[] {
+                        new TameworkDynamicAttachmentsComponent.ActiveSlot(
+                                "blanket",
+                                "Blanket_Red",
+                                true,
+                                "Blanket_Canada",
+                                "cfg/hungry"
+                        )
+                }
+        );
+
+        var result = DynamicAttachmentEvaluationSystem.restoreUnconfiguredRoleForTest(stored, overlay);
+
+        assertTrue(result.changed());
+        assertEquals(Map.of("blanket", "Blanket_Red"), result.attachments().getAttachmentIds());
+        assertEquals(0, result.overlay().getActiveSlots().length);
     }
 
     @Test
