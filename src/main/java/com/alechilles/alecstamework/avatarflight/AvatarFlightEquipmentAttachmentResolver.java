@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAttachment;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
@@ -15,11 +16,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Converts the player's current visible equipment into cosmetic visibility masks for avatar-flight rider doubles.
+ * Converts the player's current visible equipment into rider attachments and cosmetic visibility masks.
  */
 public final class AvatarFlightEquipmentAttachmentResolver {
-    private static final ModelAttachment[] NO_ATTACHMENTS = new ModelAttachment[0];
-
     private AvatarFlightEquipmentAttachmentResolver() {
     }
 
@@ -33,20 +32,22 @@ public final class AvatarFlightEquipmentAttachmentResolver {
     public static EquipmentSnapshot resolveSnapshot(@Nonnull Ref<EntityStore> ref,
                                                     @Nonnull ComponentAccessor<EntityStore> accessor) {
         EquipmentUpdate update = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, accessor);
+        ArrayList<ModelAttachment> attachments = new ArrayList<>();
         EnumSet<Cosmetic> hiddenCosmetics = EnumSet.noneOf(Cosmetic.class);
         if (update.armorIds != null) {
             for (String armorId : update.armorIds) {
-                collectItemHiddenCosmetics(hiddenCosmetics, armorId);
+                appendItemAttachment(attachments, hiddenCosmetics, armorId);
             }
         }
         return new EquipmentSnapshot(
-                NO_ATTACHMENTS,
+                attachments.toArray(ModelAttachment[]::new),
                 Collections.unmodifiableSet(hiddenCosmetics)
         );
     }
 
-    private static void collectItemHiddenCosmetics(@Nonnull EnumSet<Cosmetic> hiddenCosmetics,
-                                                   @Nullable String itemId) {
+    private static void appendItemAttachment(@Nonnull ArrayList<ModelAttachment> attachments,
+                                             @Nonnull EnumSet<Cosmetic> hiddenCosmetics,
+                                             @Nullable String itemId) {
         if (itemId == null || itemId.isBlank() || BlockType.EMPTY_KEY.equals(itemId)) {
             return;
         }
@@ -55,6 +56,12 @@ public final class AvatarFlightEquipmentAttachmentResolver {
             return;
         }
         collectHiddenCosmetics(hiddenCosmetics, item);
+        String model = item.getModel();
+        String texture = item.getTexture();
+        if (model == null || model.isBlank() || texture == null || texture.isBlank()) {
+            return;
+        }
+        attachments.add(new ModelAttachment(model, texture, null, null, 1.0));
     }
 
     private static void collectHiddenCosmetics(@Nonnull EnumSet<Cosmetic> hiddenCosmetics,

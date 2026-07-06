@@ -74,10 +74,13 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(json.contains("\"name\": \"MountAnchor\""));
         assertTrue(json.contains("\"isPiece\": true"));
         assertTrue(json.contains("\"name\": \"TameworkRider_Origin\""));
+        assertTrue(json.contains("\"id\": \"tw_rider_146\""));
         assertTrue(json.contains("\"name\": \"R-Attachment\""));
         assertTrue(json.contains("\"name\": \"L-Attachment\""));
         assertTrue(json.contains("\"name\": \"Head\""),
                 "the fake rider should keep the standard head node so player look tracking can still affect it");
+        assertFalse(json.matches("(?s).*\"id\"\\s*:\\s*\"[0-9]+\".*"),
+                "fake rider node ids must be namespaced so player/flight animation tracks cannot target them by id");
         assertFalse(json.contains("\"name\": \"Origin\""));
         assertFalse(json.contains("\"name\": \"Pelvis\""));
         assertFalse(json.contains("\"name\": \"Chest\""));

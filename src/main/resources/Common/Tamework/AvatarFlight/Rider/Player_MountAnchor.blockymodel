@@ -38,11 +38,11 @@
       },
       "children": [
         {
-          "id": "146",
+          "id": "tw_rider_146",
           "name": "TameworkRider_Origin",
           "children": [
             {
-              "id": "4",
+              "id": "tw_rider_4",
               "name": "TameworkRider_Pelvis",
               "position": {
                 "x": 0,
@@ -149,7 +149,7 @@
               },
               "children": [
                 {
-                  "id": "56",
+                  "id": "tw_rider_56",
                   "name": "TameworkRider_Belly",
                   "position": {
                     "x": 0,
@@ -256,7 +256,7 @@
                   },
                   "children": [
                     {
-                      "id": "2",
+                      "id": "tw_rider_2",
                       "name": "TameworkRider_Chest",
                       "position": {
                         "x": 0,
@@ -363,7 +363,7 @@
                       },
                       "children": [
                         {
-                          "id": "1",
+                          "id": "tw_rider_1",
                           "name": "Head",
                           "position": {
                             "x": 0,
@@ -459,7 +459,7 @@
                           },
                           "children": [
                             {
-                              "id": "5",
+                              "id": "tw_rider_5",
                               "name": "TameworkRider_Neck",
                               "position": {
                                 "x": 0,
@@ -556,7 +556,7 @@
                               "children": []
                             },
                             {
-                              "id": "125",
+                              "id": "tw_rider_125",
                               "name": "TameworkRider_L-Eyelid",
                               "children": [],
                               "position": {
@@ -609,7 +609,7 @@
                               }
                             },
                             {
-                              "id": "126",
+                              "id": "tw_rider_126",
                               "name": "TameworkRider_R-Eyelid",
                               "children": [],
                               "position": {
@@ -662,7 +662,7 @@
                               }
                             },
                             {
-                              "id": "137",
+                              "id": "tw_rider_137",
                               "name": "TameworkRider_L-Eyelid-Bot",
                               "children": [],
                               "position": {
@@ -715,7 +715,7 @@
                               }
                             },
                             {
-                              "id": "138",
+                              "id": "tw_rider_138",
                               "name": "TameworkRider_R-Eyelid-Bot",
                               "children": [],
                               "position": {
@@ -768,7 +768,7 @@
                               }
                             },
                             {
-                              "id": "127",
+                              "id": "tw_rider_127",
                               "name": "L-Eyebrow-Attachment",
                               "children": [],
                               "position": {
@@ -805,7 +805,7 @@
                               }
                             },
                             {
-                              "id": "128",
+                              "id": "tw_rider_128",
                               "name": "R-Eyebrow-Attachment",
                               "children": [],
                               "position": {
@@ -842,7 +842,7 @@
                               }
                             },
                             {
-                              "id": "129",
+                              "id": "tw_rider_129",
                               "name": "R-Eye-Attachment",
                               "children": [],
                               "position": {
@@ -879,7 +879,7 @@
                               }
                             },
                             {
-                              "id": "130",
+                              "id": "tw_rider_130",
                               "name": "L-Eye-Attachment",
                               "children": [],
                               "position": {
@@ -916,7 +916,7 @@
                               }
                             },
                             {
-                              "id": "131",
+                              "id": "tw_rider_131",
                               "name": "Mouth-Attachment",
                               "children": [],
                               "position": {
@@ -953,7 +953,7 @@
                               }
                             },
                             {
-                              "id": "132",
+                              "id": "tw_rider_132",
                               "name": "R-Ear-Attachment",
                               "children": [],
                               "position": {
@@ -990,7 +990,7 @@
                               }
                             },
                             {
-                              "id": "133",
+                              "id": "tw_rider_133",
                               "name": "L-Ear-Attachment",
                               "children": [],
                               "position": {
@@ -1029,11 +1029,11 @@
                           ]
                         },
                         {
-                          "id": "145",
+                          "id": "tw_rider_145",
                           "name": "TameworkRider_R-Shoulder",
                           "children": [
                             {
-                              "id": "35",
+                              "id": "tw_rider_35",
                               "name": "TameworkRider_R-Arm",
                               "position": {
                                 "x": 0,
@@ -1140,7 +1140,7 @@
                               },
                               "children": [
                                 {
-                                  "id": "36",
+                                  "id": "tw_rider_36",
                                   "name": "TameworkRider_R-Forearm",
                                   "position": {
                                     "x": 0,
@@ -1247,7 +1247,7 @@
                                   },
                                   "children": [
                                     {
-                                      "id": "37",
+                                      "id": "tw_rider_37",
                                       "name": "TameworkRider_R-Hand",
                                       "position": {
                                         "x": 1E-06,
@@ -1354,7 +1354,7 @@
                                       },
                                       "children": [
                                         {
-                                          "id": "43",
+                                          "id": "tw_rider_43",
                                           "name": "R-Attachment",
                                           "position": {
                                             "x": 0,
@@ -1395,7 +1395,7 @@
                                   ]
                                 },
                                 {
-                                  "id": "148",
+                                  "id": "tw_rider_148",
                                   "name": "TameworkRider_R-Shoulder2",
                                   "children": [],
                                   "position": {
@@ -1468,23 +1468,23 @@
                           }
                         },
                         {
-                          "id": "144",
+                          "id": "tw_rider_144",
                           "name": "TameworkRider_L-Shoulder",
                           "children": [
                             {
-                              "id": "139",
+                              "id": "tw_rider_139",
                               "name": "TameworkRider_L-Arm",
                               "children": [
                                 {
-                                  "id": "140",
+                                  "id": "tw_rider_140",
                                   "name": "TameworkRider_L-Forearm",
                                   "children": [
                                     {
-                                      "id": "141",
+                                      "id": "tw_rider_141",
                                       "name": "TameworkRider_L-Hand",
                                       "children": [
                                         {
-                                          "id": "142",
+                                          "id": "tw_rider_142",
                                           "name": "L-Attachment",
                                           "children": [],
                                           "position": {
@@ -1731,7 +1731,7 @@
                                   }
                                 },
                                 {
-                                  "id": "149",
+                                  "id": "tw_rider_149",
                                   "name": "TameworkRider_L-Shoulder2",
                                   "children": [],
                                   "position": {
@@ -1907,7 +1907,7 @@
                           }
                         },
                         {
-                          "id": "147",
+                          "id": "tw_rider_147",
                           "name": "Back-Attachment",
                           "children": [],
                           "position": {
@@ -1948,7 +1948,7 @@
                   ]
                 },
                 {
-                  "id": "8",
+                  "id": "tw_rider_8",
                   "name": "TameworkRider_R-Thigh",
                   "position": {
                     "x": -7.5,
@@ -2044,7 +2044,7 @@
                   },
                   "children": [
                     {
-                      "id": "9",
+                      "id": "tw_rider_9",
                       "name": "TameworkRider_R-Calf",
                       "position": {
                         "x": 0,
@@ -2151,7 +2151,7 @@
                       },
                       "children": [
                         {
-                          "id": "10",
+                          "id": "tw_rider_10",
                           "name": "TameworkRider_R-Foot",
                           "position": {
                             "x": 0,
@@ -2263,7 +2263,7 @@
                   ]
                 },
                 {
-                  "id": "25",
+                  "id": "tw_rider_25",
                   "name": "TameworkRider_L-Thigh",
                   "position": {
                     "x": 7.5,
@@ -2359,7 +2359,7 @@
                   },
                   "children": [
                     {
-                      "id": "26",
+                      "id": "tw_rider_26",
                       "name": "TameworkRider_L-Calf",
                       "position": {
                         "x": 0,
@@ -2466,7 +2466,7 @@
                       },
                       "children": [
                         {
-                          "id": "27",
+                          "id": "tw_rider_27",
                           "name": "TameworkRider_L-Foot",
                           "position": {
                             "x": 0,

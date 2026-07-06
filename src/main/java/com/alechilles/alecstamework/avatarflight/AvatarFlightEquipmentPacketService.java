@@ -43,7 +43,7 @@ public final class AvatarFlightEquipmentPacketService {
             update.leftHandItemId = BlockType.EMPTY_KEY;
         }
         if (settings.isHideOwnerArmor() && update.armorIds != null) {
-            Arrays.fill(update.armorIds, "");
+            Arrays.fill(update.armorIds, BlockType.EMPTY_KEY);
         }
         return update;
     }

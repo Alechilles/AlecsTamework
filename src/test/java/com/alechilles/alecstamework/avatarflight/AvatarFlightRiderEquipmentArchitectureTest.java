@@ -21,6 +21,10 @@ class AvatarFlightRiderEquipmentArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "avatarflight", "AvatarFlightEquipmentAttachmentResolver.java"
     );
+    private static final Path PACKET_HELPER = Path.of(
+            "src", "main", "java", "com", "alechilles", "alecstamework",
+            "avatarflight", "AvatarFlightEquipmentPacketService.java"
+    );
     private static final Path TAMEWORK = Path.of(
             "src", "main", "java", "com", "alechilles", "alecstamework", "Tamework.java"
     );
@@ -48,7 +52,7 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     }
 
     @Test
-    void equipmentAttachmentResolverUsesArmorOnlyForCosmeticHiding() throws Exception {
+    void equipmentAttachmentResolverSnapshotsArmorEquipmentAsModelAttachments() throws Exception {
         String source = Files.readString(ATTACHMENT_RESOLVER, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("createCurrentEquipmentUpdate(ref, accessor)"));
@@ -65,10 +69,17 @@ class AvatarFlightRiderEquipmentArchitectureTest {
         assertTrue(source.contains("hiddenCosmetics.add(cosmetic)"));
         assertTrue(source.contains("BlockType.EMPTY_KEY"));
         assertTrue(source.contains("Item.getAssetMap().getAsset(itemId)"));
-        assertTrue(source.contains("NO_ATTACHMENTS"));
-        assertFalse(source.contains("item.getModel()"));
-        assertFalse(source.contains("item.getTexture()"));
-        assertFalse(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
+        assertTrue(source.contains("item.getModel()"));
+        assertTrue(source.contains("item.getTexture()"));
+        assertTrue(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
+    }
+
+    @Test
+    void hiddenOwnerArmorUsesEngineEmptyItemKey() throws Exception {
+        String source = Files.readString(PACKET_HELPER, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("Arrays.fill(update.armorIds, BlockType.EMPTY_KEY)"));
+        assertFalse(source.contains("Arrays.fill(update.armorIds, \"\")"));
     }
 
     @Test
