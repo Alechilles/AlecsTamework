@@ -17,6 +17,10 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "avatarflight", "AvatarFlightActivator.java"
     );
+    private static final Path RIDER_PROXY = Path.of(
+            "src", "main", "resources", "Common", "NPC", "Tamework",
+            "AvatarFlight", "RiderProxy.blockymodel"
+    );
 
     @Test
     void riderVisualServiceUsesModelAttachmentInsteadOfNativeMount() throws Exception {
@@ -25,6 +29,10 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false))"));
         assertTrue(source.contains("appendRiderAttachment("));
         assertTrue(source.contains("new ModelAttachment("));
+        assertTrue(source.contains("RIDER_PROXY_MODEL"));
+        assertTrue(source.contains("RIDER_PROXY_TEXTURE"));
+        assertFalse(source.contains("savedModel.getModel()"));
+        assertFalse(source.contains("savedModel.getTexture()"));
         assertTrue(source.contains("Arrays.copyOf("));
         assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
         assertFalse(source.contains("new MountedComponent("));
@@ -43,5 +51,16 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("riderVisualService.remove("));
         assertTrue(source.indexOf("modelService.apply(") < source.indexOf("riderVisualService.spawn("));
         assertTrue(source.indexOf("riderVisualService.remove(") < source.indexOf("modelService.restore("));
+    }
+
+    @Test
+    void riderProxyModelTargetsNordicDrakeTorsoPiece() throws Exception {
+        String source = Files.readString(RIDER_PROXY, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("\"name\": \"Chest\""));
+        assertTrue(source.contains("\"isPiece\": true"));
+        assertTrue(source.contains("\"name\": \"RiderProxyAnchor\""));
+        assertTrue(source.contains("\"name\": \"RiderProxyTorso\""));
+        assertTrue(source.contains("\"name\": \"RiderProxyHead\""));
     }
 }

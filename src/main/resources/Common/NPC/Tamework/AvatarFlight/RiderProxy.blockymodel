@@ -1,0 +1,214 @@
+{
+  "nodes": [
+    {
+      "id": "tw_rider_proxy_chest_piece",
+      "name": "Chest",
+      "position": {"x": 0, "y": 0, "z": 0},
+      "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+      "shape": {
+        "type": "none",
+        "offset": {"x": 0, "y": 0, "z": 0},
+        "stretch": {"x": 1, "y": 1, "z": 1},
+        "settings": {
+          "isPiece": true
+        },
+        "textureLayout": {},
+        "unwrapMode": "custom",
+        "visible": true,
+        "doubleSided": false,
+        "shadingMode": "flat"
+      },
+      "children": [
+        {
+          "id": "tw_rider_proxy_anchor",
+          "name": "RiderProxyAnchor",
+          "position": {"x": 0, "y": 42, "z": -18},
+          "orientation": {"x": -0.13053, "y": 0, "z": 0, "w": 0.99144},
+          "shape": {
+            "type": "none",
+            "offset": {"x": 0, "y": 0, "z": 0},
+            "stretch": {"x": 1, "y": 1, "z": 1},
+            "settings": {
+              "isPiece": false
+            },
+            "textureLayout": {},
+            "unwrapMode": "custom",
+            "visible": true,
+            "doubleSided": false,
+            "shadingMode": "flat"
+          },
+          "children": [
+            {
+              "id": "tw_rider_proxy_torso",
+              "name": "RiderProxyTorso",
+              "position": {"x": 0, "y": 8, "z": 0},
+              "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+              "shape": {
+                "type": "box",
+                "offset": {"x": -5, "y": -9, "z": -2.5},
+                "stretch": {"x": 1, "y": 1, "z": 1},
+                "settings": {
+                  "isPiece": false,
+                  "size": {"x": 10, "y": 18, "z": 5},
+                  "isStaticBox": true
+                },
+                "textureLayout": {
+                  "front": {"offset": {"x": 0, "y": 0}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "back": {"offset": {"x": 16, "y": 0}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "left": {"offset": {"x": 32, "y": 0}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "right": {"offset": {"x": 48, "y": 0}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "top": {"offset": {"x": 0, "y": 20}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "bottom": {"offset": {"x": 16, "y": 20}, "mirror": {"x": false, "y": false}, "angle": 0}
+                },
+                "unwrapMode": "custom",
+                "visible": true,
+                "doubleSided": false,
+                "shadingMode": "flat"
+              }
+            },
+            {
+              "id": "tw_rider_proxy_head",
+              "name": "RiderProxyHead",
+              "position": {"x": 0, "y": 22, "z": 0},
+              "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+              "shape": {
+                "type": "box",
+                "offset": {"x": -4, "y": -4, "z": -4},
+                "stretch": {"x": 1, "y": 1, "z": 1},
+                "settings": {
+                  "isPiece": false,
+                  "size": {"x": 8, "y": 8, "z": 8},
+                  "isStaticBox": true
+                },
+                "textureLayout": {
+                  "front": {"offset": {"x": 32, "y": 20}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "back": {"offset": {"x": 48, "y": 20}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "left": {"offset": {"x": 0, "y": 36}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "right": {"offset": {"x": 16, "y": 36}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "top": {"offset": {"x": 32, "y": 36}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "bottom": {"offset": {"x": 48, "y": 36}, "mirror": {"x": false, "y": false}, "angle": 0}
+                },
+                "unwrapMode": "custom",
+                "visible": true,
+                "doubleSided": false,
+                "shadingMode": "flat"
+              }
+            },
+            {
+              "id": "tw_rider_proxy_left_arm",
+              "name": "RiderProxyLeftArm",
+              "position": {"x": 7, "y": 8, "z": -1},
+              "orientation": {"x": 0.25882, "y": 0, "z": 0, "w": 0.96593},
+              "shape": {
+                "type": "box",
+                "offset": {"x": -1.5, "y": -9, "z": -1.5},
+                "stretch": {"x": 1, "y": 1, "z": 1},
+                "settings": {
+                  "isPiece": false,
+                  "size": {"x": 3, "y": 18, "z": 3},
+                  "isStaticBox": true
+                },
+                "textureLayout": {
+                  "front": {"offset": {"x": 0, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "back": {"offset": {"x": 8, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "left": {"offset": {"x": 16, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "right": {"offset": {"x": 24, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "top": {"offset": {"x": 32, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "bottom": {"offset": {"x": 40, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0}
+                },
+                "unwrapMode": "custom",
+                "visible": true,
+                "doubleSided": false,
+                "shadingMode": "flat"
+              }
+            },
+            {
+              "id": "tw_rider_proxy_right_arm",
+              "name": "RiderProxyRightArm",
+              "position": {"x": -7, "y": 8, "z": -1},
+              "orientation": {"x": 0.25882, "y": 0, "z": 0, "w": 0.96593},
+              "shape": {
+                "type": "box",
+                "offset": {"x": -1.5, "y": -9, "z": -1.5},
+                "stretch": {"x": 1, "y": 1, "z": 1},
+                "settings": {
+                  "isPiece": false,
+                  "size": {"x": 3, "y": 18, "z": 3},
+                  "isStaticBox": true
+                },
+                "textureLayout": {
+                  "front": {"offset": {"x": 0, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "back": {"offset": {"x": 8, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "left": {"offset": {"x": 16, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "right": {"offset": {"x": 24, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "top": {"offset": {"x": 32, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "bottom": {"offset": {"x": 40, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0}
+                },
+                "unwrapMode": "custom",
+                "visible": true,
+                "doubleSided": false,
+                "shadingMode": "flat"
+              }
+            },
+            {
+              "id": "tw_rider_proxy_left_leg",
+              "name": "RiderProxyLeftLeg",
+              "position": {"x": 3.5, "y": -5, "z": 7},
+              "orientation": {"x": 0.60876, "y": 0, "z": 0, "w": 0.79335},
+              "shape": {
+                "type": "box",
+                "offset": {"x": -2, "y": -9, "z": -2},
+                "stretch": {"x": 1, "y": 1, "z": 1},
+                "settings": {
+                  "isPiece": false,
+                  "size": {"x": 4, "y": 18, "z": 4},
+                  "isStaticBox": true
+                },
+                "textureLayout": {
+                  "front": {"offset": {"x": 0, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "back": {"offset": {"x": 8, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "left": {"offset": {"x": 16, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "right": {"offset": {"x": 24, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "top": {"offset": {"x": 32, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "bottom": {"offset": {"x": 40, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0}
+                },
+                "unwrapMode": "custom",
+                "visible": true,
+                "doubleSided": false,
+                "shadingMode": "flat"
+              }
+            },
+            {
+              "id": "tw_rider_proxy_right_leg",
+              "name": "RiderProxyRightLeg",
+              "position": {"x": -3.5, "y": -5, "z": 7},
+              "orientation": {"x": 0.60876, "y": 0, "z": 0, "w": 0.79335},
+              "shape": {
+                "type": "box",
+                "offset": {"x": -2, "y": -9, "z": -2},
+                "stretch": {"x": 1, "y": 1, "z": 1},
+                "settings": {
+                  "isPiece": false,
+                  "size": {"x": 4, "y": 18, "z": 4},
+                  "isStaticBox": true
+                },
+                "textureLayout": {
+                  "front": {"offset": {"x": 0, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "back": {"offset": {"x": 8, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "left": {"offset": {"x": 16, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "right": {"offset": {"x": 24, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "top": {"offset": {"x": 32, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0},
+                  "bottom": {"offset": {"x": 40, "y": 52}, "mirror": {"x": false, "y": false}, "angle": 0}
+                },
+                "unwrapMode": "custom",
+                "visible": true,
+                "doubleSided": false,
+                "shadingMode": "flat"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
