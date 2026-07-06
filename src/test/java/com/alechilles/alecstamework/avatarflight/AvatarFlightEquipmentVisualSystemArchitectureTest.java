@@ -39,4 +39,14 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertTrue(source.contains("AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate("));
         assertTrue(source.contains("AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate("));
     }
+
+    @Test
+    void visualSystemDoesNotSendEquipmentPacketsToTheTargetPlayersOwnViewer() throws Exception {
+        String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("visibleTo.entrySet()"));
+        assertTrue(source.contains("sameEntity(ref, entry.getKey())"));
+        assertTrue(source.contains("continue;"));
+        assertTrue(source.contains("private static boolean sameEntity("));
+    }
 }

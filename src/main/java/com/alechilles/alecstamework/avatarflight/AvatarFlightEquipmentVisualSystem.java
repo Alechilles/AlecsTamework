@@ -123,9 +123,19 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
     private static void queue(@Nonnull Ref<EntityStore> ref,
                               @Nonnull EquipmentUpdate update,
                               @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
-        for (EntityTrackerSystems.EntityViewer viewer : visibleTo.values()) {
+        for (Map.Entry<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> entry : visibleTo.entrySet()) {
+            if (sameEntity(ref, entry.getKey())) {
+                continue;
+            }
+            EntityTrackerSystems.EntityViewer viewer = entry.getValue();
             viewer.queueUpdate(ref, update);
         }
+    }
+
+    private static boolean sameEntity(@Nonnull Ref<EntityStore> first, @Nullable Ref<EntityStore> second) {
+        return first == second || second != null
+                && first.getStore() == second.getStore()
+                && first.getIndex() == second.getIndex();
     }
 
     @Nullable
