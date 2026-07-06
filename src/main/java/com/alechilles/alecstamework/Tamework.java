@@ -109,6 +109,7 @@ import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkDynamicAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAlarmComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
@@ -305,6 +306,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
     private ComponentType<EntityStore, TameworkTranquilizerPeakComponent> tranquilizerPeakComponentType;
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
+    private ComponentType<EntityStore, TameworkDynamicAttachmentsComponent> dynamicAttachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
     private ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> projectileImpactEffectComponentType;
     private ComponentType<EntityStore, TameworkLingeringHazardProjectileComponent> lingeringHazardProjectileComponentType;
@@ -619,6 +621,12 @@ public class Tamework extends JavaPlugin {
                 TameworkAttachmentsComponent.class,
                 "TameworkAttachments",
                 TameworkAttachmentsComponent.CODEC
+        );
+
+        dynamicAttachmentsComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkDynamicAttachmentsComponent.class,
+                "TameworkDynamicAttachments",
+                TameworkDynamicAttachmentsComponent.CODEC
         );
 
         lifeStageComponentType = getEntityStoreRegistry().registerComponent(
@@ -2601,6 +2609,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkAttachmentsComponent> getAttachmentsComponentType() {
         return attachmentsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkDynamicAttachmentsComponent> getDynamicAttachmentsComponentType() {
+        return dynamicAttachmentsComponentType;
     }
 
     public ComponentType<EntityStore, TameworkLifeStageComponent> getLifeStageComponentType() {
