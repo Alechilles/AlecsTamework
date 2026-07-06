@@ -79,19 +79,19 @@ public final class TwDynamicAttachmentsConfig
             )
             .documentation("State key used by state-based conditions.")
             .add()
-            .<String>append(
-                    new KeyedCodec<>("Expected", Codec.STRING),
+            .<Boolean>append(
+                    new KeyedCodec<>("Expected", Codec.BOOLEAN),
                     (condition, value) -> condition.expected = value,
                     condition -> condition.expected
             )
-            .documentation("Expected state or condition value.")
+            .documentation("Expected boolean result for the condition. Defaults to true when omitted.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("IgnoreCase", Codec.BOOLEAN),
-                    (condition, value) -> condition.ignoreCase = value != null && value,
+                    (condition, value) -> condition.ignoreCase = value == null || value,
                     condition -> condition.ignoreCase
             )
-            .documentation("Whether string comparisons should ignore case.")
+            .documentation("Whether string comparisons should ignore case. Defaults to true.")
             .add()
             .build();
 
@@ -420,8 +420,8 @@ public final class TwDynamicAttachmentsConfig
         private String need;
         private String traitId;
         private String state;
-        private String expected;
-        private boolean ignoreCase;
+        private Boolean expected;
+        private boolean ignoreCase = true;
 
         public Condition() {
         }
@@ -457,8 +457,12 @@ public final class TwDynamicAttachmentsConfig
         }
 
         @Nullable
-        public String getExpected() {
+        public Boolean getExpected() {
             return expected;
+        }
+
+        public boolean expectedOrTrue() {
+            return expected == null || expected;
         }
 
         public boolean isIgnoreCase() {

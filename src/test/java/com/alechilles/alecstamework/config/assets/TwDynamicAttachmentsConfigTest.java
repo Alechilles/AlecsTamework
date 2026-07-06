@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,6 +26,24 @@ class TwDynamicAttachmentsConfigTest {
                 TwDynamicAttachmentsConfig.Persistence.WHILE_MATCHING,
                 TwDynamicAttachmentsConfig.Persistence.fromConfigValue("WhileMatching")
         );
+    }
+
+    @Test
+    void conditionDefaultsToIgnoreCaseTrue() {
+        TwDynamicAttachmentsConfig.Condition condition = new TwDynamicAttachmentsConfig.Condition();
+
+        assertTrue(condition.isIgnoreCase());
+        assertTrue(condition.expectedOrTrue());
+    }
+
+    @Test
+    void conditionExpectedFalseIsStoredAsBooleanFalse() throws Exception {
+        TwDynamicAttachmentsConfig.Condition condition = new TwDynamicAttachmentsConfig.Condition();
+
+        setField(condition, "expected", Boolean.FALSE);
+
+        assertEquals(Boolean.FALSE, condition.getExpected());
+        assertFalse(condition.expectedOrTrue());
     }
 
     @Test
@@ -83,6 +102,56 @@ class TwDynamicAttachmentsConfigTest {
         assertSame(highConfigLowRule, entries.get(0).getRule());
         assertSame(lowConfig, entries.get(1).getConfig());
         assertSame(lowConfigHighRule, entries.get(1).getRule());
+    }
+
+    @Test
+    void roleIndexSortsSamePrioritiesByNormalizedAssetIdAscending() throws Exception {
+        TwDynamicAttachmentsConfig.Rule zRule = rule("z-rule", 5);
+        TwDynamicAttachmentsConfig.Rule aRule = rule("a-rule", 5);
+        TwDynamicAttachmentsConfig zConfig = config(
+                "Mod:Zeta",
+                true,
+                10,
+                new String[] { "Cat_Pet" },
+                zRule
+        );
+        TwDynamicAttachmentsConfig aConfig = config(
+                "mod:alpha",
+                true,
+                10,
+                new String[] { "Cat_Pet" },
+                aRule
+        );
+
+        Map<String, List<TwDynamicAttachmentsConfig.RoleRuleEntry>> index =
+                TwDynamicAttachmentsConfig.buildRoleRuleIndexForTest(List.of(zConfig, aConfig));
+
+        List<TwDynamicAttachmentsConfig.RoleRuleEntry> entries = index.get("cat_pet");
+        assertEquals(2, entries.size());
+        assertSame(aConfig, entries.get(0).getConfig());
+        assertSame(zConfig, entries.get(1).getConfig());
+    }
+
+    @Test
+    void roleIndexPreservesDeclarationOrderForSameAssetAndRulePriority() throws Exception {
+        TwDynamicAttachmentsConfig.Rule firstRule = rule("first-rule", 5);
+        TwDynamicAttachmentsConfig.Rule secondRule = rule("second-rule", 5);
+        TwDynamicAttachmentsConfig config = config(
+                "Mod:SameConfig",
+                true,
+                10,
+                new String[] { "Cat_Pet" },
+                firstRule,
+                secondRule
+        );
+
+        Map<String, List<TwDynamicAttachmentsConfig.RoleRuleEntry>> index =
+                TwDynamicAttachmentsConfig.buildRoleRuleIndexForTest(List.of(config));
+
+        List<TwDynamicAttachmentsConfig.RoleRuleEntry> entries = index.get("cat_pet");
+        assertEquals(2, entries.size());
+        assertSame(firstRule, entries.get(0).getRule());
+        assertSame(secondRule, entries.get(1).getRule());
     }
 
     @Test
