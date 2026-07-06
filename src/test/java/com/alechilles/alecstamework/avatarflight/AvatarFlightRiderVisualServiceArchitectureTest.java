@@ -111,13 +111,23 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(json.contains("\"name\": \"MountAnchor\""));
         assertTrue(json.contains("\"id\": \"146\""));
         assertTrue(json.contains("\"id\": \"1\""));
+        assertTrue(json.contains("\"name\": \"Origin\""));
+        assertTrue(json.contains("\"name\": \"Pelvis\""));
+        assertTrue(json.contains("\"name\": \"Chest\""));
         assertTrue(json.contains("\"name\": \"Head\""));
+        assertTrue(json.contains("\"name\": \"R-Thigh\""));
+        assertTrue(json.contains("\"name\": \"R-Calf\""));
+        assertTrue(json.contains("\"name\": \"R-Foot\""));
+        assertTrue(json.contains("\"name\": \"L-Thigh\""));
+        assertTrue(json.contains("\"name\": \"L-Calf\""));
+        assertTrue(json.contains("\"name\": \"L-Foot\""));
         assertTrue(json.contains("\"name\": \"R-Attachment\""));
         assertTrue(json.contains("\"name\": \"L-Attachment\""));
         assertTrue(json.contains("\"name\": \"Back-Attachment\""));
         assertTrue(json.contains("\"type\": \"none\""));
         assertFalse(json.contains("\"type\": \"box\""));
         assertFalse(json.contains("\"id\": \"tw_rider_"));
+        assertFalse(json.contains("\"name\": \"TameworkRider_"));
     }
 
     @Test
