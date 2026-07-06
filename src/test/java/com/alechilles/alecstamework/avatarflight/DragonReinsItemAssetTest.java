@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies Flightmaster's Reins are available as a normal Tamework item. */
@@ -61,6 +62,8 @@ class DragonReinsItemAssetTest {
         assertTrue(item.contains("\"Texture\": \"Items/Tamework/FlightmasterReins/Flightmaster_Reins_Texture.png\""));
         assertTrue(item.contains("\"Icon\": \"Icons/ItemsGenerated/Flightmaster_Reins.png\""));
         assertTrue(item.contains("\"MaxStack\": 1"));
+        assertFalse(item.contains("\"PlayerAnimationsId\""),
+                "Flightmaster's Reins must not opt into the normal held-item player animation profile");
         assertTrue(item.contains("\"Items.Tools\""));
         assertTrue(lang.contains("items.Tamework_Dragon_Reins.name=Flightmaster's Reins"));
         assertTrue(lang.contains("items.Tamework_Dragon_Reins.description=Rider-held flight reins"));

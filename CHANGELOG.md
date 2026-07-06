@@ -13,7 +13,7 @@
 ### Changed
 - Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.
 - Renamed the Dragon Reins prototype to Flightmaster's Reins and replaced the recipe-page placeholder with a dedicated reins model and texture.
-- Avatar flight no longer swaps the player model by default; `Model.ApplyModel` can re-enable the unsafe model-swap probe while flight controls are tested separately from client renderer crashes.
+- Avatar flight keeps the transformed NordicDrake model enabled by default while the experimental fake rider visual remains disabled.
 - `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
 
 ### Fixed
@@ -37,7 +37,7 @@
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.
 - Improved transformed avatar flight bank sensitivity so sharp turns and full lateral input can reach stronger bank poses.
-- Disabled avatar-flight owner equipment hiding and fake rider visuals by default after client crashes from local-player equipment packets and the native mounted-rider visual path; the experimental config remains available for safer follow-up work.
+- Disabled the experimental avatar-flight fake rider visual by default after client crashes from the native mounted-rider path, while keeping transformed owner equipment hiding active.
 
 ## 2.16.1 - Server Stability Hotfix - 2026-07-01
 

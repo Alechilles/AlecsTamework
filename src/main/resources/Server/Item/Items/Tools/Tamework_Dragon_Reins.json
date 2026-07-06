@@ -5,7 +5,6 @@
     "Description": "server.items.Tamework_Dragon_Reins.description"
   },
   "Quality": "Tool",
-  "PlayerAnimationsId": "Item",
   "Interactions": {
     "Primary": {
       "Interactions": [

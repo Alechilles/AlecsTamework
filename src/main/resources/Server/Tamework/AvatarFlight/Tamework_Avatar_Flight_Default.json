@@ -2,7 +2,7 @@
   "Enabled": true,
   "Priority": 0,
   "Model": {
-    "ApplyModel": false,
+    "ApplyModel": true,
     "ModelId": "NordicDrake",
     "Scale": 1.0
   },
@@ -62,9 +62,9 @@
     "PoseResendIntervalMs": 250.0
   },
   "RiderVisual": {
-    "HideOwnerEquipment": false,
-    "HideOwnerArmor": false,
-    "HideOwnerHands": false,
+    "HideOwnerEquipment": true,
+    "HideOwnerArmor": true,
+    "HideOwnerHands": true,
     "ShowRider": false,
     "SeatOffsetX": 0.0,
     "SeatOffsetY": 1.35,
