@@ -8,7 +8,7 @@ draft: false
 
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
-`TwDynamicAttachmentsConfig` lets a pack change an NPC's stored model attachment selections from config when runtime conditions match. It is intended for conditional appearance details such as named animals, low-needs states, tamed/untamed variants, traits, gender, life stage, and command states.
+`TwDynamicAttachmentsConfig` lets a pack change an NPC's stored model attachment selections from config when runtime conditions match. It is intended for conditional appearance details such as named animals, low-needs states, tamed/untamed variants, traits, gender, life stage, ownership, and NPC state.
 
 Assets live under:
 
@@ -73,18 +73,24 @@ Condition type matching ignores case, spaces, underscores, and hyphens.
 | --- | --- | --- |
 | `DisplayNameEquals` | `Value` | Matches the NPC's custom display name. |
 | `OwnerPresent` | `Expected` | Matches whether an owner component is present. |
+| `OwnerEquals` | `Values` or `Value` | Matches the owner UUID or stored owner name. |
 | `TamedState` | `Expected` | Matches the tamed component state. |
 | `Gender` | `Value` | Matches configured progression gender. |
 | `LifeStage` | `Value` | Matches configured life stage. |
 | `TraitPresent` | `TraitId`, optional `Expected` | Matches whether the trait exists. |
 | `TraitValue` | `TraitId`, `Number` | Matches an exact trait numeric value. |
-| `HappinessAtLeast` | `Number` | Matches happiness at or above the threshold. |
-| `HappinessBelow` | `Number` | Matches happiness below the threshold. |
-| `NeedAtLeast` | `Need`, `Number` | Matches a named need at or above the threshold. |
-| `NeedBelow` | `Need`, `Number` | Matches a named need below the threshold. |
-| `CommandStateEquals` | `State`, `Value` | Matches a command-state value. |
+| `HappinessAtLeast` | `Number` or `Percent` | Matches happiness at or above the threshold. |
+| `HappinessBelow` | `Number` or `Percent` | Matches happiness below the threshold. |
+| `NeedAtLeast` | `Need`, plus `Number` or `Percent` | Matches a named need at or above the threshold. |
+| `NeedBelow` | `Need`, plus `Number` or `Percent` | Matches a named need below the threshold. |
+| `StateEquals` | `State`, `Value` | Matches an NPC state value captured by Tamework. |
+| `CommandStateEquals` | `State`, `Value` | Backward-compatible alias for `StateEquals`. |
 
 String conditions default `IgnoreCase` to `true`. Boolean conditions default `Expected` to `true`.
+
+Use `Values` for list-based matches such as `OwnerEquals`; singular `Value` is also accepted when only one value is needed. `OwnerEquals` compares case-insensitive owner names and UUID strings from the stored owner component.
+
+Use `Percent` for happiness and needs when the config should be written in player-facing percentages. `Percent: 25` means 25%. `Number` remains the raw runtime threshold and takes priority if both `Number` and `Percent` are set.
 
 ## Example: Named Moose Blanket
 This adds the Canada blanket to moose named `Flash` and keeps it permanently.
@@ -93,7 +99,7 @@ This adds the Canada blanket to moose named `Flash` and keeps it permanently.
 {
   "Enabled": true,
   "Priority": 100,
-  "RoleIds": ["Mob_Moose"],
+  "RoleIds": ["Tamed_Moose_Bull", "Tamed_Moose_Cow"],
   "Rules": [
     {
       "Id": "flash_canada_blanket",
@@ -106,7 +112,7 @@ This adds the Canada blanket to moose named `Flash` and keeps it permanently.
         }
       ],
       "Attachments": {
-        "Blanket": "Blanket_Canada"
+        "SaddleBlanket": "Canada"
       }
     }
   ]
@@ -114,13 +120,13 @@ This adds the Canada blanket to moose named `Flash` and keeps it permanently.
 ```
 
 ## Example: Low Hunger Blanket
-This applies a temporary blanket while hunger is below `25`, then restores the previous blanket when hunger recovers.
+This applies a temporary blanket while hunger is below 25%, then restores the previous blanket when hunger recovers.
 
 ```json
 {
   "Enabled": true,
   "Priority": 50,
-  "RoleIds": ["Mob_Moose"],
+  "RoleIds": ["Tamed_Moose_Bull", "Tamed_Moose_Cow"],
   "Rules": [
     {
       "Id": "hungry_blanket",
@@ -130,14 +136,55 @@ This applies a temporary blanket while hunger is below `25`, then restores the p
         {
           "Type": "NeedBelow",
           "Need": "Hunger",
-          "Number": 25
+          "Percent": 25
         }
       ],
       "Attachments": {
-        "Blanket": "Blanket_Red"
+        "SaddleBlanket": "Red"
       }
     }
   ]
+}
+```
+
+## Example: Owner-Specific Blanket
+This applies a temporary blanket only while the NPC's owner is one of the listed player names or UUIDs.
+
+```json
+{
+  "Enabled": true,
+  "Priority": 60,
+  "RoleIds": ["Tamed_Moose_Bull", "Tamed_Moose_Cow"],
+  "Rules": [
+    {
+      "Id": "owner_specific_blanket",
+      "Priority": 60,
+      "Persistence": "WhileMatching",
+      "Conditions": [
+        {
+          "Type": "OwnerEquals",
+          "Values": [
+            "Alec",
+            "00000000-0000-0000-0000-000000000000"
+          ]
+        }
+      ],
+      "Attachments": {
+        "SaddleBlanket": "Blue"
+      }
+    }
+  ]
+}
+```
+
+## Example: State Match
+Use `StateEquals` for NPC state values captured by Tamework. `CommandStateEquals` still works for older configs, but new configs should use `StateEquals`.
+
+```json
+{
+  "Type": "StateEquals",
+  "State": "has_home",
+  "Value": "true"
 }
 ```
 

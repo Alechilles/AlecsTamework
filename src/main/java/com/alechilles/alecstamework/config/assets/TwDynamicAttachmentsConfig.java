@@ -51,12 +51,26 @@ public final class TwDynamicAttachmentsConfig
             )
             .documentation("String value used by the condition.")
             .add()
+            .<String[]>append(
+                    new KeyedCodec<>("Values", Codec.STRING_ARRAY),
+                    (condition, value) -> condition.values = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
+                    condition -> condition.values
+            )
+            .documentation("String values used by list-based conditions such as OwnerEquals.")
+            .add()
             .<Double>append(
                     new KeyedCodec<>("Number", Codec.DOUBLE),
                     (condition, value) -> condition.number = value,
                     condition -> condition.number
             )
             .documentation("Numeric value used by the condition.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("Percent", Codec.DOUBLE),
+                    (condition, value) -> condition.percent = value,
+                    condition -> condition.percent
+            )
+            .documentation("Percent threshold used by happiness and need conditions. 25 means 25%.")
             .add()
             .<String>append(
                     new KeyedCodec<>("Need", Codec.STRING),
@@ -416,7 +430,9 @@ public final class TwDynamicAttachmentsConfig
     public static final class Condition {
         private String type;
         private String value;
+        private String[] values = ArrayUtil.EMPTY_STRING_ARRAY;
         private Double number;
+        private Double percent;
         private String need;
         private String traitId;
         private String state;
@@ -436,9 +452,18 @@ public final class TwDynamicAttachmentsConfig
             return value;
         }
 
+        public String[] getValues() {
+            return values == null ? ArrayUtil.EMPTY_STRING_ARRAY : values;
+        }
+
         @Nullable
         public Double getNumber() {
             return number;
+        }
+
+        @Nullable
+        public Double getPercent() {
+            return percent;
         }
 
         @Nullable

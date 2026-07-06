@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.dynamicattachments;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -11,6 +12,8 @@ public final class DynamicAttachmentNpcSnapshot {
     private final String roleId;
     private final String displayName;
     private final Boolean ownerPresent;
+    private final UUID ownerId;
+    private final String ownerName;
     private final Boolean tamed;
     private final String gender;
     private final String lifeStage;
@@ -23,6 +26,8 @@ public final class DynamicAttachmentNpcSnapshot {
         roleId = blankToNull(builder.roleId);
         displayName = blankToNull(builder.displayName);
         ownerPresent = builder.ownerPresent;
+        ownerId = builder.ownerId;
+        ownerName = blankToNull(builder.ownerName);
         tamed = builder.tamed;
         gender = blankToNull(builder.gender);
         lifeStage = blankToNull(builder.lifeStage);
@@ -50,6 +55,16 @@ public final class DynamicAttachmentNpcSnapshot {
     @Nullable
     public Boolean getOwnerPresent() {
         return ownerPresent;
+    }
+
+    @Nullable
+    public UUID getOwnerId() {
+        return ownerId;
+    }
+
+    @Nullable
+    public String getOwnerName() {
+        return ownerName;
     }
 
     @Nullable
@@ -154,6 +169,8 @@ public final class DynamicAttachmentNpcSnapshot {
         private String roleId;
         private String displayName;
         private Boolean ownerPresent;
+        private UUID ownerId;
+        private String ownerName;
         private Boolean tamed;
         private String gender;
         private String lifeStage;
@@ -180,6 +197,14 @@ public final class DynamicAttachmentNpcSnapshot {
         @Nonnull
         public Builder ownerPresent(boolean ownerPresent) {
             this.ownerPresent = ownerPresent;
+            return this;
+        }
+
+        @Nonnull
+        public Builder owner(@Nullable UUID ownerId, @Nullable String ownerName) {
+            this.ownerId = ownerId;
+            this.ownerName = ownerName;
+            this.ownerPresent = ownerId != null;
             return this;
         }
 

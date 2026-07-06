@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.dynamicattachments;
 
 import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
 import java.lang.reflect.Field;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,6 +55,23 @@ class DynamicAttachmentConditionEvaluatorTest {
     }
 
     @Test
+    void comparesNeedPercentThresholdsAcrossRatioAndHundredPointScales() throws Exception {
+        DynamicAttachmentNpcSnapshot ratioSnapshot = DynamicAttachmentNpcSnapshot.builder()
+                .need("hunger", 0.24)
+                .need("thirst", 0.75)
+                .build();
+        DynamicAttachmentNpcSnapshot hundredPointSnapshot = DynamicAttachmentNpcSnapshot.builder()
+                .need("hunger", 24.0)
+                .need("thirst", 75.0)
+                .build();
+
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percentNeed("NeedBelow", "hunger", 25.0), ratioSnapshot));
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percentNeed("NeedBelow", "hunger", 25.0), hundredPointSnapshot));
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percentNeed("NeedAtLeast", "thirst", 75.0), ratioSnapshot));
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percentNeed("NeedAtLeast", "thirst", 75.0), hundredPointSnapshot));
+    }
+
+    @Test
     void evaluatesTraitPresenceAndExactValue() throws Exception {
         DynamicAttachmentNpcSnapshot snapshot = DynamicAttachmentNpcSnapshot.builder()
                 .trait("Brave", 2.0)
@@ -85,7 +103,34 @@ class DynamicAttachmentConditionEvaluatorTest {
     }
 
     @Test
-    void commandStateEqualsUsesStateKeyAndExpectedValue() throws Exception {
+    void comparesHappinessPercentThresholdsAcrossRatioAndHundredPointScales() throws Exception {
+        DynamicAttachmentNpcSnapshot ratioSnapshot = DynamicAttachmentNpcSnapshot.builder()
+                .happiness(0.6)
+                .build();
+        DynamicAttachmentNpcSnapshot hundredPointSnapshot = DynamicAttachmentNpcSnapshot.builder()
+                .happiness(60.0)
+                .build();
+
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percent("HappinessAtLeast", 60.0), ratioSnapshot));
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percent("HappinessAtLeast", 60.0), hundredPointSnapshot));
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percent("HappinessBelow", 61.0), ratioSnapshot));
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(percent("HappinessBelow", 61.0), hundredPointSnapshot));
+    }
+
+    @Test
+    void stateEqualsUsesStateKeyAndExpectedValue() throws Exception {
+        TwDynamicAttachmentsConfig.Condition condition = condition("StateEquals");
+        setField(condition, "state", "mode");
+        setField(condition, "value", "follow");
+        DynamicAttachmentNpcSnapshot snapshot = DynamicAttachmentNpcSnapshot.builder()
+                .commandState("MODE", "Follow")
+                .build();
+
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(condition, snapshot));
+    }
+
+    @Test
+    void commandStateEqualsRemainsBackwardCompatibleAlias() throws Exception {
         TwDynamicAttachmentsConfig.Condition condition = condition("CommandStateEquals");
         setField(condition, "state", "mode");
         setField(condition, "value", "follow");
@@ -94,6 +139,18 @@ class DynamicAttachmentConditionEvaluatorTest {
                 .build();
 
         assertTrue(DynamicAttachmentConditionEvaluator.matches(condition, snapshot));
+    }
+
+    @Test
+    void ownerEqualsMatchesConfiguredOwnerNameOrUuid() throws Exception {
+        UUID ownerId = UUID.fromString("00000000-0000-0000-0000-000000000123");
+        DynamicAttachmentNpcSnapshot snapshot = DynamicAttachmentNpcSnapshot.builder()
+                .owner(ownerId, "Alec")
+                .build();
+
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(values("OwnerEquals", "someone_else", "alec"), snapshot));
+        assertTrue(DynamicAttachmentConditionEvaluator.matches(values("OwnerEquals", ownerId.toString()), snapshot));
+        assertFalse(DynamicAttachmentConditionEvaluator.matches(values("OwnerEquals", "someone_else"), snapshot));
     }
 
     @Test
@@ -146,10 +203,29 @@ class DynamicAttachmentConditionEvaluatorTest {
         return condition;
     }
 
+    private static TwDynamicAttachmentsConfig.Condition percent(String type, double percent) throws Exception {
+        TwDynamicAttachmentsConfig.Condition condition = condition(type);
+        setField(condition, "percent", percent);
+        return condition;
+    }
+
     private static TwDynamicAttachmentsConfig.Condition numberedNeed(String type, String need, double number)
             throws Exception {
         TwDynamicAttachmentsConfig.Condition condition = numbered(type, number);
         setField(condition, "need", need);
+        return condition;
+    }
+
+    private static TwDynamicAttachmentsConfig.Condition percentNeed(String type, String need, double percent)
+            throws Exception {
+        TwDynamicAttachmentsConfig.Condition condition = percent(type, percent);
+        setField(condition, "need", need);
+        return condition;
+    }
+
+    private static TwDynamicAttachmentsConfig.Condition values(String type, String... values) throws Exception {
+        TwDynamicAttachmentsConfig.Condition condition = condition(type);
+        setField(condition, "values", values);
         return condition;
     }
 

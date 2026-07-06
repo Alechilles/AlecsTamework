@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Added `TwDynamicAttachmentsConfig` so mods can conditionally change NPC model attachments by role, display name, needs, happiness, traits, life stage, gender, tamed state, ownership, or command state, with permanent and reversible while-matching persistence modes.
+- Added `TwDynamicAttachmentsConfig` so mods can conditionally change NPC model attachments by role, display name, needs, happiness, traits, life stage, gender, tamed state, ownership, owner name/UUID, or NPC state, with permanent and reversible while-matching persistence modes and percentage thresholds for needs and happiness rules.
 - Added a `/tw settings` needs resource mode with Accurate, Auto Fast, and Always Fast options so crowded servers can bypass expensive food/water path checks and consume valid nearby resources directly.
 - Added optional QuestLines Claims support for claim-aware companion population limits, with `/tw settings` able to select Auto, SimpleClaims, QuestLinesClaims, or Off as the claim provider.
 - Added an experimental transformed-player dragon flight debug prototype behind `/tw debugdragonflight`, with configurable avatar flight settings for jump lift, sprint boost, crouch descent, backward airbrake, hover damping, and pitch-based speed/altitude tradeoffs.

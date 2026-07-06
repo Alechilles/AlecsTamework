@@ -95,6 +95,8 @@ class TwConfigSchemaAdapterTest {
                 TwConfigEditorFieldPolicy.findField(fields, "Rules.Conditions.IgnoreCase");
         assertNotNull(ignoreCase);
         assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.BOOLEAN, ignoreCase.type());
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "Rules.Conditions.Values"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "Rules.Conditions.Percent"));
     }
 
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family, String assetId) {

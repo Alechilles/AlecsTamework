@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,6 +45,9 @@ class DynamicAttachmentEvaluationSystemTest {
 
         assertNotEquals(baseline, DynamicAttachmentEvaluationSystem.fingerprintForTest(
                 baseSnapshot().displayName("Birch").build()
+        ));
+        assertNotEquals(baseline, DynamicAttachmentEvaluationSystem.fingerprintForTest(
+                baseSnapshot().owner(UUID.fromString("00000000-0000-0000-0000-000000000222"), "Alec").build()
         ));
         assertNotEquals(baseline, DynamicAttachmentEvaluationSystem.fingerprintForTest(
                 baseSnapshot().need("hunger", 0.5).build()
@@ -158,7 +162,7 @@ class DynamicAttachmentEvaluationSystemTest {
         return DynamicAttachmentNpcSnapshot.builder()
                 .roleId("Moose")
                 .displayName("Aspen")
-                .ownerPresent(true)
+                .owner(UUID.fromString("00000000-0000-0000-0000-000000000111"), "Alec")
                 .tamed(true)
                 .gender("Female")
                 .lifeStage("Adult")

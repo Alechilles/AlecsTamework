@@ -30,6 +30,8 @@ class DynamicAttachmentSnapshotReaderTest {
         assertNull(snapshot.getRoleId());
         assertNull(snapshot.getDisplayName());
         assertNull(snapshot.getOwnerPresent());
+        assertNull(snapshot.getOwnerId());
+        assertNull(snapshot.getOwnerName());
         assertNull(snapshot.getTamed());
         assertNull(snapshot.getGender());
         assertNull(snapshot.getLifeStage());
@@ -55,7 +57,7 @@ class DynamicAttachmentSnapshotReaderTest {
 
         assertTrue(source.contains("CompanionRoleIdResolver.resolveRoleId(reference, store)"));
         assertTrue(source.contains("NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(reference, store)"));
-        assertTrue(source.contains("builder.ownerPresent(owner.hasOwner())"));
+        assertTrue(source.contains("builder.owner(owner.getOwnerId(), owner.getOwnerName())"));
         assertTrue(source.contains("builder.tamed(tamed.isTamed())"));
         assertTrue(source.contains("builder.gender(lifeStage.getGender())"));
         assertTrue(source.contains(".lifeStage(lifeStage.getStage())"));

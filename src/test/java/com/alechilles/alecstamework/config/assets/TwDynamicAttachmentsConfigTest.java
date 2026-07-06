@@ -1,9 +1,11 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -44,6 +46,57 @@ class TwDynamicAttachmentsConfigTest {
 
         assertEquals(Boolean.FALSE, condition.getExpected());
         assertFalse(condition.expectedOrTrue());
+    }
+
+    @Test
+    void conditionDefaultsToEmptyValuesArrayAndNoPercent() {
+        TwDynamicAttachmentsConfig.Condition condition = new TwDynamicAttachmentsConfig.Condition();
+
+        assertArrayEquals(new String[0], condition.getValues());
+        assertEquals(null, condition.getPercent());
+    }
+
+    @Test
+    void decodesValuesArrayAndPercentThresholdFromJson() throws Exception {
+        String json = """
+                {
+                  "Enabled": true,
+                  "RoleIds": ["Tamed_Moose_Bull"],
+                  "Rules": [
+                    {
+                      "Id": "owner_or_hungry",
+                      "Conditions": [
+                        {
+                          "Type": "OwnerEquals",
+                          "Values": ["Alec", "00000000-0000-0000-0000-000000000000"]
+                        },
+                        {
+                          "Type": "NeedBelow",
+                          "Need": "Hunger",
+                          "Percent": 25
+                        }
+                      ],
+                      "Attachments": {
+                        "SaddleBlanket": "Canada"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        TwDynamicAttachmentsConfig config = TwDynamicAttachmentsConfig.CODEC.decode(
+                BsonDocument.parse(json),
+                new ExtraInfo()
+        );
+
+        TwDynamicAttachmentsConfig.Condition ownerCondition = config.getRules()[0].getConditions()[0];
+        TwDynamicAttachmentsConfig.Condition needCondition = config.getRules()[0].getConditions()[1];
+
+        assertArrayEquals(
+                new String[] { "Alec", "00000000-0000-0000-0000-000000000000" },
+                ownerCondition.getValues()
+        );
+        assertEquals(25.0, needCondition.getPercent());
     }
 
     @Test

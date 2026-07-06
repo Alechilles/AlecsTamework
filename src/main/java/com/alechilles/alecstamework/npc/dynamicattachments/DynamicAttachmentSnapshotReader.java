@@ -71,7 +71,7 @@ public final class DynamicAttachmentSnapshotReader {
 
         TameworkOwnerComponent owner = getComponent(reference, store, ownerComponentType);
         if (owner != null) {
-            builder.ownerPresent(owner.hasOwner());
+            builder.owner(owner.getOwnerId(), owner.getOwnerName());
         }
 
         TameworkTamedComponent tamed = getComponent(reference, store, tamedComponentType);
