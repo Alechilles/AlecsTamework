@@ -31,7 +31,9 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertFalse(source.contains("RIDER_PROXY_TEXTURE"));
         assertTrue(source.contains("logRiderAttachment("));
         assertTrue(source.contains("logRiderAttachmentSkipped("));
-        assertTrue(source.contains("riderModel=%s riderTexture=%s"));
+        assertTrue(source.contains("PLAYER_MOUNT_ANCHOR_MODEL"));
+        assertTrue(source.contains("riderAttachmentModel(model)"));
+        assertTrue(source.contains("attachmentModel=%s riderTexture=%s"));
         assertFalse(source.contains("config.getDebug().isLogControllerTicks()"));
         assertTrue(source.contains("Arrays.copyOf("));
         assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
@@ -41,6 +43,22 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertFalse(source.contains("new NetworkId("));
         assertTrue(source.contains("RemoveReason.REMOVE"));
         assertFalse(source.contains("PlayerRef.getComponent(Player"));
+    }
+
+    @Test
+    void playerRiderAttachmentModelUsesMountAnchorPiece() throws Exception {
+        Path riderModel = Path.of(
+                "src", "main", "resources", "Common", "Tamework", "AvatarFlight",
+                "Rider", "Player_MountAnchor.blockymodel"
+        );
+        String json = Files.readString(riderModel, StandardCharsets.UTF_8);
+
+        assertTrue(json.contains("\"name\": \"MountAnchor\""));
+        assertTrue(json.contains("\"isPiece\": true"));
+        assertTrue(json.contains("\"name\": \"Origin\""));
+        assertTrue(json.contains("\"name\": \"R-Attachment\""));
+        assertTrue(json.contains("\"name\": \"L-Attachment\""));
+        assertTrue(json.split("\"isPiece\": true", -1).length - 1 == 1);
     }
 
     @Test

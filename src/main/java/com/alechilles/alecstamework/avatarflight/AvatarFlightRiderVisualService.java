@@ -20,6 +20,10 @@ import javax.annotation.Nullable;
  * Applies and removes avatar-flight rider visuals from the transformed player model.
  */
 public final class AvatarFlightRiderVisualService {
+    private static final String PLAYER_MODEL = "Characters/Player.blockymodel";
+    private static final String PLAYER_MOUNT_ANCHOR_MODEL =
+            "Tamework/AvatarFlight/Rider/Player_MountAnchor.blockymodel";
+
     public boolean spawn(@Nonnull Store<EntityStore> store,
                          @Nonnull Ref<EntityStore> ownerRef,
                          @Nonnull UUID ownerUuid,
@@ -127,12 +131,20 @@ public final class AvatarFlightRiderVisualService {
             return null;
         }
         return new ModelAttachment(
-                model,
+                riderAttachmentModel(model),
                 texture,
                 savedModel.getGradientSet(),
                 savedModel.getGradientId(),
                 1.0
         );
+    }
+
+    @Nonnull
+    private static String riderAttachmentModel(@Nonnull String savedModelPath) {
+        if (PLAYER_MODEL.equals(savedModelPath)) {
+            return PLAYER_MOUNT_ANCHOR_MODEL;
+        }
+        return savedModelPath;
     }
 
     private static void logRiderAttachment(@Nonnull Model baseModel,
@@ -143,10 +155,11 @@ public final class AvatarFlightRiderVisualService {
         }
         instance.getLogger().at(Level.INFO).log(String.format(
                 "TameworkAvatarFlight debug: riderAttachment baseModelAsset=%s riderModelAsset=%s "
-                        + "riderModel=%s riderTexture=%s riderGradientSet=%s riderGradientId=%s",
+                        + "riderModel=%s attachmentModel=%s riderTexture=%s riderGradientSet=%s riderGradientId=%s",
                 baseModel.getModelAssetId(),
                 savedModel.getModelAssetId(),
                 savedModel.getModel(),
+                riderAttachmentModel(savedModel.getModel()),
                 savedModel.getTexture(),
                 savedModel.getGradientSet(),
                 savedModel.getGradientId()
