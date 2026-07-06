@@ -28,8 +28,13 @@ public final class DynamicAttachmentConfigIndex {
     }
 
     @Nonnull
-    public static DynamicAttachmentConfigIndex emptyForTest() {
+    public static DynamicAttachmentConfigIndex empty() {
         return forTest(Map.of());
+    }
+
+    @Nonnull
+    public static DynamicAttachmentConfigIndex emptyForTest() {
+        return empty();
     }
 
     @Nonnull
