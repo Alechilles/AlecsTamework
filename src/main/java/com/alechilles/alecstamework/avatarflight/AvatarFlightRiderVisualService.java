@@ -48,7 +48,8 @@ public final class AvatarFlightRiderVisualService {
         }
 
         PlayerSkinComponent skin = store.getComponent(ownerRef, PlayerSkinComponent.getComponentType());
-        return appendRiderAttachment(store, ownerRef, savedModel, skin);
+        ModelAttachment[] equipmentAttachments = AvatarFlightEquipmentAttachmentResolver.resolve(ownerRef, store);
+        return appendRiderAttachment(store, ownerRef, savedModel, skin, equipmentAttachments);
     }
 
     public void remove(@Nonnull Store<EntityStore> store,
@@ -72,27 +73,29 @@ public final class AvatarFlightRiderVisualService {
     private static boolean appendRiderAttachment(@Nonnull Store<EntityStore> store,
                                                  @Nonnull Ref<EntityStore> ownerRef,
                                                  @Nonnull Model savedModel,
-                                                 @Nullable PlayerSkinComponent skin) {
+                                                 @Nullable PlayerSkinComponent skin,
+                                                 @Nonnull ModelAttachment[] equipmentAttachments) {
         ModelComponent component = store.getComponent(ownerRef, ModelComponent.getComponentType());
         if (component == null || component.getModel() == null) {
             logRiderAttachmentSkipped("missing_owner_model", null, savedModel);
             return false;
         }
-        Model withRider = modelWithRiderAttachment(component.getModel(), savedModel, skin);
+        Model withRider = modelWithRiderAttachment(component.getModel(), savedModel, skin, equipmentAttachments);
         if (withRider == null) {
             logRiderAttachmentSkipped("missing_rider_model_texture", component.getModel(), savedModel);
             return false;
         }
         store.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
-        logRiderAttachment(component.getModel(), savedModel, skin);
+        logRiderAttachment(component.getModel(), savedModel, skin, equipmentAttachments);
         return true;
     }
 
     @Nullable
     private static Model modelWithRiderAttachment(@Nonnull Model baseModel,
                                                   @Nonnull Model savedModel,
-                                                  @Nullable PlayerSkinComponent skin) {
-        ModelAttachment[] riderAttachments = riderAttachments(savedModel, skin);
+                                                  @Nullable PlayerSkinComponent skin,
+                                                  @Nonnull ModelAttachment[] equipmentAttachments) {
+        ModelAttachment[] riderAttachments = riderAttachments(savedModel, skin, equipmentAttachments);
         if (riderAttachments == null) {
             return null;
         }
@@ -130,7 +133,8 @@ public final class AvatarFlightRiderVisualService {
 
     @Nullable
     private static ModelAttachment[] riderAttachments(@Nonnull Model savedModel,
-                                                      @Nullable PlayerSkinComponent skin) {
+                                                      @Nullable PlayerSkinComponent skin,
+                                                      @Nonnull ModelAttachment[] equipmentAttachments) {
         String model = savedModel.getModel();
         String texture = savedModel.getTexture();
         if (model == null || model.isBlank() || texture == null || texture.isBlank()) {
@@ -146,27 +150,34 @@ public final class AvatarFlightRiderVisualService {
                         savedModel.getGradientId()
                 );
         if (skinAppearance != null) {
-            return withBody(skinAppearance.body(), skinAppearance.attachments());
+            return withBody(skinAppearance.body(), skinAppearance.attachments(), equipmentAttachments);
         }
         ModelAttachment body = new ModelAttachment(
                 riderModel, texture, savedModel.getGradientSet(), savedModel.getGradientId(), 1.0
         );
         ModelAttachment[] appearanceAttachments = savedModel.getAttachments();
         if (appearanceAttachments == null || appearanceAttachments.length == 0) {
-            return new ModelAttachment[]{body};
+            return withBody(body, new ModelAttachment[0], equipmentAttachments);
         }
-        ModelAttachment[] attachments = new ModelAttachment[appearanceAttachments.length + 1];
-        attachments[0] = body;
-        System.arraycopy(appearanceAttachments, 0, attachments, 1, appearanceAttachments.length);
-        return attachments;
+        return withBody(body, appearanceAttachments, equipmentAttachments);
     }
 
     @Nonnull
     private static ModelAttachment[] withBody(@Nonnull ModelAttachment body,
-                                              @Nonnull ModelAttachment[] appearanceAttachments) {
-        ModelAttachment[] attachments = new ModelAttachment[appearanceAttachments.length + 1];
+                                              @Nonnull ModelAttachment[] appearanceAttachments,
+                                              @Nonnull ModelAttachment[] equipmentAttachments) {
+        ModelAttachment[] attachments = new ModelAttachment[
+                appearanceAttachments.length + equipmentAttachments.length + 1
+        ];
         attachments[0] = body;
         System.arraycopy(appearanceAttachments, 0, attachments, 1, appearanceAttachments.length);
+        System.arraycopy(
+                equipmentAttachments,
+                0,
+                attachments,
+                appearanceAttachments.length + 1,
+                equipmentAttachments.length
+        );
         return attachments;
     }
 
@@ -180,7 +191,8 @@ public final class AvatarFlightRiderVisualService {
 
     private static void logRiderAttachment(@Nonnull Model baseModel,
                                            @Nonnull Model savedModel,
-                                           @Nullable PlayerSkinComponent skin) {
+                                           @Nullable PlayerSkinComponent skin,
+                                           @Nonnull ModelAttachment[] equipmentAttachments) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || instance.getLogger() == null) {
             return;
@@ -197,7 +209,8 @@ public final class AvatarFlightRiderVisualService {
         instance.getLogger().at(Level.INFO).log(String.format(
                 "TameworkAvatarFlight debug: riderAttachment baseModelAsset=%s riderModelAsset=%s "
                         + "riderModel=%s attachmentModel=%s riderTexture=%s riderGradientSet=%s riderGradientId=%s "
-                        + "riderAppearanceAttachmentCount=%s riderSkinAttachmentCount=%s",
+                        + "riderAppearanceAttachmentCount=%s riderSkinAttachmentCount=%s "
+                        + "riderEquipmentAttachmentCount=%s",
                 baseModel.getModelAssetId(),
                 savedModel.getModelAssetId(),
                 savedModel.getModel(),
@@ -206,7 +219,8 @@ public final class AvatarFlightRiderVisualService {
                 savedModel.getGradientSet(),
                 savedModel.getGradientId(),
                 savedAttachmentCount,
-                resolvedAppearance == null ? 0 : resolvedAppearance.attachments().length
+                resolvedAppearance == null ? 0 : resolvedAppearance.attachments().length,
+                equipmentAttachments.length
         ));
     }
 

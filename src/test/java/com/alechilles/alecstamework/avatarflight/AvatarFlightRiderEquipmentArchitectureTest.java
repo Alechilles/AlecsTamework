@@ -17,6 +17,10 @@ class AvatarFlightRiderEquipmentArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "avatarflight", "AvatarFlightEquipmentVisualSystem.java"
     );
+    private static final Path ATTACHMENT_RESOLVER = Path.of(
+            "src", "main", "java", "com", "alechilles", "alecstamework",
+            "avatarflight", "AvatarFlightEquipmentAttachmentResolver.java"
+    );
     private static final Path TAMEWORK = Path.of(
             "src", "main", "java", "com", "alechilles", "alecstamework", "Tamework.java"
     );
@@ -32,7 +36,7 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     }
 
     @Test
-    void equipmentSystemDoesNotMirrorEquipmentToAttachmentBasedRiderEntity() throws Exception {
+    void equipmentSystemDoesNotQueueFakeRiderEquipmentPackets() throws Exception {
         String source = Files.readString(EQUIPMENT_SYSTEM, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("AvatarFlightRiderVisualComponent"));
@@ -41,6 +45,21 @@ class AvatarFlightRiderEquipmentArchitectureTest {
         assertFalse(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
         assertTrue(source.contains("getEquipmentResendIntervalMs()"));
         assertTrue(source.contains("commandBuffer.putComponent("));
+    }
+
+    @Test
+    void equipmentAttachmentResolverSnapshotsVisibleEquipmentAsModelAttachments() throws Exception {
+        String source = Files.readString(ATTACHMENT_RESOLVER, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("createCurrentEquipmentUpdate(ref, accessor)"));
+        assertTrue(source.contains("update.rightHandItemId"));
+        assertTrue(source.contains("update.leftHandItemId"));
+        assertTrue(source.contains("update.armorIds"));
+        assertTrue(source.contains("BlockType.EMPTY_KEY"));
+        assertTrue(source.contains("Item.getAssetMap().getAsset(itemId)"));
+        assertTrue(source.contains("item.getModel()"));
+        assertTrue(source.contains("item.getTexture()"));
+        assertTrue(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
     }
 
     @Test

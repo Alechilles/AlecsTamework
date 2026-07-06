@@ -34,8 +34,11 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("savedModel.getAttachments()"));
         assertTrue(source.contains("PlayerSkinComponent"));
         assertTrue(source.contains("AvatarFlightPlayerSkinAttachmentResolver.resolve("));
+        assertTrue(source.contains("AvatarFlightEquipmentAttachmentResolver.resolve(ownerRef, store)"));
         assertTrue(source.contains("appearanceAttachments"));
+        assertTrue(source.contains("equipmentAttachments"));
         assertTrue(source.contains("System.arraycopy(appearanceAttachments, 0, attachments, 1"));
+        assertTrue(source.contains("System.arraycopy("));
         assertTrue(source.contains("System.arraycopy(riderAttachments, 0, attachments, baseCount"));
         assertFalse(source.contains("RIDER_PROXY_MODEL"));
         assertFalse(source.contains("RIDER_PROXY_TEXTURE"));
@@ -46,6 +49,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("attachmentModel=%s riderTexture=%s"));
         assertTrue(source.contains("riderAppearanceAttachmentCount=%s"));
         assertTrue(source.contains("riderSkinAttachmentCount=%s"));
+        assertTrue(source.contains("riderEquipmentAttachmentCount=%s"));
         assertFalse(source.contains("config.getDebug().isLogControllerTicks()"));
         assertTrue(source.contains("Arrays.copyOf("));
         assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
