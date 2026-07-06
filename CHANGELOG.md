@@ -36,6 +36,7 @@
 - Fixed avatar-flight equipment hiding staying inactive when fake rider visuals are disabled by preserving the owner-only visual marker for the active flight session.
 - Fixed avatar-flight owner equipment hiding no longer reaching the local transformed player by restoring the known-good hidden equipment packet broadcast path.
 - Fixed avatar-flight equipment visual updates so hidden owner equipment and fake rider equipment are sent only when their signatures change, avoiding per-tick local equipment packet spam while testing rider visuals.
+- Fixed avatar-flight owner hand hiding so changing or re-syncing a held item while transformed immediately resends the hidden-hand packet instead of waiting for the resend timer.
 - Reworked experimental avatar-flight rider visuals to attach the saved player model to the transformed dragon model instead of spawning a native mounted rider entity, avoiding the crash-prone mounted-rider client path.
 - Restored experimental avatar-flight rider visuals to attach the saved player model directly to the transformed dragon, keeping the test path closer to the intended final rider.
 - Added avatar-flight rider attachment diagnostics to print the saved rider model and texture paths, plus skip reasons, while testing model-anchor options.

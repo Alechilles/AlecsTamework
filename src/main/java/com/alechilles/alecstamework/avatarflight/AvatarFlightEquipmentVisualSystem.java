@@ -90,7 +90,10 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
                 commandBuffer,
                 settings
         );
-        String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
+        EquipmentUpdate current = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, commandBuffer);
+        String signature = AvatarFlightEquipmentPacketService.equipmentSignature(current)
+                + "->"
+                + AvatarFlightEquipmentPacketService.equipmentSignature(update);
         AvatarFlightRiderVisualComponent updated = queueIfEquipmentChanged(
                 ref,
                 commandBuffer,

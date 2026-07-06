@@ -48,6 +48,8 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings, riderVisual)"));
         assertTrue(source.contains("queueIfEquipmentChanged("));
         assertTrue(source.contains("\"owner\""));
+        assertTrue(source.contains("createCurrentEquipmentUpdate(ref, commandBuffer)"));
+        assertTrue(source.contains("+ \"->\""));
         assertTrue(source.contains("readSignature("));
         assertTrue(source.contains("writeSignature("));
         assertTrue(source.contains("queueAll(ref, update, visible.visibleTo)"));
