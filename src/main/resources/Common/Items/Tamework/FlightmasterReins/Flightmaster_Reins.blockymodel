@@ -7,40 +7,40 @@
       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
       "shape": {
         "type": "box",
-        "offset": {"x": -38.5, "y": 36.5, "z": 0},
+        "offset": {"x": -49, "y": 29, "z": 0},
         "stretch": {"x": 1, "y": 1, "z": 1},
         "settings": {
           "isPiece": false,
-          "size": {"x": 19, "y": 5, "z": 4.8}
+          "size": {"x": 4, "y": 22, "z": 3}
         },
         "textureLayout": {
           "back": {
-            "offset": {"x": 0, "y": 0},
+            "offset": {"x": 38, "y": 0},
             "mirror": {"x": false, "y": false},
             "angle": 0
           },
           "right": {
-            "offset": {"x": 0, "y": 32},
+            "offset": {"x": 84, "y": 0},
             "mirror": {"x": false, "y": false},
             "angle": 0
           },
           "front": {
-            "offset": {"x": 0, "y": 16},
+            "offset": {"x": 38, "y": 0},
             "mirror": {"x": false, "y": false},
             "angle": 0
           },
           "left": {
-            "offset": {"x": 0, "y": 32},
+            "offset": {"x": 84, "y": 0},
             "mirror": {"x": false, "y": false},
             "angle": 0
           },
           "top": {
-            "offset": {"x": 24, "y": 0},
+            "offset": {"x": 46, "y": 0},
             "mirror": {"x": false, "y": false},
             "angle": 0
           },
           "bottom": {
-            "offset": {"x": 0, "y": 16},
+            "offset": {"x": 46, "y": 0},
             "mirror": {"x": false, "y": false},
             "angle": 0
           }
@@ -48,13 +48,13 @@
         "unwrapMode": "custom",
         "visible": true,
         "doubleSided": false,
-        "shadingMode": "standard"
+        "shadingMode": "flat"
       },
       "children": [
         {
           "id": "2",
-          "name": "Left Handle Outer Rail--C1",
-          "position": {"x": -10.5, "y": -11.5, "z": 0},
+          "name": "Right Handle Outer Rail--C1",
+          "position": {"x": 98, "y": 0, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -62,37 +62,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 6, "y": 24, "z": 4.8},
+              "size": {"x": 4, "y": 22, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 0},
+                "offset": {"x": 38, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 84, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 38, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 84, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -100,13 +100,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "3",
           "name": "Left Handle Inner Rail--C2",
-          "position": {"x": 10.5, "y": -12.5, "z": 0},
+          "position": {"x": 19, "y": 0, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -114,37 +114,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 6, "y": 24, "z": 4.8},
+              "size": {"x": 4, "y": 22, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 0},
+                "offset": {"x": 38, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 84, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 38, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 84, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -152,13 +152,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "4",
-          "name": "Left Handle Bottom Rail--C3",
-          "position": {"x": 0, "y": -24.5, "z": 0},
+          "name": "Right Handle Inner Rail--C3",
+          "position": {"x": 79, "y": 0, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -166,37 +166,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 17, "y": 6, "z": 4.8},
+              "size": {"x": 4, "y": 22, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 0},
+                "offset": {"x": 38, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 84, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 38, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 84, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -204,21 +204,21 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "5",
-          "name": "Left Handle Lower Bevel--C4",
-          "position": {"x": -7, "y": -25.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": -0.30071, "w": 0.95372},
+          "name": "Left Handle Top Rail--C4",
+          "position": {"x": 9.5, "y": 10, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 7, "y": 6, "z": 4.8},
+              "size": {"x": 23, "y": 4, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
@@ -228,27 +228,27 @@
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -256,13 +256,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "6",
           "name": "Right Handle Top Rail--C5",
-          "position": {"x": 77, "y": 0, "z": 0},
+          "position": {"x": 88.5, "y": 10, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -270,7 +270,7 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 19, "y": 5, "z": 4.8},
+              "size": {"x": 23, "y": 4, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
@@ -280,27 +280,27 @@
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -308,13 +308,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "7",
-          "name": "Right Handle Outer Rail--C6",
-          "position": {"x": 87.5, "y": -11.5, "z": 0},
+          "name": "Left Handle Bottom Rail--C6",
+          "position": {"x": 10, "y": -11, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -322,7 +322,7 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 6, "y": 24, "z": 4.8},
+              "size": {"x": 18, "y": 4, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
@@ -332,27 +332,27 @@
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -360,13 +360,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "8",
-          "name": "Right Handle Inner Rail--C7",
-          "position": {"x": 66.5, "y": -12.5, "z": 0},
+          "name": "Right Handle Bottom Rail--C7",
+          "position": {"x": 88, "y": -11, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -374,7 +374,7 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 6, "y": 24, "z": 4.8},
+              "size": {"x": 18, "y": 4, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
@@ -384,27 +384,27 @@
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -412,21 +412,21 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "9",
-          "name": "Right Handle Bottom Rail--C8",
-          "position": {"x": 77, "y": -24.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Left Handle Lower Bevel--C8",
+          "position": {"x": 3, "y": -14, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": -0.32557, "w": 0.94552},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 17, "y": 6, "z": 4.8},
+              "size": {"x": 8, "y": 4, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
@@ -436,27 +436,27 @@
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -464,21 +464,21 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "10",
           "name": "Right Handle Lower Bevel--C9",
-          "position": {"x": 84, "y": -25.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.30071, "w": 0.95372},
+          "position": {"x": 95, "y": -14, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": 0.32557, "w": 0.94552},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 7, "y": 6, "z": 4.8},
+              "size": {"x": 8, "y": 4, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
@@ -488,27 +488,27 @@
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -516,13 +516,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "11",
-          "name": "Left Handle Top Left Cap--C10",
-          "position": {"x": -11, "y": 0.25, "z": 0},
+          "name": "Left Top Outer Brass Cap--C10",
+          "position": {"x": -1, "y": 10, "z": 0.2},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -530,37 +530,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 5, "y": 5.5, "z": 6},
+              "size": {"x": 5, "y": 6, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -568,13 +568,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "12",
-          "name": "Left Handle Top Right Cap--C11",
-          "position": {"x": 10.5, "y": 0.25, "z": 0},
+          "name": "Right Top Outer Brass Cap--C11",
+          "position": {"x": 99, "y": 10, "z": 0.2},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -582,37 +582,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 6, "y": 5.5, "z": 6},
+              "size": {"x": 5, "y": 6, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -620,13 +620,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "13",
-          "name": "Left Handle Lower Brass Block--C12",
-          "position": {"x": 10.85, "y": -24.3, "z": 0},
+          "name": "Left Top Inner Brass Cap--C12",
+          "position": {"x": 20, "y": 10, "z": 0.2},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -634,37 +634,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 5.7, "y": 6, "z": 6.2},
+              "size": {"x": 5, "y": 6, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -672,13 +672,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "14",
-          "name": "Right Handle Top Left Cap--C13",
-          "position": {"x": 66.5, "y": 0.25, "z": 0},
+          "name": "Right Top Inner Brass Cap--C13",
+          "position": {"x": 78, "y": 10, "z": 0.2},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -686,37 +686,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 6, "y": 5.5, "z": 6},
+              "size": {"x": 5, "y": 6, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -724,13 +724,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "15",
-          "name": "Right Handle Top Right Cap--C14",
-          "position": {"x": 88, "y": 0.25, "z": 0},
+          "name": "Left Lower Inner Brass Block--C14",
+          "position": {"x": 20, "y": -11, "z": 0.4},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -738,37 +738,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 5, "y": 5.5, "z": 6},
+              "size": {"x": 5, "y": 5, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -776,13 +776,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "16",
-          "name": "Right Handle Lower Brass Block--C15",
-          "position": {"x": 66.15, "y": -24.3, "z": 0},
+          "name": "Right Lower Inner Brass Block--C15",
+          "position": {"x": 78, "y": -11, "z": 0.4},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -790,37 +790,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 5.7, "y": 6, "z": 6.2},
+              "size": {"x": 5, "y": 5, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -828,13 +828,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "17",
-          "name": "Left Handle Front Rivet--C16",
-          "position": {"x": 10.6, "y": -17, "z": -3},
+          "name": "Left Outer Corner Brass Pin--C16",
+          "position": {"x": 0, "y": -11, "z": 0.5},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -842,37 +842,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 3, "y": 3, "z": 1},
+              "size": {"x": 4, "y": 4, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 64, "y": 32},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -880,13 +880,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "18",
-          "name": "Right Handle Front Rivet--C17",
-          "position": {"x": 66.4, "y": -17, "z": -3},
+          "name": "Right Outer Corner Brass Pin--C17",
+          "position": {"x": 98, "y": -11, "z": 0.5},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -894,37 +894,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 3, "y": 3, "z": 1},
+              "size": {"x": 4, "y": 4, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 64, "y": 32},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -932,51 +932,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "19",
-          "name": "Left Strap Joint Rivet--C18",
-          "position": {"x": 5.4, "y": -26.6, "z": -2.9},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Left Upper Arc Strap--C18",
+          "position": {"x": 12, "y": -19, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": -0.37461, "w": 0.92718},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 3.8, "y": 3.8, "z": 1},
+              "size": {"x": 14, "y": 5, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 64, "y": 32},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -984,51 +984,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "20",
-          "name": "Right Strap Joint Rivet--C19",
-          "position": {"x": 71.6, "y": -26.6, "z": -2.9},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Right Upper Arc Strap--C19",
+          "position": {"x": 86, "y": -19, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": 0.37461, "w": 0.92718},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 3.8, "y": 3.8, "z": 1},
+              "size": {"x": 14, "y": 5, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 64, "y": 32},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1036,31 +1036,31 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "21",
-          "name": "Left Upper Diagonal Strap--C20",
-          "position": {"x": 11, "y": -29.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": -0.30071, "w": 0.95372},
+          "name": "Left Middle Arc Strap A--C20",
+          "position": {"x": 21, "y": -27, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": -0.29237, "w": 0.9563},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 15, "y": 6, "z": 4},
+              "size": {"x": 14, "y": 5, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
@@ -1070,17 +1070,17 @@
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1088,31 +1088,31 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "22",
-          "name": "Left Middle Curve Strap--C21",
-          "position": {"x": 17.5, "y": -42.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": -0.21644, "w": 0.9763},
+          "name": "Right Middle Arc Strap A--C21",
+          "position": {"x": 77, "y": -27, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": 0.29237, "w": 0.9563},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 16, "y": 6, "z": 4.2},
+              "size": {"x": 14, "y": 5, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
@@ -1122,17 +1122,17 @@
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1140,13 +1140,117 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "23",
-          "name": "Left Lower Curve Strap--C22",
-          "position": {"x": 25.5, "y": -55.5, "z": 0},
+          "name": "Left Middle Arc Strap B--C22",
+          "position": {"x": 31, "y": -34, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": -0.19937, "w": 0.97992},
+          "shape": {
+            "type": "box",
+            "offset": {"x": 0, "y": 0, "z": 0},
+            "stretch": {"x": 1, "y": 1, "z": 1},
+            "settings": {
+              "isPiece": false,
+              "size": {"x": 14, "y": 5, "z": 3},
+              "isStaticBox": true
+            },
+            "textureLayout": {
+              "back": {
+                "offset": {"x": 0, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "right": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "front": {
+                "offset": {"x": 0, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "left": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "top": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "bottom": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              }
+            },
+            "unwrapMode": "custom",
+            "visible": true,
+            "doubleSided": false,
+            "shadingMode": "flat"
+          }
+        },
+        {
+          "id": "24",
+          "name": "Right Middle Arc Strap B--C23",
+          "position": {"x": 67, "y": -34, "z": 0},
+          "orientation": {"x": 0, "y": 0, "z": 0.19937, "w": 0.97992},
+          "shape": {
+            "type": "box",
+            "offset": {"x": 0, "y": 0, "z": 0},
+            "stretch": {"x": 1, "y": 1, "z": 1},
+            "settings": {
+              "isPiece": false,
+              "size": {"x": 14, "y": 5, "z": 3},
+              "isStaticBox": true
+            },
+            "textureLayout": {
+              "back": {
+                "offset": {"x": 0, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "right": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "front": {
+                "offset": {"x": 0, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "left": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "top": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "bottom": {
+                "offset": {"x": 46, "y": 0},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              }
+            },
+            "unwrapMode": "custom",
+            "visible": true,
+            "doubleSided": false,
+            "shadingMode": "flat"
+          }
+        },
+        {
+          "id": "25",
+          "name": "Left Lower Arc Strap--C24",
+          "position": {"x": 41, "y": -39, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": -0.10453, "w": 0.99452},
           "shape": {
             "type": "box",
@@ -1154,17 +1258,17 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 16, "y": 6, "z": 4.4},
+              "size": {"x": 17, "y": 5, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
@@ -1174,17 +1278,17 @@
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1192,117 +1296,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "24",
-          "name": "Right Upper Diagonal Strap--C23",
-          "position": {"x": 66, "y": -29.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.30071, "w": 0.95372},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 15, "y": 6, "z": 4},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 24, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 0, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 0, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 0, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 0, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "25",
-          "name": "Right Middle Curve Strap--C24",
-          "position": {"x": 59.5, "y": -42.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.21644, "w": 0.9763},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 16, "y": 6, "z": 4.2},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 24, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 0, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 0, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 0, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 0, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "26",
-          "name": "Right Lower Curve Strap--C25",
-          "position": {"x": 51.5, "y": -55.5, "z": 0},
+          "name": "Right Lower Arc Strap--C25",
+          "position": {"x": 57, "y": -39, "z": 0},
           "orientation": {"x": 0, "y": 0, "z": 0.10453, "w": 0.99452},
           "shape": {
             "type": "box",
@@ -1310,17 +1310,17 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 16, "y": 6, "z": 4.4},
+              "size": {"x": 17, "y": 5, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 0, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
@@ -1330,17 +1330,17 @@
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1348,51 +1348,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "27",
           "name": "Left Rear Inner Strap--C26",
-          "position": {"x": 18.5, "y": -36.75, "z": 2.9},
-          "orientation": {"x": 0, "y": 0, "z": -0.15643, "w": 0.98769},
+          "position": {"x": 29, "y": -31, "z": 1.8},
+          "orientation": {"x": 0, "y": 0, "z": -0.13917, "w": 0.99027},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 22, "y": 3.5, "z": 2.6},
+              "size": {"x": 24, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 0, "y": 30},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 0},
+                "offset": {"x": 0, "y": 30},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1400,51 +1400,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "28",
           "name": "Right Rear Inner Strap--C27",
-          "position": {"x": 58.5, "y": -36.75, "z": 2.9},
-          "orientation": {"x": 0, "y": 0, "z": 0.15643, "w": 0.98769},
+          "position": {"x": 69, "y": -31, "z": 1.8},
+          "orientation": {"x": 0, "y": 0, "z": 0.13917, "w": 0.99027},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 22, "y": 3.5, "z": 2.6},
+              "size": {"x": 24, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 24, "y": 0},
+                "offset": {"x": 0, "y": 30},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 0},
+                "offset": {"x": 0, "y": 30},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 16},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 32},
+                "offset": {"x": 46, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1452,51 +1452,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "29",
-          "name": "Left Handle Stitch Row--C28",
-          "position": {"x": -8.15, "y": -12.5, "z": -2.9},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Left Arc Brass Keeper--C28",
+          "position": {"x": 18, "y": -24, "z": 0.6},
+          "orientation": {"x": 0, "y": 0, "z": -0.29237, "w": 0.9563},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 0.7, "y": 16, "z": 0.6},
+              "size": {"x": 6, "y": 5, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1504,51 +1504,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "30",
-          "name": "Right Handle Stitch Row--C29",
-          "position": {"x": 85.15, "y": -12.5, "z": -2.9},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Right Arc Brass Keeper--C29",
+          "position": {"x": 80, "y": -24, "z": 0.6},
+          "orientation": {"x": 0, "y": 0, "z": 0.29237, "w": 0.9563},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 0.7, "y": 16, "z": 0.6},
+              "size": {"x": 6, "y": 5, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1556,51 +1556,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "31",
-          "name": "Left Diagonal Stitch Row--C30",
-          "position": {"x": 13.5, "y": -31.65, "z": -2.7},
-          "orientation": {"x": 0, "y": 0, "z": -0.30071, "w": 0.95372},
+          "name": "Left Lower Strap Stitch Plate--C30",
+          "position": {"x": 34, "y": -37, "z": 0.7},
+          "orientation": {"x": 0, "y": 0, "z": -0.19937, "w": 0.97992},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 12, "y": 0.7, "z": 0.6},
+              "size": {"x": 5, "y": 3, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1608,51 +1608,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "32",
-          "name": "Right Diagonal Stitch Row--C31",
-          "position": {"x": 63.5, "y": -31.65, "z": -2.7},
-          "orientation": {"x": 0, "y": 0, "z": 0.30071, "w": 0.95372},
+          "name": "Right Lower Strap Stitch Plate--C31",
+          "position": {"x": 64, "y": -37, "z": 0.7},
+          "orientation": {"x": 0, "y": 0, "z": 0.19937, "w": 0.97992},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 12, "y": 0.7, "z": 0.6},
+              "size": {"x": 5, "y": 3, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1660,51 +1660,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "33",
-          "name": "Left Lower Stitch Row--C32",
-          "position": {"x": 26, "y": -55.35, "z": -2.7},
-          "orientation": {"x": 0, "y": 0, "z": -0.10453, "w": 0.99452},
+          "name": "Central Back Gold Plaque--C32",
+          "position": {"x": 49, "y": -47, "z": 0.3},
+          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 13, "y": 0.7, "z": 0.6},
+              "size": {"x": 14, "y": 15, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 76, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 76, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1712,51 +1712,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "34",
-          "name": "Right Lower Stitch Row--C33",
-          "position": {"x": 51, "y": -55.35, "z": -2.7},
-          "orientation": {"x": 0, "y": 0, "z": 0.10453, "w": 0.99452},
+          "name": "Central Top Lug--C33",
+          "position": {"x": 49, "y": -37, "z": 0.4},
+          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 13, "y": 0.7, "z": 0.6},
+              "size": {"x": 9, "y": 4, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 0, "y": 48},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1764,13 +1764,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "35",
-          "name": "Central Shield Main Plate--C34",
-          "position": {"x": 38.5, "y": -65, "z": 0},
+          "name": "Central Bottom Lug--C34",
+          "position": {"x": 49, "y": -57, "z": 0.4},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -1778,37 +1778,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 15, "y": 17, "z": 6.4},
+              "size": {"x": 6, "y": 5, "z": 4},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1816,51 +1816,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "36",
-          "name": "Central Shield Top Cap--C35",
-          "position": {"x": 38.5, "y": -56.25, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Central Diamond Gold Frame--C35",
+          "position": {"x": 49, "y": -47, "z": 2.6},
+          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 18, "y": 4.5, "z": 6},
+              "size": {"x": 12, "y": 12, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 76, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 76, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1868,51 +1868,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "37",
-          "name": "Central Shield Left Side Rail--C36",
-          "position": {"x": 30.25, "y": -63, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Central Blue Diamond--C36",
+          "position": {"x": 49, "y": -47, "z": 3.8},
+          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 3.5, "y": 15, "z": 5.6},
+              "size": {"x": 7, "y": 7, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 96, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 96, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1920,51 +1920,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "38",
-          "name": "Central Shield Right Side Rail--C37",
-          "position": {"x": 46.75, "y": -63, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+          "name": "Central Blue Highlight--C37",
+          "position": {"x": 48, "y": -46, "z": 5},
+          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 3.5, "y": 15, "z": 5.6},
+              "size": {"x": 3, "y": 3, "z": 1},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 96, "y": 18},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 96, "y": 18},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -1972,51 +1972,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "39",
-          "name": "Central Shield Bottom Point--C38",
-          "position": {"x": 38.5, "y": -75.25, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
+          "name": "Left Wing Feather Top--C38",
+          "position": {"x": 36, "y": -46, "z": 1.4},
+          "orientation": {"x": 0, "y": 0, "z": -0.06976, "w": 0.99756},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 9, "y": 6.5, "z": 5.6},
+              "size": {"x": 13, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2024,51 +2024,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "40",
-          "name": "Left Feather Stack Top--C39",
-          "position": {"x": 24.5, "y": -61.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": -0.13917, "w": 0.99027},
+          "name": "Left Wing Feather Mid A--C39",
+          "position": {"x": 34, "y": -49, "z": 1.2},
+          "orientation": {"x": 0, "y": 0, "z": -0.12187, "w": 0.99255},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 12, "y": 4, "z": 4.8},
+              "size": {"x": 14, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 18, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 18, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2076,13 +2076,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "41",
-          "name": "Left Feather Stack Mid--C40",
-          "position": {"x": 22.5, "y": -65.5, "z": 0},
+          "name": "Left Wing Feather Mid B--C40",
+          "position": {"x": 32, "y": -52, "z": 1},
           "orientation": {"x": 0, "y": 0, "z": -0.17365, "w": 0.98481},
           "shape": {
             "type": "box",
@@ -2090,37 +2090,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 14, "y": 4, "z": 4.4},
+              "size": {"x": 14, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 36, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 36, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2128,51 +2128,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "42",
-          "name": "Left Feather Stack Low--C41",
-          "position": {"x": 21, "y": -69.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": -0.21644, "w": 0.9763},
+          "name": "Left Wing Feather Low--C41",
+          "position": {"x": 31, "y": -55, "z": 0.8},
+          "orientation": {"x": 0, "y": 0, "z": -0.23345, "w": 0.97237},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 13, "y": 4, "z": 4},
+              "size": {"x": 12, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 56, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 56, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2180,51 +2180,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "43",
-          "name": "Right Feather Stack Top--C42",
-          "position": {"x": 52.5, "y": -61.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.13917, "w": 0.99027},
+          "name": "Right Wing Feather Top--C42",
+          "position": {"x": 62, "y": -46, "z": 1.4},
+          "orientation": {"x": 0, "y": 0, "z": 0.06976, "w": 0.99756},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 12, "y": 4, "z": 4.8},
+              "size": {"x": 13, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 0, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 0, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2232,51 +2232,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "44",
-          "name": "Right Feather Stack Mid--C43",
-          "position": {"x": 54.5, "y": -65.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.17365, "w": 0.98481},
+          "name": "Right Wing Feather Mid A--C43",
+          "position": {"x": 64, "y": -49, "z": 1.2},
+          "orientation": {"x": 0, "y": 0, "z": 0.12187, "w": 0.99255},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 14, "y": 4, "z": 4.4},
+              "size": {"x": 14, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 18, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 18, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2284,377 +2284,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
           "id": "45",
-          "name": "Right Feather Stack Low--C44",
-          "position": {"x": 56, "y": -69.5, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.21644, "w": 0.9763},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 13, "y": 4, "z": 4},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "46",
-          "name": "Shield Upper Highlight--C45",
-          "position": {"x": 38.5, "y": -56.75, "z": -3.5},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 11, "y": 1.5, "z": 0.8},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "47",
-          "name": "Shield Left Bright Edge--C46",
-          "position": {"x": 30.65, "y": -64, "z": -3.35},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 1.5, "y": 11, "z": 0.7},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "48",
-          "name": "Shield Right Bright Edge--C47",
-          "position": {"x": 46.35, "y": -64, "z": -3.35},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 1.5, "y": 11, "z": 0.7},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "49",
-          "name": "Left Feather Highlight One--C48",
-          "position": {"x": 24.5, "y": -61.2, "z": -2.65},
-          "orientation": {"x": 0, "y": 0, "z": -0.13917, "w": 0.99027},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 8, "y": 1, "z": 0.7},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "50",
-          "name": "Left Feather Highlight Two--C49",
-          "position": {"x": 22.5, "y": -65, "z": -2.45},
-          "orientation": {"x": 0, "y": 0, "z": -0.17365, "w": 0.98481},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 10, "y": 1, "z": 0.7},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "51",
-          "name": "Right Feather Highlight One--C50",
-          "position": {"x": 52.5, "y": -61.2, "z": -2.65},
-          "orientation": {"x": 0, "y": 0, "z": 0.13917, "w": 0.99027},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 8, "y": 1, "z": 0.7},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "52",
-          "name": "Right Feather Highlight Two--C51",
-          "position": {"x": 54.5, "y": -65, "z": -2.45},
+          "name": "Right Wing Feather Mid B--C44",
+          "position": {"x": 66, "y": -52, "z": 1},
           "orientation": {"x": 0, "y": 0, "z": 0.17365, "w": 0.98481},
           "shape": {
             "type": "box",
@@ -2662,37 +2298,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 10, "y": 1, "z": 0.7},
+              "size": {"x": 14, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 64, "y": 32},
+                "offset": {"x": 36, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 36, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2700,51 +2336,51 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
-          "id": "53",
-          "name": "Shield Diamond Gem--C52",
-          "position": {"x": 38.5, "y": -63.9, "z": -3.7},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
+          "id": "46",
+          "name": "Right Wing Feather Low--C45",
+          "position": {"x": 67, "y": -55, "z": 0.8},
+          "orientation": {"x": 0, "y": 0, "z": 0.23345, "w": 0.97237},
           "shape": {
             "type": "box",
             "offset": {"x": 0, "y": 0, "z": 0},
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 8.8, "y": 8.8, "z": 1.4},
+              "size": {"x": 12, "y": 3, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 96, "y": 0},
+                "offset": {"x": 56, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 96, "y": 32},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 96, "y": 16},
+                "offset": {"x": 56, "y": 23},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 96, "y": 32},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 96, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 96, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2752,65 +2388,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
-          "id": "54",
-          "name": "Shield Gem Inner Shine--C53",
-          "position": {"x": 38.5, "y": -63.7, "z": -4.65},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 4.4, "y": 4.4, "z": 0.7},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "55",
-          "name": "Pendant Blue Gem Core--C54",
-          "position": {"x": 38.5, "y": -87.25, "z": 0},
+          "id": "47",
+          "name": "Pendant Link--C46",
+          "position": {"x": 49, "y": -61, "z": 0.2},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -2818,37 +2402,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 8.4, "y": 8.5, "z": 7.6},
+              "size": {"x": 3, "y": 8, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 96, "y": 0},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 96, "y": 32},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 96, "y": 16},
+                "offset": {"x": 0, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 96, "y": 32},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 96, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 96, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2856,13 +2440,65 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
-          "id": "56",
-          "name": "Pendant Blue Gem Shine--C55",
-          "position": {"x": 38.5, "y": -86.75, "z": -4.1},
+          "id": "48",
+          "name": "Pendant Gold Diamond Frame--C47",
+          "position": {"x": 49, "y": -69, "z": 0.3},
+          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
+          "shape": {
+            "type": "box",
+            "offset": {"x": 0, "y": 0, "z": 0},
+            "stretch": {"x": 1, "y": 1, "z": 1},
+            "settings": {
+              "isPiece": false,
+              "size": {"x": 11, "y": 11, "z": 3},
+              "isStaticBox": true
+            },
+            "textureLayout": {
+              "back": {
+                "offset": {"x": 76, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "right": {
+                "offset": {"x": 34, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "front": {
+                "offset": {"x": 76, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "left": {
+                "offset": {"x": 34, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "top": {
+                "offset": {"x": 40, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "bottom": {
+                "offset": {"x": 40, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              }
+            },
+            "unwrapMode": "custom",
+            "visible": true,
+            "doubleSided": false,
+            "shadingMode": "flat"
+          }
+        },
+        {
+          "id": "49",
+          "name": "Pendant Blue Gem--C48",
+          "position": {"x": 49, "y": -69, "z": 2.2},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -2870,7 +2506,7 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 4.4, "y": 4.5, "z": 0.8},
+              "size": {"x": 7, "y": 7, "z": 2},
               "isStaticBox": true
             },
             "textureLayout": {
@@ -2880,27 +2516,27 @@
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 96, "y": 32},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
                 "offset": {"x": 96, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
+              "left": {
+                "offset": {"x": 34, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
+              "top": {
+                "offset": {"x": 40, "y": 8},
+                "mirror": {"x": false, "y": false},
+                "angle": 0
+              },
               "bottom": {
-                "offset": {"x": 96, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -2908,13 +2544,13 @@
             "unwrapMode": "custom",
             "visible": true,
             "doubleSided": false,
-            "shadingMode": "standard"
+            "shadingMode": "flat"
           }
         },
         {
-          "id": "57",
-          "name": "Pendant Brass Link--C56",
-          "position": {"x": 38.5, "y": -77.5, "z": 0},
+          "id": "50",
+          "name": "Pendant Blue Shine--C49",
+          "position": {"x": 48, "y": -67, "z": 3.4},
           "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
           "shape": {
             "type": "box",
@@ -2922,349 +2558,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 4, "y": 8, "z": 4.8},
+              "size": {"x": 3, "y": 3, "z": 1},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 96, "y": 18},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 96, "y": 18},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 64, "y": 16},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "58",
-          "name": "Pendant Brass Frame Top--C57",
-          "position": {"x": 38.5, "y": -83.35, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 11, "y": 3.3, "z": 5.6},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "59",
-          "name": "Pendant Brass Frame Bottom--C58",
-          "position": {"x": 38.5, "y": -91.15, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 11, "y": 3.3, "z": 5.6},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "60",
-          "name": "Pendant Brass Frame Left--C59",
-          "position": {"x": 33.8, "y": -87, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 3, "y": 7, "z": 5.6},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "61",
-          "name": "Pendant Brass Frame Right--C60",
-          "position": {"x": 43.2, "y": -87, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 3, "y": 7, "z": 5.6},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "62",
-          "name": "Pendant Bottom Point--C61",
-          "position": {"x": 38.5, "y": -95, "z": 0},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 6.8, "y": 5.4, "z": 4.8},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 64, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "standard"
-          }
-        },
-        {
-          "id": "63",
-          "name": "Shield Diamond Gold Backplate--C62",
-          "position": {"x": 38.5, "y": -64.5, "z": -5.1},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 12.8, "y": 12.8, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
@@ -3276,9 +2600,9 @@
           }
         },
         {
-          "id": "64",
-          "name": "Shield Diamond Top Rim--C63",
-          "position": {"x": 38.5, "y": -60.85, "z": -5.75},
+          "id": "51",
+          "name": "Pendant Bottom Point--C50",
+          "position": {"x": 49, "y": -77, "z": 0.1},
           "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
           "shape": {
             "type": "box",
@@ -3286,661 +2610,37 @@
             "stretch": {"x": 1, "y": 1, "z": 1},
             "settings": {
               "isPiece": false,
-              "size": {"x": 9.2, "y": 1.7, "z": 1},
+              "size": {"x": 6, "y": 6, "z": 3},
               "isStaticBox": true
             },
             "textureLayout": {
               "back": {
-                "offset": {"x": 64, "y": 32},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "right": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "front": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 108, "y": 0},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "left": {
-                "offset": {"x": 48, "y": 0},
+                "offset": {"x": 34, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "top": {
-                "offset": {"x": 32, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               },
               "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "65",
-          "name": "Shield Diamond Bottom Rim--C64",
-          "position": {"x": 38.5, "y": -68.15, "z": -5.75},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 9.2, "y": 1.7, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "66",
-          "name": "Shield Diamond Left Rim--C65",
-          "position": {"x": 34.15, "y": -64.5, "z": -5.7},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 1.7, "y": 6.4, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "67",
-          "name": "Shield Diamond Right Rim--C66",
-          "position": {"x": 42.85, "y": -64.5, "z": -5.7},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 1.7, "y": 6.4, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "68",
-          "name": "Shield Raised Blue Diamond--C67",
-          "position": {"x": 38.5, "y": -64.5, "z": -6.3},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 7.6, "y": 7.6, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "69",
-          "name": "Shield Blue Diamond Highlight--C68",
-          "position": {"x": 38.5, "y": -64.6, "z": -7.05},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 3.2, "y": 3.2, "z": 0.6},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "70",
-          "name": "Visible Shield Diamond Gold Plate--C69",
-          "position": {"x": 38.5, "y": -64.5, "z": 5.1},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 12.8, "y": 12.8, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "71",
-          "name": "Visible Shield Diamond Top Rim--C70",
-          "position": {"x": 38.5, "y": -60.85, "z": 5.75},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 9.2, "y": 1.7, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "72",
-          "name": "Visible Shield Diamond Bottom Rim--C71",
-          "position": {"x": 38.5, "y": -68.15, "z": 5.75},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 9.2, "y": 1.7, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "73",
-          "name": "Visible Shield Diamond Left Rim--C72",
-          "position": {"x": 34.15, "y": -64.5, "z": 5.7},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 1.7, "y": 6.4, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "74",
-          "name": "Visible Shield Diamond Right Rim--C73",
-          "position": {"x": 42.85, "y": -64.5, "z": 5.7},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 1.7, "y": 6.4, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 64, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 48, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 32, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 72, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "75",
-          "name": "Visible Shield Raised Blue Diamond--C74",
-          "position": {"x": 38.5, "y": -64.5, "z": 6.3},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 7.6, "y": 7.6, "z": 1},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "76",
-          "name": "Visible Shield Blue Diamond Highlight--C75",
-          "position": {"x": 38.5, "y": -64.6, "z": 7.05},
-          "orientation": {"x": 0, "y": 0, "z": 0.38268, "w": 0.92388},
-          "shape": {
-            "type": "box",
-            "offset": {"x": 0, "y": 0, "z": 0},
-            "stretch": {"x": 1, "y": 1, "z": 1},
-            "settings": {
-              "isPiece": false,
-              "size": {"x": 3.2, "y": 3.2, "z": 0.6},
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "right": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "front": {
-                "offset": {"x": 96, "y": 16},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "left": {
-                "offset": {"x": 96, "y": 32},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "top": {
-                "offset": {"x": 96, "y": 0},
-                "mirror": {"x": false, "y": false},
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {"x": 96, "y": 16},
+                "offset": {"x": 40, "y": 8},
                 "mirror": {"x": false, "y": false},
                 "angle": 0
               }
