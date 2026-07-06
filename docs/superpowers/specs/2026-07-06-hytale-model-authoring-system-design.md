@@ -1,27 +1,233 @@
-# Hytale Official Model Corpus Design
+# Hytale Model Authoring System Design
 
 ## Purpose
 
-Create a local derived corpus from official Hytale assets that helps Codex make better Hytale-compatible models, textures, attachments, animations, and style decisions.
+Create an end-game Hytale model authoring system that helps Codex make high-quality Hytale-compatible models, textures, attachments, animations, and asset packages from concept art or text briefs.
 
-The immediate motivation is the failed Flightmaster's Reins modeling loop: a technically valid `.blockymodel` is not enough. The model also needs the right Hytale proportions, silhouette, texture density, material treatment, construction logic, and rendered readability. This corpus is the foundation for making those qualities measurable and retrievable before future model work begins.
+The immediate motivation is the failed Flightmaster's Reins modeling loop: a technically valid `.blockymodel` is not enough. The model also needs the right Hytale proportions, silhouette, texture density, material treatment, construction logic, rendered readability, and iterative critique. The final product should make those qualities systematic from the start.
+
+The official asset corpus is the first subsystem, not the whole product. It supplies the source-backed examples, metadata, and quality signals that the authoring system uses for planning, generation, evaluation, and learning.
 
 ## Goals
 
+- Design the full end-state product before implementing the first phase.
 - Build a source-backed corpus from official Hytale assets only.
 - Cover all model families, not just items or props.
 - Support both searchable reference lookup and future training/evaluation datasets.
 - Preserve enough geometry, texture, semantic, and render metadata to improve actual model-making quality.
 - Make concept-art-driven work systematic: concept analysis, official analog retrieval, construction planning, generation, render comparison, and revision.
+- Use Blockbench and the Blockbench MCP as an interactive authoring and inspection surface.
+- Capture accepted attempts, failed attempts, feedback, and revisions so future sessions improve.
+- Validate final assets for Hytale compatibility, mod layout, texture quality, and packaging readiness.
 - Keep the official asset release read-only and store only derived metadata, indexes, and generated evaluation artifacts in the mod/tooling workspace.
 
 ## Non-Goals
 
 - Do not train a model in this design pass.
-- Do not implement the extractor, renderer, or evaluator yet.
+- Do not implement the extractor, renderer, evaluator, generator, or packaging workflow yet.
 - Do not ingest non-official custom assets initially.
-- Do not replace Blockbench or the Blockbench MCP. The corpus should make those tools more effective.
+- Do not replace Blockbench or the Blockbench MCP. The authoring system should make those tools more effective.
 - Do not treat schema-valid output as sufficient quality. Visual comparison remains required.
+
+## End-State Product
+
+The final product is a local Hytale Model Authoring System. It should support the full workflow from idea to shippable mod asset:
+
+1. Analyze concept art, sketches, screenshots, or text briefs.
+2. Retrieve official Hytale references by shape, material, model family, usage, texture style, and rig context.
+3. Produce a concrete construction plan before editing geometry.
+4. Generate or revise `.blockymodel` geometry and `.png` textures under strict Hytale constraints.
+5. Use Blockbench MCP for interactive inspection, structured edits, and model screenshots.
+6. Render standard views and compare them against the concept and official references.
+7. Produce actionable critique and apply revisions in a closed loop.
+8. Save the attempt, renders, feedback, accepted fixes, and rejected patterns for future use.
+9. Validate and package the finished asset into the mod with predictable naming and asset references.
+
+This system should be useful for all Hytale asset families: items, props, blocks, resources, NPCs, player cosmetics, entity attachments, vehicles, projectiles, VFX models, and animation-aware rigs.
+
+## System Architecture
+
+The authoring system should be decomposed into small subsystems with explicit interfaces. The official corpus is the first dependency, but the complete product has several layers.
+
+### 1. Official Asset Corpus
+
+Reads official Hytale assets, parses `.blockymodel`, `.png`, `.blockyanim`, and `Server/Models` data, and exposes searchable official examples plus quality facts.
+
+This subsystem answers:
+
+- What official assets look like this?
+- What construction patterns does Hytale use for this kind of thing?
+- What texture size, palette, UV density, and silhouette complexity are typical?
+- Which examples should guide a new model?
+
+### 2. Concept Understanding
+
+Turns concept art or a text brief into a structured target description:
+
+- Object type and intended in-game usage.
+- Visible parts and subassemblies.
+- Materials and material regions.
+- Front/back/side/top readability requirements.
+- Symmetry, repeated motifs, ornaments, straps, handles, gems, wings, limbs, or attachments.
+- Required details versus optional details.
+- Approximate target scale and texture size.
+
+For images, the system should produce annotated observations that can be checked before generation. It should not guess silently when the concept is ambiguous.
+
+### 3. Reference Retriever
+
+Queries the corpus for official analogs and groups them by why they matter:
+
+- Shape analogs.
+- Material analogs.
+- Texture treatment analogs.
+- Family and usage analogs.
+- Rig, attachment, or animation analogs.
+- Scale and readability analogs.
+
+The retriever should produce a compact reference pack with paths, screenshots, relevant parts, texture notes, and construction takeaways.
+
+### 4. Construction Planner
+
+Produces a blocky implementation recipe before any model edits:
+
+- Target model bounds and origin.
+- Texture size and UV density target.
+- Cube and plane inventory.
+- Part hierarchy and pivots.
+- Layering and connectivity.
+- Symmetry and mirroring strategy.
+- Which details are geometry versus painted texture.
+- Material palette plan.
+- Relevant official references for each major decision.
+
+The plan should be specific enough that a human could build the asset in Blockbench from the document alone.
+
+### 5. Geometry and Texture Generator
+
+Creates or revises `.blockymodel` and `.png` files from the construction plan. It should enforce:
+
+- Hytale-compatible `.blockymodel` syntax.
+- Cube and plane geometry only when required by the target format.
+- No accidental UV stretching.
+- Consistent texel density.
+- Connected geometry unless floating parts are intentional.
+- Pivots and hierarchy appropriate to the model family.
+- Texture palettes and shading patterns derived from official references.
+
+The generator should support both first-pass creation and targeted patching from evaluator feedback.
+
+### 6. Blockbench MCP Workspace
+
+Uses Blockbench as the interactive editing and inspection layer:
+
+- Load generated models and textures.
+- Apply targeted geometry and UV edits.
+- Inspect hierarchy, pivots, and face mappings.
+- Produce standard screenshots.
+- Let the user visually inspect and guide revisions.
+
+The MCP workflow should be treated as a reliable authoring surface, not only a last-mile export tool.
+
+### 7. Renderer and Comparator
+
+Produces repeatable views for official references and generated models:
+
+- Front.
+- Back.
+- Left.
+- Right.
+- Top.
+- Bottom.
+- Isometric.
+- Optional in-hand, inventory, or entity-attached context renders when relevant.
+
+The comparator should evaluate the generated model against both the concept and the official reference pack.
+
+### 8. Evaluator and Critic
+
+Turns render and metadata comparisons into concrete revision instructions. It should identify:
+
+- Silhouette mismatch.
+- Proportion mismatch.
+- Texture density problems.
+- Palette and material mismatches.
+- Floating pieces.
+- Bad pivots or hierarchy.
+- Overly thin straps, limbs, handles, or ornaments.
+- Under-modeled details that should be geometry.
+- Over-modeled details that should be texture.
+- Low inventory readability.
+
+Feedback must point to specific parts, faces, views, or texture regions whenever possible.
+
+### 9. Learning Store
+
+Saves generation attempts and reviewer outcomes:
+
+- Prompt or concept input.
+- Reference pack.
+- Construction plan.
+- Generated model and texture versions.
+- Renders.
+- Evaluator findings.
+- User feedback.
+- Accepted fixes.
+- Rejected attempts and failure reasons.
+
+This is not necessarily model training at first. It is a structured memory that makes future authoring sessions less likely to repeat the same mistakes.
+
+### 10. Benchmark Suite
+
+Maintains challenge prompts and expected quality gates across all asset families:
+
+- Inventory item.
+- Held weapon.
+- Resource material.
+- Block prop.
+- Decorative block set piece.
+- NPC body.
+- Creature attachment.
+- Player cosmetic.
+- Vehicle or deployable.
+- Projectile or VFX model.
+- Animation-aware rig or attachment.
+
+Benchmarks should include official references, concept inputs where useful, expected constraints, and standard rendered comparisons.
+
+### 11. Asset Packager
+
+Validates and places finished assets into a mod-ready layout:
+
+- `.blockymodel` and texture path conventions.
+- Item, block, entity, attachment, or cosmetic asset references.
+- Icon or inventory render where applicable.
+- Schema validation.
+- Texture size and power/multiple constraints.
+- Regression tests or asset-load checks where available.
+
+This subsystem should prevent a polished model from failing because of naming, path, schema, or packaging mistakes.
+
+## End-to-End Flow
+
+The final workflow should be:
+
+```text
+Concept or brief
+  -> concept understanding
+  -> official reference retrieval
+  -> construction plan
+  -> geometry and texture generation
+  -> Blockbench MCP inspection
+  -> standard renders
+  -> concept/reference comparison
+  -> evaluator feedback
+  -> targeted revision loop
+  -> benchmark and quality gates
+  -> asset packaging
+```
+
+The critical discipline is that generation does not begin until the system has a reference pack and construction plan. This is the main process change intended to avoid technically valid but visually poor outputs.
 
 ## Research Baseline
 
@@ -112,7 +318,7 @@ Primary sources: `Common/VFX`, `Common/Blocks/Icons`, projectile visuals, icon r
 
 This family should stay separate because these assets may optimize for icon readability, VFX readability, or one-off presentation instead of normal in-world model behavior.
 
-## Corpus Architecture
+## Official Corpus Subsystem
 
 The corpus should be built as one ingestion pipeline with two primary outputs:
 
@@ -358,7 +564,7 @@ One record per derived or evaluated issue.
 
 ## Model-Making Workflow
 
-The corpus should make future Hytale model production follow a fixed loop.
+The complete authoring system should make future Hytale model production follow a fixed loop.
 
 ### 1. Input Analysis
 
@@ -435,7 +641,7 @@ Apply the evaluator's concrete edits, rerender, and repeat until the model passe
 
 ## Quality Checks
 
-The first evaluator should include rule-based checks before any learned scoring exists.
+The first evaluator should include rule-based checks before any learned scoring exists. Later evaluators can add image similarity, learned style scoring, and benchmark-specific scoring, but rule-based checks remain necessary because they catch concrete Hytale asset defects.
 
 Required checks:
 
@@ -456,7 +662,7 @@ The checks should produce actionable messages and point to parts or faces where 
 
 ## Storage and Outputs
 
-The implementation should keep the official release read-only and write derived corpus data under a local tooling location chosen during implementation planning.
+The implementation should keep the official release read-only and write derived corpus data under a local tooling location chosen during implementation planning. Generated models, renders, evaluator reports, benchmark results, and packaged assets should be stored separately from the official corpus so provenance stays clear.
 
 Expected output formats:
 
@@ -464,33 +670,117 @@ Expected output formats:
 - JSONL exports for future training and evaluation.
 - Render images for standard views.
 - Human-readable reports for selected reference sets and generated assets.
+- Construction plans for generated assets.
+- Iteration histories for attempts, feedback, and accepted revisions.
+- Mod-ready asset packages or patch sets when the asset is finalized.
 
 The exact storage backend should be chosen in the implementation plan. SQLite is a strong default because it supports structured queries, versioned derived data, and local portability without requiring a service.
 
 ## Success Criteria
 
-The corpus is successful when it can materially improve a future model session. For a new concept-art-driven item, the system should be able to:
+The end-state system is successful when it can take concept art or a text brief through a repeatable path to a Hytale-compatible asset that passes visual, technical, and packaging checks.
 
+For a new concept-art-driven item, the system should be able to:
+
+- Analyze the concept into parts, materials, proportions, and required views.
 - Identify the closest official visual and semantic references.
 - Explain which official construction patterns apply.
 - Produce a concrete model construction plan before Blockbench editing begins.
+- Generate or revise `.blockymodel` and `.png` files from that plan.
+- Use Blockbench MCP to inspect, edit, and render the result.
 - Flag stretched UVs and inconsistent texel density.
 - Compare standard renders against the concept and references.
 - Produce specific revision instructions.
+- Save accepted fixes and rejected attempts into the learning store.
+- Package the finished asset into the mod layout with valid references.
 - Preserve provenance back to the official Hytale version and source files.
 
-## Implementation Notes for the Later Plan
+## Delivery Phases
 
-The implementation should likely be decomposed into small packages or scripts:
+The implementation plan should preserve the end-state architecture but deliver it in vertical slices.
+
+### Phase 1: Official Corpus Vertical Slice
+
+Build the source-backed foundation:
 
 - Official asset scanner.
 - `.blockymodel` parser.
 - Texture profiler.
 - `Server/Models` semantic parser.
 - Usage graph builder.
-- Reference-set generator.
-- Renderer integration.
-- Quality checker.
-- Query/report interface.
+- Basic reference-set generator.
+- First UV/stretch quality report.
+- Query/report interface for official examples.
 
-The implementation plan should start with a minimal vertical slice: scan official assets, parse a small set of `.blockymodel` files, connect them to textures, emit geometry and UV facts, and run a first UV/stretch quality report. Rendering and learned evaluation can follow once the base corpus is trustworthy.
+This phase should prove that official assets can be parsed into useful geometry, UV, texture, and semantic facts.
+
+### Phase 2: Render and Visual Reference Pack
+
+Add repeatable renders and reference packs:
+
+- Standard renders for selected official examples.
+- Reference-pack generation by query.
+- Compact visual reports with paths, screenshots, and construction takeaways.
+- Basic silhouette and proportion metrics.
+
+This phase should make official references easy to inspect before model generation begins.
+
+### Phase 3: Construction Planner
+
+Add planning from concept or brief:
+
+- Concept/brief analysis schema.
+- Official reference selection for each major part.
+- Cube/plane construction recipe.
+- Texture size and palette plan.
+- Human-readable plan output.
+
+This phase should force the reference-first, plan-before-generation workflow.
+
+### Phase 4: Generator and Blockbench Loop
+
+Add model creation and interactive inspection:
+
+- First-pass `.blockymodel` and texture generation from a construction plan.
+- Blockbench MCP load/edit/render workflow.
+- Targeted patching from evaluator instructions.
+- Standard render export for generated assets.
+
+This phase should make the system capable of producing and revising real assets.
+
+### Phase 5: Evaluator, Learning Store, and Benchmarks
+
+Add the critic and memory layer:
+
+- Rule-based Hytale quality checks.
+- Concept/reference render comparison.
+- Specific revision suggestions.
+- Attempt history and accepted/rejected feedback storage.
+- Benchmark suite across model families.
+
+This phase should make quality improvement measurable and repeatable.
+
+### Phase 6: Packaging and Mod Integration
+
+Add final asset readiness:
+
+- Mod layout placement.
+- Asset reference generation.
+- Icon or inventory render handling.
+- Schema validation.
+- Asset-load or regression checks where available.
+- Final package/report output.
+
+This phase should turn a polished generated model into something that can be used in Tamework without manual wiring mistakes.
+
+## Implementation Notes for the Later Plan
+
+The first implementation plan should still start with Phase 1, because every later subsystem depends on trustworthy official parsing and metadata. The plan should avoid building a generator before the corpus can answer basic questions such as:
+
+- Which official assets are the closest references?
+- What texture size and UV density do they use?
+- How thick are comparable straps, handles, limbs, ornaments, and trim pieces?
+- Which details are modeled versus painted?
+- Which defects can be detected automatically?
+
+Rendering, generation, learned evaluation, and packaging should follow once the base corpus is reliable.
