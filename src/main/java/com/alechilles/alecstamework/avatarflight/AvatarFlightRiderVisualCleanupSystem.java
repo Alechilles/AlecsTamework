@@ -52,6 +52,9 @@ public final class AvatarFlightRiderVisualCleanupSystem extends EntityTickingSys
                                     @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Ref<EntityStore> riderRef = AvatarFlightRiderVisualService.resolveRiderRef(commandBuffer.getStore(), visual);
         AvatarFlightComponent flight = commandBuffer.getComponent(ownerRef, flightType);
+        if (flight != null && visual.getRiderEntityUuid().isBlank()) {
+            return;
+        }
         if (flight != null && riderRef != null && riderRef.isValid()) {
             return;
         }

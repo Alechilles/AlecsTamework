@@ -36,6 +36,8 @@ class AvatarFlightRiderVisualCleanupSystemArchitectureTest {
         assertTrue(source.contains("cleanupOwnerMarker("));
         assertTrue(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
         assertTrue(source.contains("resolveOwnerRef("));
+        assertTrue(source.contains("flight != null && visual.getRiderEntityUuid().isBlank()"),
+                "owner-only visual markers must survive while avatar flight is active and fake rider visuals are disabled");
     }
 
     @Test
