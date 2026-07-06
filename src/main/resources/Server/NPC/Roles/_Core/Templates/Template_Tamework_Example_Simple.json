@@ -173,10 +173,6 @@
       "MaxClimbHeight": {
         "Compute": "ClimbHeight"
       }
-    },
-    {
-      "$Comment": "Legacy compatibility entry; current native mounted glide does not require this motion controller.",
-      "Type": "TameworkMountedGlide"
     }
   ],
   "MaxHealth": {
@@ -223,16 +219,6 @@
     }
   ],
   "Instructions": [
-    {
-      "$Comment": "Legacy compatibility body motion entry; current native mounted glide uses rider velocity instead of NPC body motion.",
-      "Sensor": {
-        "Type": "State",
-        "State": "Ridden"
-      },
-      "BodyMotion": {
-        "Type": "TameworkMountedGlide"
-      }
-    },
     {
       "$Comment": "Bridge command-item move hooks into NPC movement.",
       "Continue": true,

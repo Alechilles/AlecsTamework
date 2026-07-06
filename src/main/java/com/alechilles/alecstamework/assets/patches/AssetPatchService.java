@@ -217,7 +217,7 @@ public final class AssetPatchService {
         AssetPatchTargetResolver.TargetSource source =
                 targetResolver.resolve(assetModule.getAssetPacks(), generatedPackId, target);
         if (source == null) {
-            status.addFailed("No source asset found for target " + target + ".");
+            status.addSkipped("No source asset found for target " + target + ".");
             return;
         }
         try {
