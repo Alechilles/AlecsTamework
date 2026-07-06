@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
+import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -43,6 +44,7 @@ public enum TwConfigFamily {
     BREEDING("breeding", "Breeding", "Tamework/Breeding", true, true),
     ATTACHMENT_MIGRATION("attachment-migration", "Attachment Migrations", "Tamework/AttachmentMigrations", true, true),
     ATTACHMENT_DISPLAY("attachment-display", "Attachment Displays", "Tamework/AttachmentDisplays", true, true),
+    DYNAMIC_ATTACHMENTS("dynamic-attachments", "Dynamic Attachments", "Tamework/DynamicAttachments", true, true),
     LEVELING("leveling", "Leveling", "Tamework/Leveling", true, true),
     TRAIT("trait", "Traits", "Tamework/Traits", true, true),
     TALENT("talent", "Talents", "Tamework/Talents", true, true),
@@ -144,6 +146,8 @@ public enum TwConfigFamily {
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentMigrationConfig.getAssetStore();
             case ATTACHMENT_DISPLAY ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentDisplayConfig.getAssetStore();
+            case DYNAMIC_ATTACHMENTS ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwDynamicAttachmentsConfig.getAssetStore();
             case LEVELING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwLevelingConfig.getAssetStore();
             case TRAIT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTraitConfig.getAssetStore();
             case TALENT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTalentConfig.getAssetStore();

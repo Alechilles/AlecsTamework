@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -76,6 +77,24 @@ class TwConfigSchemaAdapterTest {
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "SpanishFemale"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "BrazilianPortugueseMale"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "BrazilianPortugueseFemale"));
+    }
+
+    @Test
+    void dynamicAttachmentsSchemaExposesRulesAndConditionDefaults() {
+        assertEquals("Tamework/DynamicAttachments", TwConfigFamily.DYNAMIC_ATTACHMENTS.getStorePath());
+
+        TwConfigAssetDescriptor descriptor =
+                descriptor(TwConfigFamily.DYNAMIC_ATTACHMENTS, "TwDynamicAttachments_Default");
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields = TwConfigSchemaAdapter.fieldsFor(descriptor);
+
+        assertFalse(fields.isEmpty());
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "RoleIds"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "Rules"));
+        TwConfigEditorFieldPolicy.EditorFieldSpec ignoreCase =
+                TwConfigEditorFieldPolicy.findField(fields, "Rules.Conditions.IgnoreCase");
+        assertNotNull(ignoreCase);
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.BOOLEAN, ignoreCase.type());
     }
 
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family, String assetId) {

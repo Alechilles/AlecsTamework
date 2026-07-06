@@ -17,6 +17,7 @@ public enum TameworkConfigFamily {
     BREEDING,
     ATTACHMENT_MIGRATION,
     ATTACHMENT_DISPLAY,
+    DYNAMIC_ATTACHMENTS,
     LEVELING,
     TRAIT,
     TALENT,

@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
+import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -152,6 +153,7 @@ final class TwConfigSchemaAdapter {
             case BREEDING -> TwBreedingConfig.CODEC;
             case ATTACHMENT_MIGRATION -> TwAttachmentMigrationConfig.CODEC;
             case ATTACHMENT_DISPLAY -> TwAttachmentDisplayConfig.CODEC;
+            case DYNAMIC_ATTACHMENTS -> TwDynamicAttachmentsConfig.CODEC;
             case LEVELING -> TwLevelingConfig.CODEC;
             case TRAIT -> TwTraitConfig.CODEC;
             case TALENT -> TwTalentConfig.CODEC;
@@ -299,6 +301,29 @@ final class TwConfigSchemaAdapter {
                 ));
                 continue;
             }
+            if (resolved instanceof ArraySchema arraySchema) {
+                out.add(newField(
+                        path,
+                        label,
+                        currentSection,
+                        TwConfigEditorFieldPolicy.EditorFieldType.HANDOFF,
+                        false,
+                        true,
+                        false,
+                        List.of(),
+                        tooltip,
+                        depth
+                ));
+                collectArrayObjectFields(
+                        arraySchema,
+                        path,
+                        currentSection,
+                        depth + 1,
+                        definitions,
+                        out
+                );
+                continue;
+            }
             if (resolved instanceof ObjectSchema resolvedObjectSchema) {
                 Map<String, Schema> nestedProperties = resolvedObjectSchema.getProperties();
                 if (nestedProperties != null && !nestedProperties.isEmpty()) {
@@ -330,6 +355,36 @@ final class TwConfigSchemaAdapter {
                     tooltip,
                     depth
             ));
+        }
+    }
+
+    private static void collectArrayObjectFields(@Nonnull ArraySchema arraySchema,
+                                                 @Nonnull String path,
+                                                 @Nonnull String section,
+                                                 int depth,
+                                                 @Nonnull Map<String, Schema> definitions,
+                                                 @Nonnull List<TwConfigEditorFieldPolicy.EditorFieldSpec> out) {
+        if (depth > MAX_RECURSION_DEPTH || hasCompositeSchema(arraySchema)) {
+            return;
+        }
+        Object items = arraySchema.getItems();
+        if (!(items instanceof Schema itemSchema)) {
+            return;
+        }
+        Schema resolvedItem = unwrapCompositeSchema(
+                resolveSchema(itemSchema, definitions, new HashSet<>()),
+                definitions,
+                new HashSet<>()
+        );
+        if (resolvedItem instanceof ObjectSchema objectSchema) {
+            collectObjectFields(
+                    objectSchema,
+                    path,
+                    section,
+                    depth,
+                    definitions,
+                    out
+            );
         }
     }
 
