@@ -71,7 +71,8 @@ class AvatarFlightRiderEquipmentArchitectureTest {
         assertTrue(source.contains("Item.getAssetMap().getAsset(itemId)"));
         assertTrue(source.contains("item.getModel()"));
         assertTrue(source.contains("item.getTexture()"));
-        assertTrue(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
+        assertTrue(source.contains("AvatarFlightEquipmentModelVariantService.resolveForRider(model)"));
+        assertFalse(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
     }
 
     @Test

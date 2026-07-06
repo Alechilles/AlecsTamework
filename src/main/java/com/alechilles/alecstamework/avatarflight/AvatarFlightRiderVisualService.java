@@ -24,8 +24,6 @@ public final class AvatarFlightRiderVisualService {
     private static final String PLAYER_MODEL = "Characters/Player.blockymodel";
     private static final String PLAYER_MOUNT_ANCHOR_MODEL =
             "Tamework/AvatarFlight/Rider/Player_MountAnchor.blockymodel";
-    private static final String PLAYER_ARMOR_ANCHOR_MODEL =
-            "Tamework/AvatarFlight/Rider/Player_MountAnchor_ArmorAnchors.blockymodel";
 
     public boolean spawn(@Nonnull Store<EntityStore> store,
                          @Nonnull Ref<EntityStore> ownerRef,
@@ -157,7 +155,6 @@ public final class AvatarFlightRiderVisualService {
             return withBody(
                     skinAppearance.body(),
                     skinAppearance.attachments(),
-                    armorAnchorAttachment(riderModel, texture, equipment.attachments()),
                     equipment.attachments()
             );
         }
@@ -169,14 +166,12 @@ public final class AvatarFlightRiderVisualService {
             return withBody(
                     body,
                     new ModelAttachment[0],
-                    armorAnchorAttachment(riderModel, texture, equipment.attachments()),
                     equipment.attachments()
             );
         }
         return withBody(
                 body,
                 appearanceAttachments,
-                armorAnchorAttachment(riderModel, texture, equipment.attachments()),
                 equipment.attachments()
         );
     }
@@ -184,19 +179,13 @@ public final class AvatarFlightRiderVisualService {
     @Nonnull
     private static ModelAttachment[] withBody(@Nonnull ModelAttachment body,
                                               @Nonnull ModelAttachment[] appearanceAttachments,
-                                              @Nullable ModelAttachment armorAnchorAttachment,
                                               @Nonnull ModelAttachment[] equipmentAttachments) {
-        int anchorCount = armorAnchorAttachment == null ? 0 : 1;
         ModelAttachment[] attachments = new ModelAttachment[
-                appearanceAttachments.length + anchorCount + equipmentAttachments.length + 1
+                appearanceAttachments.length + equipmentAttachments.length + 1
         ];
         attachments[0] = body;
         System.arraycopy(appearanceAttachments, 0, attachments, 1, appearanceAttachments.length);
         int equipmentStart = appearanceAttachments.length + 1;
-        if (armorAnchorAttachment != null) {
-            attachments[equipmentStart] = armorAnchorAttachment;
-            equipmentStart++;
-        }
         System.arraycopy(
                 equipmentAttachments,
                 0,
@@ -205,16 +194,6 @@ public final class AvatarFlightRiderVisualService {
                 equipmentAttachments.length
         );
         return attachments;
-    }
-
-    @Nullable
-    private static ModelAttachment armorAnchorAttachment(@Nonnull String riderModel,
-                                                        @Nonnull String texture,
-                                                        @Nonnull ModelAttachment[] equipmentAttachments) {
-        if (!PLAYER_MOUNT_ANCHOR_MODEL.equals(riderModel) || equipmentAttachments.length == 0) {
-            return null;
-        }
-        return new ModelAttachment(PLAYER_ARMOR_ANCHOR_MODEL, texture, null, null, 1.0);
     }
 
     @Nonnull

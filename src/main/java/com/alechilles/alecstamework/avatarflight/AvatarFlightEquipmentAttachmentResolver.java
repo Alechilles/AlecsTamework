@@ -61,7 +61,13 @@ public final class AvatarFlightEquipmentAttachmentResolver {
         if (model == null || model.isBlank() || texture == null || texture.isBlank()) {
             return;
         }
-        attachments.add(new ModelAttachment(model, texture, null, null, 1.0));
+        attachments.add(new ModelAttachment(
+                AvatarFlightEquipmentModelVariantService.resolveForRider(model),
+                texture,
+                null,
+                null,
+                1.0
+        ));
     }
 
     private static void collectHiddenCosmetics(@Nonnull EnumSet<Cosmetic> hiddenCosmetics,
