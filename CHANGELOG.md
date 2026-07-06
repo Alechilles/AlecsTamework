@@ -42,6 +42,7 @@
 - Anchored the experimental avatar-flight fake rider model through a Tamework `MountAnchor` player-model wrapper instead of attaching the vanilla player model directly.
 - Adjusted the experimental avatar-flight fake rider wrapper so the player model attaches from the hips and uses a basic seated leg pose.
 - Improved experimental avatar-flight fake rider visuals by carrying over the saved player model's appearance attachments for face, hair, and clothing tests.
+- Expanded experimental avatar-flight fake rider appearance matching by resolving the player's skin cosmetics into rider attachments for hair, clothing, accessories, and selected facial parts.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.

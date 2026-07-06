@@ -17,6 +17,10 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "avatarflight", "AvatarFlightActivator.java"
     );
+    private static final Path SKIN_RESOLVER = Path.of(
+            "src", "main", "java", "com", "alechilles", "alecstamework",
+            "avatarflight", "AvatarFlightPlayerSkinAttachmentResolver.java"
+    );
 
     @Test
     void riderVisualServiceUsesModelAttachmentInsteadOfNativeMount() throws Exception {
@@ -28,6 +32,8 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("savedModel.getModel()"));
         assertTrue(source.contains("savedModel.getTexture()"));
         assertTrue(source.contains("savedModel.getAttachments()"));
+        assertTrue(source.contains("PlayerSkinComponent"));
+        assertTrue(source.contains("AvatarFlightPlayerSkinAttachmentResolver.resolve("));
         assertTrue(source.contains("appearanceAttachments"));
         assertTrue(source.contains("System.arraycopy(appearanceAttachments, 0, attachments, 1"));
         assertTrue(source.contains("System.arraycopy(riderAttachments, 0, attachments, baseCount"));
@@ -39,6 +45,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("riderAttachmentModel(model)"));
         assertTrue(source.contains("attachmentModel=%s riderTexture=%s"));
         assertTrue(source.contains("riderAppearanceAttachmentCount=%s"));
+        assertTrue(source.contains("riderSkinAttachmentCount=%s"));
         assertFalse(source.contains("config.getDebug().isLogControllerTicks()"));
         assertTrue(source.contains("Arrays.copyOf("));
         assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
@@ -80,5 +87,28 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("riderVisualService.remove("));
         assertTrue(source.indexOf("modelService.apply(") < source.indexOf("riderVisualService.spawn("));
         assertTrue(source.indexOf("riderVisualService.remove(") < source.indexOf("modelService.restore("));
+    }
+
+    @Test
+    void playerSkinAttachmentResolverExpandsCosmeticSlots() throws Exception {
+        String source = Files.readString(SKIN_RESOLVER, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("registry.getHaircuts()"));
+        assertTrue(source.contains("registry.getPants()"));
+        assertTrue(source.contains("registry.getOverpants()"));
+        assertTrue(source.contains("registry.getUndertops()"));
+        assertTrue(source.contains("registry.getOvertops()"));
+        assertTrue(source.contains("registry.getShoes()"));
+        assertTrue(source.contains("registry.getGloves()"));
+        assertTrue(source.contains("registry.getHeadAccessories()"));
+        assertTrue(source.contains("registry.getFaceAccessories()"));
+        assertTrue(source.contains("registry.getEarAccessories()"));
+        assertTrue(source.contains("registry.getCapes()"));
+        assertTrue(source.contains("PlayerSkinPartTexture"));
+        assertTrue(source.contains("part.getGreyscaleTexture()"));
+        assertTrue(source.contains("part.getGradientSet()"));
+        assertTrue(source.contains("variant.getTextures()"));
+        assertTrue(source.contains("new ModelAttachment("));
+        assertTrue(source.contains("Generic\" + hairPart.getHairType()"));
     }
 }
