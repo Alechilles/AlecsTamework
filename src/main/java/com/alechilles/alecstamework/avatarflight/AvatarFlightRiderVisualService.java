@@ -88,15 +88,16 @@ public final class AvatarFlightRiderVisualService {
     @Nullable
     private static Model modelWithRiderAttachment(@Nonnull Model baseModel,
                                                  @Nonnull Model savedModel) {
-        ModelAttachment riderAttachment = riderAttachment(savedModel);
-        if (riderAttachment == null) {
+        ModelAttachment[] riderAttachments = riderAttachments(savedModel);
+        if (riderAttachments == null) {
             return null;
         }
         ModelAttachment[] baseAttachments = baseModel.getAttachments();
+        int baseCount = baseAttachments == null ? 0 : baseAttachments.length;
         ModelAttachment[] attachments = baseAttachments == null
-                ? new ModelAttachment[1]
-                : Arrays.copyOf(baseAttachments, baseAttachments.length + 1);
-        attachments[attachments.length - 1] = riderAttachment;
+                ? new ModelAttachment[riderAttachments.length]
+                : Arrays.copyOf(baseAttachments, baseCount + riderAttachments.length);
+        System.arraycopy(riderAttachments, 0, attachments, baseCount, riderAttachments.length);
         return new Model(
                 baseModel.getModelAssetId(),
                 baseModel.getScale(),
@@ -124,19 +125,27 @@ public final class AvatarFlightRiderVisualService {
     }
 
     @Nullable
-    private static ModelAttachment riderAttachment(@Nonnull Model savedModel) {
+    private static ModelAttachment[] riderAttachments(@Nonnull Model savedModel) {
         String model = savedModel.getModel();
         String texture = savedModel.getTexture();
         if (model == null || model.isBlank() || texture == null || texture.isBlank()) {
             return null;
         }
-        return new ModelAttachment(
+        ModelAttachment body = new ModelAttachment(
                 riderAttachmentModel(model),
                 texture,
                 savedModel.getGradientSet(),
                 savedModel.getGradientId(),
                 1.0
         );
+        ModelAttachment[] appearanceAttachments = savedModel.getAttachments();
+        if (appearanceAttachments == null || appearanceAttachments.length == 0) {
+            return new ModelAttachment[]{body};
+        }
+        ModelAttachment[] attachments = new ModelAttachment[appearanceAttachments.length + 1];
+        attachments[0] = body;
+        System.arraycopy(appearanceAttachments, 0, attachments, 1, appearanceAttachments.length);
+        return attachments;
     }
 
     @Nonnull
@@ -155,14 +164,16 @@ public final class AvatarFlightRiderVisualService {
         }
         instance.getLogger().at(Level.INFO).log(String.format(
                 "TameworkAvatarFlight debug: riderAttachment baseModelAsset=%s riderModelAsset=%s "
-                        + "riderModel=%s attachmentModel=%s riderTexture=%s riderGradientSet=%s riderGradientId=%s",
+                        + "riderModel=%s attachmentModel=%s riderTexture=%s riderGradientSet=%s riderGradientId=%s "
+                        + "riderAppearanceAttachmentCount=%s",
                 baseModel.getModelAssetId(),
                 savedModel.getModelAssetId(),
                 savedModel.getModel(),
                 riderAttachmentModel(savedModel.getModel()),
                 savedModel.getTexture(),
                 savedModel.getGradientSet(),
-                savedModel.getGradientId()
+                savedModel.getGradientId(),
+                savedModel.getAttachments() == null ? 0 : savedModel.getAttachments().length
         ));
     }
 

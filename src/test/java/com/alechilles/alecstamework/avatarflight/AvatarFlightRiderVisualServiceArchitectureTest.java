@@ -27,6 +27,10 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("new ModelAttachment("));
         assertTrue(source.contains("savedModel.getModel()"));
         assertTrue(source.contains("savedModel.getTexture()"));
+        assertTrue(source.contains("savedModel.getAttachments()"));
+        assertTrue(source.contains("appearanceAttachments"));
+        assertTrue(source.contains("System.arraycopy(appearanceAttachments, 0, attachments, 1"));
+        assertTrue(source.contains("System.arraycopy(riderAttachments, 0, attachments, baseCount"));
         assertFalse(source.contains("RIDER_PROXY_MODEL"));
         assertFalse(source.contains("RIDER_PROXY_TEXTURE"));
         assertTrue(source.contains("logRiderAttachment("));
@@ -34,6 +38,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("PLAYER_MOUNT_ANCHOR_MODEL"));
         assertTrue(source.contains("riderAttachmentModel(model)"));
         assertTrue(source.contains("attachmentModel=%s riderTexture=%s"));
+        assertTrue(source.contains("riderAppearanceAttachmentCount=%s"));
         assertFalse(source.contains("config.getDebug().isLogControllerTicks()"));
         assertTrue(source.contains("Arrays.copyOf("));
         assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
