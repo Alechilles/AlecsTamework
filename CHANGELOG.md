@@ -45,6 +45,7 @@
 - Added an experimental avatar-flight fake rider equipment snapshot that tries to mirror currently visible hand and armor items as rider model attachments.
 - Fixed experimental avatar-flight fake rider equipment snapshots to honor armor cosmetic hiding, so helmets, chest pieces, gloves, leggings, and boots can hide the same hair, accessories, and clothing slots they hide on normal players.
 - Fixed avatar-flight held items floating on the transformed dragon by excluding hand items from the fake rider model-attachment snapshot until hand equipment can be anchored correctly.
+- Isolated the experimental avatar-flight fake rider body skeleton from dragon flight and pitch/bank animation tracks, while preserving the rider head node for look tracking.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.

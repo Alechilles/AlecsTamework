@@ -73,10 +73,17 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
 
         assertTrue(json.contains("\"name\": \"MountAnchor\""));
         assertTrue(json.contains("\"isPiece\": true"));
-        assertTrue(json.contains("\"name\": \"Origin\""));
+        assertTrue(json.contains("\"name\": \"TameworkRider_Origin\""));
         assertTrue(json.contains("\"name\": \"R-Attachment\""));
         assertTrue(json.contains("\"name\": \"L-Attachment\""));
-        int pelvis = json.indexOf("\"name\": \"Pelvis\"");
+        assertTrue(json.contains("\"name\": \"Head\""),
+                "the fake rider should keep the standard head node so player look tracking can still affect it");
+        assertFalse(json.contains("\"name\": \"Origin\""));
+        assertFalse(json.contains("\"name\": \"Pelvis\""));
+        assertFalse(json.contains("\"name\": \"Chest\""));
+        assertFalse(json.contains("\"name\": \"L-Thigh\""));
+        assertFalse(json.contains("\"name\": \"R-Thigh\""));
+        int pelvis = json.indexOf("\"name\": \"TameworkRider_Pelvis\"");
         int pelvisOrientation = json.indexOf("\"orientation\"", pelvis);
         assertTrue(pelvis >= 0);
         assertTrue(json.indexOf("\"y\": 0", pelvis) < pelvisOrientation);
