@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -11,6 +12,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -35,7 +37,7 @@ public final class AvatarFlightRiderVisualService {
             return false;
         }
 
-        return appendRiderAttachment(store, ownerRef, savedModel);
+        return appendRiderAttachment(store, ownerRef, savedModel, config);
     }
 
     public void remove(@Nonnull Store<EntityStore> store,
@@ -58,7 +60,8 @@ public final class AvatarFlightRiderVisualService {
 
     private static boolean appendRiderAttachment(@Nonnull Store<EntityStore> store,
                                                  @Nonnull Ref<EntityStore> ownerRef,
-                                                 @Nonnull Model savedModel) {
+                                                 @Nonnull Model savedModel,
+                                                 @Nonnull TwAvatarFlightConfig config) {
         ModelComponent component = store.getComponent(ownerRef, ModelComponent.getComponentType());
         if (component == null || component.getModel() == null) {
             return false;
@@ -68,6 +71,7 @@ public final class AvatarFlightRiderVisualService {
             return false;
         }
         store.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
+        logRiderAttachment(component.getModel(), savedModel, config);
         return true;
     }
 
@@ -123,6 +127,28 @@ public final class AvatarFlightRiderVisualService {
                 savedModel.getGradientId(),
                 1.0
         );
+    }
+
+    private static void logRiderAttachment(@Nonnull Model baseModel,
+                                           @Nonnull Model savedModel,
+                                           @Nonnull TwAvatarFlightConfig config) {
+        if (!config.getDebug().isLogControllerTicks() && !config.getDebug().isLogInputTransitions()) {
+            return;
+        }
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(String.format(
+                "TameworkAvatarFlight debug: riderAttachment baseModelAsset=%s riderModelAsset=%s "
+                        + "riderModel=%s riderTexture=%s riderGradientSet=%s riderGradientId=%s",
+                baseModel.getModelAssetId(),
+                savedModel.getModelAssetId(),
+                savedModel.getModel(),
+                savedModel.getTexture(),
+                savedModel.getGradientSet(),
+                savedModel.getGradientId()
+        ));
     }
 
     @Nullable

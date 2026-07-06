@@ -29,6 +29,9 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("savedModel.getTexture()"));
         assertFalse(source.contains("RIDER_PROXY_MODEL"));
         assertFalse(source.contains("RIDER_PROXY_TEXTURE"));
+        assertTrue(source.contains("logRiderAttachment("));
+        assertTrue(source.contains("riderModel=%s riderTexture=%s"));
+        assertTrue(source.contains("config.getDebug().isLogControllerTicks()"));
         assertTrue(source.contains("Arrays.copyOf("));
         assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
         assertFalse(source.contains("new MountedComponent("));
