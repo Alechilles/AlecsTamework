@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,16 +32,15 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     }
 
     @Test
-    void equipmentSystemMirrorsRealOwnerEquipmentToRiderEntity() throws Exception {
+    void equipmentSystemDoesNotMirrorEquipmentToAttachmentBasedRiderEntity() throws Exception {
         String source = Files.readString(EQUIPMENT_SYSTEM, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("AvatarFlightRiderVisualComponent"));
         assertTrue(source.contains("riderVisualType"));
-        assertTrue(source.contains("queueRiderEquipmentUpdate("));
-        assertTrue(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
+        assertFalse(source.contains("queueRiderEquipmentUpdate("));
+        assertFalse(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
         assertTrue(source.contains("getEquipmentResendIntervalMs()"));
         assertTrue(source.contains("commandBuffer.putComponent("));
-        assertTrue(source.contains("createCurrentEquipmentUpdate(ref, accessor)"));
     }
 
     @Test

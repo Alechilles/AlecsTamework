@@ -19,20 +19,18 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
     );
 
     @Test
-    void riderVisualServiceCreatesNonSerializedMountedModelEntity() throws Exception {
+    void riderVisualServiceUsesModelAttachmentInsteadOfNativeMount() throws Exception {
         String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false))"));
-        assertTrue(source.contains("new NonSerialized()"));
-        assertTrue(source.contains("new NetworkId("));
-        assertTrue(source.contains("Model riderModel = new Model(savedModel)"));
-        assertTrue(source.contains("new ModelComponent(riderModel)"));
-        assertTrue(source.contains("new PersistentModel(riderModel.toReference())"));
-        assertTrue(source.contains("new BoundingBox(riderModel.getBoundingBox())"));
-        assertTrue(source.contains("EntityModule.get().getVisibleComponentType()"));
-        assertTrue(source.contains("new MountedComponent(ownerRef"));
-        assertTrue(source.contains("MountController.BlockMount"));
-        assertTrue(source.contains("AddReason.SPAWN"));
+        assertTrue(source.contains("appendRiderAttachment("));
+        assertTrue(source.contains("new ModelAttachment("));
+        assertTrue(source.contains("Arrays.copyOf("));
+        assertTrue(source.contains("store.putComponent(ownerRef, ModelComponent.getComponentType()"));
+        assertFalse(source.contains("new MountedComponent("));
+        assertFalse(source.contains("MountController.BlockMount"));
+        assertFalse(source.contains("AddReason.SPAWN"));
+        assertFalse(source.contains("new NetworkId("));
         assertTrue(source.contains("RemoveReason.REMOVE"));
         assertFalse(source.contains("PlayerRef.getComponent(Player"));
     }

@@ -1,32 +1,21 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
-import com.hypixel.hytale.builtin.mounts.MountedComponent;
-import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.ComponentType;
-import com.hypixel.hytale.component.Holder;
-import com.hypixel.hytale.component.NonSerialized;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Rotation3f;
-import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
-import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import com.hypixel.hytale.server.core.modules.entity.EntityModule;
-import com.hypixel.hytale.server.core.modules.entity.component.BoundingBox;
-import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
+import com.hypixel.hytale.server.core.asset.type.model.config.ModelAttachment;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.PersistentModel;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Arrays;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Creates and removes the visual-only saved-player model that rides the transformed player.
+ * Applies and removes avatar-flight rider visuals from the transformed player model.
  */
 public final class AvatarFlightRiderVisualService {
     public boolean spawn(@Nonnull Store<EntityStore> store,
@@ -46,41 +35,7 @@ public final class AvatarFlightRiderVisualService {
             return false;
         }
 
-        TransformComponent ownerTransform = store.getComponent(ownerRef, TransformComponent.getComponentType());
-        if (ownerTransform == null || ownerTransform.getTransform() == null) {
-            return false;
-        }
-
-        UUIDComponent riderUuid = UUIDComponent.randomUUID();
-        Holder<EntityStore> holder = EntityStore.REGISTRY.newHolder();
-        holder.putComponent(UUIDComponent.getComponentType(), riderUuid);
-        holder.putComponent(
-                NetworkId.getComponentType(),
-                new NetworkId(store.getExternalData().takeNextNetworkId())
-        );
-        holder.putComponent(EntityStore.REGISTRY.getNonSerializedComponentType(), new NonSerialized());
-        holder.putComponent(TransformComponent.getComponentType(), ownerTransform.clone());
-        holder.putComponent(HeadRotation.getComponentType(), new HeadRotation(ownerTransform.getRotation()));
-        Model riderModel = new Model(savedModel);
-        holder.putComponent(ModelComponent.getComponentType(), new ModelComponent(riderModel));
-        holder.putComponent(PersistentModel.getComponentType(), new PersistentModel(riderModel.toReference()));
-        holder.putComponent(BoundingBox.getComponentType(), new BoundingBox(riderModel.getBoundingBox()));
-        holder.ensureComponent(EntityModule.get().getVisibleComponentType());
-        holder.putComponent(MountedComponent.getComponentType(), new MountedComponent(ownerRef,
-                new Rotation3f(
-                        (float) settings.getSeatOffsetX(),
-                        (float) settings.getSeatOffsetY(),
-                        (float) settings.getSeatOffsetZ()
-                ),
-                MountController.BlockMount
-        ));
-        AvatarFlightRiderVisualComponent riderMarker = marker(ownerUuid, riderUuid.getUuid(), true);
-        holder.putComponent(visualType, riderMarker);
-
-        store.addEntity(holder, AddReason.SPAWN);
-        AvatarFlightRiderVisualComponent ownerMarker = marker(ownerUuid, riderUuid.getUuid(), false);
-        store.putComponent(ownerRef, visualType, ownerMarker);
-        return true;
+        return appendRiderAttachment(store, ownerRef, savedModel);
     }
 
     public void remove(@Nonnull Store<EntityStore> store,
@@ -99,6 +54,75 @@ public final class AvatarFlightRiderVisualService {
             store.removeEntity(riderRef, RemoveReason.REMOVE);
         }
         store.tryRemoveComponent(ownerRef, visualType);
+    }
+
+    private static boolean appendRiderAttachment(@Nonnull Store<EntityStore> store,
+                                                 @Nonnull Ref<EntityStore> ownerRef,
+                                                 @Nonnull Model savedModel) {
+        ModelComponent component = store.getComponent(ownerRef, ModelComponent.getComponentType());
+        if (component == null || component.getModel() == null) {
+            return false;
+        }
+        Model withRider = modelWithRiderAttachment(component.getModel(), savedModel);
+        if (withRider == null) {
+            return false;
+        }
+        store.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
+        return true;
+    }
+
+    @Nullable
+    private static Model modelWithRiderAttachment(@Nonnull Model baseModel,
+                                                 @Nonnull Model savedModel) {
+        ModelAttachment riderAttachment = riderAttachment(savedModel);
+        if (riderAttachment == null) {
+            return null;
+        }
+        ModelAttachment[] baseAttachments = baseModel.getAttachments();
+        ModelAttachment[] attachments = baseAttachments == null
+                ? new ModelAttachment[1]
+                : Arrays.copyOf(baseAttachments, baseAttachments.length + 1);
+        attachments[attachments.length - 1] = riderAttachment;
+        return new Model(
+                baseModel.getModelAssetId(),
+                baseModel.getScale(),
+                baseModel.getRandomAttachmentIds(),
+                attachments,
+                baseModel.getBoundingBox(),
+                baseModel.getModel(),
+                baseModel.getTexture(),
+                baseModel.getGradientSet(),
+                baseModel.getGradientId(),
+                baseModel.getEyeHeight(),
+                baseModel.getCrouchOffset(),
+                baseModel.getSittingOffset(),
+                baseModel.getSleepingOffset(),
+                baseModel.getAnimationSetMap(),
+                baseModel.getCamera(),
+                baseModel.getLight(),
+                baseModel.getParticles(),
+                baseModel.getTrails(),
+                baseModel.getPhysicsValues(),
+                baseModel.getDetailBoxes(),
+                baseModel.getPhobia(),
+                baseModel.getPhobiaModelAssetId()
+        );
+    }
+
+    @Nullable
+    private static ModelAttachment riderAttachment(@Nonnull Model savedModel) {
+        String model = savedModel.getModel();
+        String texture = savedModel.getTexture();
+        if (model == null || model.isBlank() || texture == null || texture.isBlank()) {
+            return null;
+        }
+        return new ModelAttachment(
+                model,
+                texture,
+                savedModel.getGradientSet(),
+                savedModel.getGradientId(),
+                1.0
+        );
     }
 
     @Nullable

@@ -56,12 +56,12 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemKeepsFakeRiderPacketsOffOwnerSelfQueue() throws Exception {
+    void visualSystemDoesNotQueueFakeRiderEquipmentPackets() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("private static void queueOthers("));
-        assertTrue(source.contains("sameEntity(ref, entry.getKey())"));
-        assertTrue(source.contains("continue;"));
-        assertTrue(source.contains("private static boolean sameEntity("));
+        assertFalse(source.contains("queueRiderEquipmentUpdate("));
+        assertFalse(source.contains("queueOthers("));
+        assertFalse(source.contains("sameEntity("));
+        assertFalse(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
     }
 }

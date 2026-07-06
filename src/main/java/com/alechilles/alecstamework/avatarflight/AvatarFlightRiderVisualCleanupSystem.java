@@ -14,7 +14,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Removes stale avatar-flight rider visual markers and fake rider entities.
+ * Removes stale avatar-flight rider visual markers and legacy fake rider entities.
  */
 public final class AvatarFlightRiderVisualCleanupSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, AvatarFlightRiderVisualComponent> visualType;

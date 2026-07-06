@@ -62,9 +62,6 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         if (riderVisual != null && settings.isHideOwnerEquipment()) {
             riderVisual = queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings, riderVisual);
         }
-        if (riderVisual != null && settings.isShowRider()) {
-            queueRiderEquipmentUpdate(ref, commandBuffer, riderVisual, settings);
-        }
     }
 
     public static void restoreCurrentEquipment(@Nonnull Ref<EntityStore> ref,
@@ -105,32 +102,6 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
                 () -> queueAll(ref, update, visible.newlyVisibleTo)
         );
         return updated == null ? riderVisual : updated;
-    }
-
-    private void queueRiderEquipmentUpdate(@Nonnull Ref<EntityStore> ref,
-                                           @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                           @Nonnull AvatarFlightRiderVisualComponent riderVisual,
-                                           @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
-        Ref<EntityStore> riderRef = AvatarFlightRiderVisualService.resolveRiderRef(commandBuffer.getStore(), riderVisual);
-        if (riderRef == null || !riderRef.isValid()) {
-            return;
-        }
-        EntityTrackerSystems.Visible riderVisible = commandBuffer.getComponent(riderRef, visibleType);
-        if (riderVisible == null) {
-            return;
-        }
-        EquipmentUpdate update = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, commandBuffer);
-        String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
-        queueIfEquipmentChanged(
-                ref,
-                commandBuffer,
-                riderVisual,
-                "rider",
-                signature,
-                settings.getEquipmentResendIntervalMs(),
-                () -> queueOthers(riderRef, update, riderVisible.visibleTo),
-                () -> queueOthers(riderRef, update, riderVisible.newlyVisibleTo)
-        );
     }
 
     @Nullable
@@ -201,30 +172,12 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         return result.toString();
     }
 
-    private static void queueOthers(@Nonnull Ref<EntityStore> ref,
-                                    @Nonnull EquipmentUpdate update,
-                                    @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
-        for (Map.Entry<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> entry : visibleTo.entrySet()) {
-            if (sameEntity(ref, entry.getKey())) {
-                continue;
-            }
-            EntityTrackerSystems.EntityViewer viewer = entry.getValue();
-            viewer.queueUpdate(ref, update);
-        }
-    }
-
     private static void queueAll(@Nonnull Ref<EntityStore> ref,
                                  @Nonnull EquipmentUpdate update,
                                  @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
         for (EntityTrackerSystems.EntityViewer viewer : visibleTo.values()) {
             viewer.queueUpdate(ref, update);
         }
-    }
-
-    private static boolean sameEntity(@Nonnull Ref<EntityStore> first, @Nullable Ref<EntityStore> second) {
-        return first == second || second != null
-                && first.getStore() == second.getStore()
-                && first.getIndex() == second.getIndex();
     }
 
     @Nullable
