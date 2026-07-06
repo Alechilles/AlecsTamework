@@ -49,11 +49,14 @@ public final class AvatarFlightModelService {
                            @Nonnull Ref<EntityStore> ref,
                            @Nonnull UUID playerUuid) {
         Model savedModel = SAVED_MODELS.remove(playerUuid);
+        PlayerSkinComponent skin = store.getComponent(ref, PlayerSkinComponent.getComponentType());
         if (savedModel != null) {
             store.putComponent(ref, ModelComponent.getComponentType(), new ModelComponent(new Model(savedModel)));
+            if (skin != null) {
+                skin.setNetworkOutdated();
+            }
             return true;
         }
-        PlayerSkinComponent skin = store.getComponent(ref, PlayerSkinComponent.getComponentType());
         if (skin == null) {
             return false;
         }

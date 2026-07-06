@@ -15,10 +15,12 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.protocol.EquipmentUpdate;
 import com.hypixel.hytale.server.core.inventory.InventorySystems;
+import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -27,7 +29,10 @@ import javax.annotation.Nullable;
  */
 public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
+    private final ComponentType<EntityStore, AvatarFlightRiderVisualComponent> visualType;
     private final ComponentType<EntityStore, EntityTrackerSystems.Visible> visibleType;
+    private final AvatarFlightModelService modelService = new AvatarFlightModelService();
+    private final AvatarFlightRiderVisualService riderVisualService = new AvatarFlightRiderVisualService();
     private final Query<EntityStore> query;
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, InventorySystems.SyncEquipmentSystem.class)
@@ -35,8 +40,10 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
 
     public AvatarFlightEquipmentVisualSystem(
             @Nonnull ComponentType<EntityStore, AvatarFlightComponent> flightType,
+            @Nonnull ComponentType<EntityStore, AvatarFlightRiderVisualComponent> visualType,
             @Nonnull ComponentType<EntityStore, EntityTrackerSystems.Visible> visibleType) {
         this.flightType = flightType;
+        this.visualType = visualType;
         this.visibleType = visibleType;
         this.query = Query.and(flightType, visibleType);
     }
@@ -58,6 +65,7 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         if (settings.isHideOwnerEquipment()) {
             queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings);
         }
+        refreshRiderVisualIfNeeded(ref, commandBuffer, settings);
     }
 
     public static void restoreCurrentEquipment(@Nonnull Ref<EntityStore> ref,
@@ -86,6 +94,49 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         );
         queueAll(ref, update, visible.visibleTo);
         queueAll(ref, update, visible.newlyVisibleTo);
+    }
+
+    private void refreshRiderVisualIfNeeded(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
+        if (!settings.isShowRider()) {
+            return;
+        }
+        AvatarFlightRiderVisualComponent visual = commandBuffer.getComponent(ref, visualType);
+        if (visual == null || visual.isRiderEntity()) {
+            return;
+        }
+        AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment =
+                AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ref, commandBuffer);
+        if (equipment.armorSignature().equals(visual.getEquipmentSignature())) {
+            return;
+        }
+        UUID ownerUuid = parseOwnerUuid(visual);
+        if (ownerUuid == null) {
+            return;
+        }
+        Model savedModel = modelService.savedModelCopy(ownerUuid);
+        if (savedModel == null) {
+            return;
+        }
+        if (riderVisualService.refresh(commandBuffer, ref, savedModel, equipment)) {
+            AvatarFlightRiderVisualComponent updated = visual.clone();
+            updated.setEquipmentSignature(equipment.armorSignature());
+            commandBuffer.putComponent(ref, visualType, updated);
+        }
+    }
+
+    @Nullable
+    private static UUID parseOwnerUuid(@Nonnull AvatarFlightRiderVisualComponent visual) {
+        if (visual.getOwnerUuid().isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(visual.getOwnerUuid());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private static void queueAll(@Nonnull Ref<EntityStore> ref,

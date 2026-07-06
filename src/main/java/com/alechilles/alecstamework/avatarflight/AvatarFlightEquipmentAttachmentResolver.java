@@ -41,7 +41,8 @@ public final class AvatarFlightEquipmentAttachmentResolver {
         }
         return new EquipmentSnapshot(
                 attachments.toArray(ModelAttachment[]::new),
-                Collections.unmodifiableSet(hiddenCosmetics)
+                Collections.unmodifiableSet(hiddenCosmetics),
+                armorSignature(update.armorIds)
         );
     }
 
@@ -62,7 +63,7 @@ public final class AvatarFlightEquipmentAttachmentResolver {
             return;
         }
         attachments.add(new ModelAttachment(
-                AvatarFlightEquipmentModelVariantService.resolveForRider(model),
+                AvatarFlightRiderModelVariantService.resolveForRider(model),
                 texture,
                 null,
                 null,
@@ -86,7 +87,25 @@ public final class AvatarFlightEquipmentAttachmentResolver {
         }
     }
 
+    @Nonnull
+    private static String armorSignature(@Nullable String[] armorIds) {
+        if (armorIds == null || armorIds.length == 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < armorIds.length; index++) {
+            if (index > 0) {
+                builder.append(',');
+            }
+            if (armorIds[index] != null) {
+                builder.append(armorIds[index]);
+            }
+        }
+        return builder.toString();
+    }
+
     public record EquipmentSnapshot(@Nonnull ModelAttachment[] attachments,
-                                    @Nonnull Set<Cosmetic> hiddenCosmetics) {
+                                    @Nonnull Set<Cosmetic> hiddenCosmetics,
+                                    @Nonnull String armorSignature) {
     }
 }

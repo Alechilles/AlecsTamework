@@ -45,10 +45,10 @@ class AvatarFlightRiderEquipmentArchitectureTest {
 
         assertFalse(source.contains("queueRiderEquipmentUpdate("));
         assertFalse(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
-        assertFalse(source.contains("AvatarFlightRiderVisualComponent"));
-        assertFalse(source.contains("riderVisualType"));
+        assertTrue(source.contains("AvatarFlightRiderVisualComponent"));
+        assertTrue(source.contains("visualType"));
         assertFalse(source.contains("getEquipmentResendIntervalMs()"));
-        assertFalse(source.contains("commandBuffer.putComponent("));
+        assertTrue(source.contains("commandBuffer.putComponent(ref, visualType, updated)"));
     }
 
     @Test
@@ -71,8 +71,9 @@ class AvatarFlightRiderEquipmentArchitectureTest {
         assertTrue(source.contains("Item.getAssetMap().getAsset(itemId)"));
         assertTrue(source.contains("item.getModel()"));
         assertTrue(source.contains("item.getTexture()"));
-        assertTrue(source.contains("AvatarFlightEquipmentModelVariantService.resolveForRider(model)"));
+        assertTrue(source.contains("AvatarFlightRiderModelVariantService.resolveForRider(model)"));
         assertFalse(source.contains("new ModelAttachment(model, texture, null, null, 1.0)"));
+        assertTrue(source.contains("armorSignature(update.armorIds)"));
     }
 
     @Test
@@ -90,7 +91,7 @@ class AvatarFlightRiderEquipmentArchitectureTest {
 
         assertTrue(source.contains("new AvatarFlightEquipmentVisualSystem("));
         assertTrue(constructor >= 0);
-        assertFalse(source.substring(constructor, source.indexOf(");", constructor))
+        assertTrue(source.substring(constructor, source.indexOf(");", constructor))
                 .contains("avatarFlightRiderVisualComponentType"));
     }
 }

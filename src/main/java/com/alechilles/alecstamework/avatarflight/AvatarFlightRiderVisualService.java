@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
@@ -37,7 +38,9 @@ public final class AvatarFlightRiderVisualService {
             return false;
         }
         remove(store, ownerRef);
-        store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false));
+        AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment =
+                AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ownerRef, store);
+        store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false, equipment.armorSignature()));
         if (!settings.isShowRider()) {
             logRiderAttachmentSkipped("show_rider_disabled", null, null);
             return false;
@@ -48,9 +51,28 @@ public final class AvatarFlightRiderVisualService {
         }
 
         PlayerSkinComponent skin = store.getComponent(ownerRef, PlayerSkinComponent.getComponentType());
-        AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment =
-                AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ownerRef, store);
         return appendRiderAttachment(store, ownerRef, savedModel, skin, equipment);
+    }
+
+    public boolean refresh(@Nonnull CommandBuffer<EntityStore> commandBuffer,
+                           @Nonnull Ref<EntityStore> ownerRef,
+                           @Nonnull Model savedModel,
+                           @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment) {
+        ModelComponent component = commandBuffer.getComponent(ownerRef, ModelComponent.getComponentType());
+        if (component == null || component.getModel() == null) {
+            logRiderAttachmentSkipped("missing_owner_model", null, savedModel);
+            return false;
+        }
+        PlayerSkinComponent skin = commandBuffer.getComponent(ownerRef, PlayerSkinComponent.getComponentType());
+        Model strippedModel = modelWithoutRiderAttachments(component.getModel());
+        Model withRider = modelWithRiderAttachment(strippedModel, savedModel, skin, equipment);
+        if (withRider == null) {
+            logRiderAttachmentSkipped("missing_rider_model_texture", strippedModel, savedModel);
+            return false;
+        }
+        commandBuffer.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
+        logRiderAttachment(strippedModel, savedModel, skin, equipment);
+        return true;
     }
 
     public void remove(@Nonnull Store<EntityStore> store,
@@ -81,14 +103,41 @@ public final class AvatarFlightRiderVisualService {
             logRiderAttachmentSkipped("missing_owner_model", null, savedModel);
             return false;
         }
-        Model withRider = modelWithRiderAttachment(component.getModel(), savedModel, skin, equipment);
+        Model strippedModel = modelWithoutRiderAttachments(component.getModel());
+        Model withRider = modelWithRiderAttachment(strippedModel, savedModel, skin, equipment);
         if (withRider == null) {
             logRiderAttachmentSkipped("missing_rider_model_texture", component.getModel(), savedModel);
             return false;
         }
         store.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
-        logRiderAttachment(component.getModel(), savedModel, skin, equipment);
+        logRiderAttachment(strippedModel, savedModel, skin, equipment);
         return true;
+    }
+
+    @Nonnull
+    static Model modelWithoutRiderAttachments(@Nonnull Model model) {
+        ModelAttachment[] attachments = model.getAttachments();
+        if (attachments == null || attachments.length == 0) {
+            return model;
+        }
+        int kept = 0;
+        for (ModelAttachment attachment : attachments) {
+            if (!isRiderAttachment(attachment)) {
+                kept++;
+            }
+        }
+        if (kept == attachments.length) {
+            return model;
+        }
+        ModelAttachment[] filtered = new ModelAttachment[kept];
+        int index = 0;
+        for (ModelAttachment attachment : attachments) {
+            if (!isRiderAttachment(attachment)) {
+                filtered[index] = attachment;
+                index++;
+            }
+        }
+        return copyWithAttachments(model, filtered);
     }
 
     @Nullable
@@ -106,6 +155,12 @@ public final class AvatarFlightRiderVisualService {
                 ? new ModelAttachment[riderAttachments.length]
                 : Arrays.copyOf(baseAttachments, baseCount + riderAttachments.length);
         System.arraycopy(riderAttachments, 0, attachments, baseCount, riderAttachments.length);
+        return copyWithAttachments(baseModel, attachments);
+    }
+
+    @Nonnull
+    private static Model copyWithAttachments(@Nonnull Model baseModel,
+                                             @Nullable ModelAttachment[] attachments) {
         return new Model(
                 baseModel.getModelAssetId(),
                 baseModel.getScale(),
@@ -161,7 +216,7 @@ public final class AvatarFlightRiderVisualService {
         ModelAttachment body = new ModelAttachment(
                 riderModel, texture, savedModel.getGradientSet(), savedModel.getGradientId(), 1.0
         );
-        ModelAttachment[] appearanceAttachments = savedModel.getAttachments();
+        ModelAttachment[] appearanceAttachments = riderSafeAttachments(savedModel.getAttachments());
         if (appearanceAttachments == null || appearanceAttachments.length == 0) {
             return withBody(
                     body,
@@ -174,6 +229,25 @@ public final class AvatarFlightRiderVisualService {
                 appearanceAttachments,
                 equipment.attachments()
         );
+    }
+
+    @Nullable
+    private static ModelAttachment[] riderSafeAttachments(@Nullable ModelAttachment[] attachments) {
+        if (attachments == null || attachments.length == 0) {
+            return attachments;
+        }
+        ModelAttachment[] safeAttachments = new ModelAttachment[attachments.length];
+        for (int index = 0; index < attachments.length; index++) {
+            ModelAttachment attachment = attachments[index];
+            safeAttachments[index] = new ModelAttachment(
+                    AvatarFlightRiderModelVariantService.resolveForRider(attachment.getModel()),
+                    attachment.getTexture(),
+                    attachment.getGradientSet(),
+                    attachment.getGradientId(),
+                    attachment.getWeight()
+            );
+        }
+        return safeAttachments;
     }
 
     @Nonnull
@@ -202,6 +276,15 @@ public final class AvatarFlightRiderVisualService {
             return PLAYER_MOUNT_ANCHOR_MODEL;
         }
         return savedModelPath;
+    }
+
+    private static boolean isRiderAttachment(@Nullable ModelAttachment attachment) {
+        if (attachment == null || attachment.getModel() == null) {
+            return false;
+        }
+        String model = attachment.getModel();
+        return PLAYER_MOUNT_ANCHOR_MODEL.equals(model)
+                || AvatarFlightRiderModelVariantService.isGeneratedVariant(model);
     }
 
     private static void logRiderAttachment(@Nonnull Model baseModel,
@@ -275,11 +358,13 @@ public final class AvatarFlightRiderVisualService {
     @Nonnull
     private static AvatarFlightRiderVisualComponent marker(@Nonnull UUID ownerUuid,
                                                           @Nullable UUID riderUuid,
-                                                          boolean riderEntity) {
+                                                          boolean riderEntity,
+                                                          @Nonnull String equipmentSignature) {
         AvatarFlightRiderVisualComponent visual = new AvatarFlightRiderVisualComponent();
         visual.setOwnerUuid(ownerUuid.toString());
         visual.setRiderEntityUuid(riderUuid == null ? "" : riderUuid.toString());
         visual.setRiderEntity(riderEntity);
+        visual.setEquipmentSignature(equipmentSignature);
         return visual;
     }
 }

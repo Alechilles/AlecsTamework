@@ -20,13 +20,14 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Generates rider-safe equipment model variants so armor can bind to the seated rider without player animation tracks.
+ * Generates rider-safe attachment model variants so player cosmetics and armor bind to the seated rider.
  */
-final class AvatarFlightEquipmentModelVariantService {
+final class AvatarFlightRiderModelVariantService {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
-    private static final String GENERATED_PREFIX = "Tamework/AvatarFlight/Rider/Equipment/";
+    private static final String GENERATED_PREFIX = "Tamework/AvatarFlight/Rider/Variants/";
+    private static final String LEGACY_EQUIPMENT_PREFIX = "Tamework/AvatarFlight/Rider/Equipment/";
     private static final String GENERATED_PACK = "Alechilles:Alec's Tamework!";
-    private static final String GENERATED_ID_PREFIX = "tw_rider_equipment_";
+    private static final String GENERATED_ID_PREFIX = "tw_rider_attachment_";
     private static final Set<String> RIDER_SAFE_BIND_NODE_NAMES = Set.of(
             "Origin",
             "Pelvis",
@@ -56,29 +57,34 @@ final class AvatarFlightEquipmentModelVariantService {
     );
     private static final ConcurrentHashMap<String, String> GENERATED_MODELS = new ConcurrentHashMap<>();
 
-    private AvatarFlightEquipmentModelVariantService() {
+    private AvatarFlightRiderModelVariantService() {
     }
 
     @Nonnull
     static String resolveForRider(@Nonnull String model) {
         String normalized = normalizeCommonPath(model);
-        if (normalized.isBlank() || normalized.startsWith(GENERATED_PREFIX)) {
+        if (normalized.isBlank() || isGeneratedVariant(normalized)) {
             return normalized;
         }
         String generated = generatedVariantPath(normalized);
         if (CommonAssetRegistry.hasCommonAsset(generated)) {
             return generated;
         }
-        return GENERATED_MODELS.computeIfAbsent(normalized, AvatarFlightEquipmentModelVariantService::generateVariant);
+        return GENERATED_MODELS.computeIfAbsent(normalized, AvatarFlightRiderModelVariantService::generateVariant);
     }
 
     @Nonnull
     static String generatedVariantPath(@Nonnull String model) {
         String normalized = normalizeCommonPath(model);
-        if (normalized.startsWith(GENERATED_PREFIX)) {
+        if (isGeneratedVariant(normalized)) {
             return normalized;
         }
         return GENERATED_PREFIX + normalized;
+    }
+
+    static boolean isGeneratedVariant(@Nullable String model) {
+        String normalized = normalizeCommonPath(model);
+        return normalized.startsWith(GENERATED_PREFIX) || normalized.startsWith(LEGACY_EQUIPMENT_PREFIX);
     }
 
     @Nonnull
@@ -170,7 +176,7 @@ final class AvatarFlightEquipmentModelVariantService {
         Tamework instance = Tamework.getInstance();
         if (instance != null && instance.getLogger() != null) {
             instance.getLogger().at(Level.WARNING).withCause(ex)
-                    .log("TameworkAvatarFlight: failed to generate rider-safe equipment model for %s", model);
+                    .log("TameworkAvatarFlight: failed to generate rider-safe attachment model for %s", model);
         }
     }
 }

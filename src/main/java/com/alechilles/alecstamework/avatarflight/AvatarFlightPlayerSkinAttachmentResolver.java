@@ -208,6 +208,9 @@ public final class AvatarFlightPlayerSkinAttachmentResolver {
             gradientSet = null;
             gradientId = null;
         }
+        if (modelOverride == null) {
+            model = AvatarFlightRiderModelVariantService.resolveForRider(model);
+        }
         return new ModelAttachment(model, texture, gradientSet, gradientId, 1.0);
     }
 

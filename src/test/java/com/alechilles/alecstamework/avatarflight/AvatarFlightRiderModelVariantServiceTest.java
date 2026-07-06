@@ -9,10 +9,10 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
-class AvatarFlightEquipmentModelVariantServiceTest {
+class AvatarFlightRiderModelVariantServiceTest {
     @Test
     void rewritesPlayerAnimationNodesToRiderSafeNames() {
-        String rewritten = AvatarFlightEquipmentModelVariantService.rewriteBlockymodelJsonForRider("""
+        String rewritten = AvatarFlightRiderModelVariantService.rewriteBlockymodelJsonForRider("""
                 {
                   "nodes": [
                     {
@@ -40,9 +40,9 @@ class AvatarFlightEquipmentModelVariantServiceTest {
         JsonObject chest = firstChild(pelvis);
         JsonArray chestChildren = chest.getAsJsonArray("children");
 
-        assertEquals("tw_rider_equipment_4", pelvis.get("id").getAsString());
+        assertEquals("tw_rider_attachment_4", pelvis.get("id").getAsString());
         assertEquals("TameworkRider_Pelvis", pelvis.get("name").getAsString());
-        assertEquals("tw_rider_equipment_2", chest.get("id").getAsString());
+        assertEquals("tw_rider_attachment_2", chest.get("id").getAsString());
         assertEquals("TameworkRider_Chest", chest.get("name").getAsString());
         assertEquals("Head", chestChildren.get(0).getAsJsonObject().get("name").getAsString());
         assertEquals("Helmet_Base", chestChildren.get(1).getAsJsonObject().get("name").getAsString());
@@ -54,14 +54,17 @@ class AvatarFlightEquipmentModelVariantServiceTest {
     @Test
     void generatedVariantPathStaysUnderTameworkCommonAssets() {
         assertEquals(
-                "Tamework/AvatarFlight/Rider/Equipment/Items/Armors/Iron/Chest.blockymodel",
-                AvatarFlightEquipmentModelVariantService.generatedVariantPath(
+                "Tamework/AvatarFlight/Rider/Variants/Items/Armors/Iron/Chest.blockymodel",
+                AvatarFlightRiderModelVariantService.generatedVariantPath(
                         "Items/Armors/Iron/Chest.blockymodel"
                 )
         );
-        assertTrue(AvatarFlightEquipmentModelVariantService.generatedVariantPath(
+        assertTrue(AvatarFlightRiderModelVariantService.generatedVariantPath(
+                "Tamework/AvatarFlight/Rider/Variants/Items/Armors/Iron/Chest.blockymodel"
+        ).startsWith("Tamework/AvatarFlight/Rider/Variants/"));
+        assertTrue(AvatarFlightRiderModelVariantService.isGeneratedVariant(
                 "Tamework/AvatarFlight/Rider/Equipment/Items/Armors/Iron/Chest.blockymodel"
-        ).startsWith("Tamework/AvatarFlight/Rider/Equipment/"));
+        ));
     }
 
     private static JsonObject firstChild(JsonObject node) {

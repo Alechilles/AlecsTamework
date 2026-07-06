@@ -40,6 +40,7 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertTrue(source.contains("settings.isHideOwnerEquipment()"));
         assertTrue(source.contains("AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate("));
         assertTrue(source.contains("AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate("));
+        assertTrue(source.contains("refreshRiderVisualIfNeeded(ref, commandBuffer, settings)"));
     }
 
     @Test
@@ -50,7 +51,7 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertTrue(source.contains("queueAll(ref, update, visible.visibleTo)"));
         assertTrue(source.contains("queueAll(ref, update, visible.newlyVisibleTo)"));
         assertFalse(source.contains("queueIfEquipmentChanged("));
-        assertFalse(source.contains("riderVisualType"));
+        assertTrue(source.contains("visualType"));
         assertFalse(source.contains("\"owner\""));
         assertFalse(source.contains("readSignature("));
         assertFalse(source.contains("writeSignature("));
@@ -65,5 +66,17 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertFalse(source.contains("queueOthers("));
         assertFalse(source.contains("sameEntity("));
         assertFalse(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
+    }
+
+    @Test
+    void visualSystemRefreshesFakeRiderOnlyWhenArmorVisibilitySignatureChanges() throws Exception {
+        String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ref, commandBuffer)"));
+        assertTrue(source.contains("equipment.armorSignature().equals(visual.getEquipmentSignature())"));
+        assertTrue(source.contains("modelService.savedModelCopy(ownerUuid)"));
+        assertTrue(source.contains("riderVisualService.refresh(commandBuffer, ref, savedModel, equipment)"));
+        assertTrue(source.contains("updated.setEquipmentSignature(equipment.armorSignature())"));
+        assertTrue(source.contains("commandBuffer.putComponent(ref, visualType, updated)"));
     }
 }

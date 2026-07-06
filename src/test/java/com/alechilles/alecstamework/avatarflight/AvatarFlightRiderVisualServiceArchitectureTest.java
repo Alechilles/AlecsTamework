@@ -26,7 +26,8 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
     void riderVisualServiceUsesModelAttachmentInsteadOfNativeMount() throws Exception {
         String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false))"));
+        assertTrue(source.contains("store.putComponent(ownerRef, visualType, marker(ownerUuid, null, false, "
+                + "equipment.armorSignature()))"));
         assertTrue(source.contains("appendRiderAttachment("));
         assertTrue(source.contains("new ModelAttachment("));
         assertTrue(source.contains("savedModel.getModel()"));
@@ -36,8 +37,12 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("AvatarFlightPlayerSkinAttachmentResolver.resolve("));
         assertTrue(source.contains("AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ownerRef, store)"));
         assertTrue(source.contains("equipment.hiddenCosmetics()"));
+        assertTrue(source.contains("equipment.armorSignature()"));
         assertTrue(source.contains("appearanceAttachments"));
         assertTrue(source.contains("equipment.attachments()"));
+        assertTrue(source.contains("modelWithoutRiderAttachments("));
+        assertTrue(source.contains("riderSafeAttachments("));
+        assertTrue(source.contains("AvatarFlightRiderModelVariantService.isGeneratedVariant(model)"));
         assertFalse(source.contains("PLAYER_ARMOR_ANCHOR_MODEL"));
         assertFalse(source.contains("armorAnchorAttachment("));
         assertTrue(source.contains("System.arraycopy(appearanceAttachments, 0, attachments, 1"));
@@ -63,6 +68,8 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertFalse(source.contains("new NetworkId("));
         assertTrue(source.contains("RemoveReason.REMOVE"));
         assertFalse(source.contains("PlayerRef.getComponent(Player"));
+        assertTrue(source.contains("refresh(@Nonnull CommandBuffer<EntityStore> commandBuffer"));
+        assertTrue(source.contains("commandBuffer.putComponent(ownerRef, ModelComponent.getComponentType()"));
     }
 
     @Test
@@ -143,6 +150,8 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("PlayerSkinPartTexture"));
         assertTrue(source.contains("part.getGreyscaleTexture()"));
         assertTrue(source.contains("part.getGradientSet()"));
+        assertTrue(source.contains("modelOverride == null"));
+        assertTrue(source.contains("AvatarFlightRiderModelVariantService.resolveForRider(model)"));
         assertTrue(source.contains("variant.getTextures()"));
         assertTrue(source.contains("new ModelAttachment("));
         assertTrue(source.contains("Generic\" + hairPart.getHairType()"));

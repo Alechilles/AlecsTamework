@@ -49,6 +49,17 @@ class AvatarFlightModelServiceArchitectureTest {
     }
 
     @Test
+    void avatarFlightRestoreMarksSkinNetworkOutdatedAfterSavedModelRestore() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        int savedRestore = source.indexOf("if (savedModel != null)");
+        assertTrue(savedRestore >= 0);
+        String savedRestoreBlock = source.substring(savedRestore, source.indexOf("return true;", savedRestore));
+        assertTrue(savedRestoreBlock.contains("skin.setNetworkOutdated()"),
+                "dismount restore should force a skin refresh so armor visibility toggles do not leave stale clothing");
+    }
+
+    @Test
     void avatarFlightInjectsOnlyStandardTameworkPoseIds() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
