@@ -42,18 +42,18 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemThrottlesSelfEquipmentPacketsWithVisualMarker() throws Exception {
+    void visualSystemQueuesHiddenOwnerEquipmentToEveryViewerLikeKnownGoodPath() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("queueSelfIfChanged("));
-        assertTrue(source.contains("equipmentSignature(currentUpdate)"));
-        assertTrue(source.contains("signature.equals(riderVisual.getEquipmentSignature())"));
-        assertTrue(source.contains("updated.setEquipmentSignature(signature)"));
-        assertTrue(source.contains("queueSelf(ref, hiddenUpdate"));
+        assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings)"));
+        assertTrue(source.contains("queueAll(ref, update, visible.visibleTo)"));
+        assertTrue(source.contains("queueAll(ref, update, visible.newlyVisibleTo)"));
+        assertFalse(source.contains("queueSelfIfChanged("));
+        assertFalse(source.contains("queueSelf(ref, hiddenUpdate"));
     }
 
     @Test
-    void visualSystemKeepsNormalOwnerPacketsOffOtherViewerQueue() throws Exception {
+    void visualSystemKeepsFakeRiderPacketsOffOwnerSelfQueue() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("private static void queueOthers("));

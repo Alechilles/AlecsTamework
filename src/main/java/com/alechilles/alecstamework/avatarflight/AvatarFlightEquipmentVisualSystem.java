@@ -60,7 +60,7 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         TwAvatarFlightConfig.RiderVisualSettings settings = config.getRiderVisual();
         AvatarFlightRiderVisualComponent riderVisual = commandBuffer.getComponent(ref, riderVisualType);
         if (settings.isHideOwnerEquipment()) {
-            queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings, riderVisual);
+            queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings);
         }
         if (riderVisual != null && settings.isShowRider()) {
             queueRiderEquipmentUpdate(ref, commandBuffer, riderVisual, settings);
@@ -84,42 +84,14 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
     private static void queueHiddenOwnerUpdate(@Nonnull Ref<EntityStore> ref,
                                                @Nonnull ComponentAccessor<EntityStore> accessor,
                                                @Nonnull EntityTrackerSystems.Visible visible,
-                                               @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings,
-                                               @Nullable AvatarFlightRiderVisualComponent riderVisual) {
+                                               @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
         EquipmentUpdate update = AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate(
                 ref,
                 accessor,
                 settings
         );
-        queueOthers(ref, update, visible.visibleTo);
-        queueOthers(ref, update, visible.newlyVisibleTo);
-        queueSelfIfChanged(ref, accessor, visible, update, riderVisual);
-    }
-
-    private static void queueSelfIfChanged(@Nonnull Ref<EntityStore> ref,
-                                           @Nonnull ComponentAccessor<EntityStore> accessor,
-                                           @Nonnull EntityTrackerSystems.Visible visible,
-                                           @Nonnull EquipmentUpdate hiddenUpdate,
-                                           @Nullable AvatarFlightRiderVisualComponent riderVisual) {
-        if (riderVisual == null || riderVisual.isRiderEntity()) {
-            return;
-        }
-        EquipmentUpdate currentUpdate = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, accessor);
-        String signature = AvatarFlightEquipmentPacketService.equipmentSignature(currentUpdate);
-        if (signature.equals(riderVisual.getEquipmentSignature())) {
-            return;
-        }
-        ComponentType<EntityStore, AvatarFlightRiderVisualComponent> visualType =
-                AvatarFlightRiderVisualComponent.getComponentType();
-        if (visualType == null) {
-            return;
-        }
-        AvatarFlightRiderVisualComponent updated = riderVisual.clone();
-        updated.setEquipmentSignature(signature);
-        updated.setLastEquipmentSentAtMs(System.currentTimeMillis());
-        accessor.putComponent(ref, visualType, updated);
-        queueSelf(ref, hiddenUpdate, visible.visibleTo);
-        queueSelf(ref, hiddenUpdate, visible.newlyVisibleTo);
+        queueAll(ref, update, visible.visibleTo);
+        queueAll(ref, update, visible.newlyVisibleTo);
     }
 
     private void queueRiderEquipmentUpdate(@Nonnull Ref<EntityStore> ref,
@@ -156,18 +128,6 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
                                     @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
         for (Map.Entry<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> entry : visibleTo.entrySet()) {
             if (sameEntity(ref, entry.getKey())) {
-                continue;
-            }
-            EntityTrackerSystems.EntityViewer viewer = entry.getValue();
-            viewer.queueUpdate(ref, update);
-        }
-    }
-
-    private static void queueSelf(@Nonnull Ref<EntityStore> ref,
-                                  @Nonnull EquipmentUpdate update,
-                                  @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
-        for (Map.Entry<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> entry : visibleTo.entrySet()) {
-            if (!sameEntity(ref, entry.getKey())) {
                 continue;
             }
             EntityTrackerSystems.EntityViewer viewer = entry.getValue();
