@@ -23,6 +23,7 @@ This subsection contains one page per `Tw*Config` asset family. Structure is int
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
 - [TwAttachmentMigrationConfig Reference](/mod/alecs-tamework/twattachmentmigrationconfig-reference)
+- [TwDynamicAttachmentsConfig Reference](/mod/alecs-tamework/twdynamicattachmentsconfig-reference)
 - [TwAttachmentDisplayConfig Reference](/mod/alecs-tamework/twattachmentdisplayconfig-reference)
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference)
 - [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference)

@@ -16,6 +16,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwMountedGlideConfig`: `<ModRoot>/Server/Tamework/Mounts/Glide/*.json`
 - `TwBreedingConfig`: `<ModRoot>/Server/Tamework/Breeding/*.json`
 - `TwAttachmentMigrationConfig`: `<ModRoot>/Server/Tamework/AttachmentMigrations/*.json`
+- `TwDynamicAttachmentsConfig`: `<ModRoot>/Server/Tamework/DynamicAttachments/*.json`
 - `TwAttachmentDisplayConfig`: `<ModRoot>/Server/Tamework/AttachmentDisplays/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
@@ -34,7 +35,13 @@ Resolved by role id + `Priority`:
 - `TwMountedGlideConfig`
 - `TwBreedingConfig`
 - `TwAttachmentMigrationConfig`
+- `TwDynamicAttachmentsConfig`
 - `TwTraitConfig`
+
+### Dynamic attachment family
+- `TwDynamicAttachmentsConfig` is indexed by role id and evaluates ordered conditional rules.
+- Matching rules can either permanently update stored attachment selections or temporarily apply reversible overlays while the rule keeps matching.
+- Runtime evaluation is intentionally low-frequency and fingerprinted so crowded worlds avoid per-tick attachment work.
 
 ### Attachment display family
 - `TwAttachmentDisplayConfig` resolves friendly attachment names from all enabled configs and entries.
