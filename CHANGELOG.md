@@ -32,11 +32,7 @@
 - Fixed avatar-flight shift boosts feeling inactive when Hytale only exposes a one-frame airborne sprint pulse by keeping detected boost pulses active for a short configurable duration.
 - Fixed `/tw debugplayermodel unsafe` so positive test scales are no longer clamped to the model asset's authored min/max range.
 - Fixed transformed avatar flight trying to layer player item/combat/emote animations onto dragon models by periodically suppressing non-movement animation slots while flight is active.
-- Fixed transformed avatar flight still rendering held player equipment on dragon models by hiding hand equipment visuals while avatar flight is active, restoring them on disable, and throttling local equipment packets to activation/equipment-change moments.
-- Fixed avatar-flight equipment hiding staying inactive when fake rider visuals are disabled by preserving the owner-only visual marker for the active flight session.
-- Fixed avatar-flight owner equipment hiding no longer reaching the local transformed player by restoring the known-good hidden equipment packet broadcast path.
-- Fixed avatar-flight equipment visual updates so hidden owner equipment and fake rider equipment are sent only when their signatures change, avoiding per-tick local equipment packet spam while testing rider visuals.
-- Fixed avatar-flight owner hand hiding so changing or re-syncing a held item while transformed immediately resends the hidden-hand packet instead of waiting for the resend timer.
+- Fixed transformed avatar flight still rendering held player equipment on dragon models by continuously hiding the real transformed player's hand and armor equipment visuals while avatar flight is active, independent of fake rider visuals.
 - Reworked experimental avatar-flight rider visuals to attach the saved player model to the transformed dragon model instead of spawning a native mounted rider entity, avoiding the crash-prone mounted-rider client path.
 - Restored experimental avatar-flight rider visuals to attach the saved player model directly to the transformed dragon, keeping the test path closer to the intended final rider.
 - Added avatar-flight rider attachment diagnostics to print the saved rider model and texture paths, plus skip reasons, while testing model-anchor options.

@@ -39,12 +39,12 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     void equipmentSystemDoesNotQueueFakeRiderEquipmentPackets() throws Exception {
         String source = Files.readString(EQUIPMENT_SYSTEM, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("AvatarFlightRiderVisualComponent"));
-        assertTrue(source.contains("riderVisualType"));
         assertFalse(source.contains("queueRiderEquipmentUpdate("));
         assertFalse(source.contains("AvatarFlightRiderVisualService.resolveRiderRef("));
-        assertTrue(source.contains("getEquipmentResendIntervalMs()"));
-        assertTrue(source.contains("commandBuffer.putComponent("));
+        assertFalse(source.contains("AvatarFlightRiderVisualComponent"));
+        assertFalse(source.contains("riderVisualType"));
+        assertFalse(source.contains("getEquipmentResendIntervalMs()"));
+        assertFalse(source.contains("commandBuffer.putComponent("));
     }
 
     @Test
@@ -71,10 +71,13 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     }
 
     @Test
-    void tameworkRegistersEquipmentSystemWithRiderVisualType() throws Exception {
+    void tameworkRegistersEquipmentSystemWithoutRiderVisualType() throws Exception {
         String source = Files.readString(TAMEWORK, StandardCharsets.UTF_8);
+        int constructor = source.indexOf("new AvatarFlightEquipmentVisualSystem(");
 
         assertTrue(source.contains("new AvatarFlightEquipmentVisualSystem("));
-        assertTrue(source.contains("avatarFlightRiderVisualComponentType"));
+        assertTrue(constructor >= 0);
+        assertFalse(source.substring(constructor, source.indexOf(");", constructor))
+                .contains("avatarFlightRiderVisualComponentType"));
     }
 }

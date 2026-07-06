@@ -42,18 +42,17 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemQueuesHiddenOwnerEquipmentOnlyWhenSignatureRequiresIt() throws Exception {
+    void visualSystemQueuesHiddenOwnerEquipmentEveryTickWithoutRiderVisualState() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings, riderVisual)"));
-        assertTrue(source.contains("queueIfEquipmentChanged("));
-        assertTrue(source.contains("\"owner\""));
-        assertTrue(source.contains("createCurrentEquipmentUpdate(ref, commandBuffer)"));
-        assertTrue(source.contains("+ \"->\""));
-        assertTrue(source.contains("readSignature("));
-        assertTrue(source.contains("writeSignature("));
+        assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings)"));
         assertTrue(source.contains("queueAll(ref, update, visible.visibleTo)"));
         assertTrue(source.contains("queueAll(ref, update, visible.newlyVisibleTo)"));
+        assertFalse(source.contains("queueIfEquipmentChanged("));
+        assertFalse(source.contains("riderVisualType"));
+        assertFalse(source.contains("\"owner\""));
+        assertFalse(source.contains("readSignature("));
+        assertFalse(source.contains("writeSignature("));
         assertFalse(source.contains("queueSelf(ref, hiddenUpdate"));
     }
 
