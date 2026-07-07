@@ -33,7 +33,7 @@ The recharge delay means a spent charge requires the delay plus the recharge cad
 
 ## Launch
 
-Charged launch is the default takeoff path for avatar flight. With `Launch.PreferredInput` set to `JumpHold`, a grounded jump hold starts charging instead of immediately feeding jump into normal flight input. Releasing before `Launch.MinChargeMs` cancels the launch, while releasing after the minimum applies a charge-scaled upward and forward impulse.
+Charged launch is the default takeoff path for avatar flight. With `Launch.PreferredInput` set to `JumpHold`, a grounded jump hold starts charging instead of immediately feeding jump into normal flight input. Releasing before `Launch.MinChargeMs` cancels the launch, while releasing after the minimum applies a charge-scaled upward and forward impulse. If the player leaves the ground during the hold, the release can still apply the launch that began on the ground.
 
 Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-loads some launch strength after the minimum hold, while still rewarding longer charge time. Partial launches cost `1` Vigour by default, and launches at or above `Launch.FullChargeCostThreshold` cost `2`.
 
@@ -88,8 +88,8 @@ The compact avatar-flight HUD appears above the hotbar while avatar flight is ac
 ### Launch
 
 - `Enabled`: enables charged launch.
-- `PreferredInput`: primary launch input path. Valid values are `JumpHold` and `ReinsPrimaryHold`.
-- `FallbackInput`: fallback launch input path.
+- `PreferredInput`: primary launch input path. `JumpHold` is the built-in packet path. `ReinsPrimaryHold` is reserved for future/custom item hold integrations.
+- `FallbackInput`: fallback launch input path. Defaults to `JumpHold`; `ReinsPrimaryHold` is not wired by the default Flightmaster's Reins item.
 - `MinChargeMs`: minimum hold before release applies launch.
 - `MaxChargeMs`: hold duration that reaches full launch charge.
 - `ChargeExponent`: exponent applied to normalized charge amount.

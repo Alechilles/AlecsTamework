@@ -26,13 +26,13 @@ Keep existing untracked `outputs/` ignored unless the user explicitly asks to cl
 
 Create:
 
-- `src/main/java/com/alechilles/alecstamework/config/assets/AvatarFlightCurveSettings.java`  
+- `src/main/java/com/alechilles/alecstamework/config/assets/AvatarFlightCurveSettings.java`
   Owns curve tuning codec, defaults, inheritance copy, and getters for dive/climb/boosted-speed decay.
-- `src/main/java/com/alechilles/alecstamework/config/assets/AvatarFlightLaunchSettings.java`  
+- `src/main/java/com/alechilles/alecstamework/config/assets/AvatarFlightLaunchSettings.java`
   Owns launch tuning codec, defaults, cost selection, normalized charge calculation, and getters.
-- `src/main/java/com/alechilles/alecstamework/avatarflight/AvatarFlightManeuverMath.java`  
+- `src/main/java/com/alechilles/alecstamework/avatarflight/AvatarFlightManeuverMath.java`
   Pure helper for dive load, climb load, pitch power, climb speed eligibility, and boosted-excess decay.
-- `src/main/java/com/alechilles/alecstamework/avatarflight/AvatarFlightLaunchCurve.java`  
+- `src/main/java/com/alechilles/alecstamework/avatarflight/AvatarFlightLaunchCurve.java`
   Pure helper for launch charge normalization, impulse calculation, and launch cost.
 - `src/test/java/com/alechilles/alecstamework/avatarflight/AvatarFlightManeuverMathTest.java`
 - `src/test/java/com/alechilles/alecstamework/avatarflight/AvatarFlightLaunchCurveTest.java`

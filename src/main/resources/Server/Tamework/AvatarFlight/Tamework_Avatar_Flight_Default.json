@@ -60,7 +60,7 @@
   "Launch": {
     "Enabled": true,
     "PreferredInput": "JumpHold",
-    "FallbackInput": "ReinsPrimaryHold",
+    "FallbackInput": "JumpHold",
     "MinChargeMs": 500.0,
     "MaxChargeMs": 3000.0,
     "ChargeExponent": 0.65,

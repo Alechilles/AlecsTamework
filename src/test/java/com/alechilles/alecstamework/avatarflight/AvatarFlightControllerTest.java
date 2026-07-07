@@ -632,6 +632,22 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void activeBoostPitchDownDoesNotClampPaidSpeedToGlideCap() {
+        long nextBoostAtMs = 2_000L;
+        AvatarFlightController.Output output = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, -20.0, 0L, nextBoostAtMs),
+                input(1.0, false, false, false, false, Math.toRadians(-45.0)),
+                CONFIG,
+                0.1,
+                1_200L
+        );
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxGlideSpeed(),
+                "pitch-down during the active boost window must not clamp paid boost speed back to glide cap");
+    }
+
+    @Test
     void boostedExcessDecaysWhenBoostWindowEnds() {
         double boostedSpeed = AvatarFlightSpeedMetrics.boostedHorizontalCap(CONFIG);
         AvatarFlightController.Output output = AvatarFlightController.update(
@@ -664,6 +680,22 @@ class AvatarFlightControllerTest {
         assertEquals(-11.0, output.velocityZ(), 0.00001);
         assertEquals(2.0, output.launchCost(), 0.00001);
         assertTrue(output.applyVelocity());
+    }
+
+    @Test
+    void chargedLaunchCanReleaseAfterLeavingGround() {
+        AvatarFlightController.Output output = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, 0.0, 0L, 0L, 0.0, 0.0, 0L),
+                new AvatarFlightController.Input(0.0, 0.0, 0.0, false, false, false,
+                        false, false, 0.0, 0.0, true, true, true, 1000L),
+                CONFIG,
+                0.1,
+                1000L
+        );
+
+        assertTrue(output.launchApplied(),
+                "release should apply the launch charge even if native movement left the ground during the hold");
+        assertEquals(AvatarFlightMode.LAUNCHING, output.mode());
     }
 
     @Test

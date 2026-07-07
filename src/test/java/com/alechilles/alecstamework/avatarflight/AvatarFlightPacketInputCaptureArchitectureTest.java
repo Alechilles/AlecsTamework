@@ -54,7 +54,7 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "capture must keep packet-provided states separate from component fallback states");
         assertTrue(source.contains("boolean jumpHeld = packetStates != null && (packetStates.jumping || packetStates.swimJumping)"),
                 "jump must not be latched from MovementStatesComponent fallback");
-        assertTrue(source.contains("input.setJumping(!suppressGroundLaunchJump && jumpHeld)"),
+        assertTrue(source.contains("input.setJumping(!suppressLaunchJump && jumpHeld)"),
                 "grounded launch charge should suppress raw jump only while preserving packet-state-only jump capture");
         assertTrue(source.contains("input.setCrouching(packetStates != null && (packetStates.crouching || packetStates.forcedCrouching))"),
                 "crouch must not be latched from MovementStatesComponent fallback");
@@ -80,8 +80,14 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
 
         assertTrue(source.contains("beginLaunchCharge"),
                 "grounded held jump should begin a charged launch when configured");
+        assertTrue(source.contains("if (jumpHeld && grounded)"),
+                "jump-hold launch charge should only begin from the ground");
+        assertTrue(source.contains("} else if (!jumpHeld && input.isLaunchCharging())"),
+                "releasing after charge should queue launch even if native movement left the ground during the hold");
+        assertTrue(source.contains("boolean suppressLaunchJump = jumpHoldLaunchInput"),
+                "raw jump suppression should be tied to active launch charge/release state");
         assertTrue(source.contains("queueLaunchRelease"),
-                "releasing grounded jump after charge should queue a one-shot launch release");
+                "releasing jump after charge should queue a one-shot launch release");
         assertTrue(source.contains("cancelLaunchCharge"),
                 "leaving the configured launch state should cancel an in-progress charge");
     }

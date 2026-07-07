@@ -92,21 +92,19 @@ public final class AvatarFlightPacketInputCapture {
         input.setVerticalAxis(0.0);
         boolean jumpHeld = packetStates != null && (packetStates.jumping || packetStates.swimJumping);
         boolean grounded = movementStates == null ? input.isOnGround() : movementStates.onGround;
-        if (config.getLaunch().isEnabled()
-                && AvatarFlightLaunchSettings.INPUT_JUMP_HOLD.equalsIgnoreCase(config.getLaunch().getPreferredInput())
-                && grounded) {
-            if (jumpHeld) {
+        boolean jumpHoldLaunchInput = config.getLaunch().isEnabled() && usesJumpHoldLaunch(config);
+        if (jumpHoldLaunchInput) {
+            if (jumpHeld && grounded) {
                 input.beginLaunchCharge(now);
-            } else if (input.isLaunchCharging()) {
+            } else if (!jumpHeld && input.isLaunchCharging()) {
                 input.queueLaunchRelease(now);
             }
         } else if (input.isLaunchCharging()) {
             input.cancelLaunchCharge();
         }
-        boolean suppressGroundLaunchJump = config.getLaunch().isEnabled()
-                && grounded
-                && (jumpHeld || input.getLaunchReleasedAtMs() != 0L);
-        input.setJumping(!suppressGroundLaunchJump && jumpHeld);
+        boolean suppressLaunchJump = jumpHoldLaunchInput
+                && (input.isLaunchCharging() || input.getLaunchReleasedAtMs() != 0L || (grounded && jumpHeld));
+        input.setJumping(!suppressLaunchJump && jumpHeld);
         input.setCrouching(packetStates != null && (packetStates.crouching || packetStates.forcedCrouching));
         input.updateSprinting(packetStates != null && packetStates.sprinting, now);
         input.setOnGround(grounded);
@@ -116,6 +114,11 @@ public final class AvatarFlightPacketInputCapture {
             input.setLastInputAtMs(now);
         }
         store.putComponent(ref, inputType, input);
+    }
+
+    private boolean usesJumpHoldLaunch(@Nonnull TwAvatarFlightConfig config) {
+        return AvatarFlightLaunchSettings.INPUT_JUMP_HOLD.equalsIgnoreCase(config.getLaunch().getPreferredInput())
+                || AvatarFlightLaunchSettings.INPUT_JUMP_HOLD.equalsIgnoreCase(config.getLaunch().getFallbackInput());
     }
 
     @Nullable

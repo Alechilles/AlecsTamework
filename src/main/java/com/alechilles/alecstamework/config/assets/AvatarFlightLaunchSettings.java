@@ -42,7 +42,7 @@ public final class AvatarFlightLaunchSettings {
             .<String>append(new KeyedCodec<>("FallbackInput", Codec.STRING),
                     (settings, value) -> settings.fallbackInput = inputOrDefault(value, INPUT_REINS_PRIMARY_HOLD),
                     settings -> settings.fallbackInput)
-            .documentation("Fallback charged-launch input. Valid values: JumpHold, ReinsPrimaryHold. Inheritance: missing nested key inherits parent value.")
+            .documentation("Fallback charged-launch input. JumpHold is the built-in packet path; ReinsPrimaryHold is reserved for future/custom item hold integrations. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("MinChargeMs", Codec.DOUBLE),
                     (settings, value) -> settings.minChargeMs = nonNegativeOrDefault(value, DEFAULT_MIN_CHARGE_MS),
@@ -102,7 +102,7 @@ public final class AvatarFlightLaunchSettings {
 
     private boolean enabled = true;
     private String preferredInput = INPUT_JUMP_HOLD;
-    private String fallbackInput = INPUT_REINS_PRIMARY_HOLD;
+    private String fallbackInput = INPUT_JUMP_HOLD;
     private double minChargeMs = DEFAULT_MIN_CHARGE_MS;
     private double maxChargeMs = DEFAULT_MAX_CHARGE_MS;
     private double chargeExponent = DEFAULT_CHARGE_EXPONENT;

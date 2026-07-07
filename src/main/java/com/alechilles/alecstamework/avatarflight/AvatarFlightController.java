@@ -55,7 +55,6 @@ public final class AvatarFlightController {
         boolean descendIntent = input.crouch() || input.verticalAxis() < 0.0;
         boolean explicitAirbrakeIntent = input.airbrake();
         if (config.getLaunch().isEnabled()
-                && input.onGround()
                 && input.launchAllowed()
                 && input.launchHoldMs() >= config.getLaunch().getMinChargeMs()
                 && (nextLaunchAtMs == 0L || nowMs >= nextLaunchAtMs)) {
@@ -214,7 +213,7 @@ public final class AvatarFlightController {
             mode = AvatarFlightMode.DESCENDING;
         } else if (!boostApplied && targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE && !neutralPitch) {
             PitchAdjustment pitch = applyPitch(effectivePitchRadians, targetForwardSpeed, vertical,
-                    config, glideHorizontalCap, diveLoad, climbLoad, dt);
+                    config, boostActive ? boostedHorizontalCap : glideHorizontalCap, diveLoad, climbLoad, dt);
             targetForwardSpeed = pitch.forwardSpeed();
             vertical = pitch.verticalSpeed();
         } else if (mode == AvatarFlightMode.FORWARD_FLIGHT) {
