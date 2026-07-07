@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="380" viewBox="0 0 1100 380" role="img" aria-labelledby="title desc">
+  <title id="title">AvatarFlight Launch Charge Wind VFX Ramp</title>
+  <desc id="desc">Three-panel visualization showing launch charge effects building from faint to somewhat intense as charge reaches full.</desc>
+  <defs>
+    <linearGradient id="panelBg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#101722"/>
+      <stop offset=".68" stop-color="#172029"/>
+      <stop offset="1" stop-color="#22291f"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#243521"/>
+      <stop offset="1" stop-color="#35462b"/>
+    </linearGradient>
+    <g id="drake">
+      <ellipse cx="0" cy="0" rx="48" ry="18" fill="#2f4858"/>
+      <ellipse cx="-45" cy="-4" rx="48" ry="13" fill="#5e7e8f" opacity=".7" transform="rotate(-14)"/>
+      <ellipse cx="45" cy="-4" rx="48" ry="13" fill="#5e7e8f" opacity=".7" transform="rotate(14)"/>
+    </g>
+    <g id="dust">
+      <circle cx="-54" cy="8" r="4" fill="#c6a36b" opacity=".55"/>
+      <circle cx="-22" cy="14" r="3" fill="#c6a36b" opacity=".5"/>
+      <circle cx="30" cy="12" r="4" fill="#c6a36b" opacity=".55"/>
+      <circle cx="62" cy="6" r="3" fill="#c6a36b" opacity=".5"/>
+    </g>
+  </defs>
+  <rect width="1100" height="380" fill="#0c1118"/>
+  <text x="40" y="50" fill="#eef9ff" font-family="Arial, sans-serif" font-size="27" font-weight="700">Launch Charge Ramp</text>
+  <text x="40" y="79" fill="#b8ccd5" font-family="Arial, sans-serif" font-size="16">The charge cue starts faint, then tightens and accelerates into a denser pressure field near full charge.</text>
+
+  <g transform="translate(40 115)">
+    <rect width="320" height="220" rx="10" fill="url(#panelBg)" stroke="#263746"/>
+    <rect y="176" width="320" height="44" fill="url(#ground)"/>
+    <text x="18" y="32" fill="#eef9ff" font-family="Arial, sans-serif" font-size="17" font-weight="700">Early Hold</text>
+    <text x="18" y="56" fill="#b8ccd5" font-family="Arial, sans-serif" font-size="13">Faint dust + one soft pressure ring</text>
+    <ellipse cx="160" cy="175" rx="72" ry="15" fill="none" stroke="#dff8ff" stroke-width="2" opacity=".28"/>
+    <path d="M96 126c-18-10-28 8-16 20" stroke="#dff8ff" stroke-width="2" fill="none" opacity=".22" stroke-linecap="round"/>
+    <path d="M224 126c18-10 28 8 16 20" stroke="#dff8ff" stroke-width="2" fill="none" opacity=".22" stroke-linecap="round"/>
+    <use href="#drake" x="160" y="120"/>
+    <use href="#dust" x="160" y="184" opacity=".45"/>
+  </g>
+
+  <g transform="translate(390 115)">
+    <rect width="320" height="220" rx="10" fill="url(#panelBg)" stroke="#263746"/>
+    <rect y="176" width="320" height="44" fill="url(#ground)"/>
+    <text x="18" y="32" fill="#eef9ff" font-family="Arial, sans-serif" font-size="17" font-weight="700">Mid Charge</text>
+    <text x="18" y="56" fill="#b8ccd5" font-family="Arial, sans-serif" font-size="13">Two rings + visible inward air arcs</text>
+    <ellipse cx="160" cy="176" rx="92" ry="18" fill="none" stroke="#dff8ff" stroke-width="3" opacity=".52"/>
+    <ellipse cx="160" cy="154" rx="52" ry="10" fill="none" stroke="#ffffff" stroke-width="2" opacity=".34"/>
+    <path d="M86 123c-28-16-44 12-24 30" stroke="#dff8ff" stroke-width="3" fill="none" opacity=".45" stroke-linecap="round"/>
+    <path d="M234 123c28-16 44 12 24 30" stroke="#dff8ff" stroke-width="3" fill="none" opacity=".45" stroke-linecap="round"/>
+    <use href="#drake" x="160" y="116"/>
+    <use href="#dust" x="160" y="186" opacity=".68"/>
+  </g>
+
+  <g transform="translate(740 115)">
+    <rect width="320" height="220" rx="10" fill="url(#panelBg)" stroke="#263746"/>
+    <rect y="176" width="320" height="44" fill="url(#ground)"/>
+    <text x="18" y="32" fill="#eef9ff" font-family="Arial, sans-serif" font-size="17" font-weight="700">Full Charge</text>
+    <text x="18" y="56" fill="#b8ccd5" font-family="Arial, sans-serif" font-size="13">Dense pressure field, ready to burst</text>
+    <ellipse cx="160" cy="178" rx="112" ry="22" fill="none" stroke="#dff8ff" stroke-width="4" opacity=".78"/>
+    <ellipse cx="160" cy="153" rx="72" ry="14" fill="none" stroke="#ffffff" stroke-width="3" opacity=".58"/>
+    <ellipse cx="160" cy="131" rx="38" ry="8" fill="none" stroke="#ffffff" stroke-width="2" opacity=".42"/>
+    <path d="M72 112c-42-20-58 22-30 48" stroke="#dff8ff" stroke-width="4" fill="none" opacity=".66" stroke-linecap="round"/>
+    <path d="M248 112c42-20 58 22 30 48" stroke="#dff8ff" stroke-width="4" fill="none" opacity=".66" stroke-linecap="round"/>
+    <path d="M104 91c-24-22-60-6-64 22" stroke="#dff8ff" stroke-width="3" fill="none" opacity=".34" stroke-linecap="round"/>
+    <path d="M216 91c24-22 60-6 64 22" stroke="#dff8ff" stroke-width="3" fill="none" opacity=".34" stroke-linecap="round"/>
+    <use href="#drake" x="160" y="110"/>
+    <use href="#dust" x="160" y="188" opacity=".9"/>
+  </g>
+</svg>

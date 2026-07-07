@@ -61,11 +61,17 @@ The sequence preview is planning art, not a literal particle implementation. It 
 - flap shows downwash from the body and wing sweep;
 - boost/trails stretch behind the model to make speed direction legible.
 
+## Launch Charge Ramp Preview
+
+![AvatarFlight launch charge wind VFX ramp](assets/avatar-flight-wind-vfx-charge-ramp.svg)
+
+Launch charge should ramp smoothly rather than snapping between low, medium, and high particle systems. At early hold, the effect is faint: a soft ground ring, light dust, and barely visible inward air pull. As normalized charge approaches full, rings become denser, air arcs tighten around the body, dust grows more active, and the cue becomes somewhat intense without becoming an opaque aura.
+
 ## Initial Trigger Model
 
 Use these trigger patterns:
 
-- Launch charge: persistent cue while grounded launch hold is active, with intensity driven by normalized hold duration.
+- Launch charge: persistent cue while grounded launch hold is active, with intensity driven by normalized hold duration. The effect should ramp smoothly from faint to somewhat intense as charge approaches full.
 - Launch release: one-shot state-entry burst when `launchApplied` is true.
 - Flap: one-shot burst when `jumpApplied` is true.
 - Boost: one-shot burst when `boostApplied` is true, with optional short follow-through during the active boost window.
@@ -77,7 +83,7 @@ Default visibility should be all nearby players. The config can still expose an 
 
 ## Open Questions
 
-- Should launch charge intensity be represented by swapping between discrete particle systems, scaling spawn rate through config, or emitting repeated short pulses?
+- Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
 - Should fast-flight trails attach to named model nodes, fixed offsets, or both?
 
 ## Testing and Validation Notes
@@ -96,3 +102,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided to maintain this document as a living spec while brainstorming and implementation decisions are made.
 - 2026-07-07: Decided high-speed trails should appear whenever the dragon qualifies for fast-flight recharge, including boost, diving, and fast gliding.
 - 2026-07-07: Decided AvatarFlight wind effects should be visible to all nearby players by default.
+- 2026-07-07: Decided launch charge should use a smooth intensity ramp that starts faint and builds to a somewhat intense wind-pressure cue at full charge.
