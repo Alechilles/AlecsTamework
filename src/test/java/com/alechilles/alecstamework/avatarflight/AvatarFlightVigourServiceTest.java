@@ -84,6 +84,16 @@ class AvatarFlightVigourServiceTest {
         assertEquals(1700L, delayed.state().lastUpdateAtMs());
         assertEquals(1750L, delayed.state().rechargeBlockedUntilMs());
 
+        AvatarFlightVigourService.Result directRecovery = AvatarFlightVigourService.recharge(
+                spent,
+                CONFIG,
+                false,
+                16.0,
+                9750L
+        );
+        assertEquals(5.0, directRecovery.state().charges(), EPSILON,
+                "fast recharge must start at blockedUntil even without an intermediate delayed tick");
+
         AvatarFlightVigourService.Result recovered = AvatarFlightVigourService.recharge(
                 delayed.state(),
                 CONFIG,
@@ -93,7 +103,7 @@ class AvatarFlightVigourServiceTest {
         );
 
         assertEquals(AvatarFlightVigourService.RechargeMode.FAST_FLIGHT, recovered.mode());
-        assertEquals(5.00625, recovered.state().charges(), EPSILON);
+        assertEquals(5.0, recovered.state().charges(), EPSILON);
         assertTrue(recovered.state().charges() < 6.0, "post-delay fast recharge must not restore two charges");
         assertEquals(9750L, recovered.state().lastUpdateAtMs());
     }
@@ -161,7 +171,7 @@ class AvatarFlightVigourServiceTest {
         );
 
         assertEquals(AvatarFlightVigourService.RechargeMode.FAST_FLIGHT, afterDelay.mode());
-        assertEquals(4.0625, afterDelay.state().charges(), EPSILON);
+        assertEquals(4.03125, afterDelay.state().charges(), EPSILON);
     }
 
     private static void setNestedField(Object target, String nestedFieldName, String fieldName, Object value)

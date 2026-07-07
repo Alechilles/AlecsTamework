@@ -57,7 +57,8 @@ public final class AvatarFlightVigourService {
             return new Result(new State(charges, nowMs, blockedUntilMs), RechargeMode.NONE);
         }
 
-        long elapsedMs = elapsedMillis(state.lastUpdateAtMs(), nowMs);
+        long elapsedStartMs = eligibleElapsedStart(state.lastUpdateAtMs(), blockedUntilMs, nowMs);
+        long elapsedMs = elapsedMillis(elapsedStartMs, nowMs);
         double gain = elapsedMs / (cadence.secondsPerCharge() * MILLIS_PER_SECOND);
         double recharged = clamp(charges + gain, 0.0, maxCharges);
         return new Result(new State(recharged, nowMs, blockedUntilMs), cadence.mode());
@@ -144,6 +145,16 @@ public final class AvatarFlightVigourService {
         }
         long elapsed = nowMs - lastUpdateAtMs;
         return elapsed < 0L ? Long.MAX_VALUE : elapsed;
+    }
+
+    private static long eligibleElapsedStart(long lastUpdateAtMs, long blockedUntilMs, long nowMs) {
+        if (blockedUntilMs == 0L || nowMs < blockedUntilMs) {
+            return lastUpdateAtMs;
+        }
+        if (lastUpdateAtMs == 0L) {
+            return blockedUntilMs;
+        }
+        return Math.max(lastUpdateAtMs, blockedUntilMs);
     }
 
     private static long addDelay(long nowMs, long delayMs) {
