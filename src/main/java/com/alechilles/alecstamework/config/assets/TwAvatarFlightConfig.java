@@ -94,7 +94,7 @@ public final class TwAvatarFlightConfig implements
             .documentation("Low-speed acceleration toward the GlideStartKickSpeed floor during level forward glide. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("NeutralGlideDeceleration", Codec.DOUBLE),
-                    (settings, value) -> settings.neutralGlideDeceleration = nonNegativeOrDefault(value, 2.0),
+                    (settings, value) -> settings.neutralGlideDeceleration = nonNegativeOrDefault(value, 0.15),
                     settings -> settings.neutralGlideDeceleration)
             .documentation("Speed decay toward the GlideStartKickSpeed floor during level forward glide. Inheritance: missing nested key inherits parent value.")
             .add()
@@ -1017,7 +1017,7 @@ public final class TwAvatarFlightConfig implements
         private double maxGlideSpeed = 15.0;
         private double neutralGlideSpeed = 6.0;
         private double neutralGlideAcceleration = 4.0;
-        private double neutralGlideDeceleration = 2.0;
+        private double neutralGlideDeceleration = 0.15;
         private double glideStartKickSpeed = 1.5;
         private double forwardAcceleration = 18.0;
         private double maxBackwardSpeed = 3.0;

@@ -417,10 +417,10 @@ class AvatarFlightControllerTest {
         }
 
         double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
-        assertTrue(horizontalSpeed < CONFIG.getMovement().getMaxForwardSpeed() - 3.0,
-                "unpowered level glide should bleed speed over time");
+        assertTrue(horizontalSpeed < CONFIG.getMovement().getMaxForwardSpeed() - 0.2,
+                "unpowered level glide should bleed speed gradually over time");
         assertTrue(horizontalSpeed > CONFIG.getMovement().getNeutralGlideSpeed(),
-                "neutral glide should decay over time instead of snapping to stall speed");
+                "neutral glide should not snap down toward stall speed after only a couple seconds");
     }
 
     @Test
@@ -433,7 +433,7 @@ class AvatarFlightControllerTest {
                 0L
         );
         AvatarFlightController.Output output = null;
-        for (int tick = 0; tick < 40; tick++) {
+        for (int tick = 0; tick < 120; tick++) {
             output = update(
                     state,
                     input(1.0, false, false, false, false, 0.0)
@@ -452,6 +452,38 @@ class AvatarFlightControllerTest {
                 "flat unpowered flight should keep bleeding speed instead of preserving neutral cruise forever");
         assertTrue(output.velocityY() < -CONFIG.getMovement().getGlideSinkSpeed() * 2.0,
                 "slowing below neutral cruise should increase sink instead of preserving the old vertical velocity");
+    }
+
+    @Test
+    void shallowNegativePitchDoesNotBleedSpeedFasterThanShallowClimb() {
+        AvatarFlightController.State shallowDiveState = new AvatarFlightController.State(
+                0.0,
+                0.0,
+                -CONFIG.getMovement().getMaxForwardSpeed(),
+                0L,
+                0L
+        );
+        AvatarFlightController.State shallowClimbState = shallowDiveState;
+        AvatarFlightController.Output shallowDive = null;
+        AvatarFlightController.Output shallowClimb = null;
+        for (int tick = 0; tick < 40; tick++) {
+            shallowDive = update(
+                    shallowDiveState,
+                    input(1.0, false, false, false, false, Math.toRadians(-3.0))
+            );
+            shallowClimb = update(
+                    shallowClimbState,
+                    input(1.0, false, false, false, false, Math.toRadians(10.0))
+            );
+            shallowDiveState = stateFrom(shallowDive);
+            shallowClimbState = stateFrom(shallowClimb);
+        }
+
+        double shallowDiveSpeed = Math.hypot(shallowDive.velocityX(), shallowDive.velocityZ());
+        double shallowClimbSpeed = Math.hypot(shallowClimb.velocityX(), shallowClimb.velocityZ());
+        assertTrue(shallowDiveSpeed >= shallowClimbSpeed - 0.1,
+                "neutral/shallow downward glide should preserve at least as much horizontal momentum as a shallow climb;"
+                        + " shallowDiveSpeed=" + shallowDiveSpeed + ", shallowClimbSpeed=" + shallowClimbSpeed);
     }
 
     @Test
@@ -572,8 +604,10 @@ class AvatarFlightControllerTest {
         }
 
         double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
-        assertTrue(horizontalSpeed < CONFIG.getMovement().getNeutralGlideSpeed(),
+        assertTrue(horizontalSpeed < CONFIG.getMovement().getMaxGlideSpeed() - 1.0,
                 "a shallow negative pitch must not preserve max glide speed indefinitely");
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getNeutralGlideSpeed(),
+                "a shallow negative pitch should bleed momentum gradually instead of dumping to stall speed");
         assertTrue(altitudeChange < -8.0,
                 "a shallow negative pitch should still pay baseline glide sink; altitudeChange=" + altitudeChange);
     }

@@ -74,7 +74,7 @@ class TwAvatarFlightConfigTest {
         assertEquals(15.0, config.getMovement().getMaxGlideSpeed(), 0.00001);
         assertEquals(6.0, config.getMovement().getNeutralGlideSpeed(), 0.00001);
         assertEquals(4.0, config.getMovement().getNeutralGlideAcceleration(), 0.00001);
-        assertEquals(2.0, config.getMovement().getNeutralGlideDeceleration(), 0.00001);
+        assertEquals(0.15, config.getMovement().getNeutralGlideDeceleration(), 0.00001);
         assertEquals(1.5, config.getMovement().getGlideStartKickSpeed(), 0.00001);
         assertEquals(1.0, config.getMovement().getGlideSinkSpeed(), 0.00001);
         assertEquals(2.0, config.getMovement().getGlideSinkAcceleration(), 0.00001);

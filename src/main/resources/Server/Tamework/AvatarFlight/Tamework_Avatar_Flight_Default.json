@@ -16,7 +16,7 @@
     "MaxGlideSpeed": 15.0,
     "NeutralGlideSpeed": 6.0,
     "NeutralGlideAcceleration": 4.0,
-    "NeutralGlideDeceleration": 2.0,
+    "NeutralGlideDeceleration": 0.15,
     "GlideStartKickSpeed": 1.5,
     "ForwardAcceleration": 18.0,
     "MaxBackwardSpeed": 3.0,
