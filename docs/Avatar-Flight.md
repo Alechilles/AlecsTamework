@@ -6,6 +6,7 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
+- Holding jump on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
 - Left-click with Flightmaster's Reins performs an upward flap.
 - Right-click with Flightmaster's Reins applies the airbrake.
 - Q with Flightmaster's Reins performs a forward boost.
@@ -14,7 +15,7 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 
 ## Vigour
 
-Vigour is a charge resource for avatar-flight movement abilities. Successful upward flaps and forward boosts spend charges. When Vigour reaches zero, those movement abilities stop applying until charges recover.
+Vigour is a charge resource for avatar-flight movement abilities. Successful charged launches, upward flaps, and forward boosts spend charges. When Vigour reaches zero, those movement abilities stop applying until charges recover.
 
 Default balance:
 
@@ -30,11 +31,19 @@ Fast-flight recharge uses boosted max horizontal speed, calculated as `Movement.
 
 The recharge delay means a spent charge requires the delay plus the recharge cadence. With defaults, one airborne fast-flight charge after spending requires `0.75 + 8 = 8.75` seconds of continuous qualifying speed.
 
+## Launch
+
+Charged launch is the default takeoff path for avatar flight. With `Launch.PreferredInput` set to `JumpHold`, a grounded jump hold starts charging instead of immediately feeding jump into normal flight input. Releasing before `Launch.MinChargeMs` cancels the launch, while releasing after the minimum applies a charge-scaled upward and forward impulse.
+
+Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-loads some launch strength after the minimum hold, while still rewarding longer charge time. Partial launches cost `1` Vigour by default, and launches at or above `Launch.FullChargeCostThreshold` cost `2`.
+
 ## Glide Balance
 
 Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: it recovers or decays toward `Movement.NeutralGlideSpeed`, which defaults to `6`, while higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
 
 Sink rate scales with speed. At or above `Movement.StallSpeedThreshold`, neutral glide uses `Movement.GlideSinkSpeed`. As horizontal speed falls toward zero, sink blends toward `Movement.StallSinkSpeed`, so stalled or nearly stalled flight loses altitude much faster than a clean glide.
+
+The default maneuver curve is tuned so a clean unboosted steep dive followed by a moderate pull-up can recover most, but not all, of the lost altitude. Controller regression tests keep that recovery in the roughly `60%` to `85%` band so strong flight lines feel rewarding without allowing infinite no-Vigour loops.
 
 ## HUD
 
@@ -55,6 +64,42 @@ The compact avatar-flight HUD appears above the hotbar while avatar flight is ac
 - `GlideSinkAcceleration`: rate at which glide approaches the sink speed.
 - `StallSpeedThreshold`: horizontal speed where low-speed sink starts blending toward stall sink.
 - `StallSinkSpeed`: target downward speed when forward glide is nearly stalled.
+
+### Curve
+
+- `DiveLoadRampSeconds`: seconds for dive pitch load to ramp in.
+- `DiveLoadDecaySeconds`: seconds for dive pitch load to decay.
+- `DivePitchExponent`: exponent applied to normalized downward pitch when gaining dive speed.
+- `ClimbLoadRampSeconds`: seconds for climb pitch load to ramp in.
+- `ClimbLoadDecaySeconds`: seconds for climb pitch load to decay.
+- `ClimbPitchExponent`: exponent applied to normalized upward pitch when spending speed for lift.
+- `ClimbSpeedEligibilityExponent`: exponent applied to speed eligibility for climb lift.
+- `BoostedSpeedDecay`: speed decay after boosted flight when above `MaxGlideSpeed`.
+
+### Boost
+
+- `ForwardImpulse`: forward boost impulse.
+- `CooldownSeconds`: seconds between boost activations.
+- `DurationSeconds`: time a detected boost pulse remains active.
+- `Directional`: when true, the boost follows look pitch instead of applying only horizontal speed.
+- `UpwardPitchLiftMultiplier`: multiplier for upward directional boost lift.
+- `UpwardPitchLiftCap`: maximum upward impulse from directional boost. Flaps remain the stronger raw vertical lift tool.
+
+### Launch
+
+- `Enabled`: enables charged launch.
+- `PreferredInput`: primary launch input path. Valid values are `JumpHold` and `ReinsPrimaryHold`.
+- `FallbackInput`: fallback launch input path.
+- `MinChargeMs`: minimum hold before release applies launch.
+- `MaxChargeMs`: hold duration that reaches full launch charge.
+- `ChargeExponent`: exponent applied to normalized charge amount.
+- `MinUpImpulse`: vertical impulse at minimum charge.
+- `MaxUpImpulse`: vertical impulse at full charge.
+- `MinForwardImpulse`: forward impulse at minimum charge.
+- `MaxForwardImpulse`: forward impulse at full charge.
+- `PartialChargeCost`: Vigour cost for a partial charged launch.
+- `FullChargeCost`: Vigour cost for a full charged launch.
+- `FullChargeCostThreshold`: normalized charge threshold that spends `FullChargeCost`.
 
 ### Vigour
 
