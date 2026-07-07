@@ -50,6 +50,18 @@ The effect language should feel physical:
 
 Color should stay mostly white, pale blue, and low-opacity grey. Dust can use warm ground tones when emitted near terrain. Avoid green/gold Vigour motes for the first version.
 
+## Effect Concepts
+
+Default effect concepts:
+
+- Launch charge: inward ground-level pressure rings and dust, building smoothly as the launch hold approaches full charge.
+- Launch release: one clean expanding ground shock ring plus a short upward air column to sell the stored force releasing into takeoff.
+- Flap: brief downwash arcs from the wings/body, lighter than launch and focused on lift.
+- Boost: horizontal compression streaks behind and around the dragon, stronger than flap but shorter and punchier than persistent speed trails.
+- Fast-flight trails: thin wingtip ribbons that appear only while the dragon is at or above the fast-flight recharge speed threshold.
+
+Flap and boost can share low-level art ingredients, such as wind textures, arc spawners, or common translucent materials. They should still be separate authored particle systems so duration, orientation, spawn shape, and intensity can differ without awkward runtime parameter branching.
+
 ## Effect Sequence Preview
 
 ![AvatarFlight wind VFX sequence](assets/avatar-flight-wind-vfx-sequence.svg)
@@ -121,7 +133,6 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- What should each effect emphasize visually: launch charge/release, flap lift, forward boost, and fast-flight trails?
 - How intense should the default effects be in normal play so they read clearly without becoming visual clutter?
 
 ## Testing and Validation Notes
@@ -149,3 +160,5 @@ Expected validation once implemented:
 - 2026-07-07: Decided the missing-node warning cache should reset when relevant AvatarFlight config or model assets are reloaded.
 - 2026-07-07: Decided fallback attachment resolution should be cached per active model/config pair.
 - 2026-07-07: Decided to stop drilling into attachment implementation details for now and refocus the spec on the effect designs themselves.
+- 2026-07-07: Accepted the default effect concepts: smooth inward launch charge, launch shock ring plus upward air column, light flap downwash, punchy horizontal boost streaks, and thin fast-flight wingtip trails.
+- 2026-07-07: Decided flap and boost may share art ingredients but should be separate authored particle systems.
