@@ -57,6 +57,7 @@ Default effect concepts:
 
 - Launch charge: inward ground-level pressure rings and dust, building smoothly as the launch hold approaches full charge.
 - Launch release: one clean expanding ground shock ring plus a short upward air column to sell the stored force releasing into takeoff. Burst size/intensity should scale with final launch charge amount.
+- Launch cancel: if the player releases before minimum charge, play a tiny dissipating puff so the held charge visibly fizzles without implying a successful launch.
 - Flap: brief downwash arcs from the wings/body, lighter than launch and focused on lift.
 - Boost: horizontal compression streaks behind and around the dragon, stronger than flap but shorter and punchier than persistent speed trails.
 - Airbrake: subtle forward-facing wind shear or compression arcs that read as drag, not as a powered burst. The primary cue is world/velocity-oriented in front of and slightly around the dragon; secondary model-attached wisps near wing/body edges keep the effect visually connected to the model.
@@ -67,6 +68,7 @@ Flap and boost can share low-level art ingredients, such as wind textures, arc s
 Default intensity targets:
 
 - Launch charge: starts faint and ramps to medium-high at full charge.
+- Launch cancel: very low; a small dissipating cue only.
 - Launch release: scales from moderate at minimum successful charge to medium-high at full charge; strong enough to mark takeoff, not a screen-filling blast.
 - Flap: medium-low; readable downwash, deliberately lighter than launch or boost.
 - Boost: medium-high; punchy horizontal force cue with short duration.
@@ -174,6 +176,7 @@ Inference: named-node attachment is appropriate for curated AvatarFlight profile
 Use these trigger patterns:
 
 - Launch charge: persistent cue while grounded launch hold is active, with intensity driven by normalized hold duration. The effect should ramp smoothly from faint to somewhat intense as charge approaches full.
+- Launch cancel: tiny one-shot dissipating puff when launch hold releases below the minimum charge and no launch is applied.
 - Launch release: one-shot state-entry burst when `launchApplied` is true.
 - Flap: one-shot burst when `jumpApplied` is true.
 - Boost: one-shot burst when `boostApplied` is true, with optional short follow-through during the active boost window.
@@ -187,7 +190,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should launch charge cancellation below minimum charge play a tiny dissipating puff, or simply stop with no release effect?
+- Should the launch cancel puff share the launch-charge pulse particle system at very low scale, or use its own tiny cancel particle system?
 
 ## Testing and Validation Notes
 
@@ -227,3 +230,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided launch release scaling should use configurable scale/intensity tiers, with partial/mid/full as the first-pass tier shape.
 - 2026-07-07: Accepted first-pass release VFX thresholds: partial `<0.45`, mid `0.45` to `<0.8`, full `0.8+`.
 - 2026-07-07: Decided launch-charge pulse cadence and intensity should interpolate continuously instead of snapping to release-tier thresholds.
+- 2026-07-07: Decided canceled pre-minimum launch releases should play a tiny dissipating puff.
