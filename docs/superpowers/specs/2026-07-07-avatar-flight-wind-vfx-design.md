@@ -45,7 +45,7 @@ The effect language should feel physical:
 - launch release: a compressed ground ring expands outward as the dragon is pushed up;
 - flap: a quick downward/upward air burst from wings and body, implying lift;
 - boost: horizontal pressure streaks and a short shock-cone push behind the dragon;
-- high-speed trails: thin translucent wind ribbons from model nodes while speed remains high.
+- high-speed trails: thin translucent wind ribbons from model nodes while speed remains high enough for fast-flight recharge.
 
 Color should stay mostly white, pale blue, and low-opacity grey. Dust can use warm ground tones when emitted near terrain. Avoid green/gold Vigour motes for the first version.
 
@@ -68,7 +68,7 @@ Use these trigger patterns:
 - Launch release: one-shot state-entry burst when `launchApplied` is true.
 - Flap: one-shot burst when `jumpApplied` is true.
 - Boost: one-shot burst when `boostApplied` is true, with optional short follow-through during the active boost window.
-- Fast-flight trails: persistent cue while fast-flight/speed threshold is active, with a clear stop path when speed falls below threshold or AvatarFlight exits.
+- Fast-flight trails: persistent cue while the player is moving fast enough to qualify for fast-flight recharge, whether that speed comes from Q boost, diving, or clean high-speed gliding. Trails need a clear stop path when speed falls below threshold or AvatarFlight exits.
 
 The implementation should avoid embedding particle spawning directly in `AvatarFlightController`, which is currently pure velocity logic. A dedicated AvatarFlight VFX/presentation service should consume controller output from the movement system or a nearby orchestration point.
 
@@ -76,7 +76,6 @@ The implementation should avoid embedding particle spawning directly in `AvatarF
 
 - Should launch charge intensity be represented by swapping between discrete particle systems, scaling spawn rate through config, or emitting repeated short pulses?
 - Should fast-flight trails attach to named model nodes, fixed offsets, or both?
-- Should boost trails trigger only during active boost, or also during non-boost dives above the fast-flight recharge speed threshold?
 - Should effects be visible to all nearby players, the owner only, or configurable per effect?
 
 ## Testing and Validation Notes
@@ -93,3 +92,4 @@ Expected validation once implemented:
 
 - 2026-07-07: Chose `Wind Pressure` as the primary visual direction over Vigour-energy or hybrid magical effects.
 - 2026-07-07: Decided to maintain this document as a living spec while brainstorming and implementation decisions are made.
+- 2026-07-07: Decided high-speed trails should appear whenever the dragon qualifies for fast-flight recharge, including boost, diving, and fast gliding.
