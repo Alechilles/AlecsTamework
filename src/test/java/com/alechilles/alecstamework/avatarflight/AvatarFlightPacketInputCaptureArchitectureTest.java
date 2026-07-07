@@ -52,8 +52,10 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
 
         assertTrue(source.contains("MovementStates packetStates = resolvePacketMovementStates(packet);"),
                 "capture must keep packet-provided states separate from component fallback states");
-        assertTrue(source.contains("input.setJumping(packetStates != null && (packetStates.jumping || packetStates.swimJumping))"),
+        assertTrue(source.contains("boolean jumpHeld = packetStates != null && (packetStates.jumping || packetStates.swimJumping)"),
                 "jump must not be latched from MovementStatesComponent fallback");
+        assertTrue(source.contains("input.setJumping(!suppressGroundLaunchJump && jumpHeld)"),
+                "grounded launch charge should suppress raw jump only while preserving packet-state-only jump capture");
         assertTrue(source.contains("input.setCrouching(packetStates != null && (packetStates.crouching || packetStates.forcedCrouching))"),
                 "crouch must not be latched from MovementStatesComponent fallback");
         assertTrue(!source.contains("states == null ? !stale && input.isJumping()"),
@@ -70,6 +72,18 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "sprint boost must use packet sprint edges only; movement fallback includes our own fast-flight animation sprint state");
         assertFalse(source.contains("input.setSprinting(movementStates != null && movementStates.sprinting)"),
                 "feeding MovementStatesComponent sprint back into boost intent repeats boosts on cooldown");
+    }
+
+    @Test
+    void jumpHoldLaunchChargeIsCapturedAndCanBeCancelled() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("beginLaunchCharge"),
+                "grounded held jump should begin a charged launch when configured");
+        assertTrue(source.contains("queueLaunchRelease"),
+                "releasing grounded jump after charge should queue a one-shot launch release");
+        assertTrue(source.contains("cancelLaunchCharge"),
+                "leaving the configured launch state should cancel an in-progress charge");
     }
 
     @Test

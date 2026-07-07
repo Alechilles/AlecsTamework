@@ -93,6 +93,34 @@ class AvatarFlightMovementSystemTest {
         assertEquals(AvatarFlightVigourService.RechargeMode.NONE.name(), flight.getVigourRechargeMode());
     }
 
+    @Test
+    void launchIsBlockedWhenVigourCannotPayCost() throws Exception {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+        AvatarFlightComponent flight = new AvatarFlightComponent("default", 1000L);
+        flight.setVigourCharges(0.0);
+        flight.setLastVigourUpdateAtMs(1000L);
+        AvatarFlightController.Input input = new AvatarFlightController.Input(
+                0.0,
+                0.0,
+                0.0,
+                false,
+                false,
+                false,
+                false,
+                true,
+                0.0,
+                0.0,
+                true,
+                true,
+                true,
+                3000L
+        );
+
+        AvatarFlightController.Input authorized = authorizeVigour(input, flight, config, 2000L);
+
+        assertFalse(authorized.launchAllowed());
+    }
+
     private static AvatarFlightController.Input authorizeVigour(AvatarFlightController.Input input,
                                                                AvatarFlightComponent flight,
                                                                TwAvatarFlightConfig config,

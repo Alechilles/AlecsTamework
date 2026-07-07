@@ -13,7 +13,7 @@ public final class AvatarFlightController {
     private static final double NEUTRAL_PITCH_RADIANS = Math.toRadians(2.0);
     private static final double MAX_PHYSICAL_PITCH_UP_RADIANS = Math.toRadians(60.0);
     private static final double MAX_VISUAL_ROLL_RADIANS = Math.toRadians(30.0);
-    private static final double PITCH_UP_FORWARD_DRAG_MULTIPLIER = 4.0;
+    private static final double PITCH_UP_FORWARD_DRAG_MULTIPLIER = 1.4;
     private static final double STRAFE_ROLL_GAIN = 1.5;
     private static final double TURN_ROLL_GAIN = 1.35;
 
@@ -26,6 +26,7 @@ public final class AvatarFlightController {
                                 @Nonnull TwAvatarFlightConfig config,
                                 double dt,
                                 long nowMs) {
+        dt = Math.max(0.0, dt);
         TwAvatarFlightConfig.MovementSettings movement = config.getMovement();
         double yaw = input.yawRadians();
         double forwardX = -Math.sin(yaw);
@@ -47,14 +48,64 @@ public final class AvatarFlightController {
         double pitchUpAmount = pitchUpAmount(effectivePitchRadians);
         boolean pitchDownIntent = effectivePitchRadians < 0.0;
 
+        long nextJumpAtMs = state.nextJumpAtMs();
+        long nextBoostAtMs = state.nextBoostAtMs();
+        long nextLaunchAtMs = state.nextLaunchAtMs();
         boolean jumpIntent = (input.jump() || input.verticalAxis() > 0.0) && input.flapAllowed();
         boolean descendIntent = input.crouch() || input.verticalAxis() < 0.0;
         boolean explicitAirbrakeIntent = input.airbrake();
+        if (config.getLaunch().isEnabled()
+                && input.onGround()
+                && input.launchAllowed()
+                && input.launchHoldMs() >= config.getLaunch().getMinChargeMs()
+                && (nextLaunchAtMs == 0L || nowMs >= nextLaunchAtMs)) {
+            AvatarFlightLaunchCurve.Impulse impulse = AvatarFlightLaunchCurve.impulse(
+                    config.getLaunch(),
+                    input.launchHoldMs()
+            );
+            double launchCost = AvatarFlightLaunchCurve.cost(config.getLaunch(), input.launchHoldMs());
+            nextLaunchAtMs = nowMs + Math.round(config.getJump().getCooldownSeconds() * 1000.0);
+            return new Output(
+                    AvatarFlightMode.LAUNCHING,
+                    forwardX * impulse.forward(),
+                    impulse.up(),
+                    forwardZ * impulse.forward(),
+                    nextJumpAtMs,
+                    nextBoostAtMs,
+                    nextLaunchAtMs,
+                    0.0,
+                    0.0,
+                    true,
+                    false,
+                    false,
+                    true,
+                    launchCost,
+                    false,
+                    false,
+                    input.pitchRadians(),
+                    0.0
+            );
+        }
         if (input.onGround() && !jumpIntent) {
             return new Output(AvatarFlightMode.GROUNDED, 0.0, 0.0, 0.0,
-                    state.nextJumpAtMs(), state.nextBoostAtMs(), false, false, false,
+                    nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, 0.0, 0.0, false, false, false, false, 0.0,
                     true, false, 0.0, 0.0);
         }
+        boolean pitchControlsActive = !explicitAirbrakeIntent && !descendIntent;
+        double diveLoad = AvatarFlightManeuverMath.updateLoad(
+                state.diveLoad(),
+                pitchControlsActive && effectivePitchRadians < 0.0,
+                dt,
+                config.getCurve().getDiveLoadRampSeconds(),
+                config.getCurve().getDiveLoadDecaySeconds()
+        );
+        double climbLoad = AvatarFlightManeuverMath.updateLoad(
+                state.climbLoad(),
+                pitchControlsActive && effectivePitchRadians > 0.0,
+                dt,
+                config.getCurve().getClimbLoadRampSeconds(),
+                config.getCurve().getClimbLoadDecaySeconds()
+        );
 
         if (explicitAirbrakeIntent) {
             targetForwardSpeed = approach(targetForwardSpeed, 0.0, movement.getAirbrakeDeceleration() * dt);
@@ -103,8 +154,6 @@ public final class AvatarFlightController {
 
         boolean jumpApplied = false;
         boolean boostApplied = false;
-        long nextJumpAtMs = state.nextJumpAtMs();
-        long nextBoostAtMs = state.nextBoostAtMs();
         double boostDurationSeconds = config.getBoost().getDurationSeconds();
         long boostDurationMs = Math.round(boostDurationSeconds * 1000.0);
         long boostCooldownMs = Math.round(config.getBoost().getCooldownSeconds() * 1000.0);
@@ -120,11 +169,28 @@ public final class AvatarFlightController {
                 && input.sprint()
                 && input.boostAllowed()
                 && (nextBoostAtMs == 0L || nowMs >= nextBoostAtMs)) {
-            targetForwardSpeed = Math.min(
-                    boostedHorizontalCap,
-                    Math.max(Math.max(targetForwardSpeed, currentForwardSpeed), 0.0)
-                            + config.getBoost().getForwardImpulse()
-            );
+            double boost = config.getBoost().getForwardImpulse();
+            if (config.getBoost().isDirectional()) {
+                double absPitch = Math.abs(effectivePitchRadians);
+                double horizontalImpulse = boost * Math.cos(absPitch);
+                targetForwardSpeed = Math.min(
+                        boostedHorizontalCap,
+                        Math.max(Math.max(targetForwardSpeed, currentForwardSpeed), 0.0) + horizontalImpulse
+                );
+                if (effectivePitchRadians < 0.0) {
+                    vertical -= boost * Math.sin(absPitch);
+                } else if (effectivePitchRadians > 0.0) {
+                    vertical += Math.min(
+                            boost * Math.sin(absPitch) * config.getBoost().getUpwardPitchLiftMultiplier(),
+                            config.getBoost().getUpwardPitchLiftCap()
+                    );
+                }
+            } else {
+                targetForwardSpeed = Math.min(
+                        boostedHorizontalCap,
+                        Math.max(Math.max(targetForwardSpeed, currentForwardSpeed), 0.0) + boost
+                );
+            }
             nextBoostAtMs = nowMs + boostCooldownMs;
             boostActive = true;
             boostApplied = true;
@@ -146,9 +212,9 @@ public final class AvatarFlightController {
         } else if (descendIntent) {
             vertical = -movement.getDescendSpeed();
             mode = AvatarFlightMode.DESCENDING;
-        } else if (targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE && !neutralPitch) {
+        } else if (!boostApplied && targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE && !neutralPitch) {
             PitchAdjustment pitch = applyPitch(effectivePitchRadians, targetForwardSpeed, vertical,
-                    movement, glideHorizontalCap, dt);
+                    config, glideHorizontalCap, diveLoad, climbLoad, dt);
             targetForwardSpeed = pitch.forwardSpeed();
             vertical = pitch.verticalSpeed();
         } else if (mode == AvatarFlightMode.FORWARD_FLIGHT) {
@@ -159,6 +225,9 @@ public final class AvatarFlightController {
             }
         } else if (!jumpApplied) {
             vertical = approach(vertical, 0.0, movement.getHoverVerticalDamping() * dt);
+        }
+        if (!boostActive && targetForwardSpeed > glideHorizontalCap) {
+            targetForwardSpeed = AvatarFlightManeuverMath.decayBoostedExcess(targetForwardSpeed, config, dt);
         }
 
         vertical = Math.max(-movement.getMaxFallSpeed(), Math.min(movement.getMaxFallSpeed(), vertical));
@@ -189,8 +258,9 @@ public final class AvatarFlightController {
                 targetStrafeSpeed,
                 movement.getMaxBackwardSpeed()
         );
-        return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, applyVelocity, jumpApplied, boostApplied,
-                horizontalIdle, fastFlight, visualPitch, visualRoll);
+        return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, diveLoad, climbLoad,
+                applyVelocity, jumpApplied, boostApplied, false, 0.0, horizontalIdle, fastFlight, visualPitch,
+                visualRoll);
     }
 
     private static double resolveHorizontalSpeedLimit(double currentHorizontalSpeed,
@@ -231,38 +301,53 @@ public final class AvatarFlightController {
     private static PitchAdjustment applyPitch(double pitchRadians,
                                               double forwardSpeed,
                                               double verticalSpeed,
-                                              @Nonnull TwAvatarFlightConfig.MovementSettings movement,
+                                              @Nonnull TwAvatarFlightConfig config,
                                               double glideHorizontalCap,
+                                              double diveLoad,
+                                              double climbLoad,
                                               double dt) {
+        TwAvatarFlightConfig.MovementSettings movement = config.getMovement();
         if (pitchRadians > 0.0) {
-            double amount = pitchUpAmount(pitchRadians);
+            double amount = AvatarFlightManeuverMath.pitchPower(
+                    pitchRadians,
+                    false,
+                    config.getCurve().getClimbPitchExponent()
+            );
+            double turnAmount = pitchUpAmount(pitchRadians);
+            double load = Math.max(0.65, climbLoad);
+            double eligibility = AvatarFlightManeuverMath.climbEligibility(forwardSpeed, config);
             double physicalPitch = Math.min(MAX_PHYSICAL_PITCH_UP_RADIANS, pitchRadians);
-            double drag = movement.getPitchUpSpeedCost() * amount * dt;
             double glideSpeed = Math.max(0.0, forwardSpeed);
+            double drag = movement.getPitchUpSpeedCost() * amount * load * dt;
             double effectiveSpeed = Math.max(0.0, glideSpeed - drag);
-            double energyForwardSpeed = Math.min(movement.getMaxForwardSpeed(),
-                    effectiveSpeed * Math.cos(physicalPitch));
-            double retainedForwardSpeed = Math.max(0.0,
-                    forwardSpeed - drag * PITCH_UP_FORWARD_DRAG_MULTIPLIER);
+            double energyForwardSpeed = Math.max(0.0, effectiveSpeed * Math.cos(physicalPitch));
+            double retainedForwardSpeed = Math.max(0.0, forwardSpeed - drag * PITCH_UP_FORWARD_DRAG_MULTIPLIER);
             double targetForwardSpeed = Math.min(movement.getMaxForwardSpeed(),
                     Math.max(energyForwardSpeed, retainedForwardSpeed));
-            double climbEligibility = pitchUpClimbEligibility(forwardSpeed, movement);
             double climbVerticalSpeed = Math.min(movement.getMaxFallSpeed(),
                     effectiveSpeed * Math.sin(physicalPitch));
             double sinkVerticalSpeed = -glideSinkSpeed(movement, forwardSpeed);
+            double liftBlend = Math.max(0.65, Math.min(1.0, eligibility * load));
             double targetVerticalSpeed = sinkVerticalSpeed
-                    + (climbVerticalSpeed - sinkVerticalSpeed) * climbEligibility;
-            double turnDelta = movement.getPitchUpLiftScale() * Math.max(1.0, glideSpeed) * amount * dt;
+                    + (climbVerticalSpeed - sinkVerticalSpeed) * liftBlend;
+            double turnDelta = movement.getPitchUpLiftScale() * Math.max(1.0, glideSpeed) * turnAmount * dt;
             return new PitchAdjustment(
                     Math.max(0.0, approach(forwardSpeed, targetForwardSpeed, turnDelta)),
                     approach(verticalSpeed, targetVerticalSpeed, turnDelta)
             );
         }
         if (pitchRadians < 0.0) {
-            double amount = Math.min(1.0, -pitchRadians / Math.toRadians(70.0));
+            double amount = AvatarFlightManeuverMath.pitchPower(
+                    pitchRadians,
+                    true,
+                    config.getCurve().getDivePitchExponent()
+            );
+            double load = Math.max(0.0, diveLoad);
+            double gain = movement.getPitchDownSpeedGain() * amount * load * dt;
+            double sink = movement.getPitchDownDiveScale() * amount * (0.35 + 0.65 * load) * dt;
             return new PitchAdjustment(
-                    Math.min(glideHorizontalCap, forwardSpeed + movement.getPitchDownSpeedGain() * amount * dt),
-                    verticalSpeed - movement.getPitchDownDiveScale() * amount * dt
+                    Math.min(glideHorizontalCap, forwardSpeed + gain),
+                    verticalSpeed - sink
             );
         }
         return new PitchAdjustment(forwardSpeed, verticalSpeed);
@@ -273,14 +358,6 @@ public final class AvatarFlightController {
             return 0.0;
         }
         return Math.min(1.0, pitchRadians / Math.toRadians(70.0));
-    }
-
-    private static double pitchUpClimbEligibility(double forwardSpeed,
-                                                  @Nonnull TwAvatarFlightConfig.MovementSettings movement) {
-        double baseline = movement.getNeutralGlideSpeed();
-        double range = Math.max(0.001, movement.getMaxGlideSpeed() - baseline);
-        double ratio = clamp((forwardSpeed - baseline) / range, 0.0, 1.0);
-        return Math.sqrt(ratio);
     }
 
     private static double neutralForwardFlightSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,
@@ -384,7 +461,18 @@ public final class AvatarFlightController {
                         double velocityY,
                         double velocityZ,
                         long nextJumpAtMs,
-                        long nextBoostAtMs) {
+                        long nextBoostAtMs,
+                        double diveLoad,
+                        double climbLoad,
+                        long nextLaunchAtMs) {
+        public State(double velocityX,
+                     double velocityY,
+                     double velocityZ,
+                     long nextJumpAtMs,
+                     long nextBoostAtMs) {
+            this(velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, 0.0, 0.0, 0L);
+        }
+
         @Nonnull
         public static State from(@Nonnull AvatarFlightComponent component) {
             return new State(
@@ -392,7 +480,10 @@ public final class AvatarFlightController {
                     component.getVelocityY(),
                     component.getVelocityZ(),
                     component.getNextJumpAtMs(),
-                    component.getNextBoostAtMs()
+                    component.getNextBoostAtMs(),
+                    component.getDiveLoad(),
+                    component.getClimbLoad(),
+                    component.getNextLaunchAtMs()
             );
         }
     }
@@ -408,7 +499,24 @@ public final class AvatarFlightController {
                         double yawRadians,
                         double pitchRadians,
                         boolean flapAllowed,
-                        boolean boostAllowed) {
+                        boolean boostAllowed,
+                        boolean launchAllowed,
+                        long launchHoldMs) {
+        public Input(double forwardAxis,
+                     double strafeAxis,
+                     double verticalAxis,
+                     boolean jump,
+                     boolean crouch,
+                     boolean sprint,
+                     boolean airbrake,
+                     boolean onGround,
+                     double yawRadians,
+                     double pitchRadians,
+                     boolean flapAllowed,
+                     boolean boostAllowed) {
+            this(forwardAxis, strafeAxis, verticalAxis, jump, crouch, sprint, airbrake, onGround, yawRadians,
+                    pitchRadians, flapAllowed, boostAllowed, true, 0L);
+        }
     }
 
     public record Output(@Nonnull AvatarFlightMode mode,
@@ -417,12 +525,34 @@ public final class AvatarFlightController {
                          double velocityZ,
                          long nextJumpAtMs,
                          long nextBoostAtMs,
+                         long nextLaunchAtMs,
+                         double diveLoad,
+                         double climbLoad,
                          boolean applyVelocity,
                          boolean jumpApplied,
                          boolean boostApplied,
+                         boolean launchApplied,
+                         double launchCost,
                          boolean horizontalIdle,
                          boolean fastFlight,
                          double visualPitchRadians,
                          double visualRollRadians) {
+        public Output(@Nonnull AvatarFlightMode mode,
+                      double velocityX,
+                      double velocityY,
+                      double velocityZ,
+                      long nextJumpAtMs,
+                      long nextBoostAtMs,
+                      boolean applyVelocity,
+                      boolean jumpApplied,
+                      boolean boostApplied,
+                      boolean horizontalIdle,
+                      boolean fastFlight,
+                      double visualPitchRadians,
+                      double visualRollRadians) {
+            this(mode, velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, 0L, 0.0, 0.0, applyVelocity,
+                    jumpApplied, boostApplied, false, 0.0, horizontalIdle, fastFlight, visualPitchRadians,
+                    visualRollRadians);
+        }
     }
 }

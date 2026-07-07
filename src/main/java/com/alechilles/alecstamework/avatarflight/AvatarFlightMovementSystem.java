@@ -109,6 +109,9 @@ public final class AvatarFlightMovementSystem
         flight.setVelocity(output.velocityX(), output.velocityY(), output.velocityZ());
         flight.setNextJumpAtMs(output.nextJumpAtMs());
         flight.setNextBoostAtMs(output.nextBoostAtMs());
+        flight.setNextLaunchAtMs(output.nextLaunchAtMs());
+        flight.setDiveLoad(output.diveLoad());
+        flight.setClimbLoad(output.climbLoad());
         syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
         applyVisualPose(ref, commandBuffer, controllerInput, output);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);
@@ -158,10 +161,11 @@ public final class AvatarFlightMovementSystem
                                                                @Nonnull TwAvatarFlightConfig config,
                                                                long now) {
         if (!config.getVigour().isEnabled()) {
-            return withVigourAuthorization(input, true, true);
+            return withVigourAuthorization(input, true, true, true);
         }
         double flapCost = config.getVigour().getUpwardFlapCost();
         double boostCost = config.getVigour().getForwardBoostCost();
+        double launchCost = AvatarFlightLaunchCurve.cost(config.getLaunch(), input.launchHoldMs());
         AvatarFlightVigourService.State state = new AvatarFlightVigourService.State(
                 flight.getVigourCharges(),
                 flight.getLastVigourUpdateAtMs(),
@@ -177,13 +181,18 @@ public final class AvatarFlightMovementSystem
                 config,
                 boostCost
         );
+        boolean launchAllowed = AvatarFlightVigourService.canSpend(
+                state,
+                config,
+                launchCost
+        );
         if (flapAllowed
                 && flapEligibleThisTick(input, flight, now)
                 && boostEligibleThisTick(input, flight, now)
                 && !AvatarFlightVigourService.canSpend(state, config, combinedCost(flapCost, boostCost))) {
             boostAllowed = false;
         }
-        return withVigourAuthorization(input, flapAllowed, boostAllowed);
+        return withVigourAuthorization(input, flapAllowed, boostAllowed, launchAllowed);
     }
 
     private static void spendAppliedVigour(@Nonnull AvatarFlightComponent flight,
@@ -213,6 +222,15 @@ public final class AvatarFlightMovementSystem
                     state,
                     config,
                     config.getVigour().getForwardBoostCost(),
+                    now
+            );
+            spent = true;
+        }
+        if (output.launchApplied()) {
+            state = AvatarFlightVigourService.spend(
+                    state,
+                    config,
+                    output.launchCost(),
                     now
             );
             spent = true;
@@ -254,7 +272,8 @@ public final class AvatarFlightMovementSystem
     @Nonnull
     private static AvatarFlightController.Input withVigourAuthorization(@Nonnull AvatarFlightController.Input input,
                                                                        boolean flapAllowed,
-                                                                       boolean boostAllowed) {
+                                                                       boolean boostAllowed,
+                                                                       boolean launchAllowed) {
         return new AvatarFlightController.Input(
                 input.forwardAxis(),
                 input.strafeAxis(),
@@ -267,7 +286,9 @@ public final class AvatarFlightMovementSystem
                 input.yawRadians(),
                 input.pitchRadians(),
                 flapAllowed,
-                boostAllowed
+                boostAllowed,
+                launchAllowed,
+                input.launchHoldMs()
         );
     }
 
@@ -545,6 +566,11 @@ public final class AvatarFlightMovementSystem
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
         );
+        boolean launchRelease = input != null && input.consumeLaunchRelease(
+                now,
+                Math.round(config.getInput().getIntentTimeoutMs())
+        );
+        long launchHoldMs = launchRelease && input != null ? input.getLaunchHoldMs() : 0L;
         AvatarFlightController.Input controllerInput = new AvatarFlightController.Input(
                 stale ? 0.0 : input.getForwardAxis(),
                 stale ? 0.0 : input.getStrafeAxis(),
@@ -557,7 +583,9 @@ public final class AvatarFlightMovementSystem
                 yaw,
                 pitch,
                 true,
-                true
+                true,
+                true,
+                launchHoldMs
         );
         if (input != null) {
             input.clearTransientVerticalIntent();
@@ -613,7 +641,7 @@ public final class AvatarFlightMovementSystem
         }
         instance.getLogger().at(Level.INFO).log(String.format(
                 "TameworkAvatarFlight debug: ref=%s mode=%s input=%.2f/%.2f/%.2f jump=%s crouch=%s sprint=%s airbrake=%s onGround=%s"
-                        + " output=%.2f/%.2f/%.2f apply=%s jumpApplied=%s boostApplied=%s animIdle=%s animFast=%s"
+                        + " output=%.2f/%.2f/%.2f apply=%s jumpApplied=%s boostApplied=%s launchHold=%d launchApplied=%s loads=%.2f/%.2f animIdle=%s animFast=%s"
                         + " visual=%.1f/%.1f vigour=%.2f/%d recharge=%s speedRatio=%.2f states=%s",
                 ref,
                 output.mode(),
@@ -631,6 +659,10 @@ public final class AvatarFlightMovementSystem
                 output.applyVelocity(),
                 output.jumpApplied(),
                 output.boostApplied(),
+                input.launchHoldMs(),
+                output.launchApplied(),
+                output.diveLoad(),
+                output.climbLoad(),
                 output.horizontalIdle(),
                 output.fastFlight(),
                 Math.toDegrees(output.visualPitchRadians()),

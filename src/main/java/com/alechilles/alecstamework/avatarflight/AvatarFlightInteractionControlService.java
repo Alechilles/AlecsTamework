@@ -27,6 +27,14 @@ public final class AvatarFlightInteractionControlService {
         return apply(context, nowMs, input -> input.queueReinsBoost(nowMs));
     }
 
+    public static boolean beginLaunchCharge(@Nonnull InteractionContext context, long nowMs) {
+        return apply(context, nowMs, input -> input.beginLaunchCharge(nowMs));
+    }
+
+    public static boolean releaseLaunchCharge(@Nonnull InteractionContext context, long nowMs) {
+        return apply(context, nowMs, input -> input.queueLaunchRelease(nowMs));
+    }
+
     private static boolean apply(@Nonnull InteractionContext context,
                                  long nowMs,
                                  @Nonnull FlightInputMutation mutation) {

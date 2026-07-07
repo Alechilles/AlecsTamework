@@ -5,6 +5,7 @@ package com.alechilles.alecstamework.avatarflight;
  */
 public enum AvatarFlightMode {
     GROUNDED,
+    LAUNCHING,
     HOVER,
     FORWARD_FLIGHT,
     BRAKING,

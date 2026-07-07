@@ -231,8 +231,8 @@ class AvatarFlightControllerTest {
 
         assertTrue(Math.abs(output.velocityZ()) > 8.0,
                 "pitch-up should retain forward glide instead of hard-stalling");
-        assertTrue(Math.abs(output.velocityZ()) < 13.8,
-                "pitch-up should spend some forward speed without dumping it into a stall");
+        assertTrue(Math.abs(output.velocityZ()) < 13.95,
+                "pitch-up should spend forward speed gradually instead of dumping it into a stall");
         assertTrue(output.velocityY() > 4.0,
                 "pitch-up should create a bird-like climbing arc quickly");
     }
@@ -518,6 +518,170 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void shortDiveDoesNotImmediatelyReachLargeSpeedGain() {
+        AvatarFlightController.State state = new AvatarFlightController.State(
+                0.0, 0.0, -6.0, 0L, 0L, 0.0, 0.0, 0L
+        );
+        AvatarFlightController.Output output = null;
+        double altitudeChange = 0.0;
+        for (int tick = 0; tick < 8; tick++) {
+            output = AvatarFlightController.update(
+                    state,
+                    input(1.0, false, false, false, false, Math.toRadians(-70.0)),
+                    CONFIG,
+                    0.1,
+                    1000L + tick * 100L
+            );
+            altitudeChange += output.velocityY() * 0.1;
+            state = stateFrom(output);
+        }
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed < 7.0, "0.75s dive should not provide a large speed payoff");
+        assertTrue(altitudeChange > -3.0, "short dive should not spend a large altitude chunk immediately");
+    }
+
+    @Test
+    void sustainedSteepDiveBuildsSpeedWithoutCrossingNaturalCap() {
+        AvatarFlightController.State state = new AvatarFlightController.State(
+                0.0, 0.0, -6.0, 0L, 0L, 0.0, 0.0, 0L
+        );
+        AvatarFlightController.Output output = null;
+        for (int tick = 0; tick < 30; tick++) {
+            output = AvatarFlightController.update(
+                    state,
+                    input(1.0, false, false, false, false, Math.toRadians(-70.0)),
+                    CONFIG,
+                    0.1,
+                    1000L + tick * 100L
+            );
+            state = stateFrom(output);
+        }
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed > 11.0, "3s steep dive should build meaningful speed");
+        assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxGlideSpeed() + 0.00001);
+        assertTrue(horizontalSpeed < AvatarFlightSpeedMetrics.fastRechargeThreshold(CONFIG));
+    }
+
+    @Test
+    void sustainedDiveThenModeratePullUpRecoversAboutSeventyPercentAltitude() {
+        AvatarFlightController.State state = new AvatarFlightController.State(
+                0.0, 0.0, -6.0, 0L, 0L, 0.0, 0.0, 0L
+        );
+        double diveAltitude = 0.0;
+        for (int tick = 0; tick < 30; tick++) {
+            AvatarFlightController.Output output = AvatarFlightController.update(
+                    state,
+                    input(1.0, false, false, false, false, Math.toRadians(-70.0)),
+                    CONFIG,
+                    0.1,
+                    1000L + tick * 100L
+            );
+            diveAltitude += output.velocityY() * 0.1;
+            state = stateFrom(output);
+        }
+
+        double climbAltitude = 0.0;
+        AvatarFlightController.Output output = null;
+        for (int tick = 0; tick < 50; tick++) {
+            output = AvatarFlightController.update(
+                    state,
+                    input(1.0, false, false, false, false, Math.toRadians(45.0)),
+                    CONFIG,
+                    0.1,
+                    5000L + tick * 100L
+            );
+            climbAltitude += output.velocityY() * 0.1;
+            state = stateFrom(output);
+        }
+
+        double recovery = climbAltitude / Math.abs(diveAltitude);
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(recovery > 0.60 && recovery < 0.85,
+                "clean unboosted maneuver should recover around 70% of altitude, not all of it; recovery="
+                        + recovery + ", diveAltitude=" + diveAltitude + ", climbAltitude=" + climbAltitude
+                        + ", horizontalSpeed=" + horizontalSpeed);
+        assertTrue(horizontalSpeed < CONFIG.getMovement().getNeutralGlideSpeed() + 1.0,
+                "the climb should spend most stored speed by the end");
+    }
+
+    @Test
+    void qBoostPointedUpAddsCappedLift() {
+        AvatarFlightController.Output output = update(
+                new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
+                input(1.0, false, false, true, false, Math.toRadians(60.0))
+        );
+
+        assertTrue(output.boostApplied());
+        assertTrue(output.velocityY() > 0.0);
+        assertTrue(output.velocityY() <= 3.0 + 0.00001,
+                "upward boost lift must be capped so flap remains the stronger vertical tool");
+    }
+
+    @Test
+    void qBoostPointedDownAddsDownwardThrust() {
+        AvatarFlightController.Output output = update(
+                new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
+                input(1.0, false, false, true, false, Math.toRadians(-60.0))
+        );
+
+        assertTrue(output.boostApplied());
+        assertTrue(output.velocityY() < -5.0,
+                "downward boost should use full directional thrust because it spends altitude");
+    }
+
+    @Test
+    void boostedExcessDecaysWhenBoostWindowEnds() {
+        double boostedSpeed = AvatarFlightSpeedMetrics.boostedHorizontalCap(CONFIG);
+        AvatarFlightController.Output output = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, -boostedSpeed, 0L, 0L),
+                input(1.0, false, false, false, false, 0.0),
+                CONFIG,
+                0.5,
+                10_000L
+        );
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed < boostedSpeed);
+        assertTrue(horizontalSpeed >= CONFIG.getMovement().getMaxGlideSpeed());
+    }
+
+    @Test
+    void chargedLaunchAppliesConfiguredImpulseFromGround() {
+        AvatarFlightController.Output output = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, 0.0, 0L, 0L, 0.0, 0.0, 0L),
+                new AvatarFlightController.Input(0.0, 0.0, 0.0, false, false, false,
+                        false, true, 0.0, 0.0, true, true, true, 3000L),
+                CONFIG,
+                0.1,
+                1000L
+        );
+
+        assertTrue(output.launchApplied());
+        assertEquals(AvatarFlightMode.LAUNCHING, output.mode());
+        assertEquals(18.0, output.velocityY(), 0.00001);
+        assertEquals(-11.0, output.velocityZ(), 0.00001);
+        assertEquals(2.0, output.launchCost(), 0.00001);
+        assertTrue(output.applyVelocity());
+    }
+
+    @Test
+    void launchBelowChargeThresholdDoesNotApply() {
+        AvatarFlightController.Output output = AvatarFlightController.update(
+                new AvatarFlightController.State(0.0, 0.0, 0.0, 0L, 0L, 0.0, 0.0, 0L),
+                new AvatarFlightController.Input(0.0, 0.0, 0.0, false, false, false,
+                        false, true, 0.0, 0.0, true, true, true, 499L),
+                CONFIG,
+                0.1,
+                1000L
+        );
+
+        assertFalse(output.launchApplied());
+        assertEquals(AvatarFlightMode.GROUNDED, output.mode());
+    }
+
+    @Test
     void pitchAndLateralVelocityProduceVisualPose() {
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(0.0, 0.0, 0.0, 0L, 0L),
@@ -679,9 +843,12 @@ class AvatarFlightControllerTest {
         return new AvatarFlightController.State(
                 output.velocityX(),
                 output.velocityY(),
-                output.velocityZ(),
-                output.nextJumpAtMs(),
-                output.nextBoostAtMs()
+            output.velocityZ(),
+            output.nextJumpAtMs(),
+            output.nextBoostAtMs(),
+            output.diveLoad(),
+            output.climbLoad(),
+            output.nextLaunchAtMs()
         );
     }
 

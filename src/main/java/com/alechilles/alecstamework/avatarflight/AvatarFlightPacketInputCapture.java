@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.config.assets.AvatarFlightLaunchSettings;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -89,10 +90,26 @@ public final class AvatarFlightPacketInputCapture {
         input.setForwardAxis(primary.forward());
         input.setStrafeAxis(primary.strafe());
         input.setVerticalAxis(0.0);
-        input.setJumping(packetStates != null && (packetStates.jumping || packetStates.swimJumping));
+        boolean jumpHeld = packetStates != null && (packetStates.jumping || packetStates.swimJumping);
+        boolean grounded = movementStates == null ? input.isOnGround() : movementStates.onGround;
+        if (config.getLaunch().isEnabled()
+                && AvatarFlightLaunchSettings.INPUT_JUMP_HOLD.equalsIgnoreCase(config.getLaunch().getPreferredInput())
+                && grounded) {
+            if (jumpHeld) {
+                input.beginLaunchCharge(now);
+            } else if (input.isLaunchCharging()) {
+                input.queueLaunchRelease(now);
+            }
+        } else if (input.isLaunchCharging()) {
+            input.cancelLaunchCharge();
+        }
+        boolean suppressGroundLaunchJump = config.getLaunch().isEnabled()
+                && grounded
+                && (jumpHeld || input.getLaunchReleasedAtMs() != 0L);
+        input.setJumping(!suppressGroundLaunchJump && jumpHeld);
         input.setCrouching(packetStates != null && (packetStates.crouching || packetStates.forcedCrouching));
         input.updateSprinting(packetStates != null && packetStates.sprinting, now);
-        input.setOnGround(movementStates == null ? input.isOnGround() : movementStates.onGround);
+        input.setOnGround(grounded);
         input.setYawRadians(intent.basis().yaw());
         input.setPitchRadians(intent.basis().pitch());
         if (movementStates != null || (recentMovingState && primary.hasUsableIntent())) {
