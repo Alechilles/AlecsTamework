@@ -10,7 +10,7 @@
 - Added a creative-available Dragon Reins prototype item for transformed dragon flight controls, with left click mapped to upward flaps and right click mapped to airbraking while avatar flight is active.
 - Added `/tw debugdragonflight flightprobe` for temporarily enabling non-creative client flight and player input logging while testing avatar-flight controls.
 - Avatar flight can read client flight vertical velocity during diagnostics, but the native client flight capability remains a standalone probe because it overrides custom avatar movement.
-- Added a compact avatar-flight vigour HUD above the hotbar showing speed and remaining vigour while transformed flight is active.
+- Added Vigour charges and a compact speed/Vigour HUD for transformed avatar flight, with upward flaps and forward boosts spending charges and recharge limited to grounded recovery or high-speed flight.
 
 ### Changed
 - Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.

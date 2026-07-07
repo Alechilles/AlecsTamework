@@ -125,7 +125,7 @@ public final class AvatarFlightMovementSystem
             clearMovementAnimation(ref, commandBuffer, flight);
         }
         commandBuffer.putComponent(ref, flightType, flight);
-        maybeLogDebug(config, ref, controllerInput, output, movementStates);
+        maybeLogDebug(config, flight, ref, controllerInput, output, movementStates);
     }
 
     private static void rechargeVigour(@Nonnull AvatarFlightComponent flight,
@@ -587,6 +587,7 @@ public final class AvatarFlightMovementSystem
     }
 
     private void maybeLogDebug(@Nonnull TwAvatarFlightConfig config,
+                               @Nonnull AvatarFlightComponent flight,
                                @Nonnull Ref<EntityStore> ref,
                                @Nonnull AvatarFlightController.Input input,
                                @Nonnull AvatarFlightController.Output output,
@@ -606,7 +607,7 @@ public final class AvatarFlightMovementSystem
         instance.getLogger().at(Level.INFO).log(String.format(
                 "TameworkAvatarFlight debug: ref=%s mode=%s input=%.2f/%.2f/%.2f jump=%s crouch=%s sprint=%s airbrake=%s onGround=%s"
                         + " output=%.2f/%.2f/%.2f apply=%s jumpApplied=%s boostApplied=%s animIdle=%s animFast=%s"
-                        + " visual=%.1f/%.1f states=%s",
+                        + " visual=%.1f/%.1f vigour=%.2f/%d recharge=%s speedRatio=%.2f states=%s",
                 ref,
                 output.mode(),
                 input.forwardAxis(),
@@ -627,6 +628,17 @@ public final class AvatarFlightMovementSystem
                 output.fastFlight(),
                 Math.toDegrees(output.visualPitchRadians()),
                 Math.toDegrees(output.visualRollRadians()),
+                flight.getVigourCharges(),
+                (int) Math.round(config.getVigour().getMaxCharges()),
+                flight.getVigourRechargeMode(),
+                AvatarFlightSpeedMetrics.speedRatio(
+                        AvatarFlightSpeedMetrics.horizontalSpeed(
+                                output.velocityX(),
+                                output.velocityY(),
+                                output.velocityZ()
+                        ),
+                        config
+                ),
                 formatMovementStates(states)
         ));
     }

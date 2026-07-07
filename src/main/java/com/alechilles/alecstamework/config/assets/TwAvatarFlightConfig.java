@@ -219,7 +219,7 @@ public final class TwAvatarFlightConfig implements
             .<Double>append(new KeyedCodec<>("FastFlightRechargeSecondsPerCharge", Codec.DOUBLE),
                     (settings, value) -> settings.fastFlightRechargeSecondsPerCharge = positiveOrDefault(value, 8.0),
                     settings -> settings.fastFlightRechargeSecondsPerCharge)
-            .documentation("Fast-flight recharge seconds required for each vigour charge before speed-ratio scaling. Inheritance: missing nested key inherits parent value.")
+            .documentation("Fast-flight recharge seconds required for each vigour charge while above the configured speed ratio. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("FastFlightRechargeSpeedRatio", Codec.DOUBLE),
                     (settings, value) -> settings.fastFlightRechargeSpeedRatio = clamp01(value, 0.75),
