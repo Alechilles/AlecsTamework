@@ -91,6 +91,8 @@ A top-level `Vfx.Enabled` kill switch is acceptable if it stays simple, but it s
 
 Launch sound hooks should be populated in the first prototype. Flap, boost, airbrake, and trail sound fields should exist from the start so audio can be added without schema churn, even if some fields are blank in the first playable pass.
 
+After launch sounds, boost should be the next non-launch sound priority. It is the most action-like movement event after launch and benefits most from a clear audio cue.
+
 ## Prototype Order
 
 Prototype launch charge and launch release first. This gives the highest player-facing payoff and validates the two hardest trigger patterns early:
@@ -200,7 +202,7 @@ Default visibility should be all nearby players. The config can still expose an 
 
 ## Open Questions
 
-- Which non-launch sound should be authored next after launch: flap, boost, airbrake, or fast-flight trails?
+- Are there any remaining effect-design decisions needed before this spec can move into an implementation plan?
 
 ## Testing and Validation Notes
 
@@ -244,3 +246,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided launch cancel should use its own tiny particle system rather than reusing the charge-ramp pulse system.
 - 2026-07-07: Decided launch VFX should include optional config-driven sound hooks in the first pass.
 - 2026-07-07: Decided every AvatarFlight VFX effect section should have optional sound hooks, with launch populated first.
+- 2026-07-07: Decided boost should be the next non-launch sound priority after launch.
