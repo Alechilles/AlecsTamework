@@ -58,7 +58,7 @@ Default effect concepts:
 - Launch release: one clean expanding ground shock ring plus a short upward air column to sell the stored force releasing into takeoff.
 - Flap: brief downwash arcs from the wings/body, lighter than launch and focused on lift.
 - Boost: horizontal compression streaks behind and around the dragon, stronger than flap but shorter and punchier than persistent speed trails.
-- Airbrake: subtle forward-facing wind shear or compression arcs that read as drag, not as a powered burst.
+- Airbrake: subtle forward-facing wind shear or compression arcs that read as drag, not as a powered burst. The primary cue is world/velocity-oriented in front of and slightly around the dragon; secondary model-attached wisps near wing/body edges keep the effect visually connected to the model.
 - Fast-flight trails: thin wingtip ribbons that appear only while the dragon is at or above the fast-flight recharge speed threshold.
 
 Flap and boost can share low-level art ingredients, such as wind textures, arc spawners, or common translucent materials. They should still be separate authored particle systems so duration, orientation, spawn shape, and intensity can differ without awkward runtime parameter branching.
@@ -134,7 +134,7 @@ Use these trigger patterns:
 - Launch release: one-shot state-entry burst when `launchApplied` is true.
 - Flap: one-shot burst when `jumpApplied` is true.
 - Boost: one-shot burst when `boostApplied` is true, with optional short follow-through during the active boost window.
-- Airbrake: subtle cue while airbrake is actively held, throttled or persistent so it does not spawn a burst every tick.
+- Airbrake: subtle cue while airbrake is actively held, throttled or persistent so it does not spawn a burst every tick. It should combine a low-intensity forward compression/shear cue with very light model-attached wisps.
 - Fast-flight trails: persistent cue while the player is moving fast enough to qualify for fast-flight recharge, whether that speed comes from Q boost, diving, or clean high-speed gliding. Trails should prefer model-node attachments at left/right distal wing points, with fixed-offset fallback. Trails need a clear stop path when speed falls below threshold or AvatarFlight exits.
 
 The implementation should avoid embedding particle spawning directly in `AvatarFlightController`, which is currently pure velocity logic. A dedicated AvatarFlight VFX/presentation service should consume controller output from the movement system or a nearby orchestration point.
@@ -144,7 +144,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should airbrake use a model-attached cue near the wings/body, a position/velocity-oriented world cue, or both?
+- Should the implementation expose per-effect enable toggles in the first pass, or only one top-level AvatarFlight VFX enable flag?
 
 ## Testing and Validation Notes
 
@@ -175,3 +175,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided flap and boost may share art ingredients but should be separate authored particle systems.
 - 2026-07-07: Accepted default intensity targets: launch charge faint-to-medium-high, launch release medium-high, flap medium-low, boost medium-high, and fast-flight trails low/subtle.
 - 2026-07-07: Decided airbrake should receive a first-pass subtle wind-shear cue at low intensity.
+- 2026-07-07: Decided airbrake should use both a primary world/velocity-oriented compression cue and secondary subtle model-attached wisps.
