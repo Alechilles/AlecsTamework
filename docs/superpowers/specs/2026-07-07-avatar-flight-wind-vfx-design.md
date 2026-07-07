@@ -75,7 +75,7 @@ Recommended shape:
 
 - AvatarFlight VFX config should allow ordered attachment candidates per logical point, such as `LeftWingTrail`, `RightWingTrail`, `BodyCenter`, and `TailTrail`.
 - Each candidate can specify `TargetNodeName` and an optional `PositionOffset`.
-- Runtime should use the first configured node that exists when validation is available, or attempt ordered sends and fall back to offsets when node validation is not available.
+- Runtime should warn when a configured attachment node is missing, skip that candidate, and fall back to the next configured candidate or fixed offset. Missing nodes should never break AvatarFlight movement.
 - Tamework's default NordicDrake profile can use node names directly.
 - Generic defaults should include fixed-offset fallbacks so models without predictable wing nodes still get acceptable trails.
 
@@ -121,7 +121,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should AvatarFlight VFX config validate candidate node names against loaded model files at asset-load time, runtime, or only through tests/tooling?
+- Should missing-node warnings be throttled per model/config/node tuple to avoid repeated log spam while the player remains in fast flight?
 
 ## Testing and Validation Notes
 
@@ -131,6 +131,7 @@ Expected validation once implemented:
 - Verify launch charge effects stop on launch, cancel, landing-state loss, and AvatarFlight disable.
 - Verify burst effects fire once per successful movement action, not every tick while an input is held.
 - Verify trails stop when the player slows, lands, disables AvatarFlight, disconnects, or changes model.
+- Verify missing configured attachment nodes fail gracefully, emit a warning with model/config/node context, and fall back to the next attachment candidate or offset.
 - Run `./mvnw test` after Java changes.
 
 ## Decision Log
@@ -141,3 +142,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided AvatarFlight wind effects should be visible to all nearby players by default.
 - 2026-07-07: Decided launch charge should use a smooth intensity ramp that starts faint and builds to a somewhat intense wind-pressure cue at full charge.
 - 2026-07-07: After checking vanilla release `0.5.6` dragon/bird models and HyDragon dragon models, decided trails should support both named model nodes and fixed offsets. Node names are preferred for curated profiles; offsets are the generic fallback.
+- 2026-07-07: Decided runtime should warn on missing configured attachment nodes, fail gracefully, and fall back to the next candidate or fixed offset.
