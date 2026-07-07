@@ -25,6 +25,7 @@ This suggests a presentation layer can react to existing movement results instea
 - Prefer base-game particle/model attachment systems where possible.
 - Keep burst effects one-shot and trails explicitly start/stop so persistent effects cannot orphan.
 - Avoid noisy per-tick particle spawning unless throttled or represented as a persistent attached effect.
+- Show effects to nearby players by default so AvatarFlight movement reads well in multiplayer.
 
 ## Non-Goals
 
@@ -72,11 +73,12 @@ Use these trigger patterns:
 
 The implementation should avoid embedding particle spawning directly in `AvatarFlightController`, which is currently pure velocity logic. A dedicated AvatarFlight VFX/presentation service should consume controller output from the movement system or a nearby orchestration point.
 
+Default visibility should be all nearby players. The config can still expose an owner-only or disabled visibility mode later, but the baseline Tamework default should make flight actions readable to other players in the area.
+
 ## Open Questions
 
 - Should launch charge intensity be represented by swapping between discrete particle systems, scaling spawn rate through config, or emitting repeated short pulses?
 - Should fast-flight trails attach to named model nodes, fixed offsets, or both?
-- Should effects be visible to all nearby players, the owner only, or configurable per effect?
 
 ## Testing and Validation Notes
 
@@ -93,3 +95,4 @@ Expected validation once implemented:
 - 2026-07-07: Chose `Wind Pressure` as the primary visual direction over Vigour-energy or hybrid magical effects.
 - 2026-07-07: Decided to maintain this document as a living spec while brainstorming and implementation decisions are made.
 - 2026-07-07: Decided high-speed trails should appear whenever the dragon qualifies for fast-flight recharge, including boost, diving, and fast gliding.
+- 2026-07-07: Decided AvatarFlight wind effects should be visible to all nearby players by default.
