@@ -22,6 +22,7 @@ This suggests a presentation layer can react to existing movement results instea
 
 - Add readable wind-style VFX for launch charge, launch release, flap, boost, airbrake, and high-speed flight.
 - Keep VFX configurable through AvatarFlight config/assets rather than hardcoding particle IDs in controller logic.
+- Expose per-effect enable toggles so modders can disable launch, flap, boost, airbrake, or trail effects independently.
 - Prefer base-game particle/model attachment systems where possible.
 - Keep burst effects one-shot and trails explicitly start/stop so persistent effects cannot orphan.
 - Avoid noisy per-tick particle spawning unless throttled or represented as a persistent attached effect.
@@ -71,6 +72,19 @@ Default intensity targets:
 - Boost: medium-high; punchy horizontal force cue with short duration.
 - Airbrake: low/subtle; enough feedback to show braking drag without visual clutter.
 - Fast-flight trails: low/subtle; continuous enough to read speed, thin enough to avoid clutter.
+
+## Configuration Direction
+
+AvatarFlight VFX config should expose per-effect toggles in the first pass:
+
+- `LaunchCharge.Enabled`
+- `LaunchRelease.Enabled`
+- `Flap.Enabled`
+- `Boost.Enabled`
+- `Airbrake.Enabled`
+- `Trails.Enabled`
+
+A top-level `Vfx.Enabled` kill switch is acceptable if it stays simple, but it should not replace the per-effect toggles. Each effect section should own its particle system IDs, attachment candidates, offsets, intensity/scaling knobs, and visibility mode where relevant.
 
 ## Effect Sequence Preview
 
@@ -144,7 +158,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should the implementation expose per-effect enable toggles in the first pass, or only one top-level AvatarFlight VFX enable flag?
+- Which effect should be prototyped first: launch charge/release, flap/boost bursts, airbrake, or fast-flight trails?
 
 ## Testing and Validation Notes
 
@@ -176,3 +190,4 @@ Expected validation once implemented:
 - 2026-07-07: Accepted default intensity targets: launch charge faint-to-medium-high, launch release medium-high, flap medium-low, boost medium-high, and fast-flight trails low/subtle.
 - 2026-07-07: Decided airbrake should receive a first-pass subtle wind-shear cue at low intensity.
 - 2026-07-07: Decided airbrake should use both a primary world/velocity-oriented compression cue and secondary subtle model-attached wisps.
+- 2026-07-07: Decided first-pass config should expose per-effect enable toggles.
