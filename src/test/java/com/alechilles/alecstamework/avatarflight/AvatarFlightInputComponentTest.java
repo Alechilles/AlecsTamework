@@ -108,4 +108,56 @@ class AvatarFlightInputComponentTest {
         input.clearTransientVerticalIntent();
         assertFalse(input.consumeSprintBoost(1_200L, 1_000L));
     }
+
+    @Test
+    void launchReleaseIsQueuedOnceWithHoldDuration() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.beginLaunchCharge(1_000L);
+        input.queueLaunchRelease(1_750L);
+
+        assertFalse(input.isLaunchCharging());
+        assertEquals(750L, input.getLaunchHoldMs());
+        assertTrue(input.consumeLaunchRelease(1_800L, 1_000L));
+        assertEquals(750L, input.getLaunchHoldMs(),
+                "movement reads the queued hold duration after consuming the release intent");
+        assertFalse(input.consumeLaunchRelease(1_800L, 1_000L));
+    }
+
+    @Test
+    void staleLaunchReleaseIsConsumedWithoutApplying() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.beginLaunchCharge(1_000L);
+        input.queueLaunchRelease(1_750L);
+
+        assertFalse(input.consumeLaunchRelease(2_801L, 1_000L));
+        assertEquals(750L, input.getLaunchHoldMs());
+        assertFalse(input.consumeLaunchRelease(2_801L, 1_000L));
+    }
+
+    @Test
+    void repeatedLaunchBeginKeepsOriginalStartTime() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.beginLaunchCharge(1_000L);
+        input.beginLaunchCharge(1_500L);
+        input.queueLaunchRelease(1_750L);
+
+        assertEquals(750L, input.getLaunchHoldMs());
+        assertTrue(input.consumeLaunchRelease(1_800L, 1_000L));
+    }
+
+    @Test
+    void cancellingLaunchChargePreventsReleaseQueue() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.beginLaunchCharge(1_000L);
+        input.cancelLaunchCharge();
+        input.queueLaunchRelease(1_750L);
+
+        assertFalse(input.isLaunchCharging());
+        assertEquals(0L, input.getLaunchHoldMs());
+        assertFalse(input.consumeLaunchRelease(1_800L, 1_000L));
+    }
 }

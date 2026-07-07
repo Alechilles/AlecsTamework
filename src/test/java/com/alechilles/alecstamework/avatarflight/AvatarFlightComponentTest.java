@@ -22,4 +22,18 @@ class AvatarFlightComponentTest {
         assertEquals(-1750L, clone.getVigourRechargeBlockedUntilMs());
         assertEquals("FAST_FLIGHT", clone.getVigourRechargeMode());
     }
+
+    @Test
+    void maneuverLoadsAreFiniteAndClone() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+        component.setDiveLoad(0.75);
+        component.setClimbLoad(Double.NaN);
+        component.setNextLaunchAtMs(1500L);
+
+        AvatarFlightComponent clone = component.clone();
+
+        assertEquals(0.75, clone.getDiveLoad(), EPSILON);
+        assertEquals(0.0, clone.getClimbLoad(), EPSILON);
+        assertEquals(1500L, clone.getNextLaunchAtMs());
+    }
 }

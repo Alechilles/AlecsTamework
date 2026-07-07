@@ -73,6 +73,18 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
                     AvatarFlightInputComponent::setSprintBoostQueuedAtMs,
                     AvatarFlightInputComponent::getSprintBoostQueuedAtMs)
             .add()
+            .<Long>append(new KeyedCodec<>("LaunchChargeStartedAtMs", Codec.LONG),
+                    AvatarFlightInputComponent::setLaunchChargeStartedAtMs,
+                    AvatarFlightInputComponent::getLaunchChargeStartedAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("LaunchReleasedAtMs", Codec.LONG),
+                    AvatarFlightInputComponent::setLaunchReleasedAtMs,
+                    AvatarFlightInputComponent::getLaunchReleasedAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("LaunchHoldMs", Codec.LONG),
+                    AvatarFlightInputComponent::setLaunchHoldMs,
+                    AvatarFlightInputComponent::getLaunchHoldMs)
+            .add()
             .build();
 
     private double forwardAxis;
@@ -89,6 +101,9 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     private long reinsAirbrakeUntilMs;
     private long reinsBoostQueuedAtMs;
     private long sprintBoostQueuedAtMs;
+    private long launchChargeStartedAtMs;
+    private long launchReleasedAtMs;
+    private long launchHoldMs;
 
     @Nullable
     public static ComponentType<EntityStore, AvatarFlightInputComponent> getComponentType() {
@@ -216,6 +231,30 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         this.sprintBoostQueuedAtMs = sprintBoostQueuedAtMs == null ? 0L : sprintBoostQueuedAtMs;
     }
 
+    public long getLaunchChargeStartedAtMs() {
+        return launchChargeStartedAtMs;
+    }
+
+    public void setLaunchChargeStartedAtMs(@Nullable Long launchChargeStartedAtMs) {
+        this.launchChargeStartedAtMs = launchChargeStartedAtMs == null ? 0L : launchChargeStartedAtMs;
+    }
+
+    public long getLaunchReleasedAtMs() {
+        return launchReleasedAtMs;
+    }
+
+    public void setLaunchReleasedAtMs(@Nullable Long launchReleasedAtMs) {
+        this.launchReleasedAtMs = launchReleasedAtMs == null ? 0L : launchReleasedAtMs;
+    }
+
+    public long getLaunchHoldMs() {
+        return launchHoldMs;
+    }
+
+    public void setLaunchHoldMs(@Nullable Long launchHoldMs) {
+        this.launchHoldMs = Math.max(0L, launchHoldMs == null ? 0L : launchHoldMs);
+    }
+
     public void queueReinsFlap(long nowMs) {
         reinsFlapQueuedAtMs = nowMs;
     }
@@ -261,6 +300,35 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         return applies;
     }
 
+    public void beginLaunchCharge(long nowMs) {
+        if (!isLaunchCharging()) {
+            launchChargeStartedAtMs = nowMs;
+        }
+    }
+
+    public boolean isLaunchCharging() {
+        return launchChargeStartedAtMs != 0L;
+    }
+
+    public void cancelLaunchCharge() {
+        launchChargeStartedAtMs = 0L;
+    }
+
+    public void queueLaunchRelease(long nowMs) {
+        if (!isLaunchCharging()) {
+            return;
+        }
+        launchHoldMs = Math.max(0L, nowMs - launchChargeStartedAtMs);
+        launchReleasedAtMs = nowMs;
+        launchChargeStartedAtMs = 0L;
+    }
+
+    public boolean consumeLaunchRelease(long nowMs, long maxAgeMs) {
+        boolean applies = queuedIntentApplies(launchReleasedAtMs, nowMs, maxAgeMs);
+        launchReleasedAtMs = 0L;
+        return applies;
+    }
+
     public boolean isStale(long nowMs, long timeoutMs) {
         return lastInputAtMs == 0L || nowMs - lastInputAtMs > timeoutMs;
     }
@@ -288,6 +356,9 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         clone.reinsAirbrakeUntilMs = reinsAirbrakeUntilMs;
         clone.reinsBoostQueuedAtMs = reinsBoostQueuedAtMs;
         clone.sprintBoostQueuedAtMs = sprintBoostQueuedAtMs;
+        clone.launchChargeStartedAtMs = launchChargeStartedAtMs;
+        clone.launchReleasedAtMs = launchReleasedAtMs;
+        clone.launchHoldMs = launchHoldMs;
         return clone;
     }
 

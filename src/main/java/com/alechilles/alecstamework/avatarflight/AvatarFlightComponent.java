@@ -38,6 +38,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setVelocityZ,
                     AvatarFlightComponent::getVelocityZ)
             .add()
+            .<Double>append(new KeyedCodec<>("DiveLoad", Codec.DOUBLE),
+                    AvatarFlightComponent::setDiveLoad,
+                    AvatarFlightComponent::getDiveLoad)
+            .add()
+            .<Double>append(new KeyedCodec<>("ClimbLoad", Codec.DOUBLE),
+                    AvatarFlightComponent::setClimbLoad,
+                    AvatarFlightComponent::getClimbLoad)
+            .add()
             .<Long>append(new KeyedCodec<>("NextJumpAtMs", Codec.LONG),
                     AvatarFlightComponent::setNextJumpAtMs,
                     AvatarFlightComponent::getNextJumpAtMs)
@@ -45,6 +53,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
             .<Long>append(new KeyedCodec<>("NextBoostAtMs", Codec.LONG),
                     AvatarFlightComponent::setNextBoostAtMs,
                     AvatarFlightComponent::getNextBoostAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("NextLaunchAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextLaunchAtMs,
+                    AvatarFlightComponent::getNextLaunchAtMs)
             .add()
             .<Long>append(new KeyedCodec<>("EnabledAtMs", Codec.LONG),
                     AvatarFlightComponent::setEnabledAtMs,
@@ -105,8 +117,11 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private double velocityX;
     private double velocityY;
     private double velocityZ;
+    private double diveLoad;
+    private double climbLoad;
     private long nextJumpAtMs;
     private long nextBoostAtMs;
+    private long nextLaunchAtMs;
     private long enabledAtMs;
     private double vigourCharges;
     private long lastVigourUpdateAtMs;
@@ -194,6 +209,22 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         this.velocityZ = finiteOrZero(velocityZ);
     }
 
+    public double getDiveLoad() {
+        return clamp01(finiteOrZero(diveLoad));
+    }
+
+    public void setDiveLoad(@Nullable Double diveLoad) {
+        this.diveLoad = clamp01(finiteOrZero(diveLoad));
+    }
+
+    public double getClimbLoad() {
+        return clamp01(finiteOrZero(climbLoad));
+    }
+
+    public void setClimbLoad(@Nullable Double climbLoad) {
+        this.climbLoad = clamp01(finiteOrZero(climbLoad));
+    }
+
     public long getNextJumpAtMs() {
         return nextJumpAtMs;
     }
@@ -208,6 +239,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
 
     public void setNextBoostAtMs(@Nullable Long nextBoostAtMs) {
         this.nextBoostAtMs = nextBoostAtMs == null ? 0L : nextBoostAtMs;
+    }
+
+    public long getNextLaunchAtMs() {
+        return nextLaunchAtMs;
+    }
+
+    public void setNextLaunchAtMs(@Nullable Long nextLaunchAtMs) {
+        this.nextLaunchAtMs = nextLaunchAtMs == null ? 0L : nextLaunchAtMs;
     }
 
     public long getEnabledAtMs() {
@@ -344,8 +383,11 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.velocityX = velocityX;
         clone.velocityY = velocityY;
         clone.velocityZ = velocityZ;
+        clone.diveLoad = getDiveLoad();
+        clone.climbLoad = getClimbLoad();
         clone.nextJumpAtMs = nextJumpAtMs;
         clone.nextBoostAtMs = nextBoostAtMs;
+        clone.nextLaunchAtMs = nextLaunchAtMs;
         clone.vigourCharges = getVigourCharges();
         clone.lastVigourUpdateAtMs = lastVigourUpdateAtMs;
         clone.vigourRechargeBlockedUntilMs = vigourRechargeBlockedUntilMs;
@@ -363,5 +405,9 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
 
     private static double finiteOrZero(@Nullable Double value) {
         return value != null && Double.isFinite(value) ? value : 0.0;
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
     }
 }
