@@ -42,7 +42,26 @@ class AvatarFlightControllerTest {
 
         assertEquals(AvatarFlightMode.FORWARD_FLIGHT, output.mode());
         assertTrue(output.velocityZ() < 0.0);
+        assertTrue(Math.hypot(output.velocityX(), output.velocityZ())
+                        >= CONFIG.getMovement().getGlideStartKickSpeed(),
+                "forward input from hover should seed enough speed to actually start gliding");
         assertTrue(output.applyVelocity());
+    }
+
+    @Test
+    void pitchDownForwardInputStartsFromHoverWithoutStrafeKick() {
+        AvatarFlightController.Output output = update(
+                new AvatarFlightController.State(0.0, 0.0, 0.0, 0L, 0L),
+                input(1.0, false, false, false, false, Math.toRadians(-45.0))
+        );
+
+        assertEquals(AvatarFlightMode.FORWARD_FLIGHT, output.mode());
+        assertTrue(output.velocityZ() < 0.0,
+                "looking down while holding forward should start forward glide without needing A/D first");
+        assertTrue(output.velocityY() < 0.0);
+        assertTrue(Math.hypot(output.velocityX(), output.velocityZ())
+                        >= CONFIG.getMovement().getGlideStartKickSpeed(),
+                "pitch-down start should still use only the modest configured start kick");
     }
 
     @Test
@@ -456,6 +475,39 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void shortDivePullUpLoopStillLosesAltitudeWithoutVigour() {
+        AvatarFlightController.State state = new AvatarFlightController.State(
+                0.0,
+                0.0,
+                -CONFIG.getMovement().getNeutralGlideSpeed(),
+                0L,
+                0L
+        );
+        double altitudeChange = 0.0;
+        AvatarFlightController.Output output = null;
+
+        for (int cycle = 0; cycle < 10; cycle++) {
+            for (int tick = 0; tick < 3; tick++) {
+                output = update(state, input(1.0, false, false, false, false, Math.toRadians(-55.0)));
+                altitudeChange += output.velocityY() * 0.1;
+                state = stateFrom(output);
+            }
+            for (int tick = 0; tick < 7; tick++) {
+                output = update(state, input(1.0, false, false, false, false, Math.toRadians(45.0)));
+                altitudeChange += output.velocityY() * 0.1;
+                state = stateFrom(output);
+            }
+        }
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(altitudeChange < -1.0,
+                "short dive/pull-up loops must not sustain altitude indefinitely without Vigour; altitudeChange="
+                        + altitudeChange + ", horizontalSpeed=" + horizontalSpeed);
+        assertTrue(horizontalSpeed < AvatarFlightSpeedMetrics.fastRechargeThreshold(CONFIG),
+                "dive-only speed loops must stay below the fast-recharge band");
+    }
+
+    @Test
     void pitchDownNeverProducesUpwardLift() {
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(0.0, 1.0, -8.0, 0L, 0L),
@@ -621,6 +673,16 @@ class AvatarFlightControllerTest {
     private static AvatarFlightController.Output update(AvatarFlightController.State state,
                                                         AvatarFlightController.Input input) {
         return AvatarFlightController.update(state, input, CONFIG, 0.1, 1000L);
+    }
+
+    private static AvatarFlightController.State stateFrom(AvatarFlightController.Output output) {
+        return new AvatarFlightController.State(
+                output.velocityX(),
+                output.velocityY(),
+                output.velocityZ(),
+                output.nextJumpAtMs(),
+                output.nextBoostAtMs()
+        );
     }
 
     private static AvatarFlightController.Input input(double forwardAxis,

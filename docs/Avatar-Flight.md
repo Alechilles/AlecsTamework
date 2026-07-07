@@ -8,8 +8,9 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 - Mouse look controls heading and pitch.
 - Left-click with Flightmaster's Reins performs an upward flap.
 - Right-click with Flightmaster's Reins applies the airbrake.
+- Q with Flightmaster's Reins performs a forward boost.
 - Crouch applies direct downward movement.
-- Forward boost uses the configured boost input/action and spends Vigour.
+- Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
 ## Vigour
 
@@ -31,7 +32,7 @@ The recharge delay means a spent charge requires the delay plus the recharge cad
 
 ## Glide Balance
 
-Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: it recovers or decays toward `Movement.NeutralGlideSpeed`, which defaults to `6`, while higher speeds require diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. Active boost is the only default path to the boosted max-speed band.
+Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: it recovers or decays toward `Movement.NeutralGlideSpeed`, which defaults to `6`, while higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
 
 Sink rate scales with speed. At or above `Movement.StallSpeedThreshold`, neutral glide uses `Movement.GlideSinkSpeed`. As horizontal speed falls toward zero, sink blends toward `Movement.StallSinkSpeed`, so stalled or nearly stalled flight loses altitude much faster than a clean glide.
 
@@ -48,6 +49,7 @@ The compact avatar-flight HUD appears above the hotbar while avatar flight is ac
 - `NeutralGlideSpeed`: horizontal speed level forward glide recovers or decays toward without spending Vigour.
 - `NeutralGlideAcceleration`: low-speed acceleration toward `NeutralGlideSpeed`.
 - `NeutralGlideDeceleration`: speed decay toward `NeutralGlideSpeed`.
+- `GlideStartKickSpeed`: small forward speed seed applied when forward glide starts from hover or stall.
 - `ForwardAcceleration`: legacy forward acceleration field; neutral level glide uses the neutral glide acceleration fields instead.
 - `GlideSinkSpeed`: target downward speed for unpowered forward glide.
 - `GlideSinkAcceleration`: rate at which glide approaches the sink speed.

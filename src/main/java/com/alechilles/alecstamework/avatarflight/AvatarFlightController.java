@@ -62,9 +62,13 @@ public final class AvatarFlightController {
             mode = AvatarFlightMode.BRAKING;
         } else if (input.forwardAxis() > config.getInput().getForwardDeadzone()) {
             if (pitchUpAmount > 0.0) {
-                targetForwardSpeed = Math.max(0.0, Math.max(targetForwardSpeed, currentHorizontalSpeed));
+                targetForwardSpeed = forwardStartSpeed(movement,
+                        Math.max(targetForwardSpeed, currentHorizontalSpeed),
+                        input.forwardAxis());
             } else if (pitchDownIntent) {
-                targetForwardSpeed = Math.max(0.0, Math.max(targetForwardSpeed, currentHorizontalSpeed));
+                targetForwardSpeed = forwardStartSpeed(movement,
+                        Math.max(targetForwardSpeed, currentHorizontalSpeed),
+                        input.forwardAxis());
             } else {
                 targetForwardSpeed = neutralForwardFlightSpeed(movement, input.forwardAxis(), currentForwardSpeed, dt);
             }
@@ -234,7 +238,7 @@ public final class AvatarFlightController {
             double amount = pitchUpAmount(pitchRadians);
             double physicalPitch = Math.min(MAX_PHYSICAL_PITCH_UP_RADIANS, pitchRadians);
             double drag = movement.getPitchUpSpeedCost() * amount * dt;
-            double glideSpeed = Math.sqrt(forwardSpeed * forwardSpeed + verticalSpeed * verticalSpeed);
+            double glideSpeed = Math.max(0.0, forwardSpeed);
             double effectiveSpeed = Math.max(0.0, glideSpeed - drag);
             double energyForwardSpeed = Math.min(movement.getMaxForwardSpeed(),
                     effectiveSpeed * Math.cos(physicalPitch));
@@ -242,8 +246,12 @@ public final class AvatarFlightController {
                     forwardSpeed - drag * PITCH_UP_FORWARD_DRAG_MULTIPLIER);
             double targetForwardSpeed = Math.min(movement.getMaxForwardSpeed(),
                     Math.max(energyForwardSpeed, retainedForwardSpeed));
-            double targetVerticalSpeed = Math.min(movement.getMaxFallSpeed(),
+            double climbEligibility = pitchUpClimbEligibility(forwardSpeed, movement);
+            double climbVerticalSpeed = Math.min(movement.getMaxFallSpeed(),
                     effectiveSpeed * Math.sin(physicalPitch));
+            double sinkVerticalSpeed = -glideSinkSpeed(movement, forwardSpeed);
+            double targetVerticalSpeed = sinkVerticalSpeed
+                    + (climbVerticalSpeed - sinkVerticalSpeed) * climbEligibility;
             double turnDelta = movement.getPitchUpLiftScale() * Math.max(1.0, glideSpeed) * amount * dt;
             return new PitchAdjustment(
                     Math.max(0.0, approach(forwardSpeed, targetForwardSpeed, turnDelta)),
@@ -267,6 +275,14 @@ public final class AvatarFlightController {
         return Math.min(1.0, pitchRadians / Math.toRadians(70.0));
     }
 
+    private static double pitchUpClimbEligibility(double forwardSpeed,
+                                                  @Nonnull TwAvatarFlightConfig.MovementSettings movement) {
+        double baseline = movement.getNeutralGlideSpeed();
+        double range = Math.max(0.001, movement.getMaxGlideSpeed() - baseline);
+        double ratio = clamp((forwardSpeed - baseline) / range, 0.0, 1.0);
+        return Math.sqrt(ratio);
+    }
+
     private static double neutralForwardFlightSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,
                                                     double forwardAxis,
                                                     double currentForwardSpeed,
@@ -276,7 +292,14 @@ public final class AvatarFlightController {
         double rate = current <= neutralSpeed
                 ? movement.getNeutralGlideAcceleration()
                 : movement.getNeutralGlideDeceleration();
-        return approach(current, neutralSpeed, rate * dt);
+        return forwardStartSpeed(movement, approach(current, neutralSpeed, rate * dt), forwardAxis);
+    }
+
+    private static double forwardStartSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,
+                                            double currentForwardSpeed,
+                                            double forwardAxis) {
+        double startSpeed = movement.getGlideStartKickSpeed() * clamp(forwardAxis, 0.0, 1.0);
+        return Math.max(Math.max(0.0, currentForwardSpeed), startSpeed);
     }
 
     private static double glideSinkSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,

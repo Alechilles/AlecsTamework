@@ -75,10 +75,12 @@ class TwAvatarFlightConfigTest {
         assertEquals(6.0, config.getMovement().getNeutralGlideSpeed(), 0.00001);
         assertEquals(4.0, config.getMovement().getNeutralGlideAcceleration(), 0.00001);
         assertEquals(2.0, config.getMovement().getNeutralGlideDeceleration(), 0.00001);
+        assertEquals(1.5, config.getMovement().getGlideStartKickSpeed(), 0.00001);
         assertEquals(1.0, config.getMovement().getGlideSinkSpeed(), 0.00001);
         assertEquals(2.0, config.getMovement().getGlideSinkAcceleration(), 0.00001);
         assertEquals(8.0, config.getMovement().getStallSpeedThreshold(), 0.00001);
         assertEquals(5.0, config.getMovement().getStallSinkSpeed(), 0.00001);
+        assertEquals(3.0, config.getMovement().getPitchDownSpeedGain(), 0.00001);
     }
 
     @Test
@@ -103,6 +105,7 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "movement", "neutralGlideSpeed", 9.0);
         setNestedField(parent, "movement", "neutralGlideAcceleration", 7.0);
         setNestedField(parent, "movement", "neutralGlideDeceleration", 3.0);
+        setNestedField(parent, "movement", "glideStartKickSpeed", 2.5);
         setNestedField(parent, "movement", "forwardAcceleration", 40.0);
         setNestedField(parent, "movement", "stallSpeedThreshold", 11.0);
         setNestedField(parent, "movement", "stallSinkSpeed", 6.0);
@@ -111,6 +114,7 @@ class TwAvatarFlightConfigTest {
         setNestedField(child, "movement", "neutralGlideSpeed", 4.0);
         setNestedField(child, "movement", "neutralGlideAcceleration", 2.0);
         setNestedField(child, "movement", "neutralGlideDeceleration", 1.0);
+        setNestedField(child, "movement", "glideStartKickSpeed", 0.5);
         setNestedField(child, "movement", "forwardAcceleration", 5.0);
         setNestedField(child, "movement", "stallSpeedThreshold", 5.0);
         setNestedField(child, "movement", "stallSinkSpeed", 4.0);
@@ -126,6 +130,7 @@ class TwAvatarFlightConfigTest {
         assertEquals(9.0, child.getMovement().getNeutralGlideSpeed(), 0.00001);
         assertEquals(7.0, child.getMovement().getNeutralGlideAcceleration(), 0.00001);
         assertEquals(3.0, child.getMovement().getNeutralGlideDeceleration(), 0.00001);
+        assertEquals(2.5, child.getMovement().getGlideStartKickSpeed(), 0.00001);
         assertEquals(40.0, child.getMovement().getForwardAcceleration(), 0.00001);
         assertEquals(11.0, child.getMovement().getStallSpeedThreshold(), 0.00001);
         assertEquals(6.0, child.getMovement().getStallSinkSpeed(), 0.00001);

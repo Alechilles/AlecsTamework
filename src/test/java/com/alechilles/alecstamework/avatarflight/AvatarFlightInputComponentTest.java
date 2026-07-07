@@ -40,6 +40,26 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
+    void reinsBoostIsConsumedOnceWithinIntentWindow() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.queueReinsBoost(1_000L);
+
+        assertTrue(input.consumeReinsBoost(1_200L, 1_000L));
+        assertFalse(input.consumeReinsBoost(1_200L, 1_000L));
+    }
+
+    @Test
+    void staleReinsBoostIsConsumedWithoutApplying() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.queueReinsBoost(1_000L);
+
+        assertFalse(input.consumeReinsBoost(2_001L, 1_000L));
+        assertFalse(input.consumeReinsBoost(2_001L, 1_000L));
+    }
+
+    @Test
     void verticalPacketIntentIsClearedAfterSampling() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
         input.setVerticalAxis(-1.0);

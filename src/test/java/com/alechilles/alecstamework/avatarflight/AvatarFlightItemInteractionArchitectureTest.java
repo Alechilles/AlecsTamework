@@ -41,6 +41,26 @@ class AvatarFlightItemInteractionArchitectureTest {
             "interactions",
             "TameworkFlightAirbrakeInteraction.java"
     );
+    private static final Path BOOST = Path.of(
+            "src",
+            "main",
+            "java",
+            "com",
+            "alechilles",
+            "alecstamework",
+            "interactions",
+            "TameworkFlightBoostInteraction.java"
+    );
+    private static final Path REINS_ITEM = Path.of(
+            "src",
+            "main",
+            "resources",
+            "Server",
+            "Item",
+            "Items",
+            "Tools",
+            "Tamework_Dragon_Reins.json"
+    );
     private static final Path PACKET_HANDLER = Path.of(
             "src",
             "main",
@@ -74,6 +94,7 @@ class AvatarFlightItemInteractionArchitectureTest {
         assertTrue(service.contains("commandBuffer.getComponent(playerRef, flightType) == null"));
         assertTrue(service.contains("input.queueReinsFlap(nowMs)"));
         assertTrue(service.contains("input.activateReinsAirbrake(nowMs, durationMs)"));
+        assertTrue(service.contains("input.queueReinsBoost(nowMs)"));
         assertFalse(service.contains("input.setLastInputAtMs(nowMs)"),
                 "item actions must not keep stale movement packet state fresh");
         assertTrue(service.contains("commandBuffer.putComponent(playerRef, inputType, input)"));
@@ -83,12 +104,24 @@ class AvatarFlightItemInteractionArchitectureTest {
     void primaryAndSecondaryUseDedicatedFlightInteractions() throws Exception {
         String flap = Files.readString(FLAP, StandardCharsets.UTF_8);
         String airbrake = Files.readString(AIRBRAKE, StandardCharsets.UTF_8);
+        String boost = Files.readString(BOOST, StandardCharsets.UTF_8);
 
         assertTrue(flap.contains("AvatarFlightInteractionControlService.queueFlap"));
         assertTrue(airbrake.contains("AvatarFlightInteractionControlService.activateAirbrake"));
+        assertTrue(boost.contains("AvatarFlightInteractionControlService.queueBoost"));
         assertTrue(airbrake.contains("\"DurationMs\""));
         assertTrue(flap.contains("InteractionState.Failed"));
         assertTrue(airbrake.contains("InteractionState.Failed"));
+        assertTrue(boost.contains("InteractionState.Failed"));
+    }
+
+    @Test
+    void flightmastersReinsWireQAbilityToBoostInteraction() throws Exception {
+        String item = Files.readString(REINS_ITEM, StandardCharsets.UTF_8);
+
+        assertTrue(item.contains("\"Ability1\""),
+                "Hytale maps the first item ability slot to the Q action");
+        assertTrue(item.contains("\"Type\": \"TameworkFlightBoost\""));
     }
 
     @Test

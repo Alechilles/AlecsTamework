@@ -49,6 +49,10 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Anchor: (Bottom: 178"));
         Assertions.assertFalse(ui.contains("Background: #081220(0.78);"),
                 "the HUD root must stay transparent because the panel background renders as a missing texture");
+        Assertions.assertFalse(ui.contains("Background: #"),
+                "compact HUD bars must use explicit color background objects, not image-path shorthand");
+        Assertions.assertTrue(ui.contains("Background: (Color: #203044(0.92));"));
+        Assertions.assertTrue(ui.contains("Background: (Color: #f1d36a);"));
         Assertions.assertTrue(ui.contains("Anchor: (Top: 22, Left: 16, Width: 145, Height: 10)"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
     }

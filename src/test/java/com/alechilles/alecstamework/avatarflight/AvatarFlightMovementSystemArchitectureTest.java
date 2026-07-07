@@ -101,8 +101,18 @@ class AvatarFlightMovementSystemArchitectureTest {
 
         assertTrue(source.contains("boolean liveSprint = states != null && states.sprinting"),
                 "movement system should read the live post-vanilla sprint flag because packet capture runs before vanilla queues can apply");
-        assertTrue(source.contains("liveSprint || (!stale && input.isSprinting())"),
+        assertTrue(source.contains("reinsBoost || liveSprint || (!stale && input.isSprinting())"),
                 "airborne shift can arrive through MovementStatesComponent even when the avatar input snapshot missed it");
+    }
+
+    @Test
+    void reinsBoostActionCanDriveBoostIntentWithoutSprintDetection() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("input.consumeReinsBoost("),
+                "Flightmaster's Reins Q action should feed the existing boost intent path");
+        assertTrue(source.contains("reinsBoost || liveSprint"),
+                "Q boost must not depend on unreliable airborne sprint detection");
     }
 
     @Test

@@ -72,6 +72,7 @@ import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteraction;
+import com.alechilles.alecstamework.interactions.TameworkFlightBoostInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
@@ -441,6 +442,11 @@ public class Tamework extends JavaPlugin {
                 "TameworkFlightAirbrake",
                 TameworkFlightAirbrakeInteraction.class,
                 TameworkFlightAirbrakeInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                "TameworkFlightBoost",
+                TameworkFlightBoostInteraction.class,
+                TameworkFlightBoostInteraction.CODEC
         );
         // Register the custom block interaction used to empty water trough states.
         Interaction.CODEC.register(

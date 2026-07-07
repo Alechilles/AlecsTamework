@@ -20,6 +20,13 @@
           "DurationMs": 350
         }
       ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "TameworkFlightBoost"
+        }
+      ]
     }
   },
   "Model": "Items/Tamework/FlightmasterReins/Flightmaster_Reins.blockymodel",

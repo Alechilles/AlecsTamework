@@ -538,13 +538,17 @@ public final class AvatarFlightMovementSystem
                 Math.round(config.getInput().getIntentTimeoutMs())
         );
         boolean reinsAirbrake = input != null && input.isReinsAirbrakeActive(now);
+        boolean reinsBoost = input != null && input.consumeReinsBoost(
+                now,
+                Math.round(config.getInput().getIntentTimeoutMs())
+        );
         AvatarFlightController.Input controllerInput = new AvatarFlightController.Input(
                 stale ? 0.0 : input.getForwardAxis(),
                 stale ? 0.0 : input.getStrafeAxis(),
                 stale ? 0.0 : input.getVerticalAxis(),
                 reinsFlap || (!stale && input.isJumping()),
                 !stale && input.isCrouching(),
-                liveSprint || (!stale && input.isSprinting()),
+                reinsBoost || liveSprint || (!stale && input.isSprinting()),
                 reinsAirbrake,
                 onGround,
                 yaw,

@@ -17,6 +17,7 @@
     "NeutralGlideSpeed": 6.0,
     "NeutralGlideAcceleration": 4.0,
     "NeutralGlideDeceleration": 2.0,
+    "GlideStartKickSpeed": 1.5,
     "ForwardAcceleration": 18.0,
     "MaxBackwardSpeed": 3.0,
     "BackwardAcceleration": 8.0,
@@ -32,7 +33,7 @@
     "PitchUpLiftScale": 5.0,
     "PitchUpSpeedCost": 3.0,
     "PitchDownDiveScale": 5.0,
-    "PitchDownSpeedGain": 8.0
+    "PitchDownSpeedGain": 3.0
   },
   "Jump": {
     "UpwardImpulse": 7.0,

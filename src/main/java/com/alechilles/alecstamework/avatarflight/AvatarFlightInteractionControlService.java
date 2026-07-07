@@ -23,6 +23,10 @@ public final class AvatarFlightInteractionControlService {
         return apply(context, nowMs, input -> input.activateReinsAirbrake(nowMs, durationMs));
     }
 
+    public static boolean queueBoost(@Nonnull InteractionContext context, long nowMs) {
+        return apply(context, nowMs, input -> input.queueReinsBoost(nowMs));
+    }
+
     private static boolean apply(@Nonnull InteractionContext context,
                                  long nowMs,
                                  @Nonnull FlightInputMutation mutation) {

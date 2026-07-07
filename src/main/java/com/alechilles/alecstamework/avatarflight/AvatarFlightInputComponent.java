@@ -65,6 +65,10 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
                     AvatarFlightInputComponent::setReinsAirbrakeUntilMs,
                     AvatarFlightInputComponent::getReinsAirbrakeUntilMs)
             .add()
+            .<Long>append(new KeyedCodec<>("ReinsBoostQueuedAtMs", Codec.LONG),
+                    AvatarFlightInputComponent::setReinsBoostQueuedAtMs,
+                    AvatarFlightInputComponent::getReinsBoostQueuedAtMs)
+            .add()
             .build();
 
     private double forwardAxis;
@@ -79,6 +83,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     private long lastInputAtMs;
     private long reinsFlapQueuedAtMs;
     private long reinsAirbrakeUntilMs;
+    private long reinsBoostQueuedAtMs;
 
     @Nullable
     public static ComponentType<EntityStore, AvatarFlightInputComponent> getComponentType() {
@@ -182,6 +187,14 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         this.reinsAirbrakeUntilMs = reinsAirbrakeUntilMs == null ? 0L : reinsAirbrakeUntilMs;
     }
 
+    public long getReinsBoostQueuedAtMs() {
+        return reinsBoostQueuedAtMs;
+    }
+
+    public void setReinsBoostQueuedAtMs(@Nullable Long reinsBoostQueuedAtMs) {
+        this.reinsBoostQueuedAtMs = reinsBoostQueuedAtMs == null ? 0L : reinsBoostQueuedAtMs;
+    }
+
     public void queueReinsFlap(long nowMs) {
         reinsFlapQueuedAtMs = nowMs;
     }
@@ -211,6 +224,19 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         return reinsAirbrakeUntilMs != 0L && nowMs <= reinsAirbrakeUntilMs;
     }
 
+    public void queueReinsBoost(long nowMs) {
+        reinsBoostQueuedAtMs = nowMs;
+    }
+
+    public boolean consumeReinsBoost(long nowMs, long maxAgeMs) {
+        if (reinsBoostQueuedAtMs == 0L) {
+            return false;
+        }
+        long queuedAtMs = reinsBoostQueuedAtMs;
+        reinsBoostQueuedAtMs = 0L;
+        return maxAgeMs <= 0L || nowMs - queuedAtMs <= maxAgeMs;
+    }
+
     public boolean isStale(long nowMs, long timeoutMs) {
         return lastInputAtMs == 0L || nowMs - lastInputAtMs > timeoutMs;
     }
@@ -237,6 +263,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         clone.lastInputAtMs = lastInputAtMs;
         clone.reinsFlapQueuedAtMs = reinsFlapQueuedAtMs;
         clone.reinsAirbrakeUntilMs = reinsAirbrakeUntilMs;
+        clone.reinsBoostQueuedAtMs = reinsBoostQueuedAtMs;
         return clone;
     }
 
