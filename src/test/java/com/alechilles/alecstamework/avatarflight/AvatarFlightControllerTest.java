@@ -347,6 +347,53 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void unpoweredForwardGlideLosesAltitudeOverTime() {
+        AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -14.0, 0L, 0L);
+        double altitudeChange = 0.0;
+        for (int tick = 0; tick < 200; tick++) {
+            AvatarFlightController.Output output = update(
+                    state,
+                    input(1.0, false, false, false, false, 0.0)
+            );
+            altitudeChange += output.velocityY() * 0.1;
+            state = new AvatarFlightController.State(
+                    output.velocityX(),
+                    output.velocityY(),
+                    output.velocityZ(),
+                    output.nextJumpAtMs(),
+                    output.nextBoostAtMs()
+            );
+        }
+
+        assertTrue(altitudeChange < -12.0,
+                "unpowered neutral forward glide must eventually lose enough altitude to require landing");
+    }
+
+    @Test
+    void pitchDownCanReachFastRechargeSpeedBySpendingAltitude() {
+        AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -14.0, 0L, 0L);
+        AvatarFlightController.Output output = null;
+        for (int tick = 0; tick < 20; tick++) {
+            output = update(
+                    state,
+                    input(1.0, false, false, false, false, Math.toRadians(-55.0))
+            );
+            state = new AvatarFlightController.State(
+                    output.velocityX(),
+                    output.velocityY(),
+                    output.velocityZ(),
+                    output.nextJumpAtMs(),
+                    output.nextBoostAtMs()
+            );
+        }
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed >= AvatarFlightSpeedMetrics.fastRechargeThreshold(CONFIG),
+                "pitch-down should spend altitude to reach the fast-flight recharge band");
+        assertTrue(output.velocityY() < 0.0);
+    }
+
+    @Test
     void pitchDownNeverProducesUpwardLift() {
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(0.0, 1.0, -8.0, 0L, 0L),

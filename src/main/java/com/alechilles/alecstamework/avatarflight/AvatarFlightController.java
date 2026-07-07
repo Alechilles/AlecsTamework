@@ -10,6 +10,7 @@ public final class AvatarFlightController {
     private static final double MIN_FORWARD_FOR_BRAKE = 0.15;
     private static final double MIN_FORWARD_FOR_PITCH_TRADE = 0.5;
     private static final double HORIZONTAL_IDLE_SPEED = 0.25;
+    private static final double NEUTRAL_PITCH_RADIANS = Math.toRadians(2.0);
     private static final double MAX_PHYSICAL_PITCH_UP_RADIANS = Math.toRadians(60.0);
     private static final double MAX_VISUAL_ROLL_RADIANS = Math.toRadians(30.0);
     private static final double PITCH_UP_FORWARD_DRAG_MULTIPLIER = 4.0;
@@ -40,7 +41,11 @@ public final class AvatarFlightController {
         double targetStrafeSpeed = currentStrafeSpeed;
         double vertical = state.velocityY();
         AvatarFlightMode mode;
-        double pitchUpAmount = pitchUpAmount(input.pitchRadians());
+        double rawPitchRadians = input.pitchRadians();
+        boolean neutralPitch = Math.abs(rawPitchRadians) < NEUTRAL_PITCH_RADIANS;
+        double effectivePitchRadians = neutralPitch ? 0.0 : rawPitchRadians;
+        double pitchUpAmount = pitchUpAmount(effectivePitchRadians);
+        boolean pitchDownIntent = effectivePitchRadians < 0.0;
 
         boolean jumpIntent = (input.jump() || input.verticalAxis() > 0.0) && input.flapAllowed();
         boolean descendIntent = input.crouch() || input.verticalAxis() < 0.0;
@@ -58,6 +63,17 @@ public final class AvatarFlightController {
         } else if (input.forwardAxis() > config.getInput().getForwardDeadzone()) {
             if (pitchUpAmount > 0.0) {
                 targetForwardSpeed = Math.max(0.0, Math.max(targetForwardSpeed, currentHorizontalSpeed));
+            } else if (pitchDownIntent) {
+                double cruiseForwardSpeed = movement.getMaxForwardSpeed() * input.forwardAxis();
+                if (targetForwardSpeed < cruiseForwardSpeed) {
+                    targetForwardSpeed = approach(
+                            targetForwardSpeed,
+                            cruiseForwardSpeed,
+                            movement.getForwardAcceleration() * dt
+                    );
+                } else {
+                    targetForwardSpeed = Math.max(0.0, Math.max(targetForwardSpeed, currentHorizontalSpeed));
+                }
             } else {
                 targetForwardSpeed = approach(
                         targetForwardSpeed,
@@ -102,6 +118,7 @@ public final class AvatarFlightController {
         long boostDurationMs = Math.round(boostDurationSeconds * 1000.0);
         long boostCooldownMs = Math.round(config.getBoost().getCooldownSeconds() * 1000.0);
         boolean boostActive = isBoostActive(nextBoostAtMs, boostCooldownMs, boostDurationMs, nowMs);
+        double boostedHorizontalCap = AvatarFlightSpeedMetrics.boostedHorizontalCap(config);
         if (jumpIntent && (nextJumpAtMs == 0L || nowMs >= nextJumpAtMs)) {
             vertical = Math.max(vertical, 0.0) + config.getJump().getUpwardImpulse();
             nextJumpAtMs = nowMs + Math.round(config.getJump().getCooldownSeconds() * 1000.0);
@@ -140,9 +157,14 @@ public final class AvatarFlightController {
             vertical = -movement.getDescendSpeed();
             mode = AvatarFlightMode.DESCENDING;
         } else if (targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE) {
-            PitchAdjustment pitch = applyPitch(input.pitchRadians(), targetForwardSpeed, vertical, movement, dt);
+            PitchAdjustment pitch = applyPitch(effectivePitchRadians, targetForwardSpeed, vertical,
+                    movement, boostedHorizontalCap, dt);
             targetForwardSpeed = pitch.forwardSpeed();
             vertical = pitch.verticalSpeed();
+            if (neutralPitch && !jumpApplied) {
+                vertical = approach(vertical, -movement.getGlideSinkSpeed(),
+                        movement.getGlideSinkAcceleration() * dt);
+            }
         } else if (!jumpApplied) {
             vertical = approach(vertical, 0.0, movement.getHoverVerticalDamping() * dt);
         }
@@ -155,7 +177,7 @@ public final class AvatarFlightController {
                 targetForwardSpeed,
                 targetStrafeSpeed,
                 movement,
-                config.getBoost(),
+                boostedHorizontalCap,
                 boostActive
         );
         HorizontalVelocity horizontalVelocity = capHorizontalVelocity(x, z, horizontalSpeedLimit);
@@ -182,12 +204,15 @@ public final class AvatarFlightController {
                                                       double targetForwardSpeed,
                                                       double targetStrafeSpeed,
                                                       TwAvatarFlightConfig.MovementSettings movement,
-                                                      TwAvatarFlightConfig.BoostSettings boost,
+                                                      double boostedHorizontalCap,
                                                       boolean boostActive) {
         double configuredLimit = Math.max(movement.getMaxForwardSpeed(), movement.getMaxBackwardSpeed());
-        double boostLimit = movement.getMaxForwardSpeed() + boost.getForwardImpulse();
+        double boostLimit = Math.max(configuredLimit, boostedHorizontalCap);
         double intendedSpeed = Math.max(Math.abs(targetForwardSpeed), Math.abs(targetStrafeSpeed));
         if (boostActive) {
+            return Math.max(0.0, Math.min(boostLimit, Math.max(currentHorizontalSpeed, intendedSpeed)));
+        }
+        if (intendedSpeed > configuredLimit) {
             return Math.max(0.0, Math.min(boostLimit, Math.max(currentHorizontalSpeed, intendedSpeed)));
         }
         if (currentHorizontalSpeed > configuredLimit) {
@@ -213,6 +238,7 @@ public final class AvatarFlightController {
                                               double forwardSpeed,
                                               double verticalSpeed,
                                               @Nonnull TwAvatarFlightConfig.MovementSettings movement,
+                                              double boostedHorizontalCap,
                                               double dt) {
         if (pitchRadians > 0.0) {
             double amount = pitchUpAmount(pitchRadians);
@@ -237,7 +263,7 @@ public final class AvatarFlightController {
         if (pitchRadians < 0.0) {
             double amount = Math.min(1.0, -pitchRadians / Math.toRadians(70.0));
             return new PitchAdjustment(
-                    Math.min(movement.getMaxForwardSpeed(), forwardSpeed + movement.getPitchDownSpeedGain() * amount * dt),
+                    Math.min(boostedHorizontalCap, forwardSpeed + movement.getPitchDownSpeedGain() * amount * dt),
                     verticalSpeed - movement.getPitchDownDiveScale() * amount * dt
             );
         }
