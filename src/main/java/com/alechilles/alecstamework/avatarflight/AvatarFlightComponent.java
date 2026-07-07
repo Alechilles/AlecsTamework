@@ -50,6 +50,22 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setEnabledAtMs,
                     AvatarFlightComponent::getEnabledAtMs)
             .add()
+            .<Double>append(new KeyedCodec<>("VigourCharges", Codec.DOUBLE),
+                    AvatarFlightComponent::setVigourCharges,
+                    AvatarFlightComponent::getVigourCharges)
+            .add()
+            .<Long>append(new KeyedCodec<>("LastVigourUpdateAtMs", Codec.LONG),
+                    AvatarFlightComponent::setLastVigourUpdateAtMs,
+                    AvatarFlightComponent::getLastVigourUpdateAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("VigourRechargeBlockedUntilMs", Codec.LONG),
+                    AvatarFlightComponent::setVigourRechargeBlockedUntilMs,
+                    AvatarFlightComponent::getVigourRechargeBlockedUntilMs)
+            .add()
+            .<String>append(new KeyedCodec<>("VigourRechargeMode", Codec.STRING),
+                    AvatarFlightComponent::setVigourRechargeMode,
+                    AvatarFlightComponent::getVigourRechargeMode)
+            .add()
             .<Boolean>append(new KeyedCodec<>("ClientFlyingSynced", Codec.BOOLEAN),
                     AvatarFlightComponent::setClientFlyingSynced,
                     AvatarFlightComponent::isClientFlyingSynced)
@@ -92,6 +108,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextJumpAtMs;
     private long nextBoostAtMs;
     private long enabledAtMs;
+    private double vigourCharges;
+    private long lastVigourUpdateAtMs;
+    private long vigourRechargeBlockedUntilMs;
+    private String vigourRechargeMode = AvatarFlightVigourService.RechargeMode.NONE.name();
     private boolean clientFlyingSynced;
     private String movementAnimationId = "";
     private long nextMovementAnimationAtMs;
@@ -198,6 +218,52 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         this.enabledAtMs = enabledAtMs == null ? 0L : enabledAtMs;
     }
 
+    public double getVigourCharges() {
+        return finiteOrZero(vigourCharges);
+    }
+
+    public void setVigourCharges(@Nullable Double vigourCharges) {
+        this.vigourCharges = finiteOrZero(vigourCharges);
+    }
+
+    public long getLastVigourUpdateAtMs() {
+        return lastVigourUpdateAtMs;
+    }
+
+    public void setLastVigourUpdateAtMs(@Nullable Long lastVigourUpdateAtMs) {
+        this.lastVigourUpdateAtMs = lastVigourUpdateAtMs == null ? 0L : lastVigourUpdateAtMs;
+    }
+
+    public long getVigourRechargeBlockedUntilMs() {
+        return vigourRechargeBlockedUntilMs;
+    }
+
+    public void setVigourRechargeBlockedUntilMs(@Nullable Long vigourRechargeBlockedUntilMs) {
+        this.vigourRechargeBlockedUntilMs = vigourRechargeBlockedUntilMs == null ? 0L : vigourRechargeBlockedUntilMs;
+    }
+
+    @Nonnull
+    public String getVigourRechargeMode() {
+        return vigourRechargeMode == null || vigourRechargeMode.isBlank()
+                ? AvatarFlightVigourService.RechargeMode.NONE.name()
+                : vigourRechargeMode;
+    }
+
+    public void setVigourRechargeMode(@Nullable String vigourRechargeMode) {
+        if (vigourRechargeMode == null || vigourRechargeMode.isBlank()) {
+            this.vigourRechargeMode = AvatarFlightVigourService.RechargeMode.NONE.name();
+            return;
+        }
+        String normalized = vigourRechargeMode.trim().toUpperCase(java.util.Locale.ROOT);
+        for (AvatarFlightVigourService.RechargeMode mode : AvatarFlightVigourService.RechargeMode.values()) {
+            if (mode.name().equals(normalized)) {
+                this.vigourRechargeMode = normalized;
+                return;
+            }
+        }
+        this.vigourRechargeMode = AvatarFlightVigourService.RechargeMode.NONE.name();
+    }
+
     public boolean isClientFlyingSynced() {
         return clientFlyingSynced;
     }
@@ -280,6 +346,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.velocityZ = velocityZ;
         clone.nextJumpAtMs = nextJumpAtMs;
         clone.nextBoostAtMs = nextBoostAtMs;
+        clone.vigourCharges = getVigourCharges();
+        clone.lastVigourUpdateAtMs = lastVigourUpdateAtMs;
+        clone.vigourRechargeBlockedUntilMs = vigourRechargeBlockedUntilMs;
+        clone.vigourRechargeMode = getVigourRechargeMode();
         clone.clientFlyingSynced = clientFlyingSynced;
         clone.movementAnimationId = getMovementAnimationId();
         clone.nextMovementAnimationAtMs = nextMovementAnimationAtMs;

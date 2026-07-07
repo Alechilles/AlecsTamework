@@ -88,12 +88,14 @@ public final class AvatarFlightMovementSystem
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
         AvatarFlightInputComponent input = commandBuffer.getComponent(ref, inputType);
         MovementStates movementStates = resolveMovementStates(ref, commandBuffer);
-        AvatarFlightController.Input controllerInput =
+        AvatarFlightController.Input rawControllerInput =
                 toControllerInput(input, movementStates, ref, commandBuffer, config);
         if (input != null) {
             commandBuffer.putComponent(ref, inputType, input);
         }
         long now = System.currentTimeMillis();
+        rechargeVigour(flight, config, rawControllerInput, now);
+        AvatarFlightController.Input controllerInput = authorizeVigour(rawControllerInput, flight, config);
         AvatarFlightController.State state = AvatarFlightController.State.from(flight);
         AvatarFlightController.Output output = AvatarFlightController.update(
                 state,
@@ -102,6 +104,7 @@ public final class AvatarFlightMovementSystem
                 Math.max(0.0, dt),
                 now
         );
+        spendAppliedVigour(flight, config, output, now);
         flight.setMode(output.mode());
         flight.setVelocity(output.velocityX(), output.velocityY(), output.velocityZ());
         flight.setNextJumpAtMs(output.nextJumpAtMs());
@@ -123,6 +126,135 @@ public final class AvatarFlightMovementSystem
         }
         commandBuffer.putComponent(ref, flightType, flight);
         maybeLogDebug(config, ref, controllerInput, output, movementStates);
+    }
+
+    private static void rechargeVigour(@Nonnull AvatarFlightComponent flight,
+                                       @Nonnull TwAvatarFlightConfig config,
+                                       @Nonnull AvatarFlightController.Input input,
+                                       long now) {
+        double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
+                flight.getVelocityX(),
+                flight.getVelocityY(),
+                flight.getVelocityZ()
+        );
+        AvatarFlightVigourService.Result recharge = AvatarFlightVigourService.recharge(
+                new AvatarFlightVigourService.State(
+                        initialVigourCharges(flight, config),
+                        flight.getLastVigourUpdateAtMs(),
+                        flight.getVigourRechargeBlockedUntilMs()
+                ),
+                config,
+                input.onGround(),
+                horizontalSpeed,
+                now
+        );
+        applyVigourState(flight, recharge.state());
+        flight.setVigourRechargeMode(recharge.mode().name());
+    }
+
+    @Nonnull
+    private static AvatarFlightController.Input authorizeVigour(@Nonnull AvatarFlightController.Input input,
+                                                               @Nonnull AvatarFlightComponent flight,
+                                                               @Nonnull TwAvatarFlightConfig config) {
+        if (!config.getVigour().isEnabled()) {
+            return withVigourAuthorization(input, true, true);
+        }
+        AvatarFlightVigourService.State state = new AvatarFlightVigourService.State(
+                flight.getVigourCharges(),
+                flight.getLastVigourUpdateAtMs(),
+                flight.getVigourRechargeBlockedUntilMs()
+        );
+        boolean flapAllowed = AvatarFlightVigourService.canSpend(
+                state,
+                config,
+                config.getVigour().getUpwardFlapCost()
+        );
+        boolean boostAllowed = AvatarFlightVigourService.canSpend(
+                state,
+                config,
+                config.getVigour().getForwardBoostCost()
+        );
+        return withVigourAuthorization(input, flapAllowed, boostAllowed);
+    }
+
+    private static void spendAppliedVigour(@Nonnull AvatarFlightComponent flight,
+                                           @Nonnull TwAvatarFlightConfig config,
+                                           @Nonnull AvatarFlightController.Output output,
+                                           long now) {
+        AvatarFlightVigourService.State state = new AvatarFlightVigourService.State(
+                flight.getVigourCharges(),
+                flight.getLastVigourUpdateAtMs(),
+                flight.getVigourRechargeBlockedUntilMs()
+        );
+        boolean spent = false;
+        if (output.jumpApplied()) {
+            state = AvatarFlightVigourService.spend(
+                    state,
+                    config,
+                    config.getVigour().getUpwardFlapCost(),
+                    now
+            );
+            spent = true;
+        }
+        if (output.boostApplied()) {
+            state = AvatarFlightVigourService.spend(
+                    state,
+                    config,
+                    config.getVigour().getForwardBoostCost(),
+                    now
+            );
+            spent = true;
+        }
+        if (!spent) {
+            return;
+        }
+        applyVigourState(flight, state);
+        flight.setVigourRechargeMode(AvatarFlightVigourService.RechargeMode.DELAYED.name());
+    }
+
+    @Nonnull
+    private static AvatarFlightController.Input withVigourAuthorization(@Nonnull AvatarFlightController.Input input,
+                                                                       boolean flapAllowed,
+                                                                       boolean boostAllowed) {
+        return new AvatarFlightController.Input(
+                input.forwardAxis(),
+                input.strafeAxis(),
+                input.verticalAxis(),
+                input.jump(),
+                input.crouch(),
+                input.sprint(),
+                input.airbrake(),
+                input.onGround(),
+                input.yawRadians(),
+                input.pitchRadians(),
+                flapAllowed,
+                boostAllowed
+        );
+    }
+
+    private static void applyVigourState(@Nonnull AvatarFlightComponent flight,
+                                         @Nonnull AvatarFlightVigourService.State state) {
+        flight.setVigourCharges(state.charges());
+        flight.setLastVigourUpdateAtMs(state.lastUpdateAtMs());
+        flight.setVigourRechargeBlockedUntilMs(state.rechargeBlockedUntilMs());
+    }
+
+    private static double initialVigourCharges(@Nonnull AvatarFlightComponent flight,
+                                               @Nonnull TwAvatarFlightConfig config) {
+        double maxCharges = maxVigourCharges(config);
+        if (!config.getVigour().isEnabled()) {
+            return maxCharges;
+        }
+        double charges = flight.getVigourCharges();
+        if (flight.getLastVigourUpdateAtMs() == 0L && charges <= 0.0) {
+            return maxCharges;
+        }
+        return charges;
+    }
+
+    private static double maxVigourCharges(@Nonnull TwAvatarFlightConfig config) {
+        double maxCharges = config.getVigour().getMaxCharges();
+        return Double.isFinite(maxCharges) && maxCharges > 0.0 ? maxCharges : 0.0;
     }
 
     private void syncOwnerClientFlyingState(@Nonnull Ref<EntityStore> ref,
@@ -377,7 +509,9 @@ public final class AvatarFlightMovementSystem
                 reinsAirbrake,
                 onGround,
                 yaw,
-                pitch
+                pitch,
+                true,
+                true
         );
         if (input != null) {
             input.clearTransientVerticalIntent();

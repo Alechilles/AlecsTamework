@@ -49,7 +49,12 @@ public final class AvatarFlightActivator {
             }
             return Result.fail("Avatar flight component types are not registered.");
         }
-        store.putComponent(ref, flightType, new AvatarFlightComponent(config.getId(), System.currentTimeMillis()));
+        long enabledAtMs = System.currentTimeMillis();
+        AvatarFlightComponent flight = new AvatarFlightComponent(config.getId(), enabledAtMs);
+        flight.setVigourCharges(config.getVigour().getMaxCharges());
+        flight.setLastVigourUpdateAtMs(enabledAtMs);
+        flight.setVigourRechargeMode(AvatarFlightVigourService.RechargeMode.NONE.name());
+        store.putComponent(ref, flightType, flight);
         AvatarFlightInputComponent input = store.getComponent(ref, inputType);
         if (input == null) {
             store.putComponent(ref, inputType, new AvatarFlightInputComponent());

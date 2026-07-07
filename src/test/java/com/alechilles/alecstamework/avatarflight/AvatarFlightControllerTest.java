@@ -139,6 +139,17 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void flapIntentBlockedByResourceGateDoesNotApplyUpwardVelocity() {
+        AvatarFlightController.Output output = update(
+                new AvatarFlightController.State(0.0, 0.0, 0.0, 0L, 0L),
+                input(0.0, 0.0, true, false, false, false, false, 0.0, false, true)
+        );
+
+        assertFalse(output.jumpApplied());
+        assertEquals(0.0, output.velocityY(), 0.00001);
+    }
+
+    @Test
     void negativeVerticalIntentAppliesConfiguredDescent() {
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(0.0, 1.0, 0.0, 0L, 0L),
@@ -364,7 +375,7 @@ class AvatarFlightControllerTest {
         AvatarFlightController.Output rightTurn = AvatarFlightController.update(
                 new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
                 new AvatarFlightController.Input(1.0, 0.0, 0.0, false, false, false,
-                        false, false, Math.toRadians(-90.0), 0.0),
+                        false, false, Math.toRadians(-90.0), 0.0, true, true),
                 CONFIG,
                 0.1,
                 1000L
@@ -372,7 +383,7 @@ class AvatarFlightControllerTest {
         AvatarFlightController.Output leftTurn = AvatarFlightController.update(
                 new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
                 new AvatarFlightController.Input(1.0, 0.0, 0.0, false, false, false,
-                        false, false, Math.toRadians(90.0), 0.0),
+                        false, false, Math.toRadians(90.0), 0.0, true, true),
                 CONFIG,
                 0.1,
                 1000L
@@ -391,7 +402,7 @@ class AvatarFlightControllerTest {
         AvatarFlightController.Output output = AvatarFlightController.update(
                 new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
                 new AvatarFlightController.Input(1.0, 0.0, 0.0, false, false, false,
-                        false, false, Math.toRadians(-90.0), 0.0),
+                        false, false, Math.toRadians(-90.0), 0.0, true, true),
                 CONFIG,
                 0.1,
                 1000L
@@ -437,6 +448,19 @@ class AvatarFlightControllerTest {
         assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxForwardSpeed()
                         + CONFIG.getBoost().getForwardImpulse(),
                 "sprint boost should still respect the configured boosted speed ceiling");
+    }
+
+    @Test
+    void boostIntentBlockedByResourceGateDoesNotExceedCruiseSpeed() {
+        AvatarFlightController.Output output = update(
+                new AvatarFlightController.State(0.0, 0.0, -CONFIG.getMovement().getMaxForwardSpeed(), 0L, 0L),
+                input(1.0, 0.0, false, false, true, false, false, 0.0, true, false)
+        );
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertFalse(output.boostApplied());
+        assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxForwardSpeed(),
+                "blocked sprint boost must stay at or below the normal cruise speed");
     }
 
     @Test
@@ -537,7 +561,9 @@ class AvatarFlightControllerTest {
                 airbrake,
                 onGround,
                 0.0,
-                pitchRadians
+                pitchRadians,
+                true,
+                true
         );
     }
 
@@ -559,7 +585,35 @@ class AvatarFlightControllerTest {
                 false,
                 onGround,
                 0.0,
-                pitchRadians
+                pitchRadians,
+                true,
+                true
+        );
+    }
+
+    private static AvatarFlightController.Input input(double forwardAxis,
+                                                      double strafeAxis,
+                                                      boolean jump,
+                                                      boolean crouch,
+                                                      boolean sprint,
+                                                      boolean onGround,
+                                                      boolean airbrake,
+                                                      double pitchRadians,
+                                                      boolean flapAllowed,
+                                                      boolean boostAllowed) {
+        return new AvatarFlightController.Input(
+                forwardAxis,
+                strafeAxis,
+                0.0,
+                jump,
+                crouch,
+                sprint,
+                airbrake,
+                onGround,
+                0.0,
+                pitchRadians,
+                flapAllowed,
+                boostAllowed
         );
     }
 }

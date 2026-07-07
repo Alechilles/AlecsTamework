@@ -42,7 +42,7 @@ public final class AvatarFlightController {
         AvatarFlightMode mode;
         double pitchUpAmount = pitchUpAmount(input.pitchRadians());
 
-        boolean jumpIntent = input.jump() || input.verticalAxis() > 0.0;
+        boolean jumpIntent = (input.jump() || input.verticalAxis() > 0.0) && input.flapAllowed();
         boolean descendIntent = input.crouch() || input.verticalAxis() < 0.0;
         boolean explicitAirbrakeIntent = input.airbrake();
         if (input.onGround() && !jumpIntent) {
@@ -107,7 +107,10 @@ public final class AvatarFlightController {
             nextJumpAtMs = nowMs + Math.round(config.getJump().getCooldownSeconds() * 1000.0);
             jumpApplied = true;
         }
-        if (!explicitAirbrakeIntent && input.sprint() && (nextBoostAtMs == 0L || nowMs >= nextBoostAtMs)) {
+        if (!explicitAirbrakeIntent
+                && input.sprint()
+                && input.boostAllowed()
+                && (nextBoostAtMs == 0L || nowMs >= nextBoostAtMs)) {
             double boostSpeedLimit = movement.getMaxForwardSpeed() + config.getBoost().getForwardImpulse();
             targetForwardSpeed = Math.min(
                     boostSpeedLimit,
@@ -340,7 +343,9 @@ public final class AvatarFlightController {
                         boolean airbrake,
                         boolean onGround,
                         double yawRadians,
-                        double pitchRadians) {
+                        double pitchRadians,
+                        boolean flapAllowed,
+                        boolean boostAllowed) {
     }
 
     public record Output(@Nonnull AvatarFlightMode mode,
