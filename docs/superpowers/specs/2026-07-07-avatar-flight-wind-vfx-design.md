@@ -57,7 +57,7 @@ Default effect concepts:
 
 - Launch charge: inward ground-level pressure rings and dust, building smoothly as the launch hold approaches full charge.
 - Launch release: one clean expanding ground shock ring plus a short upward air column to sell the stored force releasing into takeoff. Burst size/intensity should scale with final launch charge amount.
-- Launch cancel: if the player releases before minimum charge, play a tiny dissipating puff so the held charge visibly fizzles without implying a successful launch.
+- Launch cancel: if the player releases before minimum charge, play a tiny dissipating puff so the held charge visibly fizzles without implying a successful launch. This should be its own small particle system, separate from the charge-ramp pulse system.
 - Flap: brief downwash arcs from the wings/body, lighter than launch and focused on lift.
 - Boost: horizontal compression streaks behind and around the dragon, stronger than flap but shorter and punchier than persistent speed trails.
 - Airbrake: subtle forward-facing wind shear or compression arcs that read as drag, not as a powered burst. The primary cue is world/velocity-oriented in front of and slightly around the dragon; secondary model-attached wisps near wing/body edges keep the effect visually connected to the model.
@@ -190,7 +190,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should the launch cancel puff share the launch-charge pulse particle system at very low scale, or use its own tiny cancel particle system?
+- Should launch effects include matching sound hooks in the first VFX pass, or stay particle-only for now?
 
 ## Testing and Validation Notes
 
@@ -231,3 +231,4 @@ Expected validation once implemented:
 - 2026-07-07: Accepted first-pass release VFX thresholds: partial `<0.45`, mid `0.45` to `<0.8`, full `0.8+`.
 - 2026-07-07: Decided launch-charge pulse cadence and intensity should interpolate continuously instead of snapping to release-tier thresholds.
 - 2026-07-07: Decided canceled pre-minimum launch releases should play a tiny dissipating puff.
+- 2026-07-07: Decided launch cancel should use its own tiny particle system rather than reusing the charge-ramp pulse system.
