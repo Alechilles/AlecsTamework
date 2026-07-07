@@ -95,7 +95,7 @@ public final class AvatarFlightMovementSystem
         }
         long now = System.currentTimeMillis();
         rechargeVigour(flight, config, rawControllerInput, now);
-        AvatarFlightController.Input controllerInput = authorizeVigour(rawControllerInput, flight, config);
+        AvatarFlightController.Input controllerInput = authorizeVigour(rawControllerInput, flight, config, now);
         AvatarFlightController.State state = AvatarFlightController.State.from(flight);
         AvatarFlightController.Output output = AvatarFlightController.update(
                 state,
@@ -155,10 +155,13 @@ public final class AvatarFlightMovementSystem
     @Nonnull
     private static AvatarFlightController.Input authorizeVigour(@Nonnull AvatarFlightController.Input input,
                                                                @Nonnull AvatarFlightComponent flight,
-                                                               @Nonnull TwAvatarFlightConfig config) {
+                                                               @Nonnull TwAvatarFlightConfig config,
+                                                               long now) {
         if (!config.getVigour().isEnabled()) {
             return withVigourAuthorization(input, true, true);
         }
+        double flapCost = config.getVigour().getUpwardFlapCost();
+        double boostCost = config.getVigour().getForwardBoostCost();
         AvatarFlightVigourService.State state = new AvatarFlightVigourService.State(
                 flight.getVigourCharges(),
                 flight.getLastVigourUpdateAtMs(),
@@ -167,13 +170,19 @@ public final class AvatarFlightMovementSystem
         boolean flapAllowed = AvatarFlightVigourService.canSpend(
                 state,
                 config,
-                config.getVigour().getUpwardFlapCost()
+                flapCost
         );
         boolean boostAllowed = AvatarFlightVigourService.canSpend(
                 state,
                 config,
-                config.getVigour().getForwardBoostCost()
+                boostCost
         );
+        if (flapAllowed
+                && flapEligibleThisTick(input, flight, now)
+                && boostEligibleThisTick(input, flight, now)
+                && !AvatarFlightVigourService.canSpend(state, config, combinedCost(flapCost, boostCost))) {
+            boostAllowed = false;
+        }
         return withVigourAuthorization(input, flapAllowed, boostAllowed);
     }
 
@@ -181,6 +190,9 @@ public final class AvatarFlightMovementSystem
                                            @Nonnull TwAvatarFlightConfig config,
                                            @Nonnull AvatarFlightController.Output output,
                                            long now) {
+        if (!config.getVigour().isEnabled()) {
+            return;
+        }
         AvatarFlightVigourService.State state = new AvatarFlightVigourService.State(
                 flight.getVigourCharges(),
                 flight.getLastVigourUpdateAtMs(),
@@ -210,6 +222,33 @@ public final class AvatarFlightMovementSystem
         }
         applyVigourState(flight, state);
         flight.setVigourRechargeMode(AvatarFlightVigourService.RechargeMode.DELAYED.name());
+    }
+
+    private static boolean flapEligibleThisTick(@Nonnull AvatarFlightController.Input input,
+                                                @Nonnull AvatarFlightComponent flight,
+                                                long now) {
+        return (input.jump() || input.verticalAxis() > 0.0)
+                && cooldownReady(flight.getNextJumpAtMs(), now);
+    }
+
+    private static boolean boostEligibleThisTick(@Nonnull AvatarFlightController.Input input,
+                                                 @Nonnull AvatarFlightComponent flight,
+                                                 long now) {
+        return !input.airbrake()
+                && input.sprint()
+                && cooldownReady(flight.getNextBoostAtMs(), now);
+    }
+
+    private static boolean cooldownReady(long nextAtMs, long now) {
+        return nextAtMs == 0L || now >= nextAtMs;
+    }
+
+    private static double combinedCost(double firstCost, double secondCost) {
+        return paidCost(firstCost) + paidCost(secondCost);
+    }
+
+    private static double paidCost(double cost) {
+        return Double.isNaN(cost) || cost <= 0.0 ? 0.0 : cost;
     }
 
     @Nonnull
