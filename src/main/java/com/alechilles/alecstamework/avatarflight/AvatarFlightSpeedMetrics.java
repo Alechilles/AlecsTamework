@@ -23,7 +23,16 @@ public final class AvatarFlightSpeedMetrics {
         }
         double maxForwardSpeed = finiteOrZero(config.getMovement().getMaxForwardSpeed());
         double forwardImpulse = finiteOrZero(config.getBoost().getForwardImpulse());
-        return Math.max(maxForwardSpeed, maxForwardSpeed + forwardImpulse);
+        return Math.max(glideHorizontalCap(config), maxForwardSpeed + forwardImpulse);
+    }
+
+    public static double glideHorizontalCap(@Nullable TwAvatarFlightConfig config) {
+        if (config == null) {
+            return 0.0;
+        }
+        double maxForwardSpeed = finiteOrZero(config.getMovement().getMaxForwardSpeed());
+        double maxGlideSpeed = finiteOrZero(config.getMovement().getMaxGlideSpeed());
+        return Math.max(maxForwardSpeed, maxGlideSpeed);
     }
 
     public static double speedRatio(double horizontalSpeed, @Nullable TwAvatarFlightConfig config) {

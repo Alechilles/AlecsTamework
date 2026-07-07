@@ -77,7 +77,7 @@ public final class AvatarFlightController {
             } else {
                 targetForwardSpeed = approach(
                         targetForwardSpeed,
-                        movement.getMaxForwardSpeed() * input.forwardAxis(),
+                        forwardFlightTargetSpeed(movement, input.forwardAxis(), currentForwardSpeed),
                         movement.getForwardAcceleration() * dt
                 );
             }
@@ -118,6 +118,7 @@ public final class AvatarFlightController {
         long boostDurationMs = Math.round(boostDurationSeconds * 1000.0);
         long boostCooldownMs = Math.round(config.getBoost().getCooldownSeconds() * 1000.0);
         boolean boostActive = isBoostActive(nextBoostAtMs, boostCooldownMs, boostDurationMs, nowMs);
+        double glideHorizontalCap = AvatarFlightSpeedMetrics.glideHorizontalCap(config);
         double boostedHorizontalCap = AvatarFlightSpeedMetrics.boostedHorizontalCap(config);
         if (jumpIntent && (nextJumpAtMs == 0L || nowMs >= nextJumpAtMs)) {
             vertical = Math.max(vertical, 0.0) + config.getJump().getUpwardImpulse();
@@ -128,9 +129,8 @@ public final class AvatarFlightController {
                 && input.sprint()
                 && input.boostAllowed()
                 && (nextBoostAtMs == 0L || nowMs >= nextBoostAtMs)) {
-            double boostSpeedLimit = movement.getMaxForwardSpeed() + config.getBoost().getForwardImpulse();
             targetForwardSpeed = Math.min(
-                    boostSpeedLimit,
+                    boostedHorizontalCap,
                     Math.max(Math.max(targetForwardSpeed, currentForwardSpeed), 0.0)
                             + config.getBoost().getForwardImpulse()
             );
@@ -140,11 +140,10 @@ public final class AvatarFlightController {
             mode = AvatarFlightMode.FORWARD_FLIGHT;
         }
         if (!explicitAirbrakeIntent && boostActive) {
-            double boostSpeedLimit = movement.getMaxForwardSpeed() + config.getBoost().getForwardImpulse();
             double boostAcceleration = config.getBoost().getForwardImpulse() / Math.max(0.001, boostDurationSeconds);
             targetForwardSpeed = approach(
                     Math.max(targetForwardSpeed, currentForwardSpeed),
-                    boostSpeedLimit,
+                    boostedHorizontalCap,
                     boostAcceleration * dt
             );
             mode = AvatarFlightMode.FORWARD_FLIGHT;
@@ -158,7 +157,7 @@ public final class AvatarFlightController {
             mode = AvatarFlightMode.DESCENDING;
         } else if (targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE) {
             PitchAdjustment pitch = applyPitch(effectivePitchRadians, targetForwardSpeed, vertical,
-                    movement, boostedHorizontalCap, dt);
+                    movement, glideHorizontalCap, dt);
             targetForwardSpeed = pitch.forwardSpeed();
             vertical = pitch.verticalSpeed();
             if (neutralPitch && !jumpApplied) {
@@ -177,6 +176,7 @@ public final class AvatarFlightController {
                 targetForwardSpeed,
                 targetStrafeSpeed,
                 movement,
+                glideHorizontalCap,
                 boostedHorizontalCap,
                 boostActive
         );
@@ -204,9 +204,10 @@ public final class AvatarFlightController {
                                                       double targetForwardSpeed,
                                                       double targetStrafeSpeed,
                                                       TwAvatarFlightConfig.MovementSettings movement,
+                                                      double glideHorizontalCap,
                                                       double boostedHorizontalCap,
                                                       boolean boostActive) {
-        double configuredLimit = Math.max(movement.getMaxForwardSpeed(), movement.getMaxBackwardSpeed());
+        double configuredLimit = Math.max(glideHorizontalCap, movement.getMaxBackwardSpeed());
         double boostLimit = Math.max(configuredLimit, boostedHorizontalCap);
         double intendedSpeed = Math.max(Math.abs(targetForwardSpeed), Math.abs(targetStrafeSpeed));
         if (boostActive) {
@@ -238,7 +239,7 @@ public final class AvatarFlightController {
                                               double forwardSpeed,
                                               double verticalSpeed,
                                               @Nonnull TwAvatarFlightConfig.MovementSettings movement,
-                                              double boostedHorizontalCap,
+                                              double glideHorizontalCap,
                                               double dt) {
         if (pitchRadians > 0.0) {
             double amount = pitchUpAmount(pitchRadians);
@@ -263,7 +264,7 @@ public final class AvatarFlightController {
         if (pitchRadians < 0.0) {
             double amount = Math.min(1.0, -pitchRadians / Math.toRadians(70.0));
             return new PitchAdjustment(
-                    Math.min(boostedHorizontalCap, forwardSpeed + movement.getPitchDownSpeedGain() * amount * dt),
+                    Math.min(glideHorizontalCap, forwardSpeed + movement.getPitchDownSpeedGain() * amount * dt),
                     verticalSpeed - movement.getPitchDownDiveScale() * amount * dt
             );
         }
@@ -275,6 +276,16 @@ public final class AvatarFlightController {
             return 0.0;
         }
         return Math.min(1.0, pitchRadians / Math.toRadians(70.0));
+    }
+
+    private static double forwardFlightTargetSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,
+                                                   double forwardAxis,
+                                                   double currentForwardSpeed) {
+        double cruiseSpeed = movement.getMaxForwardSpeed() * forwardAxis;
+        if (currentForwardSpeed <= cruiseSpeed) {
+            return cruiseSpeed;
+        }
+        return Math.min(currentForwardSpeed, movement.getMaxGlideSpeed() * forwardAxis);
     }
 
     private static boolean isBoostActive(long nextBoostAtMs, long cooldownMs, long durationMs, long nowMs) {

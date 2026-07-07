@@ -31,7 +31,7 @@ The recharge delay means a spent charge requires the delay plus the recharge cad
 
 ## Glide Balance
 
-Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Pitching upward can trade speed for altitude, but it bleeds momentum back toward normal cruise. Pitching downward can trade altitude for speed and can reach the fast-flight recharge threshold if the player dives enough.
+Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Pitching upward can trade speed for altitude, but it bleeds momentum back toward normal cruise. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. Active boost is the only default path to the boosted max-speed band.
 
 ## HUD
 
@@ -41,6 +41,8 @@ The compact avatar-flight HUD appears above the hotbar while avatar flight is ac
 
 ### Movement
 
+- `MaxForwardSpeed`: normal forward cruise speed.
+- `MaxGlideSpeed`: maximum horizontal speed reachable without an active boost.
 - `GlideSinkSpeed`: target downward speed for unpowered forward glide.
 - `GlideSinkAcceleration`: rate at which glide approaches the sink speed.
 

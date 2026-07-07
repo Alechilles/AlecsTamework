@@ -71,6 +71,7 @@ class TwAvatarFlightConfigTest {
         assertEquals(0.75, config.getVigour().getRechargeDelayAfterSpendSeconds(), 0.00001);
         assertTrue(config.getVigour().isHudEnabled());
         assertEquals(100L, config.getVigour().getHudResendIntervalMs());
+        assertEquals(15.0, config.getMovement().getMaxGlideSpeed(), 0.00001);
         assertEquals(1.0, config.getMovement().getGlideSinkSpeed(), 0.00001);
         assertEquals(2.0, config.getMovement().getGlideSinkAcceleration(), 0.00001);
     }
@@ -93,8 +94,10 @@ class TwAvatarFlightConfigTest {
         TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
         setNestedField(parent, "movement", "maxForwardSpeed", 20.0);
+        setNestedField(parent, "movement", "maxGlideSpeed", 23.0);
         setNestedField(parent, "movement", "forwardAcceleration", 40.0);
         setNestedField(child, "movement", "maxForwardSpeed", 12.0);
+        setNestedField(child, "movement", "maxGlideSpeed", 13.0);
         setNestedField(child, "movement", "forwardAcceleration", 5.0);
 
         child.inheritMissingTopLevelFrom(
@@ -104,6 +107,7 @@ class TwAvatarFlightConfigTest {
         );
 
         assertEquals(12.0, child.getMovement().getMaxForwardSpeed(), 0.00001);
+        assertEquals(23.0, child.getMovement().getMaxGlideSpeed(), 0.00001);
         assertEquals(40.0, child.getMovement().getForwardAcceleration(), 0.00001);
     }
 

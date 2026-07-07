@@ -370,7 +370,7 @@ class AvatarFlightControllerTest {
     }
 
     @Test
-    void pitchDownCanReachFastRechargeSpeedBySpendingAltitude() {
+    void pitchDownWithoutBoostStaysBelowFastRechargeSpeed() {
         AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -14.0, 0L, 0L);
         AvatarFlightController.Output output = null;
         for (int tick = 0; tick < 20; tick++) {
@@ -388,8 +388,12 @@ class AvatarFlightControllerTest {
         }
 
         double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
-        assertTrue(horizontalSpeed >= AvatarFlightSpeedMetrics.fastRechargeThreshold(CONFIG),
-                "pitch-down should spend altitude to reach the fast-flight recharge band");
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxForwardSpeed(),
+                "pitch-down should still spend altitude for some speed above normal cruise");
+        assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxGlideSpeed() + 0.00001,
+                "unboosted pitch-down must respect the glide-only speed ceiling");
+        assertTrue(horizontalSpeed < AvatarFlightSpeedMetrics.fastRechargeThreshold(CONFIG),
+                "unboosted pitch-down must not reach the fast-flight recharge band");
         assertTrue(output.velocityY() < 0.0);
     }
 
@@ -490,8 +494,8 @@ class AvatarFlightControllerTest {
 
         double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
         assertTrue(output.boostApplied());
-        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxForwardSpeed(),
-                "sprint boost must not be clamped to the normal cruise speed");
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxGlideSpeed(),
+                "sprint boost must be the only path above the glide speed ceiling");
         assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxForwardSpeed()
                         + CONFIG.getBoost().getForwardImpulse(),
                 "sprint boost should still respect the configured boosted speed ceiling");
@@ -543,7 +547,7 @@ class AvatarFlightControllerTest {
     }
 
     @Test
-    void boostedSpeedDecaysTowardCruiseInsteadOfHardClamping() {
+    void boostedSpeedDecaysTowardGlideCeilingInsteadOfHardClamping() {
         double boostedSpeed = CONFIG.getMovement().getMaxForwardSpeed() + CONFIG.getBoost().getForwardImpulse();
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(0.0, 0.0, -boostedSpeed, 0L, 0L),
@@ -551,8 +555,8 @@ class AvatarFlightControllerTest {
         );
 
         double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
-        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxForwardSpeed(),
-                "boosted speed should bleed down through acceleration/drag instead of disappearing in one tick");
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getMaxGlideSpeed(),
+                "boosted speed should bleed down toward glide speed instead of disappearing in one tick");
         assertTrue(horizontalSpeed < boostedSpeed);
     }
 

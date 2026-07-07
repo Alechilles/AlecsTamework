@@ -8,7 +8,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Center HUD shown while avatar flight vigour is active. */
+/** Compact bottom HUD shown while avatar flight vigour is active. */
 public final class TameworkAvatarFlightHud extends CustomUIHud {
     public static final String HUD_KEY = "alecstamework:avatar_flight";
     public static final String UI_PATH = "TameworkAvatarFlightHud.ui";

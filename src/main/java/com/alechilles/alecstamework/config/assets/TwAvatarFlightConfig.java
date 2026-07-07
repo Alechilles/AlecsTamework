@@ -76,7 +76,12 @@ public final class TwAvatarFlightConfig implements
             .<Double>append(new KeyedCodec<>("MaxForwardSpeed", Codec.DOUBLE),
                     (settings, value) -> settings.maxForwardSpeed = positiveOrDefault(value, 14.0),
                     settings -> settings.maxForwardSpeed)
-            .documentation("Maximum forward flight speed. Inheritance: missing nested key inherits parent value.")
+            .documentation("Normal forward flight speed while W intent is active. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("MaxGlideSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.maxGlideSpeed = positiveOrDefault(value, 15.0),
+                    settings -> settings.maxGlideSpeed)
+            .documentation("Maximum horizontal speed reachable without an active boost. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("ForwardAcceleration", Codec.DOUBLE),
                     (settings, value) -> settings.forwardAcceleration = nonNegativeOrDefault(value, 18.0),
@@ -681,6 +686,7 @@ public final class TwAvatarFlightConfig implements
         if (!top.contains("Movement")) movement = parent.movement;
         else if (keys != null && movement != null && parent.movement != null) {
             if (!keys.contains("MaxForwardSpeed")) movement.maxForwardSpeed = parent.movement.maxForwardSpeed;
+            if (!keys.contains("MaxGlideSpeed")) movement.maxGlideSpeed = parent.movement.maxGlideSpeed;
             if (!keys.contains("ForwardAcceleration")) movement.forwardAcceleration = parent.movement.forwardAcceleration;
             if (!keys.contains("MaxBackwardSpeed")) movement.maxBackwardSpeed = parent.movement.maxBackwardSpeed;
             if (!keys.contains("BackwardAcceleration")) movement.backwardAcceleration = parent.movement.backwardAcceleration;
@@ -908,6 +914,7 @@ public final class TwAvatarFlightConfig implements
 
     public static final class MovementSettings {
         private double maxForwardSpeed = 14.0;
+        private double maxGlideSpeed = 15.0;
         private double forwardAcceleration = 18.0;
         private double maxBackwardSpeed = 3.0;
         private double backwardAcceleration = 8.0;
@@ -924,6 +931,7 @@ public final class TwAvatarFlightConfig implements
         private double pitchDownSpeedGain = 8.0;
 
         public double getMaxForwardSpeed() { return maxForwardSpeed; }
+        public double getMaxGlideSpeed() { return Math.max(maxForwardSpeed, maxGlideSpeed); }
         public double getForwardAcceleration() { return forwardAcceleration; }
         public double getMaxBackwardSpeed() { return maxBackwardSpeed; }
         public double getBackwardAcceleration() { return backwardAcceleration; }

@@ -13,9 +13,12 @@ class AvatarFlightSpeedMetricsTest {
 
     @Test
     void defaultConfigUsesBoostedCapForSpeedBalance() {
+        assertEquals(15.0, AvatarFlightSpeedMetrics.glideHorizontalCap(CONFIG), EPSILON);
         assertEquals(21.0, AvatarFlightSpeedMetrics.boostedHorizontalCap(CONFIG), EPSILON);
         assertEquals(15.75, AvatarFlightSpeedMetrics.fastRechargeThreshold(CONFIG), EPSILON);
         assertEquals(2.0 / 3.0, AvatarFlightSpeedMetrics.speedRatio(14.0, CONFIG), EPSILON);
+        assertTrue(AvatarFlightSpeedMetrics.glideHorizontalCap(CONFIG)
+                < AvatarFlightSpeedMetrics.fastRechargeThreshold(CONFIG));
         assertFalse(AvatarFlightSpeedMetrics.isFastFlightRechargeSpeed(14.0, CONFIG));
         assertTrue(AvatarFlightSpeedMetrics.isFastFlightRechargeSpeed(16.0, CONFIG));
     }
@@ -31,6 +34,7 @@ class AvatarFlightSpeedMetricsTest {
 
     @Test
     void nullConfigHasNoRechargeSpeedCap() {
+        assertEquals(0.0, AvatarFlightSpeedMetrics.glideHorizontalCap(null), EPSILON);
         assertEquals(0.0, AvatarFlightSpeedMetrics.boostedHorizontalCap(null), EPSILON);
         assertEquals(0.0, AvatarFlightSpeedMetrics.speedRatio(14.0, null), EPSILON);
         assertEquals(0.0, AvatarFlightSpeedMetrics.fastRechargeThreshold(null), EPSILON);

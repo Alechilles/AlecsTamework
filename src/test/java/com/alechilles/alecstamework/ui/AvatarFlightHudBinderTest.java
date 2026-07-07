@@ -38,11 +38,16 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("Group #SpeedTrack"));
         Assertions.assertTrue(ui.contains("Group #SpeedFill"));
         Assertions.assertTrue(ui.contains("Group #PipRow"));
+        Assertions.assertFalse(ui.contains("@PageOverlay"),
+                "compact HUD must not use modal page overlays because they draw a backdrop and placeholder panel");
+        Assertions.assertFalse(ui.contains("LayoutMode: Middle"),
+                "compact HUD should be positioned by its root anchor, not centered by a page overlay");
         for (int i = 0; i < 6; i++) {
             Assertions.assertTrue(ui.contains("Group #VigourPip" + i));
         }
         Assertions.assertEquals(6, countOccurrences(ui, "Group #Fill"));
         Assertions.assertTrue(ui.contains("Anchor: (Bottom: 118"));
+        Assertions.assertTrue(ui.contains("Anchor: (Top: 22, Left: 16, Width: 145, Height: 10)"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
     }
 

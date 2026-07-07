@@ -13,6 +13,7 @@
   },
   "Movement": {
     "MaxForwardSpeed": 14.0,
+    "MaxGlideSpeed": 15.0,
     "ForwardAcceleration": 18.0,
     "MaxBackwardSpeed": 3.0,
     "BackwardAcceleration": 8.0,
