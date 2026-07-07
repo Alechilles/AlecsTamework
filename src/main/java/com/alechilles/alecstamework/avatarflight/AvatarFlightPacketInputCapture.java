@@ -91,7 +91,7 @@ public final class AvatarFlightPacketInputCapture {
         input.setVerticalAxis(0.0);
         input.setJumping(packetStates != null && (packetStates.jumping || packetStates.swimJumping));
         input.setCrouching(packetStates != null && (packetStates.crouching || packetStates.forcedCrouching));
-        input.setSprinting(movementStates != null && movementStates.sprinting);
+        input.updateSprinting(packetStates != null && packetStates.sprinting, now);
         input.setOnGround(movementStates == null ? input.isOnGround() : movementStates.onGround);
         input.setYawRadians(intent.basis().yaw());
         input.setPitchRadians(intent.basis().pitch());

@@ -13,8 +13,6 @@ final class AvatarFlightHudBinder {
     private static final int SPEED_FILL_HEIGHT = 6;
     private static final int PIP_FILL_MAX_WIDTH = 18;
     private static final int PIP_FILL_HEIGHT = 8;
-    private static final String ACTIVE_BACKGROUND = "#081220(0.78)";
-    private static final String DIMMED_BACKGROUND = "#081220(0.36)";
 
     private AvatarFlightHudBinder() {
     }
@@ -22,7 +20,6 @@ final class AvatarFlightHudBinder {
     static void bind(@Nonnull UICommandBuilder commandBuilder,
                      @Nonnull AvatarFlightHudViewModel model) {
         commandBuilder.set("#Root.Visible", model.visible());
-        commandBuilder.set("#Root.Background", model.dimmed() ? DIMMED_BACKGROUND : ACTIVE_BACKGROUND);
         commandBuilder.set("#SpeedTrack.Visible", model.visible());
         commandBuilder.setObject("#SpeedFill.Anchor", fillAnchor(SPEED_FILL_MAX_WIDTH, SPEED_FILL_HEIGHT, model.speedRatio()));
         commandBuilder.set("#PipRow.Visible", model.visible() && model.maxVigourCharges() > 0.0);

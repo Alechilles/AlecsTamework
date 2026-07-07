@@ -69,6 +69,10 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
                     AvatarFlightInputComponent::setReinsBoostQueuedAtMs,
                     AvatarFlightInputComponent::getReinsBoostQueuedAtMs)
             .add()
+            .<Long>append(new KeyedCodec<>("SprintBoostQueuedAtMs", Codec.LONG),
+                    AvatarFlightInputComponent::setSprintBoostQueuedAtMs,
+                    AvatarFlightInputComponent::getSprintBoostQueuedAtMs)
+            .add()
             .build();
 
     private double forwardAxis;
@@ -84,6 +88,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     private long reinsFlapQueuedAtMs;
     private long reinsAirbrakeUntilMs;
     private long reinsBoostQueuedAtMs;
+    private long sprintBoostQueuedAtMs;
 
     @Nullable
     public static ComponentType<EntityStore, AvatarFlightInputComponent> getComponentType() {
@@ -137,6 +142,14 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
 
     public void setSprinting(@Nullable Boolean sprinting) {
         this.sprinting = sprinting != null && sprinting;
+    }
+
+    public void updateSprinting(@Nullable Boolean sprinting, long nowMs) {
+        boolean next = sprinting != null && sprinting;
+        if (next && !this.sprinting) {
+            sprintBoostQueuedAtMs = nowMs;
+        }
+        this.sprinting = next;
     }
 
     public boolean isOnGround() {
@@ -195,6 +208,14 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         this.reinsBoostQueuedAtMs = reinsBoostQueuedAtMs == null ? 0L : reinsBoostQueuedAtMs;
     }
 
+    public long getSprintBoostQueuedAtMs() {
+        return sprintBoostQueuedAtMs;
+    }
+
+    public void setSprintBoostQueuedAtMs(@Nullable Long sprintBoostQueuedAtMs) {
+        this.sprintBoostQueuedAtMs = sprintBoostQueuedAtMs == null ? 0L : sprintBoostQueuedAtMs;
+    }
+
     public void queueReinsFlap(long nowMs) {
         reinsFlapQueuedAtMs = nowMs;
     }
@@ -229,12 +250,15 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     }
 
     public boolean consumeReinsBoost(long nowMs, long maxAgeMs) {
-        if (reinsBoostQueuedAtMs == 0L) {
-            return false;
-        }
-        long queuedAtMs = reinsBoostQueuedAtMs;
+        boolean applies = queuedIntentApplies(reinsBoostQueuedAtMs, nowMs, maxAgeMs);
         reinsBoostQueuedAtMs = 0L;
-        return maxAgeMs <= 0L || nowMs - queuedAtMs <= maxAgeMs;
+        return applies;
+    }
+
+    public boolean consumeSprintBoost(long nowMs, long maxAgeMs) {
+        boolean applies = queuedIntentApplies(sprintBoostQueuedAtMs, nowMs, maxAgeMs);
+        sprintBoostQueuedAtMs = 0L;
+        return applies;
     }
 
     public boolean isStale(long nowMs, long timeoutMs) {
@@ -245,7 +269,6 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         verticalAxis = 0.0;
         jumping = false;
         crouching = false;
-        sprinting = false;
     }
 
     @Override
@@ -264,7 +287,15 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         clone.reinsFlapQueuedAtMs = reinsFlapQueuedAtMs;
         clone.reinsAirbrakeUntilMs = reinsAirbrakeUntilMs;
         clone.reinsBoostQueuedAtMs = reinsBoostQueuedAtMs;
+        clone.sprintBoostQueuedAtMs = sprintBoostQueuedAtMs;
         return clone;
+    }
+
+    private static boolean queuedIntentApplies(long queuedAtMs, long nowMs, long maxAgeMs) {
+        if (queuedAtMs == 0L) {
+            return false;
+        }
+        return maxAgeMs <= 0L || nowMs - queuedAtMs <= maxAgeMs;
     }
 
     private static double clampAxis(@Nullable Double value) {

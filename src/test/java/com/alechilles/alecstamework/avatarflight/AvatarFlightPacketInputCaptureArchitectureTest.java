@@ -63,11 +63,13 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
     }
 
     @Test
-    void heldSprintCanComeFromMovementStateFallback() throws Exception {
+    void boostSprintEdgesComeOnlyFromPacketStates() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("input.setSprinting(movementStates != null && movementStates.sprinting)"),
-                "logs showed packets can omit states while MovementStatesComponent has sprint=true; sprint is held intent, not a one-shot flap");
+        assertTrue(source.contains("input.updateSprinting(packetStates != null && packetStates.sprinting, now)"),
+                "sprint boost must use packet sprint edges only; movement fallback includes our own fast-flight animation sprint state");
+        assertFalse(source.contains("input.setSprinting(movementStates != null && movementStates.sprinting)"),
+                "feeding MovementStatesComponent sprint back into boost intent repeats boosts on cooldown");
     }
 
     @Test

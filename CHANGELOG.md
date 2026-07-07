@@ -34,6 +34,7 @@
 - Fixed avatar-flight sprint boost speed so shift can exceed normal cruise speed instead of being immediately clamped back to the regular forward cap.
 - Fixed airborne avatar-flight sprint detection by preserving and reading the live movement-state sprint flag instead of overwriting it during custom flight-state updates.
 - Fixed avatar-flight shift boosts feeling inactive when Hytale only exposes a one-frame airborne sprint pulse by keeping detected boost pulses active for a short configurable duration.
+- Fixed Flightmaster's Reins Q and sprint-edge boosts so they apply once per press instead of repeating on cooldown, and removed the compact avatar-flight HUD root background that rendered as a missing-texture placeholder.
 - Fixed `/tw debugplayermodel unsafe` so positive test scales are no longer clamped to the model asset's authored min/max range.
 - Fixed transformed avatar flight trying to layer player item/combat/emote animations onto dragon models by periodically suppressing non-movement animation slots while flight is active.
 - Fixed transformed avatar flight still rendering held player equipment on dragon models by continuously hiding the real transformed player's hand and armor equipment visuals while avatar flight is active, independent of fake rider visuals.

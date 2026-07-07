@@ -532,7 +532,6 @@ public final class AvatarFlightMovementSystem
         double yaw = stale ? resolveYaw(ref, commandBuffer) : input.getYawRadians();
         double pitch = stale ? resolvePitch(ref, commandBuffer) : input.getPitchRadians();
         boolean onGround = stale ? states == null || states.onGround : input.isOnGround();
-        boolean liveSprint = states != null && states.sprinting;
         boolean reinsFlap = input != null && input.consumeReinsFlap(
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
@@ -542,13 +541,17 @@ public final class AvatarFlightMovementSystem
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
         );
+        boolean sprintBoost = input != null && input.consumeSprintBoost(
+                now,
+                Math.round(config.getInput().getIntentTimeoutMs())
+        );
         AvatarFlightController.Input controllerInput = new AvatarFlightController.Input(
                 stale ? 0.0 : input.getForwardAxis(),
                 stale ? 0.0 : input.getStrafeAxis(),
                 stale ? 0.0 : input.getVerticalAxis(),
                 reinsFlap || (!stale && input.isJumping()),
                 !stale && input.isCrouching(),
-                reinsBoost || liveSprint || (!stale && input.isSprinting()),
+                reinsBoost || sprintBoost,
                 reinsAirbrake,
                 onGround,
                 yaw,

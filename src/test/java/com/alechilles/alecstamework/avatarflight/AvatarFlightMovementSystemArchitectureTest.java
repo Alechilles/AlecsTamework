@@ -92,17 +92,19 @@ class AvatarFlightMovementSystemArchitectureTest {
         assertTrue(source.contains("states.fallingFar = false"));
         assertTrue(source.contains("states.horizontalIdle = output.horizontalIdle()"));
         assertTrue(source.contains("states.sprinting = states.sprinting || output.fastFlight()"),
-                "avatar flight must not erase live client sprint before packet-capture fallback can observe it");
+                "avatar flight can still mark fast flight as sprinting for animation state");
     }
 
     @Test
-    void liveMovementStateSprintCanDriveBoostIntent() throws Exception {
+    void movementStateSprintDoesNotDriveBoostIntent() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("boolean liveSprint = states != null && states.sprinting"),
-                "movement system should read the live post-vanilla sprint flag because packet capture runs before vanilla queues can apply");
-        assertTrue(source.contains("reinsBoost || liveSprint || (!stale && input.isSprinting())"),
-                "airborne shift can arrive through MovementStatesComponent even when the avatar input snapshot missed it");
+        assertFalse(source.contains("boolean liveSprint = states != null && states.sprinting"),
+                "avatar flight writes sprinting for fast-flight animation, so reading it back as boost input repeats boosts on cooldown");
+        assertFalse(source.contains("input.isSprinting()"),
+                "held sprint state must not be treated as a level-triggered boost intent");
+        assertTrue(source.contains("input.consumeSprintBoost("),
+                "packet sprint should be reduced to a one-shot rising-edge boost event");
     }
 
     @Test
@@ -111,7 +113,7 @@ class AvatarFlightMovementSystemArchitectureTest {
 
         assertTrue(source.contains("input.consumeReinsBoost("),
                 "Flightmaster's Reins Q action should feed the existing boost intent path");
-        assertTrue(source.contains("reinsBoost || liveSprint"),
+        assertTrue(source.contains("reinsBoost || sprintBoost"),
                 "Q boost must not depend on unreliable airborne sprint detection");
     }
 

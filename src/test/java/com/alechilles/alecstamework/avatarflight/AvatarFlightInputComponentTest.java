@@ -60,18 +60,52 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
-    void verticalPacketIntentIsClearedAfterSampling() {
+    void sprintBoostIsQueuedOnlyOnRisingEdge() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.updateSprinting(false, 900L);
+        input.updateSprinting(true, 1_000L);
+        input.updateSprinting(true, 1_100L);
+
+        assertTrue(input.consumeSprintBoost(1_150L, 1_000L));
+        assertFalse(input.consumeSprintBoost(1_150L, 1_000L));
+
+        input.updateSprinting(true, 1_200L);
+        assertFalse(input.consumeSprintBoost(1_250L, 1_000L),
+                "holding sprint must not queue another boost after the first press is consumed");
+
+        input.updateSprinting(false, 1_300L);
+        input.updateSprinting(true, 1_400L);
+        assertTrue(input.consumeSprintBoost(1_450L, 1_000L));
+    }
+
+    @Test
+    void staleSprintBoostIsConsumedWithoutApplying() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.updateSprinting(true, 1_000L);
+
+        assertFalse(input.consumeSprintBoost(2_001L, 1_000L));
+        assertFalse(input.consumeSprintBoost(2_001L, 1_000L));
+    }
+
+    @Test
+    void transientVerticalIntentClearingDoesNotCreateNewSprintEdges() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
         input.setVerticalAxis(-1.0);
         input.setJumping(true);
         input.setCrouching(true);
-        input.setSprinting(true);
+        input.updateSprinting(true, 1_000L);
 
         input.clearTransientVerticalIntent();
 
         assertEquals(0.0, input.getVerticalAxis(), 0.0001);
         assertFalse(input.isJumping());
         assertFalse(input.isCrouching());
-        assertFalse(input.isSprinting());
+        assertTrue(input.isSprinting(),
+                "raw sprint state must persist so a held key does not look like a fresh press every tick");
+        assertTrue(input.consumeSprintBoost(1_100L, 1_000L));
+        input.clearTransientVerticalIntent();
+        assertFalse(input.consumeSprintBoost(1_200L, 1_000L));
     }
 }

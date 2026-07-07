@@ -38,7 +38,7 @@ Sink rate scales with speed. At or above `Movement.StallSpeedThreshold`, neutral
 
 ## HUD
 
-The compact avatar-flight HUD appears above the hotbar while avatar flight is active. The upper bar shows current horizontal speed relative to boosted max speed. The pips show Vigour charges, including partial recharge progress. The HUD dims when grounded at full Vigour.
+The compact avatar-flight HUD appears above the hotbar while avatar flight is active. The upper bar shows current horizontal speed relative to boosted max speed. The pips show Vigour charges, including partial recharge progress. The HUD keeps a transparent root and renders only the bar and charge pip backgrounds so it does not draw a modal panel or missing-texture backdrop over the hotbar.
 
 ## Config Fields
 
