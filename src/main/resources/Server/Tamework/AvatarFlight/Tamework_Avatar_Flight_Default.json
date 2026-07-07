@@ -52,7 +52,10 @@
   "Boost": {
     "ForwardImpulse": 7.0,
     "CooldownSeconds": 1.0,
-    "DurationSeconds": 0.45
+    "DurationSeconds": 0.45,
+    "Directional": true,
+    "UpwardPitchLiftMultiplier": 0.45,
+    "UpwardPitchLiftCap": 3.0
   },
   "Launch": {
     "Enabled": true,

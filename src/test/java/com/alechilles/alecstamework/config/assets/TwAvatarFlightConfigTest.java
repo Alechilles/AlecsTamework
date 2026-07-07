@@ -95,6 +95,9 @@ class TwAvatarFlightConfigTest {
         assertEquals(1.35, config.getCurve().getClimbPitchExponent(), 0.00001);
         assertEquals(0.5, config.getCurve().getClimbSpeedEligibilityExponent(), 0.00001);
         assertEquals(2.0, config.getCurve().getBoostedSpeedDecay(), 0.00001);
+        assertTrue(config.getBoost().isDirectional());
+        assertEquals(0.45, config.getBoost().getUpwardPitchLiftMultiplier(), 0.00001);
+        assertEquals(3.0, config.getBoost().getUpwardPitchLiftCap(), 0.00001);
         assertTrue(config.getLaunch().isEnabled());
         assertEquals(AvatarFlightLaunchSettings.INPUT_JUMP_HOLD, config.getLaunch().getPreferredInput());
         assertEquals(AvatarFlightLaunchSettings.INPUT_REINS_PRIMARY_HOLD, config.getLaunch().getFallbackInput());
@@ -207,9 +210,15 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "boost", "forwardImpulse", 11.0);
         setNestedField(parent, "boost", "cooldownSeconds", 2.0);
         setNestedField(parent, "boost", "durationSeconds", 0.8);
+        setNestedField(parent, "boost", "directional", false);
+        setNestedField(parent, "boost", "upwardPitchLiftMultiplier", 0.25);
+        setNestedField(parent, "boost", "upwardPitchLiftCap", 1.5);
         setNestedField(child, "boost", "forwardImpulse", 5.0);
         setNestedField(child, "boost", "cooldownSeconds", 0.5);
         setNestedField(child, "boost", "durationSeconds", 0.2);
+        setNestedField(child, "boost", "directional", true);
+        setNestedField(child, "boost", "upwardPitchLiftMultiplier", 0.5);
+        setNestedField(child, "boost", "upwardPitchLiftCap", 2.5);
 
         child.inheritMissingTopLevelFrom(
                 parent,
@@ -220,6 +229,9 @@ class TwAvatarFlightConfigTest {
         assertEquals(5.0, child.getBoost().getForwardImpulse(), 0.00001);
         assertEquals(2.0, child.getBoost().getCooldownSeconds(), 0.00001);
         assertEquals(0.8, child.getBoost().getDurationSeconds(), 0.00001);
+        assertFalse(child.getBoost().isDirectional());
+        assertEquals(0.25, child.getBoost().getUpwardPitchLiftMultiplier(), 0.00001);
+        assertEquals(1.5, child.getBoost().getUpwardPitchLiftCap(), 0.00001);
     }
 
     @Test

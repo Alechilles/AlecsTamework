@@ -220,6 +220,21 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.durationSeconds)
             .documentation("Seconds a detected sprint/shift pulse remains an active forward boost. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Boolean>append(new KeyedCodec<>("Directional", Codec.BOOLEAN),
+                    (settings, value) -> settings.directional = value == null || value,
+                    settings -> settings.directional)
+            .documentation("Whether boost impulse follows look pitch instead of applying only forward speed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("UpwardPitchLiftMultiplier", Codec.DOUBLE),
+                    (settings, value) -> settings.upwardPitchLiftMultiplier = nonNegativeOrDefault(value, 0.45),
+                    settings -> settings.upwardPitchLiftMultiplier)
+            .documentation("Multiplier applied to upward directional boost lift before cap. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("UpwardPitchLiftCap", Codec.DOUBLE),
+                    (settings, value) -> settings.upwardPitchLiftCap = nonNegativeOrDefault(value, 3.0),
+                    settings -> settings.upwardPitchLiftCap)
+            .documentation("Maximum upward vertical impulse from directional boost. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private static final BuilderCodec<VigourSettings> VIGOUR_CODEC = BuilderCodec.builder(
@@ -786,6 +801,11 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("ForwardImpulse")) boost.forwardImpulse = parent.boost.forwardImpulse;
             if (!keys.contains("CooldownSeconds")) boost.cooldownSeconds = parent.boost.cooldownSeconds;
             if (!keys.contains("DurationSeconds")) boost.durationSeconds = parent.boost.durationSeconds;
+            if (!keys.contains("Directional")) boost.directional = parent.boost.directional;
+            if (!keys.contains("UpwardPitchLiftMultiplier")) {
+                boost.upwardPitchLiftMultiplier = parent.boost.upwardPitchLiftMultiplier;
+            }
+            if (!keys.contains("UpwardPitchLiftCap")) boost.upwardPitchLiftCap = parent.boost.upwardPitchLiftCap;
         }
     }
 
@@ -1054,10 +1074,16 @@ public final class TwAvatarFlightConfig implements
         private double forwardImpulse = 7.0;
         private double cooldownSeconds = 1.0;
         private double durationSeconds = 0.45;
+        private boolean directional = true;
+        private double upwardPitchLiftMultiplier = 0.45;
+        private double upwardPitchLiftCap = 3.0;
 
         public double getForwardImpulse() { return forwardImpulse; }
         public double getCooldownSeconds() { return cooldownSeconds; }
         public double getDurationSeconds() { return durationSeconds; }
+        public boolean isDirectional() { return directional; }
+        public double getUpwardPitchLiftMultiplier() { return Math.max(0.0, upwardPitchLiftMultiplier); }
+        public double getUpwardPitchLiftCap() { return Math.max(0.0, upwardPitchLiftCap); }
     }
 
     /** Vigour charge, recharge, and HUD tuning for avatar flight. */
