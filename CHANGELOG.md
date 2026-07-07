@@ -46,6 +46,7 @@
 - Restored experimental avatar-flight rider visuals to attach the saved player model directly to the transformed dragon, keeping the test path closer to the intended final rider.
 - Fixed avatar flight level glide so stalled flight no longer refills full cruise speed for free, low-speed glide sinks harder, and the speed/Vigour HUD no longer renders its root as a broken image over the hotbar.
 - Fixed flat avatar-flight glide so level forward flight continues bleeding speed below neutral cruise instead of sustaining a free no-Vigour cruise forever.
+- Fixed shallow downward avatar-flight glide so tiny negative pitch angles can no longer preserve max glide speed or carry one flap's vertical lift for minutes.
 - Added avatar-flight rider attachment diagnostics to print the saved rider model and texture paths, plus skip reasons, while testing model-anchor options.
 - Anchored the experimental avatar-flight fake rider model through a Tamework `MountAnchor` player-model wrapper instead of attaching the vanilla player model directly.
 - Adjusted the experimental avatar-flight fake rider wrapper so the player model attaches from the hips and uses a basic seated leg pose.

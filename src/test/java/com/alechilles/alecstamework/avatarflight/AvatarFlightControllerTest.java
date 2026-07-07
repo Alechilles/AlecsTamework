@@ -549,6 +549,66 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void shallowNegativePitchGlideBleedsSpeedInsteadOfHoldingNaturalCap() {
+        AvatarFlightController.State state = new AvatarFlightController.State(
+                0.0,
+                0.0,
+                -CONFIG.getMovement().getMaxGlideSpeed(),
+                0L,
+                0L
+        );
+        AvatarFlightController.Output output = null;
+        double altitudeChange = 0.0;
+        for (int tick = 0; tick < 120; tick++) {
+            output = AvatarFlightController.update(
+                    state,
+                    input(1.0, false, false, false, false, Math.toRadians(-3.0)),
+                    CONFIG,
+                    0.1,
+                    1000L + tick * 100L
+            );
+            altitudeChange += output.velocityY() * 0.1;
+            state = stateFrom(output);
+        }
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed < CONFIG.getMovement().getNeutralGlideSpeed(),
+                "a shallow negative pitch must not preserve max glide speed indefinitely");
+        assertTrue(altitudeChange < -8.0,
+                "a shallow negative pitch should still pay baseline glide sink; altitudeChange=" + altitudeChange);
+    }
+
+    @Test
+    void shallowNegativePitchFlapLiftDecaysWithinSeconds() {
+        AvatarFlightController.State state = new AvatarFlightController.State(
+                0.0,
+                CONFIG.getJump().getUpwardImpulse(),
+                -CONFIG.getMovement().getMaxGlideSpeed(),
+                2000L,
+                0L
+        );
+        AvatarFlightController.Output output = null;
+        double altitudeChange = 0.0;
+        for (int tick = 0; tick < 100; tick++) {
+            output = AvatarFlightController.update(
+                    state,
+                    input(1.0, false, false, false, false, Math.toRadians(-3.0)),
+                    CONFIG,
+                    0.1,
+                    1000L + tick * 100L
+            );
+            altitudeChange += output.velocityY() * 0.1;
+            state = stateFrom(output);
+        }
+
+        assertTrue(output.velocityY() < 0.0,
+                "unpowered shallow negative pitch must drain leftover upward flap velocity");
+        assertTrue(altitudeChange < 25.0,
+                "one flap at shallow negative pitch must not carry upward momentum for hundreds of altitude; altitudeChange="
+                        + altitudeChange);
+    }
+
+    @Test
     void shortDiveDoesNotImmediatelyReachLargeSpeedGain() {
         AvatarFlightController.State state = new AvatarFlightController.State(
                 0.0, 0.0, -6.0, 0L, 0L, 0.0, 0.0, 0L

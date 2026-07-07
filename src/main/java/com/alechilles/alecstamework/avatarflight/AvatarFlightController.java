@@ -11,6 +11,7 @@ public final class AvatarFlightController {
     private static final double MIN_FORWARD_FOR_PITCH_TRADE = 0.5;
     private static final double HORIZONTAL_IDLE_SPEED = 0.25;
     private static final double NEUTRAL_PITCH_RADIANS = Math.toRadians(2.0);
+    private static final double MIN_DIVE_PITCH_RADIANS = Math.toRadians(8.0);
     private static final double MAX_PHYSICAL_PITCH_UP_RADIANS = Math.toRadians(60.0);
     private static final double MAX_VISUAL_ROLL_RADIANS = Math.toRadians(30.0);
     private static final double PITCH_UP_FORWARD_DRAG_MULTIPLIER = 1.4;
@@ -43,7 +44,7 @@ public final class AvatarFlightController {
         double vertical = state.velocityY();
         AvatarFlightMode mode;
         double rawPitchRadians = input.pitchRadians();
-        boolean neutralPitch = Math.abs(rawPitchRadians) < NEUTRAL_PITCH_RADIANS;
+        boolean neutralPitch = isNeutralPitch(rawPitchRadians);
         double effectivePitchRadians = neutralPitch ? 0.0 : rawPitchRadians;
         double pitchUpAmount = pitchUpAmount(effectivePitchRadians);
         boolean pitchDownIntent = effectivePitchRadians < 0.0;
@@ -412,12 +413,25 @@ public final class AvatarFlightController {
             double load = Math.max(0.0, diveLoad);
             double gain = movement.getPitchDownSpeedGain() * amount * load * dt;
             double sink = movement.getPitchDownDiveScale() * amount * (0.35 + 0.65 * load) * dt;
+            double targetForwardSpeed = Math.min(glideHorizontalCap, forwardSpeed + gain);
+            double baselineSinkSpeed = -glideSinkSpeed(movement, targetForwardSpeed);
+            double baselineVerticalSpeed = verticalSpeed > baselineSinkSpeed
+                    ? approach(verticalSpeed, baselineSinkSpeed, movement.getGlideSinkAcceleration() * dt)
+                    : verticalSpeed;
+            double diveVerticalSpeed = verticalSpeed - sink;
             return new PitchAdjustment(
-                    Math.min(glideHorizontalCap, forwardSpeed + gain),
-                    verticalSpeed - sink
+                    targetForwardSpeed,
+                    Math.min(baselineVerticalSpeed, diveVerticalSpeed)
             );
         }
         return new PitchAdjustment(forwardSpeed, verticalSpeed);
+    }
+
+    private static boolean isNeutralPitch(double pitchRadians) {
+        if (pitchRadians < 0.0) {
+            return Math.abs(pitchRadians) < MIN_DIVE_PITCH_RADIANS;
+        }
+        return Math.abs(pitchRadians) < NEUTRAL_PITCH_RADIANS;
     }
 
     private static double pitchUpAmount(double pitchRadians) {
