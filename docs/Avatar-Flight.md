@@ -31,7 +31,9 @@ The recharge delay means a spent charge requires the delay plus the recharge cad
 
 ## Glide Balance
 
-Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Pitching upward can trade speed for altitude, but it bleeds momentum back toward normal cruise. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. Active boost is the only default path to the boosted max-speed band.
+Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: it recovers or decays toward `Movement.NeutralGlideSpeed`, which defaults to `6`, while higher speeds require diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. Active boost is the only default path to the boosted max-speed band.
+
+Sink rate scales with speed. At or above `Movement.StallSpeedThreshold`, neutral glide uses `Movement.GlideSinkSpeed`. As horizontal speed falls toward zero, sink blends toward `Movement.StallSinkSpeed`, so stalled or nearly stalled flight loses altitude much faster than a clean glide.
 
 ## HUD
 
@@ -43,8 +45,14 @@ The compact avatar-flight HUD appears above the hotbar while avatar flight is ac
 
 - `MaxForwardSpeed`: normal forward cruise speed.
 - `MaxGlideSpeed`: maximum horizontal speed reachable without an active boost.
+- `NeutralGlideSpeed`: horizontal speed level forward glide recovers or decays toward without spending Vigour.
+- `NeutralGlideAcceleration`: low-speed acceleration toward `NeutralGlideSpeed`.
+- `NeutralGlideDeceleration`: speed decay toward `NeutralGlideSpeed`.
+- `ForwardAcceleration`: legacy forward acceleration field; neutral level glide uses the neutral glide acceleration fields instead.
 - `GlideSinkSpeed`: target downward speed for unpowered forward glide.
 - `GlideSinkAcceleration`: rate at which glide approaches the sink speed.
+- `StallSpeedThreshold`: horizontal speed where low-speed sink starts blending toward stall sink.
+- `StallSinkSpeed`: target downward speed when forward glide is nearly stalled.
 
 ### Vigour
 

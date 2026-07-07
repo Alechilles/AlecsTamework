@@ -14,6 +14,9 @@
   "Movement": {
     "MaxForwardSpeed": 14.0,
     "MaxGlideSpeed": 15.0,
+    "NeutralGlideSpeed": 6.0,
+    "NeutralGlideAcceleration": 4.0,
+    "NeutralGlideDeceleration": 2.0,
     "ForwardAcceleration": 18.0,
     "MaxBackwardSpeed": 3.0,
     "BackwardAcceleration": 8.0,
@@ -22,6 +25,8 @@
     "HoverVerticalDamping": 8.0,
     "GlideSinkSpeed": 1.0,
     "GlideSinkAcceleration": 2.0,
+    "StallSpeedThreshold": 8.0,
+    "StallSinkSpeed": 5.0,
     "DescendSpeed": 7.0,
     "MaxFallSpeed": 14.0,
     "PitchUpLiftScale": 5.0,

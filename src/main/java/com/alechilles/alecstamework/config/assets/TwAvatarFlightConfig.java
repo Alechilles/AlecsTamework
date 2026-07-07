@@ -83,10 +83,25 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.maxGlideSpeed)
             .documentation("Maximum horizontal speed reachable without an active boost. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Double>append(new KeyedCodec<>("NeutralGlideSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.neutralGlideSpeed = nonNegativeOrDefault(value, 6.0),
+                    settings -> settings.neutralGlideSpeed)
+            .documentation("Horizontal speed neutral forward glide recovers or decays toward without spending Vigour. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("NeutralGlideAcceleration", Codec.DOUBLE),
+                    (settings, value) -> settings.neutralGlideAcceleration = nonNegativeOrDefault(value, 4.0),
+                    settings -> settings.neutralGlideAcceleration)
+            .documentation("Low-speed acceleration toward NeutralGlideSpeed during level forward glide. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("NeutralGlideDeceleration", Codec.DOUBLE),
+                    (settings, value) -> settings.neutralGlideDeceleration = nonNegativeOrDefault(value, 2.0),
+                    settings -> settings.neutralGlideDeceleration)
+            .documentation("Speed decay toward NeutralGlideSpeed during level forward glide. Inheritance: missing nested key inherits parent value.")
+            .add()
             .<Double>append(new KeyedCodec<>("ForwardAcceleration", Codec.DOUBLE),
                     (settings, value) -> settings.forwardAcceleration = nonNegativeOrDefault(value, 18.0),
                     settings -> settings.forwardAcceleration)
-            .documentation("Forward acceleration while W intent is active. Inheritance: missing nested key inherits parent value.")
+            .documentation("Legacy forward acceleration setting; neutral level glide uses NeutralGlideAcceleration and NeutralGlideDeceleration. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("MaxBackwardSpeed", Codec.DOUBLE),
                     (settings, value) -> settings.maxBackwardSpeed = positiveOrDefault(value, 3.0),
@@ -122,6 +137,16 @@ public final class TwAvatarFlightConfig implements
                     (settings, value) -> settings.glideSinkAcceleration = nonNegativeOrDefault(value, 2.0),
                     settings -> settings.glideSinkAcceleration)
             .documentation("Rate at which unpowered forward glide approaches GlideSinkSpeed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("StallSpeedThreshold", Codec.DOUBLE),
+                    (settings, value) -> settings.stallSpeedThreshold = nonNegativeOrDefault(value, 8.0),
+                    settings -> settings.stallSpeedThreshold)
+            .documentation("Horizontal speed where low-speed glide begins blending toward StallSinkSpeed. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("StallSinkSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.stallSinkSpeed = nonNegativeOrDefault(value, 5.0),
+                    settings -> settings.stallSinkSpeed)
+            .documentation("Target downward speed when forward glide has nearly stalled. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("DescendSpeed", Codec.DOUBLE),
                     (settings, value) -> settings.descendSpeed = positiveOrDefault(value, 7.0),
@@ -687,6 +712,13 @@ public final class TwAvatarFlightConfig implements
         else if (keys != null && movement != null && parent.movement != null) {
             if (!keys.contains("MaxForwardSpeed")) movement.maxForwardSpeed = parent.movement.maxForwardSpeed;
             if (!keys.contains("MaxGlideSpeed")) movement.maxGlideSpeed = parent.movement.maxGlideSpeed;
+            if (!keys.contains("NeutralGlideSpeed")) movement.neutralGlideSpeed = parent.movement.neutralGlideSpeed;
+            if (!keys.contains("NeutralGlideAcceleration")) {
+                movement.neutralGlideAcceleration = parent.movement.neutralGlideAcceleration;
+            }
+            if (!keys.contains("NeutralGlideDeceleration")) {
+                movement.neutralGlideDeceleration = parent.movement.neutralGlideDeceleration;
+            }
             if (!keys.contains("ForwardAcceleration")) movement.forwardAcceleration = parent.movement.forwardAcceleration;
             if (!keys.contains("MaxBackwardSpeed")) movement.maxBackwardSpeed = parent.movement.maxBackwardSpeed;
             if (!keys.contains("BackwardAcceleration")) movement.backwardAcceleration = parent.movement.backwardAcceleration;
@@ -697,6 +729,8 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("GlideSinkAcceleration")) {
                 movement.glideSinkAcceleration = parent.movement.glideSinkAcceleration;
             }
+            if (!keys.contains("StallSpeedThreshold")) movement.stallSpeedThreshold = parent.movement.stallSpeedThreshold;
+            if (!keys.contains("StallSinkSpeed")) movement.stallSinkSpeed = parent.movement.stallSinkSpeed;
             if (!keys.contains("DescendSpeed")) movement.descendSpeed = parent.movement.descendSpeed;
             if (!keys.contains("MaxFallSpeed")) movement.maxFallSpeed = parent.movement.maxFallSpeed;
             if (!keys.contains("PitchUpLiftScale")) movement.pitchUpLiftScale = parent.movement.pitchUpLiftScale;
@@ -915,6 +949,9 @@ public final class TwAvatarFlightConfig implements
     public static final class MovementSettings {
         private double maxForwardSpeed = 14.0;
         private double maxGlideSpeed = 15.0;
+        private double neutralGlideSpeed = 6.0;
+        private double neutralGlideAcceleration = 4.0;
+        private double neutralGlideDeceleration = 2.0;
         private double forwardAcceleration = 18.0;
         private double maxBackwardSpeed = 3.0;
         private double backwardAcceleration = 8.0;
@@ -923,6 +960,8 @@ public final class TwAvatarFlightConfig implements
         private double hoverVerticalDamping = 8.0;
         private double glideSinkSpeed = 1.0;
         private double glideSinkAcceleration = 2.0;
+        private double stallSpeedThreshold = 8.0;
+        private double stallSinkSpeed = 5.0;
         private double descendSpeed = 7.0;
         private double maxFallSpeed = 14.0;
         private double pitchUpLiftScale = 5.0;
@@ -932,14 +971,19 @@ public final class TwAvatarFlightConfig implements
 
         public double getMaxForwardSpeed() { return maxForwardSpeed; }
         public double getMaxGlideSpeed() { return Math.max(maxForwardSpeed, maxGlideSpeed); }
-        public double getForwardAcceleration() { return forwardAcceleration; }
+        public double getNeutralGlideSpeed() { return Math.max(0.0, Math.min(getMaxGlideSpeed(), neutralGlideSpeed)); }
+        public double getNeutralGlideAcceleration() { return Math.max(0.0, neutralGlideAcceleration); }
+        public double getNeutralGlideDeceleration() { return Math.max(0.0, neutralGlideDeceleration); }
+        public double getForwardAcceleration() { return Math.max(0.0, forwardAcceleration); }
         public double getMaxBackwardSpeed() { return maxBackwardSpeed; }
         public double getBackwardAcceleration() { return backwardAcceleration; }
         public double getAirbrakeDeceleration() { return airbrakeDeceleration; }
         public double getHoverHorizontalDamping() { return hoverHorizontalDamping; }
         public double getHoverVerticalDamping() { return hoverVerticalDamping; }
-        public double getGlideSinkSpeed() { return glideSinkSpeed; }
-        public double getGlideSinkAcceleration() { return glideSinkAcceleration; }
+        public double getGlideSinkSpeed() { return Math.max(0.0, glideSinkSpeed); }
+        public double getGlideSinkAcceleration() { return Math.max(0.0, glideSinkAcceleration); }
+        public double getStallSpeedThreshold() { return Math.max(0.0, stallSpeedThreshold); }
+        public double getStallSinkSpeed() { return Math.max(getGlideSinkSpeed(), stallSinkSpeed); }
         public double getDescendSpeed() { return descendSpeed; }
         public double getMaxFallSpeed() { return maxFallSpeed; }
         public double getPitchUpLiftScale() { return pitchUpLiftScale; }

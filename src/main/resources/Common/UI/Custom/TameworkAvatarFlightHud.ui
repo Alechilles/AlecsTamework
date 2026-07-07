@@ -1,8 +1,7 @@
 $C = "Common.ui";
 
 Group #Root {
-    Anchor: (Bottom: 118, Width: 178, Height: 40);
-    Background: #081220(0.78);
+    Anchor: (Bottom: 178, Width: 178, Height: 40);
     Visible: false;
 
     Group #SpeedTrack {

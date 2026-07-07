@@ -64,22 +64,9 @@ public final class AvatarFlightController {
             if (pitchUpAmount > 0.0) {
                 targetForwardSpeed = Math.max(0.0, Math.max(targetForwardSpeed, currentHorizontalSpeed));
             } else if (pitchDownIntent) {
-                double cruiseForwardSpeed = movement.getMaxForwardSpeed() * input.forwardAxis();
-                if (targetForwardSpeed < cruiseForwardSpeed) {
-                    targetForwardSpeed = approach(
-                            targetForwardSpeed,
-                            cruiseForwardSpeed,
-                            movement.getForwardAcceleration() * dt
-                    );
-                } else {
-                    targetForwardSpeed = Math.max(0.0, Math.max(targetForwardSpeed, currentHorizontalSpeed));
-                }
+                targetForwardSpeed = Math.max(0.0, Math.max(targetForwardSpeed, currentHorizontalSpeed));
             } else {
-                targetForwardSpeed = approach(
-                        targetForwardSpeed,
-                        forwardFlightTargetSpeed(movement, input.forwardAxis(), currentForwardSpeed),
-                        movement.getForwardAcceleration() * dt
-                );
+                targetForwardSpeed = neutralForwardFlightSpeed(movement, input.forwardAxis(), currentForwardSpeed, dt);
             }
             mode = AvatarFlightMode.FORWARD_FLIGHT;
         } else if (input.forwardAxis() < -config.getInput().getForwardDeadzone()) {
@@ -155,13 +142,15 @@ public final class AvatarFlightController {
         } else if (descendIntent) {
             vertical = -movement.getDescendSpeed();
             mode = AvatarFlightMode.DESCENDING;
-        } else if (targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE) {
+        } else if (targetForwardSpeed > MIN_FORWARD_FOR_PITCH_TRADE && !neutralPitch) {
             PitchAdjustment pitch = applyPitch(effectivePitchRadians, targetForwardSpeed, vertical,
                     movement, glideHorizontalCap, dt);
             targetForwardSpeed = pitch.forwardSpeed();
             vertical = pitch.verticalSpeed();
+        } else if (mode == AvatarFlightMode.FORWARD_FLIGHT) {
             if (neutralPitch && !jumpApplied) {
-                vertical = approach(vertical, -movement.getGlideSinkSpeed(),
+                double plannedHorizontalSpeed = Math.hypot(targetForwardSpeed, targetStrafeSpeed);
+                vertical = approach(vertical, -glideSinkSpeed(movement, plannedHorizontalSpeed),
                         movement.getGlideSinkAcceleration() * dt);
             }
         } else if (!jumpApplied) {
@@ -278,14 +267,28 @@ public final class AvatarFlightController {
         return Math.min(1.0, pitchRadians / Math.toRadians(70.0));
     }
 
-    private static double forwardFlightTargetSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,
-                                                   double forwardAxis,
-                                                   double currentForwardSpeed) {
-        double cruiseSpeed = movement.getMaxForwardSpeed() * forwardAxis;
-        if (currentForwardSpeed <= cruiseSpeed) {
-            return cruiseSpeed;
+    private static double neutralForwardFlightSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,
+                                                    double forwardAxis,
+                                                    double currentForwardSpeed,
+                                                    double dt) {
+        double neutralSpeed = movement.getNeutralGlideSpeed() * clamp(forwardAxis, 0.0, 1.0);
+        double current = Math.max(0.0, currentForwardSpeed);
+        double rate = current <= neutralSpeed
+                ? movement.getNeutralGlideAcceleration()
+                : movement.getNeutralGlideDeceleration();
+        return approach(current, neutralSpeed, rate * dt);
+    }
+
+    private static double glideSinkSpeed(@Nonnull TwAvatarFlightConfig.MovementSettings movement,
+                                         double horizontalSpeed) {
+        double stallThreshold = movement.getStallSpeedThreshold();
+        if (stallThreshold <= 0.0) {
+            return movement.getGlideSinkSpeed();
         }
-        return Math.min(currentForwardSpeed, movement.getMaxGlideSpeed() * forwardAxis);
+        double speedRatio = clamp(horizontalSpeed / stallThreshold, 0.0, 1.0);
+        double stallWeight = 1.0 - speedRatio;
+        return movement.getGlideSinkSpeed()
+                + (movement.getStallSinkSpeed() - movement.getGlideSinkSpeed()) * stallWeight;
     }
 
     private static boolean isBoostActive(long nextBoostAtMs, long cooldownMs, long durationMs, long nowMs) {

@@ -46,7 +46,9 @@ class AvatarFlightHudBinderTest {
             Assertions.assertTrue(ui.contains("Group #VigourPip" + i));
         }
         Assertions.assertEquals(6, countOccurrences(ui, "Group #Fill"));
-        Assertions.assertTrue(ui.contains("Anchor: (Bottom: 118"));
+        Assertions.assertTrue(ui.contains("Anchor: (Bottom: 178"));
+        Assertions.assertFalse(ui.contains("Background: #081220(0.78);"),
+                "the HUD root must stay transparent because the panel background renders as a missing texture");
         Assertions.assertTrue(ui.contains("Anchor: (Top: 22, Left: 16, Width: 145, Height: 10)"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
     }

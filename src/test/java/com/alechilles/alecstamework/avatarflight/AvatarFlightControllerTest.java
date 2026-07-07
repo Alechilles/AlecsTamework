@@ -347,6 +347,64 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void neutralForwardFromStallRecoversOnlyModestSpeedAndSinksHarder() {
+        AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -1.0, 0L, 0L);
+        AvatarFlightController.Output output = null;
+        for (int tick = 0; tick < 10; tick++) {
+            output = update(
+                    state,
+                    input(1.0, false, false, false, false, 0.0)
+            );
+            state = new AvatarFlightController.State(
+                    output.velocityX(),
+                    output.velocityY(),
+                    output.velocityZ(),
+                    output.nextJumpAtMs(),
+                    output.nextBoostAtMs()
+            );
+        }
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed <= CONFIG.getMovement().getNeutralGlideSpeed(),
+                "level forward glide must not refill full cruise speed after a stall");
+        assertTrue(horizontalSpeed < CONFIG.getMovement().getMaxForwardSpeed() * 0.5,
+                "stall recovery should remain a modest glide speed unless the player dives or boosts");
+        assertTrue(output.velocityY() < -1.5,
+                "near-stall glide should sink noticeably instead of hovering in place");
+    }
+
+    @Test
+    void neutralForwardGlideDecaysHighSpeedInsteadOfHoldingCruise() {
+        AvatarFlightController.State state = new AvatarFlightController.State(
+                0.0,
+                0.0,
+                -CONFIG.getMovement().getMaxForwardSpeed(),
+                0L,
+                0L
+        );
+        AvatarFlightController.Output output = null;
+        for (int tick = 0; tick < 20; tick++) {
+            output = update(
+                    state,
+                    input(1.0, false, false, false, false, 0.0)
+            );
+            state = new AvatarFlightController.State(
+                    output.velocityX(),
+                    output.velocityY(),
+                    output.velocityZ(),
+                    output.nextJumpAtMs(),
+                    output.nextBoostAtMs()
+            );
+        }
+
+        double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
+        assertTrue(horizontalSpeed < CONFIG.getMovement().getMaxForwardSpeed() - 3.0,
+                "unpowered level glide should bleed speed over time");
+        assertTrue(horizontalSpeed > CONFIG.getMovement().getNeutralGlideSpeed(),
+                "neutral glide should decay over time instead of snapping to stall speed");
+    }
+
+    @Test
     void unpoweredForwardGlideLosesAltitudeOverTime() {
         AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -14.0, 0L, 0L);
         double altitudeChange = 0.0;
