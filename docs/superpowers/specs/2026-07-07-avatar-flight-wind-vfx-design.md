@@ -62,6 +62,14 @@ Default effect concepts:
 
 Flap and boost can share low-level art ingredients, such as wind textures, arc spawners, or common translucent materials. They should still be separate authored particle systems so duration, orientation, spawn shape, and intensity can differ without awkward runtime parameter branching.
 
+Default intensity targets:
+
+- Launch charge: starts faint and ramps to medium-high at full charge.
+- Launch release: medium-high; strong enough to mark takeoff, not a screen-filling blast.
+- Flap: medium-low; readable downwash, deliberately lighter than launch or boost.
+- Boost: medium-high; punchy horizontal force cue with short duration.
+- Fast-flight trails: low/subtle; continuous enough to read speed, thin enough to avoid clutter.
+
 ## Effect Sequence Preview
 
 ![AvatarFlight wind VFX sequence](assets/avatar-flight-wind-vfx-sequence.svg)
@@ -133,7 +141,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- How intense should the default effects be in normal play so they read clearly without becoming visual clutter?
+- Should airbrake receive its own subtle wind-shear cue, or stay effect-free for the first pass?
 
 ## Testing and Validation Notes
 
@@ -162,3 +170,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided to stop drilling into attachment implementation details for now and refocus the spec on the effect designs themselves.
 - 2026-07-07: Accepted the default effect concepts: smooth inward launch charge, launch shock ring plus upward air column, light flap downwash, punchy horizontal boost streaks, and thin fast-flight wingtip trails.
 - 2026-07-07: Decided flap and boost may share art ingredients but should be separate authored particle systems.
+- 2026-07-07: Accepted default intensity targets: launch charge faint-to-medium-high, launch release medium-high, flap medium-low, boost medium-high, and fast-flight trails low/subtle.
