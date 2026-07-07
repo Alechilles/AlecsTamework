@@ -39,7 +39,7 @@ Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-
 
 ## Glide Balance
 
-Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: it recovers or decays toward `Movement.NeutralGlideSpeed`, which defaults to `6`, while higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
+Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: forward input can seed movement from hover or stall, but flat unpowered flight decays toward the `Movement.GlideStartKickSpeed` floor instead of preserving `Movement.NeutralGlideSpeed` forever. Higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
 
 Sink rate scales with speed. At or above `Movement.StallSpeedThreshold`, neutral glide uses `Movement.GlideSinkSpeed`. As horizontal speed falls toward zero, sink blends toward `Movement.StallSinkSpeed`, so stalled or nearly stalled flight loses altitude much faster than a clean glide.
 
@@ -55,9 +55,9 @@ The compact avatar-flight HUD appears above the hotbar while avatar flight is ac
 
 - `MaxForwardSpeed`: normal forward cruise speed.
 - `MaxGlideSpeed`: maximum horizontal speed reachable without an active boost.
-- `NeutralGlideSpeed`: horizontal speed level forward glide recovers or decays toward without spending Vigour.
-- `NeutralGlideAcceleration`: low-speed acceleration toward `NeutralGlideSpeed`.
-- `NeutralGlideDeceleration`: speed decay toward `NeutralGlideSpeed`.
+- `NeutralGlideSpeed`: reference neutral cruise speed for glide metrics and climb eligibility; level forward glide can pass below it without spending Vigour.
+- `NeutralGlideAcceleration`: low-speed acceleration toward the `GlideStartKickSpeed` floor.
+- `NeutralGlideDeceleration`: speed decay toward the `GlideStartKickSpeed` floor.
 - `GlideStartKickSpeed`: small forward speed seed applied when forward glide starts from hover or stall.
 - `ForwardAcceleration`: legacy forward acceleration field; neutral level glide uses the neutral glide acceleration fields instead.
 - `GlideSinkSpeed`: target downward speed for unpowered forward glide.

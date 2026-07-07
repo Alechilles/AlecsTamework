@@ -363,7 +363,7 @@ public final class AvatarFlightController {
                                                     double forwardAxis,
                                                     double currentForwardSpeed,
                                                     double dt) {
-        double neutralSpeed = movement.getNeutralGlideSpeed() * clamp(forwardAxis, 0.0, 1.0);
+        double neutralSpeed = movement.getGlideStartKickSpeed() * clamp(forwardAxis, 0.0, 1.0);
         double current = Math.max(0.0, currentForwardSpeed);
         double rate = current <= neutralSpeed
                 ? movement.getNeutralGlideAcceleration()

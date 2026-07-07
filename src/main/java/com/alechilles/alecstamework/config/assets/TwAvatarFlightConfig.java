@@ -86,17 +86,17 @@ public final class TwAvatarFlightConfig implements
             .<Double>append(new KeyedCodec<>("NeutralGlideSpeed", Codec.DOUBLE),
                     (settings, value) -> settings.neutralGlideSpeed = nonNegativeOrDefault(value, 6.0),
                     settings -> settings.neutralGlideSpeed)
-            .documentation("Horizontal speed neutral forward glide recovers or decays toward without spending Vigour. Inheritance: missing nested key inherits parent value.")
+            .documentation("Reference neutral cruise speed used by glide metrics and climb eligibility; level forward glide decays below this without spending Vigour. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("NeutralGlideAcceleration", Codec.DOUBLE),
                     (settings, value) -> settings.neutralGlideAcceleration = nonNegativeOrDefault(value, 4.0),
                     settings -> settings.neutralGlideAcceleration)
-            .documentation("Low-speed acceleration toward NeutralGlideSpeed during level forward glide. Inheritance: missing nested key inherits parent value.")
+            .documentation("Low-speed acceleration toward the GlideStartKickSpeed floor during level forward glide. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("NeutralGlideDeceleration", Codec.DOUBLE),
                     (settings, value) -> settings.neutralGlideDeceleration = nonNegativeOrDefault(value, 2.0),
                     settings -> settings.neutralGlideDeceleration)
-            .documentation("Speed decay toward NeutralGlideSpeed during level forward glide. Inheritance: missing nested key inherits parent value.")
+            .documentation("Speed decay toward the GlideStartKickSpeed floor during level forward glide. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("GlideStartKickSpeed", Codec.DOUBLE),
                     (settings, value) -> settings.glideStartKickSpeed = nonNegativeOrDefault(value, 1.5),
