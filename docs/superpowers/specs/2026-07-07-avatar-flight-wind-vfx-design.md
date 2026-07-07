@@ -75,7 +75,7 @@ Recommended shape:
 
 - AvatarFlight VFX config should allow ordered attachment candidates per logical point, such as `LeftWingTrail`, `RightWingTrail`, `BodyCenter`, and `TailTrail`.
 - Each candidate can specify `TargetNodeName` and an optional `PositionOffset`.
-- Runtime should warn once per model when configured attachment nodes are missing, list all missing configured nodes for that model compactly, skip those candidates, and fall back to the next configured candidate or fixed offset. Missing nodes should never break AvatarFlight movement.
+- Runtime should warn once per model when configured attachment nodes are missing, list all missing configured nodes for that model compactly, skip those candidates, and fall back to the next configured candidate or fixed offset. Missing nodes should never break AvatarFlight movement. The once-per-model warning cache should reset when relevant AvatarFlight config or model assets are reloaded.
 - Tamework's default NordicDrake profile can use node names directly.
 - Generic defaults should include fixed-offset fallbacks so models without predictable wing nodes still get acceptable trails.
 
@@ -121,7 +121,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should missing-node warning state be reset only on server restart, or also when AvatarFlight config/model assets are reloaded?
+- Should fallback resolution be cached per active model/config pair, or recomputed when each persistent trail starts?
 
 ## Testing and Validation Notes
 
@@ -145,3 +145,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided runtime should warn on missing configured attachment nodes, fail gracefully, and fall back to the next candidate or fixed offset.
 - 2026-07-07: Decided missing attachment-node warnings should be emitted only once per model to avoid log spam.
 - 2026-07-07: Decided the once-per-model warning should list all missing configured nodes for that model.
+- 2026-07-07: Decided the missing-node warning cache should reset when relevant AvatarFlight config or model assets are reloaded.
