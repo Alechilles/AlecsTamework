@@ -75,7 +75,7 @@ Recommended shape:
 
 - AvatarFlight VFX config should allow ordered attachment candidates per logical point, such as `LeftWingTrail`, `RightWingTrail`, `BodyCenter`, and `TailTrail`.
 - Each candidate can specify `TargetNodeName` and an optional `PositionOffset`.
-- Runtime should warn once per model when a configured attachment node is missing, skip that candidate, and fall back to the next configured candidate or fixed offset. Missing nodes should never break AvatarFlight movement.
+- Runtime should warn once per model when configured attachment nodes are missing, list all missing configured nodes for that model compactly, skip those candidates, and fall back to the next configured candidate or fixed offset. Missing nodes should never break AvatarFlight movement.
 - Tamework's default NordicDrake profile can use node names directly.
 - Generic defaults should include fixed-offset fallbacks so models without predictable wing nodes still get acceptable trails.
 
@@ -121,7 +121,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should the warning include the first missing node only, or a compact list of all missing configured nodes for that model?
+- Should missing-node warning state be reset only on server restart, or also when AvatarFlight config/model assets are reloaded?
 
 ## Testing and Validation Notes
 
@@ -131,7 +131,7 @@ Expected validation once implemented:
 - Verify launch charge effects stop on launch, cancel, landing-state loss, and AvatarFlight disable.
 - Verify burst effects fire once per successful movement action, not every tick while an input is held.
 - Verify trails stop when the player slows, lands, disables AvatarFlight, disconnects, or changes model.
-- Verify missing configured attachment nodes fail gracefully, emit only one warning per model, and fall back to the next attachment candidate or offset.
+- Verify missing configured attachment nodes fail gracefully, emit only one compact warning per model listing all missing configured nodes, and fall back to the next attachment candidate or offset.
 - Run `./mvnw test` after Java changes.
 
 ## Decision Log
@@ -144,3 +144,4 @@ Expected validation once implemented:
 - 2026-07-07: After checking vanilla release `0.5.6` dragon/bird models and HyDragon dragon models, decided trails should support both named model nodes and fixed offsets. Node names are preferred for curated profiles; offsets are the generic fallback.
 - 2026-07-07: Decided runtime should warn on missing configured attachment nodes, fail gracefully, and fall back to the next candidate or fixed offset.
 - 2026-07-07: Decided missing attachment-node warnings should be emitted only once per model to avoid log spam.
+- 2026-07-07: Decided the once-per-model warning should list all missing configured nodes for that model.
