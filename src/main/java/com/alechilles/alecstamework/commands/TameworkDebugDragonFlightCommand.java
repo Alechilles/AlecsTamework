@@ -40,6 +40,11 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
         }
         String[] args = getArgs(commandContext);
         String action = args.length == 0 ? "toggle" : args[0].toLowerCase(Locale.ROOT);
+        if ("inputprobe".equals(action) || "inputlog".equals(action)) {
+            String probeAction = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "toggle";
+            sendInputProbeResult(commandContext, playerUuid, probeAction);
+            return;
+        }
         if ("flightprobe".equals(action) || "clientflight".equals(action)) {
             String probeAction = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "toggle";
             sendClientFlightProbeResult(commandContext, store, ref, playerUuid, probeAction);
@@ -68,7 +73,7 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
             return;
         }
         commandContext.sender().sendMessage(Message.raw(
-                "Usage: /tw debugdragonflight [on [configId] | off | toggle | status | flightprobe [on|off|toggle|status]]"
+                "Usage: /tw debugdragonflight [on [configId] | off | toggle | status | inputprobe [on|off|toggle|status] | flightprobe [on|off|toggle|status]]"
         ));
     }
 
@@ -127,6 +132,35 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
         }
         commandContext.sender().sendMessage(Message.raw(
                 "Usage: /tw debugdragonflight flightprobe [on|off|toggle|status]"
+        ));
+    }
+
+    private static void sendInputProbeResult(@Nonnull CommandContext commandContext,
+                                             @Nonnull UUID playerUuid,
+                                             @Nonnull String action) {
+        if ("status".equals(action)) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "Input probe: active=" + PlayerInputDebugProbe.isEnabled(playerUuid)
+            ));
+            return;
+        }
+        if (isOff(action)) {
+            PlayerInputDebugProbe.disable(playerUuid);
+            commandContext.sender().sendMessage(Message.raw("Input probe disabled."));
+            return;
+        }
+        if ("toggle".equals(action) && PlayerInputDebugProbe.isEnabled(playerUuid)) {
+            PlayerInputDebugProbe.disable(playerUuid);
+            commandContext.sender().sendMessage(Message.raw("Input probe disabled."));
+            return;
+        }
+        if ("toggle".equals(action) || "on".equals(action) || "enable".equals(action) || "start".equals(action)) {
+            PlayerInputDebugProbe.enable(playerUuid);
+            commandContext.sender().sendMessage(Message.raw("Input probe enabled."));
+            return;
+        }
+        commandContext.sender().sendMessage(Message.raw(
+                "Usage: /tw debugdragonflight inputprobe [on|off|toggle|status]"
         ));
     }
 

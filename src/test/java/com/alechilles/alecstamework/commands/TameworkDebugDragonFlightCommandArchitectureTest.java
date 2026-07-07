@@ -32,4 +32,16 @@ class TameworkDebugDragonFlightCommandArchitectureTest {
         assertTrue(source.contains("PlayerInputDebugProbe.disable(playerUuid)"),
                 "flightprobe off must disable packet/input logging for the player");
     }
+
+    @Test
+    void inputProbeCommandTogglesLoggingWithoutClientFlightProbe() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("\"inputprobe\""),
+                "debugdragonflight should expose a logging-only inputprobe action for movement tests");
+        assertTrue(source.contains("sendInputProbeResult(commandContext, playerUuid, probeAction)"),
+                "inputprobe should route to a logging-only handler");
+        assertTrue(source.contains("Input probe: active="),
+                "inputprobe status should be distinguishable from the client flight probe");
+    }
 }
