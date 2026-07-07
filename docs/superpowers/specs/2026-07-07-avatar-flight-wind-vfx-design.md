@@ -23,6 +23,7 @@ This suggests a presentation layer can react to existing movement results instea
 - Add readable wind-style VFX for launch charge, launch release, flap, boost, airbrake, and high-speed flight.
 - Keep VFX configurable through AvatarFlight config/assets rather than hardcoding particle IDs in controller logic.
 - Expose per-effect enable toggles so modders can disable launch, flap, boost, airbrake, or trail effects independently.
+- Include optional config-driven sound hooks alongside launch VFX in the first pass.
 - Prefer base-game particle/model attachment systems where possible.
 - Keep burst effects one-shot and trails explicitly start/stop so persistent effects cannot orphan.
 - Avoid noisy per-tick particle spawning unless throttled or represented as a persistent attached effect.
@@ -109,6 +110,14 @@ Expected behavior:
 
 Pulse cadence and intensity should interpolate continuously from early to near-full charge instead of snapping at the release-tier thresholds. This approach should be robust with existing particle spawning because it does not require live parameter mutation on a persistent particle instance. It must still be throttled by charge state/time so it does not spawn particles every tick. If Hytale particle assets later support clean runtime scaling of a persistent effect, this can be revisited without changing the player-facing visual design.
 
+Launch VFX should include optional sound hooks in the first pass:
+
+- charge pulse sound, very quiet and throttled with pulse cadence;
+- launch release sound, scaled or tiered with the release VFX tier;
+- launch cancel sound, tiny and non-punishing.
+
+Sound hooks should be asset/config driven and independently optional so placeholder particles can be tested before final sound choices are settled.
+
 ## Effect Sequence Preview
 
 ![AvatarFlight wind VFX sequence](assets/avatar-flight-wind-vfx-sequence.svg)
@@ -189,8 +198,7 @@ Default visibility should be all nearby players. The config can still expose an 
 
 ## Open Questions
 
-- Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should launch effects include matching sound hooks in the first VFX pass, or stay particle-only for now?
+- Should sound hooks be scoped to launch only in the first pass, or defined for all effect sections up front but populated later?
 
 ## Testing and Validation Notes
 
@@ -232,3 +240,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided launch-charge pulse cadence and intensity should interpolate continuously instead of snapping to release-tier thresholds.
 - 2026-07-07: Decided canceled pre-minimum launch releases should play a tiny dissipating puff.
 - 2026-07-07: Decided launch cancel should use its own tiny particle system rather than reusing the charge-ramp pulse system.
+- 2026-07-07: Decided launch VFX should include optional config-driven sound hooks in the first pass.
