@@ -126,6 +126,12 @@ Launch charge should ramp smoothly rather than snapping between low, medium, and
 
 Launch release should use configurable scale/intensity tiers keyed by final charge amount. The first pass should support at least partial, mid, and full release tiers so stronger launches produce larger rings and a stronger upward air-column cue without needing a unique particle system for every possible charge value.
 
+First-pass release VFX thresholds:
+
+- Partial: normalized charge `0.0` to `<0.45`.
+- Mid: normalized charge `0.45` to `<0.8`.
+- Full: normalized charge `0.8+`.
+
 ## Attachment Node Research
 
 Decision: support both named model nodes and fixed offsets, with node names preferred for trails and wing/body bursts. Exact node names are useful on many models, but they are not consistent enough across vanilla and HyDragon to hardcode one universal wingtip name.
@@ -181,7 +187,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- What normalized charge thresholds should define partial, mid, and full release VFX tiers?
+- Should launch-charge pulse cadence use the same normalized charge thresholds as release tiers, or its own continuous interpolation?
 
 ## Testing and Validation Notes
 
@@ -219,3 +225,4 @@ Expected validation once implemented:
 - 2026-07-07: Accepted first-pass launch-charge pulse cadence targets: about `600ms` early, `300ms` mid, and `150ms` near full charge.
 - 2026-07-07: Decided the launch release burst should scale with final charge amount.
 - 2026-07-07: Decided launch release scaling should use configurable scale/intensity tiers, with partial/mid/full as the first-pass tier shape.
+- 2026-07-07: Accepted first-pass release VFX thresholds: partial `<0.45`, mid `0.45` to `<0.8`, full `0.8+`.
