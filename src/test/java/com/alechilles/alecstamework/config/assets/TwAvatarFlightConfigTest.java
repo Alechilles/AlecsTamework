@@ -58,6 +58,24 @@ class TwAvatarFlightConfigTest {
     }
 
     @Test
+    void defaultConfigExposesVigourAndGlideBalanceValues() {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+
+        assertTrue(config.getVigour().isEnabled());
+        assertEquals(6.0, config.getVigour().getMaxCharges(), 0.00001);
+        assertEquals(1.0, config.getVigour().getUpwardFlapCost(), 0.00001);
+        assertEquals(1.0, config.getVigour().getForwardBoostCost(), 0.00001);
+        assertEquals(4.0, config.getVigour().getGroundedRechargeSecondsPerCharge(), 0.00001);
+        assertEquals(8.0, config.getVigour().getFastFlightRechargeSecondsPerCharge(), 0.00001);
+        assertEquals(0.75, config.getVigour().getFastFlightRechargeSpeedRatio(), 0.00001);
+        assertEquals(0.75, config.getVigour().getRechargeDelayAfterSpendSeconds(), 0.00001);
+        assertTrue(config.getVigour().isHudEnabled());
+        assertEquals(100L, config.getVigour().getHudResendIntervalMs());
+        assertEquals(1.0, config.getMovement().getGlideSinkSpeed(), 0.00001);
+        assertEquals(2.0, config.getMovement().getGlideSinkAcceleration(), 0.00001);
+    }
+
+    @Test
     void omittedTopLevelSectionsInheritFromParent() throws Exception {
         TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
@@ -146,6 +164,47 @@ class TwAvatarFlightConfigTest {
         assertEquals(5.0, child.getBoost().getForwardImpulse(), 0.00001);
         assertEquals(2.0, child.getBoost().getCooldownSeconds(), 0.00001);
         assertEquals(0.8, child.getBoost().getDurationSeconds(), 0.00001);
+    }
+
+    @Test
+    void explicitVigourSectionInheritsMissingNestedKeys() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "vigour", "maxCharges", 8.0);
+        setNestedField(parent, "vigour", "fastFlightRechargeSecondsPerCharge", 10.0);
+        setNestedField(parent, "vigour", "hudEnabled", false);
+        setNestedField(child, "vigour", "maxCharges", 4.0);
+        setNestedField(child, "vigour", "fastFlightRechargeSecondsPerCharge", 3.0);
+        setNestedField(child, "vigour", "hudEnabled", true);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Vigour"),
+                Map.of("Vigour", Set.of("MaxCharges"))
+        );
+
+        assertEquals(4.0, child.getVigour().getMaxCharges(), 0.00001);
+        assertEquals(10.0, child.getVigour().getFastFlightRechargeSecondsPerCharge(), 0.00001);
+        assertFalse(child.getVigour().isHudEnabled());
+    }
+
+    @Test
+    void explicitMovementSectionInheritsMissingGlideSinkKeys() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "movement", "glideSinkSpeed", 1.4);
+        setNestedField(parent, "movement", "glideSinkAcceleration", 3.0);
+        setNestedField(child, "movement", "glideSinkSpeed", 0.2);
+        setNestedField(child, "movement", "glideSinkAcceleration", 0.3);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Movement"),
+                Map.of("Movement", Set.of("GlideSinkSpeed"))
+        );
+
+        assertEquals(0.2, child.getMovement().getGlideSinkSpeed(), 0.00001);
+        assertEquals(3.0, child.getMovement().getGlideSinkAcceleration(), 0.00001);
     }
 
     @Test

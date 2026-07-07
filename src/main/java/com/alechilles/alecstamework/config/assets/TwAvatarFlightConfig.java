@@ -108,6 +108,16 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.hoverVerticalDamping)
             .documentation("Vertical speed damping while hovering. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Double>append(new KeyedCodec<>("GlideSinkSpeed", Codec.DOUBLE),
+                    (settings, value) -> settings.glideSinkSpeed = nonNegativeOrDefault(value, 1.0),
+                    settings -> settings.glideSinkSpeed)
+            .documentation("Target downward speed for unpowered forward glide. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("GlideSinkAcceleration", Codec.DOUBLE),
+                    (settings, value) -> settings.glideSinkAcceleration = nonNegativeOrDefault(value, 2.0),
+                    settings -> settings.glideSinkAcceleration)
+            .documentation("Rate at which unpowered forward glide approaches GlideSinkSpeed. Inheritance: missing nested key inherits parent value.")
+            .add()
             .<Double>append(new KeyedCodec<>("DescendSpeed", Codec.DOUBLE),
                     (settings, value) -> settings.descendSpeed = positiveOrDefault(value, 7.0),
                     settings -> settings.descendSpeed)
@@ -174,6 +184,62 @@ public final class TwAvatarFlightConfig implements
                     (settings, value) -> settings.durationSeconds = positiveOrDefault(value, 0.45),
                     settings -> settings.durationSeconds)
             .documentation("Seconds a detected sprint/shift pulse remains an active forward boost. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .build();
+
+    private static final BuilderCodec<VigourSettings> VIGOUR_CODEC = BuilderCodec.builder(
+            VigourSettings.class,
+            VigourSettings::new
+    )
+            .<Boolean>append(new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.enabled = value == null || value,
+                    settings -> settings.enabled)
+            .documentation("Whether avatar flight vigour spending and recharge are enabled. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("MaxCharges", Codec.DOUBLE),
+                    (settings, value) -> settings.maxCharges = nonNegativeOrDefault(value, 6.0),
+                    settings -> settings.maxCharges)
+            .documentation("Maximum vigour charges available for avatar flight actions. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("UpwardFlapCost", Codec.DOUBLE),
+                    (settings, value) -> settings.upwardFlapCost = nonNegativeOrDefault(value, 1.0),
+                    settings -> settings.upwardFlapCost)
+            .documentation("Vigour charges spent by an upward flap. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("ForwardBoostCost", Codec.DOUBLE),
+                    (settings, value) -> settings.forwardBoostCost = nonNegativeOrDefault(value, 1.0),
+                    settings -> settings.forwardBoostCost)
+            .documentation("Vigour charges spent by a forward boost. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("GroundedRechargeSecondsPerCharge", Codec.DOUBLE),
+                    (settings, value) -> settings.groundedRechargeSecondsPerCharge = positiveOrDefault(value, 4.0),
+                    settings -> settings.groundedRechargeSecondsPerCharge)
+            .documentation("Grounded recharge seconds required for each vigour charge. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("FastFlightRechargeSecondsPerCharge", Codec.DOUBLE),
+                    (settings, value) -> settings.fastFlightRechargeSecondsPerCharge = positiveOrDefault(value, 8.0),
+                    settings -> settings.fastFlightRechargeSecondsPerCharge)
+            .documentation("Fast-flight recharge seconds required for each vigour charge before speed-ratio scaling. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("FastFlightRechargeSpeedRatio", Codec.DOUBLE),
+                    (settings, value) -> settings.fastFlightRechargeSpeedRatio = clamp01(value, 0.75),
+                    settings -> settings.fastFlightRechargeSpeedRatio)
+            .documentation("Normalized forward-speed ratio required for fast-flight vigour recharge. Clamped to 0..1. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("RechargeDelayAfterSpendSeconds", Codec.DOUBLE),
+                    (settings, value) -> settings.rechargeDelayAfterSpendSeconds = nonNegativeOrDefault(value, 0.75),
+                    settings -> settings.rechargeDelayAfterSpendSeconds)
+            .documentation("Recharge delay after spending vigour. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("HudEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.hudEnabled = value == null || value,
+                    settings -> settings.hudEnabled)
+            .documentation("Whether avatar flight sends vigour HUD updates. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("HudResendIntervalMs", Codec.DOUBLE),
+                    (settings, value) -> settings.hudResendIntervalMs = positiveOrDefault(value, 100.0),
+                    settings -> settings.hudResendIntervalMs)
+            .documentation("Minimum milliseconds between repeated vigour HUD updates. Inheritance: missing nested key inherits parent value.")
             .add()
             .build();
 
@@ -410,6 +476,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.boost)
             .documentation("Sprint/shift forward boost values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<VigourSettings>append(new KeyedCodec<>("Vigour", VIGOUR_CODEC),
+                    (asset, value) -> asset.vigour = value == null ? new VigourSettings() : value,
+                    asset -> asset.vigour)
+            .documentation("Vigour charge costs, recharge rates, and HUD values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<AnimationSettings>append(new KeyedCodec<>("Animation", ANIMATION_CODEC),
                     (asset, value) -> asset.animation = value == null ? new AnimationSettings() : value,
                     asset -> asset.animation)
@@ -443,6 +514,7 @@ public final class TwAvatarFlightConfig implements
     private MovementSettings movement = new MovementSettings();
     private JumpSettings jump = new JumpSettings();
     private BoostSettings boost = new BoostSettings();
+    private VigourSettings vigour = new VigourSettings();
     private AnimationSettings animation = new AnimationSettings();
     private RiderVisualSettings riderVisual = new RiderVisualSettings();
     private DebugSettings debug = new DebugSettings();
@@ -581,6 +653,7 @@ public final class TwAvatarFlightConfig implements
         inheritOrCopyMovement(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Movement"), explicitTopLevelKeys);
         inheritOrCopyJump(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Jump"), explicitTopLevelKeys);
         inheritOrCopyBoost(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Boost"), explicitTopLevelKeys);
+        inheritOrCopyVigour(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Vigour"), explicitTopLevelKeys);
         inheritOrCopyAnimation(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Animation"), explicitTopLevelKeys);
         inheritOrCopyRiderVisual(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "RiderVisual"), explicitTopLevelKeys);
         inheritOrCopyDebug(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Debug"), explicitTopLevelKeys);
@@ -614,6 +687,10 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("AirbrakeDeceleration")) movement.airbrakeDeceleration = parent.movement.airbrakeDeceleration;
             if (!keys.contains("HoverHorizontalDamping")) movement.hoverHorizontalDamping = parent.movement.hoverHorizontalDamping;
             if (!keys.contains("HoverVerticalDamping")) movement.hoverVerticalDamping = parent.movement.hoverVerticalDamping;
+            if (!keys.contains("GlideSinkSpeed")) movement.glideSinkSpeed = parent.movement.glideSinkSpeed;
+            if (!keys.contains("GlideSinkAcceleration")) {
+                movement.glideSinkAcceleration = parent.movement.glideSinkAcceleration;
+            }
             if (!keys.contains("DescendSpeed")) movement.descendSpeed = parent.movement.descendSpeed;
             if (!keys.contains("MaxFallSpeed")) movement.maxFallSpeed = parent.movement.maxFallSpeed;
             if (!keys.contains("PitchUpLiftScale")) movement.pitchUpLiftScale = parent.movement.pitchUpLiftScale;
@@ -637,6 +714,32 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("ForwardImpulse")) boost.forwardImpulse = parent.boost.forwardImpulse;
             if (!keys.contains("CooldownSeconds")) boost.cooldownSeconds = parent.boost.cooldownSeconds;
             if (!keys.contains("DurationSeconds")) boost.durationSeconds = parent.boost.durationSeconds;
+        }
+    }
+
+    private void inheritOrCopyVigour(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Vigour")) vigour = parent.vigour;
+        else if (keys != null && vigour != null && parent.vigour != null) {
+            if (!keys.contains("Enabled")) vigour.enabled = parent.vigour.enabled;
+            if (!keys.contains("MaxCharges")) vigour.maxCharges = parent.vigour.maxCharges;
+            if (!keys.contains("UpwardFlapCost")) vigour.upwardFlapCost = parent.vigour.upwardFlapCost;
+            if (!keys.contains("ForwardBoostCost")) vigour.forwardBoostCost = parent.vigour.forwardBoostCost;
+            if (!keys.contains("GroundedRechargeSecondsPerCharge")) {
+                vigour.groundedRechargeSecondsPerCharge = parent.vigour.groundedRechargeSecondsPerCharge;
+            }
+            if (!keys.contains("FastFlightRechargeSecondsPerCharge")) {
+                vigour.fastFlightRechargeSecondsPerCharge = parent.vigour.fastFlightRechargeSecondsPerCharge;
+            }
+            if (!keys.contains("FastFlightRechargeSpeedRatio")) {
+                vigour.fastFlightRechargeSpeedRatio = parent.vigour.fastFlightRechargeSpeedRatio;
+            }
+            if (!keys.contains("RechargeDelayAfterSpendSeconds")) {
+                vigour.rechargeDelayAfterSpendSeconds = parent.vigour.rechargeDelayAfterSpendSeconds;
+            }
+            if (!keys.contains("HudEnabled")) vigour.hudEnabled = parent.vigour.hudEnabled;
+            if (!keys.contains("HudResendIntervalMs")) {
+                vigour.hudResendIntervalMs = parent.vigour.hudResendIntervalMs;
+            }
         }
     }
 
@@ -748,6 +851,7 @@ public final class TwAvatarFlightConfig implements
     public MovementSettings getMovement() { return movement == null ? new MovementSettings() : movement; }
     public JumpSettings getJump() { return jump == null ? new JumpSettings() : jump; }
     public BoostSettings getBoost() { return boost == null ? new BoostSettings() : boost; }
+    public VigourSettings getVigour() { return vigour == null ? new VigourSettings() : vigour; }
     public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
     public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }
     public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
@@ -810,6 +914,8 @@ public final class TwAvatarFlightConfig implements
         private double airbrakeDeceleration = 18.0;
         private double hoverHorizontalDamping = 10.0;
         private double hoverVerticalDamping = 8.0;
+        private double glideSinkSpeed = 1.0;
+        private double glideSinkAcceleration = 2.0;
         private double descendSpeed = 7.0;
         private double maxFallSpeed = 14.0;
         private double pitchUpLiftScale = 5.0;
@@ -824,6 +930,8 @@ public final class TwAvatarFlightConfig implements
         public double getAirbrakeDeceleration() { return airbrakeDeceleration; }
         public double getHoverHorizontalDamping() { return hoverHorizontalDamping; }
         public double getHoverVerticalDamping() { return hoverVerticalDamping; }
+        public double getGlideSinkSpeed() { return glideSinkSpeed; }
+        public double getGlideSinkAcceleration() { return glideSinkAcceleration; }
         public double getDescendSpeed() { return descendSpeed; }
         public double getMaxFallSpeed() { return maxFallSpeed; }
         public double getPitchUpLiftScale() { return pitchUpLiftScale; }
@@ -848,6 +956,33 @@ public final class TwAvatarFlightConfig implements
         public double getForwardImpulse() { return forwardImpulse; }
         public double getCooldownSeconds() { return cooldownSeconds; }
         public double getDurationSeconds() { return durationSeconds; }
+    }
+
+    /** Vigour charge, recharge, and HUD tuning for avatar flight. */
+    public static final class VigourSettings {
+        private boolean enabled = true;
+        private double maxCharges = 6.0;
+        private double upwardFlapCost = 1.0;
+        private double forwardBoostCost = 1.0;
+        private double groundedRechargeSecondsPerCharge = 4.0;
+        private double fastFlightRechargeSecondsPerCharge = 8.0;
+        private double fastFlightRechargeSpeedRatio = 0.75;
+        private double rechargeDelayAfterSpendSeconds = 0.75;
+        private boolean hudEnabled = true;
+        private double hudResendIntervalMs = 100.0;
+
+        public boolean isEnabled() { return enabled; }
+        public double getMaxCharges() { return maxCharges; }
+        public double getUpwardFlapCost() { return upwardFlapCost; }
+        public double getForwardBoostCost() { return forwardBoostCost; }
+        public double getGroundedRechargeSecondsPerCharge() { return groundedRechargeSecondsPerCharge; }
+        public double getFastFlightRechargeSecondsPerCharge() { return fastFlightRechargeSecondsPerCharge; }
+        public double getFastFlightRechargeSpeedRatio() {
+            return Math.max(0.0, Math.min(1.0, fastFlightRechargeSpeedRatio));
+        }
+        public double getRechargeDelayAfterSpendSeconds() { return rechargeDelayAfterSpendSeconds; }
+        public boolean isHudEnabled() { return hudEnabled; }
+        public long getHudResendIntervalMs() { return Math.round(Math.max(1.0, hudResendIntervalMs)); }
     }
 
     public static final class RiderVisualSettings {
