@@ -84,6 +84,33 @@ class TwAvatarFlightConfigTest {
     }
 
     @Test
+    void defaultConfigExposesCurveAndLaunchValues() {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+
+        assertEquals(1.6, config.getCurve().getDiveLoadRampSeconds(), 0.00001);
+        assertEquals(0.6, config.getCurve().getDiveLoadDecaySeconds(), 0.00001);
+        assertEquals(1.55, config.getCurve().getDivePitchExponent(), 0.00001);
+        assertEquals(1.1, config.getCurve().getClimbLoadRampSeconds(), 0.00001);
+        assertEquals(0.6, config.getCurve().getClimbLoadDecaySeconds(), 0.00001);
+        assertEquals(1.35, config.getCurve().getClimbPitchExponent(), 0.00001);
+        assertEquals(0.5, config.getCurve().getClimbSpeedEligibilityExponent(), 0.00001);
+        assertEquals(2.0, config.getCurve().getBoostedSpeedDecay(), 0.00001);
+        assertTrue(config.getLaunch().isEnabled());
+        assertEquals(AvatarFlightLaunchSettings.INPUT_JUMP_HOLD, config.getLaunch().getPreferredInput());
+        assertEquals(AvatarFlightLaunchSettings.INPUT_REINS_PRIMARY_HOLD, config.getLaunch().getFallbackInput());
+        assertEquals(500L, config.getLaunch().getMinChargeMs());
+        assertEquals(3000L, config.getLaunch().getMaxChargeMs());
+        assertEquals(0.65, config.getLaunch().getChargeExponent(), 0.00001);
+        assertEquals(6.0, config.getLaunch().getMinUpImpulse(), 0.00001);
+        assertEquals(18.0, config.getLaunch().getMaxUpImpulse(), 0.00001);
+        assertEquals(6.0, config.getLaunch().getMinForwardImpulse(), 0.00001);
+        assertEquals(11.0, config.getLaunch().getMaxForwardImpulse(), 0.00001);
+        assertEquals(1.0, config.getLaunch().getPartialChargeCost(), 0.00001);
+        assertEquals(2.0, config.getLaunch().getFullChargeCost(), 0.00001);
+        assertEquals(0.6, config.getLaunch().getFullChargeCostThreshold(), 0.00001);
+    }
+
+    @Test
     void omittedTopLevelSectionsInheritFromParent() throws Exception {
         TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
@@ -193,6 +220,34 @@ class TwAvatarFlightConfigTest {
         assertEquals(5.0, child.getBoost().getForwardImpulse(), 0.00001);
         assertEquals(2.0, child.getBoost().getCooldownSeconds(), 0.00001);
         assertEquals(0.8, child.getBoost().getDurationSeconds(), 0.00001);
+    }
+
+    @Test
+    void explicitCurveAndLaunchSectionsInheritMissingNestedKeys() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "curve", "diveLoadRampSeconds", 2.4);
+        setNestedField(parent, "curve", "climbPitchExponent", 1.8);
+        setNestedField(child, "curve", "diveLoadRampSeconds", 0.9);
+        setNestedField(child, "curve", "climbPitchExponent", 1.1);
+        setNestedField(parent, "launch", "maxUpImpulse", 22.0);
+        setNestedField(parent, "launch", "partialChargeCost", 0.5);
+        setNestedField(child, "launch", "maxUpImpulse", 12.0);
+        setNestedField(child, "launch", "partialChargeCost", 3.0);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Curve", "Launch"),
+                Map.of(
+                        "Curve", Set.of("DiveLoadRampSeconds"),
+                        "Launch", Set.of("MaxUpImpulse")
+                )
+        );
+
+        assertEquals(0.9, child.getCurve().getDiveLoadRampSeconds(), 0.00001);
+        assertEquals(1.8, child.getCurve().getClimbPitchExponent(), 0.00001);
+        assertEquals(12.0, child.getLaunch().getMaxUpImpulse(), 0.00001);
+        assertEquals(0.5, child.getLaunch().getPartialChargeCost(), 0.00001);
     }
 
     @Test

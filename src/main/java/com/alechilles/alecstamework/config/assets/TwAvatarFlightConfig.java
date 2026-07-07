@@ -501,6 +501,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.movement)
             .documentation("Avatar flight movement values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AvatarFlightCurveSettings>append(new KeyedCodec<>("Curve", AvatarFlightCurveSettings.CODEC),
+                    (asset, value) -> asset.curve = value == null ? new AvatarFlightCurveSettings() : value,
+                    asset -> asset.curve)
+            .documentation("Avatar flight pitch-load curve values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<JumpSettings>append(new KeyedCodec<>("Jump", JUMP_CODEC),
                     (asset, value) -> asset.jump = value == null ? new JumpSettings() : value,
                     asset -> asset.jump)
@@ -510,6 +515,11 @@ public final class TwAvatarFlightConfig implements
                     (asset, value) -> asset.boost = value == null ? new BoostSettings() : value,
                     asset -> asset.boost)
             .documentation("Sprint/shift forward boost values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
+            .<AvatarFlightLaunchSettings>append(new KeyedCodec<>("Launch", AvatarFlightLaunchSettings.CODEC),
+                    (asset, value) -> asset.launch = value == null ? new AvatarFlightLaunchSettings() : value,
+                    asset -> asset.launch)
+            .documentation("Charged avatar launch input and impulse values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
             .<VigourSettings>append(new KeyedCodec<>("Vigour", VIGOUR_CODEC),
                     (asset, value) -> asset.vigour = value == null ? new VigourSettings() : value,
@@ -547,8 +557,10 @@ public final class TwAvatarFlightConfig implements
     private ModelSettings model = new ModelSettings();
     private InputSettings input = new InputSettings();
     private MovementSettings movement = new MovementSettings();
+    private AvatarFlightCurveSettings curve = new AvatarFlightCurveSettings();
     private JumpSettings jump = new JumpSettings();
     private BoostSettings boost = new BoostSettings();
+    private AvatarFlightLaunchSettings launch = new AvatarFlightLaunchSettings();
     private VigourSettings vigour = new VigourSettings();
     private AnimationSettings animation = new AnimationSettings();
     private RiderVisualSettings riderVisual = new RiderVisualSettings();
@@ -686,8 +698,10 @@ public final class TwAvatarFlightConfig implements
         inheritOrCopyModel(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Model"), explicitTopLevelKeys);
         inheritOrCopyInput(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Input"), explicitTopLevelKeys);
         inheritOrCopyMovement(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Movement"), explicitTopLevelKeys);
+        inheritOrCopyCurve(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Curve"), explicitTopLevelKeys);
         inheritOrCopyJump(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Jump"), explicitTopLevelKeys);
         inheritOrCopyBoost(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Boost"), explicitTopLevelKeys);
+        inheritOrCopyLaunch(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Launch"), explicitTopLevelKeys);
         inheritOrCopyVigour(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Vigour"), explicitTopLevelKeys);
         inheritOrCopyAnimation(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Animation"), explicitTopLevelKeys);
         inheritOrCopyRiderVisual(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "RiderVisual"), explicitTopLevelKeys);
@@ -746,6 +760,18 @@ public final class TwAvatarFlightConfig implements
         }
     }
 
+    private void inheritOrCopyCurve(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Curve")) {
+            curve = parent.curve;
+        } else if (keys != null && parent.curve != null) {
+            if (curve == null) {
+                curve = parent.curve;
+            } else {
+                curve.inheritMissingFrom(parent.curve, keys);
+            }
+        }
+    }
+
     private void inheritOrCopyJump(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
         if (!top.contains("Jump")) jump = parent.jump;
         else if (keys != null && jump != null && parent.jump != null) {
@@ -760,6 +786,18 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("ForwardImpulse")) boost.forwardImpulse = parent.boost.forwardImpulse;
             if (!keys.contains("CooldownSeconds")) boost.cooldownSeconds = parent.boost.cooldownSeconds;
             if (!keys.contains("DurationSeconds")) boost.durationSeconds = parent.boost.durationSeconds;
+        }
+    }
+
+    private void inheritOrCopyLaunch(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Launch")) {
+            launch = parent.launch;
+        } else if (keys != null && parent.launch != null) {
+            if (launch == null) {
+                launch = parent.launch;
+            } else {
+                launch.inheritMissingFrom(parent.launch, keys);
+            }
         }
     }
 
@@ -895,8 +933,10 @@ public final class TwAvatarFlightConfig implements
     public ModelSettings getModel() { return model == null ? new ModelSettings() : model; }
     public InputSettings getInput() { return input == null ? new InputSettings() : input; }
     public MovementSettings getMovement() { return movement == null ? new MovementSettings() : movement; }
+    public AvatarFlightCurveSettings getCurve() { return curve == null ? new AvatarFlightCurveSettings() : curve; }
     public JumpSettings getJump() { return jump == null ? new JumpSettings() : jump; }
     public BoostSettings getBoost() { return boost == null ? new BoostSettings() : boost; }
+    public AvatarFlightLaunchSettings getLaunch() { return launch == null ? new AvatarFlightLaunchSettings() : launch; }
     public VigourSettings getVigour() { return vigour == null ? new VigourSettings() : vigour; }
     public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
     public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }

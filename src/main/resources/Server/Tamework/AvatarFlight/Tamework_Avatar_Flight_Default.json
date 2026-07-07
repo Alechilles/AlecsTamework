@@ -35,6 +35,16 @@
     "PitchDownDiveScale": 5.0,
     "PitchDownSpeedGain": 3.0
   },
+  "Curve": {
+    "DiveLoadRampSeconds": 1.6,
+    "DiveLoadDecaySeconds": 0.6,
+    "DivePitchExponent": 1.55,
+    "ClimbLoadRampSeconds": 1.1,
+    "ClimbLoadDecaySeconds": 0.6,
+    "ClimbPitchExponent": 1.35,
+    "ClimbSpeedEligibilityExponent": 0.5,
+    "BoostedSpeedDecay": 2.0
+  },
   "Jump": {
     "UpwardImpulse": 7.0,
     "CooldownSeconds": 0.75
@@ -43,6 +53,21 @@
     "ForwardImpulse": 7.0,
     "CooldownSeconds": 1.0,
     "DurationSeconds": 0.45
+  },
+  "Launch": {
+    "Enabled": true,
+    "PreferredInput": "JumpHold",
+    "FallbackInput": "ReinsPrimaryHold",
+    "MinChargeMs": 500.0,
+    "MaxChargeMs": 3000.0,
+    "ChargeExponent": 0.65,
+    "MinUpImpulse": 6.0,
+    "MaxUpImpulse": 18.0,
+    "MinForwardImpulse": 6.0,
+    "MaxForwardImpulse": 11.0,
+    "PartialChargeCost": 1.0,
+    "FullChargeCost": 2.0,
+    "FullChargeCostThreshold": 0.6
   },
   "Vigour": {
     "Enabled": true,
