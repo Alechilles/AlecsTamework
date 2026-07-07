@@ -56,7 +56,7 @@ Color should stay mostly white, pale blue, and low-opacity grey. Dust can use wa
 Default effect concepts:
 
 - Launch charge: inward ground-level pressure rings and dust, building smoothly as the launch hold approaches full charge.
-- Launch release: one clean expanding ground shock ring plus a short upward air column to sell the stored force releasing into takeoff.
+- Launch release: one clean expanding ground shock ring plus a short upward air column to sell the stored force releasing into takeoff. Burst size/intensity should scale with final launch charge amount.
 - Flap: brief downwash arcs from the wings/body, lighter than launch and focused on lift.
 - Boost: horizontal compression streaks behind and around the dragon, stronger than flap but shorter and punchier than persistent speed trails.
 - Airbrake: subtle forward-facing wind shear or compression arcs that read as drag, not as a powered burst. The primary cue is world/velocity-oriented in front of and slightly around the dragon; secondary model-attached wisps near wing/body edges keep the effect visually connected to the model.
@@ -67,7 +67,7 @@ Flap and boost can share low-level art ingredients, such as wind textures, arc s
 Default intensity targets:
 
 - Launch charge: starts faint and ramps to medium-high at full charge.
-- Launch release: medium-high; strong enough to mark takeoff, not a screen-filling blast.
+- Launch release: scales from moderate at minimum successful charge to medium-high at full charge; strong enough to mark takeoff, not a screen-filling blast.
 - Flap: medium-low; readable downwash, deliberately lighter than launch or boost.
 - Boost: medium-high; punchy horizontal force cue with short duration.
 - Airbrake: low/subtle; enough feedback to show braking drag without visual clutter.
@@ -179,7 +179,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should the launch release burst scale with final charge amount, or use one consistent burst once the launch succeeds?
+- Should the release burst use discrete partial/full particle systems, or one release system with configurable scale/intensity tiers?
 
 ## Testing and Validation Notes
 
@@ -215,3 +215,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided launch charge/release should be prototyped first, before flap/boost, trails, and airbrake.
 - 2026-07-07: Decided the first launch-charge prototype should use repeated short pulses with increasing cadence and intensity.
 - 2026-07-07: Accepted first-pass launch-charge pulse cadence targets: about `600ms` early, `300ms` mid, and `150ms` near full charge.
+- 2026-07-07: Decided the launch release burst should scale with final charge amount.
