@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">AvatarFlight Wind Pressure Style Preview</title>
+  <desc id="desc">A static visualization of the selected wind pressure VFX direction with air arcs, ground rings, dust, and speed lines.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#101722"/>
+      <stop offset=".62" stop-color="#161d22"/>
+      <stop offset="1" stop-color="#22291f"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#243521"/>
+      <stop offset="1" stop-color="#35462b"/>
+    </linearGradient>
+    <linearGradient id="streak" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#dff8ff" stop-opacity="0"/>
+      <stop offset=".72" stop-color="#dff8ff" stop-opacity=".72"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".95"/>
+    </linearGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="960" height="360" fill="url(#sky)"/>
+  <rect y="294" width="960" height="66" fill="url(#ground)"/>
+  <g opacity=".5" stroke="#dff8ff" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M160 158c-48-18-72 20-46 48"/>
+    <path d="M790 160c48-18 74 22 44 50"/>
+    <path d="M233 112c-34-30-82-8-86 28"/>
+    <path d="M722 112c34-30 82-8 86 28"/>
+  </g>
+  <g opacity=".82" filter="url(#softGlow)">
+    <ellipse cx="480" cy="289" rx="186" ry="36" fill="none" stroke="#c9f4ff" stroke-width="5"/>
+    <ellipse cx="480" cy="259" rx="108" ry="23" fill="none" stroke="#dff8ff" stroke-width="4" opacity=".72"/>
+    <ellipse cx="480" cy="227" rx="54" ry="13" fill="none" stroke="#ffffff" stroke-width="3" opacity=".46"/>
+  </g>
+  <g opacity=".5" fill="#c6a36b">
+    <circle cx="325" cy="300" r="5"/>
+    <circle cx="374" cy="316" r="4"/>
+    <circle cx="613" cy="310" r="5"/>
+    <circle cx="657" cy="297" r="4"/>
+    <circle cx="290" cy="285" r="3"/>
+    <circle cx="703" cy="286" r="3"/>
+  </g>
+  <g opacity=".74">
+    <path d="M105 188h160" stroke="url(#streak)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M80 226h205" stroke="url(#streak)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M855 188h-160" stroke="url(#streak)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M880 226h-205" stroke="url(#streak)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <g>
+    <ellipse cx="380" cy="176" rx="108" ry="28" fill="#5e7e8f" opacity=".72" transform="rotate(-15 380 176)"/>
+    <ellipse cx="580" cy="176" rx="108" ry="28" fill="#5e7e8f" opacity=".72" transform="rotate(15 580 176)"/>
+    <ellipse cx="480" cy="184" rx="112" ry="42" fill="#2f4858"/>
+    <circle cx="426" cy="173" r="9" fill="#d8f6ff" opacity=".6"/>
+    <circle cx="534" cy="173" r="9" fill="#d8f6ff" opacity=".6"/>
+    <path d="M377 190c-48 26-93 29-138 10" stroke="#dff8ff" stroke-width="4" fill="none" opacity=".42" stroke-linecap="round"/>
+    <path d="M583 190c48 26 93 29 138 10" stroke="#dff8ff" stroke-width="4" fill="none" opacity=".42" stroke-linecap="round"/>
+  </g>
+  <text x="42" y="52" fill="#eef9ff" font-family="Arial, sans-serif" font-size="28" font-weight="700">Selected Style: Wind Pressure</text>
+  <text x="42" y="84" fill="#b8ccd5" font-family="Arial, sans-serif" font-size="18">Translucent air arcs, pressure rings, dust puffs, and thin speed lines. Minimal magic color.</text>
+</svg>
