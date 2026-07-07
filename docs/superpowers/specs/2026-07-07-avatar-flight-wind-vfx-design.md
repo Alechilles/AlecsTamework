@@ -23,7 +23,7 @@ This suggests a presentation layer can react to existing movement results instea
 - Add readable wind-style VFX for launch charge, launch release, flap, boost, airbrake, and high-speed flight.
 - Keep VFX configurable through AvatarFlight config/assets rather than hardcoding particle IDs in controller logic.
 - Expose per-effect enable toggles so modders can disable launch, flap, boost, airbrake, or trail effects independently.
-- Include optional config-driven sound hooks alongside launch VFX in the first pass.
+- Include optional config-driven sound hooks for each AvatarFlight VFX effect.
 - Prefer base-game particle/model attachment systems where possible.
 - Keep burst effects one-shot and trails explicitly start/stop so persistent effects cannot orphan.
 - Avoid noisy per-tick particle spawning unless throttled or represented as a persistent attached effect.
@@ -87,7 +87,9 @@ AvatarFlight VFX config should expose per-effect toggles in the first pass:
 - `Airbrake.Enabled`
 - `Trails.Enabled`
 
-A top-level `Vfx.Enabled` kill switch is acceptable if it stays simple, but it should not replace the per-effect toggles. Each effect section should own its particle system IDs, attachment candidates, offsets, intensity/scaling knobs, and visibility mode where relevant.
+A top-level `Vfx.Enabled` kill switch is acceptable if it stays simple, but it should not replace the per-effect toggles. Each effect section should own its particle system IDs, attachment candidates, offsets, intensity/scaling knobs, visibility mode, and optional sound hooks where relevant.
+
+Launch sound hooks should be populated in the first prototype. Flap, boost, airbrake, and trail sound fields should exist from the start so audio can be added without schema churn, even if some fields are blank in the first playable pass.
 
 ## Prototype Order
 
@@ -110,7 +112,7 @@ Expected behavior:
 
 Pulse cadence and intensity should interpolate continuously from early to near-full charge instead of snapping at the release-tier thresholds. This approach should be robust with existing particle spawning because it does not require live parameter mutation on a persistent particle instance. It must still be throttled by charge state/time so it does not spawn particles every tick. If Hytale particle assets later support clean runtime scaling of a persistent effect, this can be revisited without changing the player-facing visual design.
 
-Launch VFX should include optional sound hooks in the first pass:
+Launch VFX should populate its optional sound hooks in the first pass:
 
 - charge pulse sound, very quiet and throttled with pulse cadence;
 - launch release sound, scaled or tiered with the release VFX tier;
@@ -198,7 +200,7 @@ Default visibility should be all nearby players. The config can still expose an 
 
 ## Open Questions
 
-- Should sound hooks be scoped to launch only in the first pass, or defined for all effect sections up front but populated later?
+- Which non-launch sound should be authored next after launch: flap, boost, airbrake, or fast-flight trails?
 
 ## Testing and Validation Notes
 
@@ -241,3 +243,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided canceled pre-minimum launch releases should play a tiny dissipating puff.
 - 2026-07-07: Decided launch cancel should use its own tiny particle system rather than reusing the charge-ramp pulse system.
 - 2026-07-07: Decided launch VFX should include optional config-driven sound hooks in the first pass.
+- 2026-07-07: Decided every AvatarFlight VFX effect section should have optional sound hooks, with launch populated first.
