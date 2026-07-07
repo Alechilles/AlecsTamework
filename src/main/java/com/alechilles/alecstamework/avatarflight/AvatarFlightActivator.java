@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.alechilles.alecstamework.ui.TameworkAvatarFlightHud;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -71,11 +72,13 @@ public final class AvatarFlightActivator {
         ComponentType<EntityStore, AvatarFlightComponent> flightType = AvatarFlightComponent.getComponentType();
         ComponentType<EntityStore, AvatarFlightInputComponent> inputType = AvatarFlightInputComponent.getComponentType();
         AvatarFlightComponent flight = flightType == null ? null : store.getComponent(ref, flightType);
+        Player player = store.getComponent(ref, Player.getComponentType());
         boolean restoreEquipment = flight != null
                 && TwAvatarFlightConfig.resolve(flight.getConfigId()).getRiderVisual().isHideOwnerEquipment();
         if (flightType != null) {
             store.tryRemoveComponent(ref, flightType);
         }
+        TameworkAvatarFlightHud.removeFrom(player);
         if (inputType != null) {
             store.tryRemoveComponent(ref, inputType);
         }

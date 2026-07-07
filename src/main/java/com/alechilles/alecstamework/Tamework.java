@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPa
 import com.alechilles.alecstamework.avatarflight.AvatarFlightActivator;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSystem;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightHudSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
@@ -688,6 +689,12 @@ public class Tamework extends JavaPlugin {
                         MovementStatesComponent.getComponentType(),
                         HeadRotation.getComponentType(),
                         TransformComponent.getComponentType()
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightHudSystem(
+                        avatarFlightComponentType,
+                        Player.getComponentType()
                 )
         );
         getEntityStoreRegistry().registerSystem(

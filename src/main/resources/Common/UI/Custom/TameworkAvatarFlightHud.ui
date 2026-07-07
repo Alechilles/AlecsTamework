@@ -1,0 +1,62 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+    LayoutMode: Middle;
+
+    Group #Root {
+        Anchor: (Bottom: 118, Width: 178, Height: 40);
+        Background: #081220(0.78);
+        Visible: false;
+
+        Group #SpeedTrack {
+            Anchor: (Top: 8, Left: 12, Width: 154, Height: 8);
+            Background: #203044(0.92);
+
+            Group #SpeedFill {
+                Anchor: (Top: 1, Left: 1, Width: 0, Height: 6);
+                Background: #6fcdf2;
+            }
+        }
+
+        Group #PipRow {
+            Anchor: (Top: 22, Width: 145, Height: 10);
+            LayoutMode: Left;
+
+            Group #VigourPip0 {
+                Anchor: (Width: 20, Height: 10);
+                Background: #203044(0.92);
+                Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
+            }
+            Group { Anchor: (Width: 5); }
+            Group #VigourPip1 {
+                Anchor: (Width: 20, Height: 10);
+                Background: #203044(0.92);
+                Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
+            }
+            Group { Anchor: (Width: 5); }
+            Group #VigourPip2 {
+                Anchor: (Width: 20, Height: 10);
+                Background: #203044(0.92);
+                Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
+            }
+            Group { Anchor: (Width: 5); }
+            Group #VigourPip3 {
+                Anchor: (Width: 20, Height: 10);
+                Background: #203044(0.92);
+                Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
+            }
+            Group { Anchor: (Width: 5); }
+            Group #VigourPip4 {
+                Anchor: (Width: 20, Height: 10);
+                Background: #203044(0.92);
+                Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
+            }
+            Group { Anchor: (Width: 5); }
+            Group #VigourPip5 {
+                Anchor: (Width: 20, Height: 10);
+                Background: #203044(0.92);
+                Group #Fill { Anchor: (Top: 1, Left: 1, Width: 0, Height: 8); Background: #f1d36a; }
+            }
+        }
+    }
+}
