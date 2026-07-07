@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520" role="img" aria-labelledby="title desc">
+  <title id="title">AvatarFlight Flap Wind VFX Preview</title>
+  <desc id="desc">Planning visualization for a medium-low intensity flap downwash wind effect.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#101722"/>
+      <stop offset=".66" stop-color="#172029"/>
+      <stop offset="1" stop-color="#202a24"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#243521"/>
+      <stop offset="1" stop-color="#35462b"/>
+    </linearGradient>
+    <filter id="soft" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="900" height="520" fill="#0c1118"/>
+  <rect x="34" y="92" width="832" height="360" rx="12" fill="url(#bg)" stroke="#263746"/>
+  <rect x="34" y="392" width="832" height="60" fill="url(#ground)"/>
+  <text x="50" y="50" fill="#eef9ff" font-family="Arial, sans-serif" font-size="30" font-weight="700">Flap: Lift Downwash</text>
+  <text x="50" y="76" fill="#b8ccd5" font-family="Arial, sans-serif" font-size="16">Medium-low intensity. Short arcs push downward and outward from wing/body sweep.</text>
+  <g transform="translate(450 210)">
+    <ellipse cx="-116" cy="-12" rx="126" ry="26" fill="#5e7e8f" opacity=".72" transform="rotate(-14)"/>
+    <ellipse cx="116" cy="-12" rx="126" ry="26" fill="#5e7e8f" opacity=".72" transform="rotate(14)"/>
+    <ellipse cx="0" cy="0" rx="78" ry="30" fill="#2f4858"/>
+    <circle cx="-36" cy="-6" r="7" fill="#d8f6ff" opacity=".45"/>
+    <circle cx="36" cy="-6" r="7" fill="#d8f6ff" opacity=".45"/>
+  </g>
+  <g fill="none" stroke="#dff8ff" stroke-linecap="round" filter="url(#soft)">
+    <path d="M252 248c16 92 108 142 212 126" stroke-width="8" opacity=".68"/>
+    <path d="M648 248c-16 92-108 142-212 126" stroke-width="8" opacity=".68"/>
+    <path d="M306 286c14 62 78 96 154 86" stroke-width="5" opacity=".45"/>
+    <path d="M594 286c-14 62-78 96-154 86" stroke-width="5" opacity=".45"/>
+    <path d="M374 316c8 36 44 56 88 50" stroke-width="4" opacity=".32"/>
+    <path d="M526 316c-8 36-44 56-88 50" stroke-width="4" opacity=".32"/>
+  </g>
+  <ellipse cx="450" cy="396" rx="210" ry="32" fill="none" stroke="#dff8ff" stroke-width="5" opacity=".23"/>
+  <g fill="#c6a36b" opacity=".42">
+    <circle cx="314" cy="402" r="5"/>
+    <circle cx="398" cy="414" r="4"/>
+    <circle cx="506" cy="412" r="5"/>
+    <circle cx="594" cy="400" r="4"/>
+  </g>
+  <text x="52" y="486" fill="#9fb4bf" font-family="Arial, sans-serif" font-size="16">Read: quick upward lift, lighter than launch or boost.</text>
+</svg>

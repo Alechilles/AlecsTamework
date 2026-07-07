@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520" role="img" aria-labelledby="title desc">
+  <title id="title">AvatarFlight Boost Wind VFX Preview</title>
+  <desc id="desc">Planning visualization for a medium-high intensity horizontal boost compression wind effect.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#101722"/>
+      <stop offset=".66" stop-color="#172029"/>
+      <stop offset="1" stop-color="#202a24"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#243521"/>
+      <stop offset="1" stop-color="#35462b"/>
+    </linearGradient>
+    <linearGradient id="streak" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#dff8ff" stop-opacity="0"/>
+      <stop offset=".74" stop-color="#dff8ff" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".95"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="520" fill="#0c1118"/>
+  <rect x="34" y="92" width="832" height="360" rx="12" fill="url(#bg)" stroke="#263746"/>
+  <rect x="34" y="392" width="832" height="60" fill="url(#ground)"/>
+  <text x="50" y="50" fill="#eef9ff" font-family="Arial, sans-serif" font-size="30" font-weight="700">Boost: Horizontal Compression</text>
+  <text x="50" y="76" fill="#b8ccd5" font-family="Arial, sans-serif" font-size="16">Medium-high intensity. Punchy forward force cue, shorter and denser than speed trails.</text>
+  <g opacity=".8">
+    <path d="M90 206h334" stroke="url(#streak)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M132 260h392" stroke="url(#streak)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M80 318h272" stroke="url(#streak)" stroke-width="6" stroke-linecap="round" opacity=".72"/>
+    <path d="M170 170h196" stroke="url(#streak)" stroke-width="5" stroke-linecap="round" opacity=".55"/>
+  </g>
+  <ellipse cx="398" cy="248" rx="152" ry="52" fill="none" stroke="#dff8ff" stroke-width="6" opacity=".45"/>
+  <ellipse cx="360" cy="248" rx="90" ry="34" fill="none" stroke="#ffffff" stroke-width="4" opacity=".28"/>
+  <g transform="translate(590 254) rotate(5)">
+    <ellipse cx="-108" cy="-12" rx="112" ry="24" fill="#5e7e8f" opacity=".72" transform="rotate(-10)"/>
+    <ellipse cx="108" cy="-12" rx="112" ry="24" fill="#5e7e8f" opacity=".72" transform="rotate(20)"/>
+    <ellipse cx="0" cy="0" rx="78" ry="30" fill="#2f4858"/>
+    <circle cx="-36" cy="-6" r="7" fill="#d8f6ff" opacity=".45"/>
+    <circle cx="36" cy="-6" r="7" fill="#d8f6ff" opacity=".45"/>
+  </g>
+  <g fill="none" stroke="#dff8ff" stroke-linecap="round">
+    <path d="M470 194c-96-42-190-28-266 24" stroke-width="6" opacity=".38"/>
+    <path d="M470 314c-100 44-194 34-270-14" stroke-width="6" opacity=".38"/>
+    <path d="M650 194c48 12 92 26 132 48" stroke-width="4" opacity=".25"/>
+    <path d="M650 314c52-14 98-32 138-56" stroke-width="4" opacity=".25"/>
+  </g>
+  <text x="52" y="486" fill="#9fb4bf" font-family="Arial, sans-serif" font-size="16">Read: sudden forward thrust, not continuous fast-flight ribboning.</text>
+</svg>
