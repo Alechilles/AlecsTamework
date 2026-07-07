@@ -20,7 +20,7 @@ This suggests a presentation layer can react to existing movement results instea
 
 ## Goals
 
-- Add readable wind-style VFX for launch charge, launch release, flap, boost, and high-speed flight.
+- Add readable wind-style VFX for launch charge, launch release, flap, boost, airbrake, and high-speed flight.
 - Keep VFX configurable through AvatarFlight config/assets rather than hardcoding particle IDs in controller logic.
 - Prefer base-game particle/model attachment systems where possible.
 - Keep burst effects one-shot and trails explicitly start/stop so persistent effects cannot orphan.
@@ -58,6 +58,7 @@ Default effect concepts:
 - Launch release: one clean expanding ground shock ring plus a short upward air column to sell the stored force releasing into takeoff.
 - Flap: brief downwash arcs from the wings/body, lighter than launch and focused on lift.
 - Boost: horizontal compression streaks behind and around the dragon, stronger than flap but shorter and punchier than persistent speed trails.
+- Airbrake: subtle forward-facing wind shear or compression arcs that read as drag, not as a powered burst.
 - Fast-flight trails: thin wingtip ribbons that appear only while the dragon is at or above the fast-flight recharge speed threshold.
 
 Flap and boost can share low-level art ingredients, such as wind textures, arc spawners, or common translucent materials. They should still be separate authored particle systems so duration, orientation, spawn shape, and intensity can differ without awkward runtime parameter branching.
@@ -68,6 +69,7 @@ Default intensity targets:
 - Launch release: medium-high; strong enough to mark takeoff, not a screen-filling blast.
 - Flap: medium-low; readable downwash, deliberately lighter than launch or boost.
 - Boost: medium-high; punchy horizontal force cue with short duration.
+- Airbrake: low/subtle; enough feedback to show braking drag without visual clutter.
 - Fast-flight trails: low/subtle; continuous enough to read speed, thin enough to avoid clutter.
 
 ## Effect Sequence Preview
@@ -132,6 +134,7 @@ Use these trigger patterns:
 - Launch release: one-shot state-entry burst when `launchApplied` is true.
 - Flap: one-shot burst when `jumpApplied` is true.
 - Boost: one-shot burst when `boostApplied` is true, with optional short follow-through during the active boost window.
+- Airbrake: subtle cue while airbrake is actively held, throttled or persistent so it does not spawn a burst every tick.
 - Fast-flight trails: persistent cue while the player is moving fast enough to qualify for fast-flight recharge, whether that speed comes from Q boost, diving, or clean high-speed gliding. Trails should prefer model-node attachments at left/right distal wing points, with fixed-offset fallback. Trails need a clear stop path when speed falls below threshold or AvatarFlight exits.
 
 The implementation should avoid embedding particle spawning directly in `AvatarFlightController`, which is currently pure velocity logic. A dedicated AvatarFlight VFX/presentation service should consume controller output from the movement system or a nearby orchestration point.
@@ -141,7 +144,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should airbrake receive its own subtle wind-shear cue, or stay effect-free for the first pass?
+- Should airbrake use a model-attached cue near the wings/body, a position/velocity-oriented world cue, or both?
 
 ## Testing and Validation Notes
 
@@ -171,3 +174,4 @@ Expected validation once implemented:
 - 2026-07-07: Accepted the default effect concepts: smooth inward launch charge, launch shock ring plus upward air column, light flap downwash, punchy horizontal boost streaks, and thin fast-flight wingtip trails.
 - 2026-07-07: Decided flap and boost may share art ingredients but should be separate authored particle systems.
 - 2026-07-07: Accepted default intensity targets: launch charge faint-to-medium-high, launch release medium-high, flap medium-low, boost medium-high, and fast-flight trails low/subtle.
+- 2026-07-07: Decided airbrake should receive a first-pass subtle wind-shear cue at low intensity.
