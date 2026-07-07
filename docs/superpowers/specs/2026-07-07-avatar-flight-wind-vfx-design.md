@@ -86,6 +86,15 @@ AvatarFlight VFX config should expose per-effect toggles in the first pass:
 
 A top-level `Vfx.Enabled` kill switch is acceptable if it stays simple, but it should not replace the per-effect toggles. Each effect section should own its particle system IDs, attachment candidates, offsets, intensity/scaling knobs, and visibility mode where relevant.
 
+## Prototype Order
+
+Prototype launch charge and launch release first. This gives the highest player-facing payoff and validates the two hardest trigger patterns early:
+
+- persistent ramping effect while launch is charging;
+- one-shot burst effect when launch is released and successfully applied.
+
+After that pattern is proven, extend the same presentation layer to flap and boost bursts, then fast-flight trails, then airbrake. Trails and airbrake depend more on persistent start/stop behavior and attachment fallback, so they should follow once the simpler launch path is working.
+
 ## Effect Sequence Preview
 
 ![AvatarFlight wind VFX sequence](assets/avatar-flight-wind-vfx-sequence.svg)
@@ -158,7 +167,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Which effect should be prototyped first: launch charge/release, flap/boost bursts, airbrake, or fast-flight trails?
+- Which launch-charge implementation should the first prototype use: one persistent parameterized effect, repeated short pulses with changing cadence, or layered particle systems?
 
 ## Testing and Validation Notes
 
@@ -191,3 +200,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided airbrake should receive a first-pass subtle wind-shear cue at low intensity.
 - 2026-07-07: Decided airbrake should use both a primary world/velocity-oriented compression cue and secondary subtle model-attached wisps.
 - 2026-07-07: Decided first-pass config should expose per-effect enable toggles.
+- 2026-07-07: Decided launch charge/release should be prototyped first, before flap/boost, trails, and airbrake.
