@@ -56,8 +56,10 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "jump must not be latched from MovementStatesComponent fallback");
         assertTrue(source.contains("input.setJumping(!suppressLaunchJump && jumpHeld)"),
                 "grounded launch charge should suppress raw jump only while preserving packet-state-only jump capture");
-        assertTrue(source.contains("input.setCrouching(packetStates != null && (packetStates.crouching || packetStates.forcedCrouching))"),
+        assertTrue(source.contains("boolean crouchHeld = packetStates != null && (packetStates.crouching || packetStates.forcedCrouching)"),
                 "crouch must not be latched from MovementStatesComponent fallback");
+        assertTrue(source.contains("input.setCrouching(!suppressLaunchCrouch && crouchHeld)"),
+                "grounded launch charge should suppress raw crouch only while preserving packet-state-only crouch capture");
         assertTrue(!source.contains("states == null ? !stale && input.isJumping()"),
                 "stateless packets must clear jump instead of preserving stale jump");
         assertTrue(!source.contains("states == null ? !stale && input.isCrouching()"),
@@ -80,9 +82,9 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
 
         assertTrue(source.contains("beginLaunchCharge"),
                 "grounded held jump should begin a charged launch when configured");
-        assertTrue(source.contains("if (jumpHeld && grounded)"),
+        assertTrue(source.contains("if (launchHeld && grounded)"),
                 "jump-hold launch charge should only begin from the ground");
-        assertTrue(source.contains("} else if (!jumpHeld && input.isLaunchCharging())"),
+        assertTrue(source.contains("} else if (!launchHeld && input.isLaunchCharging())"),
                 "releasing after charge should queue launch even if native movement left the ground during the hold");
         assertTrue(source.contains("boolean suppressLaunchJump = jumpHoldLaunchInput"),
                 "raw jump suppression should be tied to active launch charge/release state");
@@ -90,6 +92,24 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "releasing jump after charge should queue a one-shot launch release");
         assertTrue(source.contains("cancelLaunchCharge"),
                 "leaving the configured launch state should cancel an in-progress charge");
+    }
+
+    @Test
+    void crouchHoldLaunchChargeIsCapturedWithoutFeedingDescentIntent() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("boolean crouchHeld = packetStates != null && (packetStates.crouching || packetStates.forcedCrouching)"),
+                "crouch-hold launch must read live packet crouch state, not latched movement fallback state");
+        assertTrue(source.contains("boolean crouchHoldLaunchInput = config.getLaunch().isEnabled() && usesCrouchHoldLaunch(config)"),
+                "crouch-hold launch should be independently configurable from jump-hold launch");
+        assertTrue(source.contains("boolean launchHeld = (jumpHoldLaunchInput && jumpHeld) || (crouchHoldLaunchInput && crouchHeld)"),
+                "launch hold state should combine configured packet launch inputs without treating unconfigured crouch as launch");
+        assertTrue(source.contains("handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded)"),
+                "grounded crouch hold should feed the same one-shot launch release path");
+        assertTrue(source.contains("boolean suppressLaunchCrouch = crouchHoldLaunchInput"),
+                "grounded crouch launch charge must suppress raw crouch descent while the launch is charging");
+        assertTrue(source.contains("input.setCrouching(!suppressLaunchCrouch && crouchHeld)"),
+                "crouch should resume normal downward movement when it is not being used for grounded launch charge");
     }
 
     @Test

@@ -99,8 +99,8 @@ class TwAvatarFlightConfigTest {
         assertEquals(0.45, config.getBoost().getUpwardPitchLiftMultiplier(), 0.00001);
         assertEquals(3.0, config.getBoost().getUpwardPitchLiftCap(), 0.00001);
         assertTrue(config.getLaunch().isEnabled());
-        assertEquals(AvatarFlightLaunchSettings.INPUT_JUMP_HOLD, config.getLaunch().getPreferredInput());
-        assertEquals(AvatarFlightLaunchSettings.INPUT_JUMP_HOLD, config.getLaunch().getFallbackInput());
+        assertEquals(AvatarFlightLaunchSettings.INPUT_CROUCH_HOLD, config.getLaunch().getPreferredInput());
+        assertEquals(AvatarFlightLaunchSettings.INPUT_CROUCH_HOLD, config.getLaunch().getFallbackInput());
         assertEquals(500L, config.getLaunch().getMinChargeMs());
         assertEquals(3000L, config.getLaunch().getMaxChargeMs());
         assertEquals(0.65, config.getLaunch().getChargeExponent(), 0.00001);

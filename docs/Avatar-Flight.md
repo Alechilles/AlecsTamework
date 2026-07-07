@@ -6,11 +6,11 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
-- Holding jump on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
+- Holding crouch on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
 - Left-click with Flightmaster's Reins performs an upward flap.
 - Right-click with Flightmaster's Reins applies the airbrake.
 - Q with Flightmaster's Reins performs a forward boost.
-- Crouch applies direct downward movement.
+- Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
 ## Vigour
@@ -33,7 +33,7 @@ The recharge delay means a spent charge requires the delay plus the recharge cad
 
 ## Launch
 
-Charged launch is the default takeoff path for avatar flight. With `Launch.PreferredInput` set to `JumpHold`, a grounded jump hold starts charging instead of immediately feeding jump into normal flight input. Releasing before `Launch.MinChargeMs` cancels the launch, while releasing after the minimum applies a charge-scaled upward and forward impulse. If the player leaves the ground during the hold, the release can still apply the launch that began on the ground.
+Charged launch is the default takeoff path for avatar flight. With `Launch.PreferredInput` set to `CrouchHold`, holding crouch while grounded starts charging instead of feeding crouch into descent. Releasing before `Launch.MinChargeMs` cancels the launch, while releasing after the minimum applies a charge-scaled upward and forward impulse. If the player leaves the ground during the hold, the release can still apply the launch that began on the ground. Airborne crouch without an active grounded launch charge remains direct downward movement.
 
 Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-loads some launch strength after the minimum hold, while still rewarding longer charge time. Partial launches cost `1` Vigour by default, and launches at or above `Launch.FullChargeCostThreshold` cost `2`.
 
@@ -88,8 +88,8 @@ The compact avatar-flight HUD appears above the hotbar while avatar flight is ac
 ### Launch
 
 - `Enabled`: enables charged launch.
-- `PreferredInput`: primary launch input path. `JumpHold` is the built-in packet path. `ReinsPrimaryHold` is reserved for future/custom item hold integrations.
-- `FallbackInput`: fallback launch input path. Defaults to `JumpHold`; `ReinsPrimaryHold` is not wired by the default Flightmaster's Reins item.
+- `PreferredInput`: primary launch input path. `CrouchHold` is the default built-in packet path because it is reliable and visually reads as a launch coil. `JumpHold` remains supported, and `ReinsPrimaryHold` is reserved for future/custom item hold integrations.
+- `FallbackInput`: fallback launch input path. Defaults to `CrouchHold`; `ReinsPrimaryHold` is not wired by the default Flightmaster's Reins item.
 - `MinChargeMs`: minimum hold before release applies launch.
 - `MaxChargeMs`: hold duration that reaches full launch charge.
 - `ChargeExponent`: exponent applied to normalized charge amount.

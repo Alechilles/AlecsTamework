@@ -70,7 +70,7 @@ Repo-side evidence:
 - The existing Reins actions act on `firstRun` for one-shot controls, which is required for flap and Q boost to avoid repeated spending.
 - Airborne sprint/shift is not reliable enough to be a primary boost input.
 
-Inference: jump-hold launch is plausible, but only after testing whether native jump updates can be filtered or suppressed cleanly. Reins primary-hold is the planned fallback if jump-hold causes jitter or cannot read release accurately.
+Playtest result: jump-hold launch was not reliable enough in the current client path. Grounded crouch-hold is now the preferred launch input because crouch is observable, visually reads as a launch coil, and does not fight the normal jump impulse. Reins primary-hold remains a possible fallback if crouch-hold becomes problematic.
 
 ## Control Model
 
@@ -81,11 +81,11 @@ Primary controls:
 | Mouse look | Controls heading and pitch. Pitch affects movement and visual presentation. |
 | Forward input | Starts or resumes glide from hover or stall with a small initial kick, not an instant cruise motor. |
 | Backward input | Airbrakes when moving forward; gives slow backward movement only when already stationary or moving backward. |
-| Crouch | Applies smooth, direct downward velocity while held. |
-| Left click with Reins | Upward flap while airborne. Grounded use may become charged launch fallback if jump-hold fails. |
+| Crouch | Applies smooth, direct downward velocity while airborne, unless it began as a grounded launch charge. |
+| Left click with Reins | Upward flap while airborne. Grounded use may become charged launch fallback if crouch-hold fails. |
 | Right click with Reins | Airbrake. Tap applies a slowing pulse; hold can bring the player to a hover over time. |
 | Q with Reins | Directional forward boost. This replaces shift as the primary boost input. |
-| Jump hold while grounded | Preferred charged launch input. Tap remains normal jump. |
+| Crouch hold while grounded | Preferred charged launch input. Release applies the charged takeoff if the hold reached the minimum. |
 
 Controls must be intent-based, not sticky booleans. Pressing Q once should trigger one boost. Holding or latching a signal must not spend every cooldown until Vigour is empty. The same rule applies to flaps and launch release.
 
@@ -94,7 +94,7 @@ Controls must be intent-based, not sticky booleans. Pressing Q once should trigg
 The controller should distinguish at least these modes:
 
 - Grounded: normal transformed ground locomotion. No forced glide while standing or walking.
-- LaunchCharging: grounded charge state before takeoff, if jump-hold launch is viable.
+- LaunchCharging: grounded crouch-hold charge state before takeoff.
 - Launching: short impulse application when a charged launch releases.
 - ForwardFlight: active glide or powered forward motion.
 - Hover: nearly stationary aerial state, usually after airbrake.
@@ -265,12 +265,11 @@ The speed gauge should use the same horizontal speed metric that gates fast-flig
 
 ## Charged Launch
 
-Ground takeoff was shown by the storyboard to be too expensive if the player must spend normal flaps from a flat start. The selected launch concept is jump-hold first, Reins primary-hold fallback if jump-hold cannot be made reliable.
+Ground takeoff was shown by the storyboard to be too expensive if the player must spend normal flaps from a flat start. The selected launch concept is grounded crouch-hold first, with Reins primary-hold as a fallback if crouch-hold cannot be made reliable. `JumpHold` remains a configurable input option but is not the default.
 
 Preferred behavior:
 
-- Tap jump under `500ms`: normal jump, no flight launch.
-- Hold jump at least `500ms`: start charge.
+- Hold crouch while grounded at least `500ms`: start charge.
 - Continue holding up to `3000ms`: charge increases.
 - Release after charge threshold: spend Vigour, apply launch, and enter flight.
 
@@ -288,7 +287,7 @@ Suggested sample points:
 
 | Hold Time | Up Impulse | Forward Impulse | Vigour Cost | Expected Result |
 | --- | ---: | ---: | ---: | --- |
-| `< 500ms` | native | native | 0 | normal jump |
+| `< 500ms` | none | none | 0 | launch cancel |
 | `500ms` | 6.0 | 6.0 | 1 | small hop into glide |
 | `1000ms` | 10.2 | 7.8 | 1 | reliable quick launch |
 | `2000ms` | 14.6 | 9.6 | 2 | strong takeoff |
@@ -302,7 +301,7 @@ Balance intent:
 - Launch should not make low-altitude misplay irrelevant.
 - Full launch should reach a useful low-altitude route without spending the entire Vigour bar.
 
-If native jump suppression is bad, use grounded Reins primary-hold for the same launch system. In that fallback, left click remains airborne flap after flight has begun.
+If grounded crouch-hold becomes unreliable, use grounded Reins primary-hold for the same launch system. In that fallback, left click remains airborne flap after flight has begun.
 
 ## Visual Mount And Rider
 
@@ -491,7 +490,8 @@ Schema additions must preserve old configs through defaults. Parent/child inheri
 
 Needed probes:
 
-- jump press, hold duration, release, native jump suppression, and launch result;
+- crouch press, hold duration, release, native crouch suppression, and launch result;
+- optional jump-hold diagnostics if a config explicitly selects `JumpHold`;
 - Reins primary hold/release for fallback launch;
 - per-intent logs for flap, airbrake, Q boost, and failed Vigour spend;
 - speed, pitch, dive load, climb load, altitude delta, Vigour value, and recharge mode;

@@ -12,6 +12,7 @@ import javax.annotation.Nullable;
  */
 public final class AvatarFlightLaunchSettings {
     public static final String INPUT_JUMP_HOLD = "JumpHold";
+    public static final String INPUT_CROUCH_HOLD = "CrouchHold";
     public static final String INPUT_REINS_PRIMARY_HOLD = "ReinsPrimaryHold";
 
     private static final double DEFAULT_MIN_CHARGE_MS = 500.0;
@@ -35,14 +36,14 @@ public final class AvatarFlightLaunchSettings {
             .documentation("Whether charged avatar launch is enabled. Inheritance: missing nested key inherits parent value.")
             .add()
             .<String>append(new KeyedCodec<>("PreferredInput", Codec.STRING),
-                    (settings, value) -> settings.preferredInput = inputOrDefault(value, INPUT_JUMP_HOLD),
+                    (settings, value) -> settings.preferredInput = inputOrDefault(value, INPUT_CROUCH_HOLD),
                     settings -> settings.preferredInput)
-            .documentation("Preferred charged-launch input. Valid values: JumpHold, ReinsPrimaryHold. Inheritance: missing nested key inherits parent value.")
+            .documentation("Preferred charged-launch input. Valid values: CrouchHold, JumpHold, ReinsPrimaryHold. Inheritance: missing nested key inherits parent value.")
             .add()
             .<String>append(new KeyedCodec<>("FallbackInput", Codec.STRING),
-                    (settings, value) -> settings.fallbackInput = inputOrDefault(value, INPUT_REINS_PRIMARY_HOLD),
+                    (settings, value) -> settings.fallbackInput = inputOrDefault(value, INPUT_CROUCH_HOLD),
                     settings -> settings.fallbackInput)
-            .documentation("Fallback charged-launch input. JumpHold is the built-in packet path; ReinsPrimaryHold is reserved for future/custom item hold integrations. Inheritance: missing nested key inherits parent value.")
+            .documentation("Fallback charged-launch input. CrouchHold and JumpHold are built-in packet paths; ReinsPrimaryHold is reserved for future/custom item hold integrations. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("MinChargeMs", Codec.DOUBLE),
                     (settings, value) -> settings.minChargeMs = nonNegativeOrDefault(value, DEFAULT_MIN_CHARGE_MS),
@@ -101,8 +102,8 @@ public final class AvatarFlightLaunchSettings {
             .build();
 
     private boolean enabled = true;
-    private String preferredInput = INPUT_JUMP_HOLD;
-    private String fallbackInput = INPUT_JUMP_HOLD;
+    private String preferredInput = INPUT_CROUCH_HOLD;
+    private String fallbackInput = INPUT_CROUCH_HOLD;
     private double minChargeMs = DEFAULT_MIN_CHARGE_MS;
     private double maxChargeMs = DEFAULT_MAX_CHARGE_MS;
     private double chargeExponent = DEFAULT_CHARGE_EXPONENT;
@@ -138,11 +139,11 @@ public final class AvatarFlightLaunchSettings {
     }
 
     public String getPreferredInput() {
-        return inputOrDefault(preferredInput, INPUT_JUMP_HOLD);
+        return inputOrDefault(preferredInput, INPUT_CROUCH_HOLD);
     }
 
     public String getFallbackInput() {
-        return inputOrDefault(fallbackInput, INPUT_REINS_PRIMARY_HOLD);
+        return inputOrDefault(fallbackInput, INPUT_CROUCH_HOLD);
     }
 
     public long getMinChargeMs() {
@@ -190,7 +191,9 @@ public final class AvatarFlightLaunchSettings {
             return fallback;
         }
         String normalized = value.trim();
-        if (INPUT_JUMP_HOLD.equals(normalized) || INPUT_REINS_PRIMARY_HOLD.equals(normalized)) {
+        if (INPUT_CROUCH_HOLD.equals(normalized)
+                || INPUT_JUMP_HOLD.equals(normalized)
+                || INPUT_REINS_PRIMARY_HOLD.equals(normalized)) {
             return normalized;
         }
         return fallback;

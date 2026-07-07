@@ -18,7 +18,7 @@ Add or change only these areas:
 - curve-based dive speed gain;
 - curve-based climb speed-to-altitude exchange;
 - directional Q boost with capped upward lift and full downward thrust;
-- charged ground launch, starting with jump-hold and falling back to grounded Reins primary-hold if needed;
+- charged ground launch, now defaulting to grounded crouch-hold after jump-hold proved unreliable;
 - tests, docs, and debug probes needed to validate those changes.
 
 This spec does not cover rider visuals, equipment hiding, pitch/bank animation authoring, fake rider armor, or general avatar-flight architecture unless a change is directly required by the tuning or launch work.
@@ -198,13 +198,13 @@ Add a deliberate ground takeoff system.
 
 Preferred input:
 
-- tap jump under `500ms`: normal jump, no flight launch;
-- hold jump for at least `500ms`: begin launch charge;
+- hold crouch while grounded for at least `500ms`: begin launch charge;
 - hold up to `3000ms`: charge increases;
 - release after charge threshold: spend Vigour, apply launch impulse, enter flight.
 
-Fallback input if jump-hold cannot be made reliable:
+Other supported inputs:
 
+- `JumpHold` remains configurable, but is not the default after playtesting showed jump-hold was not reliably observable;
 - grounded Flightmaster's Reins primary hold;
 - hold left click while grounded to charge launch;
 - release to launch;
@@ -240,21 +240,22 @@ Launch exists to replace the awkward heavy-spend ground climb, not to replace in
 
 ## Launch Input Probe
 
-Before committing to jump-hold implementation, add a focused probe or temporary debug path:
+Jump-hold testing showed the held jump channel was not reliable enough for launch. The default should use grounded crouch-hold instead. Keep this probe pattern for future launch input candidates:
 
 - log jump press start while grounded and transformed;
+- log crouch press start while grounded and transformed;
 - log held duration;
 - log release;
-- log whether native jump was suppressed or still applied;
+- log whether native jump/crouch behavior was suppressed or still applied;
 - log whether release generated exactly one launch intent;
 - log resulting velocity and Vigour spend.
 
-Acceptance for jump-hold:
+Acceptance for crouch-hold:
 
-- tap under `500ms` performs normal jump and does not enter launch;
-- holding does not spam jump/flap spend;
+- airborne crouch remains direct descent unless a grounded launch charge is already active;
+- holding does not spam launch/flap spend;
 - releasing at `500ms`, `1s`, `2s`, and `3s` produces distinct impulses;
-- native jump does not create visible double-pop or jitter during charge;
+- native crouch does not create visible double-pop or jitter during charge;
 - launch only fires once per hold/release.
 
 If these fail, use the Reins primary-hold fallback without changing the launch movement math.
@@ -288,8 +289,8 @@ Recommended new `Launch` section:
 
 ```text
 Enabled = true
-PreferredInput = "JumpHold"
-FallbackInput = "ReinsPrimaryHold"
+PreferredInput = "CrouchHold"
+FallbackInput = "CrouchHold"
 MinChargeMs = 500
 MaxChargeMs = 3000
 ChargeExponent = 0.65
@@ -345,7 +346,7 @@ Add focused tests for:
 - boosted excess decays toward natural cap when not actively boosted;
 - launch curve sample points match expected impulses;
 - launch spend gating blocks launch without enough Vigour;
-- tap jump below threshold does not launch;
+- grounded crouch release below threshold cancels launch;
 - launch intent is one-shot;
 - existing configs without `Launch` and curve fields still load.
 
@@ -366,9 +367,10 @@ Manual pass after implementation:
 - Dive steeply for `3s`, pull up around `45 deg`, and verify a clear but not full altitude recovery.
 - Try short dip-and-pull-up loops and confirm they are net losing.
 - Q boost level, downward, and upward; confirm each spends once and feels directional.
-- Hold jump for each launch sample duration and confirm distinct takeoff strength.
-- Tap jump and confirm normal jump/no launch.
-- If jump-hold fails, repeat with grounded Reins primary-hold fallback.
+- Hold crouch while grounded for each launch sample duration and confirm distinct takeoff strength.
+- Release crouch below threshold and confirm no charged launch.
+- Confirm airborne crouch still applies direct descent when no grounded launch charge is active.
+- If crouch-hold fails, repeat with grounded Reins primary-hold fallback.
 - Confirm HUD still has no placeholder image and remains positioned above the hotbar.
 
 ## Non-Goals For This Delta
@@ -384,7 +386,7 @@ Manual pass after implementation:
 
 Use this spec as the source for the next implementation plan. Before planning, confirm:
 
-- jump-hold should be attempted first, with Reins primary-hold as fallback;
+- grounded crouch-hold is the default launch input, with Reins primary-hold as fallback;
 - the `70%` clean maneuver altitude recovery target is still right;
 - the launch default should spend `1` charge for partial launch and `2` for strong/full launch;
 - the first implementation should include both curve tuning and charged launch, rather than splitting them into two commits.

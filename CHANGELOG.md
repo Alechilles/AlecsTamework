@@ -12,7 +12,7 @@
 - Avatar flight can read client flight vertical velocity during diagnostics, but the native client flight capability remains a standalone probe because it overrides custom avatar movement.
 - Added Vigour charges and a compact speed/Vigour HUD for transformed avatar flight, with upward flaps and forward boosts spending charges and recharge limited to grounded recovery or high-speed flight.
 - Added a separate avatar-flight `MaxGlideSpeed` cap so dive-only glide cannot reach boosted maximum speed by default.
-- Added charged avatar-flight launch tuning so holding jump on the ground can spend Vigour for a stronger takeoff with configurable charge time, launch impulse, and partial/full charge costs.
+- Added charged avatar-flight launch tuning so holding crouch on the ground can spend Vigour for a stronger takeoff with configurable charge time, launch impulse, and partial/full charge costs.
 - Added a compact avatar-flight pitch readout and red target-speed marker above the speed bar to make climb, dive, and boost speed trends easier to tune in game.
 
 ### Changed
@@ -22,6 +22,7 @@
 - `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
 - Avatar-flight Q boosts now use directional thrust by default, with upward boost lift capped below flaps and downward boost input applying full directional dive thrust.
 - Avatar-flight dive and climb tuning now uses ramping maneuver loads so diving builds speed more slowly, pitch-up spends momentum more gradually, and clean unboosted dive/pull-up loops recover most but not all lost altitude.
+- Avatar-flight charged launch now defaults to holding crouch on the ground instead of holding jump, keeping airborne crouch as direct descent once no grounded launch charge is active.
 
 ### Fixed
 - Fixed avatar flight input capture so stale movement-state fallback no longer makes jump, crouch, or sprint appear held after the packet state is gone.

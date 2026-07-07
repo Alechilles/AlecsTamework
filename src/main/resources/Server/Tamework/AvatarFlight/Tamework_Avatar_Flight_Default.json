@@ -59,8 +59,8 @@
   },
   "Launch": {
     "Enabled": true,
-    "PreferredInput": "JumpHold",
-    "FallbackInput": "JumpHold",
+    "PreferredInput": "CrouchHold",
+    "FallbackInput": "CrouchHold",
     "MinChargeMs": 500.0,
     "MaxChargeMs": 3000.0,
     "ChargeExponent": 0.65,
