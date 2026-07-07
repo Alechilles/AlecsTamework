@@ -21,9 +21,14 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(source.contains("#Root.Visible"));
         Assertions.assertFalse(source.contains("#Root.Background"),
                 "the compact flight HUD root must not receive a dynamic background because it renders as a missing texture");
+        Assertions.assertTrue(source.contains("#PitchLabel.Visible"));
+        Assertions.assertTrue(source.contains("#PitchLabel.Text"));
         Assertions.assertTrue(source.contains("#SpeedFill.Anchor"));
+        Assertions.assertTrue(source.contains("#TargetSpeedMarker.Visible"));
+        Assertions.assertTrue(source.contains("#TargetSpeedMarker.Anchor"));
         Assertions.assertTrue(source.contains("#PipRow.Visible"));
         Assertions.assertTrue(source.contains("MAX_PIPS = 6"));
+        Assertions.assertTrue(source.contains("targetMarkerAnchor(model.targetSpeedRatio())"));
         Assertions.assertTrue(source.contains("\"#VigourPip\" + i + \" #Fill.Anchor\""));
         Assertions.assertFalse(source.contains("DIMMED_BACKGROUND"));
         Assertions.assertFalse(source.contains("ACTIVE_BACKGROUND"));
@@ -36,8 +41,10 @@ class AvatarFlightHudBinderTest {
         )).replace("\r\n", "\n");
 
         Assertions.assertTrue(ui.contains("Group #Root"));
+        Assertions.assertTrue(ui.contains("Label #PitchLabel"));
         Assertions.assertTrue(ui.contains("Group #SpeedTrack"));
         Assertions.assertTrue(ui.contains("Group #SpeedFill"));
+        Assertions.assertTrue(ui.contains("Group #TargetSpeedMarker"));
         Assertions.assertTrue(ui.contains("Group #PipRow"));
         Assertions.assertFalse(ui.contains("@PageOverlay"),
                 "compact HUD must not use modal page overlays because they draw a backdrop and placeholder panel");
@@ -54,7 +61,9 @@ class AvatarFlightHudBinderTest {
                 "Group backgrounds in working Tamework HUDs use direct color literals; object color syntax can render as a placeholder");
         Assertions.assertTrue(ui.contains("Background: #203044(0.92);"));
         Assertions.assertTrue(ui.contains("Background: #f1d36a;"));
-        Assertions.assertTrue(ui.contains("Anchor: (Top: 22, Left: 16, Width: 145, Height: 10)"));
+        Assertions.assertTrue(ui.contains("Background: #f04444;"));
+        Assertions.assertTrue(ui.contains("Style: (FontSize: 11, RenderBold: true, TextColor: #f2f6fb, HorizontalAlignment: Center, VerticalAlignment: Center)"));
+        Assertions.assertTrue(ui.contains("Anchor: (Top: 32, Left: 16, Width: 145, Height: 10)"));
         Assertions.assertTrue(ui.contains("Visible: false;"));
     }
 

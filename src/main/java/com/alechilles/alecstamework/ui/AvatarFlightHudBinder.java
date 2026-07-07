@@ -9,8 +9,11 @@ import javax.annotation.Nonnull;
 /** Binds avatar-flight speed and vigour charge values into the compact HUD asset. */
 final class AvatarFlightHudBinder {
     private static final int MAX_PIPS = 6;
+    private static final int SPEED_TRACK_WIDTH = 154;
     private static final int SPEED_FILL_MAX_WIDTH = 152;
     private static final int SPEED_FILL_HEIGHT = 6;
+    private static final int TARGET_MARKER_WIDTH = 2;
+    private static final int TARGET_MARKER_HEIGHT = 10;
     private static final int PIP_FILL_MAX_WIDTH = 18;
     private static final int PIP_FILL_HEIGHT = 8;
 
@@ -20,8 +23,12 @@ final class AvatarFlightHudBinder {
     static void bind(@Nonnull UICommandBuilder commandBuilder,
                      @Nonnull AvatarFlightHudViewModel model) {
         commandBuilder.set("#Root.Visible", model.visible());
+        commandBuilder.set("#PitchLabel.Visible", model.visible());
+        commandBuilder.set("#PitchLabel.Text", model.pitchLabel());
         commandBuilder.set("#SpeedTrack.Visible", model.visible());
         commandBuilder.setObject("#SpeedFill.Anchor", fillAnchor(SPEED_FILL_MAX_WIDTH, SPEED_FILL_HEIGHT, model.speedRatio()));
+        commandBuilder.set("#TargetSpeedMarker.Visible", model.visible());
+        commandBuilder.setObject("#TargetSpeedMarker.Anchor", targetMarkerAnchor(model.targetSpeedRatio()));
         commandBuilder.set("#PipRow.Visible", model.visible() && model.maxVigourCharges() > 0.0);
         for (int i = 0; i < MAX_PIPS; i++) {
             boolean pipVisible = model.visible() && i < Math.ceil(model.maxVigourCharges());
@@ -39,6 +46,19 @@ final class AvatarFlightHudBinder {
         anchor.setLeft(Value.of(1));
         anchor.setWidth(Value.of(Math.max(0, (int) Math.round(maxWidth * clamp01(ratio)))));
         anchor.setHeight(Value.of(Math.max(0, height)));
+        return anchor;
+    }
+
+    @Nonnull
+    private static Anchor targetMarkerAnchor(double ratio) {
+        int center = 1 + (int) Math.round(SPEED_FILL_MAX_WIDTH * clamp01(ratio));
+        int left = Math.max(0, Math.min(SPEED_TRACK_WIDTH - TARGET_MARKER_WIDTH,
+                center - TARGET_MARKER_WIDTH / 2));
+        Anchor anchor = new Anchor();
+        anchor.setTop(Value.of(-1));
+        anchor.setLeft(Value.of(left));
+        anchor.setWidth(Value.of(TARGET_MARKER_WIDTH));
+        anchor.setHeight(Value.of(TARGET_MARKER_HEIGHT));
         return anchor;
     }
 

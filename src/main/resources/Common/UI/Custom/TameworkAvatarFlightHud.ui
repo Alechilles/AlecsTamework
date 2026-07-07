@@ -1,21 +1,34 @@
 $C = "Common.ui";
 
 Group #Root {
-    Anchor: (Bottom: 178, Width: 178, Height: 40);
+    Anchor: (Bottom: 178, Width: 178, Height: 50);
     Visible: false;
 
+    Label #PitchLabel {
+        Anchor: (Top: 0, Left: 0, Width: 178, Height: 12);
+        Text: "0°";
+        Style: (FontSize: 11, RenderBold: true, TextColor: #f2f6fb, HorizontalAlignment: Center, VerticalAlignment: Center);
+        Visible: false;
+    }
+
     Group #SpeedTrack {
-        Anchor: (Top: 8, Left: 12, Width: 154, Height: 8);
+        Anchor: (Top: 16, Left: 12, Width: 154, Height: 8);
         Background: #203044(0.92);
 
         Group #SpeedFill {
             Anchor: (Top: 1, Left: 1, Width: 0, Height: 6);
             Background: #6fcdf2;
         }
+
+        Group #TargetSpeedMarker {
+            Anchor: (Top: -1, Left: 0, Width: 2, Height: 10);
+            Background: #f04444;
+            Visible: false;
+        }
     }
 
     Group #PipRow {
-        Anchor: (Top: 22, Left: 16, Width: 145, Height: 10);
+        Anchor: (Top: 32, Left: 16, Width: 145, Height: 10);
         LayoutMode: Left;
 
         Group #VigourPip0 {

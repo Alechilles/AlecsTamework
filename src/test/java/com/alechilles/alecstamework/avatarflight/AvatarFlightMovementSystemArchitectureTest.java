@@ -31,6 +31,16 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void movementSystemPersistsHudTelemetryBeforeHudSystemRuns() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("flight.setHudPitchRadians(output.visualPitchRadians())"),
+                "pitch readout should come from the same controller output that drives visual pitch");
+        assertTrue(source.contains("flight.setHudTargetSpeedRatio(output.hudTargetSpeedRatio())"),
+                "speed target marker should be persisted for AvatarFlightHudSystem, which runs after movement");
+    }
+
+    @Test
     void freshPacketInputOwnsGroundedState() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

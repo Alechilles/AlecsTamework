@@ -19,6 +19,9 @@ class AvatarFlightHudViewModelTest {
         assertEquals(0.0, model.maxVigourCharges(), EPSILON);
         assertFalse(model.dimmed());
         assertEquals("NONE", model.rechargeMode());
+        assertEquals(0.0, model.targetSpeedRatio(), EPSILON);
+        assertEquals(0.0, model.pitchDegrees(), EPSILON);
+        assertEquals("0\u00B0", model.pitchLabel());
         assertEquals(0.0, model.pipFill(0), EPSILON);
     }
 
@@ -86,5 +89,45 @@ class AvatarFlightHudViewModelTest {
         assertEquals(0.0, low.pipFill(0), EPSILON);
         assertFalse(low.dimmed());
         assertEquals("NONE", low.rechargeMode());
+    }
+
+    @Test
+    void visibleModelFormatsPitchAndClampsTargetSpeedMarker() {
+        AvatarFlightHudViewModel positive = AvatarFlightHudViewModel.visible(
+                0.5,
+                1.4,
+                Math.toRadians(30.4),
+                2.25,
+                6.0,
+                false,
+                "FAST_FLIGHT"
+        );
+        AvatarFlightHudViewModel negative = AvatarFlightHudViewModel.visible(
+                0.5,
+                0.25,
+                Math.toRadians(-29.6),
+                2.25,
+                6.0,
+                false,
+                "FAST_FLIGHT"
+        );
+        AvatarFlightHudViewModel flat = AvatarFlightHudViewModel.visible(
+                0.5,
+                Double.NaN,
+                Double.POSITIVE_INFINITY,
+                2.25,
+                6.0,
+                false,
+                "FAST_FLIGHT"
+        );
+
+        assertEquals(1.0, positive.targetSpeedRatio(), EPSILON);
+        assertEquals(30.4, positive.pitchDegrees(), EPSILON);
+        assertEquals("+30\u00B0", positive.pitchLabel());
+        assertEquals(0.25, negative.targetSpeedRatio(), EPSILON);
+        assertEquals("-30\u00B0", negative.pitchLabel());
+        assertEquals(0.0, flat.targetSpeedRatio(), EPSILON);
+        assertEquals(0.0, flat.pitchDegrees(), EPSILON);
+        assertEquals("0\u00B0", flat.pitchLabel());
     }
 }

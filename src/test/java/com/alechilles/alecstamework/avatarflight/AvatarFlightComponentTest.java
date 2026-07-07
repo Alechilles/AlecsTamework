@@ -36,4 +36,22 @@ class AvatarFlightComponentTest {
         assertEquals(0.0, clone.getClimbLoad(), EPSILON);
         assertEquals(1500L, clone.getNextLaunchAtMs());
     }
+
+    @Test
+    void hudTelemetryIsFiniteClampedAndCloned() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+        component.setHudPitchRadians(Math.toRadians(30.0));
+        component.setHudTargetSpeedRatio(1.5);
+
+        AvatarFlightComponent clone = component.clone();
+
+        assertEquals(Math.toRadians(30.0), clone.getHudPitchRadians(), EPSILON);
+        assertEquals(1.0, clone.getHudTargetSpeedRatio(), EPSILON);
+
+        component.setHudPitchRadians(Double.NaN);
+        component.setHudTargetSpeedRatio(Double.NEGATIVE_INFINITY);
+
+        assertEquals(0.0, component.getHudPitchRadians(), EPSILON);
+        assertEquals(0.0, component.getHudTargetSpeedRatio(), EPSILON);
+    }
 }

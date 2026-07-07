@@ -80,6 +80,8 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                 && fullVigour(flight.getVigourCharges(), maxCharges);
         return AvatarFlightHudViewModel.visible(
                 speedRatio,
+                flight.getHudTargetSpeedRatio(),
+                flight.getHudPitchRadians(),
                 flight.getVigourCharges(),
                 maxCharges,
                 groundedAtFull,

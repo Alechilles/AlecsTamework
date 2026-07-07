@@ -38,6 +38,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setVelocityZ,
                     AvatarFlightComponent::getVelocityZ)
             .add()
+            .<Double>append(new KeyedCodec<>("HudPitchRadians", Codec.DOUBLE),
+                    AvatarFlightComponent::setHudPitchRadians,
+                    AvatarFlightComponent::getHudPitchRadians)
+            .add()
+            .<Double>append(new KeyedCodec<>("HudTargetSpeedRatio", Codec.DOUBLE),
+                    AvatarFlightComponent::setHudTargetSpeedRatio,
+                    AvatarFlightComponent::getHudTargetSpeedRatio)
+            .add()
             .<Double>append(new KeyedCodec<>("DiveLoad", Codec.DOUBLE),
                     AvatarFlightComponent::setDiveLoad,
                     AvatarFlightComponent::getDiveLoad)
@@ -117,6 +125,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private double velocityX;
     private double velocityY;
     private double velocityZ;
+    private double hudPitchRadians;
+    private double hudTargetSpeedRatio;
     private double diveLoad;
     private double climbLoad;
     private long nextJumpAtMs;
@@ -207,6 +217,22 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
 
     public void setVelocityZ(@Nullable Double velocityZ) {
         this.velocityZ = finiteOrZero(velocityZ);
+    }
+
+    public double getHudPitchRadians() {
+        return finiteOrZero(hudPitchRadians);
+    }
+
+    public void setHudPitchRadians(@Nullable Double hudPitchRadians) {
+        this.hudPitchRadians = finiteOrZero(hudPitchRadians);
+    }
+
+    public double getHudTargetSpeedRatio() {
+        return clamp01(finiteOrZero(hudTargetSpeedRatio));
+    }
+
+    public void setHudTargetSpeedRatio(@Nullable Double hudTargetSpeedRatio) {
+        this.hudTargetSpeedRatio = clamp01(finiteOrZero(hudTargetSpeedRatio));
     }
 
     public double getDiveLoad() {
@@ -383,6 +409,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.velocityX = velocityX;
         clone.velocityY = velocityY;
         clone.velocityZ = velocityZ;
+        clone.hudPitchRadians = getHudPitchRadians();
+        clone.hudTargetSpeedRatio = getHudTargetSpeedRatio();
         clone.diveLoad = getDiveLoad();
         clone.climbLoad = getClimbLoad();
         clone.nextJumpAtMs = nextJumpAtMs;

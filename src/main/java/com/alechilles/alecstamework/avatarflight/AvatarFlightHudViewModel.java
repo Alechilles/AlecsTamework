@@ -9,6 +9,8 @@ import javax.annotation.Nullable;
  */
 public record AvatarFlightHudViewModel(boolean visible,
                                        double speedRatio,
+                                       double targetSpeedRatio,
+                                       double pitchDegrees,
                                        double vigourCharges,
                                        double maxVigourCharges,
                                        boolean dimmed,
@@ -20,12 +22,16 @@ public record AvatarFlightHudViewModel(boolean visible,
     public AvatarFlightHudViewModel {
         if (!visible) {
             speedRatio = 0.0;
+            targetSpeedRatio = 0.0;
+            pitchDegrees = 0.0;
             vigourCharges = 0.0;
             maxVigourCharges = 0.0;
             dimmed = false;
             rechargeMode = RECHARGE_MODE_NONE;
         } else {
             speedRatio = clamp01(speedRatio);
+            targetSpeedRatio = clamp01(targetSpeedRatio);
+            pitchDegrees = finiteOrZero(pitchDegrees);
             maxVigourCharges = clamp(finiteOrZero(maxVigourCharges), 0.0, MAX_DISPLAY_PIPS);
             vigourCharges = clamp(finiteOrZero(vigourCharges), 0.0, maxVigourCharges);
             rechargeMode = normalizeRechargeMode(rechargeMode);
@@ -34,11 +40,22 @@ public record AvatarFlightHudViewModel(boolean visible,
 
     @Nonnull
     public static AvatarFlightHudViewModel hidden() {
-        return new AvatarFlightHudViewModel(false, 0.0, 0.0, 0.0, false, RECHARGE_MODE_NONE);
+        return new AvatarFlightHudViewModel(false, 0.0, 0.0, 0.0, 0.0, 0.0, false, RECHARGE_MODE_NONE);
     }
 
     @Nonnull
     public static AvatarFlightHudViewModel visible(double speedRatio,
+                                                   double charges,
+                                                   double maxCharges,
+                                                   boolean groundedAtFull,
+                                                   @Nullable String rechargeMode) {
+        return visible(speedRatio, speedRatio, 0.0, charges, maxCharges, groundedAtFull, rechargeMode);
+    }
+
+    @Nonnull
+    public static AvatarFlightHudViewModel visible(double speedRatio,
+                                                   double targetSpeedRatio,
+                                                   double pitchRadians,
                                                    double charges,
                                                    double maxCharges,
                                                    boolean groundedAtFull,
@@ -49,11 +66,25 @@ public record AvatarFlightHudViewModel(boolean visible,
         return new AvatarFlightHudViewModel(
                 true,
                 speedRatio,
+                targetSpeedRatio,
+                Math.toDegrees(finiteOrZero(pitchRadians)),
                 displayCharges,
                 displayMax,
                 dimmed,
                 normalizeRechargeMode(rechargeMode)
         );
+    }
+
+    @Nonnull
+    public String pitchLabel() {
+        int rounded = (int) Math.round(pitchDegrees);
+        if (rounded > 0) {
+            return "+" + rounded + "\u00B0";
+        }
+        if (rounded < 0) {
+            return rounded + "\u00B0";
+        }
+        return "0\u00B0";
     }
 
     public double pipFill(int index) {

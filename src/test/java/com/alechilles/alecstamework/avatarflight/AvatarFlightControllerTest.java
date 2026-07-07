@@ -679,6 +679,34 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void hudTargetSpeedMarkerMovesWithPitchAndBoostTrend() {
+        double currentSpeed = 10.0;
+        double currentRatio = AvatarFlightSpeedMetrics.speedRatio(currentSpeed, CONFIG);
+        AvatarFlightController.Output climb = update(
+                new AvatarFlightController.State(0.0, 0.0, -currentSpeed, 0L, 0L),
+                input(1.0, false, false, false, false, Math.toRadians(45.0))
+        );
+        AvatarFlightController.Output steepDive = update(
+                new AvatarFlightController.State(0.0, 0.0, -currentSpeed, 0L, 0L),
+                input(1.0, false, false, false, false, Math.toRadians(-80.0))
+        );
+        AvatarFlightController.Output boosted = update(
+                new AvatarFlightController.State(0.0, 0.0, -currentSpeed, 0L, 0L),
+                input(1.0, false, false, true, false, 0.0)
+        );
+
+        assertTrue(climb.hudTargetSpeedRatio() < currentRatio,
+                "pitch-up should show a target marker left of current speed because speed is being spent");
+        assertTrue(steepDive.hudTargetSpeedRatio() > currentRatio,
+                "a steep dive should show a target marker right of current speed because speed is being gained");
+        assertTrue(boosted.hudTargetSpeedRatio() > currentRatio,
+                "boost should show the target marker moving toward the paid boosted speed cap");
+        assertTrue(climb.hudTargetSpeedRatio() >= 0.0 && climb.hudTargetSpeedRatio() <= 1.0);
+        assertTrue(steepDive.hudTargetSpeedRatio() >= 0.0 && steepDive.hudTargetSpeedRatio() <= 1.0);
+        assertTrue(boosted.hudTargetSpeedRatio() >= 0.0 && boosted.hudTargetSpeedRatio() <= 1.0);
+    }
+
+    @Test
     void boostedExcessDecaysWhenBoostWindowEnds() {
         double boostedSpeed = AvatarFlightSpeedMetrics.boostedHorizontalCap(CONFIG);
         AvatarFlightController.Output output = AvatarFlightController.update(

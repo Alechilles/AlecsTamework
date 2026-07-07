@@ -112,6 +112,8 @@ public final class AvatarFlightMovementSystem
         flight.setNextLaunchAtMs(output.nextLaunchAtMs());
         flight.setDiveLoad(output.diveLoad());
         flight.setClimbLoad(output.climbLoad());
+        flight.setHudPitchRadians(output.visualPitchRadians());
+        flight.setHudTargetSpeedRatio(output.hudTargetSpeedRatio());
         syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
         applyVisualPose(ref, commandBuffer, controllerInput, output);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);

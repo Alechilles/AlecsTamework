@@ -35,6 +35,8 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("AvatarFlightSpeedMetrics.speedRatio"));
         Assertions.assertTrue(source.contains("flight.getVelocityX()"));
         Assertions.assertTrue(source.contains("flight.getVigourCharges()"));
+        Assertions.assertTrue(source.contains("flight.getHudTargetSpeedRatio()"));
+        Assertions.assertTrue(source.contains("flight.getHudPitchRadians()"));
         Assertions.assertTrue(source.contains("config.getVigour().getMaxCharges()"));
         Assertions.assertTrue(source.contains("flight.getVigourRechargeMode()"));
         Assertions.assertTrue(source.contains("config.getVigour().isHudEnabled()"));

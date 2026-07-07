@@ -82,13 +82,14 @@ public final class AvatarFlightController {
                     false,
                     false,
                     input.pitchRadians(),
-                    0.0
+                    0.0,
+                    AvatarFlightSpeedMetrics.speedRatio(impulse.forward(), config)
             );
         }
         if (input.onGround() && !jumpIntent) {
             return new Output(AvatarFlightMode.GROUNDED, 0.0, 0.0, 0.0,
                     nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, 0.0, 0.0, false, false, false, false, 0.0,
-                    true, false, 0.0, 0.0);
+                    true, false, 0.0, 0.0, 0.0);
         }
         boolean pitchControlsActive = !explicitAirbrakeIntent && !descendIntent;
         double diveLoad = AvatarFlightManeuverMath.updateLoad(
@@ -257,9 +258,76 @@ public final class AvatarFlightController {
                 targetStrafeSpeed,
                 movement.getMaxBackwardSpeed()
         );
+        double hudTargetSpeedRatio = resolveHudTargetSpeedRatio(
+                mode,
+                effectivePitchRadians,
+                currentHorizontalSpeed,
+                targetForwardSpeed,
+                boostActive,
+                explicitAirbrakeIntent,
+                config,
+                glideHorizontalCap,
+                boostedHorizontalCap
+        );
         return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, diveLoad, climbLoad,
                 applyVelocity, jumpApplied, boostApplied, false, 0.0, horizontalIdle, fastFlight, visualPitch,
-                visualRoll);
+                visualRoll, hudTargetSpeedRatio);
+    }
+
+    private static double resolveHudTargetSpeedRatio(@Nonnull AvatarFlightMode mode,
+                                                     double pitchRadians,
+                                                     double currentHorizontalSpeed,
+                                                     double targetForwardSpeed,
+                                                     boolean boostActive,
+                                                     boolean explicitAirbrakeIntent,
+                                                     @Nonnull TwAvatarFlightConfig config,
+                                                     double glideHorizontalCap,
+                                                     double boostedHorizontalCap) {
+        double targetSpeed = resolveHudTargetSpeed(
+                mode,
+                pitchRadians,
+                currentHorizontalSpeed,
+                targetForwardSpeed,
+                boostActive,
+                explicitAirbrakeIntent,
+                config,
+                glideHorizontalCap,
+                boostedHorizontalCap
+        );
+        return AvatarFlightSpeedMetrics.speedRatio(targetSpeed, config);
+    }
+
+    private static double resolveHudTargetSpeed(@Nonnull AvatarFlightMode mode,
+                                                double pitchRadians,
+                                                double currentHorizontalSpeed,
+                                                double targetForwardSpeed,
+                                                boolean boostActive,
+                                                boolean explicitAirbrakeIntent,
+                                                @Nonnull TwAvatarFlightConfig config,
+                                                double glideHorizontalCap,
+                                                double boostedHorizontalCap) {
+        if (mode == AvatarFlightMode.GROUNDED || explicitAirbrakeIntent) {
+            return 0.0;
+        }
+        if (boostActive) {
+            return boostedHorizontalCap;
+        }
+        if (pitchRadians < 0.0) {
+            double diveAmount = AvatarFlightManeuverMath.pitchPower(
+                    pitchRadians,
+                    true,
+                    config.getCurve().getDivePitchExponent()
+            );
+            double floor = config.getMovement().getGlideStartKickSpeed();
+            double projected = floor + (glideHorizontalCap - floor) * diveAmount;
+            return Math.max(Math.max(0.0, targetForwardSpeed), projected);
+        }
+        if (pitchRadians > 0.0) {
+            double physicalPitch = Math.min(MAX_PHYSICAL_PITCH_UP_RADIANS, pitchRadians);
+            double projected = Math.max(0.0, currentHorizontalSpeed * Math.cos(physicalPitch));
+            return Math.min(Math.max(0.0, targetForwardSpeed), projected);
+        }
+        return Math.max(0.0, targetForwardSpeed);
     }
 
     private static double resolveHorizontalSpeedLimit(double currentHorizontalSpeed,
@@ -535,7 +603,12 @@ public final class AvatarFlightController {
                          boolean horizontalIdle,
                          boolean fastFlight,
                          double visualPitchRadians,
-                         double visualRollRadians) {
+                         double visualRollRadians,
+                         double hudTargetSpeedRatio) {
+        public Output {
+            hudTargetSpeedRatio = clamp(hudTargetSpeedRatio, 0.0, 1.0);
+        }
+
         public Output(@Nonnull AvatarFlightMode mode,
                       double velocityX,
                       double velocityY,
@@ -551,7 +624,7 @@ public final class AvatarFlightController {
                       double visualRollRadians) {
             this(mode, velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, 0L, 0.0, 0.0, applyVelocity,
                     jumpApplied, boostApplied, false, 0.0, horizontalIdle, fastFlight, visualPitchRadians,
-                    visualRollRadians);
+                    visualRollRadians, 0.0);
         }
     }
 }
