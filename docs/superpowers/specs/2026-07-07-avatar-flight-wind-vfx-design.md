@@ -133,6 +133,17 @@ The sequence preview is planning art, not a literal particle implementation. It 
 - flap shows downwash from the body and wing sweep;
 - boost/trails stretch behind the model to make speed direction legible.
 
+## Flap and Boost Preview
+
+![AvatarFlight flap and boost wind VFX preview](assets/avatar-flight-wind-vfx-flap-boost-preview.svg)
+
+The flap and boost preview makes their separation explicit:
+
+- Flap is a lift/downwash effect: downward and outward air arcs from wing/body motion, with only a light ground echo. It stays medium-low intensity and should not look like a ground launch.
+- Boost is a forward-thrust effect: horizontal pressure streaks and compression rings behind/around the dragon. It is medium-high intensity, punchier than flap, and shorter/denser than fast-flight trails.
+
+They can reuse wind textures, translucent arc materials, and small dust/air spawners, but they should remain separate authored particle systems.
+
 ## Launch Charge Ramp Preview
 
 ![AvatarFlight launch charge wind VFX ramp](assets/avatar-flight-wind-vfx-charge-ramp.svg)
