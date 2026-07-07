@@ -105,7 +105,7 @@ Expected behavior:
 - Mid charge: moderate pulses that tighten and fire about every `300ms`.
 - Near full charge: medium-high pulses about every `150ms`, frequent enough to read as a continuous build-up with denser pressure rings and dust.
 
-This approach should be robust with existing particle spawning because it does not require live parameter mutation on a persistent particle instance. It must still be throttled by charge state/time so it does not spawn particles every tick. If Hytale particle assets later support clean runtime scaling of a persistent effect, this can be revisited without changing the player-facing visual design.
+Pulse cadence and intensity should interpolate continuously from early to near-full charge instead of snapping at the release-tier thresholds. This approach should be robust with existing particle spawning because it does not require live parameter mutation on a persistent particle instance. It must still be throttled by charge state/time so it does not spawn particles every tick. If Hytale particle assets later support clean runtime scaling of a persistent effect, this can be revisited without changing the player-facing visual design.
 
 ## Effect Sequence Preview
 
@@ -187,7 +187,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should launch-charge pulse cadence use the same normalized charge thresholds as release tiers, or its own continuous interpolation?
+- Should launch charge cancellation below minimum charge play a tiny dissipating puff, or simply stop with no release effect?
 
 ## Testing and Validation Notes
 
@@ -226,3 +226,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided the launch release burst should scale with final charge amount.
 - 2026-07-07: Decided launch release scaling should use configurable scale/intensity tiers, with partial/mid/full as the first-pass tier shape.
 - 2026-07-07: Accepted first-pass release VFX thresholds: partial `<0.45`, mid `0.45` to `<0.8`, full `0.8+`.
+- 2026-07-07: Decided launch-charge pulse cadence and intensity should interpolate continuously instead of snapping to release-tier thresholds.
