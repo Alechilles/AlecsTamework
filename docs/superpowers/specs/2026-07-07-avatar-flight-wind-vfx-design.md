@@ -101,9 +101,9 @@ Use repeated short pulses with changing cadence and intensity for the first laun
 
 Expected behavior:
 
-- Early charge: faint, infrequent pulses around the ground/body area.
-- Mid charge: pulses tighten and become more frequent.
-- Near full charge: pulses are frequent enough to read as a continuous build-up, with denser pressure rings and dust.
+- Early charge: faint pulses around the ground/body area about every `600ms`.
+- Mid charge: moderate pulses that tighten and fire about every `300ms`.
+- Near full charge: medium-high pulses about every `150ms`, frequent enough to read as a continuous build-up with denser pressure rings and dust.
 
 This approach should be robust with existing particle spawning because it does not require live parameter mutation on a persistent particle instance. It must still be throttled by charge state/time so it does not spawn particles every tick. If Hytale particle assets later support clean runtime scaling of a persistent effect, this can be revisited without changing the player-facing visual design.
 
@@ -179,7 +179,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- What cadence/intensity curve should launch-charge pulses use at early, mid, and full charge?
+- Should the launch release burst scale with final charge amount, or use one consistent burst once the launch succeeds?
 
 ## Testing and Validation Notes
 
@@ -214,3 +214,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided first-pass config should expose per-effect enable toggles.
 - 2026-07-07: Decided launch charge/release should be prototyped first, before flap/boost, trails, and airbrake.
 - 2026-07-07: Decided the first launch-charge prototype should use repeated short pulses with increasing cadence and intensity.
+- 2026-07-07: Accepted first-pass launch-charge pulse cadence targets: about `600ms` early, `300ms` mid, and `150ms` near full charge.
