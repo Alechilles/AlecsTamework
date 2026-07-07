@@ -67,6 +67,43 @@ The sequence preview is planning art, not a literal particle implementation. It 
 
 Launch charge should ramp smoothly rather than snapping between low, medium, and high particle systems. At early hold, the effect is faint: a soft ground ring, light dust, and barely visible inward air pull. As normalized charge approaches full, rings become denser, air arcs tighten around the body, dust grows more active, and the cue becomes somewhat intense without becoming an opaque aura.
 
+## Attachment Node Research
+
+Decision: support both named model nodes and fixed offsets, with node names preferred for trails and wing/body bursts. Exact node names are useful on many models, but they are not consistent enough across vanilla and HyDragon to hardcode one universal wingtip name.
+
+Recommended shape:
+
+- AvatarFlight VFX config should allow ordered attachment candidates per logical point, such as `LeftWingTrail`, `RightWingTrail`, `BodyCenter`, and `TailTrail`.
+- Each candidate can specify `TargetNodeName` and an optional `PositionOffset`.
+- Runtime should use the first configured node that exists when validation is available, or attempt ordered sends and fall back to offsets when node validation is not available.
+- Tamework's default NordicDrake profile can use node names directly.
+- Generic defaults should include fixed-offset fallbacks so models without predictable wing nodes still get acceptable trails.
+
+Source-backed attachment API evidence:
+
+- Hytale Workshop release `0.5.6`, `com.hypixel.hytale.server.core.asset.type.model.config.ModelParticle`: codec supports `TargetNodeName`, `PositionOffset`, `RotationOffset`, and `DetachedFromModel`.
+- Hytale Workshop release `0.5.6`, `BuilderActionSpawnParticles#readConfig`: vanilla NPC action config reads `TargetNodeName` as the target node where particles position.
+- Hytale Workshop release `0.5.6`, `ActionSpawnParticles#ActionSpawnParticles`: builds a `ModelParticle`, sets `PositionOffset`, sets `TargetNodeName`, and converts it to a model-particle packet.
+
+Model node evidence checked:
+
+| Source | Model path | Useful wing/trail nodes found |
+| --- | --- | --- |
+| Vanilla release `0.5.6` | `Common/NPC/Elemental/Dragon_Fire/Models/Model.blockymodel` | `Pelvis/Chest/L-Wing/L-Wing2/L-Wing3`, `Pelvis/Chest/R-Wing/R-Wing2/R-Wing3`; claw children exist near the distal wing chain. |
+| Vanilla release `0.5.6` | `Common/NPC/Elemental/Dragon_Frost/Models/Model.blockymodel` | `Pelvis/Chest/L-Wing/L-Wing2/L-Wing3`, `Pelvis/Chest/R-Wing/R-Wing2/R-Wing3`. |
+| Vanilla release `0.5.6` | `Common/NPC/Elemental/Dragon_Void/Models/Model.blockymodel` | Longer chain: `L-Wing` through `L-Wing5` and `R-Wing` through `R-Wing5`, plus wing-claw/spike nodes. |
+| Vanilla release `0.5.6` | `Common/NPC/Flying_Wildlife/Hawk/Models/Model.blockymodel` | `L-Arm/L-Wing/L-Wing2`, `R-Arm/R-Wing/R-Wing2`, plus `L-Wing-Feathers`/`R-Wing-Feathers`. |
+| Vanilla release `0.5.6` | `Common/NPC/Flying_Wildlife/Raven/Models/Model.blockymodel` | `L-Arm/L-Wing/L-Wing2`, `R-Arm/R-Wing/R-Wing2`, plus feather nodes. |
+| Vanilla release `0.5.6` | `Common/NPC/Flying_Beast/Vulture/Models/Model.blockymodel` | `L-Wing/L-Wing2`, `R-Wing/R-Wing2`, plus feather nodes. |
+| Vanilla release `0.5.6` | `Common/NPC/Flying_Beast/Pterodactyl/Models/Model.blockymodel` | Wing membrane naming differs: `L-Forearm/L-Wing/L-Wing-Flap`, `R-Forearm/R-Wing/R-Wing-Flap`. |
+| Vanilla release `0.5.6` | `Common/NPC/Flying_Beast/Archaeopteryx/Models/Model.blockymodel` | Uses arm/forearm/hand feather chains rather than direct `Wing2` tip nodes. |
+| HyDragon | `Common/NPC/HyDragon/NordicDrake/Model/NordicDrake.blockymodel` | `Origin/Pelvis/Belly/Chest/L-Wing/L-Wing2/L-Wing3`, `.../R-Wing/R-Wing2/R-Wing3`; also `MountAnchor`. |
+| HyDragon | `Common/NPC/HyDragon/GhoulDragon/Model/GhoulDragon.blockymodel` | `L-Wing/L-Wing2`, `R-Wing/R-Wing2`. |
+| HyDragon | `Common/NPC/HyDragon/Wyvern_Wild/Model/Wyvern_Wild.blockymodel` | Uses underscore naming: `L_Wing`, `R_Wing`, `R_Wing/R_Wing2`. |
+| HyDragon | `Common/NPC/HyDragon/Wyvern_Mini/Model/Wyvern_Mini.blockymodel` | Uses non-English wing names: `Asa E/Asa E2` and `Asa D/Asa D2`. |
+
+Inference: named-node attachment is appropriate for curated AvatarFlight profiles, especially NordicDrake and vanilla-style dragons. A generic Tamework feature should not require every model to follow `L-Wing3`/`R-Wing3`; it should support aliases/candidates and offset fallback.
+
 ## Initial Trigger Model
 
 Use these trigger patterns:
@@ -75,7 +112,7 @@ Use these trigger patterns:
 - Launch release: one-shot state-entry burst when `launchApplied` is true.
 - Flap: one-shot burst when `jumpApplied` is true.
 - Boost: one-shot burst when `boostApplied` is true, with optional short follow-through during the active boost window.
-- Fast-flight trails: persistent cue while the player is moving fast enough to qualify for fast-flight recharge, whether that speed comes from Q boost, diving, or clean high-speed gliding. Trails need a clear stop path when speed falls below threshold or AvatarFlight exits.
+- Fast-flight trails: persistent cue while the player is moving fast enough to qualify for fast-flight recharge, whether that speed comes from Q boost, diving, or clean high-speed gliding. Trails should prefer model-node attachments at left/right distal wing points, with fixed-offset fallback. Trails need a clear stop path when speed falls below threshold or AvatarFlight exits.
 
 The implementation should avoid embedding particle spawning directly in `AvatarFlightController`, which is currently pure velocity logic. A dedicated AvatarFlight VFX/presentation service should consume controller output from the movement system or a nearby orchestration point.
 
@@ -84,7 +121,7 @@ Default visibility should be all nearby players. The config can still expose an 
 ## Open Questions
 
 - Should the smooth launch-charge ramp be implemented as one parameterized persistent effect, repeated short pulses with changing cadence, or a small set of blended particle layers?
-- Should fast-flight trails attach to named model nodes, fixed offsets, or both?
+- Should AvatarFlight VFX config validate candidate node names against loaded model files at asset-load time, runtime, or only through tests/tooling?
 
 ## Testing and Validation Notes
 
@@ -103,3 +140,4 @@ Expected validation once implemented:
 - 2026-07-07: Decided high-speed trails should appear whenever the dragon qualifies for fast-flight recharge, including boost, diving, and fast gliding.
 - 2026-07-07: Decided AvatarFlight wind effects should be visible to all nearby players by default.
 - 2026-07-07: Decided launch charge should use a smooth intensity ramp that starts faint and builds to a somewhat intense wind-pressure cue at full charge.
+- 2026-07-07: After checking vanilla release `0.5.6` dragon/bird models and HyDragon dragon models, decided trails should support both named model nodes and fixed offsets. Node names are preferred for curated profiles; offsets are the generic fallback.
