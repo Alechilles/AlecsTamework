@@ -69,7 +69,7 @@
     "MinForwardImpulse": 6.0,
     "MaxForwardImpulse": 11.0,
     "PartialChargeCost": 1.0,
-    "FullChargeCost": 2.0,
+    "FullChargeCost": 1.0,
     "FullChargeCostThreshold": 0.6
   },
   "Vigour": {
