@@ -19,6 +19,16 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(source.contains("Anchor"));
         Assertions.assertTrue(source.contains("Value.of("));
         Assertions.assertTrue(source.contains("#Root.Visible"));
+        Assertions.assertTrue(source.contains("LAUNCH_TRACK_WIDTH"));
+        Assertions.assertTrue(source.contains("LAUNCH_FILL_MAX_WIDTH"));
+        Assertions.assertTrue(source.contains("LAUNCH_MIN_MARKER_WIDTH"));
+        Assertions.assertTrue(source.contains("#LaunchChargeGroup.Visible"));
+        Assertions.assertTrue(source.contains("#LaunchChargeFill.Anchor"));
+        Assertions.assertTrue(source.contains("#LaunchMinChargeMarker.Visible"));
+        Assertions.assertTrue(source.contains("#LaunchMinChargeMarker.Anchor"));
+        Assertions.assertTrue(source.contains("model.launchChargeVisible()"));
+        Assertions.assertTrue(source.contains("model.launchChargeRatio()"));
+        Assertions.assertTrue(source.contains("launchMarkerAnchor(model.launchMinChargeRatio())"));
         Assertions.assertFalse(source.contains("#Root.Background"),
                 "the compact flight HUD root must not receive a dynamic background because it renders as a missing texture");
         Assertions.assertTrue(source.contains("#PitchLabel.Visible"));

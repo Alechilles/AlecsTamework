@@ -16,6 +16,11 @@ final class AvatarFlightHudBinder {
     private static final int TARGET_MARKER_HEIGHT = 10;
     private static final int PIP_FILL_MAX_WIDTH = 18;
     private static final int PIP_FILL_HEIGHT = 8;
+    private static final int LAUNCH_TRACK_WIDTH = 154;
+    private static final int LAUNCH_FILL_MAX_WIDTH = 152;
+    private static final int LAUNCH_FILL_HEIGHT = 8;
+    private static final int LAUNCH_MIN_MARKER_WIDTH = 2;
+    private static final int LAUNCH_MIN_MARKER_HEIGHT = 12;
 
     private AvatarFlightHudBinder() {
     }
@@ -23,6 +28,11 @@ final class AvatarFlightHudBinder {
     static void bind(@Nonnull UICommandBuilder commandBuilder,
                      @Nonnull AvatarFlightHudViewModel model) {
         commandBuilder.set("#Root.Visible", model.visible());
+        commandBuilder.set("#LaunchChargeGroup.Visible", model.visible() && model.launchChargeVisible());
+        commandBuilder.setObject("#LaunchChargeFill.Anchor",
+                fillAnchor(LAUNCH_FILL_MAX_WIDTH, LAUNCH_FILL_HEIGHT, model.launchChargeRatio()));
+        commandBuilder.set("#LaunchMinChargeMarker.Visible", model.visible() && model.launchChargeVisible());
+        commandBuilder.setObject("#LaunchMinChargeMarker.Anchor", launchMarkerAnchor(model.launchMinChargeRatio()));
         commandBuilder.set("#PitchLabel.Visible", model.visible());
         commandBuilder.set("#PitchLabel.Text", model.pitchLabel());
         commandBuilder.set("#SpeedTrack.Visible", model.visible());
@@ -59,6 +69,19 @@ final class AvatarFlightHudBinder {
         anchor.setLeft(Value.of(left));
         anchor.setWidth(Value.of(TARGET_MARKER_WIDTH));
         anchor.setHeight(Value.of(TARGET_MARKER_HEIGHT));
+        return anchor;
+    }
+
+    @Nonnull
+    private static Anchor launchMarkerAnchor(double ratio) {
+        int center = 1 + (int) Math.round(LAUNCH_FILL_MAX_WIDTH * clamp01(ratio));
+        int left = Math.max(0, Math.min(LAUNCH_TRACK_WIDTH - LAUNCH_MIN_MARKER_WIDTH,
+                center - LAUNCH_MIN_MARKER_WIDTH / 2));
+        Anchor anchor = new Anchor();
+        anchor.setTop(Value.of(-2));
+        anchor.setLeft(Value.of(left));
+        anchor.setWidth(Value.of(LAUNCH_MIN_MARKER_WIDTH));
+        anchor.setHeight(Value.of(LAUNCH_MIN_MARKER_HEIGHT));
         return anchor;
     }
 
