@@ -62,10 +62,10 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         }
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
         TwAvatarFlightConfig.RiderVisualSettings settings = config.getRiderVisual();
+        refreshRiderVisualIfNeeded(ref, commandBuffer, settings);
         if (settings.isHideOwnerEquipment()) {
             queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings);
         }
-        refreshRiderVisualIfNeeded(ref, commandBuffer, settings);
     }
 
     public static void restoreCurrentEquipment(@Nonnull Ref<EntityStore> ref,
@@ -82,18 +82,19 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         queueAll(ref, update, visible.newlyVisibleTo);
     }
 
-    private static void queueHiddenOwnerUpdate(
+    private void queueHiddenOwnerUpdate(
             @Nonnull Ref<EntityStore> ref,
-            @Nonnull ComponentAccessor<EntityStore> accessor,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
             @Nonnull EntityTrackerSystems.Visible visible,
             @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
         EquipmentUpdate update = AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate(
                 ref,
-                accessor,
+                commandBuffer,
                 settings
         );
         queueAllExceptSelf(ref, update, visible.visibleTo);
         queueAllExceptSelf(ref, update, visible.newlyVisibleTo);
+        queueSelfIfHiddenOwnerEquipmentChanged(ref, commandBuffer, visible, update);
     }
 
     private void refreshRiderVisualIfNeeded(
@@ -157,6 +158,39 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
             }
             entry.getValue().queueUpdate(ref, update);
         }
+    }
+
+    private void queueSelfIfHiddenOwnerEquipmentChanged(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull EntityTrackerSystems.Visible visible,
+            @Nonnull EquipmentUpdate update) {
+        AvatarFlightRiderVisualComponent visual = commandBuffer.getComponent(ref, visualType);
+        if (visual == null || visual.isRiderEntity()) {
+            return;
+        }
+        String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
+        if (signature.equals(visual.getHiddenOwnerEquipmentSignature())) {
+            return;
+        }
+        if (!queueSelf(ref, update, visible.visibleTo) && !queueSelf(ref, update, visible.newlyVisibleTo)) {
+            return;
+        }
+        AvatarFlightRiderVisualComponent updated = visual.clone();
+        updated.setHiddenOwnerEquipmentSignature(signature);
+        commandBuffer.putComponent(ref, visualType, updated);
+    }
+
+    private static boolean queueSelf(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull EquipmentUpdate update,
+            @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
+        EntityTrackerSystems.EntityViewer viewer = visibleTo.get(ref);
+        if (viewer == null) {
+            return false;
+        }
+        viewer.queueUpdate(ref, update);
+        return true;
     }
 
     @Nullable

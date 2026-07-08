@@ -34,6 +34,10 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
                     AvatarFlightRiderVisualComponent::setEquipmentSignature,
                     AvatarFlightRiderVisualComponent::getEquipmentSignature)
             .add()
+            .<String>append(new KeyedCodec<>("HiddenOwnerEquipmentSignature", Codec.STRING),
+                    AvatarFlightRiderVisualComponent::setHiddenOwnerEquipmentSignature,
+                    AvatarFlightRiderVisualComponent::getHiddenOwnerEquipmentSignature)
+            .add()
             .<Long>append(new KeyedCodec<>("LastEquipmentSentAtMs", Codec.LONG),
                     AvatarFlightRiderVisualComponent::setLastEquipmentSentAtMs,
                     AvatarFlightRiderVisualComponent::getLastEquipmentSentAtMs)
@@ -44,6 +48,7 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
     private String riderEntityUuid = "";
     private boolean riderEntity;
     private String equipmentSignature = "";
+    private String hiddenOwnerEquipmentSignature = "";
     private long lastEquipmentSentAtMs;
 
     @Nullable
@@ -87,6 +92,15 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
         this.equipmentSignature = sanitize(equipmentSignature);
     }
 
+    @Nonnull
+    public String getHiddenOwnerEquipmentSignature() {
+        return hiddenOwnerEquipmentSignature == null ? "" : hiddenOwnerEquipmentSignature;
+    }
+
+    public void setHiddenOwnerEquipmentSignature(@Nullable String hiddenOwnerEquipmentSignature) {
+        this.hiddenOwnerEquipmentSignature = sanitize(hiddenOwnerEquipmentSignature);
+    }
+
     public long getLastEquipmentSentAtMs() {
         return lastEquipmentSentAtMs;
     }
@@ -102,6 +116,7 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
         clone.riderEntityUuid = getRiderEntityUuid();
         clone.riderEntity = riderEntity;
         clone.equipmentSignature = getEquipmentSignature();
+        clone.hiddenOwnerEquipmentSignature = getHiddenOwnerEquipmentSignature();
         clone.lastEquipmentSentAtMs = lastEquipmentSentAtMs;
         return clone;
     }

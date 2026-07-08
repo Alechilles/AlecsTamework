@@ -32,6 +32,8 @@ class AvatarFlightRiderVisualComponentArchitectureTest {
         assertTrue(component.contains("BuilderCodec<AvatarFlightRiderVisualComponent> CODEC"));
         assertTrue(component.contains("private String riderEntityUuid"));
         assertTrue(component.contains("private String equipmentSignature"));
+        assertTrue(component.contains("private String hiddenOwnerEquipmentSignature"));
+        assertTrue(component.contains("\"HiddenOwnerEquipmentSignature\""));
         assertTrue(plugin.contains("ComponentType<EntityStore, AvatarFlightRiderVisualComponent> avatarFlightRiderVisualComponentType"));
         assertTrue(plugin.contains("\"TameworkAvatarFlightRiderVisual\""));
     }

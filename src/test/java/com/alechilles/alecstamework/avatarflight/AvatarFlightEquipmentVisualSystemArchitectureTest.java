@@ -44,19 +44,23 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemDoesNotSendHiddenOwnerEquipmentToSelfViewer() throws Exception {
+    void visualSystemSendsHiddenOwnerEquipmentToSelfOnlyWhenSignatureChanges() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings)"));
         assertTrue(source.contains("queueAllExceptSelf(ref, update, visible.visibleTo)"));
         assertTrue(source.contains("queueAllExceptSelf(ref, update, visible.newlyVisibleTo)"));
         assertTrue(source.contains("if (ref.equals(entry.getKey()))"));
-        assertFalse(source.contains("queueIfEquipmentChanged("));
+        assertTrue(source.contains("queueSelfIfHiddenOwnerEquipmentChanged(ref, commandBuffer, visible, update)"));
+        assertTrue(source.contains("AvatarFlightEquipmentPacketService.equipmentSignature(update)"));
+        assertTrue(source.contains("visual.getHiddenOwnerEquipmentSignature()"));
+        assertTrue(source.contains("updated.setHiddenOwnerEquipmentSignature(signature)"));
+        assertTrue(source.contains("commandBuffer.putComponent(ref, visualType, updated)"));
+        assertTrue(source.contains("EntityTrackerSystems.EntityViewer viewer = visibleTo.get(ref)"));
         assertTrue(source.contains("visualType"));
         assertFalse(source.contains("\"owner\""));
         assertFalse(source.contains("readSignature("));
         assertFalse(source.contains("writeSignature("));
-        assertFalse(source.contains("queueSelf(ref, hiddenUpdate"));
     }
 
     @Test
