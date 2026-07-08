@@ -38,7 +38,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ownerRef, store)"));
         assertTrue(source.contains("equipment.hiddenCosmetics()"));
         assertTrue(source.contains("equipment.armorSignature()"));
-        assertTrue(source.contains("Collections.emptySet()"));
+        assertTrue(source.contains("equipment.hiddenCosmetics()"));
         assertTrue(source.contains("appearanceAttachments"));
         assertTrue(source.contains("equipment.attachments()"));
         assertTrue(source.contains("modelWithoutRiderAttachments("));
@@ -55,7 +55,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("logRiderAttachmentSkipped("));
         assertTrue(source.contains("PLAYER_MOUNT_ANCHOR_MODEL"));
         assertTrue(source.contains("riderAttachmentModel(model)"));
-        assertFalse(source.contains("equipment.hiddenCosmetics()\n                );"));
+        assertFalse(source.contains("Collections.emptySet()"));
         assertTrue(source.contains("attachmentModel=%s riderTexture=%s"));
         assertTrue(source.contains("riderAppearanceAttachmentCount=%s"));
         assertTrue(source.contains("riderSkinAttachmentCount=%s"));

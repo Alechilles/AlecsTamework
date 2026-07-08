@@ -66,6 +66,7 @@
 - Restored experimental avatar-flight fake rider armor mirroring, fixed owner armor hiding to use the engine empty item key, and namespaced fake rider node IDs so player/flight animation tracks do not target the rider attachment by copied player IDs.
 - Added runtime-generated rider-safe armor model variants for the experimental avatar-flight fake rider, so equipped armor can bind to the seated rider without inheriting transformed-player animation tracks.
 - Fixed experimental avatar-flight fake rider clothing and armor visibility refreshes so hidden armor no longer keeps suppressing the rider's underlying clothes, and rider clothing attachments use rider-safe model variants instead of binding to the transformed dragon.
+- Fixed experimental avatar-flight fake rider visuals so armor cosmetic hiding also hides the rider's clothing and accessory attachments for other players.
 - Fixed charged avatar-flight launch so stateless movement packets no longer break a held ground charge into tiny failed releases after the first takeoff.
 - Fixed avatar-flight activation so normal ground jumps and short drops stay in native movement until the player uses a charged launch or presses jump after already airborne.
 - Fixed avatar-flight airborne jump activation so a normal jump press observed shortly after takeoff is ignored until the configurable post-takeoff delay has elapsed.
