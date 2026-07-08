@@ -52,30 +52,43 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
 
         assertTrue(source.contains("MovementStates packetStates = resolvePacketMovementStates(packet);"),
                 "capture must keep packet-provided states separate from component fallback states");
-        assertTrue(source.contains("boolean jumpHeld = packetStates != null && (packetStates.jumping || packetStates.swimJumping)"),
+        assertTrue(source.contains("boolean stateObserved = packetStates != null"),
+                "capture must distinguish packet-observed button state from MovementStatesComponent fallback");
+        assertTrue(source.contains("boolean jumpHeld = stateObserved && (packetStates.jumping || packetStates.swimJumping)"),
                 "jump must not be latched from MovementStatesComponent fallback");
         assertTrue(source.contains("config.getInput().getAirborneJumpActivationDelayMs()"),
                 "fresh airborne jump activation should be gated by the configured post-takeoff delay");
         assertTrue(source.contains("input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded,"),
                 "grounded launch charge should suppress raw jump only while preserving packet-state-only jump capture");
-        assertTrue(source.contains("boolean crouchHeld = packetStates != null && (packetStates.crouching || packetStates.forcedCrouching)"),
+        assertTrue(source.contains("boolean crouchHeld = stateObserved && (packetStates.crouching || packetStates.forcedCrouching)"),
                 "crouch must not be latched from MovementStatesComponent fallback");
         assertTrue(source.contains("input.setCrouching(!suppressLaunchCrouch && crouchHeld)"),
                 "grounded launch charge should suppress raw crouch only while preserving packet-state-only crouch capture");
-        assertTrue(!source.contains("states == null ? !stale && input.isJumping()"),
-                "stateless packets must clear jump instead of preserving stale jump");
-        assertTrue(!source.contains("states == null ? !stale && input.isCrouching()"),
-                "stateless packets must clear crouch instead of preserving stale crouch");
+        assertTrue(source.contains("if (stateObserved) {"),
+                "stateless movement packets must preserve held/released button state until an explicit state packet arrives");
     }
 
     @Test
     void boostSprintEdgesComeOnlyFromPacketStates() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("input.updateSprinting(packetStates != null && packetStates.sprinting, now)"),
+        assertTrue(source.contains("input.updateSprinting(packetStates.sprinting, now)"),
                 "sprint boost must use packet sprint edges only; movement fallback includes our own fast-flight animation sprint state");
         assertFalse(source.contains("input.setSprinting(movementStates != null && movementStates.sprinting)"),
                 "feeding MovementStatesComponent sprint back into boost intent repeats boosts on cooldown");
+    }
+
+    @Test
+    void statelessPacketsDoNotResetAirborneJumpActivationClock() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("boolean grounded = stateObserved ? packetStates.onGround : input.isOnGround()"),
+                "packets without movement states must preserve the last observed grounded state");
+        assertTrue(source.contains("if (stateObserved) {\r\n            input.setOnGround(grounded, now);\r\n        }")
+                        || source.contains("if (stateObserved) {\n            input.setOnGround(grounded, now);\n        }"),
+                "MovementStatesComponent fallback must not reset airborneSinceMs between jump edge packets");
+        assertFalse(source.contains("boolean grounded = movementStates == null ? input.isOnGround() : movementStates.onGround"),
+                "fallback movement state can be stale relative to packet input and must not drive jump activation timing");
     }
 
     @Test
@@ -100,7 +113,7 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
     void crouchHoldLaunchChargeIsCapturedWithoutFeedingDescentIntent() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("boolean crouchHeld = packetStates != null && (packetStates.crouching || packetStates.forcedCrouching)"),
+        assertTrue(source.contains("boolean crouchHeld = stateObserved && (packetStates.crouching || packetStates.forcedCrouching)"),
                 "crouch-hold launch must read live packet crouch state, not latched movement fallback state");
         assertTrue(source.contains("boolean crouchHoldLaunchInput = config.getLaunch().isEnabled() && usesCrouchHoldLaunch(config)"),
                 "crouch-hold launch should be independently configurable from jump-hold launch");
@@ -118,11 +131,11 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
     void statelessPacketsDoNotReleaseHeldLaunchCharge() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("boolean launchStateObserved = packetStates != null"),
+        assertTrue(source.contains("boolean stateObserved = packetStates != null"),
                 "movement packets without button state must not count as launch button release");
         int handleCallIndex = source.indexOf(
                 "handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded");
-        int observedArgumentIndex = source.indexOf("launchStateObserved);", handleCallIndex);
+        int observedArgumentIndex = source.indexOf("stateObserved);", handleCallIndex);
         assertTrue(handleCallIndex > 0 && observedArgumentIndex > handleCallIndex,
                 "launch charge handling must know whether this packet actually observed jump/crouch state");
         assertTrue(source.contains("} else if (launchStateObserved && !launchHeld && input.isLaunchCharging())"),
