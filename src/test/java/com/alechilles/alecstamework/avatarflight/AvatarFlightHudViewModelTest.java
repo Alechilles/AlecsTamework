@@ -23,6 +23,9 @@ class AvatarFlightHudViewModelTest {
         assertEquals(0.0, model.pitchDegrees(), EPSILON);
         assertEquals("0\u00B0", model.pitchLabel());
         assertEquals(0.0, model.pipFill(0), EPSILON);
+        assertFalse(model.launchChargeVisible());
+        assertEquals(0.0, model.launchChargeRatio(), EPSILON);
+        assertEquals(0.0, model.launchMinChargeRatio(), EPSILON);
     }
 
     @Test
@@ -129,5 +132,46 @@ class AvatarFlightHudViewModelTest {
         assertEquals(0.0, flat.targetSpeedRatio(), EPSILON);
         assertEquals(0.0, flat.pitchDegrees(), EPSILON);
         assertEquals("0\u00B0", flat.pitchLabel());
+    }
+
+    @Test
+    void visibleModelClampsLaunchChargeValues() {
+        AvatarFlightHudViewModel model = AvatarFlightHudViewModel.visible(
+                0.5,
+                0.75,
+                Math.toRadians(3.0),
+                2.25,
+                6.0,
+                false,
+                "FAST_FLIGHT",
+                true,
+                1.25,
+                -0.5
+        );
+
+        assertTrue(model.launchChargeVisible());
+        assertEquals(1.0, model.launchChargeRatio(), EPSILON);
+        assertEquals(0.0, model.launchMinChargeRatio(), EPSILON);
+    }
+
+    @Test
+    void launchChargeCanBeHiddenWhileHudRemainsVisible() {
+        AvatarFlightHudViewModel model = AvatarFlightHudViewModel.visible(
+                0.5,
+                0.75,
+                0.0,
+                2.25,
+                6.0,
+                false,
+                "FAST_FLIGHT",
+                false,
+                0.6,
+                0.2
+        );
+
+        assertTrue(model.visible());
+        assertFalse(model.launchChargeVisible());
+        assertEquals(0.6, model.launchChargeRatio(), EPSILON);
+        assertEquals(0.2, model.launchMinChargeRatio(), EPSILON);
     }
 }

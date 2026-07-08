@@ -14,7 +14,10 @@ public record AvatarFlightHudViewModel(boolean visible,
                                        double vigourCharges,
                                        double maxVigourCharges,
                                        boolean dimmed,
-                                       @Nonnull String rechargeMode) {
+                                       @Nonnull String rechargeMode,
+                                       boolean launchChargeVisible,
+                                       double launchChargeRatio,
+                                       double launchMinChargeRatio) {
     public static final int MAX_DISPLAY_PIPS = 6;
     private static final double FULL_EPSILON = 0.0001;
     private static final String RECHARGE_MODE_NONE = "NONE";
@@ -28,6 +31,9 @@ public record AvatarFlightHudViewModel(boolean visible,
             maxVigourCharges = 0.0;
             dimmed = false;
             rechargeMode = RECHARGE_MODE_NONE;
+            launchChargeVisible = false;
+            launchChargeRatio = 0.0;
+            launchMinChargeRatio = 0.0;
         } else {
             speedRatio = clamp01(speedRatio);
             targetSpeedRatio = clamp01(targetSpeedRatio);
@@ -35,12 +41,15 @@ public record AvatarFlightHudViewModel(boolean visible,
             maxVigourCharges = clamp(finiteOrZero(maxVigourCharges), 0.0, MAX_DISPLAY_PIPS);
             vigourCharges = clamp(finiteOrZero(vigourCharges), 0.0, maxVigourCharges);
             rechargeMode = normalizeRechargeMode(rechargeMode);
+            launchChargeRatio = clamp01(launchChargeRatio);
+            launchMinChargeRatio = clamp01(launchMinChargeRatio);
         }
     }
 
     @Nonnull
     public static AvatarFlightHudViewModel hidden() {
-        return new AvatarFlightHudViewModel(false, 0.0, 0.0, 0.0, 0.0, 0.0, false, RECHARGE_MODE_NONE);
+        return new AvatarFlightHudViewModel(false, 0.0, 0.0, 0.0, 0.0, 0.0, false,
+                RECHARGE_MODE_NONE, false, 0.0, 0.0);
     }
 
     @Nonnull
@@ -60,6 +69,21 @@ public record AvatarFlightHudViewModel(boolean visible,
                                                    double maxCharges,
                                                    boolean groundedAtFull,
                                                    @Nullable String rechargeMode) {
+        return visible(speedRatio, targetSpeedRatio, pitchRadians, charges, maxCharges,
+                groundedAtFull, rechargeMode, false, 0.0, 0.0);
+    }
+
+    @Nonnull
+    public static AvatarFlightHudViewModel visible(double speedRatio,
+                                                   double targetSpeedRatio,
+                                                   double pitchRadians,
+                                                   double charges,
+                                                   double maxCharges,
+                                                   boolean groundedAtFull,
+                                                   @Nullable String rechargeMode,
+                                                   boolean launchChargeVisible,
+                                                   double launchChargeRatio,
+                                                   double launchMinChargeRatio) {
         double displayMax = clamp(finiteOrZero(maxCharges), 0.0, MAX_DISPLAY_PIPS);
         double displayCharges = clamp(finiteOrZero(charges), 0.0, displayMax);
         boolean dimmed = groundedAtFull && displayMax > 0.0 && displayCharges >= displayMax - FULL_EPSILON;
@@ -71,7 +95,10 @@ public record AvatarFlightHudViewModel(boolean visible,
                 displayCharges,
                 displayMax,
                 dimmed,
-                normalizeRechargeMode(rechargeMode)
+                normalizeRechargeMode(rechargeMode),
+                launchChargeVisible,
+                launchChargeRatio,
+                launchMinChargeRatio
         );
     }
 
