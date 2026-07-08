@@ -13,7 +13,18 @@ from typing import Any
 
 
 DEFAULT_PREFIX = "AF_"
-DEFAULT_PRESERVED_NODES = ("Origin",)
+DEFAULT_PRESERVED_NODES = ("Origin", "MountAnchor")
+DEFAULT_COLLISION_MODEL = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "main"
+    / "resources"
+    / "Common"
+    / "Tamework"
+    / "AvatarFlight"
+    / "Rider"
+    / "Player_MountAnchor.blockymodel"
+)
 
 
 @dataclass(frozen=True)
@@ -93,7 +104,25 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--prefix",
         default=DEFAULT_PREFIX,
-        help=f"Prefix applied to non-preserved model nodes. Default: {DEFAULT_PREFIX}.",
+        help=f"Prefix applied to namespaced model nodes. Default: {DEFAULT_PREFIX}.",
+    )
+    parser.add_argument(
+        "--rename-mode",
+        choices=("collisions", "all"),
+        default="collisions",
+        help=(
+            "Which nodes to namespace. 'collisions' only renames nodes that also exist in the "
+            "rider/player rig; 'all' renames every non-preserved node. Default: collisions."
+        ),
+    )
+    parser.add_argument(
+        "--collision-model",
+        type=Path,
+        default=DEFAULT_COLLISION_MODEL,
+        help=(
+            "Blockymodel whose node names define collision-mode rename targets. Defaults to "
+            "Tamework's fake-rider anchor model."
+        ),
     )
     parser.add_argument(
         "--preserve-node",
@@ -143,24 +172,34 @@ def generate(args: argparse.Namespace) -> GenerationResult:
     if not args.no_default_preserve:
         preserved_nodes.update(DEFAULT_PRESERVED_NODES)
 
-    model_json = read_json(source_common_model_path)
-    node_mapping = build_node_mapping(model_json, args.prefix, preserved_nodes)
-    renamed_model = copy.deepcopy(model_json)
-    rename_model_nodes(renamed_model, node_mapping)
-
     animation_paths = collect_animation_asset_paths(server_model)
     animation_outputs: dict[str, str] = {}
     generated_animations: list[GeneratedPath] = []
     warnings: list[str] = []
+    animation_jsons: dict[str, Any] = {}
     for animation_asset in animation_paths:
         output_asset = default_output_animation(animation_asset, args.animation_dir_name)
         animation_outputs[animation_asset] = output_asset
         source_animation_path = source_root / "Common" / path_from_asset(animation_asset)
-        output_animation_path = output_root / "Common" / path_from_asset(output_asset)
         if not source_animation_path.exists():
             warnings.append(f"missing animation file referenced by server model: {animation_asset}")
             continue
-        animation_json = read_json(source_animation_path)
+        animation_jsons[animation_asset] = read_json(source_animation_path)
+
+    model_json = read_json(source_common_model_path)
+    rename_candidates = resolve_rename_candidates(args, model_json, animation_jsons.values())
+    node_mapping = build_node_mapping(model_json, args.prefix, preserved_nodes, rename_candidates)
+    add_animation_only_mappings(node_mapping, animation_jsons.values(), args.prefix, preserved_nodes, rename_candidates)
+    renamed_model = copy.deepcopy(model_json)
+    rename_model_nodes(renamed_model, node_mapping)
+
+    for animation_asset in animation_paths:
+        output_asset = animation_outputs[animation_asset]
+        source_animation_path = source_root / "Common" / path_from_asset(animation_asset)
+        output_animation_path = output_root / "Common" / path_from_asset(output_asset)
+        animation_json = animation_jsons.get(animation_asset)
+        if animation_json is None:
+            continue
         renamed_animation = rename_animation_nodes(animation_json, node_mapping, warnings, animation_asset)
         write_json(output_animation_path, renamed_animation, args.overwrite)
         generated_animations.append(GeneratedPath(source_animation_path, output_animation_path, output_asset))
@@ -259,7 +298,65 @@ def normalize_asset_path(path: Path) -> str:
     return path.as_posix().lstrip("/")
 
 
-def build_node_mapping(model_json: Any, prefix: str, preserved_nodes: set[str]) -> dict[str, str]:
+def resolve_rename_candidates(
+    args: argparse.Namespace,
+    model_json: Any,
+    animation_jsons: Any,
+) -> set[str] | None:
+    if args.rename_mode == "all":
+        return None
+
+    collision_model_path = args.collision_model
+    if not collision_model_path.is_absolute():
+        collision_model_path = Path.cwd() / collision_model_path
+    collision_model_path = collision_model_path.resolve()
+    if not collision_model_path.exists():
+        raise UserError(
+            "collision-mode rename requires a readable --collision-model; "
+            f"not found: {collision_model_path}"
+        )
+    collision_model = read_json(collision_model_path)
+    collision_nodes = collect_model_node_names(collision_model)
+    source_nodes = collect_model_node_names(model_json)
+    animation_nodes: set[str] = set()
+    for animation_json in animation_jsons:
+        animation_nodes.update(collect_animation_node_names(animation_json))
+    return collision_nodes.intersection(source_nodes.union(animation_nodes))
+
+
+def collect_model_node_names(model_json: Any) -> set[str]:
+    if not isinstance(model_json, dict) or not isinstance(model_json.get("nodes"), list):
+        raise UserError("blockymodel JSON must contain a nodes array")
+    names: set[str] = set()
+
+    def visit(nodes: list[Any]) -> None:
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            name = node.get("name")
+            if isinstance(name, str) and name:
+                names.add(name)
+            children = node.get("children")
+            if isinstance(children, list):
+                visit(children)
+
+    visit(model_json["nodes"])
+    return names
+
+
+def collect_animation_node_names(animation_json: Any) -> set[str]:
+    node_animations = animation_json.get("nodeAnimations") if isinstance(animation_json, dict) else None
+    if not isinstance(node_animations, dict):
+        return set()
+    return {name for name in node_animations.keys() if isinstance(name, str) and name}
+
+
+def build_node_mapping(
+    model_json: Any,
+    prefix: str,
+    preserved_nodes: set[str],
+    rename_candidates: set[str] | None,
+) -> dict[str, str]:
     if not isinstance(model_json, dict) or not isinstance(model_json.get("nodes"), list):
         raise UserError("blockymodel JSON must contain a nodes array")
     mapping: dict[str, str] = {}
@@ -271,7 +368,7 @@ def build_node_mapping(model_json: Any, prefix: str, preserved_nodes: set[str]) 
                 continue
             name = node.get("name")
             if isinstance(name, str) and name:
-                mapped = namespaced_node_name(name, prefix, preserved_nodes)
+                mapped = namespaced_node_name(name, prefix, preserved_nodes, rename_candidates)
                 existing = reverse.get(mapped)
                 if existing is not None and existing != name:
                     raise UserError(
@@ -287,8 +384,28 @@ def build_node_mapping(model_json: Any, prefix: str, preserved_nodes: set[str]) 
     return mapping
 
 
-def namespaced_node_name(name: str, prefix: str, preserved_nodes: set[str]) -> str:
+def add_animation_only_mappings(
+    node_mapping: dict[str, str],
+    animation_jsons: Any,
+    prefix: str,
+    preserved_nodes: set[str],
+    rename_candidates: set[str] | None,
+) -> None:
+    for animation_json in animation_jsons:
+        for name in collect_animation_node_names(animation_json):
+            node_mapping.setdefault(
+                name,
+                namespaced_node_name(name, prefix, preserved_nodes, rename_candidates),
+            )
+
+
+def namespaced_node_name(name: str,
+                         prefix: str,
+                         preserved_nodes: set[str],
+                         rename_candidates: set[str] | None) -> str:
     if name in preserved_nodes or name.startswith(prefix):
+        return name
+    if rename_candidates is not None and name not in rename_candidates:
         return name
     return f"{prefix}{name}"
 

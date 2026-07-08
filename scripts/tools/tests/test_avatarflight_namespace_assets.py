@@ -16,7 +16,7 @@ def write_json(path: Path, payload: object) -> None:
 
 
 class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
-    def test_namespaces_model_animation_and_camera_while_preserving_origin(self):
+    def test_namespaces_only_rider_collisions_and_preserves_other_nodes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = root / "generated"
@@ -48,7 +48,14 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                                 {
                                     "name": "Pelvis",
                                     "children": [
-                                        {"name": "Chest", "children": [{"name": "Head"}]}
+                                        {
+                                            "name": "Chest",
+                                            "children": [
+                                                {"name": "Head"},
+                                                {"name": "MountAnchor"},
+                                                {"name": "Wing"},
+                                            ],
+                                        }
                                     ],
                                 }
                             ],
@@ -64,6 +71,9 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                         "Origin": {"position": []},
                         "Pelvis": {"orientation": []},
                         "Head": {"orientation": []},
+                        "MountAnchor": {"orientation": []},
+                        "Wing": {"orientation": []},
+                        "R-Hand": {"orientation": []},
                     },
                 },
             )
@@ -114,6 +124,8 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
             self.assertEqual("AF_Pelvis", pelvis["name"])
             self.assertEqual("AF_Chest", chest["name"])
             self.assertEqual("AF_Head", chest["children"][0]["name"])
+            self.assertEqual("MountAnchor", chest["children"][1]["name"])
+            self.assertEqual("Wing", chest["children"][2]["name"])
 
             animation = json.loads(
                 (
@@ -128,7 +140,7 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                 ).read_text()
             )
             self.assertEqual(
-                {"Origin", "AF_Pelvis", "AF_Head"},
+                {"Origin", "AF_Pelvis", "AF_Head", "MountAnchor", "Wing", "AF_R-Hand"},
                 set(animation["nodeAnimations"].keys()),
             )
 

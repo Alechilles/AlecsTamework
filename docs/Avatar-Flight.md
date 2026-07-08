@@ -60,13 +60,13 @@ Normal avatar flight does not enable the client's native `canFly` movement setti
 
 ## Fake Rider Model Variants
 
-When `RiderVisual.ShowRider` is enabled, the fake rider is attached to the transformed model. If the transformed model's animation tracks use player-like node names such as `Pelvis`, `Chest`, `Head`, `L-Arm`, or `R-Arm`, those animations can also affect the fake rider. Use the AvatarFlight namespace generator to create a model variant whose rig nodes are prefixed while `Origin` remains unchanged for Tamework's injected pitch/bank poses:
+When `RiderVisual.ShowRider` is enabled, the fake rider is attached to the transformed model. If the transformed model's animation tracks use player-like node names such as `Pelvis`, `Chest`, `Head`, `L-Arm`, or `R-Arm`, those animations can also affect the fake rider. Use the AvatarFlight namespace generator to create a model variant whose rider-colliding rig nodes are prefixed while unrelated nodes such as mount anchors are left unchanged. `Origin` remains unchanged for Tamework's injected pitch/bank poses:
 
 ```powershell
 python scripts/tools/avatarflight_namespace_assets.py --mod-root "C:\Path\To\Mod" --model-id MyDragon
 ```
 
-The script creates a `<ModelId>_AvatarFlight` server model, a copied `.blockymodel`, and copied `.blockyanim` files with matching node names. It rewrites camera target nodes and animation paths in the generated server model. Use the generated model id from `Model.ModelId` in the AvatarFlight config.
+The script creates a `<ModelId>_AvatarFlight` server model, a copied `.blockymodel`, and copied `.blockyanim` files with matching node names. By default it only renames nodes that collide with Tamework's fake-rider/player rig. Pass `--rename-mode all` only when a fully namespaced model is intentionally needed. It rewrites animation paths in the generated server model, but leaves server-model enum fields such as camera targets unchanged. Use the generated model id from `Model.ModelId` in the AvatarFlight config.
 
 ## Config Fields
 
