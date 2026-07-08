@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSkinComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -204,7 +205,7 @@ public final class AvatarFlightRiderVisualService {
                         texture,
                         savedModel.getGradientSet(),
                         savedModel.getGradientId(),
-                        equipment.hiddenCosmetics()
+                        Collections.emptySet()
                 );
         if (skinAppearance != null) {
             return withBody(
@@ -303,7 +304,7 @@ public final class AvatarFlightRiderVisualService {
                         savedModel.getTexture(),
                         savedModel.getGradientSet(),
                         savedModel.getGradientId(),
-                        equipment.hiddenCosmetics()
+                        Collections.emptySet()
                 );
         instance.getLogger().at(Level.INFO).log(String.format(
                 "TameworkAvatarFlight debug: riderAttachment baseModelAsset=%s riderModelAsset=%s "

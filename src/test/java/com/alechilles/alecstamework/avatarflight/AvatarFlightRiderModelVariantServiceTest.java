@@ -7,9 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class AvatarFlightRiderModelVariantServiceTest {
+    private static final Path SERVICE = Path.of(
+            "src", "main", "java", "com", "alechilles", "alecstamework",
+            "avatarflight", "AvatarFlightRiderModelVariantService.java"
+    );
+
     @Test
     void rewritesPlayerAnimationNodesToRiderSafeNames() {
         String rewritten = AvatarFlightRiderModelVariantService.rewriteBlockymodelJsonForRider("""
@@ -65,6 +73,15 @@ class AvatarFlightRiderModelVariantServiceTest {
         assertTrue(AvatarFlightRiderModelVariantService.isGeneratedVariant(
                 "Tamework/AvatarFlight/Rider/Equipment/Items/Armors/Iron/Chest.blockymodel"
         ));
+    }
+
+    @Test
+    void generatedVariantsRegisterThroughCommonAssetModule() throws Exception {
+        String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("new AvatarFlightGeneratedCommonAsset("));
+        assertTrue(source.contains("module.addCommonAsset(GENERATED_PACK, generatedAsset, false)"));
+        assertFalse(source.contains("CommonAssetRegistry.addCommonAsset(GENERATED_PACK, generatedAsset);\n            CommonAssetModule"));
     }
 
     private static JsonObject firstChild(JsonObject node) {

@@ -17,6 +17,10 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "avatarflight", "AvatarFlightEquipmentPacketService.java"
     );
+    private static final Path MODEL_SERVICE = Path.of(
+            "src", "main", "java", "com", "alechilles", "alecstamework",
+            "avatarflight", "AvatarFlightModelService.java"
+    );
 
     @Test
     void equipmentServiceBlanksOwnerArmorAndHandsWithoutMutatingInventory() throws Exception {
@@ -57,6 +61,16 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertFalse(source.contains("readSignature("));
         assertFalse(source.contains("writeSignature("));
         assertFalse(source.contains("queueSelf(ref, hiddenUpdate"));
+    }
+
+    @Test
+    void modelSwapUsesOwnerSafeVariantWhenOwnerEquipmentIsHidden() throws Exception {
+        String source = Files.readString(MODEL_SERVICE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("ownerEquipmentSafeModel("));
+        assertTrue(source.contains("config.getRiderVisual().isHideOwnerEquipment()"));
+        assertTrue(source.contains("AvatarFlightOwnerModelVariantService.resolveForOwner(model)"));
+        assertTrue(source.contains("ownerSafeModel"));
     }
 
     @Test

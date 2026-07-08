@@ -24,9 +24,9 @@ class AvatarFlightModelServiceArchitectureTest {
     void avatarFlightModelSwapInjectsPoseAnimationSetsIntoRuntimeModel() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("createAvatarFlightModel(modelAsset, scale, config.getAnimation())"),
+        assertTrue(source.contains("createAvatarFlightModel(modelAsset, scale, config)"),
                 "transformed avatar models should be enriched before the ModelComponent is applied");
-        assertTrue(source.contains("Model baseModel = Model.createScaledModel(modelAsset, scale)"),
+        assertTrue(source.contains("Model.createScaledModel(modelAsset, scale)"),
                 "enrichment should start from the normal scaled model so hitbox, camera, attachments, and texture stay intact");
         assertTrue(source.contains("new Model("),
                 "runtime enrichment needs a fresh Model instance so the packet cache includes injected animation sets");

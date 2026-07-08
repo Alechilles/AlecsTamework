@@ -11,55 +11,26 @@ import com.hypixel.hytale.server.core.asset.common.CommonAsset;
 import com.hypixel.hytale.server.core.asset.common.CommonAssetModule;
 import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
 import java.nio.charset.StandardCharsets;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Generates rider-safe attachment model variants so player cosmetics and armor bind to the seated rider.
+ * Generates transformed-owner model variants whose node ids cannot be reused by local player equipment visuals.
  */
-final class AvatarFlightRiderModelVariantService {
+final class AvatarFlightOwnerModelVariantService {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
-    private static final String GENERATED_PREFIX = "Tamework/AvatarFlight/Rider/Variants/";
-    private static final String LEGACY_EQUIPMENT_PREFIX = "Tamework/AvatarFlight/Rider/Equipment/";
+    private static final String GENERATED_PREFIX = "Tamework/AvatarFlight/Owner/Variants/";
     private static final String GENERATED_PACK = "Alechilles:Alec's Tamework!";
-    private static final String GENERATED_ID_PREFIX = "tw_rider_attachment_";
-    private static final Set<String> RIDER_SAFE_BIND_NODE_NAMES = Set.of(
-            "Origin",
-            "Pelvis",
-            "Belly",
-            "Chest",
-            "Neck",
-            "L-Eyelid",
-            "R-Eyelid",
-            "L-Eyelid-Bot",
-            "R-Eyelid-Bot",
-            "R-Shoulder",
-            "R-Arm",
-            "R-Forearm",
-            "R-Hand",
-            "R-Shoulder2",
-            "L-Shoulder",
-            "L-Arm",
-            "L-Forearm",
-            "L-Hand",
-            "L-Shoulder2",
-            "R-Thigh",
-            "R-Calf",
-            "R-Foot",
-            "L-Thigh",
-            "L-Calf",
-            "L-Foot"
-    );
+    private static final String GENERATED_ID_PREFIX = "tw_avatar_owner_";
     private static final ConcurrentHashMap<String, String> GENERATED_MODELS = new ConcurrentHashMap<>();
 
-    private AvatarFlightRiderModelVariantService() {
+    private AvatarFlightOwnerModelVariantService() {
     }
 
     @Nonnull
-    static String resolveForRider(@Nonnull String model) {
+    static String resolveForOwner(@Nonnull String model) {
         String normalized = normalizeCommonPath(model);
         if (normalized.isBlank() || isGeneratedVariant(normalized)) {
             return normalized;
@@ -68,7 +39,7 @@ final class AvatarFlightRiderModelVariantService {
         if (CommonAssetRegistry.hasCommonAsset(generated)) {
             return generated;
         }
-        return GENERATED_MODELS.computeIfAbsent(normalized, AvatarFlightRiderModelVariantService::generateVariant);
+        return GENERATED_MODELS.computeIfAbsent(normalized, AvatarFlightOwnerModelVariantService::generateVariant);
     }
 
     @Nonnull
@@ -81,12 +52,11 @@ final class AvatarFlightRiderModelVariantService {
     }
 
     static boolean isGeneratedVariant(@Nullable String model) {
-        String normalized = normalizeCommonPath(model);
-        return normalized.startsWith(GENERATED_PREFIX) || normalized.startsWith(LEGACY_EQUIPMENT_PREFIX);
+        return normalizeCommonPath(model).startsWith(GENERATED_PREFIX);
     }
 
     @Nonnull
-    static String rewriteBlockymodelJsonForRider(@Nonnull String json) {
+    static String rewriteBlockymodelJsonForOwner(@Nonnull String json) {
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         JsonElement nodes = root.get("nodes");
         if (nodes != null && nodes.isJsonArray()) {
@@ -104,7 +74,7 @@ final class AvatarFlightRiderModelVariantService {
         String generated = generatedVariantPath(model);
         try {
             byte[] sourceBytes = source.getBlob().join();
-            String rewritten = rewriteBlockymodelJsonForRider(new String(sourceBytes, StandardCharsets.UTF_8));
+            String rewritten = rewriteBlockymodelJsonForOwner(new String(sourceBytes, StandardCharsets.UTF_8));
             CommonAsset generatedAsset = new AvatarFlightGeneratedCommonAsset(
                     generated,
                     rewritten.getBytes(StandardCharsets.UTF_8)
@@ -144,14 +114,6 @@ final class AvatarFlightRiderModelVariantService {
             }
         }
 
-        JsonElement name = node.get("name");
-        if (name != null && name.isJsonPrimitive() && name.getAsJsonPrimitive().isString()) {
-            String value = name.getAsString();
-            if (RIDER_SAFE_BIND_NODE_NAMES.contains(value)) {
-                node.addProperty("name", "TameworkRider_" + value);
-            }
-        }
-
         JsonElement children = node.get("children");
         if (children != null && children.isJsonArray()) {
             rewriteNodes(children.getAsJsonArray());
@@ -177,7 +139,7 @@ final class AvatarFlightRiderModelVariantService {
         Tamework instance = Tamework.getInstance();
         if (instance != null && instance.getLogger() != null) {
             instance.getLogger().at(Level.WARNING).withCause(ex)
-                    .log("TameworkAvatarFlight: failed to generate rider-safe attachment model for %s", model);
+                    .log("TameworkAvatarFlight: failed to generate owner-safe transformed model for %s", model);
         }
     }
 }
