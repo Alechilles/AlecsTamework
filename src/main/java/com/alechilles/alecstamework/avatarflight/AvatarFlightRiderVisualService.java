@@ -120,6 +120,10 @@ public final class AvatarFlightRiderVisualService {
         if (attachments == null || attachments.length == 0) {
             return model;
         }
+        int riderStart = firstRiderBodyAttachmentIndex(attachments);
+        if (riderStart >= 0) {
+            return copyWithAttachments(model, Arrays.copyOf(attachments, riderStart));
+        }
         int kept = 0;
         for (ModelAttachment attachment : attachments) {
             if (!isRiderAttachment(attachment)) {
@@ -138,6 +142,15 @@ public final class AvatarFlightRiderVisualService {
             }
         }
         return copyWithAttachments(model, filtered);
+    }
+
+    private static int firstRiderBodyAttachmentIndex(@Nonnull ModelAttachment[] attachments) {
+        for (int index = 0; index < attachments.length; index++) {
+            if (isRiderBodyAttachment(attachments[index])) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     @Nullable
@@ -283,8 +296,12 @@ public final class AvatarFlightRiderVisualService {
             return false;
         }
         String model = attachment.getModel();
-        return PLAYER_MOUNT_ANCHOR_MODEL.equals(model)
+        return isRiderBodyAttachment(attachment)
                 || AvatarFlightRiderModelVariantService.isGeneratedVariant(model);
+    }
+
+    private static boolean isRiderBodyAttachment(@Nullable ModelAttachment attachment) {
+        return attachment != null && PLAYER_MOUNT_ANCHOR_MODEL.equals(attachment.getModel());
     }
 
     private static void logRiderAttachment(@Nonnull Model baseModel,

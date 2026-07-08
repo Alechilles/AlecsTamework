@@ -39,11 +39,11 @@
       "children": [
         {
           "id": "tw_rider_146",
-          "name": "TameworkRider_Origin",
+          "name": "Origin",
           "children": [
             {
               "id": "tw_rider_4",
-              "name": "TameworkRider_Pelvis",
+              "name": "Pelvis",
               "position": {
                 "x": 0,
                 "y": 0,
@@ -150,7 +150,7 @@
               "children": [
                 {
                   "id": "tw_rider_56",
-                  "name": "TameworkRider_Belly",
+                  "name": "Belly",
                   "position": {
                     "x": 0,
                     "y": 4,
@@ -257,7 +257,7 @@
                   "children": [
                     {
                       "id": "tw_rider_2",
-                      "name": "TameworkRider_Chest",
+                      "name": "Chest",
                       "position": {
                         "x": 0,
                         "y": 5,
@@ -460,7 +460,7 @@
                           "children": [
                             {
                               "id": "tw_rider_5",
-                              "name": "TameworkRider_Neck",
+                              "name": "Neck",
                               "position": {
                                 "x": 0,
                                 "y": -16,
@@ -557,7 +557,7 @@
                             },
                             {
                               "id": "tw_rider_125",
-                              "name": "TameworkRider_L-Eyelid",
+                              "name": "L-Eyelid",
                               "children": [],
                               "position": {
                                 "x": -8,
@@ -610,7 +610,7 @@
                             },
                             {
                               "id": "tw_rider_126",
-                              "name": "TameworkRider_R-Eyelid",
+                              "name": "R-Eyelid",
                               "children": [],
                               "position": {
                                 "x": 8,
@@ -663,7 +663,7 @@
                             },
                             {
                               "id": "tw_rider_137",
-                              "name": "TameworkRider_L-Eyelid-Bot",
+                              "name": "L-Eyelid-Bot",
                               "children": [],
                               "position": {
                                 "x": -8,
@@ -716,7 +716,7 @@
                             },
                             {
                               "id": "tw_rider_138",
-                              "name": "TameworkRider_R-Eyelid-Bot",
+                              "name": "R-Eyelid-Bot",
                               "children": [],
                               "position": {
                                 "x": 8,
@@ -1030,11 +1030,11 @@
                         },
                         {
                           "id": "tw_rider_145",
-                          "name": "TameworkRider_R-Shoulder",
+                          "name": "R-Shoulder",
                           "children": [
                             {
                               "id": "tw_rider_35",
-                              "name": "TameworkRider_R-Arm",
+                              "name": "R-Arm",
                               "position": {
                                 "x": 0,
                                 "y": 0,
@@ -1141,7 +1141,7 @@
                               "children": [
                                 {
                                   "id": "tw_rider_36",
-                                  "name": "TameworkRider_R-Forearm",
+                                  "name": "R-Forearm",
                                   "position": {
                                     "x": 0,
                                     "y": -10,
@@ -1248,7 +1248,7 @@
                                   "children": [
                                     {
                                       "id": "tw_rider_37",
-                                      "name": "TameworkRider_R-Hand",
+                                      "name": "R-Hand",
                                       "position": {
                                         "x": 1E-06,
                                         "y": -8.000005,
@@ -1396,7 +1396,7 @@
                                 },
                                 {
                                   "id": "tw_rider_148",
-                                  "name": "TameworkRider_R-Shoulder2",
+                                  "name": "R-Shoulder2",
                                   "children": [],
                                   "position": {
                                     "x": 0,
@@ -1469,19 +1469,19 @@
                         },
                         {
                           "id": "tw_rider_144",
-                          "name": "TameworkRider_L-Shoulder",
+                          "name": "L-Shoulder",
                           "children": [
                             {
                               "id": "tw_rider_139",
-                              "name": "TameworkRider_L-Arm",
+                              "name": "L-Arm",
                               "children": [
                                 {
                                   "id": "tw_rider_140",
-                                  "name": "TameworkRider_L-Forearm",
+                                  "name": "L-Forearm",
                                   "children": [
                                     {
                                       "id": "tw_rider_141",
-                                      "name": "TameworkRider_L-Hand",
+                                      "name": "L-Hand",
                                       "children": [
                                         {
                                           "id": "tw_rider_142",
@@ -1732,7 +1732,7 @@
                                 },
                                 {
                                   "id": "tw_rider_149",
-                                  "name": "TameworkRider_L-Shoulder2",
+                                  "name": "L-Shoulder2",
                                   "children": [],
                                   "position": {
                                     "x": 0,
@@ -1949,7 +1949,7 @@
                 },
                 {
                   "id": "tw_rider_8",
-                  "name": "TameworkRider_R-Thigh",
+                  "name": "R-Thigh",
                   "position": {
                     "x": -7.5,
                     "y": -1,
@@ -2045,7 +2045,7 @@
                   "children": [
                     {
                       "id": "tw_rider_9",
-                      "name": "TameworkRider_R-Calf",
+                      "name": "R-Calf",
                       "position": {
                         "x": 0,
                         "y": -10,
@@ -2152,7 +2152,7 @@
                       "children": [
                         {
                           "id": "tw_rider_10",
-                          "name": "TameworkRider_R-Foot",
+                          "name": "R-Foot",
                           "position": {
                             "x": 0,
                             "y": -10,
@@ -2264,7 +2264,7 @@
                 },
                 {
                   "id": "tw_rider_25",
-                  "name": "TameworkRider_L-Thigh",
+                  "name": "L-Thigh",
                   "position": {
                     "x": 7.5,
                     "y": -1,
@@ -2360,7 +2360,7 @@
                   "children": [
                     {
                       "id": "tw_rider_26",
-                      "name": "TameworkRider_L-Calf",
+                      "name": "L-Calf",
                       "position": {
                         "x": 0,
                         "y": -10,
@@ -2467,7 +2467,7 @@
                       "children": [
                         {
                           "id": "tw_rider_27",
-                          "name": "TameworkRider_L-Foot",
+                          "name": "L-Foot",
                           "position": {
                             "x": 0,
                             "y": -10,

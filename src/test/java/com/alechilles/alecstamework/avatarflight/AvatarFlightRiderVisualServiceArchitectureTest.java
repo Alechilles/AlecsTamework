@@ -42,6 +42,8 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("appearanceAttachments"));
         assertTrue(source.contains("equipment.attachments()"));
         assertTrue(source.contains("modelWithoutRiderAttachments("));
+        assertTrue(source.contains("firstRiderBodyAttachmentIndex("));
+        assertTrue(source.contains("Arrays.copyOf(attachments, riderStart)"));
         assertTrue(source.contains("riderSafeAttachments("));
         assertTrue(source.contains("AvatarFlightRiderModelVariantService.isGeneratedVariant(model)"));
         assertFalse(source.contains("PLAYER_ARMOR_ANCHOR_MODEL"));
@@ -84,7 +86,7 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
 
         assertTrue(json.contains("\"name\": \"MountAnchor\""));
         assertTrue(json.contains("\"isPiece\": true"));
-        assertTrue(json.contains("\"name\": \"TameworkRider_Origin\""));
+        assertTrue(json.contains("\"name\": \"Origin\""));
         assertTrue(json.contains("\"id\": \"tw_rider_146\""));
         assertTrue(json.contains("\"name\": \"R-Attachment\""));
         assertTrue(json.contains("\"name\": \"L-Attachment\""));
@@ -92,12 +94,12 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
                 "the fake rider should keep the standard head node so player look tracking can still affect it");
         assertFalse(json.matches("(?s).*\"id\"\\s*:\\s*\"[0-9]+\".*"),
                 "fake rider node ids must be namespaced so player/flight animation tracks cannot target them by id");
-        assertFalse(json.contains("\"name\": \"Origin\""));
-        assertFalse(json.contains("\"name\": \"Pelvis\""));
-        assertFalse(json.contains("\"name\": \"Chest\""));
-        assertFalse(json.contains("\"name\": \"L-Thigh\""));
-        assertFalse(json.contains("\"name\": \"R-Thigh\""));
-        int pelvis = json.indexOf("\"name\": \"TameworkRider_Pelvis\"");
+        assertFalse(json.contains("\"name\": \"TameworkRider_"));
+        assertTrue(json.contains("\"name\": \"Pelvis\""));
+        assertTrue(json.contains("\"name\": \"Chest\""));
+        assertTrue(json.contains("\"name\": \"L-Thigh\""));
+        assertTrue(json.contains("\"name\": \"R-Thigh\""));
+        int pelvis = json.indexOf("\"name\": \"Pelvis\"");
         int pelvisOrientation = json.indexOf("\"orientation\"", pelvis);
         assertTrue(pelvis >= 0);
         assertTrue(json.indexOf("\"y\": 0", pelvis) < pelvisOrientation);

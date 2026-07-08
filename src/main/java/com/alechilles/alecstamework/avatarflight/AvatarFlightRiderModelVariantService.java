@@ -1,182 +1,26 @@
 package com.alechilles.alecstamework.avatarflight;
 
-import com.alechilles.alecstamework.Tamework;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.hypixel.hytale.server.core.asset.common.CommonAsset;
-import com.hypixel.hytale.server.core.asset.common.CommonAssetModule;
-import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
-import java.nio.charset.StandardCharsets;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Generates rider-safe attachment model variants so player cosmetics and armor bind to the seated rider.
+ * Resolves rider attachment model paths without creating runtime common assets.
  */
 final class AvatarFlightRiderModelVariantService {
-    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final String GENERATED_PREFIX = "Tamework/AvatarFlight/Rider/Variants/";
     private static final String LEGACY_EQUIPMENT_PREFIX = "Tamework/AvatarFlight/Rider/Equipment/";
-    private static final String GENERATED_PACK = "Alechilles:Alec's Tamework!";
-    private static final String GENERATED_ID_PREFIX = "tw_rider_attachment_";
-    private static final long GENERATED_ASSET_MIN_INTERVAL_MS = 250L;
-    private static final Set<String> RIDER_SAFE_BIND_NODE_NAMES = Set.of(
-            "Origin",
-            "Pelvis",
-            "Belly",
-            "Chest",
-            "Neck",
-            "L-Eyelid",
-            "R-Eyelid",
-            "L-Eyelid-Bot",
-            "R-Eyelid-Bot",
-            "R-Shoulder",
-            "R-Arm",
-            "R-Forearm",
-            "R-Hand",
-            "R-Shoulder2",
-            "L-Shoulder",
-            "L-Arm",
-            "L-Forearm",
-            "L-Hand",
-            "L-Shoulder2",
-            "R-Thigh",
-            "R-Calf",
-            "R-Foot",
-            "L-Thigh",
-            "L-Calf",
-            "L-Foot"
-    );
-    private static final Set<String> FAILED_MODELS = ConcurrentHashMap.newKeySet();
-    private static final AtomicLong NEXT_GENERATION_AT_MS = new AtomicLong();
 
     private AvatarFlightRiderModelVariantService() {
     }
 
     @Nonnull
     static String resolveForRider(@Nonnull String model) {
-        String normalized = normalizeCommonPath(model);
-        if (normalized.isBlank() || isGeneratedVariant(normalized)) {
-            return normalized;
-        }
-        String generated = generatedVariantPath(normalized);
-        if (CommonAssetRegistry.hasCommonAsset(generated)) {
-            return generated;
-        }
-        maybeGenerateVariant(normalized);
-        return normalized;
-    }
-
-    @Nonnull
-    static String generatedVariantPath(@Nonnull String model) {
-        String normalized = normalizeCommonPath(model);
-        if (isGeneratedVariant(normalized)) {
-            return normalized;
-        }
-        return GENERATED_PREFIX + normalized;
+        return normalizeCommonPath(model);
     }
 
     static boolean isGeneratedVariant(@Nullable String model) {
         String normalized = normalizeCommonPath(model);
         return normalized.startsWith(GENERATED_PREFIX) || normalized.startsWith(LEGACY_EQUIPMENT_PREFIX);
-    }
-
-    @Nonnull
-    static String rewriteBlockymodelJsonForRider(@Nonnull String json) {
-        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        JsonElement nodes = root.get("nodes");
-        if (nodes != null && nodes.isJsonArray()) {
-            rewriteNodes(nodes.getAsJsonArray());
-        }
-        return GSON.toJson(root);
-    }
-
-    @Nonnull
-    private static String generateVariant(@Nonnull String model) {
-        CommonAsset source = CommonAssetRegistry.getByName(model);
-        if (source == null) {
-            return model;
-        }
-        String generated = generatedVariantPath(model);
-        try {
-            byte[] sourceBytes = source.getBlob().join();
-            String rewritten = rewriteBlockymodelJsonForRider(new String(sourceBytes, StandardCharsets.UTF_8));
-            CommonAsset generatedAsset = new AvatarFlightGeneratedCommonAsset(
-                    generated,
-                    rewritten.getBytes(StandardCharsets.UTF_8)
-            );
-            registerGeneratedAsset(generatedAsset);
-            return generated;
-        } catch (RuntimeException ex) {
-            warnFailedVariant(model, ex);
-            return model;
-        }
-    }
-
-    private static void maybeGenerateVariant(@Nonnull String model) {
-        if (FAILED_MODELS.contains(model)) {
-            return;
-        }
-
-        long now = System.currentTimeMillis();
-        long next = NEXT_GENERATION_AT_MS.get();
-        if (now < next || !NEXT_GENERATION_AT_MS.compareAndSet(next, now + GENERATED_ASSET_MIN_INTERVAL_MS)) {
-            return;
-        }
-
-        String generated = generateVariant(model);
-        if (!isGeneratedVariant(generated)) {
-            FAILED_MODELS.add(model);
-        }
-    }
-
-    private static void registerGeneratedAsset(@Nonnull CommonAsset generatedAsset) {
-        CommonAssetModule module = CommonAssetModule.get();
-        if (module != null) {
-            module.addCommonAsset(GENERATED_PACK, generatedAsset, false);
-            return;
-        }
-        CommonAssetRegistry.addCommonAsset(GENERATED_PACK, generatedAsset);
-    }
-
-    private static void rewriteNodes(@Nonnull JsonArray nodes) {
-        for (JsonElement element : nodes) {
-            if (!element.isJsonObject()) {
-                continue;
-            }
-            rewriteNode(element.getAsJsonObject());
-        }
-    }
-
-    private static void rewriteNode(@Nonnull JsonObject node) {
-        JsonElement id = node.get("id");
-        if (id != null && id.isJsonPrimitive() && id.getAsJsonPrimitive().isString()) {
-            String value = id.getAsString();
-            if (!value.startsWith(GENERATED_ID_PREFIX)) {
-                node.addProperty("id", GENERATED_ID_PREFIX + value);
-            }
-        }
-
-        JsonElement name = node.get("name");
-        if (name != null && name.isJsonPrimitive() && name.getAsJsonPrimitive().isString()) {
-            String value = name.getAsString();
-            if (RIDER_SAFE_BIND_NODE_NAMES.contains(value)) {
-                node.addProperty("name", "TameworkRider_" + value);
-            }
-        }
-
-        JsonElement children = node.get("children");
-        if (children != null && children.isJsonArray()) {
-            rewriteNodes(children.getAsJsonArray());
-        }
     }
 
     @Nonnull
@@ -194,11 +38,4 @@ final class AvatarFlightRiderModelVariantService {
         return normalized;
     }
 
-    private static void warnFailedVariant(@Nonnull String model, @Nonnull RuntimeException ex) {
-        Tamework instance = Tamework.getInstance();
-        if (instance != null && instance.getLogger() != null) {
-            instance.getLogger().at(Level.WARNING).withCause(ex)
-                    .log("TameworkAvatarFlight: failed to generate rider-safe attachment model for %s", model);
-        }
-    }
 }
