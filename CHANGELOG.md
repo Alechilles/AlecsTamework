@@ -27,6 +27,7 @@
 - Avatar-flight charged launch now defaults to holding crouch on the ground instead of holding jump, keeping airborne crouch as direct descent once no grounded launch charge is active.
 
 ### Fixed
+- Fixed transformed avatar flight sending hidden-equipment updates back to the local owner client every tick, removing a crash-adjacent warning loop seen when moving as the NordicDrake.
 - Fixed avatar flight input capture so stale movement-state fallback no longer makes jump, crouch, or sprint appear held after the packet state is gone.
 - Fixed Dragon Reins airbraking so right-click takes priority over forward input, damps horizontal and vertical velocity toward hover, and avatar flight pitch trading continues while gliding on existing momentum.
 - Tuned Dragon Reins airbraking to slow down more gradually, and forced avatar flight movement states so hovering, normal flight, and shift-boost flight can use flying animations instead of fall animation.

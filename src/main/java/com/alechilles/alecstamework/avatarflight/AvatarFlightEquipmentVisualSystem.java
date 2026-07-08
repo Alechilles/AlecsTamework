@@ -92,8 +92,8 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
                 accessor,
                 settings
         );
-        queueAll(ref, update, visible.visibleTo);
-        queueAll(ref, update, visible.newlyVisibleTo);
+        queueAllExceptSelf(ref, update, visible.visibleTo);
+        queueAllExceptSelf(ref, update, visible.newlyVisibleTo);
     }
 
     private void refreshRiderVisualIfNeeded(
@@ -144,6 +144,18 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
                                  @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
         for (EntityTrackerSystems.EntityViewer viewer : visibleTo.values()) {
             viewer.queueUpdate(ref, update);
+        }
+    }
+
+    private static void queueAllExceptSelf(
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull EquipmentUpdate update,
+            @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
+        for (Map.Entry<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> entry : visibleTo.entrySet()) {
+            if (ref.equals(entry.getKey())) {
+                continue;
+            }
+            entry.getValue().queueUpdate(ref, update);
         }
     }
 
