@@ -90,7 +90,7 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                 (output / "Server" / "Models" / "Creature" / "Dragon_AvatarFlight.json").read_text()
             )
             self.assertEqual("NPC/Test/Dragon/Models/Model_AvatarFlight.blockymodel", server_model["Model"])
-            self.assertEqual(["AF_Head"], server_model["Camera"]["Pitch"]["TargetNodes"])
+            self.assertEqual(["Head"], server_model["Camera"]["Pitch"]["TargetNodes"])
             self.assertEqual(
                 "NPC/Test/Dragon/Animations/AvatarFlight/Fly.blockyanim",
                 server_model["AnimationSets"]["Fly"]["Animations"][0]["Animation"],

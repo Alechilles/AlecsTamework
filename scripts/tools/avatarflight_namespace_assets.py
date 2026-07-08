@@ -168,8 +168,7 @@ def generate(args: argparse.Namespace) -> GenerationResult:
     generated_server_model = rewrite_server_model(
         server_model,
         output_common_model_asset,
-        animation_outputs,
-        node_mapping,
+        animation_outputs
     )
     output_server_model_path = (
         output_root
@@ -363,9 +362,8 @@ def rewrite_server_model(
     server_model: Any,
     output_common_model_asset: str,
     animation_outputs: dict[str, str],
-    node_mapping: dict[str, str],
 ) -> Any:
-    rewritten = exact_string_replace(copy.deepcopy(server_model), node_mapping)
+    rewritten = copy.deepcopy(server_model)
     rewritten["Model"] = output_common_model_asset
     animation_sets = rewritten.get("AnimationSets")
     if not isinstance(animation_sets, dict):
@@ -387,16 +385,6 @@ def rewrite_server_model(
             if output_asset is not None:
                 animation["Animation"] = output_asset
     return rewritten
-
-
-def exact_string_replace(value: Any, replacements: dict[str, str]) -> Any:
-    if isinstance(value, str):
-        return replacements.get(value, value)
-    if isinstance(value, list):
-        return [exact_string_replace(item, replacements) for item in value]
-    if isinstance(value, dict):
-        return {key: exact_string_replace(item, replacements) for key, item in value.items()}
-    return value
 
 
 def print_summary(result: GenerationResult) -> None:
