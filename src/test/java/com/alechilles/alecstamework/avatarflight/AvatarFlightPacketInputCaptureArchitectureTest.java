@@ -95,11 +95,22 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
     void clientFlyingToggleCanQueueAirborneJumpActivation() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("flight.getMode() == AvatarFlightMode.GROUNDED && packetStates.flying && !grounded"),
+        int flyingToggleIndex = source.indexOf("flight.getMode() == AvatarFlightMode.GROUNDED && packetStates.flying");
+        int airborneGateIndex = source.indexOf("if (!grounded)", flyingToggleIndex);
+        int queueIndex = source.indexOf("input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs())",
+                flyingToggleIndex);
+        int cancelIndex = source.indexOf("Player.applyMovementStates(ref, new SavedMovementStates(false), movementStates, store)",
+                flyingToggleIndex);
+
+        assertTrue(flyingToggleIndex >= 0,
                 "client canFly double-jump reports flying=true rather than a second raw jump state");
+        assertTrue(airborneGateIndex > flyingToggleIndex,
+                "grounded native flying toggles must be cancelled without activating avatar flight");
+        assertTrue(queueIndex > airborneGateIndex,
+                "only airborne creative-style flight toggles should feed the delayed explicit entry path");
         assertTrue(source.contains("input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs())"),
                 "creative-style flight toggles must feed the same delayed explicit airborne entry path");
-        assertTrue(source.contains("Player.applyMovementStates(ref, new SavedMovementStates(false), movementStates, store)"),
+        assertTrue(cancelIndex > flyingToggleIndex,
                 "native client flying must be cancelled immediately so custom avatar flight owns movement");
     }
 

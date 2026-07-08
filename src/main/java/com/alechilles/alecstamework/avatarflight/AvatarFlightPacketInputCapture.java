@@ -113,8 +113,10 @@ public final class AvatarFlightPacketInputCapture {
                     config.getInput().getAirborneJumpActivationDelayMs());
             input.setCrouching(!suppressLaunchCrouch && crouchHeld);
             input.updateSprinting(packetStates.sprinting, now);
-            if (flight.getMode() == AvatarFlightMode.GROUNDED && packetStates.flying && !grounded) {
-                input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs());
+            if (flight.getMode() == AvatarFlightMode.GROUNDED && packetStates.flying) {
+                if (!grounded) {
+                    input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs());
+                }
                 Player.applyMovementStates(ref, new SavedMovementStates(false), movementStates, store);
             }
         }

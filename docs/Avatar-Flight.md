@@ -56,7 +56,7 @@ While grounded and holding the charged launch input, the compact avatar-flight H
 
 Use `/tw debugdragonflight inputprobe on` or `/tw debugplayerinput on` for input logs without changing player movement capability. `/tw debugdragonflight flightprobe on` is a separate client-flight capability probe and can change native movement states, so it should not be used for normal launch tuning unless client flight behavior is the thing being tested.
 
-Avatar flight briefly enables the client's `canFly` movement setting only while the transformed player is grounded/waiting for explicit airborne activation. Hytale exposes creative-style double-jump through the client `flying` movement state instead of a second raw jump state; Tamework queues avatar-flight entry from that transition, immediately cancels native client flying, and disables the capability once custom flight movement starts.
+Avatar flight briefly enables the client's `canFly` movement setting only while the transformed player is grounded/waiting for explicit airborne activation. Hytale exposes creative-style double-jump through the client `flying` movement state instead of a second raw jump state; Tamework cancels that native client flying flag whenever it appears during grounded avatar mode, and only queues avatar-flight entry when the toggle arrives after the configured airborne delay. The capability is disabled once custom flight movement starts.
 
 ## Config Fields
 

@@ -73,6 +73,7 @@
 - Fixed avatar-flight airborne jump activation so a normal jump press observed shortly after takeoff is ignored until the configurable post-takeoff delay has elapsed.
 - Fixed avatar-flight double-jump activation so stateless movement packets no longer reset the airborne jump timing before the explicit airborne jump press is consumed.
 - Fixed avatar-flight double-jump activation by briefly enabling the grounded client flight capability, reading Hytale's `flying` toggle as the explicit airborne entry signal, and cancelling native flight before custom movement takes over.
+- Fixed fast avatar-flight double taps so native creative-style flight is cancelled even when Hytale reports the toggle before the airborne activation delay is satisfied.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.
