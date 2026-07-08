@@ -29,9 +29,9 @@
       ]
     }
   },
-  "Model": "Items/Tamework/FlightmasterReins/Flightmaster_Reins.blockymodel",
-  "Texture": "Items/Tamework/FlightmasterReins/Flightmaster_Reins_Texture.png",
-  "Icon": "Icons/ItemsGenerated/Flightmaster_Reins.png",
+  "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
+  "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
   "IconProperties": {
     "Scale": 0.82,
     "Translation": [
