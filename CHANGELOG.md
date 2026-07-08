@@ -27,7 +27,7 @@
 - Avatar-flight charged launch now defaults to holding crouch on the ground instead of holding jump, keeping airborne crouch as direct descent once no grounded launch charge is active.
 
 ### Fixed
-- Fixed transformed avatar flight leaving a local-only copy of the owner's armor floating under the dragon after remote armor hiding was corrected.
+- Fixed transformed avatar flight leaving a local-only copy of the owner's armor floating under the dragon after mounting or toggling armor visibility.
 - Fixed experimental avatar-flight fake rider attachments to keep original model paths for player clothing, armor, and third-party equipment instead of generating runtime rider asset variants that could crash other clients.
 - Fixed transformed avatar flight sending hidden-equipment updates back to the local owner client every tick, removing a crash-adjacent warning loop seen when moving as the NordicDrake.
 - Fixed avatar flight input capture so stale movement-state fallback no longer makes jump, crouch, or sprint appear held after the packet state is gone.

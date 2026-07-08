@@ -87,14 +87,15 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
             @Nonnull CommandBuffer<EntityStore> commandBuffer,
             @Nonnull EntityTrackerSystems.Visible visible,
             @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
-        EquipmentUpdate update = AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate(
+        EquipmentUpdate update = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(
                 ref,
-                commandBuffer,
-                settings
+                commandBuffer
         );
+        String sourceSignature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
+        AvatarFlightEquipmentPacketService.applyHiddenOwnerEquipment(update, settings);
         queueAllExceptSelf(ref, update, visible.visibleTo);
         queueAllExceptSelf(ref, update, visible.newlyVisibleTo);
-        queueSelfIfHiddenOwnerEquipmentChanged(ref, commandBuffer, visible, update);
+        queueSelfIfHiddenOwnerEquipmentChanged(ref, commandBuffer, visible, update, sourceSignature);
     }
 
     private void refreshRiderVisualIfNeeded(
@@ -164,13 +165,15 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
             @Nonnull Ref<EntityStore> ref,
             @Nonnull CommandBuffer<EntityStore> commandBuffer,
             @Nonnull EntityTrackerSystems.Visible visible,
-            @Nonnull EquipmentUpdate update) {
+            @Nonnull EquipmentUpdate update,
+            @Nonnull String sourceSignature) {
         AvatarFlightRiderVisualComponent visual = commandBuffer.getComponent(ref, visualType);
         if (visual == null || visual.isRiderEntity()) {
             return;
         }
         String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update);
-        if (signature.equals(visual.getHiddenOwnerEquipmentSignature())) {
+        if (signature.equals(visual.getHiddenOwnerEquipmentSignature())
+                && sourceSignature.equals(visual.getHiddenOwnerSourceEquipmentSignature())) {
             return;
         }
         if (!queueSelf(ref, update, visible.visibleTo) && !queueSelf(ref, update, visible.newlyVisibleTo)) {
@@ -178,6 +181,7 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         }
         AvatarFlightRiderVisualComponent updated = visual.clone();
         updated.setHiddenOwnerEquipmentSignature(signature);
+        updated.setHiddenOwnerSourceEquipmentSignature(sourceSignature);
         commandBuffer.putComponent(ref, visualType, updated);
     }
 

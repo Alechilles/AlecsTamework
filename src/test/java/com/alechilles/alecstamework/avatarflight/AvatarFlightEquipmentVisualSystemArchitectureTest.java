@@ -38,8 +38,8 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertTrue(source.contains("TwAvatarFlightConfig.resolve(flight.getConfigId())"));
         assertTrue(source.contains("config.getRiderVisual()"));
         assertTrue(source.contains("settings.isHideOwnerEquipment()"));
-        assertTrue(source.contains("AvatarFlightEquipmentPacketService.createHiddenOwnerEquipmentUpdate("));
         assertTrue(source.contains("AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate("));
+        assertTrue(source.contains("AvatarFlightEquipmentPacketService.applyHiddenOwnerEquipment(update, settings)"));
         assertTrue(source.contains("refreshRiderVisualIfNeeded(ref, commandBuffer, settings)"));
     }
 
@@ -51,10 +51,13 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertTrue(source.contains("queueAllExceptSelf(ref, update, visible.visibleTo)"));
         assertTrue(source.contains("queueAllExceptSelf(ref, update, visible.newlyVisibleTo)"));
         assertTrue(source.contains("if (ref.equals(entry.getKey()))"));
-        assertTrue(source.contains("queueSelfIfHiddenOwnerEquipmentChanged(ref, commandBuffer, visible, update)"));
-        assertTrue(source.contains("AvatarFlightEquipmentPacketService.equipmentSignature(update)"));
+        assertTrue(source.contains("String sourceSignature = AvatarFlightEquipmentPacketService.equipmentSignature(update)"));
+        assertTrue(source.contains("queueSelfIfHiddenOwnerEquipmentChanged(ref, commandBuffer, visible, update, sourceSignature)"));
+        assertTrue(source.contains("String signature = AvatarFlightEquipmentPacketService.equipmentSignature(update)"));
         assertTrue(source.contains("visual.getHiddenOwnerEquipmentSignature()"));
+        assertTrue(source.contains("visual.getHiddenOwnerSourceEquipmentSignature()"));
         assertTrue(source.contains("updated.setHiddenOwnerEquipmentSignature(signature)"));
+        assertTrue(source.contains("updated.setHiddenOwnerSourceEquipmentSignature(sourceSignature)"));
         assertTrue(source.contains("commandBuffer.putComponent(ref, visualType, updated)"));
         assertTrue(source.contains("EntityTrackerSystems.EntityViewer viewer = visibleTo.get(ref)"));
         assertTrue(source.contains("visualType"));
