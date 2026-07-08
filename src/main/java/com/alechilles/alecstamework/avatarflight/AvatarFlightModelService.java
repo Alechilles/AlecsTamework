@@ -41,7 +41,7 @@ public final class AvatarFlightModelService {
         }
         float scale = clampScale(modelAsset, (float) modelSettings.getScale());
         store.putComponent(ref, ModelComponent.getComponentType(),
-                new ModelComponent(createAvatarFlightModel(modelAsset, scale, config)));
+                new ModelComponent(createAvatarFlightModel(modelAsset, scale, config.getAnimation())));
         return true;
     }
 
@@ -93,9 +93,8 @@ public final class AvatarFlightModelService {
     @Nonnull
     private static Model createAvatarFlightModel(@Nonnull ModelAsset modelAsset,
                                                  float scale,
-                                                 @Nonnull TwAvatarFlightConfig config) {
-        Model baseModel = ownerEquipmentSafeModel(Model.createScaledModel(modelAsset, scale), config);
-        TwAvatarFlightConfig.AnimationSettings animation = config.getAnimation();
+                                                 @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
+        Model baseModel = Model.createScaledModel(modelAsset, scale);
         if (!animation.isPoseAnimationsEnabled()) {
             return baseModel;
         }
@@ -115,46 +114,6 @@ public final class AvatarFlightModelService {
                 baseModel.getSittingOffset(),
                 baseModel.getSleepingOffset(),
                 enrichedAnimations,
-                baseModel.getCamera(),
-                baseModel.getLight(),
-                baseModel.getParticles(),
-                baseModel.getTrails(),
-                baseModel.getPhysicsValues(),
-                baseModel.getDetailBoxes(),
-                baseModel.getPhobia(),
-                baseModel.getPhobiaModelAssetId()
-        );
-    }
-
-    @Nonnull
-    private static Model ownerEquipmentSafeModel(@Nonnull Model baseModel,
-                                                 @Nonnull TwAvatarFlightConfig config) {
-        if (!config.getRiderVisual().isHideOwnerEquipment()) {
-            return baseModel;
-        }
-        String model = baseModel.getModel();
-        if (model == null || model.isBlank()) {
-            return baseModel;
-        }
-        String ownerSafeModel = AvatarFlightOwnerModelVariantService.resolveForOwner(model);
-        if (ownerSafeModel.equals(model)) {
-            return baseModel;
-        }
-        return new Model(
-                baseModel.getModelAssetId(),
-                baseModel.getScale(),
-                baseModel.getRandomAttachmentIds(),
-                baseModel.getAttachments(),
-                baseModel.getBoundingBox(),
-                ownerSafeModel,
-                baseModel.getTexture(),
-                baseModel.getGradientSet(),
-                baseModel.getGradientId(),
-                baseModel.getEyeHeight(),
-                baseModel.getCrouchOffset(),
-                baseModel.getSittingOffset(),
-                baseModel.getSleepingOffset(),
-                baseModel.getAnimationSetMap(),
                 baseModel.getCamera(),
                 baseModel.getLight(),
                 baseModel.getParticles(),

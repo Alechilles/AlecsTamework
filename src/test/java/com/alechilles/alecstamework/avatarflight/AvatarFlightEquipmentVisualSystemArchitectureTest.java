@@ -17,10 +17,6 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "avatarflight", "AvatarFlightEquipmentPacketService.java"
     );
-    private static final Path MODEL_SERVICE = Path.of(
-            "src", "main", "java", "com", "alechilles", "alecstamework",
-            "avatarflight", "AvatarFlightModelService.java"
-    );
 
     @Test
     void equipmentServiceBlanksOwnerArmorAndHandsWithoutMutatingInventory() throws Exception {
@@ -64,13 +60,20 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void modelSwapUsesOwnerSafeVariantWhenOwnerEquipmentIsHidden() throws Exception {
-        String source = Files.readString(MODEL_SERVICE, StandardCharsets.UTF_8);
+    void ownerEquipmentHidingDoesNotGenerateRuntimeModelVariants() throws Exception {
+        assertFalse(Files.exists(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework",
+                "avatarflight", "AvatarFlightOwnerModelVariantService.java"
+        )));
 
-        assertTrue(source.contains("ownerEquipmentSafeModel("));
-        assertTrue(source.contains("config.getRiderVisual().isHideOwnerEquipment()"));
-        assertTrue(source.contains("AvatarFlightOwnerModelVariantService.resolveForOwner(model)"));
-        assertTrue(source.contains("ownerSafeModel"));
+        String source = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework",
+                "avatarflight", "AvatarFlightModelService.java"
+        ), StandardCharsets.UTF_8);
+
+        assertFalse(source.contains("AvatarFlightOwnerModelVariantService"));
+        assertFalse(source.contains("Owner/Variants"));
+        assertFalse(source.contains("ownerEquipmentSafeModel("));
     }
 
     @Test

@@ -27,7 +27,7 @@
 - Avatar-flight charged launch now defaults to holding crouch on the ground instead of holding jump, keeping airborne crouch as direct descent once no grounded launch charge is active.
 
 ### Fixed
-- Fixed transformed avatar flight equipment hiding so the owner client uses an equipment-safe transformed model variant instead of receiving local-player equipment packets, and registered generated rider/owner model variants as in-memory common assets so other clients can load the fake-rider clothing, face, and armor attachments.
+- Fixed generated fake-rider model variants to register as in-memory common assets so other clients can load rider clothing, face, and armor attachments.
 - Fixed transformed avatar flight sending hidden-equipment updates back to the local owner client every tick, removing a crash-adjacent warning loop seen when moving as the NordicDrake.
 - Fixed avatar flight input capture so stale movement-state fallback no longer makes jump, crouch, or sprint appear held after the packet state is gone.
 - Fixed Dragon Reins airbraking so right-click takes priority over forward input, damps horizontal and vertical velocity toward hover, and avatar flight pitch trading continues while gliding on existing momentum.
