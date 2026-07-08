@@ -103,7 +103,7 @@ public final class AvatarFlightPacketInputCapture {
                 && (input.isLaunchCharging() || input.getLaunchReleasedAtMs() != 0L || (grounded && jumpHeld));
         boolean suppressLaunchCrouch = crouchHoldLaunchInput
                 && (input.isLaunchCharging() || input.getLaunchReleasedAtMs() != 0L || (grounded && crouchHeld));
-        input.setJumping(!suppressLaunchJump && jumpHeld);
+        input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded);
         input.setCrouching(!suppressLaunchCrouch && crouchHeld);
         input.updateSprinting(packetStates != null && packetStates.sprinting, now);
         input.setOnGround(grounded);

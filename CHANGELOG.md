@@ -65,6 +65,7 @@
 - Added runtime-generated rider-safe armor model variants for the experimental avatar-flight fake rider, so equipped armor can bind to the seated rider without inheriting transformed-player animation tracks.
 - Fixed experimental avatar-flight fake rider clothing and armor visibility refreshes so hidden armor no longer keeps suppressing the rider's underlying clothes, and rider clothing attachments use rider-safe model variants instead of binding to the transformed dragon.
 - Fixed charged avatar-flight launch so stateless movement packets no longer break a held ground charge into tiny failed releases after the first takeoff.
+- Fixed avatar-flight activation so normal ground jumps and short drops stay in native movement until the player uses a charged launch or presses jump after already airborne.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.

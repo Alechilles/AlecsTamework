@@ -80,6 +80,25 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
+    void airborneJumpActivationQueuesOnlyForFreshAirbornePress() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.updateJumping(true, 1_000L, true);
+        input.clearTransientVerticalIntent();
+        input.updateJumping(true, 1_100L, false);
+
+        assertFalse(input.consumeAirborneJumpPress(1_150L, 1_000L),
+                "holding jump from a normal ground jump must not activate avatar flight after leaving the ground");
+
+        input.updateJumping(false, 1_200L, false);
+        input.updateJumping(true, 1_300L, false);
+
+        assertTrue(input.consumeAirborneJumpPress(1_350L, 1_000L),
+                "pressing jump after already airborne should queue one explicit avatar-flight entry/flap");
+        assertFalse(input.consumeAirborneJumpPress(1_350L, 1_000L));
+    }
+
+    @Test
     void staleSprintBoostIsConsumedWithoutApplying() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
 

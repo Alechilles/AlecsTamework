@@ -7,6 +7,7 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
 - Holding crouch on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
+- Avatar flight starts only from a charged launch release or a fresh jump press after the player is already airborne. Normal ground jumps and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight.
 - Left-click with Flightmaster's Reins performs an upward flap.
 - Right-click with Flightmaster's Reins applies the airbrake.
 - Q with Flightmaster's Reins performs a forward boost.

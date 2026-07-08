@@ -55,6 +55,7 @@ public final class AvatarFlightController {
         boolean jumpIntent = (input.jump() || input.verticalAxis() > 0.0) && input.flapAllowed();
         boolean descendIntent = input.crouch() || input.verticalAxis() < 0.0;
         boolean explicitAirbrakeIntent = input.airbrake();
+        boolean activeFlight = state.mode() != AvatarFlightMode.GROUNDED;
         if (config.getLaunch().isEnabled()
                 && input.launchAllowed()
                 && input.launchHoldMs() >= config.getLaunch().getMinChargeMs()
@@ -87,7 +88,7 @@ public final class AvatarFlightController {
                     AvatarFlightSpeedMetrics.speedRatio(impulse.forward(), config)
             );
         }
-        if (input.onGround() && !jumpIntent) {
+        if (input.onGround() || (!activeFlight && !jumpIntent)) {
             return new Output(AvatarFlightMode.GROUNDED, 0.0, 0.0, 0.0,
                     nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, 0.0, 0.0, false, false, false, false, 0.0,
                     true, false, 0.0, 0.0, 0.0);
@@ -545,13 +546,27 @@ public final class AvatarFlightController {
                         long nextBoostAtMs,
                         double diveLoad,
                         double climbLoad,
-                        long nextLaunchAtMs) {
+                        long nextLaunchAtMs,
+                        @Nonnull AvatarFlightMode mode) {
         public State(double velocityX,
                      double velocityY,
                      double velocityZ,
                      long nextJumpAtMs,
                      long nextBoostAtMs) {
-            this(velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, 0.0, 0.0, 0L);
+            this(velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, 0.0, 0.0, 0L,
+                    AvatarFlightMode.FORWARD_FLIGHT);
+        }
+
+        public State(double velocityX,
+                     double velocityY,
+                     double velocityZ,
+                     long nextJumpAtMs,
+                     long nextBoostAtMs,
+                     double diveLoad,
+                     double climbLoad,
+                     long nextLaunchAtMs) {
+            this(velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, diveLoad, climbLoad, nextLaunchAtMs,
+                    AvatarFlightMode.FORWARD_FLIGHT);
         }
 
         @Nonnull
@@ -564,7 +579,8 @@ public final class AvatarFlightController {
                     component.getNextBoostAtMs(),
                     component.getDiveLoad(),
                     component.getClimbLoad(),
-                    component.getNextLaunchAtMs()
+                    component.getNextLaunchAtMs(),
+                    component.getMode()
             );
         }
     }

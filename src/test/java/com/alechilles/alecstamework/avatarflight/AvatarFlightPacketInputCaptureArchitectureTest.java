@@ -54,7 +54,7 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "capture must keep packet-provided states separate from component fallback states");
         assertTrue(source.contains("boolean jumpHeld = packetStates != null && (packetStates.jumping || packetStates.swimJumping)"),
                 "jump must not be latched from MovementStatesComponent fallback");
-        assertTrue(source.contains("input.setJumping(!suppressLaunchJump && jumpHeld)"),
+        assertTrue(source.contains("input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded)"),
                 "grounded launch charge should suppress raw jump only while preserving packet-state-only jump capture");
         assertTrue(source.contains("boolean crouchHeld = packetStates != null && (packetStates.crouching || packetStates.forcedCrouching)"),
                 "crouch must not be latched from MovementStatesComponent fallback");

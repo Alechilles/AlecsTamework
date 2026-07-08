@@ -118,6 +118,18 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void inactiveAvatarFlightUsesAirborneJumpPressInsteadOfHeldGroundJump() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("boolean activeFlight = flight.getMode() != AvatarFlightMode.GROUNDED"),
+                "movement input conversion must know whether the controller is already in avatar-flight mode");
+        assertTrue(source.contains("input.consumeAirborneJumpPress("),
+                "inactive avatar flight should enter only from a one-shot jump press observed after already airborne");
+        assertTrue(source.contains("? reinsFlap || (!stale && input.isJumping())"),
+                "held jump should continue to repeat flaps only after avatar flight is already active");
+    }
+
+    @Test
     void reinsBoostActionCanDriveBoostIntentWithoutSprintDetection() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

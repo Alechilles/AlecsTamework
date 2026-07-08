@@ -89,7 +89,7 @@ public final class AvatarFlightMovementSystem
         AvatarFlightInputComponent input = commandBuffer.getComponent(ref, inputType);
         MovementStates movementStates = resolveMovementStates(ref, commandBuffer);
         AvatarFlightController.Input rawControllerInput =
-                toControllerInput(input, movementStates, ref, commandBuffer, config);
+                toControllerInput(input, movementStates, flight, ref, commandBuffer, config);
         if (input != null) {
             commandBuffer.putComponent(ref, inputType, input);
         }
@@ -547,6 +547,7 @@ public final class AvatarFlightMovementSystem
     @Nonnull
     private AvatarFlightController.Input toControllerInput(@Nullable AvatarFlightInputComponent input,
                                                            @Nullable MovementStates states,
+                                                           @Nonnull AvatarFlightComponent flight,
                                                            @Nonnull Ref<EntityStore> ref,
                                                            @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                                            @Nonnull TwAvatarFlightConfig config) {
@@ -564,6 +565,10 @@ public final class AvatarFlightMovementSystem
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
         );
+        boolean airborneJumpPress = input != null && input.consumeAirborneJumpPress(
+                now,
+                Math.round(config.getInput().getIntentTimeoutMs())
+        );
         boolean sprintBoost = input != null && input.consumeSprintBoost(
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
@@ -573,11 +578,15 @@ public final class AvatarFlightMovementSystem
                 Math.round(config.getInput().getIntentTimeoutMs())
         );
         long launchHoldMs = launchRelease && input != null ? input.getLaunchHoldMs() : 0L;
+        boolean activeFlight = flight.getMode() != AvatarFlightMode.GROUNDED;
+        boolean jumpIntent = activeFlight
+                ? reinsFlap || (!stale && input.isJumping())
+                : airborneJumpPress;
         AvatarFlightController.Input controllerInput = new AvatarFlightController.Input(
                 stale ? 0.0 : input.getForwardAxis(),
                 stale ? 0.0 : input.getStrafeAxis(),
                 stale ? 0.0 : input.getVerticalAxis(),
-                reinsFlap || (!stale && input.isJumping()),
+                jumpIntent,
                 !stale && input.isCrouching(),
                 reinsBoost || sprintBoost,
                 reinsAirbrake,

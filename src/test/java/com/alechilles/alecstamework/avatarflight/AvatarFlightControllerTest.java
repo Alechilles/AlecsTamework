@@ -22,6 +22,43 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void groundedJumpDoesNotEnterAvatarFlight() {
+        AvatarFlightController.Output output = update(
+                groundedState(0.0, 0.0, 0.0),
+                input(0.0, true, false, false, true, 0.0)
+        );
+
+        assertEquals(AvatarFlightMode.GROUNDED, output.mode(),
+                "normal ground jumps should stay native until the player explicitly activates flight while airborne");
+        assertFalse(output.applyVelocity());
+        assertFalse(output.jumpApplied());
+    }
+
+    @Test
+    void fallingWithoutExplicitEntryStaysGrounded() {
+        AvatarFlightController.Output output = update(
+                groundedState(0.0, -1.0, 0.0),
+                input(0.0, false, false, false, false, 0.0)
+        );
+
+        assertEquals(AvatarFlightMode.GROUNDED, output.mode(),
+                "walking off a ledge should not activate hover or glide by itself");
+        assertFalse(output.applyVelocity());
+    }
+
+    @Test
+    void airborneJumpFromGroundedStateEntersAvatarFlight() {
+        AvatarFlightController.Output output = update(
+                groundedState(0.0, -1.0, 0.0),
+                input(0.0, true, false, false, false, 0.0)
+        );
+
+        assertTrue(output.applyVelocity(),
+                "a jump press after already airborne is the explicit entry path into avatar flight");
+        assertTrue(output.jumpApplied());
+    }
+
+    @Test
     void idleAirborneHoversInsteadOfGlidingForward() {
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(6.0, -2.0, 0.0, 0L, 0L),
@@ -1034,6 +1071,20 @@ class AvatarFlightControllerTest {
             output.diveLoad(),
             output.climbLoad(),
             output.nextLaunchAtMs()
+        );
+    }
+
+    private static AvatarFlightController.State groundedState(double velocityX, double velocityY, double velocityZ) {
+        return new AvatarFlightController.State(
+                velocityX,
+                velocityY,
+                velocityZ,
+                0L,
+                0L,
+                0.0,
+                0.0,
+                0L,
+                AvatarFlightMode.GROUNDED
         );
     }
 

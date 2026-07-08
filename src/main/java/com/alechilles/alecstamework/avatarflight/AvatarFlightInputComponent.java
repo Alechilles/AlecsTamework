@@ -33,6 +33,10 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
                     AvatarFlightInputComponent::setJumping,
                     AvatarFlightInputComponent::isJumping)
             .add()
+            .<Boolean>append(new KeyedCodec<>("JumpHeldForEdge", Codec.BOOLEAN),
+                    AvatarFlightInputComponent::setJumpHeldForEdge,
+                    AvatarFlightInputComponent::isJumpHeldForEdge)
+            .add()
             .<Boolean>append(new KeyedCodec<>("Crouching", Codec.BOOLEAN),
                     AvatarFlightInputComponent::setCrouching,
                     AvatarFlightInputComponent::isCrouching)
@@ -60,6 +64,10 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
             .<Long>append(new KeyedCodec<>("ReinsFlapQueuedAtMs", Codec.LONG),
                     AvatarFlightInputComponent::setReinsFlapQueuedAtMs,
                     AvatarFlightInputComponent::getReinsFlapQueuedAtMs)
+            .add()
+            .<Long>append(new KeyedCodec<>("AirborneJumpPressQueuedAtMs", Codec.LONG),
+                    AvatarFlightInputComponent::setAirborneJumpPressQueuedAtMs,
+                    AvatarFlightInputComponent::getAirborneJumpPressQueuedAtMs)
             .add()
             .<Long>append(new KeyedCodec<>("ReinsAirbrakeUntilMs", Codec.LONG),
                     AvatarFlightInputComponent::setReinsAirbrakeUntilMs,
@@ -91,6 +99,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     private double strafeAxis;
     private double verticalAxis;
     private boolean jumping;
+    private boolean jumpHeldForEdge;
     private boolean crouching;
     private boolean sprinting;
     private boolean onGround = true;
@@ -98,6 +107,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     private double pitchRadians;
     private long lastInputAtMs;
     private long reinsFlapQueuedAtMs;
+    private long airborneJumpPressQueuedAtMs;
     private long reinsAirbrakeUntilMs;
     private long reinsBoostQueuedAtMs;
     private long sprintBoostQueuedAtMs;
@@ -141,6 +151,24 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
 
     public void setJumping(@Nullable Boolean jumping) {
         this.jumping = jumping != null && jumping;
+        this.jumpHeldForEdge = this.jumping;
+    }
+
+    public boolean isJumpHeldForEdge() {
+        return jumpHeldForEdge;
+    }
+
+    public void setJumpHeldForEdge(@Nullable Boolean jumpHeldForEdge) {
+        this.jumpHeldForEdge = jumpHeldForEdge != null && jumpHeldForEdge;
+    }
+
+    public void updateJumping(@Nullable Boolean jumping, long nowMs, boolean onGround) {
+        boolean next = jumping != null && jumping;
+        if (next && !jumpHeldForEdge && !onGround) {
+            airborneJumpPressQueuedAtMs = nowMs;
+        }
+        this.jumping = next;
+        this.jumpHeldForEdge = next;
     }
 
     public boolean isCrouching() {
@@ -205,6 +233,14 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
 
     public void setReinsFlapQueuedAtMs(@Nullable Long reinsFlapQueuedAtMs) {
         this.reinsFlapQueuedAtMs = reinsFlapQueuedAtMs == null ? 0L : reinsFlapQueuedAtMs;
+    }
+
+    public long getAirborneJumpPressQueuedAtMs() {
+        return airborneJumpPressQueuedAtMs;
+    }
+
+    public void setAirborneJumpPressQueuedAtMs(@Nullable Long airborneJumpPressQueuedAtMs) {
+        this.airborneJumpPressQueuedAtMs = airborneJumpPressQueuedAtMs == null ? 0L : airborneJumpPressQueuedAtMs;
     }
 
     public long getReinsAirbrakeUntilMs() {
@@ -274,6 +310,12 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         long queuedAtMs = reinsFlapQueuedAtMs;
         reinsFlapQueuedAtMs = 0L;
         return maxAgeMs <= 0L || nowMs - queuedAtMs <= maxAgeMs;
+    }
+
+    public boolean consumeAirborneJumpPress(long nowMs, long maxAgeMs) {
+        boolean applies = queuedIntentApplies(airborneJumpPressQueuedAtMs, nowMs, maxAgeMs);
+        airborneJumpPressQueuedAtMs = 0L;
+        return applies;
     }
 
     public void activateReinsAirbrake(long nowMs, long durationMs) {
@@ -346,6 +388,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         clone.strafeAxis = strafeAxis;
         clone.verticalAxis = verticalAxis;
         clone.jumping = jumping;
+        clone.jumpHeldForEdge = jumpHeldForEdge;
         clone.crouching = crouching;
         clone.sprinting = sprinting;
         clone.onGround = onGround;
@@ -353,6 +396,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         clone.pitchRadians = pitchRadians;
         clone.lastInputAtMs = lastInputAtMs;
         clone.reinsFlapQueuedAtMs = reinsFlapQueuedAtMs;
+        clone.airborneJumpPressQueuedAtMs = airborneJumpPressQueuedAtMs;
         clone.reinsAirbrakeUntilMs = reinsAirbrakeUntilMs;
         clone.reinsBoostQueuedAtMs = reinsBoostQueuedAtMs;
         clone.sprintBoostQueuedAtMs = sprintBoostQueuedAtMs;
