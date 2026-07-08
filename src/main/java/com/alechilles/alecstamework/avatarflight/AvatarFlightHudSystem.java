@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
  */
 public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
+    private final ComponentType<EntityStore, AvatarFlightInputComponent> inputType;
     private final ComponentType<EntityStore, Player> playerType;
     private final Query<EntityStore> query;
     private final Map<UUID, HudState> stateByPlayer = new HashMap<>();
@@ -35,10 +36,12 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
     );
 
     public AvatarFlightHudSystem(@Nonnull ComponentType<EntityStore, AvatarFlightComponent> flightType,
+                                 @Nonnull ComponentType<EntityStore, AvatarFlightInputComponent> inputType,
                                  @Nonnull ComponentType<EntityStore, Player> playerType) {
         this.flightType = flightType;
+        this.inputType = inputType;
         this.playerType = playerType;
-        this.query = Query.and(flightType, playerType);
+        this.query = Query.and(flightType, inputType, playerType);
     }
 
     @Override
@@ -49,8 +52,9 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         Ref<EntityStore> ref = archetypeChunk.getReferenceTo(index);
         AvatarFlightComponent flight = archetypeChunk.getComponent(index, flightType);
+        AvatarFlightInputComponent input = archetypeChunk.getComponent(index, inputType);
         Player player = archetypeChunk.getComponent(index, playerType);
-        if (ref == null || flight == null || player == null) {
+        if (ref == null || flight == null || input == null || player == null) {
             return;
         }
         UUID playerUuid = playerUuid(player);
@@ -62,13 +66,17 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
             removeHud(playerUuid, player);
             return;
         }
-        AvatarFlightHudViewModel model = buildModel(flight, config);
-        showOrRefresh(playerUuid, player, flight.getEnabledAtMs(), model, config.getVigour().getHudResendIntervalMs());
+        long now = System.currentTimeMillis();
+        AvatarFlightHudViewModel model = buildModel(flight, input, config, now);
+        showOrRefresh(playerUuid, player, flight.getEnabledAtMs(), model,
+                config.getVigour().getHudResendIntervalMs(), now);
     }
 
     @Nonnull
     private static AvatarFlightHudViewModel buildModel(@Nonnull AvatarFlightComponent flight,
-                                                       @Nonnull TwAvatarFlightConfig config) {
+                                                       @Nonnull AvatarFlightInputComponent input,
+                                                       @Nonnull TwAvatarFlightConfig config,
+                                                       long nowMs) {
         double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
                 flight.getVelocityX(),
                 flight.getVelocityY(),
@@ -78,6 +86,17 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
         double maxCharges = config.getVigour().getMaxCharges();
         boolean groundedAtFull = flight.getMode() == AvatarFlightMode.GROUNDED
                 && fullVigour(flight.getVigourCharges(), maxCharges);
+        long maxChargeMs = config.getLaunch().getMaxChargeMs();
+        boolean launchChargeVisible = config.getLaunch().isEnabled()
+                && maxChargeMs > 0L
+                && input.isLaunchCharging()
+                && input.isOnGround();
+        double launchChargeRatio = launchChargeVisible
+                ? ratio(nowMs - input.getLaunchChargeStartedAtMs(), maxChargeMs)
+                : 0.0;
+        double launchMinChargeRatio = launchChargeVisible
+                ? ratio(config.getLaunch().getMinChargeMs(), maxChargeMs)
+                : 0.0;
         return AvatarFlightHudViewModel.visible(
                 speedRatio,
                 flight.getHudTargetSpeedRatio(),
@@ -85,7 +104,10 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                 flight.getVigourCharges(),
                 maxCharges,
                 groundedAtFull,
-                flight.getVigourRechargeMode()
+                flight.getVigourRechargeMode(),
+                launchChargeVisible,
+                launchChargeRatio,
+                launchMinChargeRatio
         );
     }
 
@@ -93,12 +115,12 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
                                @Nonnull Player player,
                                long enabledAtMs,
                                @Nonnull AvatarFlightHudViewModel model,
-                               long resendIntervalMs) {
+                               long resendIntervalMs,
+                               long now) {
         PlayerRef playerRef = player.getPlayerRef();
         if (playerRef == null || player.getHudManager() == null) {
             return;
         }
-        long now = System.currentTimeMillis();
         HudState previous = stateByPlayer.get(playerUuid);
         boolean newSession = previous == null || previous.enabledAtMs() != enabledAtMs;
         TameworkAvatarFlightHud hud = newSession ? null : previous.hud();
@@ -134,6 +156,13 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
         return Double.isFinite(maxCharges) && maxCharges > 0.0
                 && Double.isFinite(charges)
                 && charges >= maxCharges - 0.0001;
+    }
+
+    private static double ratio(long value, long max) {
+        if (max <= 0L) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, (double) value / (double) max));
     }
 
     @Nullable

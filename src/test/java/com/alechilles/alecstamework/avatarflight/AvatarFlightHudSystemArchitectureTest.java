@@ -29,8 +29,9 @@ class AvatarFlightHudSystemArchitectureTest {
         ));
 
         Assertions.assertTrue(source.contains("extends EntityTickingSystem<EntityStore>"));
-        Assertions.assertTrue(source.contains("Query.and(flightType, playerType)"));
+        Assertions.assertTrue(source.contains("Query.and(flightType, inputType, playerType)"));
         Assertions.assertTrue(source.contains("archetypeChunk.getComponent(index, playerType)"));
+        Assertions.assertTrue(source.contains("archetypeChunk.getComponent(index, inputType)"));
         Assertions.assertTrue(source.contains("AvatarFlightSpeedMetrics.horizontalSpeed"));
         Assertions.assertTrue(source.contains("AvatarFlightSpeedMetrics.speedRatio"));
         Assertions.assertTrue(source.contains("flight.getVelocityX()"));
@@ -39,6 +40,14 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("flight.getHudPitchRadians()"));
         Assertions.assertTrue(source.contains("config.getVigour().getMaxCharges()"));
         Assertions.assertTrue(source.contains("flight.getVigourRechargeMode()"));
+        Assertions.assertTrue(source.contains("input.isLaunchCharging()"));
+        Assertions.assertTrue(source.contains("input.isOnGround()"));
+        Assertions.assertTrue(source.contains("input.getLaunchChargeStartedAtMs()"));
+        Assertions.assertTrue(source.contains("config.getLaunch().getMinChargeMs()"));
+        Assertions.assertTrue(source.contains("config.getLaunch().getMaxChargeMs()"));
+        Assertions.assertTrue(source.contains("launchChargeVisible"));
+        Assertions.assertTrue(source.contains("launchChargeRatio"));
+        Assertions.assertTrue(source.contains("launchMinChargeRatio"));
         Assertions.assertTrue(source.contains("config.getVigour().isHudEnabled()"));
         Assertions.assertTrue(source.contains("config.getVigour().getHudResendIntervalMs()"));
         Assertions.assertTrue(source.contains("player.getHudManager().addCustomHud(playerRef, hud)"));
@@ -56,12 +65,14 @@ class AvatarFlightHudSystemArchitectureTest {
         int hudIndex = source.indexOf("new AvatarFlightHudSystem(");
         int visualIndex = source.indexOf("new AvatarFlightEquipmentVisualSystem(");
         int playerTypeIndex = source.indexOf("Player.getComponentType()", hudIndex);
+        int inputTypeIndex = source.indexOf("avatarFlightInputComponentType", hudIndex);
 
         Assertions.assertTrue(importIndex >= 0);
         Assertions.assertTrue(movementIndex >= 0);
         Assertions.assertTrue(hudIndex > movementIndex);
         Assertions.assertTrue(visualIndex > hudIndex);
         Assertions.assertTrue(playerTypeIndex > hudIndex);
+        Assertions.assertTrue(inputTypeIndex > hudIndex);
     }
 
     @Test
