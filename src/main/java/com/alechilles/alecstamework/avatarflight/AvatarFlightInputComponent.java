@@ -281,6 +281,14 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         this.airborneJumpPressQueuedAtMs = airborneJumpPressQueuedAtMs == null ? 0L : airborneJumpPressQueuedAtMs;
     }
 
+    public boolean queueAirborneJumpPress(long nowMs, long airborneActivationDelayMs) {
+        if (!canQueueAirborneJumpPress(nowMs, airborneActivationDelayMs)) {
+            return false;
+        }
+        airborneJumpPressQueuedAtMs = nowMs;
+        return true;
+    }
+
     public long getReinsAirbrakeUntilMs() {
         return reinsAirbrakeUntilMs;
     }

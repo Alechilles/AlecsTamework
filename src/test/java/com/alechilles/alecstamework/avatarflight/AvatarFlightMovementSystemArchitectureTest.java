@@ -92,6 +92,20 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void nativeActivationCapabilityIsDisabledDuringCustomFlight() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("syncActivationCapability(ref, commandBuffer, output.mode() == AvatarFlightMode.GROUNDED)"),
+                "client canFly should be available only while waiting for explicit airborne activation");
+        assertTrue(source.contains("AvatarFlightActivationCapability.setGroundedProbeEnabled("),
+                "avatar flight should not reuse the standalone debug client-flight probe");
+        int activationIndex = source.indexOf("syncActivationCapability(ref, commandBuffer");
+        int ownerFlyingIndex = source.indexOf("syncOwnerClientFlyingState(ref, commandBuffer");
+        assertTrue(activationIndex >= 0 && ownerFlyingIndex > activationIndex,
+                "native canFly should be disabled before syncing owner flying animation for custom flight");
+    }
+
+    @Test
     void avatarFlightForcesFlyingMovementStateInsteadOfFallState() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

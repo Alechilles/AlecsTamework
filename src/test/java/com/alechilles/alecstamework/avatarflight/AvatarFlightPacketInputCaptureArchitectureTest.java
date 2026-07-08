@@ -92,6 +92,18 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
     }
 
     @Test
+    void clientFlyingToggleCanQueueAirborneJumpActivation() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("flight.getMode() == AvatarFlightMode.GROUNDED && packetStates.flying && !grounded"),
+                "client canFly double-jump reports flying=true rather than a second raw jump state");
+        assertTrue(source.contains("input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs())"),
+                "creative-style flight toggles must feed the same delayed explicit airborne entry path");
+        assertTrue(source.contains("Player.applyMovementStates(ref, new SavedMovementStates(false), movementStates, store)"),
+                "native client flying must be cancelled immediately so custom avatar flight owns movement");
+    }
+
+    @Test
     void jumpHoldLaunchChargeIsCapturedAndCanBeCancelled() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

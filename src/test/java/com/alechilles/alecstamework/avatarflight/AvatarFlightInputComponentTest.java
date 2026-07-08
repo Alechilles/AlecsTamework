@@ -117,6 +117,22 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
+    void clientFlyingToggleUsesSameAirborneActivationDelay() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.setOnGround(true, 1_000L);
+        input.setOnGround(false, 1_050L);
+
+        assertFalse(input.queueAirborneJumpPress(1_100L, 250L),
+                "creative-style flight toggles during normal takeoff must not activate avatar flight immediately");
+        assertFalse(input.consumeAirborneJumpPress(1_150L, 1_000L));
+
+        assertTrue(input.queueAirborneJumpPress(1_350L, 250L),
+                "a delayed client flying toggle is an explicit airborne entry attempt");
+        assertTrue(input.consumeAirborneJumpPress(1_360L, 1_000L));
+    }
+
+    @Test
     void staleSprintBoostIsConsumedWithoutApplying() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
 

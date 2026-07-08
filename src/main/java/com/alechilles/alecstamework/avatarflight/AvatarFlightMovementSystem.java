@@ -16,6 +16,7 @@ import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.SavedMovementStates;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.AnimationUtils;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesSystems;
@@ -114,6 +115,7 @@ public final class AvatarFlightMovementSystem
         flight.setClimbLoad(output.climbLoad());
         flight.setHudPitchRadians(output.visualPitchRadians());
         flight.setHudTargetSpeedRatio(output.hudTargetSpeedRatio());
+        syncActivationCapability(ref, commandBuffer, output.mode() == AvatarFlightMode.GROUNDED);
         syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
         applyVisualPose(ref, commandBuffer, controllerInput, output);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);
@@ -336,6 +338,18 @@ public final class AvatarFlightMovementSystem
             );
             flight.setClientFlyingSynced(desiredFlying);
         }
+    }
+
+    private void syncActivationCapability(@Nonnull Ref<EntityStore> ref,
+                                          @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                          boolean groundedProbeEnabled) {
+        UUIDComponent uuid = commandBuffer.getComponent(ref, UUIDComponent.getComponentType());
+        AvatarFlightActivationCapability.setGroundedProbeEnabled(
+                commandBuffer,
+                ref,
+                uuid == null ? null : uuid.getUuid(),
+                groundedProbeEnabled
+        );
     }
 
     private void applyFlightMovementState(@Nonnull Ref<EntityStore> ref,

@@ -60,6 +60,7 @@ public final class AvatarFlightActivator {
         if (input == null) {
             store.putComponent(ref, inputType, new AvatarFlightInputComponent());
         }
+        AvatarFlightActivationCapability.enableGroundedProbe(store, ref, playerUuid);
         AvatarFlightSessionRegistry.markActive(playerUuid);
         return Result.ok("Avatar flight enabled with config=" + safeConfigId(config)
                 + " modelSwap=" + (applyModel ? config.getModel().getModelId() : "disabled"));
@@ -82,6 +83,7 @@ public final class AvatarFlightActivator {
         if (inputType != null) {
             store.tryRemoveComponent(ref, inputType);
         }
+        AvatarFlightActivationCapability.restore(store, ref, playerUuid);
         restoreClientFlyingState(store, ref);
         resetVisualPose(store, ref);
         clearForcedAnimations(store, ref);
@@ -138,6 +140,7 @@ public final class AvatarFlightActivator {
         }
         UUID playerUuid = event.getPlayerRef().getUuid();
         AvatarFlightClientFlightProbe.clear(playerUuid);
+        AvatarFlightActivationCapability.clear(playerUuid);
         AvatarFlightSessionRegistry.markDisconnecting(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
         modelService.clearSavedModel(playerUuid);
