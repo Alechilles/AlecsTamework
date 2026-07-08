@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -36,6 +37,8 @@ class AvatarFlightRiderVisualComponentArchitectureTest {
         assertTrue(component.contains("private String hiddenOwnerSourceEquipmentSignature"));
         assertTrue(component.contains("\"HiddenOwnerEquipmentSignature\""));
         assertTrue(component.contains("\"HiddenOwnerSourceEquipmentSignature\""));
+        assertFalse(component.contains("LastEquipmentSentAtMs"));
+        assertFalse(component.contains("lastEquipmentSentAtMs"));
         assertTrue(plugin.contains("ComponentType<EntityStore, AvatarFlightRiderVisualComponent> avatarFlightRiderVisualComponentType"));
         assertTrue(plugin.contains("\"TameworkAvatarFlightRiderVisual\""));
     }

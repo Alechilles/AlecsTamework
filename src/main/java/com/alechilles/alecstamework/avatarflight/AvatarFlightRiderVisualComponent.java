@@ -42,10 +42,6 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
                     AvatarFlightRiderVisualComponent::setHiddenOwnerSourceEquipmentSignature,
                     AvatarFlightRiderVisualComponent::getHiddenOwnerSourceEquipmentSignature)
             .add()
-            .<Long>append(new KeyedCodec<>("LastEquipmentSentAtMs", Codec.LONG),
-                    AvatarFlightRiderVisualComponent::setLastEquipmentSentAtMs,
-                    AvatarFlightRiderVisualComponent::getLastEquipmentSentAtMs)
-            .add()
             .build();
 
     private String ownerUuid = "";
@@ -54,7 +50,6 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
     private String equipmentSignature = "";
     private String hiddenOwnerEquipmentSignature = "";
     private String hiddenOwnerSourceEquipmentSignature = "";
-    private long lastEquipmentSentAtMs;
 
     @Nullable
     public static ComponentType<EntityStore, AvatarFlightRiderVisualComponent> getComponentType() {
@@ -115,14 +110,6 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
         this.hiddenOwnerSourceEquipmentSignature = sanitize(hiddenOwnerSourceEquipmentSignature);
     }
 
-    public long getLastEquipmentSentAtMs() {
-        return lastEquipmentSentAtMs;
-    }
-
-    public void setLastEquipmentSentAtMs(@Nullable Long lastEquipmentSentAtMs) {
-        this.lastEquipmentSentAtMs = lastEquipmentSentAtMs == null ? 0L : lastEquipmentSentAtMs;
-    }
-
     @Override
     public AvatarFlightRiderVisualComponent clone() {
         AvatarFlightRiderVisualComponent clone = new AvatarFlightRiderVisualComponent();
@@ -132,7 +119,6 @@ public final class AvatarFlightRiderVisualComponent implements Component<EntityS
         clone.equipmentSignature = getEquipmentSignature();
         clone.hiddenOwnerEquipmentSignature = getHiddenOwnerEquipmentSignature();
         clone.hiddenOwnerSourceEquipmentSignature = getHiddenOwnerSourceEquipmentSignature();
-        clone.lastEquipmentSentAtMs = lastEquipmentSentAtMs;
         return clone;
     }
 

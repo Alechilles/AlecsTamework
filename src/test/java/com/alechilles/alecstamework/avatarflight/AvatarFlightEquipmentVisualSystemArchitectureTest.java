@@ -22,10 +22,11 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     void equipmentServiceBlanksOwnerArmorAndHandsWithoutMutatingInventory() throws Exception {
         String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("createHiddenOwnerEquipmentUpdate("));
+        assertTrue(source.contains("applyHiddenOwnerEquipment("));
         assertTrue(source.contains("update.rightHandItemId = BlockType.EMPTY_KEY"));
         assertTrue(source.contains("update.leftHandItemId = BlockType.EMPTY_KEY"));
         assertTrue(source.contains("Arrays.fill(update.armorIds, \"\")"));
+        assertFalse(source.contains("createHiddenOwnerEquipmentUpdate("));
         assertFalse(source.contains("Arrays.fill(update.armorIds, BlockType.EMPTY_KEY)"));
         assertFalse(source.contains("removeItem"));
         assertFalse(source.contains("setItem"));

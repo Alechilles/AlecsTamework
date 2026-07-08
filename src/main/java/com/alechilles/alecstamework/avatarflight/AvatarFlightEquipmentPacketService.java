@@ -30,15 +30,6 @@ public final class AvatarFlightEquipmentPacketService {
     }
 
     @Nonnull
-    public static EquipmentUpdate createHiddenOwnerEquipmentUpdate(
-            @Nonnull Ref<EntityStore> ref,
-            @Nonnull ComponentAccessor<EntityStore> accessor,
-            @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
-        EquipmentUpdate update = createCurrentEquipmentUpdate(ref, accessor);
-        return applyHiddenOwnerEquipment(update, settings);
-    }
-
-    @Nonnull
     public static EquipmentUpdate applyHiddenOwnerEquipment(
             @Nonnull EquipmentUpdate update,
             @Nonnull TwAvatarFlightConfig.RiderVisualSettings settings) {
