@@ -84,8 +84,8 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "grounded held jump should begin a charged launch when configured");
         assertTrue(source.contains("if (launchHeld && grounded)"),
                 "jump-hold launch charge should only begin from the ground");
-        assertTrue(source.contains("} else if (!launchHeld && input.isLaunchCharging())"),
-                "releasing after charge should queue launch even if native movement left the ground during the hold");
+        assertTrue(source.contains("} else if (launchStateObserved && !launchHeld && input.isLaunchCharging())"),
+                "explicit release after charge should queue launch even if native movement left the ground during the hold");
         assertTrue(source.contains("boolean suppressLaunchJump = jumpHoldLaunchInput"),
                 "raw jump suppression should be tied to active launch charge/release state");
         assertTrue(source.contains("queueLaunchRelease"),
@@ -104,12 +104,27 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "crouch-hold launch should be independently configurable from jump-hold launch");
         assertTrue(source.contains("boolean launchHeld = (jumpHoldLaunchInput && jumpHeld) || (crouchHoldLaunchInput && crouchHeld)"),
                 "launch hold state should combine configured packet launch inputs without treating unconfigured crouch as launch");
-        assertTrue(source.contains("handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded)"),
+        assertTrue(source.contains("handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded"),
                 "grounded crouch hold should feed the same one-shot launch release path");
         assertTrue(source.contains("boolean suppressLaunchCrouch = crouchHoldLaunchInput"),
                 "grounded crouch launch charge must suppress raw crouch descent while the launch is charging");
         assertTrue(source.contains("input.setCrouching(!suppressLaunchCrouch && crouchHeld)"),
                 "crouch should resume normal downward movement when it is not being used for grounded launch charge");
+    }
+
+    @Test
+    void statelessPacketsDoNotReleaseHeldLaunchCharge() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("boolean launchStateObserved = packetStates != null"),
+                "movement packets without button state must not count as launch button release");
+        int handleCallIndex = source.indexOf(
+                "handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded");
+        int observedArgumentIndex = source.indexOf("launchStateObserved);", handleCallIndex);
+        assertTrue(handleCallIndex > 0 && observedArgumentIndex > handleCallIndex,
+                "launch charge handling must know whether this packet actually observed jump/crouch state");
+        assertTrue(source.contains("} else if (launchStateObserved && !launchHeld && input.isLaunchCharging())"),
+                "only explicit button-release packets should queue a launch release");
     }
 
     @Test

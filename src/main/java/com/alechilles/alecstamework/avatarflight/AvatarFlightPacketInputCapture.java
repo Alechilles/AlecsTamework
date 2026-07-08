@@ -95,8 +95,10 @@ public final class AvatarFlightPacketInputCapture {
         boolean grounded = movementStates == null ? input.isOnGround() : movementStates.onGround;
         boolean jumpHoldLaunchInput = config.getLaunch().isEnabled() && usesJumpHoldLaunch(config);
         boolean crouchHoldLaunchInput = config.getLaunch().isEnabled() && usesCrouchHoldLaunch(config);
+        boolean launchStateObserved = packetStates != null;
         boolean launchHeld = (jumpHoldLaunchInput && jumpHeld) || (crouchHoldLaunchInput && crouchHeld);
-        handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded);
+        handleLaunchCharge(input, now, jumpHoldLaunchInput || crouchHoldLaunchInput, launchHeld, grounded,
+                launchStateObserved);
         boolean suppressLaunchJump = jumpHoldLaunchInput
                 && (input.isLaunchCharging() || input.getLaunchReleasedAtMs() != 0L || (grounded && jumpHeld));
         boolean suppressLaunchCrouch = crouchHoldLaunchInput
@@ -127,11 +129,12 @@ public final class AvatarFlightPacketInputCapture {
                                     long now,
                                     boolean launchInputConfigured,
                                     boolean launchHeld,
-                                    boolean grounded) {
+                                    boolean grounded,
+                                    boolean launchStateObserved) {
         if (launchInputConfigured) {
             if (launchHeld && grounded) {
                 input.beginLaunchCharge(now);
-            } else if (!launchHeld && input.isLaunchCharging()) {
+            } else if (launchStateObserved && !launchHeld && input.isLaunchCharging()) {
                 input.queueLaunchRelease(now);
             }
         } else if (input.isLaunchCharging()) {
