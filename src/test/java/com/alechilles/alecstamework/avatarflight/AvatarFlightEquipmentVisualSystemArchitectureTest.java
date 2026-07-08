@@ -44,13 +44,12 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
     }
 
     @Test
-    void visualSystemQueuesHiddenOwnerEquipmentForNonOwnerViewersOnly() throws Exception {
+    void visualSystemQueuesHiddenOwnerEquipmentEveryTickWithoutRiderVisualState() throws Exception {
         String source = Files.readString(SYSTEM, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("queueHiddenOwnerUpdate(ref, commandBuffer, visible, settings)"));
-        assertTrue(source.contains("queueAllExceptOwner(ref, update, visible.visibleTo)"));
-        assertTrue(source.contains("queueAllExceptOwner(ref, update, visible.newlyVisibleTo)"));
-        assertTrue(source.contains("if (viewerRef.equals(ref))"));
+        assertTrue(source.contains("queueAll(ref, update, visible.visibleTo)"));
+        assertTrue(source.contains("queueAll(ref, update, visible.newlyVisibleTo)"));
         assertFalse(source.contains("queueIfEquipmentChanged("));
         assertTrue(source.contains("visualType"));
         assertFalse(source.contains("\"owner\""));
