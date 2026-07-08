@@ -426,7 +426,7 @@ public final class TwAvatarFlightConfig implements
             .<Boolean>append(new KeyedCodec<>("HideOwnerEquipment", Codec.BOOLEAN),
                     (settings, value) -> settings.hideOwnerEquipment = value != null && value,
                     settings -> settings.hideOwnerEquipment)
-            .documentation("Whether avatar flight sends equipment packets that hide the transformed player's equipped visuals. Disabled by default because local-player equipment packets can crash the current client. Inheritance: missing nested key inherits parent value.")
+            .documentation("Whether avatar flight sends equipment packets that hide the transformed player's equipped visuals from other viewers. Owner-client equipment packets are skipped because they can crash the current client. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Boolean>append(new KeyedCodec<>("HideOwnerArmor", Codec.BOOLEAN),
                     (settings, value) -> settings.hideOwnerArmor = value != null && value,

@@ -119,3 +119,12 @@ Use `/tw debugdragonflight inputprobe on` or `/tw debugplayerinput on` for input
 - `RechargeDelayAfterSpendSeconds`: delay before recharge resumes after spending.
 - `HudEnabled`: shows the compact speed and Vigour HUD.
 - `HudResendIntervalMs`: throttles unchanged HUD refreshes.
+
+### RiderVisual
+
+- `HideOwnerEquipment`: hides the transformed player's held-item and armor visuals from other viewers. The owner client is skipped because local-player equipment packets can crash the current client.
+- `HideOwnerArmor`: blanks armor visuals when owner equipment hiding is enabled.
+- `HideOwnerHands`: blanks held-item and offhand visuals when owner equipment hiding is enabled.
+- `ShowRider`: attaches an experimental saved-player rider visual to the transformed model.
+- `SeatOffsetX`, `SeatOffsetY`, `SeatOffsetZ`: local model offset for the experimental rider attachment.
+- `EquipmentResendIntervalMs`: minimum resend interval for unchanged rider equipment refreshes.

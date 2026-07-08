@@ -45,6 +45,7 @@
 - Fixed `/tw debugplayermodel unsafe` so positive test scales are no longer clamped to the model asset's authored min/max range.
 - Fixed transformed avatar flight trying to layer player item/combat/emote animations onto dragon models by periodically suppressing non-movement animation slots while flight is active.
 - Fixed transformed avatar flight still rendering held player equipment on dragon models by continuously hiding the real transformed player's hand and armor equipment visuals while avatar flight is active, independent of fake rider visuals.
+- Fixed transformed avatar flight equipment hiding so it no longer sends hidden equipment packets back to the transformed player's own client, avoiding a client crash seen when moving as the NordicDrake model.
 - Reworked experimental avatar-flight rider visuals to attach the saved player model to the transformed dragon model instead of spawning a native mounted rider entity, avoiding the crash-prone mounted-rider client path.
 - Restored experimental avatar-flight rider visuals to attach the saved player model directly to the transformed dragon, keeping the test path closer to the intended final rider.
 - Fixed avatar flight level glide so stalled flight no longer refills full cruise speed for free, low-speed glide sinks harder, and the speed/Vigour HUD no longer renders its root as a broken image over the hotbar.
