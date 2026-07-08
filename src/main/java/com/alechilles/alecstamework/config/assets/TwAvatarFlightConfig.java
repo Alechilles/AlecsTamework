@@ -67,6 +67,11 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.strafeDeadzone)
             .documentation("Absolute strafe-axis threshold for future A/D tuning. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Double>append(new KeyedCodec<>("AirborneJumpActivationDelayMs", Codec.DOUBLE),
+                    (settings, value) -> settings.airborneJumpActivationDelayMs = nonNegativeOrDefault(value, 250.0),
+                    settings -> settings.airborneJumpActivationDelayMs)
+            .documentation("Milliseconds after leaving ground before a fresh jump press can explicitly enter avatar flight. This prevents normal jump presses from leaking into flight activation. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private static final BuilderCodec<MovementSettings> MOVEMENT_CODEC = BuilderCodec.builder(
@@ -738,6 +743,9 @@ public final class TwAvatarFlightConfig implements
             if (!keys.contains("IntentTimeoutMs")) input.intentTimeoutMs = parent.input.intentTimeoutMs;
             if (!keys.contains("ForwardDeadzone")) input.forwardDeadzone = parent.input.forwardDeadzone;
             if (!keys.contains("StrafeDeadzone")) input.strafeDeadzone = parent.input.strafeDeadzone;
+            if (!keys.contains("AirborneJumpActivationDelayMs")) {
+                input.airborneJumpActivationDelayMs = parent.input.airborneJumpActivationDelayMs;
+            }
         }
     }
 
@@ -1006,10 +1014,12 @@ public final class TwAvatarFlightConfig implements
         private double intentTimeoutMs = 750.0;
         private double forwardDeadzone = 0.25;
         private double strafeDeadzone = 0.25;
+        private double airborneJumpActivationDelayMs = 250.0;
 
         public long getIntentTimeoutMs() { return Math.round(intentTimeoutMs); }
         public double getForwardDeadzone() { return forwardDeadzone; }
         public double getStrafeDeadzone() { return strafeDeadzone; }
+        public long getAirborneJumpActivationDelayMs() { return Math.round(Math.max(0.0, airborneJumpActivationDelayMs)); }
     }
 
     public static final class MovementSettings {

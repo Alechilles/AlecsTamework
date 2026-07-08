@@ -7,7 +7,7 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
 - Holding crouch on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
-- Avatar flight starts only from a charged launch release or a fresh jump press after the player is already airborne. Normal ground jumps and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight.
+- Avatar flight starts only from a charged launch release or a fresh jump press after the player has already been airborne for the configured input delay. Normal ground jumps and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight.
 - Left-click with Flightmaster's Reins performs an upward flap.
 - Right-click with Flightmaster's Reins applies the airbrake.
 - Q with Flightmaster's Reins performs a forward boost.
@@ -57,6 +57,13 @@ While grounded and holding the charged launch input, the compact avatar-flight H
 Use `/tw debugdragonflight inputprobe on` or `/tw debugplayerinput on` for input logs without changing player movement capability. `/tw debugdragonflight flightprobe on` is a separate client-flight capability probe and can change native movement states, so it should not be used for normal launch tuning unless client flight behavior is the thing being tested.
 
 ## Config Fields
+
+### Input
+
+- `IntentTimeoutMs`: milliseconds before packet-derived movement intent decays to neutral.
+- `ForwardDeadzone`: absolute forward-axis threshold for W/S intent.
+- `StrafeDeadzone`: absolute strafe-axis threshold for future A/D tuning.
+- `AirborneJumpActivationDelayMs`: milliseconds after leaving ground before a fresh jump press can enter avatar flight. This protects normal ground jumps from starting flight when their jump packet is observed just after takeoff.
 
 ### Movement
 

@@ -49,6 +49,10 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
                     AvatarFlightInputComponent::setOnGround,
                     AvatarFlightInputComponent::isOnGround)
             .add()
+            .<Long>append(new KeyedCodec<>("AirborneSinceMs", Codec.LONG),
+                    AvatarFlightInputComponent::setAirborneSinceMs,
+                    AvatarFlightInputComponent::getAirborneSinceMs)
+            .add()
             .<Double>append(new KeyedCodec<>("YawRadians", Codec.DOUBLE),
                     AvatarFlightInputComponent::setYawRadians,
                     AvatarFlightInputComponent::getYawRadians)
@@ -103,6 +107,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     private boolean crouching;
     private boolean sprinting;
     private boolean onGround = true;
+    private long airborneSinceMs;
     private double yawRadians;
     private double pitchRadians;
     private long lastInputAtMs;
@@ -163,12 +168,23 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     }
 
     public void updateJumping(@Nullable Boolean jumping, long nowMs, boolean onGround) {
+        updateJumping(jumping, nowMs, onGround, 0L);
+    }
+
+    public void updateJumping(@Nullable Boolean jumping, long nowMs, boolean onGround, long airborneActivationDelayMs) {
         boolean next = jumping != null && jumping;
-        if (next && !jumpHeldForEdge && !onGround) {
+        if (next && !jumpHeldForEdge && !onGround && canQueueAirborneJumpPress(nowMs, airborneActivationDelayMs)) {
             airborneJumpPressQueuedAtMs = nowMs;
         }
         this.jumping = next;
         this.jumpHeldForEdge = next;
+    }
+
+    private boolean canQueueAirborneJumpPress(long nowMs, long airborneActivationDelayMs) {
+        if (airborneActivationDelayMs <= 0L) {
+            return true;
+        }
+        return airborneSinceMs != 0L && nowMs - airborneSinceMs >= airborneActivationDelayMs;
     }
 
     public boolean isCrouching() {
@@ -200,7 +216,29 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     }
 
     public void setOnGround(@Nullable Boolean onGround) {
-        this.onGround = onGround != null && onGround;
+        boolean next = onGround != null && onGround;
+        this.onGround = next;
+        if (next) {
+            airborneSinceMs = 0L;
+        }
+    }
+
+    public void setOnGround(@Nullable Boolean onGround, long nowMs) {
+        boolean next = onGround != null && onGround;
+        if (next) {
+            airborneSinceMs = 0L;
+        } else if (this.onGround || airborneSinceMs == 0L) {
+            airborneSinceMs = nowMs;
+        }
+        this.onGround = next;
+    }
+
+    public long getAirborneSinceMs() {
+        return airborneSinceMs;
+    }
+
+    public void setAirborneSinceMs(@Nullable Long airborneSinceMs) {
+        this.airborneSinceMs = airborneSinceMs == null ? 0L : airborneSinceMs;
     }
 
     public double getYawRadians() {
@@ -392,6 +430,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         clone.crouching = crouching;
         clone.sprinting = sprinting;
         clone.onGround = onGround;
+        clone.airborneSinceMs = airborneSinceMs;
         clone.yawRadians = yawRadians;
         clone.pitchRadians = pitchRadians;
         clone.lastInputAtMs = lastInputAtMs;

@@ -19,6 +19,7 @@ class TwAvatarFlightConfigTest {
         assertFalse(config.getModel().isApplyModel());
         assertEquals("NordicDrake", config.getModel().getModelId());
         assertEquals(750L, config.getInput().getIntentTimeoutMs());
+        assertEquals(250L, config.getInput().getAirborneJumpActivationDelayMs());
         assertTrue(config.getMovement().getMaxForwardSpeed() > 0.0);
         assertEquals(18.0, config.getMovement().getAirbrakeDeceleration(), 0.00001);
         assertTrue(config.getJump().getCooldownSeconds() > 0.0);
@@ -182,6 +183,25 @@ class TwAvatarFlightConfigTest {
 
         assertTrue(child.getModel().isApplyModel());
         assertEquals("ChildDragon", child.getModel().getModelId());
+    }
+
+    @Test
+    void explicitInputSectionInheritsMissingAirborneJumpDelay() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "input", "intentTimeoutMs", 900.0);
+        setNestedField(parent, "input", "airborneJumpActivationDelayMs", 400.0);
+        setNestedField(child, "input", "intentTimeoutMs", 300.0);
+        setNestedField(child, "input", "airborneJumpActivationDelayMs", 50.0);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Input"),
+                Map.of("Input", Set.of("IntentTimeoutMs"))
+        );
+
+        assertEquals(300L, child.getInput().getIntentTimeoutMs());
+        assertEquals(400L, child.getInput().getAirborneJumpActivationDelayMs());
     }
 
     @Test

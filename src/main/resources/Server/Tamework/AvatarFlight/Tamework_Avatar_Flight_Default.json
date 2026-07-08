@@ -9,7 +9,8 @@
   "Input": {
     "IntentTimeoutMs": 750.0,
     "ForwardDeadzone": 0.25,
-    "StrafeDeadzone": 0.25
+    "StrafeDeadzone": 0.25,
+    "AirborneJumpActivationDelayMs": 250.0
   },
   "Movement": {
     "MaxForwardSpeed": 14.0,

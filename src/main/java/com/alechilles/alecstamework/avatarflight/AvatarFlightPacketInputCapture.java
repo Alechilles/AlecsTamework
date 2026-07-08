@@ -93,6 +93,7 @@ public final class AvatarFlightPacketInputCapture {
         boolean jumpHeld = packetStates != null && (packetStates.jumping || packetStates.swimJumping);
         boolean crouchHeld = packetStates != null && (packetStates.crouching || packetStates.forcedCrouching);
         boolean grounded = movementStates == null ? input.isOnGround() : movementStates.onGround;
+        input.setOnGround(grounded, now);
         boolean jumpHoldLaunchInput = config.getLaunch().isEnabled() && usesJumpHoldLaunch(config);
         boolean crouchHoldLaunchInput = config.getLaunch().isEnabled() && usesCrouchHoldLaunch(config);
         boolean launchStateObserved = packetStates != null;
@@ -103,10 +104,10 @@ public final class AvatarFlightPacketInputCapture {
                 && (input.isLaunchCharging() || input.getLaunchReleasedAtMs() != 0L || (grounded && jumpHeld));
         boolean suppressLaunchCrouch = crouchHoldLaunchInput
                 && (input.isLaunchCharging() || input.getLaunchReleasedAtMs() != 0L || (grounded && crouchHeld));
-        input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded);
+        input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded,
+                config.getInput().getAirborneJumpActivationDelayMs());
         input.setCrouching(!suppressLaunchCrouch && crouchHeld);
         input.updateSprinting(packetStates != null && packetStates.sprinting, now);
-        input.setOnGround(grounded);
         input.setYawRadians(intent.basis().yaw());
         input.setPitchRadians(intent.basis().pitch());
         if (movementStates != null || (recentMovingState && primary.hasUsableIntent())) {

@@ -99,6 +99,24 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
+    void airborneJumpActivationIgnoresPressesTooSoonAfterLeavingGround() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.setOnGround(true, 1_000L);
+        input.setOnGround(false, 1_050L);
+        input.updateJumping(true, 1_100L, false, 250L);
+
+        assertFalse(input.consumeAirborneJumpPress(1_150L, 1_000L),
+                "normal jump presses can arrive shortly after takeoff and must not immediately activate flight");
+
+        input.updateJumping(false, 1_250L, false, 250L);
+        input.updateJumping(true, 1_350L, false, 250L);
+
+        assertTrue(input.consumeAirborneJumpPress(1_360L, 1_000L),
+                "a fresh jump press after the airborne lockout should explicitly activate avatar flight");
+    }
+
+    @Test
     void staleSprintBoostIsConsumedWithoutApplying() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
 
