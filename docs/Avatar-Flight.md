@@ -7,10 +7,10 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
 - Holding crouch on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
-- Avatar flight starts only from a charged launch release or a fresh jump/double-jump press after the player has already been airborne for the configured input delay. Normal ground jumps and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight.
-- Left-click with Flightmaster's Reins performs an upward flap.
+- Avatar flight starts only from a charged launch release, left-click flap, or Q boost from Flightmaster's Reins. Normal jumps, double jumps, and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight with those controls.
+- Left-click with Flightmaster's Reins performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
 - Right-click with Flightmaster's Reins applies the airbrake.
-- Q with Flightmaster's Reins performs a forward boost.
+- Q with Flightmaster's Reins performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
@@ -56,7 +56,7 @@ While grounded and holding the charged launch input, the compact avatar-flight H
 
 Use `/tw debugdragonflight inputprobe on` or `/tw debugplayerinput on` for input logs without changing player movement capability. `/tw debugdragonflight flightprobe on` is a separate client-flight capability probe and can change native movement states, so it should not be used for normal launch tuning unless client flight behavior is the thing being tested.
 
-Avatar flight briefly enables the client's `canFly` movement setting only while the transformed player is grounded/waiting for explicit airborne activation. Hytale exposes creative-style double-jump through the client `flying` movement state instead of a second raw jump state; Tamework cancels that native client flying flag whenever it appears during grounded avatar mode, and only queues avatar-flight entry when the toggle arrives after the configured airborne delay. The capability is disabled once custom flight movement starts.
+Normal avatar flight does not enable the client's native `canFly` movement setting. The standalone `/tw debugdragonflight flightprobe` command remains available when client flight behavior itself needs investigation, but default avatar-flight activation avoids the native double-jump flight path entirely.
 
 ## Config Fields
 
@@ -65,7 +65,7 @@ Avatar flight briefly enables the client's `canFly` movement setting only while 
 - `IntentTimeoutMs`: milliseconds before packet-derived movement intent decays to neutral.
 - `ForwardDeadzone`: absolute forward-axis threshold for W/S intent.
 - `StrafeDeadzone`: absolute strafe-axis threshold for future A/D tuning.
-- `AirborneJumpActivationDelayMs`: milliseconds after leaving ground before a fresh jump press can enter avatar flight. This protects normal ground jumps from starting flight when their jump packet is observed just after takeoff.
+- `AirborneJumpActivationDelayMs`: legacy input setting retained for config compatibility. Default avatar flight no longer uses jump or double-jump as an entry path.
 
 ### Movement
 

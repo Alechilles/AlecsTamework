@@ -27,8 +27,8 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
 
         assertFalse(enableBody.contains("AvatarFlightClientFlightProbe.enable("),
                 "native client flight overrides avatar-flight motion, so it must stay a standalone debug probe");
-        assertTrue(enableBody.contains("AvatarFlightActivationCapability.enableGroundedProbe(store, ref, playerUuid)"),
-                "avatar flight may enable only the grounded activation capability for double-jump detection");
+        assertFalse(enableBody.contains("AvatarFlightActivationCapability"),
+                "normal avatar flight must not borrow native canFly for jump/double-jump activation");
     }
 
     @Test
@@ -38,8 +38,8 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
 
         assertFalse(disableBody.contains("AvatarFlightClientFlightProbe.disable("),
                 "avatar flight disable should not silently disable a manually enabled flightprobe session");
-        assertTrue(disableBody.contains("AvatarFlightActivationCapability.restore(store, ref, playerUuid)"),
-                "avatar flight disable must restore the movement canFly setting it borrowed for activation");
+        assertFalse(disableBody.contains("AvatarFlightActivationCapability"),
+                "normal avatar flight should not own or restore native canFly activation state");
     }
 
     @Test
@@ -79,8 +79,8 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
                 "disconnect events can run off the world thread and must not resolve movement components");
         assertTrue(disconnectBody.contains("AvatarFlightClientFlightProbe.clear(playerUuid)"),
                 "disconnect cleanup should still clear probe bookkeeping");
-        assertTrue(disconnectBody.contains("AvatarFlightActivationCapability.clear(playerUuid)"),
-                "disconnect cleanup should drop activation-capability bookkeeping without resolving components");
+        assertFalse(disconnectBody.contains("AvatarFlightActivationCapability"),
+                "disconnect cleanup should not manage removed double-jump activation bookkeeping");
     }
 
     private static String methodBody(String source, String startNeedle, String endNeedle) {

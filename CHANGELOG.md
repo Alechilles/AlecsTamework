@@ -25,6 +25,7 @@
 - Avatar-flight Q boosts now use directional thrust by default, with upward boost lift capped below flaps and downward boost input applying full directional dive thrust.
 - Avatar-flight dive and climb tuning now uses ramping maneuver loads so diving builds speed more slowly, pitch-up spends momentum more gradually, and clean unboosted dive/pull-up loops recover most but not all lost altitude.
 - Avatar-flight charged launch now defaults to holding crouch on the ground instead of holding jump, keeping airborne crouch as direct descent once no grounded launch charge is active.
+- Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
 - Fixed transformed avatar flight leaving a local-only copy of the owner's armor floating under the dragon after mounting or toggling armor visibility.
@@ -69,11 +70,7 @@
 - Fixed experimental avatar-flight fake rider clothing and armor visibility refreshes so hidden armor no longer keeps suppressing the rider's underlying clothes.
 - Fixed experimental avatar-flight fake rider visuals so armor cosmetic hiding also hides the rider's clothing and accessory attachments for other players.
 - Fixed charged avatar-flight launch so stateless movement packets no longer break a held ground charge into tiny failed releases after the first takeoff.
-- Fixed avatar-flight activation so normal ground jumps and short drops stay in native movement until the player uses a charged launch or presses jump after already airborne.
-- Fixed avatar-flight airborne jump activation so a normal jump press observed shortly after takeoff is ignored until the configurable post-takeoff delay has elapsed.
-- Fixed avatar-flight double-jump activation so stateless movement packets no longer reset the airborne jump timing before the explicit airborne jump press is consumed.
-- Fixed avatar-flight double-jump activation by briefly enabling the grounded client flight capability, reading Hytale's `flying` toggle as the explicit airborne entry signal, and cancelling native flight before custom movement takes over.
-- Fixed fast avatar-flight double taps so native creative-style flight is cancelled even when Hytale reports the toggle before the airborne activation delay is satisfied.
+- Fixed avatar-flight activation leaking into native creative-style flight by removing the normal-mode client `canFly` activation probe.
 - Fixed transformed avatar flight banking poses by supporting single-slot combined pitch/bank pose animations, allowing generic `Origin` pose clips to work when separate overlay slots do not render on transformed players.
 - Fixed transformed avatar flight pose setup so standard Tamework pitch/bank animation sets are injected into the runtime player model instead of requiring every model asset to declare them.
 - Improved transformed avatar flight pose smoothing with a generic injected pitch/bank breakpoint grid, including 40-degree pitch and 30-degree bank poses.

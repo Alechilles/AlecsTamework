@@ -173,9 +173,6 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
 
     public void updateJumping(@Nullable Boolean jumping, long nowMs, boolean onGround, long airborneActivationDelayMs) {
         boolean next = jumping != null && jumping;
-        if (next && !jumpHeldForEdge && !onGround && canQueueAirborneJumpPress(nowMs, airborneActivationDelayMs)) {
-            airborneJumpPressQueuedAtMs = nowMs;
-        }
         this.jumping = next;
         this.jumpHeldForEdge = next;
     }

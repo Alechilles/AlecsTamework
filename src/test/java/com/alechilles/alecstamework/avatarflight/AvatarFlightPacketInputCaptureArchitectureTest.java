@@ -56,9 +56,9 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
                 "capture must distinguish packet-observed button state from MovementStatesComponent fallback");
         assertTrue(source.contains("boolean jumpHeld = stateObserved && (packetStates.jumping || packetStates.swimJumping)"),
                 "jump must not be latched from MovementStatesComponent fallback");
-        assertTrue(source.contains("config.getInput().getAirborneJumpActivationDelayMs()"),
-                "fresh airborne jump activation should be gated by the configured post-takeoff delay");
-        assertTrue(source.contains("input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded,"),
+        assertFalse(source.contains("config.getInput().getAirborneJumpActivationDelayMs()"),
+                "jump/double-jump input should no longer activate avatar flight");
+        assertTrue(source.contains("input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded);"),
                 "grounded launch charge should suppress raw jump only while preserving packet-state-only jump capture");
         assertTrue(source.contains("boolean crouchHeld = stateObserved && (packetStates.crouching || packetStates.forcedCrouching)"),
                 "crouch must not be latched from MovementStatesComponent fallback");
@@ -92,26 +92,15 @@ class AvatarFlightPacketInputCaptureArchitectureTest {
     }
 
     @Test
-    void clientFlyingToggleCanQueueAirborneJumpActivation() throws Exception {
+    void packetFlyingToggleDoesNotActivateAvatarFlight() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        int flyingToggleIndex = source.indexOf("flight.getMode() == AvatarFlightMode.GROUNDED && packetStates.flying");
-        int airborneGateIndex = source.indexOf("if (!grounded)", flyingToggleIndex);
-        int queueIndex = source.indexOf("input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs())",
-                flyingToggleIndex);
-        int cancelIndex = source.indexOf("Player.applyMovementStates(ref, new SavedMovementStates(false), movementStates, store)",
-                flyingToggleIndex);
-
-        assertTrue(flyingToggleIndex >= 0,
-                "client canFly double-jump reports flying=true rather than a second raw jump state");
-        assertTrue(airborneGateIndex > flyingToggleIndex,
-                "grounded native flying toggles must be cancelled without activating avatar flight");
-        assertTrue(queueIndex > airborneGateIndex,
-                "only airborne creative-style flight toggles should feed the delayed explicit entry path");
-        assertTrue(source.contains("input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs())"),
-                "creative-style flight toggles must feed the same delayed explicit airborne entry path");
-        assertTrue(cancelIndex > flyingToggleIndex,
-                "native client flying must be cancelled immediately so custom avatar flight owns movement");
+        assertFalse(source.contains("packetStates.flying"),
+                "native client flying toggles must not be an avatar-flight input path");
+        assertFalse(source.contains("queueAirborneJumpPress"),
+                "jump/double-jump input must not queue avatar-flight activation");
+        assertFalse(source.contains("SavedMovementStates(false), movementStates, store"),
+                "packet capture should not fight native flight toggles because normal avatar mode no longer enables canFly");
     }
 
     @Test

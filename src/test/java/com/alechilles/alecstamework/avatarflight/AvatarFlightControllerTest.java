@@ -22,16 +22,15 @@ class AvatarFlightControllerTest {
     }
 
     @Test
-    void groundedJumpDoesNotEnterAvatarFlight() {
+    void groundedFlapActionCanStartAvatarFlight() {
         AvatarFlightController.Output output = update(
                 groundedState(0.0, 0.0, 0.0),
                 input(0.0, true, false, false, true, 0.0)
         );
 
-        assertEquals(AvatarFlightMode.GROUNDED, output.mode(),
-                "normal ground jumps should stay native until the player explicitly activates flight while airborne");
-        assertFalse(output.applyVelocity());
-        assertFalse(output.jumpApplied());
+        assertTrue(output.applyVelocity(),
+                "Flightmaster's Reins flap is an explicit flight entry action even from grounded mode");
+        assertTrue(output.jumpApplied());
     }
 
     @Test
@@ -47,15 +46,28 @@ class AvatarFlightControllerTest {
     }
 
     @Test
-    void airborneJumpFromGroundedStateEntersAvatarFlight() {
+    void airborneFlapActionFromGroundedStateEntersAvatarFlight() {
         AvatarFlightController.Output output = update(
                 groundedState(0.0, -1.0, 0.0),
                 input(0.0, true, false, false, false, 0.0)
         );
 
         assertTrue(output.applyVelocity(),
-                "a jump press after already airborne is the explicit entry path into avatar flight");
+                "Flightmaster's Reins flap can explicitly enter avatar flight while falling");
         assertTrue(output.jumpApplied());
+    }
+
+    @Test
+    void groundedBoostActionCanStartAvatarFlight() {
+        AvatarFlightController.Output output = update(
+                groundedState(0.0, 0.0, 0.0),
+                input(0.0, false, false, true, true, 0.0)
+        );
+
+        assertEquals(AvatarFlightMode.FORWARD_FLIGHT, output.mode());
+        assertTrue(output.applyVelocity(),
+                "Flightmaster's Reins boost should enter avatar flight before applying boost impulse");
+        assertTrue(output.boostApplied());
     }
 
     @Test

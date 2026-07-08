@@ -80,7 +80,7 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
-    void airborneJumpActivationQueuesOnlyForFreshAirbornePress() {
+    void rawJumpInputDoesNotQueueAvatarFlightActivation() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
 
         input.updateJumping(true, 1_000L, true);
@@ -93,13 +93,13 @@ class AvatarFlightInputComponentTest {
         input.updateJumping(false, 1_200L, false);
         input.updateJumping(true, 1_300L, false);
 
-        assertTrue(input.consumeAirborneJumpPress(1_350L, 1_000L),
-                "pressing jump after already airborne should queue one explicit avatar-flight entry/flap");
+        assertFalse(input.consumeAirborneJumpPress(1_350L, 1_000L),
+                "jump presses no longer activate avatar flight; use charged launch or Flightmaster's Reins");
         assertFalse(input.consumeAirborneJumpPress(1_350L, 1_000L));
     }
 
     @Test
-    void airborneJumpActivationIgnoresPressesTooSoonAfterLeavingGround() {
+    void airborneJumpActivationDelayDoesNotMakeRawJumpAnEntryInput() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
 
         input.setOnGround(true, 1_000L);
@@ -112,24 +112,8 @@ class AvatarFlightInputComponentTest {
         input.updateJumping(false, 1_250L, false, 250L);
         input.updateJumping(true, 1_350L, false, 250L);
 
-        assertTrue(input.consumeAirborneJumpPress(1_360L, 1_000L),
-                "a fresh jump press after the airborne lockout should explicitly activate avatar flight");
-    }
-
-    @Test
-    void clientFlyingToggleUsesSameAirborneActivationDelay() {
-        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
-
-        input.setOnGround(true, 1_000L);
-        input.setOnGround(false, 1_050L);
-
-        assertFalse(input.queueAirborneJumpPress(1_100L, 250L),
-                "creative-style flight toggles during normal takeoff must not activate avatar flight immediately");
-        assertFalse(input.consumeAirborneJumpPress(1_150L, 1_000L));
-
-        assertTrue(input.queueAirborneJumpPress(1_350L, 250L),
-                "a delayed client flying toggle is an explicit airborne entry attempt");
-        assertTrue(input.consumeAirborneJumpPress(1_360L, 1_000L));
+        assertFalse(input.consumeAirborneJumpPress(1_360L, 1_000L),
+                "the legacy airborne delay field must not re-enable jump/double-jump flight entry");
     }
 
     @Test

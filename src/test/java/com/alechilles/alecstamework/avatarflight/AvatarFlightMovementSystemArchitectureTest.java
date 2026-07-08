@@ -92,17 +92,15 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
-    void nativeActivationCapabilityIsDisabledDuringCustomFlight() throws Exception {
+    void normalAvatarFlightDoesNotBorrowNativeClientFlightCapability() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("syncActivationCapability(ref, commandBuffer, output.mode() == AvatarFlightMode.GROUNDED)"),
-                "client canFly should be available only while waiting for explicit airborne activation");
-        assertTrue(source.contains("AvatarFlightActivationCapability.setGroundedProbeEnabled("),
-                "avatar flight should not reuse the standalone debug client-flight probe");
-        int activationIndex = source.indexOf("syncActivationCapability(ref, commandBuffer");
-        int ownerFlyingIndex = source.indexOf("syncOwnerClientFlyingState(ref, commandBuffer");
-        assertTrue(activationIndex >= 0 && ownerFlyingIndex > activationIndex,
-                "native canFly should be disabled before syncing owner flying animation for custom flight");
+        assertFalse(source.contains("syncActivationCapability"),
+                "normal avatar flight must not enable native canFly for jump/double-jump activation");
+        assertFalse(source.contains("AvatarFlightActivationCapability"),
+                "normal avatar flight should keep client-flight capability isolated to the standalone debug probe");
+        assertTrue(source.contains("syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity())"),
+                "custom flight may still sync saved flying state for transformed-player animations");
     }
 
     @Test
@@ -132,15 +130,23 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
-    void inactiveAvatarFlightUsesAirborneJumpPressInsteadOfHeldGroundJump() throws Exception {
+    void inactiveAvatarFlightStartsOnlyFromReinsActions() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("boolean activeFlight = flight.getMode() != AvatarFlightMode.GROUNDED"),
                 "movement input conversion must know whether the controller is already in avatar-flight mode");
-        assertTrue(source.contains("input.consumeAirborneJumpPress("),
-                "inactive avatar flight should enter only from a one-shot jump press observed after already airborne");
+        assertTrue(source.contains("boolean itemFlightStart = reinsFlap || reinsBoost"),
+                "inactive avatar flight should start from explicit Flightmaster's Reins actions");
+        assertFalse(source.contains("input.consumeAirborneJumpPress("),
+                "jump/double-jump input must not enter avatar flight");
         assertTrue(source.contains("? reinsFlap || (!stale && input.isJumping())"),
                 "held jump should continue to repeat flaps only after avatar flight is already active");
+        assertTrue(source.contains(": reinsFlap"),
+                "inactive avatar flight may start from the Reins flap action");
+        assertTrue(source.contains("boolean boostIntent = reinsBoost || (activeFlight && sprintBoost)"),
+                "inactive avatar flight may start from Q boost, but not from unreliable sprint pulses");
+        assertTrue(source.contains("onGround && !itemFlightStart"),
+                "item actions should be allowed to lift off even while the cached movement state is grounded");
     }
 
     @Test
@@ -149,8 +155,8 @@ class AvatarFlightMovementSystemArchitectureTest {
 
         assertTrue(source.contains("input.consumeReinsBoost("),
                 "Flightmaster's Reins Q action should feed the existing boost intent path");
-        assertTrue(source.contains("reinsBoost || sprintBoost"),
-                "Q boost must not depend on unreliable airborne sprint detection");
+        assertTrue(source.contains("boolean boostIntent = reinsBoost || (activeFlight && sprintBoost)"),
+                "Q boost must not depend on unreliable airborne sprint detection when entering flight");
     }
 
     @Test

@@ -53,6 +53,7 @@ public final class AvatarFlightController {
         long nextBoostAtMs = state.nextBoostAtMs();
         long nextLaunchAtMs = state.nextLaunchAtMs();
         boolean jumpIntent = (input.jump() || input.verticalAxis() > 0.0) && input.flapAllowed();
+        boolean boostIntent = input.sprint() && input.boostAllowed();
         boolean descendIntent = input.crouch() || input.verticalAxis() < 0.0;
         boolean explicitAirbrakeIntent = input.airbrake();
         boolean activeFlight = state.mode() != AvatarFlightMode.GROUNDED;
@@ -88,7 +89,10 @@ public final class AvatarFlightController {
                     AvatarFlightSpeedMetrics.speedRatio(impulse.forward(), config)
             );
         }
-        if (input.onGround() || (!activeFlight && !jumpIntent)) {
+        boolean flapReady = nextJumpAtMs == 0L || nowMs >= nextJumpAtMs;
+        boolean boostReady = nextBoostAtMs == 0L || nowMs >= nextBoostAtMs;
+        boolean flightStartIntent = (jumpIntent && flapReady) || (boostIntent && boostReady);
+        if (!flightStartIntent && (input.onGround() || !activeFlight)) {
             return new Output(AvatarFlightMode.GROUNDED, 0.0, 0.0, 0.0,
                     nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, 0.0, 0.0, false, false, false, false, 0.0,
                     true, false, 0.0, 0.0, 0.0);
@@ -162,15 +166,12 @@ public final class AvatarFlightController {
         boolean boostActive = isBoostActive(nextBoostAtMs, boostCooldownMs, boostDurationMs, nowMs);
         double glideHorizontalCap = AvatarFlightSpeedMetrics.glideHorizontalCap(config);
         double boostedHorizontalCap = AvatarFlightSpeedMetrics.boostedHorizontalCap(config);
-        if (jumpIntent && (nextJumpAtMs == 0L || nowMs >= nextJumpAtMs)) {
+        if (jumpIntent && flapReady) {
             vertical = Math.max(vertical, 0.0) + config.getJump().getUpwardImpulse();
             nextJumpAtMs = nowMs + Math.round(config.getJump().getCooldownSeconds() * 1000.0);
             jumpApplied = true;
         }
-        if (!explicitAirbrakeIntent
-                && input.sprint()
-                && input.boostAllowed()
-                && (nextBoostAtMs == 0L || nowMs >= nextBoostAtMs)) {
+        if (!explicitAirbrakeIntent && boostIntent && boostReady) {
             double boost = config.getBoost().getForwardImpulse();
             if (config.getBoost().isDirectional()) {
                 double absPitch = Math.abs(effectivePitchRadians);

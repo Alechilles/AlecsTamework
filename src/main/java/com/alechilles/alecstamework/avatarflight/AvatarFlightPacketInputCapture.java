@@ -8,9 +8,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.Direction;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.Position;
-import com.hypixel.hytale.protocol.SavedMovementStates;
 import com.hypixel.hytale.protocol.packets.player.ClientMovement;
-import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.io.handlers.IPacketHandler;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -109,16 +107,9 @@ public final class AvatarFlightPacketInputCapture {
         boolean suppressLaunchCrouch = crouchHoldLaunchInput
                 && (input.isLaunchCharging() || input.getLaunchReleasedAtMs() != 0L || (grounded && crouchHeld));
         if (stateObserved) {
-            input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded,
-                    config.getInput().getAirborneJumpActivationDelayMs());
+            input.updateJumping(!suppressLaunchJump && jumpHeld, now, grounded);
             input.setCrouching(!suppressLaunchCrouch && crouchHeld);
             input.updateSprinting(packetStates.sprinting, now);
-            if (flight.getMode() == AvatarFlightMode.GROUNDED && packetStates.flying) {
-                if (!grounded) {
-                    input.queueAirborneJumpPress(now, config.getInput().getAirborneJumpActivationDelayMs());
-                }
-                Player.applyMovementStates(ref, new SavedMovementStates(false), movementStates, store);
-            }
         }
         input.setYawRadians(intent.basis().yaw());
         input.setPitchRadians(intent.basis().pitch());
