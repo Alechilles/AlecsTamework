@@ -49,6 +49,8 @@ The default maneuver curve is tuned so a clean unboosted steep dive followed by 
 
 The compact avatar-flight HUD appears above the hotbar while avatar flight is active. The upper label shows current pitch relative to flat, such as `-30°` while diving or `+30°` while climbing. The speed bar shows current horizontal speed relative to boosted max speed, and the thin red marker shows the target horizontal speed the controller is trending toward at the current pitch, airbrake, or boost state. The pips show Vigour charges, including partial recharge progress. The HUD keeps a transparent root and renders only the label, bar, marker, and charge pip backgrounds so it does not draw a modal panel or missing-texture backdrop over the hotbar.
 
+While grounded and holding the charged launch input, the compact avatar-flight HUD shows an amber launch-charge bar above the pitch readout. The bar fills from `0%` at hold start to `100%` at `Launch.MaxChargeMs`, and a small marker shows the minimum valid release threshold from `Launch.MinChargeMs`. The launch bar hides as soon as the charge is released, cancelled, or the player is airborne.
+
 ## Debugging
 
 Use `/tw debugdragonflight inputprobe on` or `/tw debugplayerinput on` for input logs without changing player movement capability. `/tw debugdragonflight flightprobe on` is a separate client-flight capability probe and can change native movement states, so it should not be used for normal launch tuning unless client flight behavior is the thing being tested.
