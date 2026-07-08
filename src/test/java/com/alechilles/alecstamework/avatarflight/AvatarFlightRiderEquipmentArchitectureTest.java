@@ -77,11 +77,11 @@ class AvatarFlightRiderEquipmentArchitectureTest {
     }
 
     @Test
-    void hiddenOwnerArmorUsesEngineEmptyItemKey() throws Exception {
+    void hiddenOwnerArmorUsesEngineEmptyArmorSlotValue() throws Exception {
         String source = Files.readString(PACKET_HELPER, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("Arrays.fill(update.armorIds, BlockType.EMPTY_KEY)"));
-        assertFalse(source.contains("Arrays.fill(update.armorIds, \"\")"));
+        assertTrue(source.contains("Arrays.fill(update.armorIds, \"\")"));
+        assertFalse(source.contains("Arrays.fill(update.armorIds, BlockType.EMPTY_KEY)"));
     }
 
     @Test
