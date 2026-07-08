@@ -76,11 +76,17 @@ class AvatarFlightRiderModelVariantServiceTest {
     }
 
     @Test
-    void generatedVariantsRegisterThroughCommonAssetModule() throws Exception {
+    void missingGeneratedVariantsAreRegisteredOutOfBand() throws Exception {
         String source = Files.readString(SERVICE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("new AvatarFlightGeneratedCommonAsset("));
         assertTrue(source.contains("module.addCommonAsset(GENERATED_PACK, generatedAsset, false)"));
+        assertTrue(source.contains("GENERATED_ASSET_MIN_INTERVAL_MS"));
+        assertTrue(source.contains("NEXT_GENERATION_AT_MS.compareAndSet"));
+        assertTrue(source.contains("maybeGenerateVariant(normalized);"));
+        assertTrue(source.contains("return normalized;"));
+        assertTrue(source.contains("CommonAssetRegistry.hasCommonAsset(generated)"));
+        assertFalse(source.contains("computeIfAbsent"));
         assertFalse(source.contains("CommonAssetRegistry.addCommonAsset(GENERATED_PACK, generatedAsset);\n            CommonAssetModule"));
     }
 

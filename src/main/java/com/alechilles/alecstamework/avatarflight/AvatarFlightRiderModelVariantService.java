@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,6 +27,7 @@ final class AvatarFlightRiderModelVariantService {
     private static final String LEGACY_EQUIPMENT_PREFIX = "Tamework/AvatarFlight/Rider/Equipment/";
     private static final String GENERATED_PACK = "Alechilles:Alec's Tamework!";
     private static final String GENERATED_ID_PREFIX = "tw_rider_attachment_";
+    private static final long GENERATED_ASSET_MIN_INTERVAL_MS = 250L;
     private static final Set<String> RIDER_SAFE_BIND_NODE_NAMES = Set.of(
             "Origin",
             "Pelvis",
@@ -53,7 +55,8 @@ final class AvatarFlightRiderModelVariantService {
             "L-Calf",
             "L-Foot"
     );
-    private static final ConcurrentHashMap<String, String> GENERATED_MODELS = new ConcurrentHashMap<>();
+    private static final Set<String> FAILED_MODELS = ConcurrentHashMap.newKeySet();
+    private static final AtomicLong NEXT_GENERATION_AT_MS = new AtomicLong();
 
     private AvatarFlightRiderModelVariantService() {
     }
@@ -68,7 +71,8 @@ final class AvatarFlightRiderModelVariantService {
         if (CommonAssetRegistry.hasCommonAsset(generated)) {
             return generated;
         }
-        return GENERATED_MODELS.computeIfAbsent(normalized, AvatarFlightRiderModelVariantService::generateVariant);
+        maybeGenerateVariant(normalized);
+        return normalized;
     }
 
     @Nonnull
@@ -114,6 +118,23 @@ final class AvatarFlightRiderModelVariantService {
         } catch (RuntimeException ex) {
             warnFailedVariant(model, ex);
             return model;
+        }
+    }
+
+    private static void maybeGenerateVariant(@Nonnull String model) {
+        if (FAILED_MODELS.contains(model)) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        long next = NEXT_GENERATION_AT_MS.get();
+        if (now < next || !NEXT_GENERATION_AT_MS.compareAndSet(next, now + GENERATED_ASSET_MIN_INTERVAL_MS)) {
+            return;
+        }
+
+        String generated = generateVariant(model);
+        if (!isGeneratedVariant(generated)) {
+            FAILED_MODELS.add(model);
         }
     }
 
