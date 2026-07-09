@@ -70,6 +70,10 @@ Player-facing Tamework config strings support `server.lang` keys. Built-in talen
 - [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation)
 - [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
 
+## Licensing
+Tamework is source-available under [Alec's Tamework Source Available License 1.0](LICENSE.txt). Unmodified dependency use and example/template reuse are allowed under the public license.
+
+Custom private plugins, private forks, or server-specific adaptations that copy or derive from Tamework systems require separate written permission. See [Private Server Licensing Template](PRIVATE-SERVER-LICENSE-TEMPLATE.md) for the starting deal structure.
 
 ## Issue Reporting
 If you run into a bug, integration issue, or behavior problem, report it in the Discord server:
