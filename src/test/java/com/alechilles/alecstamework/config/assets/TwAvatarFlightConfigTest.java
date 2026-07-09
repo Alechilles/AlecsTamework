@@ -112,6 +112,13 @@ class TwAvatarFlightConfigTest {
         assertEquals(1.0, config.getLaunch().getPartialChargeCost(), 0.00001);
         assertEquals(2.0, config.getLaunch().getFullChargeCost(), 0.00001);
         assertEquals(0.6, config.getLaunch().getFullChargeCostThreshold(), 0.00001);
+        assertTrue(config.getVfx().isEnabled());
+        assertEquals(AvatarFlightVfxSettings.DEFAULT_CHARGE_SYSTEM,
+                config.getVfx().getLaunchChargeParticleSystem());
+        assertEquals(600L, config.getVfx().getLaunchChargeEarlyIntervalMs());
+        assertEquals(150L, config.getVfx().getLaunchChargeFullIntervalMs());
+        assertEquals(0.45, config.getVfx().getLaunchReleaseMidThreshold(), 0.00001);
+        assertEquals(0.80, config.getVfx().getLaunchReleaseFullThreshold(), 0.00001);
     }
 
     @Test
@@ -120,11 +127,48 @@ class TwAvatarFlightConfigTest {
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
         setNestedField(parent, "movement", "maxForwardSpeed", 22.0);
         setNestedField(parent, "jump", "upwardImpulse", 9.0);
+        setNestedField(parent, "vfx", "launchChargeEarlyIntervalMs", 725.0);
 
         child.inheritMissingTopLevelFrom(parent, Set.of());
 
         assertEquals(22.0, child.getMovement().getMaxForwardSpeed(), 0.00001);
         assertEquals(9.0, child.getJump().getUpwardImpulse(), 0.00001);
+        assertEquals(725L, child.getVfx().getLaunchChargeEarlyIntervalMs());
+    }
+
+    @Test
+    void explicitVfxSectionInheritsMissingNestedKeys() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "vfx", "launchChargeEarlyIntervalMs", 800.0);
+        setNestedField(parent, "vfx", "launchReleaseFullParticleSystem", "ParentFull");
+        setNestedField(child, "vfx", "launchChargeEarlyIntervalMs", 300.0);
+        setNestedField(child, "vfx", "launchReleaseFullParticleSystem", "ChildFull");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Vfx"),
+                Map.of("Vfx", Set.of("LaunchChargeEarlyIntervalMs"))
+        );
+
+        assertEquals(300L, child.getVfx().getLaunchChargeEarlyIntervalMs());
+        assertEquals("ParentFull", child.getVfx().getLaunchReleaseFullParticleSystem());
+    }
+
+    @Test
+    void invalidVfxTimingScaleAndThresholdValuesClampSafely() throws Exception {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(config, "vfx", "launchChargeEarlyIntervalMs", 100.0);
+        setNestedField(config, "vfx", "launchChargeFullIntervalMs", 900.0);
+        setNestedField(config, "vfx", "launchChargeMinScale", -1.0);
+        setNestedField(config, "vfx", "launchReleaseMidThreshold", 0.9);
+        setNestedField(config, "vfx", "launchReleaseFullThreshold", 0.2);
+
+        assertEquals(100L, config.getVfx().getLaunchChargeEarlyIntervalMs());
+        assertEquals(100L, config.getVfx().getLaunchChargeFullIntervalMs());
+        assertEquals(0.65, config.getVfx().getLaunchChargeMinScale(), 0.00001);
+        assertEquals(0.9, config.getVfx().getLaunchReleaseMidThreshold(), 0.00001);
+        assertEquals(0.9, config.getVfx().getLaunchReleaseFullThreshold(), 0.00001);
     }
 
     @Test

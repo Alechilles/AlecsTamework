@@ -40,6 +40,8 @@ Charged launch is the default takeoff path for avatar flight. With `Launch.Prefe
 
 Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-loads some launch strength after the minimum hold, while still rewarding longer charge time. Partial launches cost `1` Vigour by default, and launches at or above `Launch.FullChargeCostThreshold` cost `2`.
 
+Launch presentation uses short world-space particle systems. Grounded charging emits increasingly frequent inward pressure pulses at the avatar's foot position. A release below the minimum or a rejected release emits a small fizzle. Successful launches emit partial, mid, or full release systems selected from the configured launch curve. The release stays at the last grounded charge origin if the avatar leaves the ground before releasing.
+
 ## Glide Balance
 
 Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: forward input can seed movement from hover or stall, but flat unpowered flight decays gradually toward the `Movement.GlideStartKickSpeed` floor instead of preserving `Movement.NeutralGlideSpeed` forever. Very shallow downward pitch, currently less than about `8°`, is treated like neutral glide for speed and sink so tiny dive angles cannot preserve max glide speed or carry leftover flap lift indefinitely. This neutral/shallow speed bleed is intentionally gentle, with default `Movement.NeutralGlideDeceleration` set to `0.15`, so it preserves more horizontal momentum than a shallow climb while still losing altitude through glide sink. Higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward past the shallow-dive dead zone can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
@@ -145,3 +147,20 @@ The generator warns when player-style locomotion sets that the native transforme
 - `RechargeDelayAfterSpendSeconds`: delay before recharge resumes after spending.
 - `HudEnabled`: shows the compact speed and Vigour HUD.
 - `HudResendIntervalMs`: throttles unchanged HUD refreshes.
+
+### Vfx
+
+- `Enabled`: enables avatar-flight particle presentation without changing movement behavior.
+- `GroundOffsetY`: vertical offset from the avatar foot position for launch effects.
+- `MaxDurationSeconds`: defensive client-side lifetime cap for each spawned system.
+- `LaunchChargeEnabled`: enables grounded charge pulses.
+- `LaunchChargeParticleSystem`: system ID for each charge pulse.
+- `LaunchChargeEarlyIntervalMs` / `LaunchChargeFullIntervalMs`: pulse cadence at the start and end of charging.
+- `LaunchChargeMinScale` / `LaunchChargeMaxScale`: pulse scale at the start and end of charging.
+- `LaunchCancelEnabled`, `LaunchCancelParticleSystem`, `LaunchCancelScale`: canceled or rejected release effect.
+- `LaunchReleaseEnabled`: enables successful release effects.
+- `LaunchReleasePartialParticleSystem`, `LaunchReleaseMidParticleSystem`, `LaunchReleaseFullParticleSystem`: release systems by launch-curve tier.
+- `LaunchReleasePartialScale`, `LaunchReleaseMidScale`, `LaunchReleaseFullScale`: whole-system scale by tier.
+- `LaunchReleaseMidThreshold` / `LaunchReleaseFullThreshold`: launch-curve charge boundaries for mid and full release effects.
+
+Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object overrides only its explicit nested keys and inherits the remaining values.

@@ -12,6 +12,10 @@ class AvatarFlightRiderVisualConfigArchitectureTest {
             "src", "main", "java", "com", "alechilles", "alecstamework",
             "config", "assets", "TwAvatarFlightConfig.java"
     );
+    private static final Path INHERITANCE = Path.of(
+            "src", "main", "java", "com", "alechilles", "alecstamework",
+            "config", "assets", "TwAvatarFlightConfigInheritance.java"
+    );
     private static final Path DEFAULT_JSON = Path.of(
             "src", "main", "resources", "Server", "Tamework", "AvatarFlight",
             "Tamework_Avatar_Flight_Default.json"
@@ -20,11 +24,13 @@ class AvatarFlightRiderVisualConfigArchitectureTest {
     @Test
     void riderVisualConfigIsCodecBackedAndInheritanceAware() throws Exception {
         String source = Files.readString(CONFIG, StandardCharsets.UTF_8);
+        String inheritance = Files.readString(INHERITANCE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("BuilderCodec<RiderVisualSettings> RIDER_VISUAL_CODEC"));
         assertTrue(source.contains("new KeyedCodec<>(\"RiderVisual\", RIDER_VISUAL_CODEC)"));
-        assertTrue(source.contains("inheritOrCopyRiderVisual("));
-        assertTrue(source.contains("if (!keys.contains(\"ShowRider\"))"));
+        assertTrue(source.contains("TwAvatarFlightConfigInheritance.inheritMissingFrom("));
+        assertTrue(inheritance.contains("inheritRiderVisual("));
+        assertTrue(inheritance.contains("if (!keys.contains(\"ShowRider\"))"));
         assertTrue(source.contains("public RiderVisualSettings getRiderVisual()"));
     }
 

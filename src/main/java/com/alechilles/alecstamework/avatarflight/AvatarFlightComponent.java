@@ -118,6 +118,30 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setNextRollPoseAnimationAtMs,
                     AvatarFlightComponent::getNextRollPoseAnimationAtMs)
             .add()
+            .<Boolean>append(new KeyedCodec<>("LaunchVfxOriginValid", Codec.BOOLEAN),
+                    AvatarFlightComponent::setLaunchVfxOriginValid,
+                    AvatarFlightComponent::isLaunchVfxOriginValid)
+            .add()
+            .<Double>append(new KeyedCodec<>("LaunchVfxOriginX", Codec.DOUBLE),
+                    AvatarFlightComponent::setLaunchVfxOriginX,
+                    AvatarFlightComponent::getLaunchVfxOriginX)
+            .add()
+            .<Double>append(new KeyedCodec<>("LaunchVfxOriginY", Codec.DOUBLE),
+                    AvatarFlightComponent::setLaunchVfxOriginY,
+                    AvatarFlightComponent::getLaunchVfxOriginY)
+            .add()
+            .<Double>append(new KeyedCodec<>("LaunchVfxOriginZ", Codec.DOUBLE),
+                    AvatarFlightComponent::setLaunchVfxOriginZ,
+                    AvatarFlightComponent::getLaunchVfxOriginZ)
+            .add()
+            .<Double>append(new KeyedCodec<>("LaunchVfxYawRadians", Codec.DOUBLE),
+                    AvatarFlightComponent::setLaunchVfxYawRadians,
+                    AvatarFlightComponent::getLaunchVfxYawRadians)
+            .add()
+            .<Long>append(new KeyedCodec<>("NextLaunchChargeVfxAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextLaunchChargeVfxAtMs,
+                    AvatarFlightComponent::getNextLaunchChargeVfxAtMs)
+            .add()
             .build();
 
     private String configId = "";
@@ -145,6 +169,12 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextPitchPoseAnimationAtMs;
     private String rollPoseAnimationId = "";
     private long nextRollPoseAnimationAtMs;
+    private boolean launchVfxOriginValid;
+    private double launchVfxOriginX;
+    private double launchVfxOriginY;
+    private double launchVfxOriginZ;
+    private double launchVfxYawRadians;
+    private long nextLaunchChargeVfxAtMs;
 
     public AvatarFlightComponent() {
     }
@@ -396,6 +426,36 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         this.nextRollPoseAnimationAtMs = nextRollPoseAnimationAtMs == null ? 0L : nextRollPoseAnimationAtMs;
     }
 
+    public boolean isLaunchVfxOriginValid() { return launchVfxOriginValid; }
+    public void setLaunchVfxOriginValid(@Nullable Boolean value) { launchVfxOriginValid = value != null && value; }
+    public double getLaunchVfxOriginX() { return finiteOrZero(launchVfxOriginX); }
+    public void setLaunchVfxOriginX(@Nullable Double value) { launchVfxOriginX = finiteOrZero(value); }
+    public double getLaunchVfxOriginY() { return finiteOrZero(launchVfxOriginY); }
+    public void setLaunchVfxOriginY(@Nullable Double value) { launchVfxOriginY = finiteOrZero(value); }
+    public double getLaunchVfxOriginZ() { return finiteOrZero(launchVfxOriginZ); }
+    public void setLaunchVfxOriginZ(@Nullable Double value) { launchVfxOriginZ = finiteOrZero(value); }
+    public double getLaunchVfxYawRadians() { return finiteOrZero(launchVfxYawRadians); }
+    public void setLaunchVfxYawRadians(@Nullable Double value) { launchVfxYawRadians = finiteOrZero(value); }
+    public long getNextLaunchChargeVfxAtMs() { return nextLaunchChargeVfxAtMs; }
+    public void setNextLaunchChargeVfxAtMs(@Nullable Long value) { nextLaunchChargeVfxAtMs = value == null ? 0L : value; }
+
+    public void captureLaunchVfxOrigin(double x, double y, double z, double yawRadians) {
+        launchVfxOriginValid = true;
+        launchVfxOriginX = finiteOrZero(x);
+        launchVfxOriginY = finiteOrZero(y);
+        launchVfxOriginZ = finiteOrZero(z);
+        launchVfxYawRadians = finiteOrZero(yawRadians);
+    }
+
+    public void clearLaunchVfxState() {
+        launchVfxOriginValid = false;
+        launchVfxOriginX = 0.0;
+        launchVfxOriginY = 0.0;
+        launchVfxOriginZ = 0.0;
+        launchVfxYawRadians = 0.0;
+        nextLaunchChargeVfxAtMs = 0L;
+    }
+
     public void setVelocity(double x, double y, double z) {
         velocityX = finiteOrZero(x);
         velocityY = finiteOrZero(y);
@@ -428,6 +488,12 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.nextPitchPoseAnimationAtMs = nextPitchPoseAnimationAtMs;
         clone.rollPoseAnimationId = getRollPoseAnimationId();
         clone.nextRollPoseAnimationAtMs = nextRollPoseAnimationAtMs;
+        clone.launchVfxOriginValid = launchVfxOriginValid;
+        clone.launchVfxOriginX = getLaunchVfxOriginX();
+        clone.launchVfxOriginY = getLaunchVfxOriginY();
+        clone.launchVfxOriginZ = getLaunchVfxOriginZ();
+        clone.launchVfxYawRadians = getLaunchVfxYawRadians();
+        clone.nextLaunchChargeVfxAtMs = nextLaunchChargeVfxAtMs;
         return clone;
     }
 

@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
-import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
 import com.hypixel.hytale.assetstore.codec.AssetBuilderCodec;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -541,6 +540,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.launch)
             .documentation("Charged avatar launch input and impulse values. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AvatarFlightVfxSettings>append(new KeyedCodec<>("Vfx", AvatarFlightVfxSettings.CODEC),
+                    (asset, value) -> asset.vfx = value == null ? new AvatarFlightVfxSettings() : value,
+                    asset -> asset.vfx)
+            .documentation("Avatar-flight particle presentation. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<VigourSettings>append(new KeyedCodec<>("Vigour", VIGOUR_CODEC),
                     (asset, value) -> asset.vigour = value == null ? new VigourSettings() : value,
                     asset -> asset.vigour)
@@ -563,134 +567,53 @@ public final class TwAvatarFlightConfig implements
             .add()
             .build();
 
-    private static AssetStore<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> ASSET_STORE;
-    private static final Object CACHE_LOCK = new Object();
-    private static volatile boolean CACHE_DIRTY = true;
-    private static volatile TwAvatarFlightConfig ACTIVE_CONFIG;
-    private static final Object INHERITANCE_CACHE_LOCK = new Object();
-    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
-
     private AssetExtraInfo.Data data;
     private String id;
-    private boolean enabled = true;
-    private int priority;
-    private ModelSettings model = new ModelSettings();
-    private InputSettings input = new InputSettings();
-    private MovementSettings movement = new MovementSettings();
-    private AvatarFlightCurveSettings curve = new AvatarFlightCurveSettings();
-    private JumpSettings jump = new JumpSettings();
-    private BoostSettings boost = new BoostSettings();
-    private AvatarFlightLaunchSettings launch = new AvatarFlightLaunchSettings();
-    private VigourSettings vigour = new VigourSettings();
-    private AnimationSettings animation = new AnimationSettings();
-    private RiderVisualSettings riderVisual = new RiderVisualSettings();
-    private DebugSettings debug = new DebugSettings();
+    boolean enabled = true;
+    int priority;
+    ModelSettings model = new ModelSettings();
+    InputSettings input = new InputSettings();
+    MovementSettings movement = new MovementSettings();
+    AvatarFlightCurveSettings curve = new AvatarFlightCurveSettings();
+    JumpSettings jump = new JumpSettings();
+    BoostSettings boost = new BoostSettings();
+    AvatarFlightLaunchSettings launch = new AvatarFlightLaunchSettings();
+    AvatarFlightVfxSettings vfx = new AvatarFlightVfxSettings();
+    VigourSettings vigour = new VigourSettings();
+    AnimationSettings animation = new AnimationSettings();
+    RiderVisualSettings riderVisual = new RiderVisualSettings();
+    DebugSettings debug = new DebugSettings();
 
     protected TwAvatarFlightConfig() {
     }
 
     @Nullable
     public static AssetStore<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> getAssetStore() {
-        if (ASSET_STORE == null) {
-            ASSET_STORE = AssetRegistry.getAssetStore(TwAvatarFlightConfig.class);
-        }
-        return ASSET_STORE;
+        return TwAvatarFlightConfigRegistry.getAssetStore();
     }
 
     @Nullable
     public static DefaultAssetMap<String, TwAvatarFlightConfig> getAssetMap() {
-        AssetStore<String, TwAvatarFlightConfig, DefaultAssetMap<String, TwAvatarFlightConfig>> store = getAssetStore();
-        if (store == null) {
-            return null;
-        }
-        DefaultAssetMap<String, TwAvatarFlightConfig> assetMap =
-                (DefaultAssetMap<String, TwAvatarFlightConfig>) store.getAssetMap();
-        ensureInheritanceFallbackApplied(assetMap);
-        return assetMap;
+        return TwAvatarFlightConfigRegistry.getAssetMap();
     }
 
     public static void clearCache() {
-        CACHE_DIRTY = true;
-        INHERITANCE_CACHE_DIRTY = true;
+        TwAvatarFlightConfigRegistry.clearCache();
     }
 
     @Nonnull
     public static TwAvatarFlightConfig resolveActive() {
-        DefaultAssetMap<String, TwAvatarFlightConfig> assetMap = getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return defaultConfig();
-        }
-        TwAvatarFlightConfig cached = ACTIVE_CONFIG;
-        if (CACHE_DIRTY || cached == null) {
-            synchronized (CACHE_LOCK) {
-                if (CACHE_DIRTY || ACTIVE_CONFIG == null) {
-                    ACTIVE_CONFIG = selectBest(assetMap.getAssetMap().values());
-                    CACHE_DIRTY = false;
-                }
-                cached = ACTIVE_CONFIG;
-            }
-        }
-        return cached == null ? defaultConfig() : cached;
+        return TwAvatarFlightConfigRegistry.resolveActive();
     }
 
     @Nonnull
     public static TwAvatarFlightConfig resolve(@Nullable String configId) {
-        if (configId == null || configId.isBlank()) {
-            return resolveActive();
-        }
-        DefaultAssetMap<String, TwAvatarFlightConfig> assetMap = getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return defaultConfig();
-        }
-        TwAvatarFlightConfig direct = assetMap.getAssetMap().get(configId);
-        if (direct != null && direct.isEnabled()) {
-            return direct;
-        }
-        for (TwAvatarFlightConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate != null && candidate.isEnabled()
-                    && candidate.getId() != null && candidate.getId().equalsIgnoreCase(configId.trim())) {
-                return candidate;
-            }
-        }
-        return resolveActive();
+        return TwAvatarFlightConfigRegistry.resolve(configId);
     }
 
     @Nonnull
     public static TwAvatarFlightConfig defaultConfig() {
         return new TwAvatarFlightConfig();
-    }
-
-    @Nullable
-    private static TwAvatarFlightConfig selectBest(@Nullable Iterable<TwAvatarFlightConfig> candidates) {
-        TwAvatarFlightConfig best = null;
-        if (candidates == null) {
-            return null;
-        }
-        for (TwAvatarFlightConfig candidate : candidates) {
-            if (candidate == null || !candidate.isEnabled()) {
-                continue;
-            }
-            if (best == null || candidate.getPriority() > best.getPriority()
-                    || (candidate.getPriority() == best.getPriority()
-                    && safe(candidate.getId()).compareToIgnoreCase(safe(best.getId())) < 0)) {
-                best = candidate;
-            }
-        }
-        return best;
-    }
-
-    private static void ensureInheritanceFallbackApplied(
-            @Nullable DefaultAssetMap<String, TwAvatarFlightConfig> assetMap) {
-        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
-            return;
-        }
-        synchronized (INHERITANCE_CACHE_LOCK) {
-            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
-                return;
-            }
-            TwAssetInheritanceFallback.repairAll(assetMap);
-            INHERITANCE_CACHE_DIRTY = false;
-        }
     }
 
     @Override
@@ -713,246 +636,12 @@ public final class TwAvatarFlightConfig implements
     public void inheritMissingTopLevelFrom(@Nonnull TwAvatarFlightConfig parent,
                                            @Nonnull Set<String> explicitTopLevelKeys,
                                            @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
-        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
-        if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
-        inheritOrCopyModel(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Model"), explicitTopLevelKeys);
-        inheritOrCopyInput(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Input"), explicitTopLevelKeys);
-        inheritOrCopyMovement(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Movement"), explicitTopLevelKeys);
-        inheritOrCopyCurve(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Curve"), explicitTopLevelKeys);
-        inheritOrCopyJump(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Jump"), explicitTopLevelKeys);
-        inheritOrCopyBoost(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Boost"), explicitTopLevelKeys);
-        inheritOrCopyLaunch(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Launch"), explicitTopLevelKeys);
-        inheritOrCopyVigour(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Vigour"), explicitTopLevelKeys);
-        inheritOrCopyAnimation(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Animation"), explicitTopLevelKeys);
-        inheritOrCopyRiderVisual(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "RiderVisual"), explicitTopLevelKeys);
-        inheritOrCopyDebug(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Debug"), explicitTopLevelKeys);
-    }
-
-    private void inheritOrCopyModel(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Model")) model = parent.model;
-        else if (keys != null && model != null && parent.model != null) {
-            if (!keys.contains("ApplyModel")) model.applyModel = parent.model.applyModel;
-            if (!keys.contains("ModelId")) model.modelId = parent.model.modelId;
-            if (!keys.contains("Scale")) model.scale = parent.model.scale;
-        }
-    }
-
-    private void inheritOrCopyInput(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Input")) input = parent.input;
-        else if (keys != null && input != null && parent.input != null) {
-            if (!keys.contains("IntentTimeoutMs")) input.intentTimeoutMs = parent.input.intentTimeoutMs;
-            if (!keys.contains("ForwardDeadzone")) input.forwardDeadzone = parent.input.forwardDeadzone;
-            if (!keys.contains("StrafeDeadzone")) input.strafeDeadzone = parent.input.strafeDeadzone;
-            if (!keys.contains("AirborneJumpActivationDelayMs")) {
-                input.airborneJumpActivationDelayMs = parent.input.airborneJumpActivationDelayMs;
-            }
-        }
-    }
-
-    private void inheritOrCopyMovement(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Movement")) movement = parent.movement;
-        else if (keys != null && movement != null && parent.movement != null) {
-            if (!keys.contains("MaxForwardSpeed")) movement.maxForwardSpeed = parent.movement.maxForwardSpeed;
-            if (!keys.contains("MaxGlideSpeed")) movement.maxGlideSpeed = parent.movement.maxGlideSpeed;
-            if (!keys.contains("NeutralGlideSpeed")) movement.neutralGlideSpeed = parent.movement.neutralGlideSpeed;
-            if (!keys.contains("NeutralGlideAcceleration")) {
-                movement.neutralGlideAcceleration = parent.movement.neutralGlideAcceleration;
-            }
-            if (!keys.contains("NeutralGlideDeceleration")) {
-                movement.neutralGlideDeceleration = parent.movement.neutralGlideDeceleration;
-            }
-            if (!keys.contains("GlideStartKickSpeed")) movement.glideStartKickSpeed = parent.movement.glideStartKickSpeed;
-            if (!keys.contains("ForwardAcceleration")) movement.forwardAcceleration = parent.movement.forwardAcceleration;
-            if (!keys.contains("MaxBackwardSpeed")) movement.maxBackwardSpeed = parent.movement.maxBackwardSpeed;
-            if (!keys.contains("BackwardAcceleration")) movement.backwardAcceleration = parent.movement.backwardAcceleration;
-            if (!keys.contains("AirbrakeDeceleration")) movement.airbrakeDeceleration = parent.movement.airbrakeDeceleration;
-            if (!keys.contains("HoverHorizontalDamping")) movement.hoverHorizontalDamping = parent.movement.hoverHorizontalDamping;
-            if (!keys.contains("HoverVerticalDamping")) movement.hoverVerticalDamping = parent.movement.hoverVerticalDamping;
-            if (!keys.contains("GlideSinkSpeed")) movement.glideSinkSpeed = parent.movement.glideSinkSpeed;
-            if (!keys.contains("GlideSinkAcceleration")) {
-                movement.glideSinkAcceleration = parent.movement.glideSinkAcceleration;
-            }
-            if (!keys.contains("StallSpeedThreshold")) movement.stallSpeedThreshold = parent.movement.stallSpeedThreshold;
-            if (!keys.contains("StallSinkSpeed")) movement.stallSinkSpeed = parent.movement.stallSinkSpeed;
-            if (!keys.contains("DescendSpeed")) movement.descendSpeed = parent.movement.descendSpeed;
-            if (!keys.contains("MaxFallSpeed")) movement.maxFallSpeed = parent.movement.maxFallSpeed;
-            if (!keys.contains("PitchUpLiftScale")) movement.pitchUpLiftScale = parent.movement.pitchUpLiftScale;
-            if (!keys.contains("PitchUpSpeedCost")) movement.pitchUpSpeedCost = parent.movement.pitchUpSpeedCost;
-            if (!keys.contains("PitchDownDiveScale")) movement.pitchDownDiveScale = parent.movement.pitchDownDiveScale;
-            if (!keys.contains("PitchDownSpeedGain")) movement.pitchDownSpeedGain = parent.movement.pitchDownSpeedGain;
-        }
-    }
-
-    private void inheritOrCopyCurve(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Curve")) {
-            curve = parent.curve;
-        } else if (keys != null && parent.curve != null) {
-            if (curve == null) {
-                curve = parent.curve;
-            } else {
-                curve.inheritMissingFrom(parent.curve, keys);
-            }
-        }
-    }
-
-    private void inheritOrCopyJump(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Jump")) jump = parent.jump;
-        else if (keys != null && jump != null && parent.jump != null) {
-            if (!keys.contains("UpwardImpulse")) jump.upwardImpulse = parent.jump.upwardImpulse;
-            if (!keys.contains("CooldownSeconds")) jump.cooldownSeconds = parent.jump.cooldownSeconds;
-        }
-    }
-
-    private void inheritOrCopyBoost(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Boost")) boost = parent.boost;
-        else if (keys != null && boost != null && parent.boost != null) {
-            if (!keys.contains("ForwardImpulse")) boost.forwardImpulse = parent.boost.forwardImpulse;
-            if (!keys.contains("CooldownSeconds")) boost.cooldownSeconds = parent.boost.cooldownSeconds;
-            if (!keys.contains("DurationSeconds")) boost.durationSeconds = parent.boost.durationSeconds;
-            if (!keys.contains("Directional")) boost.directional = parent.boost.directional;
-            if (!keys.contains("UpwardPitchLiftMultiplier")) {
-                boost.upwardPitchLiftMultiplier = parent.boost.upwardPitchLiftMultiplier;
-            }
-            if (!keys.contains("UpwardPitchLiftCap")) boost.upwardPitchLiftCap = parent.boost.upwardPitchLiftCap;
-        }
-    }
-
-    private void inheritOrCopyLaunch(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Launch")) {
-            launch = parent.launch;
-        } else if (keys != null && parent.launch != null) {
-            if (launch == null) {
-                launch = parent.launch;
-            } else {
-                launch.inheritMissingFrom(parent.launch, keys);
-            }
-        }
-    }
-
-    private void inheritOrCopyVigour(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Vigour")) vigour = parent.vigour;
-        else if (keys != null && vigour != null && parent.vigour != null) {
-            if (!keys.contains("Enabled")) vigour.enabled = parent.vigour.enabled;
-            if (!keys.contains("MaxCharges")) vigour.maxCharges = parent.vigour.maxCharges;
-            if (!keys.contains("UpwardFlapCost")) vigour.upwardFlapCost = parent.vigour.upwardFlapCost;
-            if (!keys.contains("ForwardBoostCost")) vigour.forwardBoostCost = parent.vigour.forwardBoostCost;
-            if (!keys.contains("GroundedRechargeSecondsPerCharge")) {
-                vigour.groundedRechargeSecondsPerCharge = parent.vigour.groundedRechargeSecondsPerCharge;
-            }
-            if (!keys.contains("FastFlightRechargeSecondsPerCharge")) {
-                vigour.fastFlightRechargeSecondsPerCharge = parent.vigour.fastFlightRechargeSecondsPerCharge;
-            }
-            if (!keys.contains("FastFlightRechargeSpeedRatio")) {
-                vigour.fastFlightRechargeSpeedRatio = parent.vigour.fastFlightRechargeSpeedRatio;
-            }
-            if (!keys.contains("RechargeDelayAfterSpendSeconds")) {
-                vigour.rechargeDelayAfterSpendSeconds = parent.vigour.rechargeDelayAfterSpendSeconds;
-            }
-            if (!keys.contains("HudEnabled")) vigour.hudEnabled = parent.vigour.hudEnabled;
-            if (!keys.contains("HudResendIntervalMs")) {
-                vigour.hudResendIntervalMs = parent.vigour.hudResendIntervalMs;
-            }
-        }
-    }
-
-    private void inheritOrCopyAnimation(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Animation")) animation = parent.animation;
-        else if (keys != null && animation != null && parent.animation != null) {
-            if (!keys.contains("IdleAnimation")) animation.idleAnimation = parent.animation.idleAnimation;
-            if (!keys.contains("FlightAnimation")) animation.flightAnimation = parent.animation.flightAnimation;
-            if (!keys.contains("FastFlightAnimation")) {
-                animation.fastFlightAnimation = parent.animation.fastFlightAnimation;
-            }
-            if (!keys.contains("ResendIntervalMs")) animation.resendIntervalMs = parent.animation.resendIntervalMs;
-            if (!keys.contains("SuppressNonMovementAnimations")) {
-                animation.suppressNonMovementAnimations = parent.animation.suppressNonMovementAnimations;
-            }
-            if (!keys.contains("SuppressActionAnimation")) {
-                animation.suppressActionAnimation = parent.animation.suppressActionAnimation;
-            }
-            if (!keys.contains("SuppressStatusAnimation")) {
-                animation.suppressStatusAnimation = parent.animation.suppressStatusAnimation;
-            }
-            if (!keys.contains("SuppressEmoteAnimation")) {
-                animation.suppressEmoteAnimation = parent.animation.suppressEmoteAnimation;
-            }
-            if (!keys.contains("SuppressFaceAnimation")) {
-                animation.suppressFaceAnimation = parent.animation.suppressFaceAnimation;
-            }
-            if (!keys.contains("SuppressionIntervalMs")) {
-                animation.suppressionIntervalMs = parent.animation.suppressionIntervalMs;
-            }
-            if (!keys.contains("PoseAnimationsEnabled")) {
-                animation.poseAnimationsEnabled = parent.animation.poseAnimationsEnabled;
-            }
-            if (!keys.contains("PitchPoseSlot")) animation.pitchPoseSlot = parent.animation.pitchPoseSlot;
-            if (!keys.contains("RollPoseSlot")) animation.rollPoseSlot = parent.animation.rollPoseSlot;
-            if (!keys.contains("PitchUpPoseAnimation")) {
-                animation.pitchUpPoseAnimation = parent.animation.pitchUpPoseAnimation;
-            }
-            if (!keys.contains("PitchDownPoseAnimation")) {
-                animation.pitchDownPoseAnimation = parent.animation.pitchDownPoseAnimation;
-            }
-            if (!keys.contains("BankLeftPoseAnimation")) {
-                animation.bankLeftPoseAnimation = parent.animation.bankLeftPoseAnimation;
-            }
-            if (!keys.contains("BankRightPoseAnimation")) {
-                animation.bankRightPoseAnimation = parent.animation.bankRightPoseAnimation;
-            }
-            if (!keys.contains("PitchUpBankLeftPoseAnimation")) {
-                animation.pitchUpBankLeftPoseAnimation = parent.animation.pitchUpBankLeftPoseAnimation;
-            }
-            if (!keys.contains("PitchUpBankRightPoseAnimation")) {
-                animation.pitchUpBankRightPoseAnimation = parent.animation.pitchUpBankRightPoseAnimation;
-            }
-            if (!keys.contains("PitchDownBankLeftPoseAnimation")) {
-                animation.pitchDownBankLeftPoseAnimation = parent.animation.pitchDownBankLeftPoseAnimation;
-            }
-            if (!keys.contains("PitchDownBankRightPoseAnimation")) {
-                animation.pitchDownBankRightPoseAnimation = parent.animation.pitchDownBankRightPoseAnimation;
-            }
-            if (!keys.contains("PitchPoseThresholdDegrees")) {
-                animation.pitchPoseThresholdDegrees = parent.animation.pitchPoseThresholdDegrees;
-            }
-            if (!keys.contains("RollPoseThresholdDegrees")) {
-                animation.rollPoseThresholdDegrees = parent.animation.rollPoseThresholdDegrees;
-            }
-            if (!keys.contains("PoseResendIntervalMs")) {
-                animation.poseResendIntervalMs = parent.animation.poseResendIntervalMs;
-            }
-        }
-    }
-
-    private void inheritOrCopyDebug(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("Debug")) debug = parent.debug;
-        else if (keys != null && debug != null && parent.debug != null) {
-            if (!keys.contains("LogControllerTicks")) debug.logControllerTicks = parent.debug.logControllerTicks;
-            if (!keys.contains("LogInputTransitions")) debug.logInputTransitions = parent.debug.logInputTransitions;
-        }
-    }
-
-    private void inheritOrCopyRiderVisual(TwAvatarFlightConfig parent, @Nullable Set<String> keys, Set<String> top) {
-        if (!top.contains("RiderVisual")) riderVisual = parent.riderVisual;
-        else if (keys != null && riderVisual != null && parent.riderVisual != null) {
-            if (!keys.contains("HideOwnerEquipment")) {
-                riderVisual.hideOwnerEquipment = parent.riderVisual.hideOwnerEquipment;
-            }
-            if (!keys.contains("HideOwnerArmor")) riderVisual.hideOwnerArmor = parent.riderVisual.hideOwnerArmor;
-            if (!keys.contains("HideOwnerHands")) riderVisual.hideOwnerHands = parent.riderVisual.hideOwnerHands;
-            if (!keys.contains("ShowRider")) riderVisual.showRider = parent.riderVisual.showRider;
-            if (!keys.contains("SeatOffsetX")) riderVisual.seatOffsetX = parent.riderVisual.seatOffsetX;
-            if (!keys.contains("SeatOffsetY")) riderVisual.seatOffsetY = parent.riderVisual.seatOffsetY;
-            if (!keys.contains("SeatOffsetZ")) riderVisual.seatOffsetZ = parent.riderVisual.seatOffsetZ;
-            if (!keys.contains("EquipmentResendIntervalMs")) {
-                riderVisual.equipmentResendIntervalMs = parent.riderVisual.equipmentResendIntervalMs;
-            }
-        }
-    }
-
-    @Nullable
-    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
-                                                     @Nonnull String topLevelKey) {
-        return explicitNestedKeysByTopLevel == null ? null : explicitNestedKeysByTopLevel.get(topLevelKey);
+        TwAvatarFlightConfigInheritance.inheritMissingFrom(
+                this,
+                parent,
+                explicitTopLevelKeys,
+                explicitNestedKeysByTopLevel
+        );
     }
 
     public String getId() { return id; }
@@ -965,6 +654,7 @@ public final class TwAvatarFlightConfig implements
     public JumpSettings getJump() { return jump == null ? new JumpSettings() : jump; }
     public BoostSettings getBoost() { return boost == null ? new BoostSettings() : boost; }
     public AvatarFlightLaunchSettings getLaunch() { return launch == null ? new AvatarFlightLaunchSettings() : launch; }
+    public AvatarFlightVfxSettings getVfx() { return vfx == null ? new AvatarFlightVfxSettings() : vfx; }
     public VigourSettings getVigour() { return vigour == null ? new VigourSettings() : vigour; }
     public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
     public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }
@@ -996,14 +686,10 @@ public final class TwAvatarFlightConfig implements
         return Math.max(0.0, Math.min(1.0, resolved));
     }
 
-    private static String safe(@Nullable String value) {
-        return value == null ? "" : value;
-    }
-
     public static final class ModelSettings {
-        private boolean applyModel;
-        private String modelId = DEFAULT_MODEL_ID;
-        private double scale = 1.0;
+        boolean applyModel;
+        String modelId = DEFAULT_MODEL_ID;
+        double scale = 1.0;
 
         public boolean isApplyModel() { return applyModel; }
         public String getModelId() { return modelId; }
@@ -1011,10 +697,10 @@ public final class TwAvatarFlightConfig implements
     }
 
     public static final class InputSettings {
-        private double intentTimeoutMs = 750.0;
-        private double forwardDeadzone = 0.25;
-        private double strafeDeadzone = 0.25;
-        private double airborneJumpActivationDelayMs = 250.0;
+        double intentTimeoutMs = 750.0;
+        double forwardDeadzone = 0.25;
+        double strafeDeadzone = 0.25;
+        double airborneJumpActivationDelayMs = 250.0;
 
         public long getIntentTimeoutMs() { return Math.round(intentTimeoutMs); }
         public double getForwardDeadzone() { return forwardDeadzone; }
@@ -1023,28 +709,28 @@ public final class TwAvatarFlightConfig implements
     }
 
     public static final class MovementSettings {
-        private double maxForwardSpeed = 14.0;
-        private double maxGlideSpeed = 15.0;
-        private double neutralGlideSpeed = 6.0;
-        private double neutralGlideAcceleration = 4.0;
-        private double neutralGlideDeceleration = 0.15;
-        private double glideStartKickSpeed = 1.5;
-        private double forwardAcceleration = 18.0;
-        private double maxBackwardSpeed = 3.0;
-        private double backwardAcceleration = 8.0;
-        private double airbrakeDeceleration = 18.0;
-        private double hoverHorizontalDamping = 10.0;
-        private double hoverVerticalDamping = 8.0;
-        private double glideSinkSpeed = 1.0;
-        private double glideSinkAcceleration = 2.0;
-        private double stallSpeedThreshold = 8.0;
-        private double stallSinkSpeed = 5.0;
-        private double descendSpeed = 7.0;
-        private double maxFallSpeed = 14.0;
-        private double pitchUpLiftScale = 5.0;
-        private double pitchUpSpeedCost = 3.0;
-        private double pitchDownDiveScale = 5.0;
-        private double pitchDownSpeedGain = 3.0;
+        double maxForwardSpeed = 14.0;
+        double maxGlideSpeed = 15.0;
+        double neutralGlideSpeed = 6.0;
+        double neutralGlideAcceleration = 4.0;
+        double neutralGlideDeceleration = 0.15;
+        double glideStartKickSpeed = 1.5;
+        double forwardAcceleration = 18.0;
+        double maxBackwardSpeed = 3.0;
+        double backwardAcceleration = 8.0;
+        double airbrakeDeceleration = 18.0;
+        double hoverHorizontalDamping = 10.0;
+        double hoverVerticalDamping = 8.0;
+        double glideSinkSpeed = 1.0;
+        double glideSinkAcceleration = 2.0;
+        double stallSpeedThreshold = 8.0;
+        double stallSinkSpeed = 5.0;
+        double descendSpeed = 7.0;
+        double maxFallSpeed = 14.0;
+        double pitchUpLiftScale = 5.0;
+        double pitchUpSpeedCost = 3.0;
+        double pitchDownDiveScale = 5.0;
+        double pitchDownSpeedGain = 3.0;
 
         public double getMaxForwardSpeed() { return maxForwardSpeed; }
         public double getMaxGlideSpeed() { return Math.max(maxForwardSpeed, maxGlideSpeed); }
@@ -1073,20 +759,20 @@ public final class TwAvatarFlightConfig implements
     }
 
     public static final class JumpSettings {
-        private double upwardImpulse = 7.0;
-        private double cooldownSeconds = 0.75;
+        double upwardImpulse = 7.0;
+        double cooldownSeconds = 0.75;
 
         public double getUpwardImpulse() { return upwardImpulse; }
         public double getCooldownSeconds() { return cooldownSeconds; }
     }
 
     public static final class BoostSettings {
-        private double forwardImpulse = 7.0;
-        private double cooldownSeconds = 1.0;
-        private double durationSeconds = 0.45;
-        private boolean directional = true;
-        private double upwardPitchLiftMultiplier = 0.45;
-        private double upwardPitchLiftCap = 3.0;
+        double forwardImpulse = 7.0;
+        double cooldownSeconds = 1.0;
+        double durationSeconds = 0.45;
+        boolean directional = true;
+        double upwardPitchLiftMultiplier = 0.45;
+        double upwardPitchLiftCap = 3.0;
 
         public double getForwardImpulse() { return forwardImpulse; }
         public double getCooldownSeconds() { return cooldownSeconds; }
@@ -1098,16 +784,16 @@ public final class TwAvatarFlightConfig implements
 
     /** Vigour charge, recharge, and HUD tuning for avatar flight. */
     public static final class VigourSettings {
-        private boolean enabled = true;
-        private double maxCharges = 6.0;
-        private double upwardFlapCost = 1.0;
-        private double forwardBoostCost = 1.0;
-        private double groundedRechargeSecondsPerCharge = 4.0;
-        private double fastFlightRechargeSecondsPerCharge = 8.0;
-        private double fastFlightRechargeSpeedRatio = 0.75;
-        private double rechargeDelayAfterSpendSeconds = 0.75;
-        private boolean hudEnabled = true;
-        private double hudResendIntervalMs = 100.0;
+        boolean enabled = true;
+        double maxCharges = 6.0;
+        double upwardFlapCost = 1.0;
+        double forwardBoostCost = 1.0;
+        double groundedRechargeSecondsPerCharge = 4.0;
+        double fastFlightRechargeSecondsPerCharge = 8.0;
+        double fastFlightRechargeSpeedRatio = 0.75;
+        double rechargeDelayAfterSpendSeconds = 0.75;
+        boolean hudEnabled = true;
+        double hudResendIntervalMs = 100.0;
 
         public boolean isEnabled() { return enabled; }
         public double getMaxCharges() { return maxCharges; }
@@ -1124,14 +810,14 @@ public final class TwAvatarFlightConfig implements
     }
 
     public static final class RiderVisualSettings {
-        private boolean hideOwnerEquipment;
-        private boolean hideOwnerArmor;
-        private boolean hideOwnerHands;
-        private boolean showRider;
-        private double seatOffsetX;
-        private double seatOffsetY = 1.35;
-        private double seatOffsetZ = -0.25;
-        private double equipmentResendIntervalMs = 250.0;
+        boolean hideOwnerEquipment;
+        boolean hideOwnerArmor;
+        boolean hideOwnerHands;
+        boolean showRider;
+        double seatOffsetX;
+        double seatOffsetY = 1.35;
+        double seatOffsetZ = -0.25;
+        double equipmentResendIntervalMs = 250.0;
 
         public boolean isHideOwnerEquipment() { return hideOwnerEquipment; }
         public boolean isHideOwnerArmor() { return hideOwnerArmor; }
@@ -1146,30 +832,30 @@ public final class TwAvatarFlightConfig implements
     }
 
     public static final class AnimationSettings {
-        private String idleAnimation = DEFAULT_IDLE_ANIMATION;
-        private String flightAnimation = DEFAULT_FLIGHT_ANIMATION;
-        private String fastFlightAnimation = DEFAULT_FAST_FLIGHT_ANIMATION;
-        private double resendIntervalMs = 250.0;
-        private boolean suppressNonMovementAnimations = true;
-        private boolean suppressActionAnimation = true;
-        private boolean suppressStatusAnimation = true;
-        private boolean suppressEmoteAnimation = true;
-        private boolean suppressFaceAnimation;
-        private double suppressionIntervalMs = 100.0;
-        private boolean poseAnimationsEnabled;
-        private String pitchPoseSlot = "Status";
-        private String rollPoseSlot = "Emote";
-        private String pitchUpPoseAnimation = "";
-        private String pitchDownPoseAnimation = "";
-        private String bankLeftPoseAnimation = "";
-        private String bankRightPoseAnimation = "";
-        private String pitchUpBankLeftPoseAnimation = "";
-        private String pitchUpBankRightPoseAnimation = "";
-        private String pitchDownBankLeftPoseAnimation = "";
-        private String pitchDownBankRightPoseAnimation = "";
-        private double pitchPoseThresholdDegrees = 8.0;
-        private double rollPoseThresholdDegrees = 5.0;
-        private double poseResendIntervalMs = 250.0;
+        String idleAnimation = DEFAULT_IDLE_ANIMATION;
+        String flightAnimation = DEFAULT_FLIGHT_ANIMATION;
+        String fastFlightAnimation = DEFAULT_FAST_FLIGHT_ANIMATION;
+        double resendIntervalMs = 250.0;
+        boolean suppressNonMovementAnimations = true;
+        boolean suppressActionAnimation = true;
+        boolean suppressStatusAnimation = true;
+        boolean suppressEmoteAnimation = true;
+        boolean suppressFaceAnimation;
+        double suppressionIntervalMs = 100.0;
+        boolean poseAnimationsEnabled;
+        String pitchPoseSlot = "Status";
+        String rollPoseSlot = "Emote";
+        String pitchUpPoseAnimation = "";
+        String pitchDownPoseAnimation = "";
+        String bankLeftPoseAnimation = "";
+        String bankRightPoseAnimation = "";
+        String pitchUpBankLeftPoseAnimation = "";
+        String pitchUpBankRightPoseAnimation = "";
+        String pitchDownBankLeftPoseAnimation = "";
+        String pitchDownBankRightPoseAnimation = "";
+        double pitchPoseThresholdDegrees = 8.0;
+        double rollPoseThresholdDegrees = 5.0;
+        double poseResendIntervalMs = 250.0;
 
         public String getIdleAnimation() { return stringOrDefault(idleAnimation, DEFAULT_IDLE_ANIMATION); }
         public String getFlightAnimation() { return stringOrDefault(flightAnimation, DEFAULT_FLIGHT_ANIMATION); }
@@ -1269,8 +955,8 @@ public final class TwAvatarFlightConfig implements
     }
 
     public static final class DebugSettings {
-        private boolean logControllerTicks;
-        private boolean logInputTransitions;
+        boolean logControllerTicks;
+        boolean logInputTransitions;
 
         public boolean isLogControllerTicks() { return logControllerTicks; }
         public boolean isLogInputTransitions() { return logInputTransitions; }

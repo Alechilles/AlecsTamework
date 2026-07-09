@@ -12,6 +12,19 @@ This plan implements the launch portion of
 `docs/superpowers/specs/2026-07-07-avatar-flight-wind-vfx-design.md` without changing flight physics.
 Flap, forward boost, airbrake, fast-flight trails, and sound playback remain follow-up work.
 
+## Implementation Status
+
+Implemented on 2026-07-09:
+
+- five launch particle systems and eight reusable spawners;
+- inherited `Vfx` config settings with configurable cadence, scale, systems, and tier thresholds;
+- grounded origin capture, airborne preservation, cancel routing, and partial/mid/full release routing;
+- warn-once missing-system handling through `ParticleUtil` spatial broadcasts;
+- config, math, service, and asset-budget regression tests;
+- Hytale Workshop schema validation for all thirteen authored assets with zero warnings.
+
+In-game `/particle spawn` and multiplayer owner/observer art review remain manual validation steps.
+
 ## Confirmed Hytale Particle Behavior
 
 Research target: Hytale release `0.5.6`.
@@ -129,7 +142,7 @@ entries, start delays, and runtime scale instead of duplicating spawner definiti
 | Tier | Ring groups | Column target | Dust target | Runtime scale |
 | --- | --- | --- | --- | --- |
 | Partial | One ring | About 5-6 particles | About 5-6 particles | `0.75` |
-| Mid | One ring plus a faint delayed ring | About 7-9 particles | About 8-10 particles | `1.00` |
+| Mid | One ring | About 7-9 particles | About 8-10 particles | `1.00` |
 | Full | Two readable rings separated by `0.06-0.10s` | About 10-12 particles | About 12-14 particles | `1.20` |
 
 Avoid `Distortion` and additive glow in the first prototype. Prefer `Erosion` for rings and
@@ -211,6 +224,9 @@ Suggested default fields:
   "LaunchReleasePartialParticleSystem": "Tamework_AvatarFlight_Launch_Release_Partial",
   "LaunchReleaseMidParticleSystem": "Tamework_AvatarFlight_Launch_Release_Mid",
   "LaunchReleaseFullParticleSystem": "Tamework_AvatarFlight_Launch_Release_Full",
+  "LaunchReleasePartialScale": 0.75,
+  "LaunchReleaseMidScale": 1.00,
+  "LaunchReleaseFullScale": 1.20,
   "LaunchReleaseMidThreshold": 0.45,
   "LaunchReleaseFullThreshold": 0.80
 }

@@ -1,0 +1,11 @@
+{
+  "Spawners": [
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Ring" },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column" },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust" }
+  ],
+  "LifeSpan": 0.85,
+  "CullDistance": 60.0,
+  "BoundingRadius": 7.0,
+  "IsImportant": false
+}

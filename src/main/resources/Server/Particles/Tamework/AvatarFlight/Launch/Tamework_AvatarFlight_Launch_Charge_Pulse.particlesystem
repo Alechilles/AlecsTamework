@@ -1,0 +1,11 @@
+{
+  "Spawners": [
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Charge_Ring" },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Charge_Wisps" },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Charge_Dust" }
+  ],
+  "LifeSpan": 0.50,
+  "CullDistance": 60.0,
+  "BoundingRadius": 5.0,
+  "IsImportant": false
+}
