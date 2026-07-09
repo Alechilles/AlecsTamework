@@ -53,7 +53,7 @@ class AvatarFlightMovementSystemArchitectureTest {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("applyVisualPose(ref, commandBuffer, controllerInput, output)"),
-                "avatar flight must update the transformed model pose each active tick, including grounded reset ticks");
+                "avatar flight must update the transformed model pose while custom flight velocity is active");
         assertTrue(source.contains("if (transform != null && transform.getRotation() != null)"),
                 "missing transform rotation must not block the HeadRotation pose write");
         assertTrue(source.contains("transform.getRotation().setPitch((float) output.visualPitchRadians())"));
@@ -67,16 +67,30 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
-    void visualPoseIsNotGuardedByVelocityApplication() throws Exception {
+    void visualPoseAndPoseAnimationsAreGuardedByVelocityApplication() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String tick = methodSlice(source, "public void tick");
 
-        int poseIndex = source.indexOf("applyVisualPose(ref, commandBuffer, controllerInput, output)");
-        int velocityGuardIndex = source.indexOf("if (output.applyVelocity())");
+        int velocityGuardIndex = tick.indexOf("if (applyingVelocity)");
+        int poseIndex = tick.indexOf("applyVisualPose(ref, commandBuffer, controllerInput, output)");
+        int poseAnimationIndex = tick.indexOf("applyPoseAnimations(ref, commandBuffer, flight, config, output)");
+        String groundedBranch = substringBetween(
+                tick,
+                "} else if (hasFlightVisualOverrides) {",
+                "commandBuffer.putComponent(ref, flightType, flight);"
+        );
 
-        assertTrue(poseIndex >= 0, "avatar flight must write visual pose while the component is active");
+        assertTrue(poseIndex >= 0, "avatar flight must write visual pose while custom velocity is active");
+        assertTrue(poseAnimationIndex >= 0, "avatar flight must drive pose animations while custom velocity is active");
         assertTrue(velocityGuardIndex >= 0, "test expects the velocity guard to remain present");
-        assertTrue(poseIndex < velocityGuardIndex,
-                "pose writes must also run on grounded ticks so stale pitch/roll cannot stick after landing");
+        assertTrue(velocityGuardIndex < poseIndex,
+                "grounded transformed mode should not keep rewriting transform pitch/roll");
+        assertTrue(velocityGuardIndex < poseAnimationIndex,
+                "grounded transformed mode should not keep replaying pose animations");
+        assertFalse(groundedBranch.contains("applyVisualPose("),
+                "grounded transformed mode should leave native grounded visuals alone after cleanup");
+        assertFalse(groundedBranch.contains("applyPoseAnimations("),
+                "grounded transformed mode should not replay flight pose animations");
     }
 
     @Test
@@ -99,7 +113,7 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "normal avatar flight must not enable native canFly for jump/double-jump activation");
         assertFalse(source.contains("AvatarFlightActivationCapability"),
                 "normal avatar flight should keep client-flight capability isolated to the standalone debug probe");
-        assertTrue(source.contains("syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity())"),
+        assertTrue(source.contains("syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity)"),
                 "custom flight may still sync saved flying state for transformed-player animations");
     }
 
@@ -133,15 +147,43 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
-    void groundedAvatarFlightScrubsSprintStateFromPacketInputOnly() throws Exception {
+    void groundedAvatarFlightLeavesNativeMovementStateOwner() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String tick = methodSlice(source, "public void tick");
+        String groundedBranch = substringBetween(
+                tick,
+                "} else if (hasFlightVisualOverrides) {",
+                "commandBuffer.putComponent(ref, flightType, flight);"
+        );
 
-        assertTrue(source.contains("applyGroundedSprintMovementState(ref, commandBuffer, input)"),
-                "grounded transformed mode should still sanitize sprint animation state");
-        assertTrue(source.contains("states.sprinting = input.isSprinting()"),
-                "real packet sprint should be allowed to drive sprint animation while false positives are cleared");
+        assertFalse(source.contains("applyGroundedSprintMovementState"),
+                "grounded transformed mode should not rewrite native sprint/movement animation state");
+        assertFalse(source.contains("states.sprinting = input.isSprinting()"),
+                "packet sprint input should be observed, not written back to MovementStates by avatar flight");
         assertFalse(source.contains("states.sprinting = false"),
                 "grounded transformed sprint must not be blindly suppressed when the player is actually sprinting");
+        assertFalse(groundedBranch.contains("commandBuffer.putComponent(ref, movementStatesType"),
+                "grounded transformed mode should leave MovementStates ownership with native PlayerInput processing");
+    }
+
+    @Test
+    void groundedTransitionOnlyCleansFlightVisualOverrides() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String tick = methodSlice(source, "public void tick");
+        String cleanup = methodSlice(source, "private void clearFlightVisualOverrides");
+
+        assertTrue(tick.contains("boolean hasFlightVisualOverrides = hasFlightVisualOverrides(flight)"),
+                "grounded cleanup should be driven by avatar-flight-owned visual state");
+        assertTrue(tick.contains("clearFlightVisualOverrides(ref, commandBuffer, flight, config)"),
+                "leaving custom flight should clear forced animation and pose overrides once");
+        assertTrue(cleanup.contains("clearMovementAnimation(ref, commandBuffer, flight)"),
+                "forced Movement slot animation must be stopped when returning to native grounded mode");
+        assertTrue(cleanup.contains("clearPoseAnimation(ref, commandBuffer, flight, true, pitchSlot)"),
+                "pitch pose slot should be stopped when returning to native grounded mode");
+        assertTrue(cleanup.contains("clearPoseAnimation(ref, commandBuffer, flight, false, rollSlot)"),
+                "bank pose slot should be stopped when returning to native grounded mode");
+        assertTrue(cleanup.contains("resetVisualPose(ref, commandBuffer)"),
+                "transform/head pitch and roll should be reset once on the transition out of custom flight");
     }
 
     @Test
@@ -258,5 +300,14 @@ class AvatarFlightMovementSystemArchitectureTest {
             nextMethod = source.indexOf("\n    private", start + methodStart.length());
         }
         return nextMethod < 0 ? source.substring(start) : source.substring(start, nextMethod);
+    }
+
+    private static String substringBetween(String source, String startMarker, String endMarker) {
+        int start = source.indexOf(startMarker);
+        if (start < 0) {
+            return "";
+        }
+        int end = source.indexOf(endMarker, start + startMarker.length());
+        return end < 0 ? source.substring(start) : source.substring(start, end);
     }
 }

@@ -114,11 +114,13 @@ public final class AvatarFlightMovementSystem
         flight.setClimbLoad(output.climbLoad());
         flight.setHudPitchRadians(output.visualPitchRadians());
         flight.setHudTargetSpeedRatio(output.hudTargetSpeedRatio());
-        syncOwnerClientFlyingState(ref, commandBuffer, flight, output.applyVelocity());
-        applyVisualPose(ref, commandBuffer, controllerInput, output);
+        boolean applyingVelocity = output.applyVelocity();
+        boolean hasFlightVisualOverrides = hasFlightVisualOverrides(flight);
+        syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);
-        applyPoseAnimations(ref, commandBuffer, flight, config, output);
-        if (output.applyVelocity()) {
+        if (applyingVelocity) {
+            applyVisualPose(ref, commandBuffer, controllerInput, output);
+            applyPoseAnimations(ref, commandBuffer, flight, config, output);
             velocity.addInstruction(
                     new Vector3d(output.velocityX(), output.velocityY(), output.velocityZ()),
                     null,
@@ -126,9 +128,8 @@ public final class AvatarFlightMovementSystem
             );
             applyFlightMovementState(ref, commandBuffer, output);
             applyMovementAnimation(ref, commandBuffer, flight, config, output);
-        } else {
-            clearMovementAnimation(ref, commandBuffer, flight);
-            applyGroundedSprintMovementState(ref, commandBuffer, input);
+        } else if (hasFlightVisualOverrides) {
+            clearFlightVisualOverrides(ref, commandBuffer, flight, config);
         }
         commandBuffer.putComponent(ref, flightType, flight);
         maybeLogDebug(config, flight, ref, controllerInput, output, movementStates);
@@ -363,22 +364,6 @@ public final class AvatarFlightMovementSystem
         commandBuffer.putComponent(ref, movementStatesType, component);
     }
 
-    private void applyGroundedSprintMovementState(@Nonnull Ref<EntityStore> ref,
-                                                  @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                                  @Nullable AvatarFlightInputComponent input) {
-        if (input == null) {
-            return;
-        }
-        MovementStatesComponent component = commandBuffer.getComponent(ref, movementStatesType);
-        if (component == null || component.getMovementStates() == null) {
-            return;
-        }
-        MovementStates states = new MovementStates(component.getMovementStates());
-        states.sprinting = input.isSprinting();
-        component.setMovementStates(states);
-        commandBuffer.putComponent(ref, movementStatesType, component);
-    }
-
     private void applyMovementAnimation(@Nonnull Ref<EntityStore> ref,
                                         @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                         @Nonnull AvatarFlightComponent flight,
@@ -403,6 +388,33 @@ public final class AvatarFlightMovementSystem
         AnimationUtils.stopAnimation(ref, AnimationSlot.Movement, true, commandBuffer);
         flight.setMovementAnimationId("");
         flight.setNextMovementAnimationAtMs(0L);
+    }
+
+    private boolean hasFlightVisualOverrides(@Nonnull AvatarFlightComponent flight) {
+        return flight.isClientFlyingSynced()
+                || !flight.getMovementAnimationId().isBlank()
+                || !flight.getPitchPoseAnimationId().isBlank()
+                || !flight.getRollPoseAnimationId().isBlank();
+    }
+
+    private void clearFlightVisualOverrides(@Nonnull Ref<EntityStore> ref,
+                                            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                            @Nonnull AvatarFlightComponent flight,
+                                            @Nonnull TwAvatarFlightConfig config) {
+        clearMovementAnimation(ref, commandBuffer, flight);
+        clearPoseAnimations(ref, commandBuffer, flight, config);
+        resetVisualPose(ref, commandBuffer);
+    }
+
+    private void clearPoseAnimations(@Nonnull Ref<EntityStore> ref,
+                                     @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                     @Nonnull AvatarFlightComponent flight,
+                                     @Nonnull TwAvatarFlightConfig config) {
+        TwAvatarFlightConfig.AnimationSettings animation = config.getAnimation();
+        AnimationSlot pitchSlot = resolveAnimationSlot(animation.getPitchPoseSlot(), AnimationSlot.Status);
+        AnimationSlot rollSlot = resolveAnimationSlot(animation.getRollPoseSlot(), AnimationSlot.Emote);
+        clearPoseAnimation(ref, commandBuffer, flight, true, pitchSlot);
+        clearPoseAnimation(ref, commandBuffer, flight, false, rollSlot);
     }
 
     private void suppressPlayerOverlayAnimations(@Nonnull Ref<EntityStore> ref,
@@ -539,6 +551,22 @@ public final class AvatarFlightMovementSystem
             }
         }
         return fallback;
+    }
+
+    private void resetVisualPose(@Nonnull Ref<EntityStore> ref,
+                                 @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        TransformComponent transform = commandBuffer.getComponent(ref, transformType);
+        if (transform != null && transform.getRotation() != null) {
+            transform.getRotation().setPitch(0.0f);
+            transform.getRotation().setRoll(0.0f);
+            commandBuffer.putComponent(ref, transformType, transform);
+        }
+        HeadRotation headRotation = commandBuffer.getComponent(ref, headRotationType);
+        if (headRotation != null && headRotation.getRotation() != null) {
+            headRotation.getRotation().setPitch(0.0f);
+            headRotation.getRotation().setRoll(0.0f);
+            commandBuffer.putComponent(ref, headRotationType, headRotation);
+        }
     }
 
     private void applyVisualPose(@Nonnull Ref<EntityStore> ref,
