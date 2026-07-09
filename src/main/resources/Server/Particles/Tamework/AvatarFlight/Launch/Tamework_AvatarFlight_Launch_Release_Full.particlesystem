@@ -1,13 +1,13 @@
 {
   "Spawners": [
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Ring" },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Ring", "StartDelay": 0.08 },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column" },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "StartDelay": 0.04 },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "StartDelay": 0.08 },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust" },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "StartDelay": 0.04 },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "StartDelay": 0.08 }
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Ring", "PositionOffset": { "Y": 0.16 } },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Ring", "PositionOffset": { "Y": 0.16 }, "StartDelay": 0.08 },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "PositionOffset": { "Y": 0.28 } },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "PositionOffset": { "Y": 0.28 }, "StartDelay": 0.04 },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "PositionOffset": { "Y": 0.28 }, "StartDelay": 0.08 },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "PositionOffset": { "Y": 0.14 } },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "PositionOffset": { "Y": 0.14 }, "StartDelay": 0.04 },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "PositionOffset": { "Y": 0.14 }, "StartDelay": 0.08 }
   ],
   "LifeSpan": 1.15,
   "CullDistance": 60.0,

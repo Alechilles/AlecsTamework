@@ -1,7 +1,7 @@
 {
   "Spawners": [
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Cancel_Ring" },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Cancel_Puff" }
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Cancel_Ring", "PositionOffset": { "Y": 0.18 } },
+    { "SpawnerId": "Tamework_AvatarFlight_Launch_Cancel_Puff", "PositionOffset": { "Y": 0.24 } }
   ],
   "LifeSpan": 0.40,
   "CullDistance": 60.0,

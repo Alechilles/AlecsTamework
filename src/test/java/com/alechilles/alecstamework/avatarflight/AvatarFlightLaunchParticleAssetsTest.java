@@ -37,8 +37,12 @@ class AvatarFlightLaunchParticleAssetsTest {
             assertFalse(system.get("IsImportant").getAsBoolean());
             assertTrue(system.get("CullDistance").getAsDouble() <= 75.0);
             for (var element : system.getAsJsonArray("Spawners")) {
-                String spawnerId = element.getAsJsonObject().get("SpawnerId").getAsString();
+                JsonObject group = element.getAsJsonObject();
+                String spawnerId = group.get("SpawnerId").getAsString();
                 assertTrue(spawnerIds.contains(spawnerId), systemId + " references missing " + spawnerId);
+                assertTrue(group.has("PositionOffset"), systemId + " must lift " + spawnerId + " above terrain");
+                assertTrue(group.getAsJsonObject("PositionOffset").get("Y").getAsDouble() >= 0.1,
+                        systemId + " places " + spawnerId + " too close to terrain for soft-particle rendering");
             }
         }
     }

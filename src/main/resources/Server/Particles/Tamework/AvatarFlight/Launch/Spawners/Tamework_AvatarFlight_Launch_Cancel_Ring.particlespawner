@@ -14,7 +14,7 @@
     "UVOption": "None",
     "Animation": {
       "0": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.9, "Max": 0.9 } }, "Color": "#a7a29c" },
-      "20": { "Opacity": 0.32 },
+      "20": { "Opacity": 0.46 },
       "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.18, "Max": 0.18 } } }
     },
     "InitialAnimationFrame": {

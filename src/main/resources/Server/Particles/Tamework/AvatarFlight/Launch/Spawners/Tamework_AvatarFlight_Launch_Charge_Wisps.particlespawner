@@ -19,7 +19,7 @@
     "UVOption": "RandomFlipU",
     "Animation": {
       "0": { "Opacity": 0.0, "Scale": { "X": { "Min": 1.15, "Max": 1.45 } }, "Color": "#effbff" },
-      "25": { "Opacity": 0.28 },
+      "25": { "Opacity": 0.42 },
       "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.18, "Max": 0.30 } }, "Rotation": { "Z": { "Min": 120.0, "Max": 220.0 } } }
     },
     "InitialAnimationFrame": {

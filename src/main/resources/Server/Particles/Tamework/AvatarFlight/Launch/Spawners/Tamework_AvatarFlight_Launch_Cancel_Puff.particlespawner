@@ -21,10 +21,10 @@
     "SoftParticles": "Require",
     "UVOption": "RandomFlipU",
     "Animation": {
-      "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.30, "Scale": { "X": { "Min": 0.12, "Max": 0.22 } }, "Color": "#88827c" },
+      "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.40, "Scale": { "X": { "Min": 0.12, "Max": 0.22 } }, "Color": "#88827c" },
       "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.38, "Max": 0.52 } } }
     },
-    "InitialAnimationFrame": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.30, "Color": "#88827c" }
+    "InitialAnimationFrame": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.40, "Color": "#88827c" }
   },
   "SpawnBurst": true,
   "SpawnRate": { "Min": 3.0, "Max": 3.0 }
