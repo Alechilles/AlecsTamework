@@ -18,6 +18,7 @@
 - Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
 - Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.
 - Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `Origin` for injected pitch/bank poses.
+- AvatarFlight namespace generation now adds missing grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) so transformed-player sprint/step animations have native client targets.
 
 ### Changed
 - Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.

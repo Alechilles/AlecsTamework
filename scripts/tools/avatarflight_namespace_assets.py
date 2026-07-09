@@ -501,7 +501,26 @@ def rewrite_server_model(
             output_asset = animation_outputs.get(source_asset)
             if output_asset is not None:
                 animation["Animation"] = output_asset
+    normalize_avatar_locomotion_animation_sets(rewritten)
     return rewritten
+
+
+def normalize_avatar_locomotion_animation_sets(server_model: Any) -> None:
+    animation_sets = server_model.get("AnimationSets")
+    if not isinstance(animation_sets, dict):
+        return
+    copy_animation_set(animation_sets, "Run", "Sprint")
+    copy_animation_set(animation_sets, "JumpRun", "JumpSprint")
+    copy_animation_set(animation_sets, "StepRun", "StepSprint")
+
+
+def copy_animation_set(animation_sets: dict[str, Any], source_id: str, target_id: str) -> None:
+    if target_id in animation_sets:
+        return
+    source = animation_sets.get(source_id)
+    if source is None:
+        return
+    animation_sets[target_id] = copy.deepcopy(source)
 
 
 def print_summary(result: GenerationResult) -> None:

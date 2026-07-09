@@ -144,6 +144,70 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                 set(animation["nodeAnimations"].keys()),
             )
 
+    def test_adds_player_locomotion_aliases_to_generated_avatar_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "generated"
+            write_json(
+                root / "Server" / "Models" / "Creature" / "Dragon.json",
+                {
+                    "Model": "NPC/Test/Dragon/Models/Model.blockymodel",
+                    "AnimationSets": {
+                        "Run": {
+                            "Animations": [
+                                {"Animation": "NPC/Test/Dragon/Animations/Run.blockyanim"}
+                            ]
+                        },
+                        "JumpRun": {
+                            "Animations": [
+                                {"Animation": "NPC/Test/Dragon/Animations/Jump.blockyanim"}
+                            ]
+                        },
+                        "StepRun": {
+                            "Animations": [
+                                {"Animation": "NPC/Test/Dragon/Animations/Step_Run.blockyanim"}
+                            ]
+                        },
+                    },
+                },
+            )
+            write_json(
+                root / "Common" / "NPC" / "Test" / "Dragon" / "Models" / "Model.blockymodel",
+                {"nodes": [{"name": "Origin"}]},
+            )
+            for animation in ("Run", "Jump", "Step_Run"):
+                write_json(
+                    root / "Common" / "NPC" / "Test" / "Dragon" / "Animations" / f"{animation}.blockyanim",
+                    {"duration": 10, "nodeAnimations": {"Origin": {"position": []}}},
+                )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--mod-root",
+                    str(root),
+                    "--model-id",
+                    "Dragon",
+                    "--output-root",
+                    str(output),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stdout)
+            server_model = json.loads(
+                (output / "Server" / "Models" / "Creature" / "Dragon_AvatarFlight.json").read_text()
+            )
+            animation_sets = server_model["AnimationSets"]
+
+            self.assertEqual(animation_sets["Run"], animation_sets["Sprint"])
+            self.assertEqual(animation_sets["JumpRun"], animation_sets["JumpSprint"])
+            self.assertEqual(animation_sets["StepRun"], animation_sets["StepSprint"])
+
 
 if __name__ == "__main__":
     unittest.main()
