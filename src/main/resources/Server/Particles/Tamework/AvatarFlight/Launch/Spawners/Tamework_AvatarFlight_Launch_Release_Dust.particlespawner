@@ -1,19 +1,19 @@
 {
   "RenderMode": "BlendLinear",
   "EmitOffset": {
-    "X": { "Min": -0.35, "Max": 0.35 },
-    "Y": { "Min": 0.02, "Max": 0.12 },
-    "Z": { "Min": -0.35, "Max": 0.35 }
+    "X": { "Min": -0.50, "Max": 0.50 },
+    "Y": { "Min": 0.04, "Max": 0.18 },
+    "Z": { "Min": -0.50, "Max": 0.50 }
   },
   "ParticleRotationInfluence": "Billboard",
   "LinearFiltering": true,
   "LightInfluence": 0,
   "ParticleRotateWithSpawner": false,
   "MaxConcurrentParticles": 4,
-  "ParticleLifeSpan": { "Min": 0.42, "Max": 0.62 },
+  "ParticleLifeSpan": { "Min": 0.50, "Max": 0.75 },
   "TotalParticles": { "Min": 4, "Max": 4 },
-  "InitialVelocity": { "Yaw": { "Min": 0, "Max": 360 }, "Pitch": { "Min": 0, "Max": 10 }, "Speed": { "Min": 1.3, "Max": 2.2 } },
-  "Attractors": [ { "DampingMultiplier": { "X": 0.82, "Y": 0.76, "Z": 0.82 }, "LinearAcceleration": { "Y": 0.25 } } ],
+  "InitialVelocity": { "Yaw": { "Min": 0, "Max": 360 }, "Pitch": { "Min": 0, "Max": 12 }, "Speed": { "Min": 1.7, "Max": 3.0 } },
+  "Attractors": [ { "DampingMultiplier": { "X": 0.80, "Y": 0.74, "Z": 0.80 }, "LinearAcceleration": { "Y": 0.30 } } ],
   "Particle": {
     "Texture": "Particles/Textures/Smoke/Smoke_Smooth2.png",
     "FrameSize": { "Width": 64, "Height": 64 },
@@ -21,11 +21,11 @@
     "SoftParticles": "Require",
     "UVOption": "RandomFlipU",
     "Animation": {
-      "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Scale": { "X": { "Min": 0.20, "Max": 0.34 } }, "Color": "#8b8177" },
-      "18": { "Opacity": 0.48 },
-      "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.62, "Max": 0.92 } } }
+      "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Scale": { "X": { "Min": 0.28, "Max": 0.45 } }, "Color": "#a09385" },
+      "18": { "Opacity": 0.58 },
+      "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.85, "Max": 1.25 } } }
     },
-    "InitialAnimationFrame": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Color": "#8b8177" }
+    "InitialAnimationFrame": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Color": "#a09385" }
   },
   "SpawnBurst": true,
   "SpawnRate": { "Min": 4.0, "Max": 4.0 }

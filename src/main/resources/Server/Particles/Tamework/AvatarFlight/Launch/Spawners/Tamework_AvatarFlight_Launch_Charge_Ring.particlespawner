@@ -5,7 +5,7 @@
   "LightInfluence": 0,
   "ParticleRotateWithSpawner": true,
   "MaxConcurrentParticles": 1,
-  "ParticleLifeSpan": { "Min": 0.35, "Max": 0.35 },
+  "ParticleLifeSpan": { "Min": 0.45, "Max": 0.45 },
   "TotalParticles": { "Min": 1, "Max": 1 },
   "Particle": {
     "Texture": "Particles/Textures/Basic/Ring2.png",
@@ -13,9 +13,9 @@
     "SoftParticles": "Enable",
     "UVOption": "None",
     "Animation": {
-      "0": { "Opacity": 0.0, "Scale": { "X": { "Min": 2.8, "Max": 2.8 } }, "Color": "#dff6ff" },
-      "20": { "Opacity": 0.52 },
-      "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.35, "Max": 0.35 } } }
+      "0": { "Opacity": 0.0, "Scale": { "X": { "Min": 3.6, "Max": 3.6 } }, "Color": "#dff6ff" },
+      "18": { "Opacity": 0.68 },
+      "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.50, "Max": 0.50 } } }
     },
     "InitialAnimationFrame": {
       "FrameIndex": { "Min": 0, "Max": 0 },

@@ -58,7 +58,7 @@ class AvatarFlightLaunchParticleAssetsTest {
             assertTrue(maxParticles <= 4, spawnerId + " exceeds per-spawner burst budget");
             if (spawnerId.contains("Launch_Charge_")) totalParticlesPerChargePulse += maxParticles;
         }
-        assertEquals(6, totalParticlesPerChargePulse);
+        assertEquals(7, totalParticlesPerChargePulse);
     }
 
     @Test
@@ -72,6 +72,18 @@ class AvatarFlightLaunchParticleAssetsTest {
         }
         assertTrue(particles < 30, "full launch release must stay under the particle budget");
         assertEquals(26, particles);
+    }
+
+    @Test
+    void releaseParticlesRemainReadableAtDragonScale() throws IOException {
+        Path spawners = LAUNCH_ROOT.resolve("Spawners");
+        JsonObject ring = read(spawners.resolve("Tamework_AvatarFlight_Launch_Release_Ring.particlespawner"));
+        JsonObject column = read(spawners.resolve("Tamework_AvatarFlight_Launch_Release_Column.particlespawner"));
+        JsonObject dust = read(spawners.resolve("Tamework_AvatarFlight_Launch_Release_Dust.particlespawner"));
+
+        assertTrue(animationScale(ring, "100", "X") >= 4.0, "release ring regressed to prototype scale");
+        assertTrue(animationScale(column, "100", "Y") >= 1.8, "release column is too short");
+        assertTrue(animationScale(dust, "100", "X") >= 0.8, "release dust is too small");
     }
 
     private static Set<String> fileStems(Path directory, String suffix) throws IOException {
@@ -88,5 +100,15 @@ class AvatarFlightLaunchParticleAssetsTest {
 
     private static JsonObject read(Path path) throws IOException {
         return JsonParser.parseString(Files.readString(path, StandardCharsets.UTF_8)).getAsJsonObject();
+    }
+
+    private static double animationScale(JsonObject spawner, String frame, String axis) {
+        return spawner.getAsJsonObject("Particle")
+                .getAsJsonObject("Animation")
+                .getAsJsonObject(frame)
+                .getAsJsonObject("Scale")
+                .getAsJsonObject(axis)
+                .get("Min")
+                .getAsDouble();
     }
 }

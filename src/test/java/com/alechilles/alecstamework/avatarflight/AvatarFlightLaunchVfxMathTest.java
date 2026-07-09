@@ -19,8 +19,8 @@ class AvatarFlightLaunchVfxMathTest {
         assertEquals(600L, AvatarFlightLaunchVfxMath.pulseIntervalMs(config.getVfx(), 0.0));
         assertEquals(375L, AvatarFlightLaunchVfxMath.pulseIntervalMs(config.getVfx(), 0.5));
         assertEquals(150L, AvatarFlightLaunchVfxMath.pulseIntervalMs(config.getVfx(), 1.0));
-        assertEquals(0.65, AvatarFlightLaunchVfxMath.pulseScale(config.getVfx(), 0.0), EPSILON);
-        assertEquals(1.15, AvatarFlightLaunchVfxMath.pulseScale(config.getVfx(), 1.0), EPSILON);
+        assertEquals(0.85, AvatarFlightLaunchVfxMath.pulseScale(config.getVfx(), 0.0), EPSILON);
+        assertEquals(1.50, AvatarFlightLaunchVfxMath.pulseScale(config.getVfx(), 1.0), EPSILON);
     }
 
     @Test

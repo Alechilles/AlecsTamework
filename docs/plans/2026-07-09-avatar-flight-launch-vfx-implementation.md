@@ -141,9 +141,9 @@ entries, start delays, and runtime scale instead of duplicating spawner definiti
 
 | Tier | Ring groups | Column target | Dust target | Runtime scale |
 | --- | --- | --- | --- | --- |
-| Partial | One ring | About 5-6 particles | About 5-6 particles | `0.75` |
-| Mid | One ring | About 7-9 particles | About 8-10 particles | `1.00` |
-| Full | Two readable rings separated by `0.06-0.10s` | About 10-12 particles | About 12-14 particles | `1.20` |
+| Partial | One ring | About 5-6 particles | About 5-6 particles | `1.20` |
+| Mid | One ring | About 7-9 particles | About 8-10 particles | `1.60` |
+| Full | Two readable rings separated by `0.06-0.10s` | About 10-12 particles | About 12-14 particles | `2.00` |
 
 Avoid `Distortion` and additive glow in the first prototype. Prefer `Erosion` for rings and
 `BlendLinear` or restrained `Erosion` for mist/dust. Wind color should stay near white or pale blue;
@@ -154,13 +154,13 @@ dust should stay neutral grey-brown.
 ### Charge ring
 
 - `SpawnBurst: true`, exactly one particle.
-- `ParticleLifeSpan`: approximately `0.30-0.40s`.
+- `ParticleLifeSpan`: approximately `0.40-0.50s`.
 - `ParticleRotationInfluence: None`.
 - `ParticleRotateWithSpawner: true`.
 - `ScaleRatioConstraint: OneToOne`.
 - Initial X rotation: `90deg` so the ring lies on the ground plane.
-- Animate scale from roughly `2.5-3.0` down to `0.25-0.50`.
-- Opacity should peak below `0.45` and return to zero.
+- Animate scale from roughly `3.5-4.0` down to `0.40-0.60`.
+- Opacity should peak around `0.65` and return to zero.
 
 ### Charge dust
 
@@ -168,7 +168,7 @@ dust should stay neutral grey-brown.
 - Use a radial attractor with axis `(0, 1, 0)` and negative radial acceleration to pull inward.
 - Add modest radial tangent acceleration so dust circles instead of moving in a perfectly straight
   line.
-- Keep life below `0.55s`, use strong damping, and cap each pulse at five dust particles.
+- Keep life below `0.60s`, use strong damping, and cap each pulse at five dust particles.
 
 Vanilla evidence for inward motion comes from charged-weapon spawners such as
 `Sword_Charging_Sparks`, which combine negative radial acceleration/impulse with tangent
@@ -178,7 +178,7 @@ as the release-ring baseline.
 ### Release ring
 
 - `SpawnBurst: true`, exactly one particle per group entry.
-- `ParticleLifeSpan`: approximately `0.20-0.32s`.
+- `ParticleLifeSpan`: approximately `0.35-0.45s`.
 - Start near zero scale, expand rapidly, and fade completely.
 - Use a horizontal `Ring2` texture with `SoftParticles` enabled.
 - Keep the ring translucent enough that terrain remains visible.
@@ -215,18 +215,18 @@ Suggested default fields:
   "LaunchChargeParticleSystem": "Tamework_AvatarFlight_Launch_Charge_Pulse",
   "LaunchChargeEarlyIntervalMs": 600,
   "LaunchChargeFullIntervalMs": 150,
-  "LaunchChargeMinScale": 0.65,
-  "LaunchChargeMaxScale": 1.15,
+  "LaunchChargeMinScale": 0.85,
+  "LaunchChargeMaxScale": 1.50,
   "LaunchCancelEnabled": true,
   "LaunchCancelParticleSystem": "Tamework_AvatarFlight_Launch_Cancel",
-  "LaunchCancelScale": 0.70,
+  "LaunchCancelScale": 1.00,
   "LaunchReleaseEnabled": true,
   "LaunchReleasePartialParticleSystem": "Tamework_AvatarFlight_Launch_Release_Partial",
   "LaunchReleaseMidParticleSystem": "Tamework_AvatarFlight_Launch_Release_Mid",
   "LaunchReleaseFullParticleSystem": "Tamework_AvatarFlight_Launch_Release_Full",
-  "LaunchReleasePartialScale": 0.75,
-  "LaunchReleaseMidScale": 1.00,
-  "LaunchReleaseFullScale": 1.20,
+  "LaunchReleasePartialScale": 1.20,
+  "LaunchReleaseMidScale": 1.60,
+  "LaunchReleaseFullScale": 2.00,
   "LaunchReleaseMidThreshold": 0.45,
   "LaunchReleaseFullThreshold": 0.80
 }
@@ -293,7 +293,7 @@ release, cancel, AvatarFlight disable, or launch-state reset.
 2. **Charge continues**
    - Progress for VFX cadence is `clamp(heldMs / Launch.MaxChargeMs, 0, 1)`.
    - Interval is linear interpolation from `600ms` to `150ms` by default.
-   - Scale is linear interpolation from `0.65` to `1.15` by default.
+   - Scale is linear interpolation from `0.85` to `1.50` by default.
    - Schedule from the actual emission time; never emit more than one pulse per server tick.
 
 3. **Charge leaves the ground while still held**
@@ -322,10 +322,10 @@ release, cancel, AvatarFlight disable, or launch-state reset.
 Default target per charging avatar:
 
 - maximum pulse frequency: about `6.67` systems/second at full charge;
-- target particles per pulse: no more than `6`;
-- target generated particles: no more than about `40/second`;
+- target particles per pulse: no more than `7`;
+- target generated particles: no more than about `47/second`;
 - pulse particle life: no more than `0.55s`;
-- expected pulse concurrency: below about `24` particles;
+- expected pulse concurrency: below about `28` particles;
 - full release: below `30` particles with no particle living longer than `1.15s`.
 
 Use `IsImportant: false`, conservative bounding radii, and no per-tick allocations in cadence math.

@@ -16,7 +16,7 @@
 - Added a separate avatar-flight `MaxGlideSpeed` cap so dive-only glide cannot reach boosted maximum speed by default.
 - Added charged avatar-flight launch tuning so holding crouch on the ground can spend Vigour for a stronger takeoff with configurable charge time, launch impulse, and partial/full charge costs.
 - Added a temporary avatar-flight launch charge HUD bar above the pitch/speed display while holding grounded crouch launch, including a marker for the minimum valid release threshold.
-- Added configurable launch particles for grounded charge pulses, canceled or rejected releases, and partial, mid, or full charged takeoffs.
+- Added configurable dragon-scale launch particles for grounded charge pulses, canceled or rejected releases, and staged partial, mid, or full charged takeoffs.
 - Added a compact avatar-flight pitch readout and red target-speed marker above the speed bar to make climb, dive, and boost speed trends easier to tune in game.
 - Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
 - Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.

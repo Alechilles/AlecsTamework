@@ -117,6 +117,12 @@ class TwAvatarFlightConfigTest {
                 config.getVfx().getLaunchChargeParticleSystem());
         assertEquals(600L, config.getVfx().getLaunchChargeEarlyIntervalMs());
         assertEquals(150L, config.getVfx().getLaunchChargeFullIntervalMs());
+        assertEquals(0.85, config.getVfx().getLaunchChargeMinScale(), 0.00001);
+        assertEquals(1.50, config.getVfx().getLaunchChargeMaxScale(), 0.00001);
+        assertEquals(1.0, config.getVfx().getLaunchCancelScale(), 0.00001);
+        assertEquals(1.20, config.getVfx().getLaunchReleasePartialScale(), 0.00001);
+        assertEquals(1.60, config.getVfx().getLaunchReleaseMidScale(), 0.00001);
+        assertEquals(2.0, config.getVfx().getLaunchReleaseFullScale(), 0.00001);
         assertEquals(0.45, config.getVfx().getLaunchReleaseMidThreshold(), 0.00001);
         assertEquals(0.80, config.getVfx().getLaunchReleaseFullThreshold(), 0.00001);
     }
@@ -166,7 +172,7 @@ class TwAvatarFlightConfigTest {
 
         assertEquals(100L, config.getVfx().getLaunchChargeEarlyIntervalMs());
         assertEquals(100L, config.getVfx().getLaunchChargeFullIntervalMs());
-        assertEquals(0.65, config.getVfx().getLaunchChargeMinScale(), 0.00001);
+        assertEquals(0.85, config.getVfx().getLaunchChargeMinScale(), 0.00001);
         assertEquals(0.9, config.getVfx().getLaunchReleaseMidThreshold(), 0.00001);
         assertEquals(0.9, config.getVfx().getLaunchReleaseFullThreshold(), 0.00001);
     }
