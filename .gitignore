@@ -30,3 +30,6 @@ AGENTS.md
 artifacts/
 /docs/superpowers/
 /.superpowers/
+
+# Private local agreements
+/private-agreements/
