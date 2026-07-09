@@ -21,6 +21,7 @@
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
 
 ### Changed
+- Updated Alec's Tamework from GPL-3.0 to a source-available license that allows unmodified dependency use and example/template reuse while reserving forks, modified copies, and Tamework system reuse for separate written permission.
 - Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.
 - Renamed the Dragon Reins prototype to Flightmaster's Reins and replaced the recipe-page placeholder with a dedicated reins model and texture.
 - Avatar flight keeps the transformed NordicDrake model enabled by default while the experimental fake rider visual remains disabled.
