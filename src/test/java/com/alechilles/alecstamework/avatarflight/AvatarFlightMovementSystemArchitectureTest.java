@@ -100,7 +100,9 @@ class AvatarFlightMovementSystemArchitectureTest {
 
         assertFalse(tick.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);"),
                 "unconditional slot suppression prevents native grounded sprint/step animations while transformed");
-        assertTrue(tick.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, applyingVelocity, hasFlightVisualOverrides)"),
+        assertTrue(tick.contains("boolean suppressingOverlays ="),
+                "the suppression decision should be named so diagnostics can report it");
+        assertTrue(tick.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays)"),
                 "overlay suppression should be scoped to custom flight visuals instead of idle grounded mode");
         assertTrue(source.contains("if (!applyingVelocity && !hasFlightVisualOverrides)"),
                 "grounded transformed locomotion should be able to use the same native animation path as a plain model swap");
@@ -279,7 +281,7 @@ class AvatarFlightMovementSystemArchitectureTest {
     void avatarFlightSuppressesPlayerOverlayAnimationSlotsWhileActive() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, applyingVelocity, hasFlightVisualOverrides)"),
+        assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays)"),
                 "transformed-player flight should suppress held-item/combat overlay slots only while custom flight visuals are active");
         assertTrue(source.contains("animation.isSuppressNonMovementAnimations()"),
                 "suppression should be config-driven for unsafe model-swap experiments");
@@ -317,12 +319,57 @@ class AvatarFlightMovementSystemArchitectureTest {
 
     @Test
     void debugLogFormatsMovementStateFlags() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = Files.readString(Path.of(
+                "src",
+                "main",
+                "java",
+                "com",
+                "alechilles",
+                "alecstamework",
+                "avatarflight",
+                "AvatarFlightDebugLogService.java"
+        ), StandardCharsets.UTF_8);
 
         assertTrue(source.contains("formatMovementStates(states)"),
                 "debug logs should print movement-state flags, not MovementStates object identities");
         assertFalse(source.contains("states.toString()"),
                 "object identity logs do not help diagnose client animation state");
+    }
+
+    @Test
+    void debugLogReportsVisualOwnershipAndRawInputState() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String debugSource = Files.readString(Path.of(
+                "src",
+                "main",
+                "java",
+                "com",
+                "alechilles",
+                "alecstamework",
+                "avatarflight",
+                "AvatarFlightDebugLogService.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("AvatarFlightDebugLogService"),
+                "controller diagnostics should live outside the already-large movement system");
+        assertTrue(source.contains("debugLogService.maybeLogControllerTick("),
+                "movement system should delegate controller tick diagnostics");
+        assertTrue(debugSource.contains("visualOverride=%s"),
+                "diagnostics must say whether avatar flight still owns visual overrides");
+        assertTrue(debugSource.contains("suppressOverlays=%s"),
+                "diagnostics must say whether overlay suppression is active this tick");
+        assertTrue(debugSource.contains("clientFly=%s"),
+                "diagnostics must include the synced self-client flying state");
+        assertTrue(debugSource.contains("movementAnim=%s"),
+                "diagnostics must include forced Movement slot animation ownership");
+        assertTrue(debugSource.contains("poseAnim=%s/%s"),
+                "diagnostics must include pitch and roll pose animation ownership");
+        assertTrue(debugSource.contains("rawInput=sprint=%s"),
+                "diagnostics must include raw packet sprint before controller conversion");
+        assertTrue(debugSource.contains("rawStale=%s"),
+                "diagnostics must include whether raw packet input is stale");
+        assertTrue(debugSource.contains("rawAgeMs=%s"),
+                "diagnostics must include raw input age for stale-input investigations");
     }
 
     @Test

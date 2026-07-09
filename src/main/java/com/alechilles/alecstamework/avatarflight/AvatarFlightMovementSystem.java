@@ -30,8 +30,6 @@ import com.hypixel.hytale.server.core.modules.physics.systems.IVelocityModifying
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -49,7 +47,7 @@ public final class AvatarFlightMovementSystem
     private final ComponentType<EntityStore, HeadRotation> headRotationType;
     private final ComponentType<EntityStore, TransformComponent> transformType;
     private final Query<EntityStore> query;
-    private long nextDebugLogAtMs;
+    private final AvatarFlightDebugLogService debugLogService = new AvatarFlightDebugLogService();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, PlayerSystems.ProcessPlayerInput.class),
             new SystemDependency<>(Order.AFTER, MovementStatesSystems.TickingSystem.class),
@@ -116,8 +114,10 @@ public final class AvatarFlightMovementSystem
         flight.setHudTargetSpeedRatio(output.hudTargetSpeedRatio());
         boolean applyingVelocity = output.applyVelocity();
         boolean hasFlightVisualOverrides = hasFlightVisualOverrides(flight);
+        boolean suppressingOverlays =
+                shouldSuppressPlayerOverlayAnimations(config, applyingVelocity, hasFlightVisualOverrides);
         syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity);
-        suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, applyingVelocity, hasFlightVisualOverrides);
+        suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays);
         if (applyingVelocity) {
             applyVisualPose(ref, commandBuffer, controllerInput, output);
             applyPoseAnimations(ref, commandBuffer, flight, config, output);
@@ -132,7 +132,18 @@ public final class AvatarFlightMovementSystem
             clearFlightVisualOverrides(ref, commandBuffer, flight, config, controllerInput);
         }
         commandBuffer.putComponent(ref, flightType, flight);
-        maybeLogDebug(config, flight, ref, controllerInput, output, movementStates);
+        debugLogService.maybeLogControllerTick(
+                config,
+                flight,
+                ref,
+                controllerInput,
+                output,
+                input,
+                movementStates,
+                applyingVelocity,
+                hasFlightVisualOverrides,
+                suppressingOverlays
+        );
     }
 
     private static void rechargeVigour(@Nonnull AvatarFlightComponent flight,
@@ -447,19 +458,25 @@ public final class AvatarFlightMovementSystem
         clearPoseAnimation(ref, commandBuffer, flight, false, rollSlot);
     }
 
+    private static boolean shouldSuppressPlayerOverlayAnimations(@Nonnull TwAvatarFlightConfig config,
+                                                                 boolean applyingVelocity,
+                                                                 boolean hasFlightVisualOverrides) {
+        if (!applyingVelocity && !hasFlightVisualOverrides) {
+            return false;
+        }
+        TwAvatarFlightConfig.AnimationSettings animation = config.getAnimation();
+        return animation.isSuppressNonMovementAnimations();
+    }
+
     private void suppressPlayerOverlayAnimations(@Nonnull Ref<EntityStore> ref,
                                                  @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                                  @Nonnull AvatarFlightComponent flight,
                                                  @Nonnull TwAvatarFlightConfig config,
-                                                 boolean applyingVelocity,
-                                                 boolean hasFlightVisualOverrides) {
-        if (!applyingVelocity && !hasFlightVisualOverrides) {
+                                                 boolean suppressingOverlays) {
+        if (!suppressingOverlays) {
             return;
         }
         TwAvatarFlightConfig.AnimationSettings animation = config.getAnimation();
-        if (!animation.isSuppressNonMovementAnimations()) {
-            return;
-        }
         long now = System.currentTimeMillis();
         if (now < flight.getNextSuppressedAnimationAtMs()) {
             return;
@@ -708,88 +725,6 @@ public final class AvatarFlightMovementSystem
         }
         TransformComponent transform = commandBuffer.getComponent(ref, transformType);
         return transform == null ? null : transform.getRotation();
-    }
-
-    private void maybeLogDebug(@Nonnull TwAvatarFlightConfig config,
-                               @Nonnull AvatarFlightComponent flight,
-                               @Nonnull Ref<EntityStore> ref,
-                               @Nonnull AvatarFlightController.Input input,
-                               @Nonnull AvatarFlightController.Output output,
-                               @Nullable MovementStates states) {
-        if (!config.getDebug().isLogControllerTicks()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (now < nextDebugLogAtMs) {
-            return;
-        }
-        nextDebugLogAtMs = now + TimeUnit.SECONDS.toMillis(1L);
-        com.alechilles.alecstamework.Tamework instance = com.alechilles.alecstamework.Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
-            return;
-        }
-        instance.getLogger().at(Level.INFO).log(String.format(
-                "TameworkAvatarFlight debug: ref=%s mode=%s input=%.2f/%.2f/%.2f jump=%s crouch=%s sprint=%s airbrake=%s onGround=%s"
-                        + " output=%.2f/%.2f/%.2f apply=%s jumpApplied=%s boostApplied=%s launchHold=%d launchApplied=%s loads=%.2f/%.2f animIdle=%s animFast=%s"
-                        + " visual=%.1f/%.1f vigour=%.2f/%d recharge=%s speedRatio=%.2f states=%s",
-                ref,
-                output.mode(),
-                input.forwardAxis(),
-                input.strafeAxis(),
-                input.verticalAxis(),
-                input.jump(),
-                input.crouch(),
-                input.sprint(),
-                input.airbrake(),
-                input.onGround(),
-                output.velocityX(),
-                output.velocityY(),
-                output.velocityZ(),
-                output.applyVelocity(),
-                output.jumpApplied(),
-                output.boostApplied(),
-                input.launchHoldMs(),
-                output.launchApplied(),
-                output.diveLoad(),
-                output.climbLoad(),
-                output.horizontalIdle(),
-                output.fastFlight(),
-                Math.toDegrees(output.visualPitchRadians()),
-                Math.toDegrees(output.visualRollRadians()),
-                flight.getVigourCharges(),
-                (int) Math.round(config.getVigour().getMaxCharges()),
-                flight.getVigourRechargeMode(),
-                AvatarFlightSpeedMetrics.speedRatio(
-                        AvatarFlightSpeedMetrics.horizontalSpeed(
-                                output.velocityX(),
-                                output.velocityY(),
-                                output.velocityZ()
-                        ),
-                        config
-                ),
-                formatMovementStates(states)
-        ));
-    }
-
-    @Nonnull
-    private static String formatMovementStates(@Nullable MovementStates states) {
-        if (states == null) {
-            return "<none>";
-        }
-        return String.format(
-                "fly=%s ground=%s idle=%s hIdle=%s sprint=%s run=%s walk=%s jump=%s crouch=%s fall=%s far=%s",
-                states.flying,
-                states.onGround,
-                states.idle,
-                states.horizontalIdle,
-                states.sprinting,
-                states.running,
-                states.walking,
-                states.jumping,
-                states.crouching,
-                states.falling,
-                states.fallingFar
-        );
     }
 
     @Nonnull
