@@ -112,6 +112,7 @@ public final class AvatarFlightMovementSystem
                 config,
                 commandBuffer.getComponent(ref, transformType),
                 now,
+                ref,
                 commandBuffer
         );
         flight.setMode(output.mode());

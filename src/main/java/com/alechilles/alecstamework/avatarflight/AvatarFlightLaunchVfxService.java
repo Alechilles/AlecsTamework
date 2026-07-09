@@ -1,10 +1,14 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.AvatarFlightVfxSettings;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Locale;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -17,7 +21,8 @@ public final class AvatarFlightLaunchVfxService {
     @FunctionalInterface
     interface EmissionSink {
         boolean emit(String systemId, double x, double y, double z, float yaw, float scale,
-                     float maxDurationSeconds, ComponentAccessor<EntityStore> componentAccessor);
+                     float maxDurationSeconds, Ref<EntityStore> ownerRef,
+                     ComponentAccessor<EntityStore> componentAccessor);
     }
 
     private final EmissionSink emissionSink;
@@ -37,6 +42,7 @@ public final class AvatarFlightLaunchVfxService {
                      @Nonnull TwAvatarFlightConfig config,
                      @Nullable TransformComponent transform,
                      long nowMs,
+                     @Nullable Ref<EntityStore> ownerRef,
                      @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         AvatarFlightVfxSettings vfx = config.getVfx();
         if (!config.getLaunch().isEnabled() || !vfx.isEnabled()) {
@@ -47,7 +53,7 @@ public final class AvatarFlightLaunchVfxService {
         long releasedHoldMs = controllerInput.launchHoldMs();
         if (releasedHoldMs > 0L) {
             emitRelease(flight, output, config, vfx, transform, controllerInput.yawRadians(),
-                    releasedHoldMs, componentAccessor);
+                    releasedHoldMs, ownerRef, componentAccessor);
             flight.clearLaunchVfxState();
             return;
         }
@@ -71,7 +77,7 @@ public final class AvatarFlightLaunchVfxService {
 
         long heldMs = Math.max(0L, nowMs - input.getLaunchChargeStartedAtMs());
         double progress = AvatarFlightLaunchVfxMath.chargeProgress(heldMs, config.getLaunch().getMaxChargeMs());
-        emissionSink.emit(
+        boolean emitted = emissionSink.emit(
                 vfx.getLaunchChargeParticleSystem(),
                 flight.getLaunchVfxOriginX(),
                 flight.getLaunchVfxOriginY(),
@@ -79,8 +85,11 @@ public final class AvatarFlightLaunchVfxService {
                 (float) flight.getLaunchVfxYawRadians(),
                 (float) AvatarFlightLaunchVfxMath.pulseScale(vfx, progress),
                 vfx.getMaxDurationSeconds(),
+                ownerRef,
                 componentAccessor
         );
+        logEmission(config, vfx.getLaunchChargeParticleSystem(), flight, emitted,
+                AvatarFlightLaunchVfxMath.pulseScale(vfx, progress));
         flight.setNextLaunchChargeVfxAtMs(
                 nowMs + AvatarFlightLaunchVfxMath.pulseIntervalMs(vfx, progress)
         );
@@ -93,11 +102,13 @@ public final class AvatarFlightLaunchVfxService {
                              @Nullable TransformComponent transform,
                              double yawRadians,
                              long holdMs,
+                             @Nullable Ref<EntityStore> ownerRef,
                              @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         if (!flight.isLaunchVfxOriginValid() && !captureFallbackOrigin(flight, transform, vfx, yawRadians)) return;
         if (!output.launchApplied()) {
             if (vfx.isLaunchCancelEnabled()) {
-                emit(flight, vfx.getLaunchCancelParticleSystem(), vfx.getLaunchCancelScale(), vfx, componentAccessor);
+                emit(flight, config, vfx.getLaunchCancelParticleSystem(), vfx.getLaunchCancelScale(), vfx,
+                        ownerRef, componentAccessor);
             }
             return;
         }
@@ -105,12 +116,12 @@ public final class AvatarFlightLaunchVfxService {
         AvatarFlightLaunchVfxMath.ReleaseTier tier =
                 AvatarFlightLaunchVfxMath.releaseTier(config.getLaunch(), vfx, holdMs);
         switch (tier) {
-            case PARTIAL -> emit(flight, vfx.getLaunchReleasePartialParticleSystem(),
-                    vfx.getLaunchReleasePartialScale(), vfx, componentAccessor);
-            case MID -> emit(flight, vfx.getLaunchReleaseMidParticleSystem(),
-                    vfx.getLaunchReleaseMidScale(), vfx, componentAccessor);
-            case FULL -> emit(flight, vfx.getLaunchReleaseFullParticleSystem(),
-                    vfx.getLaunchReleaseFullScale(), vfx, componentAccessor);
+            case PARTIAL -> emit(flight, config, vfx.getLaunchReleasePartialParticleSystem(),
+                    vfx.getLaunchReleasePartialScale(), vfx, ownerRef, componentAccessor);
+            case MID -> emit(flight, config, vfx.getLaunchReleaseMidParticleSystem(),
+                    vfx.getLaunchReleaseMidScale(), vfx, ownerRef, componentAccessor);
+            case FULL -> emit(flight, config, vfx.getLaunchReleaseFullParticleSystem(),
+                    vfx.getLaunchReleaseFullScale(), vfx, ownerRef, componentAccessor);
         }
     }
 
@@ -130,11 +141,13 @@ public final class AvatarFlightLaunchVfxService {
     }
 
     private void emit(@Nonnull AvatarFlightComponent flight,
+                      @Nonnull TwAvatarFlightConfig config,
                       @Nonnull String systemId,
                       double scale,
                       @Nonnull AvatarFlightVfxSettings vfx,
+                      @Nullable Ref<EntityStore> ownerRef,
                       @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
-        emissionSink.emit(
+        boolean emitted = emissionSink.emit(
                 systemId,
                 flight.getLaunchVfxOriginX(),
                 flight.getLaunchVfxOriginY(),
@@ -142,8 +155,31 @@ public final class AvatarFlightLaunchVfxService {
                 (float) flight.getLaunchVfxYawRadians(),
                 (float) scale,
                 vfx.getMaxDurationSeconds(),
+                ownerRef,
                 componentAccessor
         );
+        logEmission(config, systemId, flight, emitted, scale);
+    }
+
+    private static void logEmission(@Nullable TwAvatarFlightConfig config,
+                                    @Nonnull String systemId,
+                                    @Nonnull AvatarFlightComponent flight,
+                                    boolean emitted,
+                                    double scale) {
+        if (config == null || !config.getDebug().isLogControllerTicks()) return;
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || plugin.getLogger() == null) return;
+        plugin.getLogger().at(Level.INFO).log(String.format(
+                Locale.ROOT,
+                "TameworkAvatarFlight debug: launchVfx config=%s system=%s emitted=%s position=%.2f/%.2f/%.2f scale=%.2f",
+                config.getId(),
+                systemId,
+                emitted,
+                flight.getLaunchVfxOriginX(),
+                flight.getLaunchVfxOriginY(),
+                flight.getLaunchVfxOriginZ(),
+                scale
+        ));
     }
 
     private static boolean isPulseDue(@Nonnull AvatarFlightComponent flight, long nowMs) {

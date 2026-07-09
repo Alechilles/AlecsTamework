@@ -2,8 +2,10 @@ package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.AvatarFlightVfxSettings;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AvatarFlightLaunchVfxServiceTest {
@@ -26,8 +29,8 @@ class AvatarFlightLaunchVfxServiceTest {
         TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
         TransformComponent transform = transform(1.0, 2.0, 3.0);
 
-        service.tick(flight, input, input(0L, true), output(false), config, transform, 1000L, null);
-        service.tick(flight, input, input(0L, true), output(false), config, transform, 1500L, null);
+        service.tick(flight, input, input(0L, true), output(false), config, transform, 1000L, null, null);
+        service.tick(flight, input, input(0L, true), output(false), config, transform, 1500L, null, null);
 
         assertEquals(1, sink.emissions.size());
         Emission emission = sink.emissions.getFirst();
@@ -47,10 +50,10 @@ class AvatarFlightLaunchVfxServiceTest {
         TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
 
         service.tick(flight, input, input(0L, true), output(false), config,
-                transform(4.0, 5.0, 6.0), 1000L, null);
+                transform(4.0, 5.0, 6.0), 1000L, null, null);
         input.setOnGround(false);
         service.tick(flight, input, input(0L, false), output(false), config,
-                transform(40.0, 50.0, 60.0), 2000L, null);
+                transform(40.0, 50.0, 60.0), 2000L, null, null);
 
         assertEquals(1, sink.emissions.size());
         assertTrue(flight.isLaunchVfxOriginValid());
@@ -66,7 +69,7 @@ class AvatarFlightLaunchVfxServiceTest {
         flight.captureLaunchVfxOrigin(7.0, 8.0, 9.0, 0.5);
 
         service.tick(flight, new AvatarFlightInputComponent(), input(200L, true), output(false),
-                TwAvatarFlightConfig.defaultConfig(), transform(70.0, 80.0, 90.0), 2000L, null);
+                TwAvatarFlightConfig.defaultConfig(), transform(70.0, 80.0, 90.0), 2000L, null, null);
 
         assertEquals(1, sink.emissions.size());
         Emission emission = sink.emissions.getFirst();
@@ -88,7 +91,7 @@ class AvatarFlightLaunchVfxServiceTest {
         setField(config.getLaunch(), "chargeExponent", 1.0);
 
         service.tick(flight, new AvatarFlightInputComponent(), input(800L, true), output(true),
-                config, transform(20.0, 30.0, 40.0), 2000L, null);
+                config, transform(20.0, 30.0, 40.0), 2000L, null, null);
 
         assertEquals(1, sink.emissions.size());
         assertEquals(AvatarFlightVfxSettings.DEFAULT_FULL_SYSTEM, sink.emissions.getFirst().systemId());
@@ -107,10 +110,24 @@ class AvatarFlightLaunchVfxServiceTest {
         setField(config.getVfx(), "enabled", false);
 
         service.tick(flight, chargingInput(1000L, true), input(0L, true), output(false),
-                config, transform(1.0, 2.0, 3.0), 1000L, null);
+                config, transform(1.0, 2.0, 3.0), 1000L, null, null);
 
         assertTrue(sink.emissions.isEmpty());
         assertFalse(flight.isLaunchVfxOriginValid());
+    }
+
+    @Test
+    void ownerReferenceIsForwardedToEmissionSink() {
+        RecordingSink sink = new RecordingSink();
+        AvatarFlightLaunchVfxService service = new AvatarFlightLaunchVfxService(sink);
+        Ref<EntityStore> ownerRef = new Ref<>(null, 7);
+
+        service.tick(new AvatarFlightComponent(), chargingInput(1000L, true), input(0L, true),
+                output(false), TwAvatarFlightConfig.defaultConfig(), transform(1.0, 2.0, 3.0),
+                1000L, ownerRef, null);
+
+        assertEquals(1, sink.emissions.size());
+        assertSame(ownerRef, sink.emissions.getFirst().ownerRef());
     }
 
     private static AvatarFlightInputComponent chargingInput(long startedAtMs, boolean onGround) {
@@ -146,7 +163,8 @@ class AvatarFlightLaunchVfxServiceTest {
         field.set(target, value);
     }
 
-    private record Emission(String systemId, double x, double y, double z, float yaw, float scale) {
+    private record Emission(String systemId, double x, double y, double z, float yaw, float scale,
+                            Ref<EntityStore> ownerRef) {
     }
 
     private static final class RecordingSink implements AvatarFlightLaunchVfxService.EmissionSink {
@@ -155,9 +173,10 @@ class AvatarFlightLaunchVfxServiceTest {
         @Override
         public boolean emit(String systemId, double x, double y, double z, float yaw, float scale,
                             float maxDurationSeconds,
+                            Ref<EntityStore> ownerRef,
                             com.hypixel.hytale.component.ComponentAccessor<
                                     com.hypixel.hytale.server.core.universe.world.storage.EntityStore> accessor) {
-            emissions.add(new Emission(systemId, x, y, z, yaw, scale));
+            emissions.add(new Emission(systemId, x, y, z, yaw, scale, ownerRef));
             return true;
         }
     }
