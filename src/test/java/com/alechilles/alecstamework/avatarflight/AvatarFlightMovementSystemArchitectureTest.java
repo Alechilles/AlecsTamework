@@ -122,13 +122,26 @@ class AvatarFlightMovementSystemArchitectureTest {
     @Test
     void movementStateSprintDoesNotDriveBoostIntent() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String inputConversion = methodSlice(source, "private AvatarFlightController.Input toControllerInput");
 
         assertFalse(source.contains("boolean liveSprint = states != null && states.sprinting"),
                 "avatar flight writes sprinting for fast-flight animation, so reading it back as boost input repeats boosts on cooldown");
-        assertFalse(source.contains("input.isSprinting()"),
+        assertFalse(inputConversion.contains("input.isSprinting()"),
                 "held sprint state must not be treated as a level-triggered boost intent");
         assertTrue(source.contains("input.consumeSprintBoost("),
                 "packet sprint should be reduced to a one-shot rising-edge boost event");
+    }
+
+    @Test
+    void groundedAvatarFlightScrubsSprintStateFromPacketInputOnly() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("applyGroundedSprintMovementState(ref, commandBuffer, input)"),
+                "grounded transformed mode should still sanitize sprint animation state");
+        assertTrue(source.contains("states.sprinting = input.isSprinting()"),
+                "real packet sprint should be allowed to drive sprint animation while false positives are cleared");
+        assertFalse(source.contains("states.sprinting = false"),
+                "grounded transformed sprint must not be blindly suppressed when the player is actually sprinting");
     }
 
     @Test
@@ -233,5 +246,17 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "avatar flight animation states must run after base movement-state derivation");
         assertTrue(source.contains("Order.BEFORE, ModelSystems.AnimationEntityTrackerUpdate.class"),
                 "avatar flight animation states must be visible before model animation tracking");
+    }
+
+    private static String methodSlice(String source, String methodStart) {
+        int start = source.indexOf(methodStart);
+        if (start < 0) {
+            return "";
+        }
+        int nextMethod = source.indexOf("\n    @", start + methodStart.length());
+        if (nextMethod < 0) {
+            nextMethod = source.indexOf("\n    private", start + methodStart.length());
+        }
+        return nextMethod < 0 ? source.substring(start) : source.substring(start, nextMethod);
     }
 }

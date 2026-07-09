@@ -128,6 +128,7 @@ public final class AvatarFlightMovementSystem
             applyMovementAnimation(ref, commandBuffer, flight, config, output);
         } else {
             clearMovementAnimation(ref, commandBuffer, flight);
+            applyGroundedSprintMovementState(ref, commandBuffer, input);
         }
         commandBuffer.putComponent(ref, flightType, flight);
         maybeLogDebug(config, flight, ref, controllerInput, output, movementStates);
@@ -358,6 +359,22 @@ public final class AvatarFlightMovementSystem
         states.crouching = false;
         states.falling = false;
         states.fallingFar = false;
+        component.setMovementStates(states);
+        commandBuffer.putComponent(ref, movementStatesType, component);
+    }
+
+    private void applyGroundedSprintMovementState(@Nonnull Ref<EntityStore> ref,
+                                                  @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                                  @Nullable AvatarFlightInputComponent input) {
+        if (input == null) {
+            return;
+        }
+        MovementStatesComponent component = commandBuffer.getComponent(ref, movementStatesType);
+        if (component == null || component.getMovementStates() == null) {
+            return;
+        }
+        MovementStates states = new MovementStates(component.getMovementStates());
+        states.sprinting = input.isSprinting();
         component.setMovementStates(states);
         commandBuffer.putComponent(ref, movementStatesType, component);
     }
