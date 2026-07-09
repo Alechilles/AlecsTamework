@@ -117,7 +117,7 @@ public final class AvatarFlightMovementSystem
         boolean applyingVelocity = output.applyVelocity();
         boolean hasFlightVisualOverrides = hasFlightVisualOverrides(flight);
         syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity);
-        suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);
+        suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, applyingVelocity, hasFlightVisualOverrides);
         if (applyingVelocity) {
             applyVisualPose(ref, commandBuffer, controllerInput, output);
             applyPoseAnimations(ref, commandBuffer, flight, config, output);
@@ -450,7 +450,12 @@ public final class AvatarFlightMovementSystem
     private void suppressPlayerOverlayAnimations(@Nonnull Ref<EntityStore> ref,
                                                  @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                                  @Nonnull AvatarFlightComponent flight,
-                                                 @Nonnull TwAvatarFlightConfig config) {
+                                                 @Nonnull TwAvatarFlightConfig config,
+                                                 boolean applyingVelocity,
+                                                 boolean hasFlightVisualOverrides) {
+        if (!applyingVelocity && !hasFlightVisualOverrides) {
+            return;
+        }
         TwAvatarFlightConfig.AnimationSettings animation = config.getAnimation();
         if (!animation.isSuppressNonMovementAnimations()) {
             return;

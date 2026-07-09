@@ -41,7 +41,7 @@
 - Fixed avatar flight animation and pose sync so the owner client receives the same saved flying-state update used by native flight, pitch follows look pitch directly, turn banking applies from trajectory changes, and stale roll/pitch clears when landing or disabling avatar flight.
 - Fixed a sharp-turn avatar flight bug that could create runaway horizontal speed and leave airbraking unable to recover.
 - Fixed transformed dragon flight animations by explicitly sending configurable movement-slot animations (`FlyIdle`, `Fly`, and `FlyFast` by default) to the owner client while avatar flight is active.
-- Fixed transformed avatar flight interfering with native grounded sprint visuals; grounded transformed movement now leaves walk/run/sprint state to the base client and only clears Tamework flight visual overrides when returning from custom flight.
+- Fixed transformed avatar flight interfering with native grounded sprint visuals; grounded transformed movement now leaves walk/run/sprint animation state and overlay slots to the base client, only suppressing overlays while custom flight visuals are active.
 - Fixed Dragon Reins sprint boost detection when client movement packets omit movement-state payloads but the current player movement state still reports sprinting.
 - Added Q forward boost for Flightmaster's Reins, slowed dive-only speed gain, restored a small forward start from hover/stall, and fixed the compact avatar-flight HUD background color syntax.
 - Fixed avatar-flight sprint boost speed so shift can exceed normal cruise speed instead of being immediately clamped back to the regular forward cap.

@@ -94,6 +94,19 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void groundedAvatarFlightDoesNotSuppressNativeLocomotionAnimations() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String tick = methodSlice(source, "public void tick");
+
+        assertFalse(tick.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);"),
+                "unconditional slot suppression prevents native grounded sprint/step animations while transformed");
+        assertTrue(tick.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, applyingVelocity, hasFlightVisualOverrides)"),
+                "overlay suppression should be scoped to custom flight visuals instead of idle grounded mode");
+        assertTrue(source.contains("if (!applyingVelocity && !hasFlightVisualOverrides)"),
+                "grounded transformed locomotion should be able to use the same native animation path as a plain model swap");
+    }
+
+    @Test
     void ownerClientFlyingStateIsSyncedThroughPlayerApplyMovementStates() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
@@ -266,8 +279,8 @@ class AvatarFlightMovementSystemArchitectureTest {
     void avatarFlightSuppressesPlayerOverlayAnimationSlotsWhileActive() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config)"),
-                "transformed-player flight should suppress held-item/combat overlay slots while active");
+        assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, applyingVelocity, hasFlightVisualOverrides)"),
+                "transformed-player flight should suppress held-item/combat overlay slots only while custom flight visuals are active");
         assertTrue(source.contains("animation.isSuppressNonMovementAnimations()"),
                 "suppression should be config-driven for unsafe model-swap experiments");
         assertTrue(source.contains("!isPoseSlot(AnimationSlot.Status, pitchSlot, rollSlot)"),
