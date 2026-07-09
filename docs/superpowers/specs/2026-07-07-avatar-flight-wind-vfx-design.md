@@ -102,6 +102,9 @@ Prototype launch charge and launch release first. This gives the highest player-
 
 After that pattern is proven, extend the same presentation layer to flap and boost bursts, then fast-flight trails, then airbrake. Trails and airbrake depend more on persistent start/stop behavior and attachment fallback, so they should follow once the simpler launch path is working.
 
+The source-backed launch implementation plan is maintained in
+[`2026-07-09-avatar-flight-launch-vfx-implementation.md`](../../plans/2026-07-09-avatar-flight-launch-vfx-implementation.md).
+
 ## Launch Charge Prototype
 
 Use repeated short pulses with changing cadence and intensity for the first launch-charge prototype.
@@ -258,3 +261,6 @@ Expected validation once implemented:
 - 2026-07-07: Decided launch VFX should include optional config-driven sound hooks in the first pass.
 - 2026-07-07: Decided every AvatarFlight VFX effect section should have optional sound hooks, with launch populated first.
 - 2026-07-07: Decided boost should be the next non-launch sound priority after launch.
+- 2026-07-09: Confirmed the launch prototype can use bounded world-space pulse systems, avoiding model-node attachment and persistent-effect teardown for charge, cancel, and release.
+- 2026-07-09: Chose base-game `Ring2`, `Portal_Wind`, `Smoke_Mist`, and `Smoke_Smooth2` textures for the first playable launch prototype; custom textures are deferred until in-game art review.
+- 2026-07-09: Decided launch release should use the last grounded charge origin so the ground ring cannot follow an airborne avatar.
