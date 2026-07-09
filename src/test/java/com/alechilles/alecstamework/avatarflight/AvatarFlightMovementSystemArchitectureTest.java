@@ -113,8 +113,10 @@ class AvatarFlightMovementSystemArchitectureTest {
         assertTrue(source.contains("states.falling = false"));
         assertTrue(source.contains("states.fallingFar = false"));
         assertTrue(source.contains("states.horizontalIdle = output.horizontalIdle()"));
-        assertTrue(source.contains("states.sprinting = states.sprinting || output.fastFlight()"),
-                "avatar flight can still mark fast flight as sprinting for animation state");
+        assertTrue(source.contains("states.sprinting = output.fastFlight()"),
+                "avatar flight must own sprinting while airborne so leaked native sprint state cannot latch");
+        assertFalse(source.contains("states.sprinting = states.sprinting || output.fastFlight()"),
+                "preserving a stale native sprint bit keeps the transformed model stuck in sprint/fast-flight animation");
     }
 
     @Test

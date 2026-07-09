@@ -350,7 +350,7 @@ public final class AvatarFlightMovementSystem
         states.idle = output.horizontalIdle();
         states.horizontalIdle = output.horizontalIdle();
         states.flying = true;
-        states.sprinting = states.sprinting || output.fastFlight();
+        states.sprinting = output.fastFlight();
         states.walking = false;
         states.running = false;
         states.onGround = false;
