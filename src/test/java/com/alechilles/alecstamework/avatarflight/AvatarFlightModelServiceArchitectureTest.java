@@ -39,6 +39,22 @@ class AvatarFlightModelServiceArchitectureTest {
     }
 
     @Test
+    void avatarFlightModelSwapNormalizesGroundedMovementAnimationFallbacks() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("normalizedGroundedMovementAnimationSets(baseModel)"),
+                "avatar-flight model enrichment should also normalize native grounded movement fallbacks");
+        assertTrue(source.contains("ensureSprintAnimationSet(animations)"),
+                "models without a Sprint set should still have a native sprint target while transformed");
+        assertTrue(source.contains("softenStepRunFallback(animations)"),
+                "normal step-up should not borrow the same fast run clip used for sprinting");
+        assertTrue(source.contains("animations.putIfAbsent(\"Sprint\", run)"),
+                "missing Sprint should be copied from Run so actual sprint can still animate");
+        assertTrue(source.contains("animations.put(\"StepRun\", stepWalk)"),
+                "StepRun should fall back to StepWalk when it otherwise points at the Run clip");
+    }
+
+    @Test
     void avatarFlightModelSwapDoesNotMutateGlobalModelAssets() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

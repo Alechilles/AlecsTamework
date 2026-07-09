@@ -127,10 +127,12 @@ class AvatarFlightMovementSystemArchitectureTest {
         assertTrue(source.contains("states.falling = false"));
         assertTrue(source.contains("states.fallingFar = false"));
         assertTrue(source.contains("states.horizontalIdle = output.horizontalIdle()"));
-        assertTrue(source.contains("states.sprinting = output.fastFlight()"),
-                "avatar flight must own sprinting while airborne so leaked native sprint state cannot latch");
+        assertTrue(source.contains("states.sprinting = false"),
+                "fast-flight animation is explicitly driven, so avatar flight should not leave native sprint bits latched");
         assertFalse(source.contains("states.sprinting = states.sprinting || output.fastFlight()"),
                 "preserving a stale native sprint bit keeps the transformed model stuck in sprint/fast-flight animation");
+        assertFalse(source.contains("states.sprinting = output.fastFlight()"),
+                "movement-state sprint should not duplicate the explicit fast-flight Movement animation");
     }
 
     @Test
@@ -160,10 +162,10 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "grounded transformed mode should not rewrite native sprint/movement animation state");
         assertFalse(source.contains("states.sprinting = input.isSprinting()"),
                 "packet sprint input should be observed, not written back to MovementStates by avatar flight");
-        assertFalse(source.contains("states.sprinting = false"),
+        assertFalse(groundedBranch.contains("states.sprinting = false"),
                 "grounded transformed sprint must not be blindly suppressed when the player is actually sprinting");
-        assertFalse(groundedBranch.contains("commandBuffer.putComponent(ref, movementStatesType"),
-                "grounded transformed mode should leave MovementStates ownership with native PlayerInput processing");
+        assertFalse(groundedBranch.contains("states.sprinting = input.isSprinting()"),
+                "grounded transformed mode should leave current sprint ownership with native PlayerInput processing");
     }
 
     @Test
@@ -174,8 +176,10 @@ class AvatarFlightMovementSystemArchitectureTest {
 
         assertTrue(tick.contains("boolean hasFlightVisualOverrides = hasFlightVisualOverrides(flight)"),
                 "grounded cleanup should be driven by avatar-flight-owned visual state");
-        assertTrue(tick.contains("clearFlightVisualOverrides(ref, commandBuffer, flight, config)"),
-                "leaving custom flight should clear forced animation and pose overrides once");
+        assertTrue(tick.contains("clearFlightVisualOverrides(ref, commandBuffer, flight, config, controllerInput)"),
+                "leaving custom flight should clear forced animation, pose, and movement-state overrides once");
+        assertTrue(cleanup.contains("clearFlightMovementState(ref, commandBuffer, controllerInput)"),
+                "forced airborne MovementStates must be cleared once before native grounded locomotion resumes");
         assertTrue(cleanup.contains("clearMovementAnimation(ref, commandBuffer, flight)"),
                 "forced Movement slot animation must be stopped when returning to native grounded mode");
         assertTrue(cleanup.contains("clearPoseAnimation(ref, commandBuffer, flight, true, pitchSlot)"),
@@ -184,6 +188,34 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "bank pose slot should be stopped when returning to native grounded mode");
         assertTrue(cleanup.contains("resetVisualPose(ref, commandBuffer)"),
                 "transform/head pitch and roll should be reset once on the transition out of custom flight");
+    }
+
+    @Test
+    void flightMovementCleanupClearsOnlyTameworkOwnedAirborneBits() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String cleanup = methodSlice(source, "private void clearFlightMovementState");
+
+        assertTrue(cleanup.contains("states.flying = false"),
+                "landing should clear Tamework's forced airborne state");
+        assertTrue(cleanup.contains("states.sprinting = false"),
+                "fast-flight movement-state sprint must not remain latched after custom flight stops");
+        assertTrue(cleanup.contains("states.running = false"));
+        assertTrue(cleanup.contains("states.walking = false"));
+        assertTrue(cleanup.contains("states.jumping = false"));
+        assertTrue(cleanup.contains("states.falling = false"));
+        assertTrue(cleanup.contains("states.fallingFar = false"));
+        assertTrue(cleanup.contains("states.climbing = false"));
+        assertTrue(cleanup.contains("states.mantling = false"));
+        assertTrue(cleanup.contains("states.sliding = false"));
+        assertTrue(cleanup.contains("states.gliding = false"));
+        assertTrue(cleanup.contains("states.idle = true"));
+        assertTrue(cleanup.contains("states.horizontalIdle = true"));
+        assertTrue(cleanup.contains("states.onGround = input.onGround()"),
+                "cleanup should not claim grounded when the controller input still says airborne");
+        assertTrue(cleanup.contains("commandBuffer.putComponent(ref, movementStatesType, component)"),
+                "runtime systems must write cleaned movement-state components through the command buffer");
+        assertFalse(cleanup.contains("input.isSprinting()"),
+                "transition cleanup should not mirror live grounded sprint state");
     }
 
     @Test

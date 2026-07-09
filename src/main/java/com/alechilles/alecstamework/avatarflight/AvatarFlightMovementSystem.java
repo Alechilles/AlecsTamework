@@ -129,7 +129,7 @@ public final class AvatarFlightMovementSystem
             applyFlightMovementState(ref, commandBuffer, output);
             applyMovementAnimation(ref, commandBuffer, flight, config, output);
         } else if (hasFlightVisualOverrides) {
-            clearFlightVisualOverrides(ref, commandBuffer, flight, config);
+            clearFlightVisualOverrides(ref, commandBuffer, flight, config, controllerInput);
         }
         commandBuffer.putComponent(ref, flightType, flight);
         maybeLogDebug(config, flight, ref, controllerInput, output, movementStates);
@@ -352,7 +352,7 @@ public final class AvatarFlightMovementSystem
         states.idle = output.horizontalIdle();
         states.horizontalIdle = output.horizontalIdle();
         states.flying = true;
-        states.sprinting = output.fastFlight();
+        states.sprinting = false;
         states.walking = false;
         states.running = false;
         states.onGround = false;
@@ -400,10 +400,40 @@ public final class AvatarFlightMovementSystem
     private void clearFlightVisualOverrides(@Nonnull Ref<EntityStore> ref,
                                             @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                             @Nonnull AvatarFlightComponent flight,
-                                            @Nonnull TwAvatarFlightConfig config) {
+                                            @Nonnull TwAvatarFlightConfig config,
+                                            @Nonnull AvatarFlightController.Input controllerInput) {
+        clearFlightMovementState(ref, commandBuffer, controllerInput);
         clearMovementAnimation(ref, commandBuffer, flight);
         clearPoseAnimations(ref, commandBuffer, flight, config);
         resetVisualPose(ref, commandBuffer);
+    }
+
+    private void clearFlightMovementState(@Nonnull Ref<EntityStore> ref,
+                                          @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                          @Nonnull AvatarFlightController.Input input) {
+        MovementStatesComponent component = commandBuffer.getComponent(ref, movementStatesType);
+        if (component == null) {
+            return;
+        }
+        MovementStates states = component.getMovementStates();
+        states = states == null ? new MovementStates() : new MovementStates(states);
+        states.flying = false;
+        states.sprinting = false;
+        states.running = false;
+        states.walking = false;
+        states.jumping = false;
+        states.crouching = false;
+        states.falling = false;
+        states.fallingFar = false;
+        states.climbing = false;
+        states.mantling = false;
+        states.sliding = false;
+        states.gliding = false;
+        states.idle = true;
+        states.horizontalIdle = true;
+        states.onGround = input.onGround();
+        component.setMovementStates(states);
+        commandBuffer.putComponent(ref, movementStatesType, component);
     }
 
     private void clearPoseAnimations(@Nonnull Ref<EntityStore> ref,

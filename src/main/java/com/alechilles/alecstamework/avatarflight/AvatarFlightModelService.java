@@ -25,6 +25,9 @@ public final class AvatarFlightModelService {
     private static final float POSE_ANIMATION_BLEND_SECONDS = 0.75f;
     private static final float POSE_ANIMATION_WEIGHT = 1.0f;
     private static final int[] NO_FOOTSTEPS = new int[0];
+    private static final String ANIMATION_RUN = "Run";
+    private static final String ANIMATION_STEP_RUN = "StepRun";
+    private static final String ANIMATION_STEP_WALK = "StepWalk";
 
     public boolean apply(@Nonnull Store<EntityStore> store,
                          @Nonnull Ref<EntityStore> ref,
@@ -95,10 +98,10 @@ public final class AvatarFlightModelService {
                                                  float scale,
                                                  @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
         Model baseModel = Model.createScaledModel(modelAsset, scale);
-        if (!animation.isPoseAnimationsEnabled()) {
-            return baseModel;
+        Map<String, ModelAsset.AnimationSet> enrichedAnimations = normalizedGroundedMovementAnimationSets(baseModel);
+        if (animation.isPoseAnimationsEnabled()) {
+            injectPoseAnimationSets(enrichedAnimations, animation);
         }
-        Map<String, ModelAsset.AnimationSet> enrichedAnimations = injectedPoseAnimationSets(baseModel, animation);
         return new Model(
                 baseModel.getModelAssetId(),
                 baseModel.getScale(),
@@ -126,15 +129,56 @@ public final class AvatarFlightModelService {
     }
 
     @Nonnull
-    private static Map<String, ModelAsset.AnimationSet> injectedPoseAnimationSets(
-            @Nonnull Model baseModel,
-            @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
+    private static Map<String, ModelAsset.AnimationSet> normalizedGroundedMovementAnimationSets(
+            @Nonnull Model baseModel) {
         Map<String, ModelAsset.AnimationSet> animations = new LinkedHashMap<>(baseModel.getAnimationSetMap());
+        ensureSprintAnimationSet(animations);
+        softenStepRunFallback(animations);
+        return animations;
+    }
+
+    private static void ensureSprintAnimationSet(@Nonnull Map<String, ModelAsset.AnimationSet> animations) {
+        ModelAsset.AnimationSet run = animations.get(ANIMATION_RUN);
+        if (run == null) {
+            return;
+        }
+        animations.putIfAbsent("Sprint", run);
+    }
+
+    private static void softenStepRunFallback(@Nonnull Map<String, ModelAsset.AnimationSet> animations) {
+        ModelAsset.AnimationSet stepRun = animations.get(ANIMATION_STEP_RUN);
+        ModelAsset.AnimationSet stepWalk = animations.get(ANIMATION_STEP_WALK);
+        ModelAsset.AnimationSet run = animations.get(ANIMATION_RUN);
+        if (stepRun == null || stepWalk == null || run == null) {
+            return;
+        }
+        if (usesSameFirstAnimation(stepRun, run)) {
+            animations.put("StepRun", stepWalk);
+        }
+    }
+
+    private static boolean usesSameFirstAnimation(@Nonnull ModelAsset.AnimationSet first,
+                                                  @Nonnull ModelAsset.AnimationSet second) {
+        String firstAnimation = firstAnimationPath(first);
+        return firstAnimation != null && firstAnimation.equals(firstAnimationPath(second));
+    }
+
+    @Nullable
+    private static String firstAnimationPath(@Nonnull ModelAsset.AnimationSet set) {
+        ModelAsset.Animation[] animations = set.getAnimations();
+        if (animations == null || animations.length == 0 || animations[0] == null) {
+            return null;
+        }
+        return animations[0].getAnimation();
+    }
+
+    private static void injectPoseAnimationSets(
+            @Nonnull Map<String, ModelAsset.AnimationSet> animations,
+            @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
         for (AvatarFlightPoseAnimationCatalog.Definition definition
                 : AvatarFlightPoseAnimationCatalog.standardDefinitionsFor(animation)) {
             addStandardPoseAnimation(animations, definition.id(), definition.path());
         }
-        return animations;
     }
 
     private static void addStandardPoseAnimation(@Nonnull Map<String, ModelAsset.AnimationSet> animations,
