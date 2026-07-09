@@ -25,6 +25,11 @@ DEFAULT_COLLISION_MODEL = (
     / "Rider"
     / "Player_MountAnchor.blockymodel"
 )
+RECOMMENDED_NATIVE_LOCOMOTION_SETS = (
+    ("Run", "Sprint"),
+    ("JumpRun", "JumpSprint"),
+    ("StepRun", "StepSprint"),
+)
 
 
 @dataclass(frozen=True)
@@ -209,6 +214,7 @@ def generate(args: argparse.Namespace) -> GenerationResult:
         output_common_model_asset,
         animation_outputs
     )
+    warn_missing_native_locomotion_sets(generated_server_model, warnings)
     output_server_model_path = (
         output_root
         / server_model_path.relative_to(source_root).parent
@@ -501,26 +507,26 @@ def rewrite_server_model(
             output_asset = animation_outputs.get(source_asset)
             if output_asset is not None:
                 animation["Animation"] = output_asset
-    normalize_avatar_locomotion_animation_sets(rewritten)
     return rewritten
 
 
-def normalize_avatar_locomotion_animation_sets(server_model: Any) -> None:
+def warn_missing_native_locomotion_sets(server_model: Any, warnings: list[str]) -> None:
     animation_sets = server_model.get("AnimationSets")
     if not isinstance(animation_sets, dict):
         return
-    copy_animation_set(animation_sets, "Run", "Sprint")
-    copy_animation_set(animation_sets, "JumpRun", "JumpSprint")
-    copy_animation_set(animation_sets, "StepRun", "StepSprint")
-
-
-def copy_animation_set(animation_sets: dict[str, Any], source_id: str, target_id: str) -> None:
-    if target_id in animation_sets:
-        return
-    source = animation_sets.get(source_id)
-    if source is None:
-        return
-    animation_sets[target_id] = copy.deepcopy(source)
+    for fallback_id, native_id in RECOMMENDED_NATIVE_LOCOMOTION_SETS:
+        if native_id in animation_sets:
+            continue
+        if fallback_id in animation_sets:
+            warnings.append(
+                f"missing native transformed-player animation set {native_id!r}; "
+                f"add it to the source model, usually by aliasing {fallback_id!r}"
+            )
+        else:
+            warnings.append(
+                f"missing native transformed-player animation set {native_id!r}; "
+                "add it to the source model if this avatar will use grounded player locomotion"
+            )
 
 
 def print_summary(result: GenerationResult) -> None:

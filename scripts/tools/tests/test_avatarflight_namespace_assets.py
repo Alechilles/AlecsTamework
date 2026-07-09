@@ -144,7 +144,7 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
                 set(animation["nodeAnimations"].keys()),
             )
 
-    def test_adds_player_locomotion_aliases_to_generated_avatar_model(self):
+    def test_warns_about_missing_player_locomotion_aliases_without_mutating_generated_model(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = root / "generated"
@@ -199,14 +199,17 @@ class AvatarFlightNamespaceAssetsTest(unittest.TestCase):
             )
 
             self.assertEqual(0, result.returncode, result.stdout)
+            self.assertIn("missing native transformed-player animation set 'Sprint'", result.stdout)
+            self.assertIn("missing native transformed-player animation set 'JumpSprint'", result.stdout)
+            self.assertIn("missing native transformed-player animation set 'StepSprint'", result.stdout)
             server_model = json.loads(
                 (output / "Server" / "Models" / "Creature" / "Dragon_AvatarFlight.json").read_text()
             )
             animation_sets = server_model["AnimationSets"]
 
-            self.assertEqual(animation_sets["Run"], animation_sets["Sprint"])
-            self.assertEqual(animation_sets["JumpRun"], animation_sets["JumpSprint"])
-            self.assertEqual(animation_sets["StepRun"], animation_sets["StepSprint"])
+            self.assertNotIn("Sprint", animation_sets)
+            self.assertNotIn("JumpSprint", animation_sets)
+            self.assertNotIn("StepSprint", animation_sets)
 
 
 if __name__ == "__main__":
