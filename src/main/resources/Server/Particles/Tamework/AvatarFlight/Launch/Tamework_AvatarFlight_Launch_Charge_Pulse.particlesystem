@@ -1,5 +1,6 @@
 {
   "Spawners": [
+    { "SpawnerId": "Impact_Ice_Shockwave", "PositionOffset": { "Y": 0.22 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Charge_Ring", "PositionOffset": { "Y": 0.18 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Charge_Wisps", "PositionOffset": { "Y": 0.28 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Charge_Dust", "PositionOffset": { "Y": 0.16 } }
@@ -7,5 +8,5 @@
   "LifeSpan": 0.50,
   "CullDistance": 60.0,
   "BoundingRadius": 5.0,
-  "IsImportant": false
+  "IsImportant": true
 }

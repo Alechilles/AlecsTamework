@@ -1,10 +1,11 @@
 {
   "Spawners": [
+    { "SpawnerId": "Impact_Ice_Shockwave", "PositionOffset": { "Y": 0.22 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Cancel_Ring", "PositionOffset": { "Y": 0.18 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Cancel_Puff", "PositionOffset": { "Y": 0.24 } }
   ],
   "LifeSpan": 0.40,
   "CullDistance": 60.0,
   "BoundingRadius": 4.0,
-  "IsImportant": false
+  "IsImportant": true
 }
