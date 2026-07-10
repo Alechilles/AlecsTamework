@@ -37,10 +37,11 @@ restyling should proceed incrementally after this clean baseline is confirmed in
 
 The clean baseline rendered successfully in game. `TwLaunchChargeRing` is now runtime-confirmed as
 one pale-cyan ring that contracts from `2.2` to `0.28` scale over `0.28s`. Incremental art tuning has
-moved to `TwLaunchChargeWisps`, which retains the working `Drop_Epic_Vortex` field structure while
-replacing its purple expanding vortex with up to three pale white-blue arcs that tighten over
-`0.38s`. The wisp pass still needs in-game confirmation. Remaining charge, cancel, and release
-spawners stay on their visible vanilla baselines until each is tuned and verified independently.
+moved to `TwLaunchChargeWisps`. Its first low-opacity continuous-vortex tuning was not readable in
+game, so the spawner now uses the runtime-confirmed charge-ring burst structure: three pale
+white-blue `Portal_Wind` arcs contract over `0.34s` with visible opacity from frame zero. This second
+wisp pass still needs in-game confirmation. Remaining charge, cancel, and release spawners stay on
+their visible vanilla baselines until each is tuned and verified independently.
 
 ## Confirmed Hytale Particle Behavior
 

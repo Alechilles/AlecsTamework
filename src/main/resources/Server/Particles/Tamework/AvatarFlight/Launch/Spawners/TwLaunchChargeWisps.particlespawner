@@ -1,25 +1,31 @@
 {
   "RenderMode": "Erosion",
   "ParticleRotationInfluence": "None",
-  "MaxConcurrentParticles": 3,
-  "ParticleLifeSpan": { "Min": 0.38, "Max": 0.38 },
+  "LinearFiltering": true,
+  "LightInfluence": 0,
+  "ParticleRotateWithSpawner": true,
   "TrailSpawnerPositionMultiplier": 1,
   "TrailSpawnerRotationMultiplier": 1,
-  "SpawnRate": { "Min": 5.0, "Max": 5.0 },
+  "MaxConcurrentParticles": 3,
+  "ParticleLifeSpan": { "Min": 0.34, "Max": 0.34 },
+  "TotalParticles": { "Min": 3, "Max": 3 },
   "Particle": {
     "Texture": "Particles/Textures/Circles/Portal_Wind.png",
     "ScaleRatioConstraint": "OneToOne",
     "UVOption": "None",
     "Animation": {
-      "0": { "Opacity": 0.0 },
-      "19": { "Opacity": 0.0 },
-      "20": { "Opacity": 0.18, "Rotation": { "Y": { "Min": -90.0, "Max": -90.0 } }, "Scale": { "X": { "Min": 1.25, "Max": 1.55 } }, "Color": "#effbff" },
-      "40": { "Opacity": 0.42 },
-      "70": { "Opacity": 0.28 },
-      "100": { "Opacity": 0.0, "Color": "#bfeaff", "Rotation": { "Y": { "Min": 180.0, "Max": 180.0 } }, "Scale": { "X": { "Min": 0.24, "Max": 0.38 } } }
+      "0": { "FrameIndex": { "Min": 0, "Max": 0 }, "Opacity": 0.72, "Color": "#effbff", "Scale": { "X": { "Min": 1.8, "Max": 2.1 } } },
+      "30": {},
+      "100": { "Opacity": 0.0, "Color": "#bfeaff", "Scale": { "X": { "Min": 0.32, "Max": 0.46 } } }
     },
-    "InitialAnimationFrame": { "Scale": { "X": { "Min": 0.15, "Max": 0.2 } }, "Opacity": 0.824, "Rotation": { "X": { "Min": 90.0, "Max": 90.0 }, "Y": { "Min": -180.0, "Max": 180.0 }, "Z": { "Min": 180.0, "Max": 180.0 } } }
+    "InitialAnimationFrame": {
+      "FrameIndex": { "Min": 0, "Max": 0 },
+      "Scale": { "X": { "Min": 0.15, "Max": 0.22 }, "Y": { "Min": 0.2, "Max": 0.2 } },
+      "Rotation": { "Z": { "Min": -180.0, "Max": 180.0 }, "X": { "Min": 90.0, "Max": 90.0 } },
+      "Color": "#effbff"
+    },
+    "SoftParticles": "Enable"
   },
-  "CameraOffset": -0.1,
-  "LinearFiltering": true
+  "SpawnBurst": true,
+  "SpawnRate": { "Min": 3.0, "Max": 3.0 }
 }
