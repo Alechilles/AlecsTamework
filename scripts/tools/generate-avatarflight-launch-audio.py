@@ -16,6 +16,7 @@ import numpy as np
 
 SAMPLE_RATE = 48_000
 SEED = 0xA11EC
+LEGACY_CHARGE_SAMPLE_COUNT = int(0.36 * SAMPLE_RATE)
 DEFAULT_OUTPUT = (
     Path(__file__).resolve().parents[2]
     / "src/main/resources/Common/Sounds/Tamework/AvatarFlight/Launch"
@@ -69,16 +70,28 @@ def normalize(samples: np.ndarray, peak_db: float = -1.0) -> np.ndarray:
 
 
 def charge_pulse(rng: np.random.Generator) -> np.ndarray:
-    duration = 0.36
+    duration = 0.72
     time = np.arange(int(duration * SAMPLE_RATE)) / SAMPLE_RATE
     noise = rng.normal(0.0, 1.0, len(time))
-    air = bandpass(noise, 420.0, 7_500.0)
-    body = bandpass(noise, 110.0, 1_600.0)
-    envelope = np.sin(np.pi * np.clip(time / duration, 0.0, 1.0)) ** 1.35
-    swirl = 0.70 + 0.30 * np.sin(2.0 * math.pi * (4.1 * time + 3.4 * time * time))
-    tone = chirp(time, 260.0, 540.0) * np.sin(np.pi * time / duration) ** 2
-    output = (0.82 * air + 0.34 * body) * envelope * swirl + 0.055 * tone
-    return normalize(fade(output, 0.018, 0.055), -2.0)
+    shifted = np.roll(noise, int(0.021 * SAMPLE_RATE))
+    air = highpass(lowpass(lowpass(noise, 2_400.0), 2_400.0), 180.0)
+    body = highpass(lowpass(lowpass(shifted, 820.0), 820.0), 65.0)
+    rumble = highpass(lowpass(np.roll(noise, int(0.047 * SAMPLE_RATE)), 340.0), 32.0)
+
+    progress = np.clip(time / duration, 0.0, 1.0)
+    attack = np.sin(np.clip(time / 0.18, 0.0, 1.0) * math.pi / 2.0) ** 2
+    release = np.sin(np.clip((duration - time) / 0.28, 0.0, 1.0) * math.pi / 2.0) ** 2
+    envelope = attack * release
+
+    turbulence_noise = lowpass(rng.normal(0.0, 1.0, len(time)), 4.2)
+    turbulence_scale = max(float(np.std(turbulence_noise)), 1e-9)
+    turbulence = np.clip(0.86 + 0.16 * turbulence_noise / turbulence_scale, 0.58, 1.14)
+    swirl = 0.90 + 0.10 * np.sin(2.0 * math.pi * (1.3 * time + 0.85 * time * time))
+    breath = 0.018 * chirp(time, 145.0, 215.0) * envelope ** 1.4
+
+    wind = (0.28 + 0.18 * progress) * air + 0.78 * body + 0.24 * rumble
+    output = wind * envelope * turbulence * swirl + breath
+    return normalize(fade(output, 0.07, 0.18), -4.5)
 
 
 def ready_cue(rng: np.random.Generator) -> np.ndarray:
@@ -217,14 +230,23 @@ def ogg_crc_table() -> list[int]:
 
 
 def generate(output_root: Path, ffmpeg: str) -> None:
-    rng = np.random.default_rng(SEED)
+    cue_rng = np.random.default_rng(SEED)
+    cue_rng.normal(0.0, 1.0, LEGACY_CHARGE_SAMPLE_COUNT)
     sounds = {
-        "Tamework_AvatarFlight_Launch_Charge_Pulse.ogg": charge_pulse(rng),
-        "Tamework_AvatarFlight_Launch_Ready.ogg": ready_cue(rng),
-        "Tamework_AvatarFlight_Launch_Cancel.ogg": cancel_cue(rng),
-        "Tamework_AvatarFlight_Launch_Release_Partial.ogg": release_burst(rng, 0.48, 0.72),
-        "Tamework_AvatarFlight_Launch_Release_Mid.ogg": release_burst(rng, 0.72, 0.90),
-        "Tamework_AvatarFlight_Launch_Release_Full.ogg": release_burst(rng, 1.0, 1.16),
+        "Tamework_AvatarFlight_Launch_Charge_Pulse.ogg": charge_pulse(
+            np.random.default_rng(SEED)
+        ),
+        "Tamework_AvatarFlight_Launch_Ready.ogg": ready_cue(cue_rng),
+        "Tamework_AvatarFlight_Launch_Cancel.ogg": cancel_cue(cue_rng),
+        "Tamework_AvatarFlight_Launch_Release_Partial.ogg": release_burst(
+            cue_rng, 0.48, 0.72
+        ),
+        "Tamework_AvatarFlight_Launch_Release_Mid.ogg": release_burst(
+            cue_rng, 0.72, 0.90
+        ),
+        "Tamework_AvatarFlight_Launch_Release_Full.ogg": release_burst(
+            cue_rng, 1.0, 1.16
+        ),
     }
     output_root.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="tamework-launch-audio-") as temporary:
