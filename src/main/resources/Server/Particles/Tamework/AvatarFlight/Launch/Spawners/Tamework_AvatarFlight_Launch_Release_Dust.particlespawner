@@ -18,7 +18,7 @@
     "Texture": "Particles/Textures/Smoke/Smoke_Smooth2.png",
     "FrameSize": { "Width": 64, "Height": 64 },
     "ScaleRatioConstraint": "OneToOne",
-    "SoftParticles": "Require",
+    "SoftParticles": "Disable",
     "UVOption": "RandomFlipU",
     "Animation": {
       "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Scale": { "X": { "Min": 0.20, "Max": 0.34 } }, "Color": "#8b8177" },

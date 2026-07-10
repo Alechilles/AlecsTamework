@@ -10,7 +10,7 @@
   "Particle": {
     "Texture": "Particles/Textures/Basic/Ring2.png",
     "ScaleRatioConstraint": "OneToOne",
-    "SoftParticles": "Enable",
+    "SoftParticles": "Disable",
     "UVOption": "None",
     "Animation": {
       "0": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.08, "Max": 0.08 } }, "Color": "#e8f8ff" },

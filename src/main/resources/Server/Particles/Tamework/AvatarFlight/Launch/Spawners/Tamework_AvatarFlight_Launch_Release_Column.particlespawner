@@ -23,7 +23,7 @@
     "Texture": "Particles/Textures/Smoke/Smoke_Mist.png",
     "FrameSize": { "Width": 32, "Height": 64 },
     "ScaleRatioConstraint": "None",
-    "SoftParticles": "Require",
+    "SoftParticles": "Disable",
     "UVOption": "RandomFlipU",
     "Animation": {
       "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Scale": { "X": { "Min": 0.22, "Max": 0.34 }, "Y": { "Min": 0.65, "Max": 0.95 } }, "Color": "#eefbff" },

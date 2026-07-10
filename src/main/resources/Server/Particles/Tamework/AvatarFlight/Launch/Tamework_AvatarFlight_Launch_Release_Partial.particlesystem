@@ -1,6 +1,5 @@
 {
   "Spawners": [
-    { "SpawnerId": "Impact_Ice_Shockwave", "PositionOffset": { "Y": 0.22 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Ring", "PositionOffset": { "Y": 0.16 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "PositionOffset": { "Y": 0.28 } },
     { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "PositionOffset": { "Y": 0.14 } }

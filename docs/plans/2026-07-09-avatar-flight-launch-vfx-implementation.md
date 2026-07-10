@@ -25,10 +25,10 @@ Implemented on 2026-07-09:
 
 In-game `/particle spawn` and multiplayer owner/observer art review remain manual validation steps.
 
-Current live diagnostic: charge pulses also reference `TwLaunchProbe`, a short-ID structural copy
-of vanilla `MagicHit_Flash`, at three elevated offsets. Gold star flashes prove that a custom
-spawner reaches the client independently of the authored launch materials; frost-only output means
-the failure is in custom spawner delivery or client resolution rather than the launch trigger.
+Live diagnostics confirmed that a short-ID structural copy of vanilla `MagicHit_Flash` rendered
+from the custom Tamework pack while the original launch spawners did not. Every original spawner
+used soft-particle depth fading at a near-ground origin, so launch spawners now explicitly disable
+soft particles. The temporary gold-flash probe and base ice shockwave have been removed.
 
 ## Confirmed Hytale Particle Behavior
 
@@ -186,7 +186,7 @@ as the release-ring baseline.
 - `SpawnBurst: true`, exactly one particle per group entry.
 - `ParticleLifeSpan`: approximately `0.25-0.30s`.
 - Start near zero scale, expand rapidly, and fade completely.
-- Use a horizontal `Ring2` texture with `SoftParticles` enabled.
+- Use a horizontal `Ring2` texture with `SoftParticles` disabled so terrain depth does not erase it.
 - Keep the ring translucent enough that terrain remains visible.
 
 ### Release column

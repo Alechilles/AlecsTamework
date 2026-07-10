@@ -15,7 +15,7 @@
   "Particle": {
     "Texture": "Particles/Textures/Circles/Portal_Wind.png",
     "ScaleRatioConstraint": "OneToOne",
-    "SoftParticles": "Enable",
+    "SoftParticles": "Disable",
     "UVOption": "RandomFlipU",
     "Animation": {
       "0": { "Opacity": 0.0, "Scale": { "X": { "Min": 1.15, "Max": 1.45 } }, "Color": "#effbff" },
