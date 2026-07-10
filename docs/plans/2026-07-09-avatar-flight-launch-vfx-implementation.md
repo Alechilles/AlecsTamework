@@ -35,13 +35,16 @@ copy of a known-working Hytale 0.5.6 spawner: `Stick_Slam_Shockwave_Small` for r
 release column. The temporary gold-flash probe and base ice shockwave remain removed. Visual
 restyling should proceed incrementally after this clean baseline is confirmed in game.
 
-The clean baseline, tuned charge ring, and second burst-based wind-wisp pass rendered successfully
-in game. The full sequence is now authored for in-game art review. Charge pulses combine one
-pale-cyan inward ring, three white-blue wind arcs, and three inward-circling earth-toned puffs. A
-rejected launch collapses one grey ring into three weak outward puffs. Successful releases reuse one
-expanding ring, four upward pale-mist particles, and four outward ground-dust particles per group;
-the existing partial/mid/full compositions produce concurrency budgets of `9`, `17`, and `26` with
-runtime scales of `0.75`, `1.0`, and `1.2`. All five systems are non-important and remain bounded.
+The clean baseline and scaled launch sequence rendered successfully in game, but the repeated
+`Ring2` and `Portal_Wind` sheets read as pulsing rings rather than moving air. The current art pass
+uses Hytale 0.5.6's `Battleaxe_Signature_Whirlwind` and `Wind_Spirit_Tentacle` as direct visual
+references. Charge pulses now combine a contracting, rotating `Signature_Spin7` brush stroke, ten
+small `Ball3` motes bent into curved paths by radial and tangent acceleration, and three
+inward-circling earth-toned puffs. A rejected launch collapses a muted `Signature_Spin5` crescent
+into three weak outward puffs. Successful releases combine expanding rotating brush strokes, six
+helical `Glow_Direction` streaks per group, upward pale mist, and outward ground dust. The partial,
+mid, and full compositions have bounded concurrency budgets of `15`, `23`, and `38`; charge pulses
+are bounded at `14`. All five systems remain non-important and independently previewable.
 
 ## Confirmed Hytale Particle Behavior
 
@@ -109,8 +112,10 @@ The first prototype reuses base-game particle textures:
 
 | Purpose | Base texture | Reason |
 | --- | --- | --- |
-| Pressure rings | `Particles/Textures/Basic/Ring2.png` | Broken, soft white ring already used by expanding shockwaves. |
-| Curved wind accent | `Particles/Textures/Circles/Portal_Wind.png` | Physical-looking circular wind stroke when kept pale and low-opacity. |
+| Swept wind arcs | `Particles/Textures/Circles/Signature_Spin7.png` | Broad asymmetric brush strokes rotate while contracting or expanding, so the silhouette reads as moving air instead of a UI-like ring. |
+| Cancel crescent | `Particles/Textures/Circles/Signature_Spin5.png` | Softer incomplete stroke suitable for a restrained collapsing fizzle. |
+| Curved wind motes | `Particles/Textures/Basic/Ball3.png` | Small points reveal orbital motion clearly when driven by radial and tangent forces. |
+| Helical release streaks | `Particles/Textures/Basic/Glow_Direction.png` | Directional marks expose the upward spiral during launch release. |
 | Air column | `Particles/Textures/Smoke/Smoke_Mist.png` | Directional four-frame mist suitable for stretched upward airflow. |
 | Dust | `Particles/Textures/Smoke/Smoke_Smooth2.png` | Soft four-frame smoke suitable for restrained earth-toned dust. |
 
@@ -143,12 +148,13 @@ the server send radius.
 
 | Spawner ID | Composition target |
 | --- | --- |
-| `TwLaunchChargeRing` | One flat `Ring2` particle contracting from wide/faint to tight/transparent over roughly `0.35s`. |
-| `TwLaunchChargeWisps` | Two or three pale `Portal_Wind` accents tightening toward the origin. |
+| `TwLaunchChargeRing` | One flat `Signature_Spin7` brush stroke rotating and contracting toward the launch origin. |
+| `TwLaunchChargeWisps` | Ten small pale motes following short curved orbital paths around the launch origin. |
 | `TwLaunchChargeDust` | Three to five low earth-toned puffs pulled inward with a Y-axis radial attractor and a small tangent acceleration. |
-| `TwLaunchCancelRing` | One small broken ring that appears briefly and collapses/fades. |
+| `TwLaunchCancelRing` | One muted `Signature_Spin5` crescent that rotates, collapses, and fades. |
 | `TwLaunchCancelPuff` | Two or three small grey-brown puffs with weak outward velocity. |
-| `TwLaunchReleaseRing` | One flat ring expanding rapidly from near-zero scale and fading by `0.30s`. |
+| `TwLaunchReleaseRing` | One flat `Signature_Spin7` brush stroke rotating and expanding rapidly from near-zero scale. |
+| `TwLaunchReleaseStreamers` | Six pale directional streaks accelerated upward while radial and tangent forces bend them into a helix. |
 | `TwLaunchReleaseColumn` | Pale mist particles accelerated upward and stretched along velocity. |
 | `TwLaunchReleaseDust` | Low radial dust pushed outward with short life and strong damping. |
 
@@ -157,28 +163,36 @@ the server send radius.
 Reuse the same release spawners in all three systems. Increase intensity through explicit group
 entries, start delays, and runtime scale instead of duplicating spawner definitions.
 
-| Tier | Ring groups | Column target | Dust target | Runtime scale |
-| --- | --- | --- | --- | --- |
-| Partial | One ring | About 5-6 particles | About 5-6 particles | `0.75` |
-| Mid | One ring | About 7-9 particles | About 8-10 particles | `1.00` |
-| Full | Two readable rings separated by `0.06-0.10s` | About 10-12 particles | About 12-14 particles | `1.20` |
+| Tier | Wind arcs | Helical streaks | Upward mist | Ground dust | Default runtime scale |
+| --- | --- | --- | --- | --- | --- |
+| Partial | One | 6 | 4 | 4 | `0.75` |
+| Mid | One | 6 | 8 | 8 | `1.00` |
+| Full | Two separated by `0.08s` | 12 | 12 | 12 | `1.20` |
 
-Avoid `Distortion` and additive glow in the first prototype. Prefer `Erosion` for rings and
-`BlendLinear` or restrained `Erosion` for mist/dust. Wind color should stay near white or pale blue;
-dust should stay neutral grey-brown.
+Avoid `Distortion`. Use `Erosion` for wind arcs and directional streaks, reserve restrained
+`BlendAdd` for the small charge motes, and use `BlendLinear` for mist/dust. Wind color should stay
+near white or pale blue; dust should stay neutral grey-brown.
 
 ## Spawner Tuning Targets
 
-### Charge ring
+### Charge wind arc
 
 - `SpawnBurst: true`, exactly one particle.
 - `ParticleLifeSpan`: approximately `0.30-0.40s`.
 - `ParticleRotationInfluence: None`.
 - `ParticleRotateWithSpawner: true`.
 - `ScaleRatioConstraint: OneToOne`.
-- Initial X rotation: `90deg` so the ring lies on the ground plane.
-- Animate scale from roughly `2.5-3.0` down to `0.30-0.40`.
-- Opacity should peak around `0.50` and return to zero.
+- Initial X rotation: `90deg` so the brush stroke lies on the ground plane.
+- Animate scale from roughly `2.2` down to `0.28` while rotating about `310deg`.
+- Opacity should peak below `0.70` and return to zero.
+
+### Charge wind motes
+
+- Emit exactly ten small `Ball3` particles in one bounded burst.
+- Use negative Y-axis radial acceleration to hold the motes near the charge origin.
+- Use stronger positive tangent acceleration so the path visibly curves instead of converging in a
+  straight line.
+- Fade in and out during a `0.35-0.44s` life so the orbit reads as wind movement rather than sparks.
 
 ### Charge dust
 
@@ -189,18 +203,26 @@ dust should stay neutral grey-brown.
 - Keep life below the parent system lifetime, use strong damping, and cap each pulse at five dust
   particles. The parent lifetime must cover each group's start delay plus its maximum particle life.
 
-Vanilla evidence for inward motion comes from charged-weapon spawners such as
-`Sword_Charging_Sparks`, which combine negative radial acceleration/impulse with tangent
-acceleration. Vanilla `Stick_Slam_Shockwave_Small` provides the flat expanding `Ring2` pattern used
-as the release-ring baseline.
+Vanilla evidence for the broad rotating sheet comes from
+`Battleaxe_Signature_Whirlwind_Spin`, which animates `Signature_Spin7` through a full turn. Curved
+particle motion comes from `Wind_Sparks_Tail`, used by `Wind_Spirit_Tentacle`, which combines
+negative radial acceleration with stronger tangent acceleration around the Y axis.
 
-### Release ring
+### Release wind arc
 
 - `SpawnBurst: true`, exactly one particle per group entry.
-- `ParticleLifeSpan`: approximately `0.25-0.30s`.
-- Start near zero scale, expand rapidly, and fade completely.
-- Use a horizontal `Ring2` texture with `SoftParticles` disabled so terrain depth does not erase it.
-- Keep the ring translucent enough that terrain remains visible.
+- `ParticleLifeSpan`: approximately `0.34s`.
+- Start near zero scale, expand rapidly while rotating about `300deg`, and fade completely.
+- Use a horizontal `Signature_Spin7` texture with `SoftParticles` disabled so terrain depth does not
+  erase it.
+- Keep the brush stroke translucent enough that terrain remains visible.
+
+### Release streamers
+
+- Emit six `Glow_Direction` particles per group with velocity-oriented rotation.
+- Combine positive Y acceleration with inward radial and positive tangent acceleration to form a
+  short rising helix.
+- Keep particle life at or below `0.52s`; full release may use two groups separated by `0.05s`.
 
 ### Release column
 

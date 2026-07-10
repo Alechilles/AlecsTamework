@@ -1,0 +1,69 @@
+{
+  "RenderMode": "Erosion",
+  "EmitOffset": {
+    "X": { "Min": -0.35, "Max": 0.35 },
+    "Y": { "Min": 0.02, "Max": 0.16 },
+    "Z": { "Min": -0.35, "Max": 0.35 }
+  },
+  "ParticleRotationInfluence": "Velocity",
+  "LinearFiltering": true,
+  "LightInfluence": 0,
+  "ParticleRotateWithSpawner": false,
+  "TrailSpawnerPositionMultiplier": 1,
+  "TrailSpawnerRotationMultiplier": 1,
+  "MaxConcurrentParticles": 6,
+  "ParticleLifeSpan": { "Min": 0.38, "Max": 0.52 },
+  "SpawnRate": { "Min": 120, "Max": 120 },
+  "TotalParticles": { "Min": 6, "Max": 6 },
+  "InitialVelocity": {
+    "Yaw": { "Min": -180, "Max": 180 },
+    "Pitch": { "Min": 55, "Max": 75 },
+    "Speed": { "Min": 1.1, "Max": 2 }
+  },
+  "Attractors": [
+    {
+      "Position": { "X": 0, "Y": 0, "Z": 0 },
+      "RadialAxis": { "X": 0, "Y": 1, "Z": 0 },
+      "Radius": 0,
+      "RadialAcceleration": -5,
+      "RadialTangentAcceleration": 8,
+      "LinearAcceleration": { "X": 0, "Y": 2.5, "Z": 0 },
+      "DampingMultiplier": { "X": 0.9, "Y": 0.96, "Z": 0.9 }
+    }
+  ],
+  "Particle": {
+    "Texture": "Particles/Textures/Basic/Glow_Direction.png",
+    "ScaleRatioConstraint": "None",
+    "UVOption": "RandomFlipU",
+    "Animation": {
+      "0": {
+        "FrameIndex": { "Min": 0, "Max": 0 },
+        "Opacity": 0,
+        "Color": "#e8fbff",
+        "Scale": { "X": { "Min": 0.7, "Max": 0.9 }, "Y": { "Min": 0.8, "Max": 1 } },
+        "Rotation": { "X": { "Min": 0, "Max": 0 }, "Y": { "Min": 0, "Max": 0 }, "Z": { "Min": 0, "Max": 0 } }
+      },
+      "18": {
+        "Opacity": 0.62,
+        "Scale": { "X": { "Min": 0.9, "Max": 1.1 }, "Y": { "Min": 1.2, "Max": 1.5 } }
+      },
+      "65": {
+        "Opacity": 0.4,
+        "Color": "#c8f1ff",
+        "Scale": { "X": { "Min": 0.7, "Max": 0.9 }, "Y": { "Min": 1.6, "Max": 1.9 } }
+      },
+      "100": {
+        "Opacity": 0,
+        "Scale": { "X": { "Min": 0.25, "Max": 0.4 }, "Y": { "Min": 1.8, "Max": 2.2 } }
+      }
+    },
+    "InitialAnimationFrame": {
+      "Rotation": { "Z": { "Min": -35, "Max": 35 } },
+      "Scale": { "X": { "Min": 0.1, "Max": 0.16 }, "Y": { "Min": 0.18, "Max": 0.3 } },
+      "Opacity": 0.65,
+      "Color": "#e8fbff",
+      "FrameIndex": { "Min": 0, "Max": 0 }
+    }
+  },
+  "SpawnBurst": true
+}

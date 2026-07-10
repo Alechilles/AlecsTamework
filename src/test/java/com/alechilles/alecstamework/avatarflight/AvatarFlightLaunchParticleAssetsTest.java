@@ -24,8 +24,10 @@ class AvatarFlightLaunchParticleAssetsTest {
             "src/main/resources/Server/Particles/Tamework/AvatarFlight/Launch"
     );
     private static final Set<String> APPROVED_TEXTURES = Set.of(
-            "Particles/Textures/Basic/Ring2.png",
-            "Particles/Textures/Circles/Portal_Wind.png",
+            "Particles/Textures/Basic/Ball3.png",
+            "Particles/Textures/Basic/Glow_Direction.png",
+            "Particles/Textures/Circles/Signature_Spin5.png",
+            "Particles/Textures/Circles/Signature_Spin7.png",
             "Particles/Textures/Smoke/Smoke_Mist.png",
             "Particles/Textures/Smoke/Smoke_Smooth2.png"
     );
@@ -37,7 +39,8 @@ class AvatarFlightLaunchParticleAssetsTest {
             "TwLaunchChargeWisps",
             "TwLaunchReleaseColumn",
             "TwLaunchReleaseDust",
-            "TwLaunchReleaseRing"
+            "TwLaunchReleaseRing",
+            "TwLaunchReleaseStreamers"
     );
 
     @Test
@@ -70,7 +73,7 @@ class AvatarFlightLaunchParticleAssetsTest {
             String texture = spawner.getAsJsonObject("Particle").get("Texture").getAsString();
             assertTrue(APPROVED_TEXTURES.contains(texture), spawnerId + " uses unexpected texture " + texture);
             int maxConcurrent = spawner.get("MaxConcurrentParticles").getAsInt();
-            assertTrue(maxConcurrent <= 5, spawnerId + " exceeds its concurrency budget");
+            assertTrue(maxConcurrent <= 10, spawnerId + " exceeds its concurrency budget");
             assertTrue(spawner.getAsJsonObject("TotalParticles").get("Max").getAsInt() <= maxConcurrent,
                     spawnerId + " can emit more particles than it can retain");
         }
@@ -78,13 +81,33 @@ class AvatarFlightLaunchParticleAssetsTest {
 
     @Test
     void sequenceCompositionsMatchParticleBudgets() throws IOException {
-        assertEquals(7, compositionConcurrency("Tamework_AvatarFlight_Launch_Charge_Pulse"));
+        assertEquals(14, compositionConcurrency("Tamework_AvatarFlight_Launch_Charge_Pulse"));
         assertEquals(4, compositionConcurrency("Tamework_AvatarFlight_Launch_Cancel"));
-        assertEquals(9, compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Partial"));
-        assertEquals(17, compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Mid"));
+        assertEquals(15, compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Partial"));
+        assertEquals(23, compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Mid"));
         int fullReleaseParticles = compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Full");
-        assertEquals(26, fullReleaseParticles);
-        assertTrue(fullReleaseParticles < 30, "full launch release must stay under the particle budget");
+        assertEquals(38, fullReleaseParticles);
+        assertTrue(fullReleaseParticles < 45, "full launch release must stay under the particle budget");
+    }
+
+    @Test
+    void windLayersUseSweptArcsAndCurvedParticleMotion() throws IOException {
+        JsonObject chargeArc = spawner("TwLaunchChargeRing");
+        JsonObject releaseArc = spawner("TwLaunchReleaseRing");
+        assertEquals("Particles/Textures/Circles/Signature_Spin7.png",
+                chargeArc.getAsJsonObject("Particle").get("Texture").getAsString());
+        assertEquals("Particles/Textures/Circles/Signature_Spin7.png",
+                releaseArc.getAsJsonObject("Particle").get("Texture").getAsString());
+
+        JsonObject chargeMotes = spawner("TwLaunchChargeWisps");
+        assertEquals("Particles/Textures/Basic/Ball3.png",
+                chargeMotes.getAsJsonObject("Particle").get("Texture").getAsString());
+        assertCurvedMotion(chargeMotes, "TwLaunchChargeWisps");
+
+        JsonObject releaseStreamers = spawner("TwLaunchReleaseStreamers");
+        assertEquals("Particles/Textures/Basic/Glow_Direction.png",
+                releaseStreamers.getAsJsonObject("Particle").get("Texture").getAsString());
+        assertCurvedMotion(releaseStreamers, "TwLaunchReleaseStreamers");
     }
 
     @Test
@@ -138,6 +161,18 @@ class AvatarFlightLaunchParticleAssetsTest {
             particles += spawner.get("MaxConcurrentParticles").getAsInt();
         }
         return particles;
+    }
+
+    private static JsonObject spawner(String spawnerId) throws IOException {
+        return read(LAUNCH_ROOT.resolve("Spawners").resolve(spawnerId + ".particlespawner"));
+    }
+
+    private static void assertCurvedMotion(JsonObject spawner, String spawnerId) {
+        JsonObject attractor = spawner.getAsJsonArray("Attractors").get(0).getAsJsonObject();
+        assertTrue(attractor.get("RadialAcceleration").getAsDouble() < 0,
+                spawnerId + " must pull particles toward its orbit");
+        assertTrue(Math.abs(attractor.get("RadialTangentAcceleration").getAsDouble()) > 0,
+                spawnerId + " must bend particles around its orbit");
     }
 
     private static Set<String> fileStems(Path directory, String suffix) throws IOException {

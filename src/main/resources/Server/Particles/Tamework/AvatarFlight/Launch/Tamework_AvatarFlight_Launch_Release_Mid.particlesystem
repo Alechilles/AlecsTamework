@@ -1,6 +1,7 @@
 {
   "Spawners": [
     { "SpawnerId": "TwLaunchReleaseRing", "PositionOffset": { "Y": 0.16 } },
+    { "SpawnerId": "TwLaunchReleaseStreamers", "PositionOffset": { "Y": 0.25 } },
     { "SpawnerId": "TwLaunchReleaseColumn", "PositionOffset": { "Y": 0.28 } },
     { "SpawnerId": "TwLaunchReleaseColumn", "PositionOffset": { "Y": 0.28 }, "StartDelay": 0.05 },
     { "SpawnerId": "TwLaunchReleaseDust", "PositionOffset": { "Y": 0.14 } },

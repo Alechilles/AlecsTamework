@@ -2,6 +2,8 @@
   "Spawners": [
     { "SpawnerId": "TwLaunchReleaseRing", "PositionOffset": { "Y": 0.16 } },
     { "SpawnerId": "TwLaunchReleaseRing", "PositionOffset": { "Y": 0.16 }, "StartDelay": 0.08 },
+    { "SpawnerId": "TwLaunchReleaseStreamers", "PositionOffset": { "Y": 0.25 } },
+    { "SpawnerId": "TwLaunchReleaseStreamers", "PositionOffset": { "Y": 0.25 }, "StartDelay": 0.05 },
     { "SpawnerId": "TwLaunchReleaseColumn", "PositionOffset": { "Y": 0.28 } },
     { "SpawnerId": "TwLaunchReleaseColumn", "PositionOffset": { "Y": 0.28 }, "StartDelay": 0.04 },
     { "SpawnerId": "TwLaunchReleaseColumn", "PositionOffset": { "Y": 0.28 }, "StartDelay": 0.08 },
