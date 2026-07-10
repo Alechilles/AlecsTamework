@@ -6,26 +6,26 @@
   "ParticleRotateWithSpawner": true,
   "TrailSpawnerPositionMultiplier": 1,
   "TrailSpawnerRotationMultiplier": 1,
-  "MaxConcurrentParticles": 2,
-  "ParticleLifeSpan": { "Min": 0.1, "Max": 0.1 },
-  "TotalParticles": { "Min": 2, "Max": 2 },
+  "MaxConcurrentParticles": 1,
+  "ParticleLifeSpan": { "Min": 0.28, "Max": 0.28 },
+  "TotalParticles": { "Min": 1, "Max": 1 },
   "Particle": {
     "Texture": "Particles/Textures/Basic/Ring2.png",
     "ScaleRatioConstraint": "OneToOne",
     "UVOption": "None",
     "Animation": {
-      "0": { "FrameIndex": { "Min": 0, "Max": 0 }, "Opacity": 1.0, "Color": "#ffffff", "Scale": { "X": { "Min": 0.1, "Max": 0.1 } } },
+      "0": { "FrameIndex": { "Min": 0, "Max": 0 }, "Opacity": 0.72, "Color": "#e8f8ff", "Scale": { "X": { "Min": 0.08, "Max": 0.08 } } },
       "30": {},
-      "100": { "Opacity": 0.46, "Scale": { "X": { "Min": 2.0, "Max": 2.0 } } }
+      "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 3.2, "Max": 3.2 } } }
     },
     "InitialAnimationFrame": {
       "FrameIndex": { "Min": 0, "Max": 0 },
       "Scale": { "X": { "Min": 0.1, "Max": 0.15 }, "Y": { "Min": 0.2, "Max": 0.2 } },
-      "Rotation": { "Z": { "Min": -360.0, "Max": 360.0 }, "X": { "Min": 90.0, "Max": 90.0 } },
-      "Color": "#ffffff"
+      "Rotation": { "Z": { "Min": -180.0, "Max": 180.0 }, "X": { "Min": 90.0, "Max": 90.0 } },
+      "Color": "#e8f8ff"
     },
-    "SoftParticles": "Enable"
+    "SoftParticles": "Disable"
   },
   "SpawnBurst": true,
-  "SpawnRate": { "Min": 2.0, "Max": 2.0 }
+  "SpawnRate": { "Min": 1.0, "Max": 1.0 }
 }

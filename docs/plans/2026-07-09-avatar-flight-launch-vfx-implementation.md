@@ -35,13 +35,13 @@ copy of a known-working Hytale 0.5.6 spawner: `Stick_Slam_Shockwave_Small` for r
 release column. The temporary gold-flash probe and base ice shockwave remain removed. Visual
 restyling should proceed incrementally after this clean baseline is confirmed in game.
 
-The clean baseline rendered successfully in game. `TwLaunchChargeRing` is now runtime-confirmed as
-one pale-cyan ring that contracts from `2.2` to `0.28` scale over `0.28s`. Incremental art tuning has
-moved to `TwLaunchChargeWisps`. Its first low-opacity continuous-vortex tuning was not readable in
-game, so the spawner now uses the runtime-confirmed charge-ring burst structure: three pale
-white-blue `Portal_Wind` arcs contract over `0.34s` with visible opacity from frame zero. This second
-wisp pass still needs in-game confirmation. Remaining charge, cancel, and release spawners stay on
-their visible vanilla baselines until each is tuned and verified independently.
+The clean baseline, tuned charge ring, and second burst-based wind-wisp pass rendered successfully
+in game. The full sequence is now authored for in-game art review. Charge pulses combine one
+pale-cyan inward ring, three white-blue wind arcs, and three inward-circling earth-toned puffs. A
+rejected launch collapses one grey ring into three weak outward puffs. Successful releases reuse one
+expanding ring, four upward pale-mist particles, and four outward ground-dust particles per group;
+the existing partial/mid/full compositions produce concurrency budgets of `9`, `17`, and `26` with
+runtime scales of `0.75`, `1.0`, and `1.2`. All five systems are non-important and remain bounded.
 
 ## Confirmed Hytale Particle Behavior
 

@@ -6,5 +6,5 @@
   "LifeSpan": 0.40,
   "CullDistance": 60.0,
   "BoundingRadius": 4.0,
-  "IsImportant": true
+  "IsImportant": false
 }

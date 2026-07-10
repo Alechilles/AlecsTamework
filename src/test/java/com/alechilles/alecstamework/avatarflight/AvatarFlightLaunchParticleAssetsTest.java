@@ -49,7 +49,7 @@ class AvatarFlightLaunchParticleAssetsTest {
         assertEquals(5, systemIds.size());
         for (String systemId : systemIds) {
             JsonObject system = read(LAUNCH_ROOT.resolve(systemId + ".particlesystem"));
-            assertTrue(system.get("IsImportant").getAsBoolean());
+            assertFalse(system.get("IsImportant").getAsBoolean());
             assertTrue(system.get("CullDistance").getAsDouble() <= 75.0);
             for (var element : system.getAsJsonArray("Spawners")) {
                 JsonObject group = element.getAsJsonObject();
@@ -71,24 +71,24 @@ class AvatarFlightLaunchParticleAssetsTest {
             assertTrue(APPROVED_TEXTURES.contains(texture), spawnerId + " uses unexpected texture " + texture);
             int maxConcurrent = spawner.get("MaxConcurrentParticles").getAsInt();
             assertTrue(maxConcurrent <= 5, spawnerId + " exceeds its concurrency budget");
+            assertTrue(spawner.getAsJsonObject("TotalParticles").get("Max").getAsInt() <= maxConcurrent,
+                    spawnerId + " can emit more particles than it can retain");
         }
     }
 
     @Test
-    void fullReleaseCompositionRemainsBelowThirtyParticles() throws IOException {
-        JsonObject full = read(LAUNCH_ROOT.resolve("Tamework_AvatarFlight_Launch_Release_Full.particlesystem"));
-        int particles = 0;
-        for (var element : full.getAsJsonArray("Spawners")) {
-            String spawnerId = element.getAsJsonObject().get("SpawnerId").getAsString();
-            JsonObject spawner = read(LAUNCH_ROOT.resolve("Spawners").resolve(spawnerId + ".particlespawner"));
-            particles += spawner.get("MaxConcurrentParticles").getAsInt();
-        }
-        assertTrue(particles < 30, "full launch release must stay under the particle budget");
-        assertEquals(22, particles);
+    void sequenceCompositionsMatchParticleBudgets() throws IOException {
+        assertEquals(7, compositionConcurrency("Tamework_AvatarFlight_Launch_Charge_Pulse"));
+        assertEquals(4, compositionConcurrency("Tamework_AvatarFlight_Launch_Cancel"));
+        assertEquals(9, compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Partial"));
+        assertEquals(17, compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Mid"));
+        int fullReleaseParticles = compositionConcurrency("Tamework_AvatarFlight_Launch_Release_Full");
+        assertEquals(26, fullReleaseParticles);
+        assertTrue(fullReleaseParticles < 30, "full launch release must stay under the particle budget");
     }
 
     @Test
-    void burstParticlesFinishWithinTheirParentSystemLifetime() throws IOException {
+    void particlesFinishWithinTheirParentSystemLifetime() throws IOException {
         Path spawners = LAUNCH_ROOT.resolve("Spawners");
         for (String systemId : fileStems(LAUNCH_ROOT, ".particlesystem")) {
             JsonObject system = read(LAUNCH_ROOT.resolve(systemId + ".particlesystem"));
@@ -98,7 +98,6 @@ class AvatarFlightLaunchParticleAssetsTest {
                 String spawnerId = group.get("SpawnerId").getAsString();
                 double startDelay = group.has("StartDelay") ? group.get("StartDelay").getAsDouble() : 0.0;
                 JsonObject spawner = read(spawners.resolve(spawnerId + ".particlespawner"));
-                if (!spawner.has("SpawnBurst") || !spawner.get("SpawnBurst").getAsBoolean()) continue;
                 double particleLifeSpan = spawner.getAsJsonObject("ParticleLifeSpan").get("Max").getAsDouble();
 
                 assertTrue(startDelay + particleLifeSpan <= systemLifeSpan,
@@ -125,8 +124,20 @@ class AvatarFlightLaunchParticleAssetsTest {
             assertFalse(packet.particle.animationFrames.isEmpty(), spawnerId + " has no animation frames");
             assertNotNull(packet.particleLifeSpan, spawnerId + " has no particle lifespan");
             assertNotNull(packet.spawnRate, spawnerId + " has no spawn rate");
+            assertNotNull(packet.totalParticles, spawnerId + " has no total-particle range");
             assertTrue(packet.maxConcurrentParticles > 0, spawnerId + " cannot allocate particles");
         }
+    }
+
+    private static int compositionConcurrency(String systemId) throws IOException {
+        JsonObject system = read(LAUNCH_ROOT.resolve(systemId + ".particlesystem"));
+        int particles = 0;
+        for (var element : system.getAsJsonArray("Spawners")) {
+            String spawnerId = element.getAsJsonObject().get("SpawnerId").getAsString();
+            JsonObject spawner = read(LAUNCH_ROOT.resolve("Spawners").resolve(spawnerId + ".particlespawner"));
+            particles += spawner.get("MaxConcurrentParticles").getAsInt();
+        }
+        return particles;
     }
 
     private static Set<String> fileStems(Path directory, String suffix) throws IOException {
