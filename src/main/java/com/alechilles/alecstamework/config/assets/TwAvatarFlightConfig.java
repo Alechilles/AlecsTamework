@@ -545,6 +545,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.vfx)
             .documentation("Avatar-flight particle presentation. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AvatarFlightAudioSettings>append(new KeyedCodec<>("Audio", AvatarFlightAudioSettings.CODEC),
+                    (asset, value) -> asset.audio = value == null ? new AvatarFlightAudioSettings() : value,
+                    asset -> asset.audio)
+            .documentation("Avatar-flight launch audio presentation. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<VigourSettings>append(new KeyedCodec<>("Vigour", VIGOUR_CODEC),
                     (asset, value) -> asset.vigour = value == null ? new VigourSettings() : value,
                     asset -> asset.vigour)
@@ -579,6 +584,7 @@ public final class TwAvatarFlightConfig implements
     BoostSettings boost = new BoostSettings();
     AvatarFlightLaunchSettings launch = new AvatarFlightLaunchSettings();
     AvatarFlightVfxSettings vfx = new AvatarFlightVfxSettings();
+    AvatarFlightAudioSettings audio = new AvatarFlightAudioSettings();
     VigourSettings vigour = new VigourSettings();
     AnimationSettings animation = new AnimationSettings();
     RiderVisualSettings riderVisual = new RiderVisualSettings();
@@ -655,6 +661,7 @@ public final class TwAvatarFlightConfig implements
     public BoostSettings getBoost() { return boost == null ? new BoostSettings() : boost; }
     public AvatarFlightLaunchSettings getLaunch() { return launch == null ? new AvatarFlightLaunchSettings() : launch; }
     public AvatarFlightVfxSettings getVfx() { return vfx == null ? new AvatarFlightVfxSettings() : vfx; }
+    public AvatarFlightAudioSettings getAudio() { return audio == null ? new AvatarFlightAudioSettings() : audio; }
     public VigourSettings getVigour() { return vigour == null ? new VigourSettings() : vigour; }
     public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
     public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }

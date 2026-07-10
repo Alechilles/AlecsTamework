@@ -1,0 +1,23 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/AvatarFlight/Launch/Tamework_AvatarFlight_Launch_Charge_Pulse.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -0.35,
+        "MaxPitch": 0.35,
+        "MinVolume": -0.5,
+        "MaxVolume": 0.0
+      },
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 8,
+  "Volume": -4.0,
+  "PreventSoundInterruption": true,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 1.0,
+  "MaxDistance": 28.0
+}

@@ -142,6 +142,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setNextLaunchChargeVfxAtMs,
                     AvatarFlightComponent::getNextLaunchChargeVfxAtMs)
             .add()
+            .<Long>append(new KeyedCodec<>("NextLaunchChargeAudioAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextLaunchChargeAudioAtMs,
+                    AvatarFlightComponent::getNextLaunchChargeAudioAtMs)
+            .add()
+            .<Boolean>append(new KeyedCodec<>("LaunchFullChargeAudioPlayed", Codec.BOOLEAN),
+                    AvatarFlightComponent::setLaunchFullChargeAudioPlayed,
+                    AvatarFlightComponent::isLaunchFullChargeAudioPlayed)
+            .add()
             .build();
 
     private String configId = "";
@@ -175,6 +183,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private double launchVfxOriginZ;
     private double launchVfxYawRadians;
     private long nextLaunchChargeVfxAtMs;
+    private long nextLaunchChargeAudioAtMs;
+    private boolean launchFullChargeAudioPlayed;
 
     public AvatarFlightComponent() {
     }
@@ -438,6 +448,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     public void setLaunchVfxYawRadians(@Nullable Double value) { launchVfxYawRadians = finiteOrZero(value); }
     public long getNextLaunchChargeVfxAtMs() { return nextLaunchChargeVfxAtMs; }
     public void setNextLaunchChargeVfxAtMs(@Nullable Long value) { nextLaunchChargeVfxAtMs = value == null ? 0L : value; }
+    public long getNextLaunchChargeAudioAtMs() { return nextLaunchChargeAudioAtMs; }
+    public void setNextLaunchChargeAudioAtMs(@Nullable Long value) { nextLaunchChargeAudioAtMs = value == null ? 0L : value; }
+    public boolean isLaunchFullChargeAudioPlayed() { return launchFullChargeAudioPlayed; }
+    public void setLaunchFullChargeAudioPlayed(@Nullable Boolean value) { launchFullChargeAudioPlayed = value != null && value; }
 
     public void captureLaunchVfxOrigin(double x, double y, double z, double yawRadians) {
         launchVfxOriginValid = true;
@@ -454,6 +468,11 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         launchVfxOriginZ = 0.0;
         launchVfxYawRadians = 0.0;
         nextLaunchChargeVfxAtMs = 0L;
+    }
+
+    public void clearLaunchAudioState() {
+        nextLaunchChargeAudioAtMs = 0L;
+        launchFullChargeAudioPlayed = false;
     }
 
     public void setVelocity(double x, double y, double z) {
@@ -494,6 +513,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.launchVfxOriginZ = getLaunchVfxOriginZ();
         clone.launchVfxYawRadians = getLaunchVfxYawRadians();
         clone.nextLaunchChargeVfxAtMs = nextLaunchChargeVfxAtMs;
+        clone.nextLaunchChargeAudioAtMs = nextLaunchChargeAudioAtMs;
+        clone.launchFullChargeAudioPlayed = launchFullChargeAudioPlayed;
         return clone;
     }
 

@@ -96,6 +96,21 @@
     "LaunchReleaseMidThreshold": 0.45,
     "LaunchReleaseFullThreshold": 0.8
   },
+  "Audio": {
+    "Enabled": true,
+    "LaunchChargeSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Charge_Pulse",
+    "LaunchChargeEarlyIntervalMs": 600.0,
+    "LaunchChargeFullIntervalMs": 180.0,
+    "LaunchChargeMinVolume": 0.32,
+    "LaunchChargeMaxVolume": 0.9,
+    "LaunchChargeMinPitch": 0.85,
+    "LaunchChargeMaxPitch": 1.12,
+    "LaunchReadySoundEvent": "SFX_Tamework_AvatarFlight_Launch_Ready",
+    "LaunchCancelSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Cancel",
+    "LaunchReleasePartialSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Partial",
+    "LaunchReleaseMidSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Mid",
+    "LaunchReleaseFullSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Full"
+  },
   "Vigour": {
     "Enabled": true,
     "MaxCharges": 6.0,

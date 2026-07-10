@@ -125,6 +125,17 @@ class TwAvatarFlightConfigTest {
         assertEquals(1.20, config.getVfx().getLaunchReleaseFullScale(), 0.00001);
         assertEquals(0.45, config.getVfx().getLaunchReleaseMidThreshold(), 0.00001);
         assertEquals(0.80, config.getVfx().getLaunchReleaseFullThreshold(), 0.00001);
+        assertTrue(config.getAudio().isEnabled());
+        assertEquals(AvatarFlightAudioSettings.DEFAULT_CHARGE_SOUND,
+                config.getAudio().getLaunchChargeSoundEvent());
+        assertEquals(600L, config.getAudio().getLaunchChargeEarlyIntervalMs());
+        assertEquals(180L, config.getAudio().getLaunchChargeFullIntervalMs());
+        assertEquals(0.32, config.getAudio().getLaunchChargeMinVolume(), 0.00001);
+        assertEquals(0.90, config.getAudio().getLaunchChargeMaxVolume(), 0.00001);
+        assertEquals(0.85, config.getAudio().getLaunchChargeMinPitch(), 0.00001);
+        assertEquals(1.12, config.getAudio().getLaunchChargeMaxPitch(), 0.00001);
+        assertEquals(AvatarFlightAudioSettings.DEFAULT_FULL_SOUND,
+                config.getAudio().getLaunchReleaseFullSoundEvent());
     }
 
     @Test
@@ -134,12 +145,50 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "movement", "maxForwardSpeed", 22.0);
         setNestedField(parent, "jump", "upwardImpulse", 9.0);
         setNestedField(parent, "vfx", "launchChargeEarlyIntervalMs", 725.0);
+        setNestedField(parent, "audio", "launchChargeEarlyIntervalMs", 710.0);
 
         child.inheritMissingTopLevelFrom(parent, Set.of());
 
         assertEquals(22.0, child.getMovement().getMaxForwardSpeed(), 0.00001);
         assertEquals(9.0, child.getJump().getUpwardImpulse(), 0.00001);
         assertEquals(725L, child.getVfx().getLaunchChargeEarlyIntervalMs());
+        assertEquals(710L, child.getAudio().getLaunchChargeEarlyIntervalMs());
+    }
+
+    @Test
+    void explicitAudioSectionInheritsMissingNestedKeys() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "audio", "launchChargeEarlyIntervalMs", 800.0);
+        setNestedField(parent, "audio", "launchReleaseFullSoundEvent", "ParentFull");
+        setNestedField(child, "audio", "launchChargeEarlyIntervalMs", 300.0);
+        setNestedField(child, "audio", "launchReleaseFullSoundEvent", "ChildFull");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Audio"),
+                Map.of("Audio", Set.of("LaunchChargeEarlyIntervalMs"))
+        );
+
+        assertEquals(300L, child.getAudio().getLaunchChargeEarlyIntervalMs());
+        assertEquals("ParentFull", child.getAudio().getLaunchReleaseFullSoundEvent());
+    }
+
+    @Test
+    void explicitBlankAudioCueDisablesOnlyThatCue() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(child, "audio", "launchReadySoundEvent", "");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Audio"),
+                Map.of("Audio", Set.of("LaunchReadySoundEvent"))
+        );
+
+        assertEquals("", child.getAudio().getLaunchReadySoundEvent());
+        assertEquals(AvatarFlightAudioSettings.DEFAULT_CANCEL_SOUND,
+                child.getAudio().getLaunchCancelSoundEvent());
     }
 
     @Test

@@ -1,0 +1,17 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/AvatarFlight/Launch/Tamework_AvatarFlight_Launch_Release_Mid.ogg"
+      ],
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 4,
+  "Volume": -2.5,
+  "PreventSoundInterruption": true,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 2.0,
+  "MaxDistance": 34.0
+}

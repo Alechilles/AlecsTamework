@@ -40,7 +40,7 @@ Charged launch is the default takeoff path for avatar flight. With `Launch.Prefe
 
 Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-loads some launch strength after the minimum hold, while still rewarding longer charge time. Partial launches cost `1` Vigour by default, and launches at or above `Launch.FullChargeCostThreshold` cost `2`.
 
-Launch presentation uses short world-space particle systems. Grounded charging emits increasingly frequent inward pressure pulses at the avatar's foot position. A release below the minimum or a rejected release emits a small fizzle. Successful launches emit partial, mid, or full release systems selected from the configured launch curve. The release stays at the last grounded charge origin if the avatar leaves the ground before releasing.
+Launch presentation uses short world-space particle and positional audio cues. Grounded charging emits increasingly frequent inward pressure pulses paired with short wind swirls whose volume and pitch rise with charge progress. Reaching full charge plays one ready cue. A release below the minimum or a rejected release emits a small visual and audio fizzle. Successful launches emit partial, mid, or full release effects selected from the configured launch curve. Particle release stays at the last grounded charge origin if the avatar leaves the ground before releasing, while audio follows the avatar's current release position.
 
 ## Glide Balance
 
@@ -164,3 +164,16 @@ The generator warns when player-style locomotion sets that the native transforme
 - `LaunchReleaseMidThreshold` / `LaunchReleaseFullThreshold`: launch-curve charge boundaries for mid and full release effects.
 
 Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object overrides only its explicit nested keys and inherits the remaining values.
+
+### Audio
+
+- `Enabled`: enables positional launch audio without changing movement behavior.
+- `LaunchChargeSoundEvent`: short wind cue emitted repeatedly while grounded charge builds. Blank disables charge pulses.
+- `LaunchChargeEarlyIntervalMs` / `LaunchChargeFullIntervalMs`: sound-pulse cadence at the start and end of charging.
+- `LaunchChargeMinVolume` / `LaunchChargeMaxVolume`: linear volume modifiers interpolated across charge progress.
+- `LaunchChargeMinPitch` / `LaunchChargeMaxPitch`: linear pitch modifiers interpolated across charge progress.
+- `LaunchReadySoundEvent`: one-shot cue emitted once when charge first reaches `Launch.MaxChargeMs`. Blank disables it.
+- `LaunchCancelSoundEvent`: one-shot cue for a canceled or rejected release. Blank disables it.
+- `LaunchReleasePartialSoundEvent`, `LaunchReleaseMidSoundEvent`, `LaunchReleaseFullSoundEvent`: one-shot release cues selected with the same launch-curve tiers as release VFX. Blank disables an individual tier.
+
+Omitting `Audio` inherits the complete parent section. An explicit `Audio` object overrides only its explicit nested keys and inherits the remaining values. Launch sounds are positional mono events routed through Hytale's dragon NPC audio category.

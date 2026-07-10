@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.avatarflight;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AvatarFlightComponentTest {
     private static final double EPSILON = 0.00001;
@@ -53,5 +55,21 @@ class AvatarFlightComponentTest {
 
         assertEquals(0.0, component.getHudPitchRadians(), EPSILON);
         assertEquals(0.0, component.getHudTargetSpeedRatio(), EPSILON);
+    }
+
+    @Test
+    void cloneAndClearPreserveLaunchAudioStateContract() {
+        AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
+        component.setNextLaunchChargeAudioAtMs(-250L);
+        component.setLaunchFullChargeAudioPlayed(true);
+
+        AvatarFlightComponent clone = component.clone();
+
+        assertEquals(-250L, clone.getNextLaunchChargeAudioAtMs());
+        assertTrue(clone.isLaunchFullChargeAudioPlayed());
+
+        clone.clearLaunchAudioState();
+        assertEquals(0L, clone.getNextLaunchChargeAudioAtMs());
+        assertFalse(clone.isLaunchFullChargeAudioPlayed());
     }
 }

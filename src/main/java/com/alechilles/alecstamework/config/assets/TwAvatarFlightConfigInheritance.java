@@ -27,6 +27,7 @@ final class TwAvatarFlightConfigInheritance {
         inheritBoost(target, parent, nested(nestedByTop, "Boost"), top);
         inheritLaunch(target, parent, nested(nestedByTop, "Launch"), top);
         inheritVfx(target, parent, nested(nestedByTop, "Vfx"), top);
+        inheritAudio(target, parent, nested(nestedByTop, "Audio"), top);
         inheritVigour(target, parent, nested(nestedByTop, "Vigour"), top);
         inheritAnimation(target, parent, nested(nestedByTop, "Animation"), top);
         inheritRiderVisual(target, parent, nested(nestedByTop, "RiderVisual"), top);
@@ -131,6 +132,15 @@ final class TwAvatarFlightConfigInheritance {
         else if (keys != null && parent.vfx != null) {
             if (target.vfx == null) target.vfx = parent.vfx;
             else target.vfx.inheritMissingFrom(parent.vfx, keys);
+        }
+    }
+
+    private static void inheritAudio(TwAvatarFlightConfig target, TwAvatarFlightConfig parent,
+                                     @Nullable Set<String> keys, Set<String> top) {
+        if (!top.contains("Audio")) target.audio = parent.audio;
+        else if (keys != null && parent.audio != null) {
+            if (target.audio == null) target.audio = parent.audio;
+            else target.audio.inheritMissingFrom(parent.audio, keys);
         }
     }
 

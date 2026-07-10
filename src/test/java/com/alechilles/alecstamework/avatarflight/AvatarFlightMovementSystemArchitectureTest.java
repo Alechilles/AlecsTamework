@@ -41,6 +41,18 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void movementSystemDrivesLaunchAudioFromAuthoritativeLaunchState() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("private final AvatarFlightLaunchAudioService launchAudioService"),
+                "launch audio should have a focused service instead of expanding controller responsibilities");
+        assertTrue(source.contains("launchAudioService.tick("),
+                "launch audio must consume the same authoritative charge/release state as launch VFX");
+        assertTrue(source.contains("TransformComponent transform = commandBuffer.getComponent(ref, transformType)"),
+                "launch VFX and audio should share one current world-space transform lookup");
+    }
+
+    @Test
     void freshPacketInputOwnsGroundedState() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

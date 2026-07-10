@@ -49,6 +49,7 @@ public final class AvatarFlightMovementSystem
     private final Query<EntityStore> query;
     private final AvatarFlightDebugLogService debugLogService = new AvatarFlightDebugLogService();
     private final AvatarFlightLaunchVfxService launchVfxService = new AvatarFlightLaunchVfxService();
+    private final AvatarFlightLaunchAudioService launchAudioService = new AvatarFlightLaunchAudioService();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, PlayerSystems.ProcessPlayerInput.class),
             new SystemDependency<>(Order.AFTER, MovementStatesSystems.TickingSystem.class),
@@ -104,15 +105,26 @@ public final class AvatarFlightMovementSystem
                 now
         );
         spendAppliedVigour(flight, config, output, now);
+        TransformComponent transform = commandBuffer.getComponent(ref, transformType);
         launchVfxService.tick(
                 flight,
                 input,
                 controllerInput,
                 output,
                 config,
-                commandBuffer.getComponent(ref, transformType),
+                transform,
                 now,
                 ref,
+                commandBuffer
+        );
+        launchAudioService.tick(
+                flight,
+                input,
+                controllerInput,
+                output,
+                config,
+                transform,
+                now,
                 commandBuffer
         );
         flight.setMode(output.mode());
