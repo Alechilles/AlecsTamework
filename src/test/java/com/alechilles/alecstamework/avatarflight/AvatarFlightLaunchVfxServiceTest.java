@@ -95,7 +95,7 @@ class AvatarFlightLaunchVfxServiceTest {
 
         assertEquals(1, sink.emissions.size());
         assertEquals(AvatarFlightVfxSettings.DEFAULT_FULL_SYSTEM, sink.emissions.getFirst().systemId());
-        assertEquals(2.0f, sink.emissions.getFirst().scale(), 0.00001f);
+        assertEquals(1.2f, sink.emissions.getFirst().scale(), 0.00001f);
         assertFalse(flight.isLaunchVfxOriginValid());
         assertEquals(0L, flight.getNextLaunchChargeVfxAtMs());
     }

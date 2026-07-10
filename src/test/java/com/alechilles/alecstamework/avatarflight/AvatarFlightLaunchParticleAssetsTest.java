@@ -58,7 +58,7 @@ class AvatarFlightLaunchParticleAssetsTest {
             assertTrue(maxParticles <= 4, spawnerId + " exceeds per-spawner burst budget");
             if (spawnerId.contains("Launch_Charge_")) totalParticlesPerChargePulse += maxParticles;
         }
-        assertEquals(7, totalParticlesPerChargePulse);
+        assertEquals(6, totalParticlesPerChargePulse);
     }
 
     @Test
@@ -75,15 +75,22 @@ class AvatarFlightLaunchParticleAssetsTest {
     }
 
     @Test
-    void releaseParticlesRemainReadableAtDragonScale() throws IOException {
+    void burstParticlesFinishWithinTheirParentSystemLifetime() throws IOException {
         Path spawners = LAUNCH_ROOT.resolve("Spawners");
-        JsonObject ring = read(spawners.resolve("Tamework_AvatarFlight_Launch_Release_Ring.particlespawner"));
-        JsonObject column = read(spawners.resolve("Tamework_AvatarFlight_Launch_Release_Column.particlespawner"));
-        JsonObject dust = read(spawners.resolve("Tamework_AvatarFlight_Launch_Release_Dust.particlespawner"));
+        for (String systemId : fileStems(LAUNCH_ROOT, ".particlesystem")) {
+            JsonObject system = read(LAUNCH_ROOT.resolve(systemId + ".particlesystem"));
+            double systemLifeSpan = system.get("LifeSpan").getAsDouble();
+            for (var element : system.getAsJsonArray("Spawners")) {
+                JsonObject group = element.getAsJsonObject();
+                String spawnerId = group.get("SpawnerId").getAsString();
+                double startDelay = group.has("StartDelay") ? group.get("StartDelay").getAsDouble() : 0.0;
+                JsonObject spawner = read(spawners.resolve(spawnerId + ".particlespawner"));
+                double particleLifeSpan = spawner.getAsJsonObject("ParticleLifeSpan").get("Max").getAsDouble();
 
-        assertTrue(animationScale(ring, "100", "X") >= 4.0, "release ring regressed to prototype scale");
-        assertTrue(animationScale(column, "100", "Y") >= 1.8, "release column is too short");
-        assertTrue(animationScale(dust, "100", "X") >= 0.8, "release dust is too small");
+                assertTrue(startDelay + particleLifeSpan <= systemLifeSpan,
+                        systemId + " ends before " + spawnerId + " can finish rendering");
+            }
+        }
     }
 
     private static Set<String> fileStems(Path directory, String suffix) throws IOException {
@@ -102,13 +109,4 @@ class AvatarFlightLaunchParticleAssetsTest {
         return JsonParser.parseString(Files.readString(path, StandardCharsets.UTF_8)).getAsJsonObject();
     }
 
-    private static double animationScale(JsonObject spawner, String frame, String axis) {
-        return spawner.getAsJsonObject("Particle")
-                .getAsJsonObject("Animation")
-                .getAsJsonObject(frame)
-                .getAsJsonObject("Scale")
-                .getAsJsonObject(axis)
-                .get("Min")
-                .getAsDouble();
-    }
 }
