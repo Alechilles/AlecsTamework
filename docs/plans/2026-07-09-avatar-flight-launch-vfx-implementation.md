@@ -25,13 +25,15 @@ Implemented on 2026-07-09:
 
 In-game `/particle spawn` and multiplayer owner/observer art review remain manual validation steps.
 
-Live diagnostics confirmed that a newly named short-ID structural copy of vanilla
-`MagicHit_Flash` rendered from the custom Tamework pack while the existing launch spawner IDs did
-not. The current spawner payloads otherwise match the revision previously seen in game, and the
-server reports successful emissions without particle validation warnings. The production spawners
-therefore use fresh short `TwLaunch*` IDs, preserve the intended payloads, and explicitly disable
-near-ground soft-particle fading. The temporary gold-flash probe and base ice shockwave remain
-removed.
+Live diagnostics confirmed that a structural copy of vanilla `MagicHit_Flash` rendered from the
+custom Tamework pack while the launch spawners did not. The server reported successful emissions
+without particle validation warnings, and fresh short `TwLaunch*` IDs produced the same blank
+result. The remaining shared difference was `InitialAnimationFrame.Opacity`: the working flash and
+vanilla fade-in examples use a nonzero initial opacity as the particle's base multiplier, while the
+launch assets set that base to zero and therefore kept their timed opacity curves transparent. All
+production spawners now use a `1.0` base opacity, retain their timed fade curves, and explicitly
+disable near-ground soft-particle fading. The temporary gold-flash probe and base ice shockwave
+remain removed.
 
 ## Confirmed Hytale Particle Behavior
 

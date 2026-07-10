@@ -20,7 +20,7 @@
     "InitialAnimationFrame": {
       "Rotation": { "X": { "Min": 90.0, "Max": 90.0 }, "Z": { "Min": -180.0, "Max": 180.0 } },
       "Scale": { "X": { "Min": 1.0, "Max": 1.0 } },
-      "Opacity": 0.0,
+      "Opacity": 1.0,
       "Color": "#e8f8ff"
     }
   },

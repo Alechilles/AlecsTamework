@@ -72,6 +72,9 @@ class AvatarFlightLaunchParticleAssetsTest {
             assertTrue(APPROVED_TEXTURES.contains(texture), spawnerId + " uses unexpected texture " + texture);
             assertEquals("Disable", spawner.getAsJsonObject("Particle").get("SoftParticles").getAsString(),
                     spawnerId + " must not depth-fade against the launch surface");
+            assertEquals(1.0, spawner.getAsJsonObject("Particle")
+                            .getAsJsonObject("InitialAnimationFrame").get("Opacity").getAsDouble(), 0.0001,
+                    spawnerId + " must use a visible base opacity for its animation curve");
             int maxParticles = spawner.getAsJsonObject("TotalParticles").get("Max").getAsInt();
             assertTrue(maxParticles <= 4, spawnerId + " exceeds per-spawner burst budget");
             if (spawnerId.startsWith("TwLaunchCharge")) totalParticlesPerChargePulse += maxParticles;

@@ -25,7 +25,7 @@
       "18": { "Opacity": 0.48 },
       "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.62, "Max": 0.92 } } }
     },
-    "InitialAnimationFrame": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Color": "#8b8177" }
+    "InitialAnimationFrame": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 1.0, "Color": "#8b8177" }
   },
   "SpawnBurst": true,
   "SpawnRate": { "Min": 4.0, "Max": 4.0 }
