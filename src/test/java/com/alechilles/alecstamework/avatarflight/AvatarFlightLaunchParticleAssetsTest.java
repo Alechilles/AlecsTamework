@@ -29,12 +29,23 @@ class AvatarFlightLaunchParticleAssetsTest {
             "Particles/Textures/Smoke/Smoke_Mist.png",
             "Particles/Textures/Smoke/Smoke_Smooth2.png"
     );
+    private static final Set<String> EXPECTED_SPAWNER_IDS = Set.of(
+            "TwLaunchCancelPuff",
+            "TwLaunchCancelRing",
+            "TwLaunchChargeDust",
+            "TwLaunchChargeRing",
+            "TwLaunchChargeWisps",
+            "TwLaunchReleaseColumn",
+            "TwLaunchReleaseDust",
+            "TwLaunchReleaseRing"
+    );
+
     @Test
     void allLaunchSystemsReferenceAvailableSpawners() throws IOException {
         Set<String> spawnerIds = fileStems(LAUNCH_ROOT.resolve("Spawners"), ".particlespawner");
         Set<String> systemIds = fileStems(LAUNCH_ROOT, ".particlesystem");
 
-        assertEquals(8, spawnerIds.size());
+        assertEquals(EXPECTED_SPAWNER_IDS, spawnerIds);
         assertEquals(5, systemIds.size());
         for (String systemId : systemIds) {
             JsonObject system = read(LAUNCH_ROOT.resolve(systemId + ".particlesystem"));
@@ -63,7 +74,7 @@ class AvatarFlightLaunchParticleAssetsTest {
                     spawnerId + " must not depth-fade against the launch surface");
             int maxParticles = spawner.getAsJsonObject("TotalParticles").get("Max").getAsInt();
             assertTrue(maxParticles <= 4, spawnerId + " exceeds per-spawner burst budget");
-            if (spawnerId.contains("Launch_Charge_")) totalParticlesPerChargePulse += maxParticles;
+            if (spawnerId.startsWith("TwLaunchCharge")) totalParticlesPerChargePulse += maxParticles;
         }
         assertEquals(6, totalParticlesPerChargePulse);
     }

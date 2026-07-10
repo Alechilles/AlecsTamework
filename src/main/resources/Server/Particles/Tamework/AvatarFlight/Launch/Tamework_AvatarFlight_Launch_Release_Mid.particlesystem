@@ -1,10 +1,10 @@
 {
   "Spawners": [
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Ring", "PositionOffset": { "Y": 0.16 } },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "PositionOffset": { "Y": 0.28 } },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Column", "PositionOffset": { "Y": 0.28 }, "StartDelay": 0.05 },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "PositionOffset": { "Y": 0.14 } },
-    { "SpawnerId": "Tamework_AvatarFlight_Launch_Release_Dust", "PositionOffset": { "Y": 0.14 }, "StartDelay": 0.04 }
+    { "SpawnerId": "TwLaunchReleaseRing", "PositionOffset": { "Y": 0.16 } },
+    { "SpawnerId": "TwLaunchReleaseColumn", "PositionOffset": { "Y": 0.28 } },
+    { "SpawnerId": "TwLaunchReleaseColumn", "PositionOffset": { "Y": 0.28 }, "StartDelay": 0.05 },
+    { "SpawnerId": "TwLaunchReleaseDust", "PositionOffset": { "Y": 0.14 } },
+    { "SpawnerId": "TwLaunchReleaseDust", "PositionOffset": { "Y": 0.14 }, "StartDelay": 0.04 }
   ],
   "LifeSpan": 1.00,
   "CullDistance": 60.0,

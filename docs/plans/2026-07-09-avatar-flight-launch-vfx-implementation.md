@@ -25,10 +25,13 @@ Implemented on 2026-07-09:
 
 In-game `/particle spawn` and multiplayer owner/observer art review remain manual validation steps.
 
-Live diagnostics confirmed that a short-ID structural copy of vanilla `MagicHit_Flash` rendered
-from the custom Tamework pack while the original launch spawners did not. Every original spawner
-used soft-particle depth fading at a near-ground origin, so launch spawners now explicitly disable
-soft particles. The temporary gold-flash probe and base ice shockwave have been removed.
+Live diagnostics confirmed that a newly named short-ID structural copy of vanilla
+`MagicHit_Flash` rendered from the custom Tamework pack while the existing launch spawner IDs did
+not. The current spawner payloads otherwise match the revision previously seen in game, and the
+server reports successful emissions without particle validation warnings. The production spawners
+therefore use fresh short `TwLaunch*` IDs, preserve the intended payloads, and explicitly disable
+near-ground soft-particle fading. The temporary gold-flash probe and base ice shockwave remain
+removed.
 
 ## Confirmed Hytale Particle Behavior
 
@@ -130,14 +133,14 @@ the server send radius.
 
 | Spawner ID | Composition target |
 | --- | --- |
-| `Tamework_AvatarFlight_Launch_Charge_Ring` | One flat `Ring2` particle contracting from wide/faint to tight/transparent over roughly `0.35s`. |
-| `Tamework_AvatarFlight_Launch_Charge_Wisps` | Two or three pale `Portal_Wind` accents tightening toward the origin. |
-| `Tamework_AvatarFlight_Launch_Charge_Dust` | Three to five low earth-toned puffs pulled inward with a Y-axis radial attractor and a small tangent acceleration. |
-| `Tamework_AvatarFlight_Launch_Cancel_Ring` | One small broken ring that appears briefly and collapses/fades. |
-| `Tamework_AvatarFlight_Launch_Cancel_Puff` | Two or three small grey-brown puffs with weak outward velocity. |
-| `Tamework_AvatarFlight_Launch_Release_Ring` | One flat ring expanding rapidly from near-zero scale and fading by `0.30s`. |
-| `Tamework_AvatarFlight_Launch_Release_Column` | Pale mist particles accelerated upward and stretched along velocity. |
-| `Tamework_AvatarFlight_Launch_Release_Dust` | Low radial dust pushed outward with short life and strong damping. |
+| `TwLaunchChargeRing` | One flat `Ring2` particle contracting from wide/faint to tight/transparent over roughly `0.35s`. |
+| `TwLaunchChargeWisps` | Two or three pale `Portal_Wind` accents tightening toward the origin. |
+| `TwLaunchChargeDust` | Three to five low earth-toned puffs pulled inward with a Y-axis radial attractor and a small tangent acceleration. |
+| `TwLaunchCancelRing` | One small broken ring that appears briefly and collapses/fades. |
+| `TwLaunchCancelPuff` | Two or three small grey-brown puffs with weak outward velocity. |
+| `TwLaunchReleaseRing` | One flat ring expanding rapidly from near-zero scale and fading by `0.30s`. |
+| `TwLaunchReleaseColumn` | Pale mist particles accelerated upward and stretched along velocity. |
+| `TwLaunchReleaseDust` | Low radial dust pushed outward with short life and strong damping. |
 
 ### System composition by release tier
 
