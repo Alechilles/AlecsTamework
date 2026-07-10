@@ -25,6 +25,11 @@ Implemented on 2026-07-09:
 
 In-game `/particle spawn` and multiplayer owner/observer art review remain manual validation steps.
 
+Current live diagnostic: charge pulses also reference `TwLaunchProbe`, a short-ID structural copy
+of vanilla `MagicHit_Flash`, at three elevated offsets. Gold star flashes prove that a custom
+spawner reaches the client independently of the authored launch materials; frost-only output means
+the failure is in custom spawner delivery or client resolution rather than the launch trigger.
+
 ## Confirmed Hytale Particle Behavior
 
 Research target: Hytale release `0.5.6`.

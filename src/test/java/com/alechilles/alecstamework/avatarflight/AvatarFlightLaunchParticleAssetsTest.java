@@ -25,6 +25,7 @@ class AvatarFlightLaunchParticleAssetsTest {
     );
     private static final Set<String> APPROVED_TEXTURES = Set.of(
             "Particles/Textures/Basic/Ring2.png",
+            "Particles/Textures/Basic/Star3.png",
             "Particles/Textures/Circles/Portal_Wind.png",
             "Particles/Textures/Smoke/Smoke_Mist.png",
             "Particles/Textures/Smoke/Smoke_Smooth2.png"
@@ -36,7 +37,7 @@ class AvatarFlightLaunchParticleAssetsTest {
         Set<String> spawnerIds = fileStems(LAUNCH_ROOT.resolve("Spawners"), ".particlespawner");
         Set<String> systemIds = fileStems(LAUNCH_ROOT, ".particlesystem");
 
-        assertEquals(8, spawnerIds.size());
+        assertEquals(9, spawnerIds.size());
         assertEquals(5, systemIds.size());
         for (String systemId : systemIds) {
             JsonObject system = read(LAUNCH_ROOT.resolve(systemId + ".particlesystem"));
