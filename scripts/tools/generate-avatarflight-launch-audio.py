@@ -21,6 +21,12 @@ DEFAULT_OUTPUT = (
     Path(__file__).resolve().parents[2]
     / "src/main/resources/Common/Sounds/Tamework/AvatarFlight/Launch"
 )
+DEFAULT_WIND_SOURCE = Path.home() / "Downloads/dragon-studio-harsh-wind-515272.mp3"
+CHARGE_PULSE_SAMPLES = (
+    ("Tamework_AvatarFlight_Launch_Charge_Pulse.ogg", 1.78, 1.02),
+    ("Tamework_AvatarFlight_Launch_Charge_Pulse_B.ogg", 4.18, 1.02),
+    ("Tamework_AvatarFlight_Launch_Charge_Pulse_C.ogg", 6.92, 1.02),
+)
 
 
 def lowpass(samples: np.ndarray, cutoff_hz: float) -> np.ndarray:
@@ -67,31 +73,6 @@ def normalize(samples: np.ndarray, peak_db: float = -1.0) -> np.ndarray:
         return samples
     target = 10.0 ** (peak_db / 20.0)
     return np.tanh(samples * (target / peak) * 1.12) / math.tanh(1.12)
-
-
-def charge_pulse(rng: np.random.Generator) -> np.ndarray:
-    duration = 0.72
-    time = np.arange(int(duration * SAMPLE_RATE)) / SAMPLE_RATE
-    noise = rng.normal(0.0, 1.0, len(time))
-    shifted = np.roll(noise, int(0.021 * SAMPLE_RATE))
-    air = highpass(lowpass(lowpass(noise, 2_400.0), 2_400.0), 180.0)
-    body = highpass(lowpass(lowpass(shifted, 820.0), 820.0), 65.0)
-    rumble = highpass(lowpass(np.roll(noise, int(0.047 * SAMPLE_RATE)), 340.0), 32.0)
-
-    progress = np.clip(time / duration, 0.0, 1.0)
-    attack = np.sin(np.clip(time / 0.18, 0.0, 1.0) * math.pi / 2.0) ** 2
-    release = np.sin(np.clip((duration - time) / 0.28, 0.0, 1.0) * math.pi / 2.0) ** 2
-    envelope = attack * release
-
-    turbulence_noise = lowpass(rng.normal(0.0, 1.0, len(time)), 4.2)
-    turbulence_scale = max(float(np.std(turbulence_noise)), 1e-9)
-    turbulence = np.clip(0.86 + 0.16 * turbulence_noise / turbulence_scale, 0.58, 1.14)
-    swirl = 0.90 + 0.10 * np.sin(2.0 * math.pi * (1.3 * time + 0.85 * time * time))
-    breath = 0.018 * chirp(time, 145.0, 215.0) * envelope ** 1.4
-
-    wind = (0.28 + 0.18 * progress) * air + 0.78 * body + 0.24 * rumble
-    output = wind * envelope * turbulence * swirl + breath
-    return normalize(fade(output, 0.07, 0.18), -4.5)
 
 
 def ready_cue(rng: np.random.Generator) -> np.ndarray:
@@ -190,6 +171,47 @@ def encode_ogg(ffmpeg: str, wav_path: Path, ogg_path: Path) -> None:
     normalize_ogg_serial(ogg_path, 0xA11EC)
 
 
+def encode_sampled_wind(ffmpeg: str, source_path: Path, ogg_path: Path,
+                        start_s: float, duration_s: float) -> None:
+    fade_out_start = duration_s - 0.34
+    filters = ",".join((
+        f"atrim=start={start_s}:duration={duration_s}",
+        "asetpts=PTS-STARTPTS",
+        "pan=mono|c0=0.65*c0+0.35*c1",
+        "highpass=f=55:p=2",
+        "lowpass=f=6500:p=2",
+        "afade=t=in:st=0:d=0.22",
+        f"afade=t=out:st={fade_out_start}:d=0.34",
+        "loudnorm=I=-23:TP=-5:LRA=5",
+    ))
+    subprocess.run(
+        [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source_path),
+            "-af",
+            filters,
+            "-ac",
+            "1",
+            "-ar",
+            str(SAMPLE_RATE),
+            "-c:a",
+            "libvorbis",
+            "-q:a",
+            "6",
+            "-serial_offset",
+            "1",
+            str(ogg_path),
+        ],
+        check=True,
+    )
+    normalize_ogg_serial(ogg_path, 0xA11EC)
+
+
 def normalize_ogg_serial(path: Path, serial: int) -> None:
     """Replace FFmpeg's random Ogg stream serial and repair each page checksum."""
     data = bytearray(path.read_bytes())
@@ -229,13 +251,12 @@ def ogg_crc_table() -> list[int]:
     return table
 
 
-def generate(output_root: Path, ffmpeg: str) -> None:
+def generate(output_root: Path, ffmpeg: str, wind_source: Path) -> None:
+    if not wind_source.is_file():
+        raise FileNotFoundError(f"wind source recording was not found: {wind_source}")
     cue_rng = np.random.default_rng(SEED)
     cue_rng.normal(0.0, 1.0, LEGACY_CHARGE_SAMPLE_COUNT)
     sounds = {
-        "Tamework_AvatarFlight_Launch_Charge_Pulse.ogg": charge_pulse(
-            np.random.default_rng(SEED)
-        ),
         "Tamework_AvatarFlight_Launch_Ready.ogg": ready_cue(cue_rng),
         "Tamework_AvatarFlight_Launch_Cancel.ogg": cancel_cue(cue_rng),
         "Tamework_AvatarFlight_Launch_Release_Partial.ogg": release_burst(
@@ -249,6 +270,10 @@ def generate(output_root: Path, ffmpeg: str) -> None:
         ),
     }
     output_root.mkdir(parents=True, exist_ok=True)
+    for filename, start_s, duration_s in CHARGE_PULSE_SAMPLES:
+        output_path = output_root / filename
+        encode_sampled_wind(ffmpeg, wind_source, output_path, start_s, duration_s)
+        print(f"generated {output_path}")
     with tempfile.TemporaryDirectory(prefix="tamework-launch-audio-") as temporary:
         temporary_root = Path(temporary)
         for filename, samples in sounds.items():
@@ -262,10 +287,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--ffmpeg", default=shutil.which("ffmpeg"))
+    parser.add_argument("--wind-source", type=Path, default=DEFAULT_WIND_SOURCE)
     args = parser.parse_args()
     if not args.ffmpeg:
         raise SystemExit("ffmpeg was not found on PATH; pass --ffmpeg explicitly")
-    generate(args.output_root.resolve(), args.ffmpeg)
+    generate(args.output_root.resolve(), args.ffmpeg, args.wind_source.resolve())
 
 
 if __name__ == "__main__":

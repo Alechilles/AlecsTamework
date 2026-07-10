@@ -2,7 +2,9 @@
   "Layers": [
     {
       "Files": [
-        "Sounds/Tamework/AvatarFlight/Launch/Tamework_AvatarFlight_Launch_Charge_Pulse.ogg"
+        "Sounds/Tamework/AvatarFlight/Launch/Tamework_AvatarFlight_Launch_Charge_Pulse.ogg",
+        "Sounds/Tamework/AvatarFlight/Launch/Tamework_AvatarFlight_Launch_Charge_Pulse_B.ogg",
+        "Sounds/Tamework/AvatarFlight/Launch/Tamework_AvatarFlight_Launch_Charge_Pulse_C.ogg"
       ],
       "RandomSettings": {
         "MinPitch": -0.35,

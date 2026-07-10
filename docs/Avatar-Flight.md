@@ -40,7 +40,7 @@ Charged launch is the default takeoff path for avatar flight. With `Launch.Prefe
 
 Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-loads some launch strength after the minimum hold, while still rewarding longer charge time. Partial launches cost `1` Vigour by default, and launches at or above `Launch.FullChargeCostThreshold` cost `2`.
 
-Launch presentation uses short world-space particle and positional audio cues. Grounded charging emits increasingly frequent inward pressure pulses paired with short wind swirls whose volume and pitch rise with charge progress. Reaching full charge plays one ready cue. A release below the minimum or a rejected release emits a small visual and audio fizzle. Successful launches emit partial, mid, or full release effects selected from the configured launch curve. Particle release stays at the last grounded charge origin if the avatar leaves the ground before releasing, while audio follows the avatar's current release position.
+Launch presentation uses short world-space particle and positional audio cues. Grounded charging emits increasingly frequent inward pressure pulses paired with varied sampled wind gusts whose volume and pitch rise with charge progress. Reaching full charge plays one ready cue. A release below the minimum or a rejected release emits a small visual and audio fizzle. Successful launches emit partial, mid, or full release effects selected from the configured launch curve. Particle release stays at the last grounded charge origin if the avatar leaves the ground before releasing, while audio follows the avatar's current release position.
 
 ## Glide Balance
 

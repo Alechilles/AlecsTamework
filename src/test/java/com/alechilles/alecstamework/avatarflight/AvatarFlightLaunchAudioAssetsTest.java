@@ -37,17 +37,21 @@ class AvatarFlightLaunchAudioAssetsTest {
             assertEquals(1, layers.size(), id);
             JsonObject layer = layers.get(0).getAsJsonObject();
             assertTrue(!layer.get("Looping").getAsBoolean(), id);
-            String soundPath = layer.getAsJsonArray("Files").get(0).getAsString();
-            Path oggPath = RESOURCE_ROOT.resolve("Common").resolve(soundPath);
-            assertTrue(Files.isRegularFile(oggPath), soundPath);
-            byte[] oggBytes = Files.readAllBytes(oggPath);
-            assertArrayEquals(
-                    "OggS".getBytes(StandardCharsets.US_ASCII),
-                    oggBytes.length >= 4
-                            ? java.util.Arrays.copyOf(oggBytes, 4)
-                            : new byte[0],
-                    soundPath
-            );
+            JsonArray soundFiles = layer.getAsJsonArray("Files");
+            if (id.endsWith("Charge_Pulse")) assertEquals(3, soundFiles.size(), id);
+            for (int index = 0; index < soundFiles.size(); index++) {
+                String soundPath = soundFiles.get(index).getAsString();
+                Path oggPath = RESOURCE_ROOT.resolve("Common").resolve(soundPath);
+                assertTrue(Files.isRegularFile(oggPath), soundPath);
+                byte[] oggBytes = Files.readAllBytes(oggPath);
+                assertArrayEquals(
+                        "OggS".getBytes(StandardCharsets.US_ASCII),
+                        oggBytes.length >= 4
+                                ? java.util.Arrays.copyOf(oggBytes, 4)
+                                : new byte[0],
+                        soundPath
+                );
+            }
         }
     }
 }
