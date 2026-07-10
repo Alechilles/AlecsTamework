@@ -1,34 +1,25 @@
 {
   "RenderMode": "Erosion",
-  "EmitOffset": {
-    "X": { "Min": -0.35, "Max": 0.35 },
-    "Y": { "Min": 0.03, "Max": 0.12 },
-    "Z": { "Min": -0.35, "Max": 0.35 }
-  },
   "ParticleRotationInfluence": "None",
-  "LinearFiltering": true,
-  "LightInfluence": 0,
-  "ParticleRotateWithSpawner": true,
-  "MaxConcurrentParticles": 2,
-  "ParticleLifeSpan": { "Min": 0.30, "Max": 0.42 },
-  "TotalParticles": { "Min": 2, "Max": 2 },
+  "MaxConcurrentParticles": 4,
+  "ParticleLifeSpan": { "Min": 1.0, "Max": 1.0 },
+  "TrailSpawnerPositionMultiplier": 1,
+  "TrailSpawnerRotationMultiplier": 1,
+  "SpawnRate": { "Min": 3.2, "Max": 3.2 },
   "Particle": {
     "Texture": "Particles/Textures/Circles/Portal_Wind.png",
     "ScaleRatioConstraint": "OneToOne",
-    "SoftParticles": "Disable",
-    "UVOption": "RandomFlipU",
+    "UVOption": "None",
     "Animation": {
-      "0": { "Opacity": 0.0, "Scale": { "X": { "Min": 1.15, "Max": 1.45 } }, "Color": "#effbff" },
-      "25": { "Opacity": 0.42 },
-      "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.18, "Max": 0.30 } }, "Rotation": { "Z": { "Min": 120.0, "Max": 220.0 } } }
+      "0": { "Opacity": 0.0 },
+      "19": { "Opacity": 0.0 },
+      "20": { "Opacity": 0.0, "Rotation": { "Y": { "Min": -90.0, "Max": -90.0 } }, "Scale": { "X": { "Min": 0.2, "Max": 0.5 } }, "Color": "#a000ff" },
+      "40": { "Opacity": 0.9 },
+      "70": { "Opacity": 1.0 },
+      "100": { "Opacity": 0.0, "Color": "#6500ff", "Rotation": { "Y": { "Min": 180.0, "Max": 180.0 } }, "Scale": { "X": { "Min": 0.8, "Max": 1.0 } } }
     },
-    "InitialAnimationFrame": {
-      "Rotation": { "X": { "Min": 90.0, "Max": 90.0 }, "Z": { "Min": -180.0, "Max": 180.0 } },
-      "Scale": { "X": { "Min": 1.0, "Max": 1.0 } },
-      "Opacity": 1.0,
-      "Color": "#effbff"
-    }
+    "InitialAnimationFrame": { "Scale": { "X": { "Min": 0.15, "Max": 0.2 } }, "Opacity": 0.824, "Rotation": { "X": { "Min": 90.0, "Max": 90.0 }, "Y": { "Min": -180.0, "Max": 180.0 }, "Z": { "Min": 180.0, "Max": 180.0 } } }
   },
-  "SpawnBurst": true,
-  "SpawnRate": { "Min": 2.0, "Max": 2.0 }
+  "CameraOffset": -0.1,
+  "LinearFiltering": true
 }

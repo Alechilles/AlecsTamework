@@ -64,22 +64,14 @@ class AvatarFlightLaunchParticleAssetsTest {
     }
 
     @Test
-    void launchSpawnersUseOnlyApprovedBaseTexturesAndBoundedParticleCounts() throws IOException {
-        int totalParticlesPerChargePulse = 0;
+    void launchSpawnersUseOnlyApprovedBaseTexturesAndBoundedConcurrency() throws IOException {
         for (String spawnerId : fileStems(LAUNCH_ROOT.resolve("Spawners"), ".particlespawner")) {
             JsonObject spawner = read(LAUNCH_ROOT.resolve("Spawners").resolve(spawnerId + ".particlespawner"));
             String texture = spawner.getAsJsonObject("Particle").get("Texture").getAsString();
             assertTrue(APPROVED_TEXTURES.contains(texture), spawnerId + " uses unexpected texture " + texture);
-            assertEquals("Disable", spawner.getAsJsonObject("Particle").get("SoftParticles").getAsString(),
-                    spawnerId + " must not depth-fade against the launch surface");
-            assertEquals(1.0, spawner.getAsJsonObject("Particle")
-                            .getAsJsonObject("InitialAnimationFrame").get("Opacity").getAsDouble(), 0.0001,
-                    spawnerId + " must use a visible base opacity for its animation curve");
-            int maxParticles = spawner.getAsJsonObject("TotalParticles").get("Max").getAsInt();
-            assertTrue(maxParticles <= 4, spawnerId + " exceeds per-spawner burst budget");
-            if (spawnerId.startsWith("TwLaunchCharge")) totalParticlesPerChargePulse += maxParticles;
+            int maxConcurrent = spawner.get("MaxConcurrentParticles").getAsInt();
+            assertTrue(maxConcurrent <= 5, spawnerId + " exceeds its concurrency budget");
         }
-        assertEquals(6, totalParticlesPerChargePulse);
     }
 
     @Test
@@ -89,10 +81,10 @@ class AvatarFlightLaunchParticleAssetsTest {
         for (var element : full.getAsJsonArray("Spawners")) {
             String spawnerId = element.getAsJsonObject().get("SpawnerId").getAsString();
             JsonObject spawner = read(LAUNCH_ROOT.resolve("Spawners").resolve(spawnerId + ".particlespawner"));
-            particles += spawner.getAsJsonObject("TotalParticles").get("Max").getAsInt();
+            particles += spawner.get("MaxConcurrentParticles").getAsInt();
         }
         assertTrue(particles < 30, "full launch release must stay under the particle budget");
-        assertEquals(26, particles);
+        assertEquals(22, particles);
     }
 
     @Test
@@ -106,6 +98,7 @@ class AvatarFlightLaunchParticleAssetsTest {
                 String spawnerId = group.get("SpawnerId").getAsString();
                 double startDelay = group.has("StartDelay") ? group.get("StartDelay").getAsDouble() : 0.0;
                 JsonObject spawner = read(spawners.resolve(spawnerId + ".particlespawner"));
+                if (!spawner.has("SpawnBurst") || !spawner.get("SpawnBurst").getAsBoolean()) continue;
                 double particleLifeSpan = spawner.getAsJsonObject("ParticleLifeSpan").get("Max").getAsDouble();
 
                 assertTrue(startDelay + particleLifeSpan <= systemLifeSpan,
@@ -132,7 +125,6 @@ class AvatarFlightLaunchParticleAssetsTest {
             assertFalse(packet.particle.animationFrames.isEmpty(), spawnerId + " has no animation frames");
             assertNotNull(packet.particleLifeSpan, spawnerId + " has no particle lifespan");
             assertNotNull(packet.spawnRate, spawnerId + " has no spawn rate");
-            assertNotNull(packet.totalParticles, spawnerId + " has no total-particle range");
             assertTrue(packet.maxConcurrentParticles > 0, spawnerId + " cannot allocate particles");
         }
     }

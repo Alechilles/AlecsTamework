@@ -27,13 +27,13 @@ In-game `/particle spawn` and multiplayer owner/observer art review remain manua
 
 Live diagnostics confirmed that a structural copy of vanilla `MagicHit_Flash` rendered from the
 custom Tamework pack while the launch spawners did not. The server reported successful emissions
-without particle validation warnings, and fresh short `TwLaunch*` IDs produced the same blank
-result. The remaining shared difference was `InitialAnimationFrame.Opacity`: the working flash and
-vanilla fade-in examples use a nonzero initial opacity as the particle's base multiplier, while the
-launch assets set that base to zero and therefore kept their timed opacity curves transparent. All
-production spawners now use a `1.0` base opacity, retain their timed fade curves, and explicitly
-disable near-ground soft-particle fading. The temporary gold-flash probe and base ice shockwave
-remain removed.
+without particle validation warnings, and neither fresh short IDs, disabled soft particles, nor
+nonzero initial opacity made the accumulated authored payloads render. Those payloads were removed
+rather than tuned further. Each production `TwLaunch*` spawner is now rebuilt as a clean structural
+copy of a known-working Hytale 0.5.6 spawner: `Stick_Slam_Shockwave_Small` for rings,
+`Magic_Hit_Smoke` for dust/puffs, `Drop_Epic_Vortex` for wind wisps, and `Weapon_Frost_Mist` for the
+release column. The temporary gold-flash probe and base ice shockwave remain removed. Visual
+restyling should proceed incrementally after this clean baseline is confirmed in game.
 
 ## Confirmed Hytale Particle Behavior
 

@@ -1,42 +1,28 @@
 {
   "RenderMode": "BlendLinear",
-  "EmitOffset": {
-    "X": { "Min": -0.45, "Max": 0.45 },
-    "Y": { "Min": 0.02, "Max": 0.20 },
-    "Z": { "Min": -0.45, "Max": 0.45 }
-  },
-  "ParticleRotationInfluence": "BillboardVelocity",
+  "EmitOffset": { "X": { "Min": 0.0, "Max": 0.2 } },
+  "ParticleRotationInfluence": "Velocity",
   "LinearFiltering": true,
-  "LightInfluence": 0,
-  "ParticleRotateWithSpawner": false,
-  "MaxConcurrentParticles": 4,
-  "ParticleLifeSpan": { "Min": 0.42, "Max": 0.62 },
-  "TotalParticles": { "Min": 4, "Max": 4 },
-  "Attractors": [
-    {
-      "DampingMultiplier": { "X": 0.88, "Y": 0.94, "Z": 0.88 },
-      "LinearAcceleration": { "Y": 2.2 },
-      "LinearImpulse": { "Y": 1.4 }
-    }
-  ],
+  "ParticleRotateWithSpawner": true,
+  "TrailSpawnerPositionMultiplier": 0,
+  "TrailSpawnerRotationMultiplier": 0,
+  "MaxConcurrentParticles": 1,
+  "ParticleLifeSpan": { "Min": 1.5, "Max": 2.5 },
+  "SpawnRate": { "Min": 2.0, "Max": 4.0 },
+  "InitialVelocity": { "Speed": { "Min": 0.03, "Max": 0.18 }, "Yaw": { "Min": 90, "Max": 90 }, "Pitch": { "Min": 0, "Max": 0 } },
   "Particle": {
     "Texture": "Particles/Textures/Smoke/Smoke_Mist.png",
     "FrameSize": { "Width": 32, "Height": 64 },
     "ScaleRatioConstraint": "None",
-    "SoftParticles": "Disable",
+    "SoftParticles": "Require",
     "UVOption": "RandomFlipU",
     "Animation": {
-      "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Opacity": 0.0, "Scale": { "X": { "Min": 0.22, "Max": 0.34 }, "Y": { "Min": 0.65, "Max": 0.95 } }, "Color": "#eefbff" },
-      "18": { "Opacity": 0.50 },
-      "100": { "Opacity": 0.0, "Scale": { "X": { "Min": 0.48, "Max": 0.65 }, "Y": { "Min": 1.2, "Max": 1.7 } } }
+      "0": { "FrameIndex": { "Min": 0, "Max": 3 }, "Rotation": { "X": { "Min": 0, "Max": 0 }, "Y": { "Min": 0, "Max": 0 }, "Z": { "Min": 0, "Max": 0 } }, "Scale": { "X": { "Min": 0.75, "Max": 0.75 }, "Y": { "Min": 0.75, "Max": 0.75 } }, "Opacity": 0 },
+      "40": { "Opacity": 0.6 },
+      "60": { "Opacity": 0.8 },
+      "100": { "Opacity": 0, "Scale": { "X": { "Min": 2.0, "Max": 2.0 }, "Y": { "Min": 1.0, "Max": 1.0 } } }
     },
-    "InitialAnimationFrame": {
-      "FrameIndex": { "Min": 0, "Max": 3 },
-      "Scale": { "X": { "Min": 1.0, "Max": 1.0 }, "Y": { "Min": 1.0, "Max": 1.0 } },
-      "Opacity": 1.0,
-      "Color": "#eefbff"
-    }
+    "InitialAnimationFrame": { "Rotation": { "X": { "Min": 0, "Max": 0 }, "Y": { "Min": 90, "Max": 90 }, "Z": { "Min": 90, "Max": 90 } }, "Scale": { "X": { "Min": 0.4, "Max": 0.4 }, "Y": { "Min": 0.8, "Max": 0.8 } }, "Opacity": 0.75, "FrameIndex": { "Min": 0, "Max": 3 }, "Color": "#1bb6fd" }
   },
-  "SpawnBurst": true,
-  "SpawnRate": { "Min": 4.0, "Max": 4.0 }
+  "UVMotion": { "Texture": "Particles/Textures/UVMotion/FlowMapSmoke.png", "Strength": 10.0, "Scale": 1.5, "SpeedY": 0.2 }
 }
