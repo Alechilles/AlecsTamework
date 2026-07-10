@@ -32,7 +32,7 @@
     }
   ],
   "Particle": {
-    "Texture": "Particles/Textures/Basic/Glow_Direction.png",
+    "Texture": "Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Streak.png",
     "ScaleRatioConstraint": "None",
     "UVOption": "RandomFlipU",
     "Animation": {

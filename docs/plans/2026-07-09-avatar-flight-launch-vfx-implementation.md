@@ -38,11 +38,11 @@ restyling should proceed incrementally after this clean baseline is confirmed in
 The clean baseline and scaled launch sequence rendered successfully in game, but the repeated
 `Ring2` and `Portal_Wind` sheets read as pulsing rings rather than moving air. The current art pass
 uses Hytale 0.5.6's `Battleaxe_Signature_Whirlwind` and `Wind_Spirit_Tentacle` as direct visual
-references. Charge pulses now combine a contracting, rotating `Signature_Spin7` brush stroke, ten
+references. Charge pulses now combine a contracting, rotating custom `Wind_Arc` brush stroke, ten
 small `Ball3` motes bent into curved paths by radial and tangent acceleration, and three
-inward-circling earth-toned puffs. A rejected launch collapses a muted `Signature_Spin5` crescent
+inward-circling earth-toned puffs. A rejected launch collapses a custom `Wind_Curl` sprite
 into three weak outward puffs. Successful releases combine expanding rotating brush strokes, six
-helical `Glow_Direction` streaks per group, upward pale mist, and outward ground dust. The partial,
+helical custom `Wind_Streak` particles per group, upward pale mist, and outward ground dust. The partial,
 mid, and full compositions have bounded concurrency budgets of `15`, `23`, and `38`; charge pulses
 are bounded at `14`. All five systems remain non-important and independently previewable.
 
@@ -108,19 +108,22 @@ charge ramp comes from repeated short pulses. Pulse cadence and whole-system sca
 continuously as charge increases, while each particle asset remains static and independently
 previewable.
 
-The first prototype reuses base-game particle textures:
+The production composition uses custom grayscale sprites for the wind silhouettes and restrained
+base-game textures for secondary motes, mist, and dust:
 
-| Purpose | Base texture | Reason |
+| Purpose | Texture | Reason |
 | --- | --- | --- |
-| Swept wind arcs | `Particles/Textures/Circles/Signature_Spin7.png` | Broad asymmetric brush strokes rotate while contracting or expanding, so the silhouette reads as moving air instead of a UI-like ring. |
-| Cancel crescent | `Particles/Textures/Circles/Signature_Spin5.png` | Softer incomplete stroke suitable for a restrained collapsing fizzle. |
+| Swept wind arcs | `Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Arc.png` | Custom broken brush stroke rotates while contracting or expanding, so the silhouette reads as moving air instead of a UI-like ring. |
+| Cancel curl | `Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Curl.png` | Custom inward-folding corkscrew suitable for a restrained collapsing fizzle. |
 | Curved wind motes | `Particles/Textures/Basic/Ball3.png` | Small points reveal orbital motion clearly when driven by radial and tangent forces. |
-| Helical release streaks | `Particles/Textures/Basic/Glow_Direction.png` | Directional marks expose the upward spiral during launch release. |
+| Helical release streaks | `Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Streak.png` | Custom directional slash exposes the upward spiral during launch release and remains readable at `32x32`. |
 | Air column | `Particles/Textures/Smoke/Smoke_Mist.png` | Directional four-frame mist suitable for stretched upward airflow. |
 | Dust | `Particles/Textures/Smoke/Smoke_Smooth2.png` | Soft four-frame smoke suitable for restrained earth-toned dust. |
 
-Do not add custom Common textures until the first in-game art review proves these base textures
-cannot produce the intended physical wind language.
+The custom wind sprites were generated as high-resolution white/light-grey glyphs on a flat chroma
+background, converted to alpha, and Lanczos-downscaled to Hytale-native sizes: `256x256` for the
+major arc, `128x128` for the cancel curl, and `32x32` for the directional streak. All retain fully
+transparent corners and broad empty margins for rotation and mipmapping.
 
 ## Asset Layout
 
@@ -148,12 +151,12 @@ the server send radius.
 
 | Spawner ID | Composition target |
 | --- | --- |
-| `TwLaunchChargeRing` | One flat `Signature_Spin7` brush stroke rotating and contracting toward the launch origin. |
+| `TwLaunchChargeRing` | One flat custom `Wind_Arc` brush stroke rotating and contracting toward the launch origin. |
 | `TwLaunchChargeWisps` | Ten small pale motes following short curved orbital paths around the launch origin. |
 | `TwLaunchChargeDust` | Three to five low earth-toned puffs pulled inward with a Y-axis radial attractor and a small tangent acceleration. |
-| `TwLaunchCancelRing` | One muted `Signature_Spin5` crescent that rotates, collapses, and fades. |
+| `TwLaunchCancelRing` | One muted custom `Wind_Curl` sprite that rotates, collapses, and fades. |
 | `TwLaunchCancelPuff` | Two or three small grey-brown puffs with weak outward velocity. |
-| `TwLaunchReleaseRing` | One flat `Signature_Spin7` brush stroke rotating and expanding rapidly from near-zero scale. |
+| `TwLaunchReleaseRing` | One flat custom `Wind_Arc` brush stroke rotating and expanding rapidly from near-zero scale. |
 | `TwLaunchReleaseStreamers` | Six pale directional streaks accelerated upward while radial and tangent forces bend them into a helix. |
 | `TwLaunchReleaseColumn` | Pale mist particles accelerated upward and stretched along velocity. |
 | `TwLaunchReleaseDust` | Low radial dust pushed outward with short life and strong damping. |
@@ -213,13 +216,13 @@ negative radial acceleration with stronger tangent acceleration around the Y axi
 - `SpawnBurst: true`, exactly one particle per group entry.
 - `ParticleLifeSpan`: approximately `0.34s`.
 - Start near zero scale, expand rapidly while rotating about `300deg`, and fade completely.
-- Use a horizontal `Signature_Spin7` texture with `SoftParticles` disabled so terrain depth does not
+- Use the horizontal custom `Wind_Arc` texture with `SoftParticles` disabled so terrain depth does not
   erase it.
 - Keep the brush stroke translucent enough that terrain remains visible.
 
 ### Release streamers
 
-- Emit six `Glow_Direction` particles per group with velocity-oriented rotation.
+- Emit six custom `Wind_Streak` particles per group with velocity-oriented rotation.
 - Combine positive Y acceleration with inward radial and positive tangent acceleration to form a
   short rising helix.
 - Keep particle life at or below `0.52s`; full release may use two groups separated by `0.05s`.

@@ -10,7 +10,7 @@
   "ParticleLifeSpan": { "Min": 0.32, "Max": 0.32 },
   "TotalParticles": { "Min": 1, "Max": 1 },
   "Particle": {
-    "Texture": "Particles/Textures/Circles/Signature_Spin7.png",
+    "Texture": "Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Arc.png",
     "ScaleRatioConstraint": "OneToOne",
     "UVOption": "RandomFlipU",
     "Animation": {
