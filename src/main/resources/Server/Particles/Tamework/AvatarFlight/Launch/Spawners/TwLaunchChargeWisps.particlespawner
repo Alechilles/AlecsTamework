@@ -1,11 +1,11 @@
 {
   "RenderMode": "Erosion",
   "ParticleRotationInfluence": "None",
-  "MaxConcurrentParticles": 4,
-  "ParticleLifeSpan": { "Min": 1.0, "Max": 1.0 },
+  "MaxConcurrentParticles": 3,
+  "ParticleLifeSpan": { "Min": 0.38, "Max": 0.38 },
   "TrailSpawnerPositionMultiplier": 1,
   "TrailSpawnerRotationMultiplier": 1,
-  "SpawnRate": { "Min": 3.2, "Max": 3.2 },
+  "SpawnRate": { "Min": 5.0, "Max": 5.0 },
   "Particle": {
     "Texture": "Particles/Textures/Circles/Portal_Wind.png",
     "ScaleRatioConstraint": "OneToOne",
@@ -13,10 +13,10 @@
     "Animation": {
       "0": { "Opacity": 0.0 },
       "19": { "Opacity": 0.0 },
-      "20": { "Opacity": 0.0, "Rotation": { "Y": { "Min": -90.0, "Max": -90.0 } }, "Scale": { "X": { "Min": 0.2, "Max": 0.5 } }, "Color": "#a000ff" },
-      "40": { "Opacity": 0.9 },
-      "70": { "Opacity": 1.0 },
-      "100": { "Opacity": 0.0, "Color": "#6500ff", "Rotation": { "Y": { "Min": 180.0, "Max": 180.0 } }, "Scale": { "X": { "Min": 0.8, "Max": 1.0 } } }
+      "20": { "Opacity": 0.18, "Rotation": { "Y": { "Min": -90.0, "Max": -90.0 } }, "Scale": { "X": { "Min": 1.25, "Max": 1.55 } }, "Color": "#effbff" },
+      "40": { "Opacity": 0.42 },
+      "70": { "Opacity": 0.28 },
+      "100": { "Opacity": 0.0, "Color": "#bfeaff", "Rotation": { "Y": { "Min": 180.0, "Max": 180.0 } }, "Scale": { "X": { "Min": 0.24, "Max": 0.38 } } }
     },
     "InitialAnimationFrame": { "Scale": { "X": { "Min": 0.15, "Max": 0.2 } }, "Opacity": 0.824, "Rotation": { "X": { "Min": 90.0, "Max": 90.0 }, "Y": { "Min": -180.0, "Max": 180.0 }, "Z": { "Min": 180.0, "Max": 180.0 } } }
   },
