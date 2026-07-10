@@ -109,10 +109,13 @@ class AvatarFlightLaunchParticleAssetsTest {
                 chargeArc.getAsJsonObject("Particle").get("Texture").getAsString());
         assertEquals("Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Arc.png",
                 releaseArc.getAsJsonObject("Particle").get("Texture").getAsString());
+        assertSceneLitTranslucent(chargeArc, "TwLaunchChargeRing");
+        assertSceneLitTranslucent(releaseArc, "TwLaunchReleaseRing");
 
         JsonObject cancelCurl = spawner("TwLaunchCancelRing");
         assertEquals("Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Curl.png",
                 cancelCurl.getAsJsonObject("Particle").get("Texture").getAsString());
+        assertSceneLitTranslucent(cancelCurl, "TwLaunchCancelRing");
 
         JsonObject chargeMotes = spawner("TwLaunchChargeWisps");
         assertEquals("Particles/Textures/Basic/Ball3.png",
@@ -123,6 +126,7 @@ class AvatarFlightLaunchParticleAssetsTest {
         assertEquals("Particles/Textures/Tamework/AvatarFlight/Launch/Wind_Streak.png",
                 releaseStreamers.getAsJsonObject("Particle").get("Texture").getAsString());
         assertCurvedMotion(releaseStreamers, "TwLaunchReleaseStreamers");
+        assertSceneLitTranslucent(releaseStreamers, "TwLaunchReleaseStreamers");
     }
 
     @Test
@@ -212,6 +216,27 @@ class AvatarFlightLaunchParticleAssetsTest {
                 spawnerId + " must pull particles toward its orbit");
         assertTrue(Math.abs(attractor.get("RadialTangentAcceleration").getAsDouble()) > 0,
                 spawnerId + " must bend particles around its orbit");
+    }
+
+    private static void assertSceneLitTranslucent(JsonObject spawner, String spawnerId) {
+        assertEquals("BlendLinear", spawner.get("RenderMode").getAsString(),
+                spawnerId + " must use alpha blending instead of a hard erosion silhouette");
+        assertTrue(spawner.get("LightInfluence").getAsDouble() >= 1,
+                spawnerId + " must receive scene lighting instead of rendering fullbright");
+
+        JsonObject particle = spawner.getAsJsonObject("Particle");
+        double maxOpacity = particle.getAsJsonObject("Animation").entrySet().stream()
+                .map(Map.Entry::getValue)
+                .map(value -> value.getAsJsonObject())
+                .filter(frame -> frame.has("Opacity"))
+                .mapToDouble(frame -> frame.get("Opacity").getAsDouble())
+                .max()
+                .orElse(0);
+        JsonObject initialFrame = particle.getAsJsonObject("InitialAnimationFrame");
+        if (initialFrame.has("Opacity")) {
+            maxOpacity = Math.max(maxOpacity, initialFrame.get("Opacity").getAsDouble());
+        }
+        assertTrue(maxOpacity <= 0.4, spawnerId + " is too opaque for a wind sheet");
     }
 
     private static int visiblePixels(BufferedImage image) {

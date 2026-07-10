@@ -125,6 +125,10 @@ background, converted to alpha, and Lanczos-downscaled to Hytale-native sizes: `
 major arc, `128x128` for the cancel curl, and `32x32` for the directional streak. All retain fully
 transparent corners and broad empty margins for rotation and mipmapping.
 
+The custom sprite spawners use `BlendLinear` and `LightInfluence: 1` so their alpha remains soft and
+world lighting can darken them naturally. Peak authored opacity stays at or below `0.38`; this avoids
+the fullbright, solid-white result produced by the earlier `Erosion` plus `LightInfluence: 0` pass.
+
 ## Asset Layout
 
 Place systems and spawners under:
@@ -172,9 +176,9 @@ entries, start delays, and runtime scale instead of duplicating spawner definiti
 | Mid | One | 6 | 8 | 8 | `1.00` |
 | Full | Two separated by `0.08s` | 12 | 12 | 12 | `1.20` |
 
-Avoid `Distortion`. Use `Erosion` for wind arcs and directional streaks, reserve restrained
-`BlendAdd` for the small charge motes, and use `BlendLinear` for mist/dust. Wind color should stay
-near white or pale blue; dust should stay neutral grey-brown.
+Avoid `Distortion`. Use scene-lit `BlendLinear` for wind arcs, directional streaks, mist, and dust;
+reserve restrained `BlendAdd` for the small charge motes. Wind color should stay pale blue-grey and
+below `0.40` peak opacity; dust should stay neutral grey-brown.
 
 ## Spawner Tuning Targets
 
@@ -187,7 +191,7 @@ near white or pale blue; dust should stay neutral grey-brown.
 - `ScaleRatioConstraint: OneToOne`.
 - Initial X rotation: `90deg` so the brush stroke lies on the ground plane.
 - Animate scale from roughly `2.2` down to `0.28` while rotating about `310deg`.
-- Opacity should peak below `0.70` and return to zero.
+- Opacity should peak near `0.34` and return to zero.
 
 ### Charge wind motes
 
@@ -218,7 +222,8 @@ negative radial acceleration with stronger tangent acceleration around the Y axi
 - Start near zero scale, expand rapidly while rotating about `300deg`, and fade completely.
 - Use the horizontal custom `Wind_Arc` texture with `SoftParticles` disabled so terrain depth does not
   erase it.
-- Keep the brush stroke translucent enough that terrain remains visible.
+- Use `BlendLinear`, full scene-light influence, and no more than `0.38` peak opacity so terrain and
+  the avatar remain visible through the brush stroke.
 
 ### Release streamers
 
