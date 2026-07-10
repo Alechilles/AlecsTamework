@@ -35,7 +35,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
-- Rebuilt avatar-flight launch spawners from clean, known-working base-game particle structures after the original authored payloads rendered blank in game.
+- Rebuilt avatar-flight launch spawners from clean, known-working base-game particle structures after the original authored payloads rendered blank in game, then restored the charge cue as a single pale-cyan ring that contracts toward the launch point.
 - Fixed transformed avatar flight leaving a local-only copy of the owner's armor floating under the dragon after mounting or toggling armor visibility.
 - Fixed experimental avatar-flight fake rider attachments to keep original model paths for player clothing, armor, and third-party equipment instead of generating runtime rider asset variants that could crash other clients.
 - Fixed transformed avatar flight sending hidden-equipment updates back to the local owner client every tick, removing a crash-adjacent warning loop seen when moving as the NordicDrake.

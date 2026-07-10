@@ -35,6 +35,12 @@ copy of a known-working Hytale 0.5.6 spawner: `Stick_Slam_Shockwave_Small` for r
 release column. The temporary gold-flash probe and base ice shockwave remain removed. Visual
 restyling should proceed incrementally after this clean baseline is confirmed in game.
 
+The clean baseline rendered successfully in game. Incremental art tuning has started with
+`TwLaunchChargeRing`: it retains the working `Stick_Slam_Shockwave_Small` field structure while
+using one pale-cyan ring that contracts from `2.2` to `0.28` scale over `0.28s`. The remaining
+charge, cancel, and release spawners stay on their visible vanilla baselines until each is tuned and
+verified independently.
+
 ## Confirmed Hytale Particle Behavior
 
 Research target: Hytale release `0.5.6`.
