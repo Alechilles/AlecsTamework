@@ -63,6 +63,8 @@ public final class ManagedCoopCompositeIndexRefreshService {
     private final RefreshAction residentRefresh;
     private final RefreshAction operationRefresh;
     private final AtomicBoolean trusted = new AtomicBoolean();
+    private volatile long publishedResidentRevision;
+    private volatile long publishedOperationRevision;
 
     public ManagedCoopCompositeIndexRefreshService(
             @Nonnull ManagedCoopResidentIndexRefreshService residentRefreshService,
@@ -98,6 +100,8 @@ public final class ManagedCoopCompositeIndexRefreshService {
 
         String rejection = rejectionDetail(resident, operations);
         if (rejection == null && residentIndex.isTrusted() && operationIndex.isTrusted()) {
+            publishedResidentRevision = residentRevision();
+            publishedOperationRevision = operationRevision();
             trusted.set(true);
             return new RefreshResult(
                     RefreshStatus.REFRESHED,
@@ -127,7 +131,11 @@ public final class ManagedCoopCompositeIndexRefreshService {
 
     /** Returns whether the latest complete paired refresh published one coherent trust epoch. */
     public boolean isTrusted() {
-        return trusted.get();
+        return trusted.get()
+                && residentIndex.isTrusted()
+                && operationIndex.isTrusted()
+                && residentRevision() == publishedResidentRevision
+                && operationRevision() == publishedOperationRevision;
     }
 
     /**

@@ -113,6 +113,26 @@ class ManagedCoopCompositeIndexRefreshServiceTest {
         assertFalse(composite.isTrusted());
     }
 
+    @Test
+    void independentIndexRebuildInvalidatesPublishedCompositeEpoch() {
+        Scenario residentChanged = scenario();
+        assertTrue(residentChanged.composite.refresh().refreshed());
+        assertTrue(residentChanged.residentIndex.rebuild(
+                ManagedCoopReadResult.loaded(List.of()),
+                ManagedCoopReadResult.loaded(List.of())
+        ).rebuilt());
+
+        assertFalse(residentChanged.composite.isTrusted());
+
+        Scenario operationChanged = scenario();
+        assertTrue(operationChanged.composite.refresh().refreshed());
+        assertTrue(operationChanged.operationIndex.rebuild(
+                ManagedCoopReadResult.loaded(List.of())
+        ).rebuilt());
+
+        assertFalse(operationChanged.composite.isTrusted());
+    }
+
     private static void assertExceptionScenario(boolean residentThrows) {
         ManagedCoopResidentIndex residentIndex = trustedResidentIndex();
         ManagedCoopLifecycleOperationIndex operationIndex = trustedOperationIndex();
