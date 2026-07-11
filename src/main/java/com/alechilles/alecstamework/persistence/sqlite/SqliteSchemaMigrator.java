@@ -13,10 +13,12 @@ public final class SqliteSchemaMigrator {
     public static final int SCHEMA_VERSION_V2 = 2;
     public static final int SCHEMA_VERSION_V3 = 3;
     public static final int SCHEMA_VERSION_V4 = 4;
+    public static final int SCHEMA_VERSION_V6 = 6;
     public static final int MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2 = 2001;
     public static final String MIGRATION_NAME_SCHEMA_V2 = "schema_v2";
     public static final String MIGRATION_NAME_SCHEMA_V3 = "schema_v3_api_profile_data";
     public static final String MIGRATION_NAME_SCHEMA_V4 = "schema_v4_coop_state_snapshot";
+    public static final String MIGRATION_NAME_SCHEMA_V6 = "schema_v6_companion_population_integrity";
     public static final String MIGRATION_NAME_LEGACY_DAT_IMPORT_V2 = "legacy_dat_import_v2";
 
     public void migrate(@Nonnull Connection connection) throws Exception {
@@ -32,6 +34,10 @@ public final class SqliteSchemaMigrator {
         if (!isVersionApplied(connection, SCHEMA_VERSION_V4)) {
             applySchemaV4(connection);
             recordMigration(connection, SCHEMA_VERSION_V4, MIGRATION_NAME_SCHEMA_V4);
+        }
+        if (!isVersionApplied(connection, SCHEMA_VERSION_V6)) {
+            applySchemaV6(connection);
+            recordMigration(connection, SCHEMA_VERSION_V6, MIGRATION_NAME_SCHEMA_V6);
         }
     }
 
@@ -201,6 +207,84 @@ public final class SqliteSchemaMigrator {
         }
         try (Statement statement = connection.createStatement()) {
             statement.execute("ALTER TABLE coop_slots ADD COLUMN state_snapshot_json TEXT");
+        }
+    }
+
+    private void applySchemaV6(@Nonnull Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS companion_population_state (
+                        profile_id TEXT PRIMARY KEY,
+                        ownership_world_name TEXT,
+                        lifecycle_state TEXT NOT NULL,
+                        physical_world_name TEXT,
+                        physical_chunk_x INTEGER,
+                        physical_chunk_z INTEGER,
+                        revision INTEGER NOT NULL CHECK (revision >= 0),
+                        source TEXT,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE,
+                        CHECK ((physical_world_name IS NULL AND physical_chunk_x IS NULL AND physical_chunk_z IS NULL)
+                            OR (physical_world_name IS NOT NULL AND physical_chunk_x IS NOT NULL AND physical_chunk_z IS NOT NULL))
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_scope
+                    ON companion_population_state(ownership_world_name, lifecycle_state)
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_physical_chunk
+                    ON companion_population_state(physical_world_name, physical_chunk_x, physical_chunk_z, lifecycle_state)
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS companion_population_operations (
+                        operation_id TEXT PRIMARY KEY,
+                        profile_id TEXT NOT NULL,
+                        operation_type TEXT NOT NULL,
+                        state TEXT NOT NULL,
+                        expected_revision INTEGER NOT NULL CHECK (expected_revision >= 0),
+                        old_state_json TEXT NOT NULL,
+                        new_state_json TEXT NOT NULL,
+                        target_context_json TEXT,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        completed_at_ms INTEGER NOT NULL DEFAULT 0,
+                        last_error TEXT,
+                        FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_operations_state
+                    ON companion_population_operations(state, updated_at_ms)
+                    """);
+            statement.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_companion_population_nonterminal_profile
+                    ON companion_population_operations(profile_id)
+                    WHERE state IN ('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING')
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS companion_population_reconciliation (
+                        coverage_key TEXT PRIMARY KEY,
+                        coverage_dimension TEXT NOT NULL,
+                        world_or_save_id TEXT,
+                        scan_generation TEXT NOT NULL,
+                        state TEXT NOT NULL,
+                        cursor_json TEXT,
+                        scanned_count INTEGER NOT NULL DEFAULT 0 CHECK (scanned_count >= 0),
+                        estimated_total INTEGER NOT NULL DEFAULT -1 CHECK (estimated_total >= -1),
+                        started_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        completed_at_ms INTEGER NOT NULL DEFAULT 0,
+                        last_error TEXT
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_reconciliation_state
+                    ON companion_population_reconciliation(coverage_dimension, state, updated_at_ms)
+                    """);
         }
     }
 

@@ -52,6 +52,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final DeathRepository deathRepository;
     private final LostRepository lostRepository;
     private final NpcProfileRepository npcProfileRepository;
+    private final CompanionPopulationRepository companionPopulationRepository;
+    private final CompanionPopulationCoverageRepository companionPopulationCoverageRepository;
     private final SqliteSchemaMigrator schemaMigrator;
     @Nullable
     private final HytaleLogger logger;
@@ -68,6 +70,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                        @Nonnull DeathRepository deathRepository,
                                        @Nonnull LostRepository lostRepository,
                                        @Nonnull NpcProfileRepository npcProfileRepository,
+                                       @Nonnull CompanionPopulationRepository companionPopulationRepository,
+                                       @Nonnull CompanionPopulationCoverageRepository companionPopulationCoverageRepository,
                                        @Nonnull SqliteSchemaMigrator schemaMigrator,
                                        @Nullable HytaleLogger logger) {
         this.runtimeDataDirectory = runtimeDataDirectory;
@@ -82,6 +86,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.deathRepository = deathRepository;
         this.lostRepository = lostRepository;
         this.npcProfileRepository = npcProfileRepository;
+        this.companionPopulationRepository = companionPopulationRepository;
+        this.companionPopulationCoverageRepository = companionPopulationCoverageRepository;
         this.schemaMigrator = schemaMigrator;
         this.logger = logger;
     }
@@ -93,8 +99,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         Path sqlitePath = normalizedDataDir.resolve(SQLITE_FILENAME);
         PersistenceHealthService health = new PersistenceHealthService();
         SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
-        PersistenceWriteQueue writeQueue = new PersistenceWriteQueue(connectionManager, health, logger);
         SqliteSchemaMigrator schemaMigrator = new SqliteSchemaMigrator();
+        SqliteMigrationBackupService backupService = new SqliteMigrationBackupService();
         ScheduledExecutorService maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "tamework-persistence-maintenance");
             thread.setDaemon(true);
@@ -102,6 +108,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         });
 
         try {
+            backupService.backupBeforeVersion(
+                    sqlitePath,
+                    connectionManager,
+                    schemaMigrator,
+                    SqliteSchemaMigrator.SCHEMA_VERSION_V6
+            );
             backupAndResetPreV2SqliteIfNeeded(sqlitePath, connectionManager, schemaMigrator);
             try (Connection connection = connectionManager.openConnection()) {
                 connection.setAutoCommit(false);
@@ -135,7 +147,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             }
         }
 
+        PersistenceWriteQueue writeQueue = new PersistenceWriteQueue(connectionManager, health, logger);
         NpcProfileRepository npcProfileRepository = new NpcProfileRepository(connectionManager, writeQueue);
+        CompanionPopulationRepository companionPopulationRepository =
+                new CompanionPopulationRepository(connectionManager, writeQueue);
+        CompanionPopulationCoverageRepository companionPopulationCoverageRepository =
+                new CompanionPopulationCoverageRepository(connectionManager, writeQueue);
         ApiProfileDataRepository apiProfileDataRepository = new ApiProfileDataRepository(connectionManager, writeQueue);
         CaptureRepository captureRepository = new CaptureRepository(connectionManager, writeQueue, npcProfileRepository);
         CoopLedgerRepository coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue, npcProfileRepository);
@@ -155,6 +172,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 deathRepository,
                 lostRepository,
                 npcProfileRepository,
+                companionPopulationRepository,
+                companionPopulationCoverageRepository,
                 schemaMigrator,
                 logger
         );
@@ -213,8 +232,23 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     @Nonnull
+    public CompanionPopulationRepository getCompanionPopulationRepository() {
+        return companionPopulationRepository;
+    }
+
+    @Nonnull
+    public CompanionPopulationCoverageRepository getCompanionPopulationCoverageRepository() {
+        return companionPopulationCoverageRepository;
+    }
+
+    @Nonnull
     public PersistenceWriteQueue.QueueMetrics getWriteQueueMetrics() {
         return writeQueue.getMetrics();
+    }
+
+    @Nonnull
+    public PersistenceWriteQueue.QueueLifecycleMetrics getWriteQueueLifecycleMetrics() {
+        return writeQueue.getLifecycleMetrics();
     }
 
     public boolean awaitWriteQueueIdle(long timeoutMs) {
