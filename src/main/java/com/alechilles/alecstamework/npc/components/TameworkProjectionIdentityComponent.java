@@ -21,6 +21,7 @@ import javax.annotation.Nullable;
 public final class TameworkProjectionIdentityComponent implements Component<EntityStore> {
     public static final String KIND_RECOVERY = "RECOVERY";
     public static final String KIND_MANAGED_COOP_RELEASE = "MANAGED_COOP_RELEASE";
+    public static final String KIND_MANAGED_COOP_CAPTURE_SOURCE = "MANAGED_COOP_CAPTURE_SOURCE";
 
     public static final BuilderCodec<TameworkProjectionIdentityComponent> CODEC = BuilderCodec.builder(
             TameworkProjectionIdentityComponent.class,

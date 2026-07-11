@@ -43,12 +43,15 @@ class CommandLinkedNpcStateSnapshotServiceTest {
     }
 
     @Test
-    void recoveryAndManagedReleaseMarkersDeferGenericProfileUpsert() {
+    void operationOwnedRecoveryReleaseAndCaptureMarkersDeferGenericProfileUpsert() {
         assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
                 TameworkProjectionIdentityComponent.KIND_RECOVERY
         )));
         assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
                 TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE
+        )));
+        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
+                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE
         )));
     }
 

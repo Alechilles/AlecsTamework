@@ -197,15 +197,14 @@ public final class CommandLinkedNpcStateSnapshotService {
     }
 
     static boolean shouldDeferProfileUpsert(@Nullable TameworkProjectionIdentityComponent marker) {
-        return marker != null
-                && marker.getProfileId() != null
-                && !marker.getProfileId().isBlank()
-                && marker.getOperationId() != null
-                && !marker.getOperationId().isBlank()
-                && (TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(marker.getProjectionKind())
-                    || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(
-                        marker.getProjectionKind()
-                ));
+        if (marker == null || marker.getProfileId() == null || marker.getProfileId().isBlank()
+                || marker.getOperationId() == null || marker.getOperationId().isBlank()) {
+            return false;
+        }
+        String kind = marker.getProjectionKind();
+        return TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(kind)
+                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(kind)
+                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind);
     }
 
     private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
