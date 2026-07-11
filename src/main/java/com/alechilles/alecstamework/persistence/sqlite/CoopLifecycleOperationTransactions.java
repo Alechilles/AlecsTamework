@@ -1,7 +1,10 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -63,6 +66,28 @@ final class CoopLifecycleOperationTransactions {
         }
         store.insertCapture(connection, request);
         return applied(requireOperation(connection, request.operationId()));
+    }
+
+    MutationResult claimCapture(Connection connection, CaptureRequest request) throws SQLException {
+        ManagedCoopCaptureClaimValidator.validate(request);
+        Savepoint captureBoundary = connection.setSavepoint();
+        MutationResult prepared = prepareCapture(connection, request);
+        if (!prepared.succeeded() || prepared.operation() == null) {
+            connection.releaseSavepoint(captureBoundary);
+            return prepared;
+        }
+        MutationResult committed = commitCaptureSlot(
+                connection,
+                request,
+                prepared.operation().generation()
+        );
+        if (committed.succeeded()) {
+            connection.releaseSavepoint(captureBoundary);
+            return committed;
+        }
+        connection.rollback(captureBoundary);
+        connection.releaseSavepoint(captureBoundary);
+        return new MutationResult(committed.status(), null, committed.detail());
     }
 
     MutationResult commitCaptureSlot(Connection connection,
@@ -284,7 +309,53 @@ final class CoopLifecycleOperationTransactions {
                         connection, request.sourceNpcUuid(), request.profileId())) {
             return "capture_uuid_conflict";
         }
+        if (!sourceMapsToProfile(connection, request.sourceNpcUuid(), request.profileId())) {
+            return "capture_source_profile_mapping_conflict";
+        }
+        if (hasActiveSourceOperationConflict(
+                connection, request.operationId(), request.sourceNpcUuid())) {
+            return "active_capture_source_operation_conflict";
+        }
         return null;
+    }
+
+    private boolean sourceMapsToProfile(Connection connection,
+                                        UUID sourceNpcUuid,
+                                        String profileId) throws SQLException {
+        boolean found = false;
+        try (PreparedStatement query = connection.prepareStatement("""
+                SELECT profile_id FROM npc_uuid_aliases WHERE npc_uuid = ?
+                UNION
+                SELECT profile_id FROM npc_profiles WHERE current_npc_uuid = ?
+                """)) {
+            query.setString(1, sourceNpcUuid.toString());
+            query.setString(2, sourceNpcUuid.toString());
+            try (ResultSet resultSet = query.executeQuery()) {
+                while (resultSet.next()) {
+                    found = true;
+                    if (!profileId.equals(resultSet.getString(1))) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return found;
+    }
+
+    private boolean hasActiveSourceOperationConflict(Connection connection,
+                                                     String operationId,
+                                                     UUID sourceNpcUuid) throws SQLException {
+        try (PreparedStatement query = connection.prepareStatement("""
+                SELECT 1 FROM coop_lifecycle_operations
+                WHERE active = 1 AND operation_id <> ? AND source_npc_uuid = ?
+                LIMIT 1
+                """)) {
+            query.setString(1, operationId);
+            query.setString(2, sourceNpcUuid.toString());
+            try (ResultSet resultSet = query.executeQuery()) {
+                return resultSet.next();
+            }
+        }
     }
 
     @Nullable

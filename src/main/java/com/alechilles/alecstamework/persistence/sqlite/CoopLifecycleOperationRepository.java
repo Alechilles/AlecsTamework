@@ -112,6 +112,19 @@ public final class CoopLifecycleOperationRepository {
         return submit("coop_capture_prepare", connection -> transactions.prepareCapture(connection, request));
     }
 
+    /**
+     * Atomically claims the capture operation and commits its full resident snapshot/slot.
+     *
+     * <p>Runtime capture must use this boundary so a crash cannot strand a PREPARED row that lacks
+     * the complete replay bundle.</p>
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> claimCapture(
+            @Nonnull CaptureRequest request) {
+        ManagedCoopCaptureClaimValidator.validate(request);
+        return submit("coop_capture_claim", connection -> transactions.claimCapture(connection, request));
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> commitCaptureSlot(
             @Nonnull CaptureRequest request,
