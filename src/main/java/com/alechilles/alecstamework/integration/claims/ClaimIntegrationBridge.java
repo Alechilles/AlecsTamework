@@ -24,6 +24,23 @@ public interface ClaimIntegrationBridge {
         return lookupClaim(worldName, position.x, position.z);
     }
 
+    /**
+     * Resolves richer claim details when a provider exposes them. Legacy providers retain their
+     * scalar lookup behavior through this compatibility default.
+     */
+    @Nonnull
+    default ClaimResolution resolveClaim(@Nullable String worldName, double blockX, double blockZ) {
+        return ClaimResolution.fromLookupResult(lookupClaim(worldName, blockX, blockZ));
+    }
+
+    @Nonnull
+    default ClaimResolution resolveClaim(@Nullable String worldName, @Nullable Vector3d position) {
+        if (position == null) {
+            return ClaimResolution.error("Position is missing.");
+        }
+        return resolveClaim(worldName, position.x, position.z);
+    }
+
     @Nonnull
     ClaimLookupResult lookupClaim(@Nullable String worldName, double blockX, double blockZ);
 }
