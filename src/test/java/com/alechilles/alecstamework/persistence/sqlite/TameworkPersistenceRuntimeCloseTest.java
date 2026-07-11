@@ -23,8 +23,9 @@ class TameworkPersistenceRuntimeCloseTest {
         Files.createDirectories(runtimeDir);
 
         TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(runtimeDir, null);
+        UUID npcUuid = UUID.randomUUID();
         assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
-                UUID.randomUUID(),
+                npcUuid,
                 UUID.randomUUID(),
                 "Owner",
                 "Mob_Test",
@@ -38,6 +39,9 @@ class TameworkPersistenceRuntimeCloseTest {
         )));
 
         runtime.close();
+        try (TameworkPersistenceRuntime reopened = TameworkPersistenceRuntime.initialize(runtimeDir, null)) {
+            assertTrue(reopened.getNpcProfileRepository().resolveProfileId(npcUuid) != null);
+        }
         deleteRecursively(runtimeDir);
 
         assertFalse(Files.exists(runtimeDir));
