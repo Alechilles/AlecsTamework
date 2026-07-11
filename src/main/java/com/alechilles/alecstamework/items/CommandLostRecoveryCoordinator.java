@@ -382,11 +382,17 @@ final class CommandLostRecoveryCoordinator {
             @Nonnull LostRecoveryEnvelope envelope,
             @Nonnull NpcRecoveryOperationRepository.RecoveryOperation operation,
             @Nullable DeferredProjectionWork deferredWork) {
+        if (operation.state() == NpcRecoveryOperationRepository.RecoveryState.FINALIZED
+                && operation.generation() == 0L) {
+            failOperationRequest(request, operation, "Finalized recovery has an invalid generation.");
+            return;
+        }
         List<String> toolIds = toolIds(envelope, request.toolId());
+        long expectedGeneration = expectedFinalizationGeneration(operation);
         var finalization = new NpcRecoveryOperationRepository.RecoveryFinalization(
                 operation.operationId(), operation.profileId(), operation.sourceNpcUuid(),
                 operation.plannedTargetUuid(), operation.plannedTargetUuid(),
-                operation.generation(), toolIds);
+                expectedGeneration, toolIds);
         operationRepository.finalizeRecovery(finalization).completion().whenComplete((outcome, failure) -> {
             if (!committed(outcome) || outcome.value() == null
                     || !transitionSucceeded(outcome.value())) {
@@ -543,6 +549,13 @@ final class CommandLostRecoveryCoordinator {
             @Nonnull NpcRecoveryOperationRepository.TransitionResult result) {
         return result.status() == NpcRecoveryOperationRepository.TransitionStatus.APPLIED
                 || result.status() == NpcRecoveryOperationRepository.TransitionStatus.REPLAYED;
+    }
+
+    static long expectedFinalizationGeneration(
+            @Nonnull NpcRecoveryOperationRepository.RecoveryOperation operation) {
+        return operation.state() == NpcRecoveryOperationRepository.RecoveryState.FINALIZED
+                ? operation.generation() - 1L
+                : operation.generation();
     }
 
     private boolean sameEnvelopeSource(@Nonnull LostRecoveryEnvelope first,
