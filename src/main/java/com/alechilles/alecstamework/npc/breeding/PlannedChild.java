@@ -18,7 +18,7 @@ public record PlannedChild(@Nonnull String roleId,
         adultRoleId = normalizeOptional(adultRoleId);
         gender = normalizeOptional(gender);
         lifecycleFamily = normalizeOptional(lifecycleFamily);
-        populationType = requireNonBlank(populationType, "populationType").toLowerCase(Locale.ROOT);
+        populationType = canonicalPopulationType(populationType);
     }
 
     private static String requireNonBlank(String value, String label) {
@@ -28,6 +28,10 @@ public record PlannedChild(@Nonnull String roleId,
             throw new IllegalArgumentException(label + " must not be blank");
         }
         return normalized;
+    }
+
+    static String canonicalPopulationType(String value) {
+        return requireNonBlank(value, "populationType").toLowerCase(Locale.ROOT);
     }
 
     @Nullable

@@ -10,18 +10,21 @@ import javax.annotation.Nonnull;
  * <p>The ordered child list is defensively copied. Delayed callbacks consume this plan and never
  * reroll fertility, role, adult role, gender, lifecycle family, or population type.
  */
-public record BreedingBirthPlan(int rolledChildCount, @Nonnull List<PlannedChild> children) {
-    private static final int MAX_CHILDREN_PER_ROLL = 4;
+public record BreedingBirthPlan(@Nonnull BreedingFertilitySnapshot fertilitySnapshot,
+                                @Nonnull List<PlannedChild> children) {
 
     public BreedingBirthPlan {
+        Objects.requireNonNull(fertilitySnapshot, "fertilitySnapshot");
         Objects.requireNonNull(children, "children");
-        if (rolledChildCount < 0 || rolledChildCount > MAX_CHILDREN_PER_ROLL) {
-            throw new IllegalArgumentException("rolledChildCount must be between 0 and 4");
-        }
         children = List.copyOf(children);
-        if (rolledChildCount != children.size()) {
+        if (fertilitySnapshot.rolledChildCount() != children.size()) {
             throw new IllegalArgumentException("rolledChildCount must equal the resolved child count");
         }
+    }
+
+    /** Backward-compatible constructor for count-only callers. */
+    public BreedingBirthPlan(int rolledChildCount, @Nonnull List<PlannedChild> children) {
+        this(BreedingFertilitySnapshot.countOnly(rolledChildCount), children);
     }
 
     /** Creates a plan whose pre-rolled result is the supplied resolved child list size. */
@@ -31,8 +34,13 @@ public record BreedingBirthPlan(int rolledChildCount, @Nonnull List<PlannedChild
         return new BreedingBirthPlan(children.size(), children);
     }
 
+    /** Returns the immutable result of the one fertility roll. */
+    public int rolledChildCount() {
+        return fertilitySnapshot.rolledChildCount();
+    }
+
     /** Returns whether the pre-rolled fertility result naturally produced no children. */
     public boolean isNaturallyEmpty() {
-        return rolledChildCount == 0;
+        return fertilitySnapshot.rolledChildCount() == 0;
     }
 }

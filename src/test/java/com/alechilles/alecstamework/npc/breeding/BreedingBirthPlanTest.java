@@ -54,6 +54,23 @@ class BreedingBirthPlanTest {
         assertTrue(plan.isNaturallyEmpty());
     }
 
+    @Test
+    void retainsTheSingleExactFertilitySnapshot() {
+        PlannedChild child = child("Baby", "Adult", null, "Family", "cattle");
+        BreedingFertilitySnapshot fertility = new BreedingFertilitySnapshot(1.5, 1.0, 1.5, 0.25, 2);
+
+        BreedingBirthPlan plan = new BreedingBirthPlan(fertility, List.of(child, child));
+
+        assertEquals(fertility, plan.fertilitySnapshot());
+        assertEquals(2, plan.rolledChildCount());
+    }
+
+    @Test
+    void rejectsFertilitySnapshotWhoseRollDoesNotResolveItsCount() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new BreedingFertilitySnapshot(1.0, 1.0, 0.25, 0.75, 1));
+    }
+
     private static PlannedChild child(String role,
                                       String adultRole,
                                       String gender,
