@@ -53,20 +53,39 @@ public final class ManagedCoopLifecycleRecoveryPlanner {
         String world = normalize(worldName);
         Objects.requireNonNull(contexts, "contexts");
         Objects.requireNonNull(operations, "operations");
-        OperationRecord selected = null;
+        OperationRecord executable = null;
+        RecoveryAction executableAction = null;
+        OperationRecord fallback = null;
+        RecoveryAction fallbackAction = null;
         for (OperationRecord operation : operations) {
             if (operation == null || !operation.active()
                     || !operation.authorityKey().worldName().equals(world)) {
                 continue;
             }
-            if (selected == null || RECOVERY_ORDER.compare(operation, selected) < 0) {
-                selected = operation;
+            RecoveryAction candidate = action(operation, contextFor(operation, contexts));
+            if (isExecutable(candidate)) {
+                if (executable == null || RECOVERY_ORDER.compare(operation, executable) < 0) {
+                    executable = operation;
+                    executableAction = candidate;
+                }
+            } else if (fallback == null || RECOVERY_ORDER.compare(operation, fallback) < 0) {
+                fallback = operation;
+                fallbackAction = candidate;
             }
         }
-        if (selected != null) {
-            return action(selected, contextFor(selected, contexts));
+        if (executableAction != null) {
+            return executableAction;
+        }
+        if (fallbackAction != null) {
+            return fallbackAction;
         }
         return new RecoveryAction(ActionKind.NONE, null, null, null);
+    }
+
+    private boolean isExecutable(RecoveryAction action) {
+        return action.kind() == ActionKind.REQUEST_CAPTURE_SOURCE_RETIREMENT
+                || action.kind() == ActionKind.RESUME_CAPTURE_SOURCE_RETIREMENT
+                || action.kind() == ActionKind.RESUME_RELEASE;
     }
 
     @Nonnull

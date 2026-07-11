@@ -78,6 +78,58 @@ class ManagedCoopLifecycleRecoveryPlannerTest {
                 action.kind());
     }
 
+    @Test
+    void unloadedEarlierReleaseDoesNotStarveLaterExecutableCapture() {
+        OperationRecord waiting = operation(
+                "waiting", AUTHORITY,
+                OperationKind.RELEASE, OperationState.SPAWN_CLAIMED);
+        OperationRecord capture = operation(
+                "capture", new ManagedCoopAuthorityKey("world", 9, 2, 3),
+                OperationKind.CAPTURE, OperationState.SOURCE_RETIRE_REQUESTED);
+
+        var action = planner.plan("world", List.of(), List.of(capture, waiting));
+
+        assertEquals("capture", action.operation().operationId());
+        assertEquals(
+                ManagedCoopLifecycleRecoveryPlanner.ActionKind.RESUME_CAPTURE_SOURCE_RETIREMENT,
+                action.kind());
+    }
+
+    @Test
+    void importReservationDoesNotStarveExecutableRelease() throws Exception {
+        OperationRecord reserved = operation(
+                "import", AUTHORITY,
+                OperationKind.IMPORT, OperationState.SLOT_COMMITTED);
+        ManagedCoopAuthorityKey releaseAuthority =
+                new ManagedCoopAuthorityKey("world", 9, 2, 3);
+        OperationRecord release = operation(
+                "release", releaseAuthority,
+                OperationKind.RELEASE, OperationState.SPAWN_CLAIMED);
+
+        var action = planner.plan(
+                "world", List.of(context(releaseAuthority)), List.of(release, reserved));
+
+        assertEquals("release", action.operation().operationId());
+        assertEquals(ManagedCoopLifecycleRecoveryPlanner.ActionKind.RESUME_RELEASE, action.kind());
+    }
+
+    @Test
+    void earliestFallbackRemainsVisibleWhenNothingCanExecute() {
+        OperationRecord reserved = operation(
+                "import", AUTHORITY,
+                OperationKind.IMPORT, OperationState.SLOT_COMMITTED);
+        OperationRecord waiting = operation(
+                "waiting", new ManagedCoopAuthorityKey("world", 9, 2, 3),
+                OperationKind.RELEASE, OperationState.SPAWN_CLAIMED);
+
+        var action = planner.plan("world", List.of(), List.of(waiting, reserved));
+
+        assertEquals("import", action.operation().operationId());
+        assertEquals(
+                ManagedCoopLifecycleRecoveryPlanner.ActionKind.RESERVED_FOR_IMPORT,
+                action.kind());
+    }
+
     private static OperationRecord operation(OperationKind kind, OperationState state) {
         return operation(kind.name().toLowerCase() + "-op", AUTHORITY, kind, state);
     }
@@ -86,15 +138,14 @@ class ManagedCoopLifecycleRecoveryPlannerTest {
                                               ManagedCoopAuthorityKey authority,
                                               OperationKind kind,
                                               OperationState state) {
-        boolean capture = kind == OperationKind.CAPTURE;
         long generation = switch (state) {
             case PREPARED -> 0L;
             case SLOT_COMMITTED, SPAWN_CLAIMED -> 1L;
             case SOURCE_RETIRE_REQUESTED, PROJECTION_CREATED -> 2L;
             default -> 0L;
         };
-        UUID source = capture ? new UUID(0L, 1L) : null;
-        UUID planned = capture ? null : new UUID(0L, 2L);
+        UUID source = kind == OperationKind.RELEASE ? null : new UUID(0L, 1L);
+        UUID planned = kind == OperationKind.RELEASE ? new UUID(0L, 2L) : null;
         UUID actual = state == OperationState.PROJECTION_CREATED ? planned : null;
         return new OperationRecord(
                 operationId, kind, "profile", authority,
@@ -104,6 +155,10 @@ class ManagedCoopLifecycleRecoveryPlannerTest {
     }
 
     private static ManagedCoopContext context() throws Exception {
+        return context(AUTHORITY);
+    }
+
+    private static ManagedCoopContext context(ManagedCoopAuthorityKey authority) throws Exception {
         var constructor = TwCoopConfig.class.getDeclaredConstructor();
         constructor.setAccessible(true);
         TwCoopConfig config = constructor.newInstance();
@@ -111,7 +166,7 @@ class ManagedCoopLifecycleRecoveryPlannerTest {
         set(config, "enabled", true);
         set(config, "coopId", "coop_chicken");
         set(config.getIdentityRules(), "preserveUUID", false);
-        return new ManagedCoopContext(AUTHORITY, "coop_chicken", 0, config, null);
+        return new ManagedCoopContext(authority, "coop_chicken", 0, config, null);
     }
 
     private static void set(Object target, String name, Object value) throws Exception {
