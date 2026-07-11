@@ -433,6 +433,7 @@ final class CommandPanelActionService {
             if (record.groupId != null && record.groupId.equalsIgnoreCase(groupId.trim())) {
                 updated.add(new LinkedNpcRecord(
                         record.npcUuid,
+                        record.profileId,
                         record.lastKnownPosition,
                         record.lastKnownWorldName,
                         record.homePosition,

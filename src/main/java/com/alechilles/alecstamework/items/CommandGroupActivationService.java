@@ -198,6 +198,7 @@ final class CommandGroupActivationService {
     private LinkedNpcRecord withActive(LinkedNpcRecord record, boolean active) {
         return new LinkedNpcRecord(
                 record.npcUuid,
+                record.profileId,
                 record.lastKnownPosition,
                 record.lastKnownWorldName,
                 record.homePosition,

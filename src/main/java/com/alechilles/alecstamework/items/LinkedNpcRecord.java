@@ -11,6 +11,7 @@ import java.util.UUID;
  */
 final class LinkedNpcRecord {
     final UUID npcUuid;
+    final String profileId;
     final Vector3d lastKnownPosition;
     final String lastKnownWorldName;
     final Vector3d homePosition;
@@ -78,7 +79,36 @@ final class LinkedNpcRecord {
                     boolean active,
                     boolean breedingEnabled,
                     String groupId) {
+        this(
+                npcUuid,
+                null,
+                lastKnownPosition,
+                lastKnownWorldName,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                cachedCommandState,
+                active,
+                breedingEnabled,
+                groupId
+        );
+    }
+
+    LinkedNpcRecord(UUID npcUuid,
+                    String profileId,
+                    Vector3d lastKnownPosition,
+                    String lastKnownWorldName,
+                    Vector3d homePosition,
+                    String cachedDisplayName,
+                    String cachedNameKey,
+                    String cachedRoleId,
+                    String cachedCommandState,
+                    boolean active,
+                    boolean breedingEnabled,
+                    String groupId) {
         this.npcUuid = npcUuid;
+        this.profileId = LinkedNpcRecordCodec.normalizeProfileId(profileId);
         this.lastKnownPosition = lastKnownPosition != null ? new Vector3d(lastKnownPosition) : null;
         this.lastKnownWorldName = (lastKnownWorldName != null && !lastKnownWorldName.isBlank())
                 ? lastKnownWorldName.trim()

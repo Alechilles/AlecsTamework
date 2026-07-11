@@ -1767,6 +1767,7 @@ public final class CommandItemFeatureHandler {
             }
             return new LinkedNpcRecord(
                     npcUuid,
+                    previous.profileId,
                     lastKnownPosition != null ? lastKnownPosition : previous.lastKnownPosition,
                     firstNonBlank(lastKnownWorldName, previous.lastKnownWorldName),
                     homePosition != null ? homePosition : previous.homePosition,

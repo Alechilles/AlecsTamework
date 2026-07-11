@@ -60,6 +60,22 @@ class CommandGroupActivationServiceTest {
         assertEquals(CommandGroupActivationService.ALL_VALUE, activationService.resolveSelectionValue(all, GROUPS));
     }
 
+    @Test
+    void activationCopyPreservesCanonicalProfileIdentity() {
+        UUID npcUuid = UUID.randomUUID();
+        LinkedNpcRecord record = new LinkedNpcRecord(
+                npcUuid, "profile-a", null, null, null,
+                "Test", null, "test_role", null,
+                false, false, "blue"
+        );
+
+        List<LinkedNpcRecord> updated = activationService.applySelection(
+                List.of(record), GROUPS, CommandGroupActivationService.ALL_VALUE);
+
+        assertEquals("profile-a", updated.getFirst().profileId);
+        assertTrue(updated.getFirst().active);
+    }
+
     private List<LinkedNpcRecord> records(UUID blueNpc, UUID redNpc, UUID ungroupedNpc) {
         return List.of(
                 record(blueNpc, "blue", false),
