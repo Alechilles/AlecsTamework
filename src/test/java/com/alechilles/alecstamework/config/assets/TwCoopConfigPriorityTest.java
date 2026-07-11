@@ -2,13 +2,14 @@ package com.alechilles.alecstamework.config.assets;
 
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /** Tests coop cache selection rules for coop-id priority resolution. */
 class TwCoopConfigPriorityTest {
@@ -44,6 +45,22 @@ class TwCoopConfigPriorityTest {
         assertSame(earlierId, cache.get("coop_tie"));
     }
 
+    @Test
+    void preserveUuidDisablesManagedAuthorityResolution() throws Exception {
+        TwCoopConfig invalid = createConfig("Coop_Invalid", 100, "Coop_Chicken");
+        setField(invalid.getIdentityRules(), "preserveUUID", true);
+        DefaultAssetMap<String, TwCoopConfig> assetMap = new DefaultAssetMap<>();
+        seedAssetMap(assetMap, Map.of("invalid", invalid));
+
+        Map<String, TwCoopConfig> coopCache = buildCoopCache(assetMap);
+        Map<String, TwCoopConfig> blockCache = TwCoopConfigResolver.buildBlockTypeCache(assetMap);
+
+        assertFalse(invalid.isManagedAuthorityEnabled());
+        assertNotNull(invalid.getManagedAuthorityValidationError());
+        assertNull(coopCache.get("coop_chicken"));
+        assertNull(blockCache.get("coop_chicken"));
+    }
+
     private TwCoopConfig createConfig(String id, int priority, String coopId) throws Exception {
         TwCoopConfig config = new TwCoopConfig();
         setField(config, "id", id);
@@ -53,11 +70,8 @@ class TwCoopConfigPriorityTest {
         return config;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, TwCoopConfig> buildCoopCache(DefaultAssetMap<String, TwCoopConfig> assetMap) throws Exception {
-        Method buildCoopCache = TwCoopConfig.class.getDeclaredMethod("buildCoopCache", DefaultAssetMap.class);
-        buildCoopCache.setAccessible(true);
-        return (Map<String, TwCoopConfig>) buildCoopCache.invoke(null, assetMap);
+    private Map<String, TwCoopConfig> buildCoopCache(DefaultAssetMap<String, TwCoopConfig> assetMap) {
+        return TwCoopConfigResolver.buildCoopCache(assetMap);
     }
 
     private void setField(Object target, String fieldName, Object value) throws Exception {

@@ -10,8 +10,6 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -189,7 +187,8 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     (rules, value) -> rules.preserveUUID = value,
                     rules -> rules.preserveUUID
             )
-            .documentation("If true, released residents keep their original UUID when possible.")
+            .documentation("Deprecated compatibility field. Managed overlays require false because profile_id, "
+                    + "not an entity UUID, is the stable identity; true disables this config.")
             .add()
             .build();
 
@@ -268,12 +267,7 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
     private static AssetStore<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> ASSET_STORE;
     private static final Object INHERITANCE_CACHE_LOCK = new Object();
     private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
-    private static final Object COOP_CACHE_LOCK = new Object();
-    private static volatile boolean COOP_CACHE_DIRTY = true;
-    private static volatile Map<String, TwCoopConfig> COOP_CACHE = Map.of();
-    private static final Object BLOCK_TYPE_CACHE_LOCK = new Object();
-    private static volatile boolean BLOCK_TYPE_CACHE_DIRTY = true;
-    private static volatile Map<String, TwCoopConfig> BLOCK_TYPE_CACHE = Map.of();
+    private static final TwCoopConfigResolver RESOLVER = new TwCoopConfigResolver();
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -306,54 +300,17 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
 
     public static void clearCoopCache() {
         INHERITANCE_CACHE_DIRTY = true;
-        COOP_CACHE_DIRTY = true;
-        BLOCK_TYPE_CACHE_DIRTY = true;
+        RESOLVER.clear();
     }
 
     @Nullable
     public static TwCoopConfig resolveForCoop(@Nullable String coopId) {
-        String key = normalizeIdentifier(coopId);
-        if (key == null) {
-            return null;
-        }
-        DefaultAssetMap<String, TwCoopConfig> assetMap = getAssetMap();
-        if (assetMap == null) {
-            return null;
-        }
-        Map<String, TwCoopConfig> cache = COOP_CACHE;
-        if (COOP_CACHE_DIRTY || cache == null) {
-            synchronized (COOP_CACHE_LOCK) {
-                if (COOP_CACHE_DIRTY || COOP_CACHE == null) {
-                    COOP_CACHE = buildCoopCache(assetMap);
-                    COOP_CACHE_DIRTY = false;
-                }
-                cache = COOP_CACHE;
-            }
-        }
-        return cache.get(key);
+        return RESOLVER.resolveForCoop(coopId, getAssetMap());
     }
 
     @Nullable
     public static TwCoopConfig resolveForBlockType(@Nullable String blockTypeId) {
-        String key = normalizeBlockTypeId(blockTypeId);
-        if (key == null) {
-            return null;
-        }
-        DefaultAssetMap<String, TwCoopConfig> assetMap = getAssetMap();
-        if (assetMap == null) {
-            return null;
-        }
-        Map<String, TwCoopConfig> cache = BLOCK_TYPE_CACHE;
-        if (BLOCK_TYPE_CACHE_DIRTY || cache == null) {
-            synchronized (BLOCK_TYPE_CACHE_LOCK) {
-                if (BLOCK_TYPE_CACHE_DIRTY || BLOCK_TYPE_CACHE == null) {
-                    BLOCK_TYPE_CACHE = buildBlockTypeCache(assetMap);
-                    BLOCK_TYPE_CACHE_DIRTY = false;
-                }
-                cache = BLOCK_TYPE_CACHE;
-            }
-        }
-        return cache.get(key);
+        return RESOLVER.resolveForBlockType(blockTypeId, getAssetMap());
     }
 
     @Nullable
@@ -381,92 +338,6 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
         return null;
     }
 
-    private static Map<String, TwCoopConfig> buildCoopCache(DefaultAssetMap<String, TwCoopConfig> assetMap) {
-        Map<String, TwCoopConfig> cache = new HashMap<>();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return cache;
-        }
-        for (TwCoopConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
-                continue;
-            }
-            String key = normalizeIdentifier(candidate.getCoopId());
-            if (key == null) {
-                continue;
-            }
-            TwCoopConfig existing = cache.get(key);
-            if (existing == null || shouldPreferCandidate(candidate, existing)) {
-                cache.put(key, candidate);
-            }
-        }
-        return cache;
-    }
-
-    private static Map<String, TwCoopConfig> buildBlockTypeCache(DefaultAssetMap<String, TwCoopConfig> assetMap) {
-        Map<String, TwCoopConfig> cache = new HashMap<>();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return cache;
-        }
-        for (TwCoopConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
-                continue;
-            }
-            registerBlockTypeCandidates(cache, candidate);
-        }
-        return cache;
-    }
-
-    private static void registerBlockTypeCandidates(@Nonnull Map<String, TwCoopConfig> cache,
-                                                    @Nonnull TwCoopConfig candidate) {
-        boolean resolvedAny = false;
-        String[] configuredBlockTypeIds = candidate.getBlockTypeIds();
-        if (configuredBlockTypeIds != null && configuredBlockTypeIds.length > 0) {
-            for (String rawBlockTypeId : configuredBlockTypeIds) {
-                String blockTypeId = normalizeBlockTypeId(rawBlockTypeId);
-                if (blockTypeId == null) {
-                    continue;
-                }
-                resolvedAny = true;
-                TwCoopConfig existing = cache.get(blockTypeId);
-                if (existing == null || shouldPreferCandidate(candidate, existing)) {
-                    cache.put(blockTypeId, candidate);
-                }
-            }
-        }
-        if (resolvedAny) {
-            return;
-        }
-        String fallbackBlockTypeId = normalizeBlockTypeId(candidate.getCoopId());
-        if (fallbackBlockTypeId == null) {
-            return;
-        }
-        TwCoopConfig existing = cache.get(fallbackBlockTypeId);
-        if (existing == null || shouldPreferCandidate(candidate, existing)) {
-            cache.put(fallbackBlockTypeId, candidate);
-        }
-    }
-
-    private static boolean shouldPreferCandidate(@Nonnull TwCoopConfig candidate,
-                                                 @Nonnull TwCoopConfig existing) {
-        int candidatePriority = candidate.getPriority();
-        int existingPriority = existing.getPriority();
-        if (candidatePriority != existingPriority) {
-            return candidatePriority > existingPriority;
-        }
-        String candidateId = candidate.getId();
-        String existingId = existing.getId();
-        if (candidateId == null && existingId == null) {
-            return false;
-        }
-        if (candidateId == null) {
-            return false;
-        }
-        if (existingId == null) {
-            return true;
-        }
-        return candidateId.compareToIgnoreCase(existingId) < 0;
-    }
-
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwCoopConfig> assetMap) {
         if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
             return;
@@ -478,26 +349,6 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
             TwAssetInheritanceFallback.repairAll(assetMap);
             INHERITANCE_CACHE_DIRTY = false;
         }
-    }
-
-    @Nullable
-    private static String normalizeIdentifier(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.trim().toLowerCase(Locale.ROOT);
-    }
-
-    @Nullable
-    private static String normalizeBlockTypeId(@Nullable String value) {
-        String normalized = normalizeIdentifier(value);
-        if (normalized == null) {
-            return null;
-        }
-        while (normalized.startsWith("*")) {
-            normalized = normalized.substring(1);
-        }
-        return normalized.isBlank() ? null : normalized;
     }
 
     protected TwCoopConfig() {
@@ -648,6 +499,21 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
         return enabled;
     }
 
+    /** Returns whether this config may become the sole authority for its managed coop. */
+    public boolean isManagedAuthorityEnabled() {
+        return enabled && getManagedAuthorityValidationError() == null;
+    }
+
+    /** Returns the actionable reason an enabled config cannot own managed-coop lifecycle. */
+    @Nullable
+    public String getManagedAuthorityValidationError() {
+        if (!enabled || !getIdentityRules().isPreserveUUID()) {
+            return null;
+        }
+        return "IdentityRules.PreserveUUID=true is unsupported for managed coops; set it to false "
+                + "because profile_id is the stable identity";
+    }
+
     public int getPriority() {
         return priority;
     }
@@ -772,6 +638,8 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
             return requireSnapshotOnRelease;
         }
 
+        /** @deprecated Entity UUIDs are replaceable projections; managed configs require false. */
+        @Deprecated(since = "2.16.1", forRemoval = true)
         public boolean isPreserveUUID() {
             return preserveUUID;
         }

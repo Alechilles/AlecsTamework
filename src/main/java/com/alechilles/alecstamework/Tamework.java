@@ -40,6 +40,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
+import com.alechilles.alecstamework.config.assets.TwCoopConfigValidationService;
 import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwDynamicAttachmentsConfig;
 import com.alechilles.alecstamework.config.assets.TwFoodConfig;
@@ -1694,6 +1695,7 @@ public class Tamework extends JavaPlugin {
         if (coopAssetsRegistered) {
             return;
         }
+        TwCoopConfigValidationService.resetWarnings();
         getAssetRegistry().register(
                 HytaleAssetStore.builder(TwCoopConfig.class, new DefaultAssetMap<>())
                         .setPath("Tamework/Items/Coops")
@@ -2147,6 +2149,13 @@ public class Tamework extends JavaPlugin {
     private void onCoopAssetsLoaded(
             LoadedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
         TwCoopConfig.clearCoopCache();
+        DefaultAssetMap<String, TwCoopConfig> resolvedAssets = TwCoopConfig.getAssetMap();
+        TwCoopConfigValidationService.logInvalidManagedConfigs(
+                getLogger(),
+                resolvedAssets != null && resolvedAssets.getAssetMap() != null
+                        ? resolvedAssets.getAssetMap().values()
+                        : event.getLoadedAssets().values()
+        );
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.COOP, event.getLoadedAssets().keySet());
         }
@@ -2155,6 +2164,14 @@ public class Tamework extends JavaPlugin {
     private void onCoopAssetsRemoved(
             RemovedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
         TwCoopConfig.clearCoopCache();
+        DefaultAssetMap<String, TwCoopConfig> resolvedAssets = TwCoopConfig.getAssetMap();
+        TwCoopConfigValidationService.logInvalidManagedConfigs(
+                getLogger(),
+                resolvedAssets != null && resolvedAssets.getAssetMap() != null
+                        ? resolvedAssets.getAssetMap().values()
+                        : java.util.List.of()
+        );
+        TwCoopConfigValidationService.forgetConfigs(event.getRemovedAssets());
         emitExperimentalConfigReload(TameworkConfigFamily.COOP, event.getRemovedAssets());
     }
 
