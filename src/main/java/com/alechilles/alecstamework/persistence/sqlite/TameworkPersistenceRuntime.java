@@ -51,6 +51,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final NpcProfileRepository npcProfileRepository;
     private final NpcRecoveryOperationRepository npcRecoveryOperationRepository;
     private final NpcLiveAliasRepairRepository npcLiveAliasRepairRepository;
+    private final PersistenceIntegrityService integrityService;
     private final SqliteSchemaMigrator schemaMigrator;
     @Nullable
     private final HytaleLogger logger;
@@ -72,6 +73,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                        @Nonnull NpcProfileRepository npcProfileRepository,
                                        @Nonnull NpcRecoveryOperationRepository npcRecoveryOperationRepository,
                                        @Nonnull NpcLiveAliasRepairRepository npcLiveAliasRepairRepository,
+                                       @Nonnull PersistenceIntegrityService integrityService,
                                        @Nonnull SqliteSchemaMigrator schemaMigrator,
                                        @Nullable HytaleLogger logger) {
         this.runtimeDataDirectory = runtimeDataDirectory;
@@ -91,6 +93,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.npcProfileRepository = npcProfileRepository;
         this.npcRecoveryOperationRepository = npcRecoveryOperationRepository;
         this.npcLiveAliasRepairRepository = npcLiveAliasRepairRepository;
+        this.integrityService = integrityService;
         this.schemaMigrator = schemaMigrator;
         this.logger = logger;
     }
@@ -170,6 +173,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new NpcRecoveryOperationRepository(connectionManager, writeQueue);
         NpcLiveAliasRepairRepository npcLiveAliasRepairRepository =
                 new NpcLiveAliasRepairRepository(writeQueue);
+        PersistenceIntegrityService integrityService =
+                new PersistenceIntegrityService(connectionManager);
 
         TameworkPersistenceRuntime runtime = new TameworkPersistenceRuntime(
                 normalizedDataDir,
@@ -189,6 +194,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 npcProfileRepository,
                 npcRecoveryOperationRepository,
                 npcLiveAliasRepairRepository,
+                integrityService,
                 schemaMigrator,
                 logger
         );
@@ -269,6 +275,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public NpcLiveAliasRepairRepository getNpcLiveAliasRepairRepository() {
         return npcLiveAliasRepairRepository;
+    }
+
+    @Nonnull
+    public PersistenceIntegrityService getIntegrityService() {
+        return integrityService;
     }
 
     @Nonnull

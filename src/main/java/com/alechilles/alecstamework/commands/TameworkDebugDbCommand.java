@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceIntegrityService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -26,7 +27,7 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
             DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneOffset.UTC);
 
     public TameworkDebugDbCommand() {
-        super("debugdb", "Show SQLite persistence diagnostics. Optional: checkpoint|vacuum");
+        super("debugdb", "Show SQLite persistence diagnostics. Optional: integrity|checkpoint|vacuum");
         setAllowsExtraArguments(true);
     }
 
@@ -48,7 +49,9 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
         }
 
         String action = normalizeAction(getFirstArg(commandContext));
-        if ("checkpoint".equals(action)) {
+        if ("integrity".equals(action)) {
+            printIntegrity(commandContext, runtime.getIntegrityService().inspect());
+        } else if ("checkpoint".equals(action)) {
             boolean scheduled = runtime.requestWalCheckpoint();
             commandContext.sender().sendMessage(Message.raw(
                     scheduled
@@ -63,7 +66,8 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
                             : "Unable to schedule SQLite VACUUM (runtime may be shutting down)."
             ));
         } else if (action != null) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw debugdb [checkpoint|vacuum]"));
+            commandContext.sender().sendMessage(
+                    Message.raw("Usage: /tw debugdb [integrity|checkpoint|vacuum]"));
             return;
         }
 
@@ -100,6 +104,24 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
                         ? "<none>"
                         : queueMetrics.lastFailureReason())
         ));
+    }
+
+    private void printIntegrity(
+            @Nonnull CommandContext commandContext,
+            @Nonnull PersistenceIntegrityService.IntegrityReport report) {
+        if (report.status() == PersistenceIntegrityService.ReportStatus.FAILED) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "SQLite integrity audit FAILED: " + report.failureReason()));
+        } else if (report.isClean()) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "SQLite integrity audit: clean (integrity_check, foreign keys, identity/lifecycle uniqueness)."));
+        }
+        for (PersistenceIntegrityService.IntegrityIssue issue : report.issues()) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "Integrity issue " + issue.id()
+                            + ": groups=" + issue.affectedGroups()
+                            + ", detail=" + issue.detail()));
+        }
     }
 
     @Nullable
