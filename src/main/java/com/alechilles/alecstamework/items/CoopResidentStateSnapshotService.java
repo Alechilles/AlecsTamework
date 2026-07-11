@@ -21,7 +21,6 @@ import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -46,6 +45,7 @@ import javax.annotation.Nullable;
 public final class CoopResidentStateSnapshotService {
     private final ConcurrentHashMap<UUID, CoopResidentStateSnapshot> snapshotsByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CoopResidentStateSnapshot> recentRemovedByRole = new ConcurrentHashMap<>();
+    private final CoopResidentStateRestorer stateRestorer = new CoopResidentStateRestorer();
 
     @Nullable
     public RemovedCoopResidentCapture onNpcRemoved(@Nullable Ref<EntityStore> reference,
@@ -344,21 +344,15 @@ public final class CoopResidentStateSnapshotService {
         if (reference == null || !reference.isValid() || store == null || commandBuffer == null || snapshot == null) {
             return;
         }
-        putIfPresent(commandBuffer, reference, TameworkCommandLinksComponent.getComponentType(), snapshot.commandLinks());
-        putIfPresent(commandBuffer, reference, TameworkOwnerComponent.getComponentType(), snapshot.owner());
-        putIfPresent(commandBuffer, reference, TameworkTamedComponent.getComponentType(), snapshot.tamed());
-        putIfPresent(commandBuffer, reference, TameworkNpcNameComponent.getComponentType(), snapshot.npcName());
-        applyDisplayNameIfPresent(reference, commandBuffer, snapshot.npcName());
-        putIfPresent(commandBuffer, reference, TameworkHappinessComponent.getComponentType(), snapshot.happiness());
-        putIfPresent(commandBuffer, reference, TameworkNeedsComponent.getComponentType(), snapshot.needs());
-        putIfPresent(commandBuffer, reference, TameworkBreedingComponent.getComponentType(), snapshot.breeding());
-        putIfPresent(commandBuffer, reference, TameworkLevelingComponent.getComponentType(), snapshot.leveling());
-        putIfPresent(commandBuffer, reference, TameworkTraitsComponent.getComponentType(), snapshot.traits());
-        putIfPresent(commandBuffer, reference, TameworkTalentsComponent.getComponentType(), snapshot.talents());
-        putIfPresent(commandBuffer, reference, TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
-        putIfPresent(commandBuffer, reference, TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
-        if (snapshot.healthPercent() != null) {
-            commandBuffer.run(bufferStore -> applyRestoredHealth(reference, bufferStore, snapshot.healthPercent()));
+        CoopResidentStateRestorer.PostAddWork postAddWork =
+                stateRestorer.restoreToCommandBuffer(commandBuffer, reference, snapshot);
+        applyDisplayNameIfPresent(reference, commandBuffer, postAddWork.displayName());
+        if (postAddWork.hasHealthWork()) {
+            commandBuffer.run(bufferStore -> applyRestoredHealth(
+                    reference,
+                    bufferStore,
+                    postAddWork.healthPercent()
+            ));
         }
     }
 
@@ -374,11 +368,11 @@ public final class CoopResidentStateSnapshotService {
 
     private void applyDisplayNameIfPresent(@Nonnull Ref<EntityStore> reference,
                                            @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                           @Nullable TameworkNpcNameComponent npcName) {
-        if (npcName == null || npcName.getName() == null || npcName.getName().isBlank()) {
+                                           @Nullable String displayName) {
+        if (displayName == null || displayName.isBlank()) {
             return;
         }
-        NpcDisplayNameComponentService.putPersistentAndRuntimeName(commandBuffer, reference, npcName.getName());
+        NpcDisplayNameComponentService.putPersistentAndRuntimeName(commandBuffer, reference, displayName);
     }
 
     @Nullable
@@ -462,16 +456,6 @@ public final class CoopResidentStateSnapshotService {
             return null;
         }
         return (T) component.clone();
-    }
-
-    private <T extends Component<EntityStore>> void putIfPresent(@Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                                                  @Nonnull Ref<EntityStore> reference,
-                                                                  @Nullable ComponentType<EntityStore, T> type,
-                                                                  @Nullable T component) {
-        if (type == null || component == null) {
-            return;
-        }
-        commandBuffer.putComponent(reference, type, copyComponent(component));
     }
 
     private void debugCoop(String message) {
@@ -597,7 +581,7 @@ public final class CoopResidentStateSnapshotService {
         return new TameworkHappinessComponent(
                 configId,
                 fallbackValue,
-                Math.max(0L, fallbackLastUpdateMs)
+                fallbackLastUpdateMs
         );
     }
 
