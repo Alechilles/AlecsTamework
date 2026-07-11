@@ -43,7 +43,7 @@ class ManagedCoopReleaseCoordinatorTest {
             new ManagedCoopAuthorityKey("world", 10, 20, 30);
 
     @Test
-    void ordersPrepareRefreshAndSpawnClaimBeforeReadyCompletion() throws Exception {
+    void refreshesBothDurableReleaseTransitionsBeforeReadyCompletion() throws Exception {
         List<String> events = new ArrayList<>();
         CompletableFuture<PersistenceWriteQueue.WriteOutcome<MutationResult>> prepareCommit =
                 new CompletableFuture<>();
@@ -62,11 +62,13 @@ class ManagedCoopReleaseCoordinatorTest {
             assertEquals(900L, nowMs);
             return submission(claimCommit);
         };
+        AtomicInteger refreshCount = new AtomicInteger();
         ManagedCoopReleaseCoordinator coordinator = new ManagedCoopReleaseCoordinator(
                 operations,
                 () -> {
-                    events.add("index_refreshed");
-                    return refreshed(8L);
+                    int call = refreshCount.incrementAndGet();
+                    events.add(call == 1 ? "prepare_index_refreshed" : "claim_index_refreshed");
+                    return refreshed(call == 1 ? 8L : 9L);
                 },
                 () -> 900L
         );
@@ -79,13 +81,18 @@ class ManagedCoopReleaseCoordinatorTest {
         ReleaseRequest request = preparedRequest.get();
         prepareCommit.complete(committed(applied(operation(request, OperationState.PREPARED, 0L))));
         assertEquals(
-                List.of("prepare_submitted", "index_refreshed", "spawn_claim_submitted"),
+                List.of("prepare_submitted", "prepare_index_refreshed", "spawn_claim_submitted"),
                 events
         );
         assertFalse(completion.isDone());
 
         claimCommit.complete(committed(applied(operation(request, OperationState.SPAWN_CLAIMED, 1L))));
         ManagedCoopReleaseCoordinator.ReleaseOutcome outcome = completion.get(3, TimeUnit.SECONDS);
+        assertEquals(
+                List.of("prepare_submitted", "prepare_index_refreshed", "spawn_claim_submitted",
+                        "claim_index_refreshed"),
+                events
+        );
         assertEquals(SPAWN_READY, outcome.status());
         assertTrue(outcome.isSpawnReady());
         ManagedCoopReleaseCoordinator.SpawnReady ready = outcome.spawnReady();
@@ -97,7 +104,7 @@ class ManagedCoopReleaseCoordinatorTest {
         assertEquals(0L, ready.expectedResidentGeneration());
         assertEquals(1L, ready.releasingResidentGeneration());
         assertEquals(1L, ready.operationGeneration());
-        assertEquals(8L, ready.indexRevision());
+        assertEquals(9L, ready.indexRevision());
     }
 
     @Test
@@ -259,6 +266,35 @@ class ManagedCoopReleaseCoordinatorTest {
         ).get(3, TimeUnit.SECONDS);
         assertEquals(FAILED, refreshFailure.status());
         assertTrue(refreshFailure.detail().contains("resident_index_refresh_rejected:sql_failure"));
+
+        AtomicInteger postClaimRefreshes = new AtomicInteger();
+        FakeOperations postClaimOperations = new FakeOperations();
+        postClaimOperations.prepareBehavior = request -> completedSubmission(applied(
+                operation(request, OperationState.PREPARED, 0L)));
+        postClaimOperations.claimBehavior = (operationId, generation, nowMs) -> {
+            ReleaseRequest request = postClaimOperations.lastRequest.get();
+            return completedSubmission(applied(
+                    operation(request, OperationState.SPAWN_CLAIMED, 1L)));
+        };
+        ManagedCoopReleaseCoordinator postClaimRefreshFailure = new ManagedCoopReleaseCoordinator(
+                postClaimOperations,
+                () -> postClaimRefreshes.incrementAndGet() == 1
+                        ? refreshed(1L)
+                        : new ManagedCoopResidentIndexRefreshService.RefreshResult(
+                                ManagedCoopResidentIndexRefreshService.RefreshStatus.REJECTED,
+                                1L,
+                                "operation_snapshot_failed"
+                        ),
+                () -> 200L
+        );
+        ManagedCoopReleaseCoordinator.ReleaseOutcome staleOperationIndex =
+                postClaimRefreshFailure.coordinate(
+                        attempt(resident("resident-a", "profile-a", SOURCE_A, 0), PLANNED_A)
+                ).get(3, TimeUnit.SECONDS);
+        assertEquals(FAILED, staleOperationIndex.status());
+        assertTrue(staleOperationIndex.detail().contains(
+                "spawn_claim_index_refresh_rejected:operation_snapshot_failed"));
+        assertNull(staleOperationIndex.spawnReady());
     }
 
     @Test

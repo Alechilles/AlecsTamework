@@ -111,6 +111,18 @@ public final class ManagedCoopCaptureCoordinator {
         );
     }
 
+    public ManagedCoopCaptureCoordinator(
+            @Nonnull ManagedCoopCaptureProfileRepository profiles,
+            @Nonnull CoopLifecycleOperationRepository operations,
+            @Nonnull ManagedCoopCompositeIndexRefreshService indexRefresh) {
+        this(
+                Objects.requireNonNull(profiles, "profiles")::ensureProfile,
+                new RepositoryOperationGateway(Objects.requireNonNull(operations, "operations")),
+                Objects.requireNonNull(indexRefresh, "indexRefresh")::refreshForLifecycleMutation,
+                System::currentTimeMillis
+        );
+    }
+
     ManagedCoopCaptureCoordinator(@Nonnull ProfileGateway profiles,
                                   @Nonnull OperationGateway operations,
                                   @Nonnull IndexRefreshGateway indexRefresh,
@@ -190,33 +202,48 @@ public final class ManagedCoopCaptureCoordinator {
             return CompletableFuture.completedFuture(failed(mutationDetail("capture_claim", result)));
         }
 
-        final ManagedCoopResidentIndexRefreshService.RefreshResult refresh;
-        try {
-            refresh = indexRefresh.refresh();
-        } catch (RuntimeException exception) {
-            return CompletableFuture.completedFuture(failed(detail("resident_index_refresh", exception)));
-        }
-        if (refresh == null || !refresh.refreshed()) {
-            String reason = refresh != null ? refresh.detail() : null;
-            return CompletableFuture.completedFuture(failed(
-                    "resident_index_refresh_rejected" + suffix(reason)
-            ));
+        RefreshAttempt refresh = refreshIndex("resident_index_refresh");
+        if (!refresh.succeeded()) {
+            return CompletableFuture.completedFuture(failed(refresh.failure()));
         }
         if (operation.state() == OperationState.SOURCE_RETIRE_REQUESTED
                 || operation.state() == OperationState.COMPLETE) {
-            return CompletableFuture.completedFuture(ready(request, operation, refresh.revision()));
+            return CompletableFuture.completedFuture(
+                    ready(request, operation, refresh.result().revision()));
         }
         return committed(
                 operations.requestSourceRetirement(
                         operation.operationId(), operation.generation(), clock.getAsLong()),
                 "source_retirement_request"
-        ).thenApply(retired -> {
-            OperationRecord durable = requireSuccessfulOperation(
-                    retired, request, "source_retirement_request");
-            return durable == null
-                    ? failed(mutationDetail("source_retirement_request", retired))
-                    : ready(request, durable, refresh.revision());
-        });
+        ).thenApply(retired -> afterRetirementRequest(request, retired));
+    }
+
+    @Nonnull
+    private CaptureOutcome afterRetirementRequest(CaptureRequest request, MutationResult result) {
+        OperationRecord durable = requireSuccessfulOperation(
+                result, request, "source_retirement_request");
+        if (durable == null) {
+            return failed(mutationDetail("source_retirement_request", result));
+        }
+        RefreshAttempt refresh = refreshIndex("source_retirement_index_refresh");
+        return refresh.succeeded()
+                ? ready(request, durable, refresh.result().revision())
+                : failed(refresh.failure());
+    }
+
+    @Nonnull
+    private RefreshAttempt refreshIndex(String stage) {
+        final ManagedCoopResidentIndexRefreshService.RefreshResult result;
+        try {
+            result = indexRefresh.refresh();
+        } catch (RuntimeException exception) {
+            return new RefreshAttempt(null, detail(stage, exception));
+        }
+        if (result == null || !result.refreshed()) {
+            String reason = result != null ? result.detail() : null;
+            return new RefreshAttempt(null, stage + "_rejected" + suffix(reason));
+        }
+        return new RefreshAttempt(result, null);
     }
 
     @Nullable
@@ -441,6 +468,14 @@ public final class ManagedCoopCaptureCoordinator {
 
         private InFlight(UUID sourceNpcUuid) {
             this.sourceNpcUuid = sourceNpcUuid;
+        }
+    }
+
+    private record RefreshAttempt(
+            @Nullable ManagedCoopResidentIndexRefreshService.RefreshResult result,
+            @Nullable String failure) {
+        private boolean succeeded() {
+            return result != null && failure == null;
         }
     }
 

@@ -79,6 +79,14 @@ public final class ManagedCoopLifecycleOperationIndex {
         return current.get().trusted();
     }
 
+    /** Revokes admission trust without discarding the last immutable diagnostic evidence. */
+    public synchronized void revokeTrust() {
+        Snapshot previous = current.get();
+        if (previous.trusted()) {
+            current.set(previous.withTrusted(false));
+        }
+    }
+
     /** Returns the current immutable point-in-time projection. */
     @Nonnull
     public Snapshot snapshot() {
@@ -108,10 +116,7 @@ public final class ManagedCoopLifecycleOperationIndex {
 
     @Nonnull
     private RebuildResult reject(@Nullable String detail) {
-        Snapshot previous = current.get();
-        if (previous.trusted()) {
-            current.set(previous.withTrusted(false));
-        }
+        revokeTrust();
         return new RebuildResult(RebuildStatus.REJECTED,
                 detail == null || detail.isBlank()
                         ? "coop_lifecycle_operation_index_rebuild_rejected"

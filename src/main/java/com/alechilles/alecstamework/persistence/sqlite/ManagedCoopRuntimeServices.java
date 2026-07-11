@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.alechilles.alecstamework.items.ManagedCoopLifecycleOperationIndex;
 import com.alechilles.alecstamework.items.ManagedCoopLifecycleOperationIndexRefreshService;
+import com.alechilles.alecstamework.items.ManagedCoopCompositeIndexRefreshService;
 import com.alechilles.alecstamework.items.ManagedCoopOccupancyService;
 import com.alechilles.alecstamework.items.ManagedCoopResidentIndex;
 import com.alechilles.alecstamework.items.ManagedCoopResidentIndexRefreshService;
@@ -18,6 +19,7 @@ public final class ManagedCoopRuntimeServices {
     private final ManagedCoopResidentIndexRefreshService residentIndexRefreshService;
     private final ManagedCoopLifecycleOperationIndex lifecycleIndex;
     private final ManagedCoopLifecycleOperationIndexRefreshService lifecycleIndexRefreshService;
+    private final ManagedCoopCompositeIndexRefreshService compositeIndexRefreshService;
     private final ManagedCoopOccupancyService occupancyService;
 
     ManagedCoopRuntimeServices(@Nonnull SqliteConnectionManager connectionManager,
@@ -43,7 +45,16 @@ public final class ManagedCoopRuntimeServices {
                 lifecycleIndex,
                 logger
         );
-        occupancyService = new ManagedCoopOccupancyService(residentIndex);
+        compositeIndexRefreshService = new ManagedCoopCompositeIndexRefreshService(
+                residentIndexRefreshService,
+                lifecycleIndexRefreshService,
+                residentIndex,
+                lifecycleIndex
+        );
+        occupancyService = new ManagedCoopOccupancyService(
+                residentIndex,
+                compositeIndexRefreshService::isTrusted
+        );
     }
 
     @Nonnull
@@ -79,6 +90,11 @@ public final class ManagedCoopRuntimeServices {
     @Nonnull
     public ManagedCoopLifecycleOperationIndexRefreshService lifecycleIndexRefreshService() {
         return lifecycleIndexRefreshService;
+    }
+
+    @Nonnull
+    public ManagedCoopCompositeIndexRefreshService compositeIndexRefreshService() {
+        return compositeIndexRefreshService;
     }
 
     @Nonnull

@@ -42,7 +42,7 @@ class ManagedCoopCaptureCoordinatorTest {
             new ManagedCoopAuthorityKey("world", 10, 20, 30);
 
     @Test
-    void ordersProfileClaimRefreshAndRetirementBeforeReadyCompletion() throws Exception {
+    void refreshesBothDurableCaptureTransitionsBeforeReadyCompletion() throws Exception {
         List<String> events = new ArrayList<>();
         CompletableFuture<PersistenceWriteQueue.WriteOutcome<ProfileIdentity>> profileCommit =
                 new CompletableFuture<>();
@@ -70,9 +70,11 @@ class ManagedCoopCaptureCoordinatorTest {
             assertEquals(900L, nowMs);
             return submission(retireCommit);
         };
+        AtomicInteger refreshCount = new AtomicInteger();
         ManagedCoopCaptureCoordinator.IndexRefreshGateway refresh = () -> {
-            events.add("index_refreshed");
-            return refreshed(7L);
+            int call = refreshCount.incrementAndGet();
+            events.add(call == 1 ? "slot_index_refreshed" : "retirement_index_refreshed");
+            return refreshed(call == 1 ? 7L : 8L);
         };
         ManagedCoopCaptureCoordinator coordinator =
                 new ManagedCoopCaptureCoordinator(profiles, operations, refresh, () -> 900L);
@@ -93,7 +95,8 @@ class ManagedCoopCaptureCoordinatorTest {
         CaptureRequest request = claimedRequest.get();
         claimCommit.complete(committed(applied(operation(request, OperationState.SLOT_COMMITTED, 1L))));
         assertEquals(
-                List.of("profile_submitted", "claim_submitted", "index_refreshed", "retirement_submitted"),
+                List.of("profile_submitted", "claim_submitted", "slot_index_refreshed",
+                        "retirement_submitted"),
                 events
         );
         assertFalse(completion.isDone());
@@ -101,13 +104,18 @@ class ManagedCoopCaptureCoordinatorTest {
         retireCommit.complete(committed(applied(
                 operation(request, OperationState.SOURCE_RETIRE_REQUESTED, 2L))));
         ManagedCoopCaptureCoordinator.CaptureOutcome outcome = completion.get(3, TimeUnit.SECONDS);
+        assertEquals(
+                List.of("profile_submitted", "claim_submitted", "slot_index_refreshed",
+                        "retirement_submitted", "retirement_index_refreshed"),
+                events
+        );
         assertEquals(RETIREMENT_READY, outcome.status());
         assertTrue(outcome.isRetirementReady());
         assertNotNull(outcome.retirementReady());
         assertEquals(SOURCE_A, outcome.retirementReady().sourceNpcUuid());
         assertEquals("profile-a", outcome.retirementReady().profileId());
         assertEquals(OperationState.SOURCE_RETIRE_REQUESTED, outcome.retirementReady().durableState());
-        assertEquals(7L, outcome.retirementReady().indexRevision());
+        assertEquals(8L, outcome.retirementReady().indexRevision());
     }
 
     @Test
@@ -315,6 +323,28 @@ class ManagedCoopCaptureCoordinatorTest {
         assertEquals(FAILED, failedRetirement.status());
         assertTrue(failedRetirement.detail().contains("source_retirement_request_not_committed"));
         assertNull(failedRetirement.retirementReady());
+
+        AtomicInteger refreshCalls = new AtomicInteger();
+        FakeOperations postRetirementRefreshOperations = readyOperations();
+        ManagedCoopCaptureCoordinator postRetirementRefreshFailure = coordinator(
+                SOURCE_A,
+                "profile-a",
+                postRetirementRefreshOperations,
+                () -> refreshCalls.incrementAndGet() == 1
+                        ? refreshed(1L)
+                        : new ManagedCoopResidentIndexRefreshService.RefreshResult(
+                                ManagedCoopResidentIndexRefreshService.RefreshStatus.REJECTED,
+                                1L,
+                                "operation_snapshot_failed"
+                        )
+        );
+        ManagedCoopCaptureCoordinator.CaptureOutcome staleOperationIndex =
+                postRetirementRefreshFailure.coordinate(attempt(SOURCE_A, new String[0]))
+                        .get(3, TimeUnit.SECONDS);
+        assertEquals(FAILED, staleOperationIndex.status());
+        assertTrue(staleOperationIndex.detail().contains(
+                "source_retirement_index_refresh_rejected:operation_snapshot_failed"));
+        assertNull(staleOperationIndex.retirementReady());
     }
 
     @Test

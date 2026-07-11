@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -44,9 +45,16 @@ public final class ManagedCoopOccupancyService {
     }
 
     private final ManagedCoopResidentIndex index;
+    private final BooleanSupplier trustGate;
 
     public ManagedCoopOccupancyService(@Nonnull ManagedCoopResidentIndex index) {
+        this(index, index::isTrusted);
+    }
+
+    public ManagedCoopOccupancyService(@Nonnull ManagedCoopResidentIndex index,
+                                       @Nonnull BooleanSupplier trustGate) {
         this.index = Objects.requireNonNull(index, "index");
+        this.trustGate = Objects.requireNonNull(trustGate, "trustGate");
     }
 
     /** Resolves authority and occupancy from one point-in-time index snapshot. */
@@ -54,7 +62,7 @@ public final class ManagedCoopOccupancyService {
     public View inspect(@Nonnull ManagedCoopContext context) {
         Objects.requireNonNull(context, "context");
         ManagedCoopResidentIndex.Snapshot snapshot = index.snapshot();
-        if (!index.isTrusted() || snapshot.revision() == 0L) {
+        if (!indexesTrusted() || snapshot.revision() == 0L) {
             return new View(AuthorityStatus.INDEX_UNAVAILABLE, snapshot.revision(), List.of());
         }
         AuthorityRecord exact = null;
@@ -143,7 +151,7 @@ public final class ManagedCoopOccupancyService {
     public List<ResidentRecord> housedResidentsForWorld(@Nullable String worldName) {
         String normalizedWorld = normalizeNullable(worldName);
         ManagedCoopResidentIndex.Snapshot snapshot = index.snapshot();
-        if (normalizedWorld == null || !index.isTrusted() || snapshot.revision() == 0L) {
+        if (normalizedWorld == null || !indexesTrusted() || snapshot.revision() == 0L) {
             return List.of();
         }
         ArrayList<ResidentRecord> housed = new ArrayList<>();
@@ -169,9 +177,13 @@ public final class ManagedCoopOccupancyService {
     @Nullable
     public ResidentRecord residentByUuid(@Nullable UUID npcUuid) {
         ManagedCoopResidentIndex.Snapshot snapshot = index.snapshot();
-        return npcUuid == null || !index.isTrusted() || snapshot.revision() == 0L
+        return npcUuid == null || !indexesTrusted() || snapshot.revision() == 0L
                 ? null
                 : snapshot.residentByUuid(npcUuid);
+    }
+
+    private boolean indexesTrusted() {
+        return index.isTrusted() && trustGate.getAsBoolean();
     }
 
     @Nonnull

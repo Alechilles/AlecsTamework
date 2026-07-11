@@ -98,6 +98,11 @@ public final class ManagedCoopResidentIndex {
         return trusted.get();
     }
 
+    /** Revokes admission trust without discarding the last immutable diagnostic evidence. */
+    public void revokeTrust() {
+        trusted.set(false);
+    }
+
     /** Returns the current immutable point-in-time index. */
     @Nonnull
     public Snapshot snapshot() {

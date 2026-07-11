@@ -87,6 +87,16 @@ public final class ManagedCoopReleaseProjectionCoordinator {
         );
     }
 
+    public ManagedCoopReleaseProjectionCoordinator(
+            @Nonnull CoopLifecycleOperationRepository operations,
+            @Nonnull ManagedCoopCompositeIndexRefreshService indexRefresh) {
+        this(
+                new RepositoryOperationGateway(Objects.requireNonNull(operations, "operations")),
+                Objects.requireNonNull(indexRefresh, "indexRefresh")::refreshForLifecycleMutation,
+                System::currentTimeMillis
+        );
+    }
+
     ManagedCoopReleaseProjectionCoordinator(@Nonnull OperationGateway operations,
                                             @Nonnull IndexRefreshGateway indexRefresh,
                                             @Nonnull LongSupplier clock) {

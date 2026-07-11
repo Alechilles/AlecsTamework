@@ -105,6 +105,22 @@ class ManagedCoopOccupancyServiceTest {
         assertTrue(service.housedResidentsForWorld("world").isEmpty());
     }
 
+    @Test
+    void compositeTrustGateBlocksAResidentOnlyRefreshEpoch() throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 3);
+        ManagedCoopResidentIndex index = index(
+                List.of(authority("coop_chicken", AuthorityState.TWORK_MANAGED)),
+                List.of(resident(0, "profile-a", uuid(1), ResidentState.HOUSED))
+        );
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index, () -> false);
+
+        assertEquals(ManagedCoopOccupancyService.AuthorityStatus.INDEX_UNAVAILABLE,
+                service.inspect(context).status());
+        assertEquals(-1, service.firstHousedSlot(context));
+        assertTrue(service.housedResidentsForWorld("world").isEmpty());
+        assertNull(service.residentByUuid(uuid(1)));
+    }
+
     private static ManagedCoopResidentIndex index(List<AuthorityRecord> authorities,
                                                   List<ResidentRecord> residents) {
         ManagedCoopResidentIndex index = new ManagedCoopResidentIndex();

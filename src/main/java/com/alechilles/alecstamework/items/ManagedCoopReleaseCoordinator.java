@@ -94,6 +94,16 @@ public final class ManagedCoopReleaseCoordinator {
         );
     }
 
+    public ManagedCoopReleaseCoordinator(
+            @Nonnull CoopLifecycleOperationRepository operations,
+            @Nonnull ManagedCoopCompositeIndexRefreshService indexRefresh) {
+        this(
+                new RepositoryOperationGateway(Objects.requireNonNull(operations, "operations")),
+                Objects.requireNonNull(indexRefresh, "indexRefresh")::refreshForLifecycleMutation,
+                System::currentTimeMillis
+        );
+    }
+
     ManagedCoopReleaseCoordinator(@Nonnull OperationGateway operations,
                                   @Nonnull IndexRefreshGateway indexRefresh,
                                   @Nonnull LongSupplier clock) {
@@ -147,31 +157,47 @@ public final class ManagedCoopReleaseCoordinator {
             return CompletableFuture.completedFuture(failed(mutationDetail("release_prepare", result)));
         }
 
-        final ManagedCoopResidentIndexRefreshService.RefreshResult refresh;
-        try {
-            refresh = indexRefresh.refresh();
-        } catch (RuntimeException exception) {
-            return CompletableFuture.completedFuture(failed(detail("resident_index_refresh", exception)));
-        }
-        if (refresh == null || !refresh.refreshed()) {
-            String reason = refresh != null ? refresh.detail() : null;
-            return CompletableFuture.completedFuture(failed(
-                    "resident_index_refresh_rejected" + suffix(reason)
-            ));
+        RefreshAttempt refresh = refreshIndex("resident_index_refresh");
+        if (!refresh.succeeded()) {
+            return CompletableFuture.completedFuture(failed(refresh.failure()));
         }
         if (operation.state() != OperationState.PREPARED) {
             return CompletableFuture.completedFuture(outcome(
-                    attempt, request, operation, refresh.revision()));
+                    attempt, request, operation, refresh.result().revision()));
         }
         return committed(
                 operations.claimSpawn(operation.operationId(), operation.generation(), clock.getAsLong()),
                 "release_spawn_claim"
-        ).thenApply(claimed -> {
-            OperationRecord durable = requireOperation(claimed, request, false, "release_spawn_claim");
-            return durable == null
-                    ? failed(mutationDetail("release_spawn_claim", claimed))
-                    : outcome(attempt, request, durable, refresh.revision());
-        });
+        ).thenApply(claimed -> afterSpawnClaim(attempt, request, claimed));
+    }
+
+    @Nonnull
+    private ReleaseOutcome afterSpawnClaim(ReleaseAttempt attempt,
+                                           ReleaseRequest request,
+                                           MutationResult result) {
+        OperationRecord durable = requireOperation(result, request, false, "release_spawn_claim");
+        if (durable == null) {
+            return failed(mutationDetail("release_spawn_claim", result));
+        }
+        RefreshAttempt refresh = refreshIndex("spawn_claim_index_refresh");
+        return refresh.succeeded()
+                ? outcome(attempt, request, durable, refresh.result().revision())
+                : failed(refresh.failure());
+    }
+
+    @Nonnull
+    private RefreshAttempt refreshIndex(String stage) {
+        final ManagedCoopResidentIndexRefreshService.RefreshResult result;
+        try {
+            result = indexRefresh.refresh();
+        } catch (RuntimeException exception) {
+            return new RefreshAttempt(null, detail(stage, exception));
+        }
+        if (result == null || !result.refreshed()) {
+            String reason = result != null ? result.detail() : null;
+            return new RefreshAttempt(null, stage + "_rejected" + suffix(reason));
+        }
+        return new RefreshAttempt(result, null);
     }
 
     @Nullable
@@ -480,6 +506,14 @@ public final class ManagedCoopReleaseCoordinator {
     }
 
     private record InFlight(String residentId, String profileId) {
+    }
+
+    private record RefreshAttempt(
+            @Nullable ManagedCoopResidentIndexRefreshService.RefreshResult result,
+            @Nullable String failure) {
+        private boolean succeeded() {
+            return result != null && failure == null;
+        }
     }
 
     private static final class StageFailure extends RuntimeException {
