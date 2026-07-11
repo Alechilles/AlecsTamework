@@ -49,8 +49,10 @@ class NpcRecoveryOperationConflictTest {
             insertProfile(connection, "profile-b", SOURCE_B);
             putProfileState(connection, "profile-a", 0, 0, 1, 0);
             putProfileState(connection, "profile-b", 0, 0, 1, 0);
-            insertLostSnapshot(connection, "profile-a", "{}");
-            insertLostSnapshot(connection, "profile-b", "{}");
+            insertLostSnapshot(connection, "profile-a",
+                    RecoveryTestEnvelopeFixtures.validEnvelope(SOURCE_A));
+            insertLostSnapshot(connection, "profile-b",
+                    RecoveryTestEnvelopeFixtures.validEnvelope(SOURCE_B));
         }
         health = new PersistenceHealthService();
         writeQueue = new PersistenceWriteQueue(connections, health, null);
@@ -134,13 +136,13 @@ class NpcRecoveryOperationConflictTest {
             putProfileState(connection, "profile-a", 0, 0, 1, 0);
             execute(connection, "DELETE FROM npc_snapshots WHERE profile_id = 'profile-a'");
         }
-        assertProfileStateConflict("missing-snapshot");
+        assertClaimStatus("missing-snapshot", ClaimStatus.LOST_SNAPSHOT_CONFLICT);
 
         try (Connection connection = connections.openConnection()) {
             insertLostSnapshot(connection, "profile-a",
-                    "{\"replacementNpcUuid\":\"" + TARGET_B + "\"}");
+                    RecoveryTestEnvelopeFixtures.recoveredEnvelope(SOURCE_A, TARGET_B));
         }
-        assertProfileStateConflict("already-recovered");
+        assertClaimStatus("already-recovered", ClaimStatus.LOST_NOT_AWAITING);
         assertEquals(0, recoveryRowCount());
     }
 
@@ -150,7 +152,7 @@ class NpcRecoveryOperationConflictTest {
             execute(connection, "DELETE FROM npc_snapshots WHERE profile_id = 'profile-a'");
             insertLostSnapshot(connection, "profile-a", "not-json");
         }
-        assertClaimFailsIntegrity("corrupt-lost-snapshot");
+        assertClaimStatus("corrupt-lost-snapshot", ClaimStatus.LOST_ENVELOPE_INVALID);
     }
 
     @Test
@@ -158,7 +160,7 @@ class NpcRecoveryOperationConflictTest {
         try (Connection connection = connections.openConnection()) {
             insertLostSnapshot(connection, "profile-a", "{}");
         }
-        assertClaimFailsIntegrity("multiple-lost-snapshots");
+        assertClaimStatus("multiple-lost-snapshots", ClaimStatus.LOST_SNAPSHOT_CONFLICT);
     }
 
     @Test
@@ -276,9 +278,13 @@ class NpcRecoveryOperationConflictTest {
     }
 
     private void assertProfileStateConflict(String operationId) throws Exception {
+        assertClaimStatus(operationId, ClaimStatus.PROFILE_STATE_CONFLICT);
+    }
+
+    private void assertClaimStatus(String operationId, ClaimStatus expectedStatus) throws Exception {
         var result = committed(repository.claim(
                 new RecoveryClaim(operationId, "profile-a", SOURCE_A, TARGET_A)));
-        assertEquals(ClaimStatus.PROFILE_STATE_CONFLICT, result.status());
+        assertEquals(expectedStatus, result.status());
         assertNull(result.operation());
     }
 

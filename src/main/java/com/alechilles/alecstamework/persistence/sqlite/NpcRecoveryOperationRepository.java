@@ -217,6 +217,10 @@ public final class NpcRecoveryOperationRepository {
         OPERATION_CONFLICT,
         SOURCE_CONFLICT,
         PROFILE_STATE_CONFLICT,
+        LOST_NOT_AWAITING,
+        LOST_SNAPSHOT_CONFLICT,
+        LOST_ENVELOPE_UNVERIFIED,
+        LOST_ENVELOPE_INVALID,
         PROFILE_CONFLICT,
         TARGET_CONFLICT
     }

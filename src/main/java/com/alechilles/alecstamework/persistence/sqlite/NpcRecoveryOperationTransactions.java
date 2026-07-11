@@ -32,11 +32,13 @@ final class NpcRecoveryOperationTransactions {
 
     private final LongSupplier clock;
     private final NpcRecoveryConflictStore conflictStore;
+    private final NpcRecoveryClaimAuthorizer claimAuthorizer;
     private final NpcRecoveryFinalizationStore finalizationStore;
 
     NpcRecoveryOperationTransactions(@Nonnull LongSupplier clock) {
         this.clock = clock;
         this.conflictStore = new NpcRecoveryConflictStore();
+        this.claimAuthorizer = new NpcRecoveryClaimAuthorizer();
         this.finalizationStore = new NpcRecoveryFinalizationStore(conflictStore);
     }
 
@@ -48,15 +50,13 @@ final class NpcRecoveryOperationTransactions {
                     ? ClaimResult.replayed(sameId)
                     : ClaimResult.conflict(ClaimStatus.OPERATION_CONFLICT, sameId);
         }
-        if (!profileExists(connection, claim.profileId())) {
-            return ClaimResult.conflict(ClaimStatus.PROFILE_NOT_FOUND, null);
+        ClaimStatus authorization = claimAuthorizer.authorize(connection, claim);
+        if (authorization != null) {
+            return ClaimResult.conflict(authorization, null);
         }
         if (conflictStore.sourceMapsToDifferentProfile(
                 connection, claim.profileId(), claim.sourceNpcUuid())) {
             return ClaimResult.conflict(ClaimStatus.SOURCE_CONFLICT, null);
-        }
-        if (conflictStore.profileStateBlocksRecovery(connection, claim.profileId())) {
-            return ClaimResult.conflict(ClaimStatus.PROFILE_STATE_CONFLICT, null);
         }
         RecoveryOperation active = findActiveByProfile(connection, claim.profileId(), true);
         if (active != null) {
@@ -305,18 +305,6 @@ final class NpcRecoveryOperationTransactions {
                         : TransitionStatus.STATE_CONFLICT,
                 latest
         );
-    }
-
-    private boolean profileExists(@Nonnull Connection connection,
-                                  @Nonnull String profileId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT 1 FROM npc_profiles WHERE profile_id = ? LIMIT 1"
-        )) {
-            statement.setString(1, profileId);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next();
-            }
-        }
     }
 
     @Nullable

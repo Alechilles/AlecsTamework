@@ -53,8 +53,8 @@ class NpcRecoveryOperationRepositoryTest {
             new SqliteSchemaMigrator().migrate(connection);
             insertProfile(connection, "profile-a", SOURCE_A);
             insertProfile(connection, "profile-b", SOURCE_B);
-            insertAwaitingLostState(connection, "profile-a");
-            insertAwaitingLostState(connection, "profile-b");
+            insertAwaitingLostState(connection, "profile-a", SOURCE_A);
+            insertAwaitingLostState(connection, "profile-b", SOURCE_B);
         }
         clock = new AtomicLong(100L);
         writeQueue = new PersistenceWriteQueue(connections, new PersistenceHealthService(), null);
@@ -181,7 +181,7 @@ class NpcRecoveryOperationRepositoryTest {
         var nextRecovery = committed(repository.claim(
                 new RecoveryClaim("operation-a-next", "profile-a", TARGET_A, TARGET_C)
         ));
-        assertEquals(ClaimStatus.PROFILE_STATE_CONFLICT, nextRecovery.status());
+        assertEquals(ClaimStatus.LOST_NOT_AWAITING, nextRecovery.status());
     }
 
     @Test
@@ -314,7 +314,9 @@ class NpcRecoveryOperationRepositoryTest {
         }
     }
 
-    private static void insertAwaitingLostState(Connection connection, String profileId) throws Exception {
+    private static void insertAwaitingLostState(Connection connection,
+                                                String profileId,
+                                                UUID sourceUuid) throws Exception {
         try (PreparedStatement state = connection.prepareStatement("""
                 INSERT INTO profile_states (
                     profile_id, capture_active, death_active, lost_active,
@@ -328,9 +330,10 @@ class NpcRecoveryOperationRepositoryTest {
                 INSERT INTO npc_snapshots (
                     profile_id, snapshot_type, snapshot_version,
                     payload_json, is_active, created_at_ms
-                ) VALUES (?, 'lost', 1, '{}', 1, 1)
+                ) VALUES (?, 'lost', 1, ?, 1, 1)
                 """)) {
             snapshot.setString(1, profileId);
+            snapshot.setString(2, RecoveryTestEnvelopeFixtures.validEnvelope(sourceUuid));
             snapshot.executeUpdate();
         }
     }
