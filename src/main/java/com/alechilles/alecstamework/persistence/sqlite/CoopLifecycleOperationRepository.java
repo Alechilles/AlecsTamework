@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -95,6 +96,7 @@ public final class CoopLifecycleOperationRepository {
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
     private final CoopLifecycleOperationTransactions transactions;
+    private final CoopLifecycleOperationReader reader = new CoopLifecycleOperationReader();
 
     public CoopLifecycleOperationRepository(@Nonnull SqliteConnectionManager connectionManager,
                                             @Nonnull PersistenceWriteQueue writeQueue,
@@ -193,6 +195,38 @@ public final class CoopLifecycleOperationRepository {
     public OperationRecord loadActiveForProfile(@Nonnull String profileId) throws SQLException {
         try (Connection connection = connectionManager.openConnection()) {
             return transactions.loadActiveForProfile(connection, profileId);
+        }
+    }
+
+    /** Loads every active lifecycle operation in deterministic authority/slot order. */
+    @Nonnull
+    public ManagedCoopReadResult<List<OperationRecord>> loadAllActiveOperations() {
+        try (Connection connection = connectionManager.openConnection()) {
+            return ManagedCoopReadResult.loaded(reader.loadAllActive(connection));
+        } catch (ManagedCoopIntegrityException exception) {
+            return ManagedCoopReadResult.integrityFailure(exception);
+        } catch (SQLException exception) {
+            return ManagedCoopReadResult.sqlFailure(exception);
+        }
+    }
+
+    /** Loads active lifecycle operations for one exact authority in deterministic slot order. */
+    @Nonnull
+    public ManagedCoopReadResult<List<OperationRecord>> loadActiveOperations(
+            @Nonnull ManagedCoopAuthorityKey key,
+            @Nonnull String coopId) {
+        if (key == null || coopId == null || coopId.isBlank()) {
+            return ManagedCoopReadResult.invalidInput("coop_id_required");
+        }
+        try (Connection connection = connectionManager.openConnection()) {
+            List<OperationRecord> active = reader.loadActiveForAuthority(connection, key, coopId);
+            return active == null
+                    ? ManagedCoopReadResult.notFound()
+                    : ManagedCoopReadResult.loaded(active);
+        } catch (ManagedCoopIntegrityException exception) {
+            return ManagedCoopReadResult.integrityFailure(exception);
+        } catch (SQLException exception) {
+            return ManagedCoopReadResult.sqlFailure(exception);
         }
     }
 

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -52,7 +53,19 @@ public final class ManagedCoopResidentRepository {
                                  long capturedAtMs,
                                  long releasedAtMs,
                                  long createdAtMs,
-                                 long updatedAtMs) {
+                                  long updatedAtMs) {
+    }
+
+    /** Immutable exact-location authority projection used by runtime indexes. */
+    public record AuthorityRecord(@Nonnull String authorityId,
+                                  @Nonnull ManagedCoopAuthorityKey authorityKey,
+                                  @Nonnull String coopId,
+                                  @Nonnull AuthorityState state,
+                                  boolean active,
+                                  int importVersion,
+                                  long createdAtMs,
+                                  long updatedAtMs,
+                                  @Nullable String lastError) {
     }
 
     public record MutationResult(@Nonnull MutationStatus status,
@@ -79,6 +92,7 @@ public final class ManagedCoopResidentRepository {
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
     private final ManagedCoopResidentTransactions transactions = new ManagedCoopResidentTransactions();
+    private final ManagedCoopResidentReader reader = new ManagedCoopResidentReader();
 
     public ManagedCoopResidentRepository(@Nonnull SqliteConnectionManager connectionManager,
                                          @Nonnull PersistenceWriteQueue writeQueue) {
@@ -196,6 +210,70 @@ public final class ManagedCoopResidentRepository {
             throws SQLException {
         try (Connection connection = connectionManager.openConnection()) {
             return transactions.findFirstAvailableSlot(connection, key, maximumResidents);
+        }
+    }
+
+    /** Loads one active authority by exact world, coop ID, and block coordinates. */
+    @Nonnull
+    public ManagedCoopReadResult<AuthorityRecord> loadAuthority(@Nonnull ManagedCoopAuthorityKey key,
+                                                                @Nonnull String coopId) {
+        if (key == null || coopId == null || coopId.isBlank()) {
+            return ManagedCoopReadResult.invalidInput("coop_id_required");
+        }
+        try (Connection connection = connectionManager.openConnection()) {
+            AuthorityRecord authority = reader.loadAuthority(connection, key, coopId);
+            return authority == null
+                    ? ManagedCoopReadResult.notFound()
+                    : ManagedCoopReadResult.loaded(authority);
+        } catch (ManagedCoopIntegrityException exception) {
+            return ManagedCoopReadResult.integrityFailure(exception);
+        } catch (SQLException exception) {
+            return ManagedCoopReadResult.sqlFailure(exception);
+        }
+    }
+
+    /** Loads every active authority in deterministic location order. */
+    @Nonnull
+    public ManagedCoopReadResult<List<AuthorityRecord>> loadAllActiveAuthorities() {
+        try (Connection connection = connectionManager.openConnection()) {
+            return ManagedCoopReadResult.loaded(reader.loadAllActiveAuthorities(connection));
+        } catch (ManagedCoopIntegrityException exception) {
+            return ManagedCoopReadResult.integrityFailure(exception);
+        } catch (SQLException exception) {
+            return ManagedCoopReadResult.sqlFailure(exception);
+        }
+    }
+
+    /** Loads every active managed resident in deterministic authority/slot order. */
+    @Nonnull
+    public ManagedCoopReadResult<List<ResidentRecord>> loadAllActiveResidents() {
+        try (Connection connection = connectionManager.openConnection()) {
+            return ManagedCoopReadResult.loaded(reader.loadAllActiveResidents(connection));
+        } catch (ManagedCoopIntegrityException exception) {
+            return ManagedCoopReadResult.integrityFailure(exception);
+        } catch (SQLException exception) {
+            return ManagedCoopReadResult.sqlFailure(exception);
+        }
+    }
+
+    /** Loads active residents for one exact authority in deterministic slot order. */
+    @Nonnull
+    public ManagedCoopReadResult<List<ResidentRecord>> loadActiveResidents(
+            @Nonnull ManagedCoopAuthorityKey key,
+            @Nonnull String coopId) {
+        if (key == null || coopId == null || coopId.isBlank()) {
+            return ManagedCoopReadResult.invalidInput("coop_id_required");
+        }
+        try (Connection connection = connectionManager.openConnection()) {
+            AuthorityRecord authority = reader.loadAuthority(connection, key, coopId);
+            if (authority == null) {
+                return ManagedCoopReadResult.notFound();
+            }
+            return ManagedCoopReadResult.loaded(reader.loadActiveResidents(connection, key, coopId));
+        } catch (ManagedCoopIntegrityException exception) {
+            return ManagedCoopReadResult.integrityFailure(exception);
+        } catch (SQLException exception) {
+            return ManagedCoopReadResult.sqlFailure(exception);
         }
     }
 
