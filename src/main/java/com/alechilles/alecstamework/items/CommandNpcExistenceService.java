@@ -9,13 +9,35 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Locates live NPC entities by UUID across all loaded worlds.
  */
 final class CommandNpcExistenceService {
+    private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
+
+    CommandNpcExistenceService() {
+        this(new LoadedNpcIdentityIndex());
+    }
+
+    CommandNpcExistenceService(@Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex) {
+        this.loadedNpcIdentityIndex = Objects.requireNonNull(loadedNpcIdentityIndex, "loadedNpcIdentityIndex");
+    }
+
+    /** Probes event-maintained identity evidence without scanning the universe. */
+    @Nonnull
+    LoadedNpcIdentityIndex.Probe probe(@Nullable UUID npcUuid) {
+        return loadedNpcIdentityIndex.probe(npcUuid);
+    }
+
+    /** Returns true whenever the index has one or more loaded locations, even during bootstrap. */
+    boolean isKnownLive(@Nullable UUID npcUuid) {
+        return probe(npcUuid).isKnownLive();
+    }
 
     @Nullable
     LiveNpcMatch findLiveNpc(UUID npcUuid) {

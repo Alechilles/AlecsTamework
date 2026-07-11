@@ -22,12 +22,14 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
@@ -44,16 +46,27 @@ public final class CommandLinkedNpcStateSnapshotService {
             new ConcurrentHashMap<>();
     @Nullable
     private final NpcProfileRepository profileRepository;
+    private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
 
     public CommandLinkedNpcStateSnapshotService() {
-        this(null);
+        this(null, new LoadedNpcIdentityIndex());
     }
 
     public CommandLinkedNpcStateSnapshotService(@Nullable NpcProfileRepository profileRepository) {
+        this(profileRepository, new LoadedNpcIdentityIndex());
+    }
+
+    public CommandLinkedNpcStateSnapshotService(@Nullable NpcProfileRepository profileRepository,
+                                                @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex) {
         this.profileRepository = profileRepository;
+        this.loadedNpcIdentityIndex = Objects.requireNonNull(loadedNpcIdentityIndex, "loadedNpcIdentityIndex");
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
+        if (reference == null || store == null) {
+            return;
+        }
+        indexNpcAdded(reference, store);
         refreshFromEntity(reference, store);
     }
 
@@ -64,7 +77,15 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
-        UUID npcUuid = npc != null ? npc.getUuid() : null;
+        UUID componentUuid = resolveComponentUuid(reference, store);
+        UUID legacyNpcUuid = npc != null ? npc.getUuid() : null;
+        LoadedNpcIdentityIndex.Location location = LoadedNpcLocationResolver.resolve(store);
+        loadedNpcIdentityIndex.recordRemoved(componentUuid, location);
+        if (legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)) {
+            loadedNpcIdentityIndex.recordRemoved(legacyNpcUuid, location);
+        }
+        UUID indexedUuid = componentUuid != null ? componentUuid : legacyNpcUuid;
+        UUID npcUuid = npc != null && npc.getUuid() != null ? npc.getUuid() : indexedUuid;
         if (npcUuid == null) {
             return;
         }
@@ -73,6 +94,34 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         refreshFromEntity(reference, store);
+    }
+
+    @Nonnull
+    public LoadedNpcIdentityIndex getLoadedNpcIdentityIndex() {
+        return loadedNpcIdentityIndex;
+    }
+
+    private void indexNpcAdded(@Nonnull Ref<EntityStore> reference,
+                               @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        if (npc == null) {
+            return;
+        }
+        UUID componentUuid = resolveComponentUuid(reference, store);
+        UUID legacyNpcUuid = npc.getUuid();
+        LoadedNpcIdentityIndex.Location location = LoadedNpcLocationResolver.resolve(store);
+        loadedNpcIdentityIndex.recordAdded(componentUuid, location);
+        if (legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)) {
+            loadedNpcIdentityIndex.recordAdded(legacyNpcUuid, location);
+        }
+    }
+
+    @Nullable
+    private UUID resolveComponentUuid(@Nonnull Ref<EntityStore> reference,
+                                      @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, UUIDComponent> uuidType = UUIDComponent.getComponentType();
+        UUIDComponent uuidComponent = uuidType != null ? store.getComponent(reference, uuidType) : null;
+        return uuidComponent != null ? uuidComponent.getUuid() : null;
     }
 
     public void refreshFromEntity(Ref<EntityStore> reference, Store<EntityStore> store) {
