@@ -125,6 +125,7 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateCompo
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
@@ -312,6 +313,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkDynamicAttachmentsComponent> dynamicAttachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
+    private ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentityComponentType;
     private ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> projectileImpactEffectComponentType;
     private ComponentType<EntityStore, TameworkLingeringHazardProjectileComponent> lingeringHazardProjectileComponentType;
     private ComponentType<EntityStore, TameworkLingeringHazardComponent> lingeringHazardComponentType;
@@ -493,186 +495,38 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
-        // Register components that persist owner and tamed state on NPCs.
-        ownerComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkOwnerComponent.class,
-                "TameworkOwner",
-                TameworkOwnerComponent.CODEC
-        );
-
-        tamedComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkTamedComponent.class,
-                "TameworkTamed",
-                TameworkTamedComponent.CODEC
-        );
-
-        hookComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkHookComponent.class,
-                "TameworkHook",
-                TameworkHookComponent.CODEC
-        );
-
-        npcNameComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkNpcNameComponent.class,
-                "TameworkNpcName",
-                TameworkNpcNameComponent.CODEC
-        );
-
-        mountedNameplateComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkMountedNameplateComponent.class,
-                "TameworkMountedNameplate",
-                TameworkMountedNameplateComponent.CODEC
-        );
-
-        commandLinksComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkCommandLinksComponent.class,
-                "TameworkCommandLinks",
-                TameworkCommandLinksComponent.CODEC
-        );
-
-        happinessComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkHappinessComponent.class,
-                "TameworkHappiness",
-                TameworkHappinessComponent.CODEC
-        );
-
-        needsComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkNeedsComponent.class,
-                "TameworkNeeds",
-                TameworkNeedsComponent.CODEC
-        );
-
-        breedingComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkBreedingComponent.class,
-                "TameworkBreeding",
-                TameworkBreedingComponent.CODEC
-        );
-
-        alarmComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkAlarmComponent.class,
-                "TameworkAlarm",
-                TameworkAlarmComponent.CODEC
-        );
-
-        flyingCompanionComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkFlyingCompanionComponent.class,
-                "TameworkFlyingCompanion",
-                TameworkFlyingCompanionComponent.CODEC
-        );
-
-        rideMountComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkRideMountComponent.class,
-                "TameworkRideMount",
-                TameworkRideMountComponent.CODEC
-        );
-
-        rideRiderComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkRideRiderComponent.class,
-                "TameworkRideRider",
-                TameworkRideRiderComponent.CODEC
-        );
-
-        mountedGlideComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkMountedGlideComponent.class,
-                "TameworkMountedGlide",
-                TameworkMountedGlideComponent.CODEC
-        );
-
-        mountedGlideRiderComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkMountedGlideRiderComponent.class,
-                "TameworkMountedGlideRider",
-                TameworkMountedGlideRiderComponent.CODEC
-        );
-
-        avatarFlightComponentType = getEntityStoreRegistry().registerComponent(
-                AvatarFlightComponent.class,
-                "TameworkAvatarFlight",
-                AvatarFlightComponent.CODEC
-        );
-
-        avatarFlightInputComponentType = getEntityStoreRegistry().registerComponent(
-                AvatarFlightInputComponent.class,
-                "TameworkAvatarFlightInput",
-                AvatarFlightInputComponent.CODEC
-        );
-
-        avatarFlightRiderVisualComponentType = getEntityStoreRegistry().registerComponent(
-                AvatarFlightRiderVisualComponent.class,
-                "TameworkAvatarFlightRiderVisual",
-                AvatarFlightRiderVisualComponent.CODEC
-        );
-
-        levelingComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkLevelingComponent.class,
-                "TameworkLeveling",
-                TameworkLevelingComponent.CODEC
-        );
-
-        traitsComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkTraitsComponent.class,
-                "TameworkTraits",
-                TameworkTraitsComponent.CODEC
-        );
-
-        talentsComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkTalentsComponent.class,
-                "TameworkTalents",
-                TameworkTalentsComponent.CODEC
-        );
-
-        tranquilizerPeakComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkTranquilizerPeakComponent.class,
-                "TameworkTranquilizerPeak",
-                TameworkTranquilizerPeakComponent.CODEC
-        );
-
-        attachmentsComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkAttachmentsComponent.class,
-                "TameworkAttachments",
-                TameworkAttachmentsComponent.CODEC
-        );
-
-        dynamicAttachmentsComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkDynamicAttachmentsComponent.class,
-                "TameworkDynamicAttachments",
-                TameworkDynamicAttachmentsComponent.CODEC
-        );
-
-        lifeStageComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkLifeStageComponent.class,
-                "TameworkLifeStage",
-                TameworkLifeStageComponent.CODEC
-        );
-
-        projectileImpactEffectComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkProjectileImpactEffectComponent.class,
-                "TameworkProjectileImpactEffect",
-                TameworkProjectileImpactEffectComponent.CODEC
-        );
-
-        lingeringHazardProjectileComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkLingeringHazardProjectileComponent.class,
-                "TameworkLingeringHazardProjectile",
-                TameworkLingeringHazardProjectileComponent.CODEC
-        );
-
-        lingeringHazardComponentType = getEntityStoreRegistry().registerComponent(
-                TameworkLingeringHazardComponent.class,
-                "TameworkLingeringHazard",
-                TameworkLingeringHazardComponent.CODEC
-        );
-
-        apiSelfTestFixtureMarkerComponentType = getEntityStoreRegistry().registerComponent(
-                ApiSelfTestFixtureMarkerComponent.class,
-                "TameworkApiSelfTestFixture",
-                ApiSelfTestFixtureMarkerComponent.CODEC
-        );
-
-        feedTroughWaterChargesComponentType = getChunkStoreRegistry().registerComponent(
-                TameworkFeedTroughWaterChargesComponent.class,
-                "TameworkFeedTroughWaterCharges",
-                TameworkFeedTroughWaterChargesComponent.CODEC
-        );
+        TameworkComponentRegistrar.RegisteredComponents components = TameworkComponentRegistrar.register(this);
+        ownerComponentType = components.owner();
+        tamedComponentType = components.tamed();
+        hookComponentType = components.hook();
+        npcNameComponentType = components.npcName();
+        mountedNameplateComponentType = components.mountedNameplate();
+        commandLinksComponentType = components.commandLinks();
+        happinessComponentType = components.happiness();
+        needsComponentType = components.needs();
+        breedingComponentType = components.breeding();
+        alarmComponentType = components.alarm();
+        flyingCompanionComponentType = components.flyingCompanion();
+        rideMountComponentType = components.rideMount();
+        rideRiderComponentType = components.rideRider();
+        mountedGlideComponentType = components.mountedGlide();
+        mountedGlideRiderComponentType = components.mountedGlideRider();
+        avatarFlightComponentType = components.avatarFlight();
+        avatarFlightInputComponentType = components.avatarFlightInput();
+        avatarFlightRiderVisualComponentType = components.avatarFlightRiderVisual();
+        levelingComponentType = components.leveling();
+        traitsComponentType = components.traits();
+        talentsComponentType = components.talents();
+        tranquilizerPeakComponentType = components.tranquilizerPeak();
+        attachmentsComponentType = components.attachments();
+        dynamicAttachmentsComponentType = components.dynamicAttachments();
+        lifeStageComponentType = components.lifeStage();
+        projectionIdentityComponentType = components.projectionIdentity();
+        projectileImpactEffectComponentType = components.projectileImpactEffect();
+        lingeringHazardProjectileComponentType = components.lingeringHazardProjectile();
+        lingeringHazardComponentType = components.lingeringHazard();
+        apiSelfTestFixtureMarkerComponentType = components.apiSelfTestFixtureMarker();
+        feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
@@ -2657,6 +2511,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkLifeStageComponent> getLifeStageComponentType() {
         return lifeStageComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkProjectionIdentityComponent> getProjectionIdentityComponentType() {
+        return projectionIdentityComponentType;
     }
 
     public ComponentType<EntityStore, TameworkLingeringHazardProjectileComponent> getLingeringHazardProjectileComponentType() {
