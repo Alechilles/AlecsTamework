@@ -50,6 +50,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final NpcIdentityRepository npcIdentityRepository;
     private final NpcProfileRepository npcProfileRepository;
     private final NpcRecoveryOperationRepository npcRecoveryOperationRepository;
+    private final NpcLiveAliasRepairRepository npcLiveAliasRepairRepository;
     private final SqliteSchemaMigrator schemaMigrator;
     @Nullable
     private final HytaleLogger logger;
@@ -70,6 +71,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                        @Nonnull NpcIdentityRepository npcIdentityRepository,
                                        @Nonnull NpcProfileRepository npcProfileRepository,
                                        @Nonnull NpcRecoveryOperationRepository npcRecoveryOperationRepository,
+                                       @Nonnull NpcLiveAliasRepairRepository npcLiveAliasRepairRepository,
                                        @Nonnull SqliteSchemaMigrator schemaMigrator,
                                        @Nullable HytaleLogger logger) {
         this.runtimeDataDirectory = runtimeDataDirectory;
@@ -88,6 +90,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.npcIdentityRepository = npcIdentityRepository;
         this.npcProfileRepository = npcProfileRepository;
         this.npcRecoveryOperationRepository = npcRecoveryOperationRepository;
+        this.npcLiveAliasRepairRepository = npcLiveAliasRepairRepository;
         this.schemaMigrator = schemaMigrator;
         this.logger = logger;
     }
@@ -165,6 +168,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         NpcIdentityRepository npcIdentityRepository = new NpcIdentityRepository(connectionManager);
         NpcRecoveryOperationRepository npcRecoveryOperationRepository =
                 new NpcRecoveryOperationRepository(connectionManager, writeQueue);
+        NpcLiveAliasRepairRepository npcLiveAliasRepairRepository =
+                new NpcLiveAliasRepairRepository(writeQueue);
 
         TameworkPersistenceRuntime runtime = new TameworkPersistenceRuntime(
                 normalizedDataDir,
@@ -183,6 +188,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 npcIdentityRepository,
                 npcProfileRepository,
                 npcRecoveryOperationRepository,
+                npcLiveAliasRepairRepository,
                 schemaMigrator,
                 logger
         );
@@ -258,6 +264,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public NpcRecoveryOperationRepository getNpcRecoveryOperationRepository() {
         return npcRecoveryOperationRepository;
+    }
+
+    @Nonnull
+    public NpcLiveAliasRepairRepository getNpcLiveAliasRepairRepository() {
+        return npcLiveAliasRepairRepository;
     }
 
     @Nonnull

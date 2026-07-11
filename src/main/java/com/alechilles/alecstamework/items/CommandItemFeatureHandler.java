@@ -33,6 +33,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
@@ -121,7 +122,8 @@ public final class CommandItemFeatureHandler {
     private final CommandNpcExistenceService npcExistenceService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandRespawnService respawnService;
-    private final CommandLostRecoveryService lostRecoveryService;
+    @Nullable
+    private final CommandLostRecoveryCoordinator lostRecoveryCoordinator;
     private final CommandMenuMoveService menuMoveService;
     private final CommandLinkedNpcLocateService locateService;
     private final CommandPanelPreferenceService panelPreferenceService;
@@ -138,6 +140,18 @@ public final class CommandItemFeatureHandler {
                                      CommandLinkedNpcCoopService coopService,
                                      CommandLinkedNpcLostService lostService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService) {
+        this(registry, relocationService, deathService, captureService, coopService, lostService,
+                stateSnapshotService, null);
+    }
+
+    public CommandItemFeatureHandler(CommandItemRegistry registry,
+                                     CommandNpcRelocationService relocationService,
+                                     CommandLinkedNpcDeathService deathService,
+                                     CommandLinkedNpcCaptureService captureService,
+                                     CommandLinkedNpcCoopService coopService,
+                                     CommandLinkedNpcLostService lostService,
+                                     CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                     @Nullable TameworkPersistenceRuntime persistenceRuntime) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.deathService = deathService;
@@ -198,7 +212,9 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 npcNameResolver
         );
-        this.npcExistenceService = new CommandNpcExistenceService();
+        this.npcExistenceService = stateSnapshotService != null
+                ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
+                : new CommandNpcExistenceService();
         this.relocationDispatchService = new CommandRelocationDispatchService(
                 relocationService,
                 deathService,
@@ -216,16 +232,19 @@ public final class CommandItemFeatureHandler {
                 deathService,
                 stepExecutionService
         );
-        this.lostRecoveryService = new CommandLostRecoveryService(
-                companionPlacementService,
-                npcExistenceService,
-                linkPolicyService,
-                linkMutationService,
-                npcNameResolver,
-                respawnService,
-                stepExecutionService,
-                lostService
-        );
+        this.lostRecoveryCoordinator = persistenceRuntime != null
+                ? new CommandLostRecoveryCoordinator(
+                    new CommandNpcIdentityService(
+                            persistenceRuntime.getNpcIdentityRepository(), npcExistenceService),
+                    persistenceRuntime.getLostRepository(),
+                    persistenceRuntime.getNpcRecoveryOperationRepository(),
+                    persistenceRuntime.getNpcLiveAliasRepairRepository(),
+                    new CommandLinkedNpcInventoryRepairService(registry),
+                    companionPlacementService,
+                    new PlannedNpcProjectionSpawner(),
+                    new PlannedNpcProjectionPostAddService(),
+                    stepExecutionService)
+                : null;
         this.menuMoveService = new CommandMenuMoveService(
                 resolutionService,
                 linkMutationService,
@@ -1210,7 +1229,7 @@ public final class CommandItemFeatureHandler {
                 feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.respawn.success", name);
                 return;
             }
-            if (lostService == null || !lostService.isLost(npcUuid)) {
+            if (lostRecoveryCoordinator == null) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.notDeadOrLost");
                 return;
             }
@@ -1220,35 +1239,47 @@ public final class CommandItemFeatureHandler {
                     companionSettings.getRecallSafeSpawnDistance(),
                     RECALL_SAFE_SPAWN_DISTANCE
             );
-            CommandLostRecoveryService.Result recoveryResult = lostRecoveryService.recoverLostLinkedNpc(
-                    player,
-                    playerRef,
-                    store,
+            lostRecoveryCoordinator.request(
+                    world,
+                    player.getUuid(),
                     toolId,
-                    stack,
                     record,
-                    safeSpawnDistance
+                    safeSpawnDistance,
+                    this::onLostRecoveryComplete
             );
-            if (!recoveryResult.isSuccess()) {
-                String errorMessage = recoveryResult.errorMessage();
-                if (errorMessage == null || errorMessage.isBlank()) {
-                    errorMessage = LocalizedText.resolve(player, "tamework.ui.notifications.command.respawn.recoverFailed");
-                }
-                feedbackService.showWarning(player, errorMessage);
-                return;
-            }
-            hotbar.setItemStackForSlot(slot, recoveryResult.updatedStack());
-            String recoveredName = recoveryResult.recoveredName();
-            if (recoveredName == null || recoveredName.isBlank()) {
-                recoveredName = record.cachedDisplayName;
-            }
-            if (recoveredName == null || recoveredName.isBlank()) {
-                recoveredName = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultCompanionName");
-            }
-            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.respawn.recovered", recoveredName);
             return;
         }
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
+    }
+
+    private void onLostRecoveryComplete(
+            @Nonnull Player player,
+            @Nonnull CommandLostRecoveryCoordinator.Outcome outcome) {
+        if (outcome.status() == CommandLostRecoveryCoordinator.OutcomeStatus.RECOVERED) {
+            String name = outcome.companionName();
+            if (name == null || name.isBlank()) {
+                name = LocalizedText.resolve(
+                        player, "tamework.ui.notifications.command.shared.defaultCompanionName");
+            }
+            feedbackService.showSuccessKey(
+                    player, "tamework.ui.notifications.command.respawn.recovered", name);
+            return;
+        }
+        if (outcome.status() == CommandLostRecoveryCoordinator.OutcomeStatus.ALREADY_LIVE_REPAIRED) {
+            feedbackService.showSuccess(
+                    player, "That companion is already live; command records were repaired.");
+            return;
+        }
+        if (outcome.status() == CommandLostRecoveryCoordinator.OutcomeStatus.IN_PROGRESS) {
+            feedbackService.showDefault(player, outcome.message());
+            return;
+        }
+        String message = outcome.message();
+        if (message == null || message.isBlank()) {
+            message = LocalizedText.resolve(
+                    player, "tamework.ui.notifications.command.respawn.recoverFailed");
+        }
+        feedbackService.showWarning(player, message);
     }
 
     private void applyMenuSetHome(Player player,
