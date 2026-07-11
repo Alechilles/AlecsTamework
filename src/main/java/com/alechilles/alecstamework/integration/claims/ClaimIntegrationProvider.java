@@ -26,6 +26,18 @@ public enum ClaimIntegrationProvider {
 
     @Nonnull
     public static ClaimIntegrationProvider fromConfigValue(@Nullable String raw) {
+        ClaimIntegrationProvider parsed = tryFromConfigValue(raw);
+        return parsed == null ? AUTO : parsed;
+    }
+
+    /**
+     * Parses a configured provider without silently converting an invalid explicit value to
+     * {@link #AUTO}. A missing or blank value remains the documented Auto default.
+     *
+     * @return the parsed provider, or {@code null} when {@code raw} is an unrecognized value
+     */
+    @Nullable
+    public static ClaimIntegrationProvider tryFromConfigValue(@Nullable String raw) {
         if (raw == null || raw.isBlank()) {
             return AUTO;
         }
@@ -38,7 +50,8 @@ public enum ClaimIntegrationProvider {
             case "simpleclaims", "simpleclaim" -> SIMPLE_CLAIMS;
             case "questlinesclaims", "questlineclaims", "qlclaims", "qlc" -> QUESTLINES_CLAIMS;
             case "off", "disabled", "none", "false" -> OFF;
-            default -> AUTO;
+            case "auto", "automatic", "default" -> AUTO;
+            default -> null;
         };
     }
 }
