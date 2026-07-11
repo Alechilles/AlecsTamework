@@ -3,10 +3,6 @@ package com.alechilles.alecstamework.ownership;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,47 +60,21 @@ class OwnerPopulationCapServiceTest {
     }
 
     @Test
-    void foreignThreadSourcesUseDeferredCounting() {
-        AtomicBoolean foreignDirectCalled = new AtomicBoolean(false);
-        OwnerPopulationCapService.PopulationSource currentThreadSource = new OwnerPopulationCapService.PopulationSource() {
-            @Override
-            public boolean isInCallingThread() {
-                return true;
-            }
+    void unavailableAuthorityFailsClosedWithoutReportingFalseZero() {
+        OwnerPopulationCapService.Decision decision =
+                OwnerPopulationCapService.Decision.denyUnavailable(
+                        5,
+                        TwGlobalConfig.PerPlayerLimitScope.GLOBAL,
+                        "owner-population-reconciling"
+                );
 
-            @Override
-            public int countDirect() {
-                return 2;
-            }
-
-            @Override
-            public CompletableFuture<Integer> countDeferred() {
-                return CompletableFuture.failedFuture(new AssertionError("current-thread source should not defer"));
-            }
-        };
-        OwnerPopulationCapService.PopulationSource foreignThreadSource = new OwnerPopulationCapService.PopulationSource() {
-            @Override
-            public boolean isInCallingThread() {
-                return false;
-            }
-
-            @Override
-            public int countDirect() {
-                foreignDirectCalled.set(true);
-                throw new AssertionError("foreign-thread source should not count directly");
-            }
-
-            @Override
-            public CompletableFuture<Integer> countDeferred() {
-                return CompletableFuture.completedFuture(3);
-            }
-        };
-
-        int count = OwnerPopulationCapService.countOwnedPopulationAcrossSources(
-                List.of(currentThreadSource, foreignThreadSource)
+        assertFalse(decision.allowed());
+        assertTrue(decision.capEnabled());
+        assertEquals(-1, decision.currentCount());
+        assertEquals(0, decision.remainingHeadroom());
+        assertEquals(
+                "owner-population-reconciling",
+                decision.reason()
         );
-
-        assertEquals(5, count);
-        assertFalse(foreignDirectCalled.get());
     }
 }

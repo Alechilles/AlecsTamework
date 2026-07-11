@@ -54,6 +54,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final NpcProfileRepository npcProfileRepository;
     private final CompanionPopulationRepository companionPopulationRepository;
     private final CompanionPopulationCoverageRepository companionPopulationCoverageRepository;
+    private final CompanionIdentityRepository companionIdentityRepository;
     private final SqliteSchemaMigrator schemaMigrator;
     @Nullable
     private final HytaleLogger logger;
@@ -72,6 +73,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                        @Nonnull NpcProfileRepository npcProfileRepository,
                                        @Nonnull CompanionPopulationRepository companionPopulationRepository,
                                        @Nonnull CompanionPopulationCoverageRepository companionPopulationCoverageRepository,
+                                       @Nonnull CompanionIdentityRepository companionIdentityRepository,
                                        @Nonnull SqliteSchemaMigrator schemaMigrator,
                                        @Nullable HytaleLogger logger) {
         this.runtimeDataDirectory = runtimeDataDirectory;
@@ -88,6 +90,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.npcProfileRepository = npcProfileRepository;
         this.companionPopulationRepository = companionPopulationRepository;
         this.companionPopulationCoverageRepository = companionPopulationCoverageRepository;
+        this.companionIdentityRepository = companionIdentityRepository;
         this.schemaMigrator = schemaMigrator;
         this.logger = logger;
     }
@@ -153,6 +156,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new CompanionPopulationRepository(connectionManager, writeQueue);
         CompanionPopulationCoverageRepository companionPopulationCoverageRepository =
                 new CompanionPopulationCoverageRepository(connectionManager, writeQueue);
+        CompanionIdentityRepository companionIdentityRepository =
+                new CompanionIdentityRepository(connectionManager);
         ApiProfileDataRepository apiProfileDataRepository = new ApiProfileDataRepository(connectionManager, writeQueue);
         CaptureRepository captureRepository = new CaptureRepository(connectionManager, writeQueue, npcProfileRepository);
         CoopLedgerRepository coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue, npcProfileRepository);
@@ -174,6 +179,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 npcProfileRepository,
                 companionPopulationRepository,
                 companionPopulationCoverageRepository,
+                companionIdentityRepository,
                 schemaMigrator,
                 logger
         );
@@ -239,6 +245,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public CompanionPopulationCoverageRepository getCompanionPopulationCoverageRepository() {
         return companionPopulationCoverageRepository;
+    }
+
+    @Nonnull
+    public CompanionIdentityRepository getCompanionIdentityRepository() {
+        return companionIdentityRepository;
     }
 
     @Nonnull

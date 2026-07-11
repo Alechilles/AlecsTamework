@@ -46,6 +46,19 @@ public final class TameworkRuntimeSettings {
         return values;
     }
 
+    /**
+     * Stable non-negative fingerprint used to keep one admission on one immutable settings view.
+     */
+    public long revision() {
+        long hash = 0xcbf29ce484222325L;
+        String serialized = values.toString();
+        for (int index = 0; index < serialized.length(); index++) {
+            hash ^= serialized.charAt(index);
+            hash *= 0x100000001b3L;
+        }
+        return hash & Long.MAX_VALUE;
+    }
+
     public int populationLimitPerPlayerOwnedTotal() {
         return values.populationLimitPerPlayerOwnedTotal();
     }

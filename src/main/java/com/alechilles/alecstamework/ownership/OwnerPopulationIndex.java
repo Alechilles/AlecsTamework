@@ -11,6 +11,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
 
 import static com.alechilles.alecstamework.ownership.OwnerPopulationTransitionDraft.scopeKeys;
+import static com.alechilles.alecstamework.ownership.OwnerPopulationCountOps.addCounts;
+import static com.alechilles.alecstamework.ownership.OwnerPopulationCountOps.count;
+import static com.alechilles.alecstamework.ownership.OwnerPopulationCountOps.removeCounts;
 
 /**
  * Thread-safe, process-local authority for committed and reserved owner population.
@@ -27,7 +30,7 @@ public final class OwnerPopulationIndex {
     private final Map<OwnerPopulationScopeKey, Long> pendingCounts = new HashMap<>();
     private final Map<UUID, PendingTransition> pendingByToken = new HashMap<>();
     private final Map<String, UUID> pendingTokenByProfile = new HashMap<>();
-    private OwnerPopulationReadiness readiness = OwnerPopulationReadiness.LOADING;
+    private final OwnerPopulationReadinessState readiness = new OwnerPopulationReadinessState();
     private long lastObservedNanos = Long.MIN_VALUE;
 
     public OwnerPopulationIndex() {
@@ -64,7 +67,7 @@ public final class OwnerPopulationIndex {
             committedCounts.putAll(replacementCounts);
             pendingCounts.clear();
             pendingTokenByProfile.clear();
-            readiness = newReadiness;
+            readiness.setBoth(newReadiness);
         } finally {
             lock.unlock();
         }
@@ -91,7 +94,17 @@ public final class OwnerPopulationIndex {
     public void setReadiness(OwnerPopulationReadiness readiness) {
         lock.lock();
         try {
-            this.readiness = Objects.requireNonNull(readiness, "readiness");
+            this.readiness.setBoth(Objects.requireNonNull(readiness, "readiness"));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void setReadiness(OwnerPopulationReadiness globalReadiness,
+                             OwnerPopulationReadiness perWorldReadiness) {
+        lock.lock();
+        try {
+            readiness.set(globalReadiness, perWorldReadiness);
         } finally {
             lock.unlock();
         }
@@ -100,7 +113,17 @@ public final class OwnerPopulationIndex {
     public OwnerPopulationReadiness readiness() {
         lock.lock();
         try {
-            return readiness;
+            return readiness.overall();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public OwnerPopulationReadiness readiness(OwnerPopulationLimitScope scope) {
+        Objects.requireNonNull(scope, "scope");
+        lock.lock();
+        try {
+            return readiness.forScope(scope);
         } finally {
             lock.unlock();
         }
@@ -167,7 +190,7 @@ public final class OwnerPopulationIndex {
         if (!draft.positiveDelta() || request.limit() <= 0 || request.force()) {
             return null;
         }
-        if (!readiness.allowsPositiveCappedAdmissions()) {
+        if (!readiness.forScope(request.limitScope()).allowsPositiveCappedAdmissions()) {
             return denied(request, "owner-population-not-ready", current, committed, pending, true);
         }
         if (committed >= request.limit() || pending >= request.limit() - committed) {
@@ -198,7 +221,7 @@ public final class OwnerPopulationIndex {
                 true,
                 OwnerPopulationTransitionDraft.reservationReason(request, draft.positiveDelta()),
                 reservation,
-                readiness,
+                readiness.forScope(request.limitScope()),
                 request.limit(),
                 committed,
                 pending,
@@ -381,7 +404,7 @@ public final class OwnerPopulationIndex {
                 false,
                 reason,
                 null,
-                readiness,
+                readiness.forScope(request.limitScope()),
                 request.limit(),
                 committed,
                 pending,
@@ -389,32 +412,6 @@ public final class OwnerPopulationIndex {
                 positiveDelta,
                 request.force()
         );
-    }
-
-    private void addCounts(Map<OwnerPopulationScopeKey, Long> counts,
-                           Collection<OwnerPopulationScopeKey> keys) {
-        for (OwnerPopulationScopeKey key : keys) {
-            counts.merge(key, 1L, Long::sum);
-        }
-    }
-
-    private void removeCounts(Map<OwnerPopulationScopeKey, Long> counts,
-                              Collection<OwnerPopulationScopeKey> keys) {
-        for (OwnerPopulationScopeKey key : keys) {
-            long updated = count(counts, key) - 1L;
-            if (updated < 0L) {
-                throw new IllegalStateException("Owner population count underflow for " + key);
-            }
-            if (updated == 0L) {
-                counts.remove(key);
-            } else {
-                counts.put(key, updated);
-            }
-        }
-    }
-
-    private long count(Map<OwnerPopulationScopeKey, Long> counts, OwnerPopulationScopeKey key) {
-        return key == null ? 0L : counts.getOrDefault(key, 0L);
     }
 
     private PendingTransition findPending(OwnerPopulationReservation reservation) {

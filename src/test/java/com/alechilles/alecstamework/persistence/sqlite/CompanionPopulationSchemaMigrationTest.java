@@ -15,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -102,6 +103,44 @@ class CompanionPopulationSchemaMigrationTest {
             );
                  ResultSet resultSet = statement.executeQuery()) {
                 assertFalse(resultSet.next());
+            }
+        }
+    }
+
+    @Test
+    void legacyProfilesAreConservativelyBackfilledAndRepeatMigrationRepairsMissingRows() throws Exception {
+        SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve("backfill.sqlite"));
+        SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
+        try (Connection connection = connections.openConnection()) {
+            migrator.migrate(connection);
+            String profileId = insertProfile(connection);
+            try (PreparedStatement state = connection.prepareStatement(
+                    """
+                    INSERT INTO profile_states (
+                        profile_id, capture_active, death_active, lost_active, in_coop, updated_at_ms
+                    ) VALUES (?, 0, 1, 0, 0, 1)
+                    """
+            )) {
+                state.setString(1, profileId);
+                state.executeUpdate();
+            }
+
+            migrator.migrate(connection);
+
+            try (PreparedStatement statement = connection.prepareStatement(
+                    """
+                    SELECT lifecycle_state, physical_world_name, revision
+                    FROM companion_population_state
+                    WHERE profile_id = ?
+                    """
+            )) {
+                statement.setString(1, profileId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    assertTrue(resultSet.next());
+                    assertEquals("DEAD_REVIVABLE", resultSet.getString("lifecycle_state"));
+                    assertNull(resultSet.getString("physical_world_name"));
+                    assertEquals(0L, resultSet.getLong("revision"));
+                }
             }
         }
     }

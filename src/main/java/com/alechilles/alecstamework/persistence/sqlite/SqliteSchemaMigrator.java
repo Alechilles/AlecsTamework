@@ -38,6 +38,8 @@ public final class SqliteSchemaMigrator {
         if (!isVersionApplied(connection, SCHEMA_VERSION_V6)) {
             applySchemaV6(connection);
             recordMigration(connection, SCHEMA_VERSION_V6, MIGRATION_NAME_SCHEMA_V6);
+        } else {
+            reconcileSchemaV6Data(connection);
         }
     }
 
@@ -284,6 +286,59 @@ public final class SqliteSchemaMigrator {
             statement.execute("""
                     CREATE INDEX IF NOT EXISTS idx_companion_population_reconciliation_state
                     ON companion_population_reconciliation(coverage_dimension, state, updated_at_ms)
+                    """);
+            statement.execute("""
+                    INSERT OR IGNORE INTO companion_population_state (
+                        profile_id, ownership_world_name, lifecycle_state,
+                        physical_world_name, physical_chunk_x, physical_chunk_z,
+                        revision, source, created_at_ms, updated_at_ms
+                    )
+                    SELECT
+                        p.profile_id,
+                        p.last_world_name,
+                        CASE
+                            WHEN COALESCE(s.capture_active, 0) = 1 THEN 'CAPTURED'
+                            WHEN COALESCE(s.death_active, 0) = 1 THEN 'DEAD_REVIVABLE'
+                            WHEN COALESCE(s.lost_active, 0) = 1 THEN 'LOST'
+                            WHEN COALESCE(s.in_coop, 0) = 1 THEN 'COOP'
+                            ELSE 'UNKNOWN_DORMANT'
+                        END,
+                        NULL, NULL, NULL,
+                        0,
+                        'schema_v6_legacy_backfill',
+                        p.created_at_ms,
+                        p.updated_at_ms
+                    FROM npc_profiles p
+                    LEFT JOIN profile_states s ON s.profile_id = p.profile_id
+                    """);
+        }
+    }
+
+    private void reconcileSchemaV6Data(@Nonnull Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    INSERT OR IGNORE INTO companion_population_state (
+                        profile_id, ownership_world_name, lifecycle_state,
+                        physical_world_name, physical_chunk_x, physical_chunk_z,
+                        revision, source, created_at_ms, updated_at_ms
+                    )
+                    SELECT
+                        p.profile_id,
+                        p.last_world_name,
+                        CASE
+                            WHEN COALESCE(s.capture_active, 0) = 1 THEN 'CAPTURED'
+                            WHEN COALESCE(s.death_active, 0) = 1 THEN 'DEAD_REVIVABLE'
+                            WHEN COALESCE(s.lost_active, 0) = 1 THEN 'LOST'
+                            WHEN COALESCE(s.in_coop, 0) = 1 THEN 'COOP'
+                            ELSE 'UNKNOWN_DORMANT'
+                        END,
+                        NULL, NULL, NULL,
+                        0,
+                        'schema_v6_runtime_backfill',
+                        p.created_at_ms,
+                        p.updated_at_ms
+                    FROM npc_profiles p
+                    LEFT JOIN profile_states s ON s.profile_id = p.profile_id
                     """);
         }
     }

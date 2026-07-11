@@ -136,6 +136,13 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
+import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
+import com.alechilles.alecstamework.ownership.OwnerPopulationAdmissionCoordinator;
+import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
+import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
+import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
+import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
@@ -246,6 +253,7 @@ public class Tamework extends JavaPlugin {
     private CoopResidentStateSnapshotService coopResidentStateSnapshotService;
     private Path runtimeDataDirectory;
     private TameworkPersistenceRuntime persistenceRuntime;
+    private OwnerPopulationRuntime ownerPopulationRuntime;
     private TameworkApi api;
     private TameworkEventBus apiEventBus;
     private InteractionExtensionRegistry interactionExtensionRegistry;
@@ -889,6 +897,19 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
+        ownerPopulationRuntime = OwnerPopulationRuntime.initialize(persistenceRuntime);
+        CompanionPopulationBootstrapService.BootstrapResult populationBootstrap =
+                ownerPopulationRuntime.bootstrapResult();
+        getLogger().at(Level.INFO).log(
+                "Companion population ledger loaded: profiles="
+                        + populationBootstrap.profileCount()
+                        + ", operations="
+                        + populationBootstrap.nonterminalOperationCount()
+                        + ", global="
+                        + populationBootstrap.globalReadiness()
+                        + ", perWorld="
+                        + populationBootstrap.perWorldReadiness()
+        );
         apiEventBus = new TameworkEventBus(getLogger());
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
         HeldItemAttachmentInteractionService heldItemAttachmentInteractions =
@@ -1284,6 +1305,7 @@ public class Tamework extends JavaPlugin {
             persistenceRuntime.close();
             persistenceRuntime = null;
         }
+        ownerPopulationRuntime = null;
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
@@ -1432,6 +1454,31 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkPersistenceRuntime getPersistenceRuntime() {
         return persistenceRuntime;
+    }
+
+    @Nullable
+    public OwnerPopulationIndex getOwnerPopulationIndex() {
+        return ownerPopulationRuntime == null ? null : ownerPopulationRuntime.index();
+    }
+
+    @Nullable
+    public CompanionIdentityResolver getCompanionIdentityResolver() {
+        return ownerPopulationRuntime == null ? null : ownerPopulationRuntime.identityResolver();
+    }
+
+    @Nullable
+    public OwnerPopulationAdmissionCoordinator getOwnerPopulationAdmissionCoordinator() {
+        return ownerPopulationRuntime == null ? null : ownerPopulationRuntime.admissionCoordinator();
+    }
+
+    @Nullable
+    public OwnerComponentMutationService getOwnerComponentMutationService() {
+        return ownerPopulationRuntime == null ? null : ownerPopulationRuntime.mutationService();
+    }
+
+    @Nullable
+    public OwnerMutationScheduler getOwnerMutationScheduler() {
+        return ownerPopulationRuntime == null ? null : ownerPopulationRuntime.mutationScheduler();
     }
 
     @Nullable
