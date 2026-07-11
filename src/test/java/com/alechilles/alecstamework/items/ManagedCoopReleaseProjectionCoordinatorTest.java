@@ -106,7 +106,7 @@ class ManagedCoopReleaseProjectionCoordinatorTest {
     }
 
     @Test
-    void deduplicatesSameTargetAndRejectsDifferentTargetForInFlightOperation() throws Exception {
+    void deduplicatesSameTargetAndRejectsNonPlannedTargetBeforePersistence() throws Exception {
         CompletableFuture<PersistenceWriteQueue.WriteOutcome<MutationResult>> projectionCommit =
                 new CompletableFuture<>();
         FakeOperations operations = new FakeOperations();
@@ -134,7 +134,10 @@ class ManagedCoopReleaseProjectionCoordinatorTest {
         assertEquals(DEDUPLICATED, duplicate.status());
         assertEquals("release_projection_operation_already_in_flight", duplicate.detail());
         assertEquals(FAILED, conflict.status());
-        assertEquals("release_projection_target_in_flight_conflict", conflict.detail());
+        assertEquals(
+                "projection_attempt_failed:actual projection UUID must equal the durable planned UUID",
+                conflict.detail()
+        );
         assertEquals(1, operations.markCalls.get());
 
         projectionCommit.complete(committed(applied(
@@ -183,7 +186,10 @@ class ManagedCoopReleaseProjectionCoordinatorTest {
                             claim, OTHER_ACTUAL, 151L)
             ).get(3, TimeUnit.SECONDS);
             assertEquals(FAILED, secondTarget.status());
-            assertTrue(secondTarget.detail().contains("projection_created_conflict:projection_uuid_conflict"));
+            assertEquals(
+                    "projection_attempt_failed:actual projection UUID must equal the durable planned UUID",
+                    secondTarget.detail()
+            );
             assertEquals(replayState == OperationState.FINALIZED ? 0 : 1,
                     operations.finalizeCalls.get());
         }
