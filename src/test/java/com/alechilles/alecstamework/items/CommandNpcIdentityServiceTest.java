@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Pure regression tests for canonical profile resolution and replacement suppression.
  */
 class CommandNpcIdentityServiceTest {
+    private static final LoadedNpcIdentityIndex.Location LOCATION_A =
+            new LoadedNpcIdentityIndex.Location("world-a", "store-a");
+    private static final LoadedNpcIdentityIndex.Location LOCATION_B =
+            new LoadedNpcIdentityIndex.Location("world-b", "store-b");
+
     @Test
     void historicalAliasResolvesToCurrentUuidWithoutAuthorizingUnmarkedReplacement() {
         UUID historical = UUID.randomUUID();
@@ -53,6 +60,123 @@ class CommandNpcIdentityServiceTest {
                 service(found(identity), Set.of()).resolve(record(current, "profile-a"));
 
         assertTrue(resolution.durableState().lostAwaitingRecovery());
+        assertTrue(resolution.replacementAllowed());
+    }
+
+    @Test
+    void incompleteIndexMakesUnknownPresenceFailClosed() {
+        UUID current = UUID.randomUUID();
+        NpcIdentityRepository.ProfileFlags awaitingLost =
+                new NpcIdentityRepository.ProfileFlags(false, false, true, false, null, null);
+        NpcIdentityRepository.ProfileIdentity identity = identity(
+                "profile-a", current, List.of(current), true,
+                awaitingLost, null, null);
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        CommandNpcIdentityService service = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> found(identity),
+                index::probe
+        );
+
+        CommandNpcIdentityService.IdentityResolution resolution =
+                service.resolve(record(current, "profile-a"));
+
+        assertEquals(CommandNpcIdentityService.ResolutionStatus.FAILED, resolution.status());
+        assertEquals("loaded_identity_index_incomplete", resolution.failureReason());
+        assertEquals(List.of(current), resolution.checkedUuids());
+        assertTrue(resolution.liveUuids().isEmpty());
+        assertFalse(resolution.replacementAllowed());
+    }
+
+    @Test
+    void positiveOneLocationResolvesWhileBootstrapIsIncomplete() {
+        UUID current = UUID.randomUUID();
+        NpcIdentityRepository.ProfileIdentity identity = identity(
+                "profile-a", current, List.of(current), true,
+                emptyFlags(), null, null);
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        index.recordAdded(current, LOCATION_A);
+        CommandNpcIdentityService service = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> found(identity),
+                index::probe
+        );
+
+        CommandNpcIdentityService.IdentityResolution resolution =
+                service.resolve(record(current, "profile-a"));
+
+        assertFalse(index.isInitializationComplete());
+        assertEquals(CommandNpcIdentityService.ResolutionStatus.RESOLVED, resolution.status());
+        assertEquals(List.of(current), resolution.liveUuids());
+        assertFalse(resolution.replacementAllowed());
+    }
+
+    @Test
+    void oneUuidInMultipleLocationsIsAnIdentityConflict() {
+        UUID current = UUID.randomUUID();
+        NpcIdentityRepository.ProfileIdentity identity = identity(
+                "profile-a", current, List.of(current), true,
+                emptyFlags(), null, null);
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        index.recordAdded(current, LOCATION_A);
+        index.recordAdded(current, LOCATION_B);
+        CommandNpcIdentityService service = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> found(identity),
+                index::probe
+        );
+
+        CommandNpcIdentityService.IdentityResolution resolution =
+                service.resolve(record(current, "profile-a"));
+
+        assertEquals(CommandNpcIdentityService.ResolutionStatus.CONFLICT, resolution.status());
+        assertEquals("multiple_live_locations_for_uuid", resolution.failureReason());
+        assertEquals(List.of(current), resolution.liveUuids());
+        assertFalse(resolution.replacementAllowed());
+    }
+
+    @Test
+    void liveAliasPlusUnknownAliasStillFailsClosed() {
+        UUID current = UUID.randomUUID();
+        UUID historical = UUID.randomUUID();
+        NpcIdentityRepository.ProfileIdentity identity = identity(
+                "profile-a", current, List.of(current, historical), true,
+                emptyFlags(), null, null);
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        index.recordAdded(current, LOCATION_A);
+        CommandNpcIdentityService service = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> found(identity),
+                index::probe
+        );
+
+        CommandNpcIdentityService.IdentityResolution resolution =
+                service.resolve(record(historical, "profile-a"));
+
+        assertEquals(CommandNpcIdentityService.ResolutionStatus.FAILED, resolution.status());
+        assertEquals("loaded_identity_index_incomplete", resolution.failureReason());
+        assertEquals(List.of(current, historical), resolution.checkedUuids());
+        assertEquals(List.of(current), resolution.liveUuids());
+        assertFalse(resolution.replacementAllowed());
+    }
+
+    @Test
+    void completeIndexAbsenceCanAuthorizeLostReplacement() {
+        UUID current = UUID.randomUUID();
+        NpcIdentityRepository.ProfileFlags awaitingLost =
+                new NpcIdentityRepository.ProfileFlags(false, false, true, false, null, null);
+        NpcIdentityRepository.ProfileIdentity identity = identity(
+                "profile-a", current, List.of(current), true,
+                awaitingLost, null, null);
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        index.markInitializationComplete();
+        CommandNpcIdentityService service = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> found(identity),
+                index::probe
+        );
+
+        CommandNpcIdentityService.IdentityResolution resolution =
+                service.resolve(record(current, "profile-a"));
+
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(current).status());
+        assertEquals(CommandNpcIdentityService.ResolutionStatus.RESOLVED, resolution.status());
+        assertTrue(resolution.liveUuids().isEmpty());
         assertTrue(resolution.replacementAllowed());
     }
 
@@ -122,7 +246,9 @@ class CommandNpcIdentityServiceTest {
                 (profileId, historicalUuid) -> found(identity),
                 npcUuid -> {
                     probed.add(npcUuid);
-                    return npcUuid.equals(unknownCached);
+                    return npcUuid.equals(unknownCached)
+                            ? oneLocation(npcUuid)
+                            : absent(npcUuid);
                 }
         );
 
@@ -232,6 +358,17 @@ class CommandNpcIdentityServiceTest {
     }
 
     @Test
+    void productionIdentityPathUsesTypedIndexProbeWithoutUniverseScan() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandNpcIdentityService.java"
+        ));
+
+        assertTrue(source.contains("existenceService::probe"));
+        assertFalse(source.contains("findLiveNpc"));
+        assertFalse(source.contains("Universe"));
+    }
+
+    @Test
     void repositoryConflictFailsClosedWithoutChoosingAProfile() {
         NpcIdentityRepository.IdentityLoadResult conflict = new NpcIdentityRepository.IdentityLoadResult(
                 NpcIdentityRepository.LoadStatus.CONFLICT, null,
@@ -310,7 +447,7 @@ class CommandNpcIdentityServiceTest {
                             NpcIdentityRepository.LoadStatus.NOT_FOUND,
                             null, null, null, null, null);
                 },
-                npcUuid -> false
+                this::absent
         );
 
         CommandNpcIdentityService.CanonicalizationResult result = service.canonicalize(List.of(
@@ -350,7 +487,7 @@ class CommandNpcIdentityServiceTest {
                                 "profile_and_uuid_resolve_differently",
                                 null
                         ),
-                npcUuid -> false
+                this::absent
         );
 
         CommandNpcIdentityService.CanonicalizationResult result =
@@ -389,8 +526,24 @@ class CommandNpcIdentityServiceTest {
                                               Set<UUID> liveUuids) {
         return new CommandNpcIdentityService(
                 (profileId, historicalUuid) -> result,
-                liveUuids::contains
+                npcUuid -> liveUuids.contains(npcUuid)
+                        ? oneLocation(npcUuid)
+                        : absent(npcUuid)
         );
+    }
+
+    private LoadedNpcIdentityIndex.Probe oneLocation(UUID npcUuid) {
+        return probe(npcUuid, LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION, LOCATION_A);
+    }
+
+    private LoadedNpcIdentityIndex.Probe absent(UUID npcUuid) {
+        return probe(npcUuid, LoadedNpcIdentityIndex.ProbeStatus.ABSENT);
+    }
+
+    private LoadedNpcIdentityIndex.Probe probe(UUID npcUuid,
+                                               LoadedNpcIdentityIndex.ProbeStatus status,
+                                               LoadedNpcIdentityIndex.Location... locations) {
+        return new LoadedNpcIdentityIndex.Probe(npcUuid, status, List.of(locations));
     }
 
     private NpcIdentityRepository.IdentityLoadResult found(

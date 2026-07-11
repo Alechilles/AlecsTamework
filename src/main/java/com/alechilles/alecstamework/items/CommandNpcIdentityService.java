@@ -87,7 +87,8 @@ final class CommandNpcIdentityService {
 
     @FunctionalInterface
     interface LiveNpcProbe {
-        boolean isLive(@Nonnull UUID npcUuid);
+        @Nonnull
+        LoadedNpcIdentityIndex.Probe probe(@Nonnull UUID npcUuid);
     }
 
     private final ProfileIdentityLoader identityLoader;
@@ -97,7 +98,7 @@ final class CommandNpcIdentityService {
     CommandNpcIdentityService(@Nonnull NpcIdentityRepository identityRepository,
                               @Nonnull CommandNpcExistenceService existenceService) {
         this(identityRepository::load,
-                npcUuid -> existenceService.findLiveNpc(npcUuid) != null,
+                existenceService::probe,
                 new LinkedNpcRecordCollection());
     }
 
@@ -206,17 +207,49 @@ final class CommandNpcIdentityService {
             checked.add(record.npcUuid);
         }
         ArrayList<UUID> live = new ArrayList<>();
+        boolean unknownPresence = false;
+        boolean multipleLocations = false;
         try {
             for (UUID candidate : checked) {
-                if (candidate != null && liveNpcProbe.isLive(candidate)) {
-                    live.add(candidate);
+                if (candidate == null) {
+                    continue;
+                }
+                LoadedNpcIdentityIndex.Probe probe = liveNpcProbe.probe(candidate);
+                if (probe == null) {
+                    return failedFound(
+                            record, identity, checked, live, durable,
+                            "live_identity_probe_returned_null", null
+                    );
+                }
+                switch (probe.status()) {
+                    case UNKNOWN -> unknownPresence = true;
+                    case ABSENT -> {
+                    }
+                    case ONE_LOCATION -> live.add(candidate);
+                    case MULTIPLE_LOCATIONS -> {
+                        live.add(candidate);
+                        multipleLocations = true;
+                    }
                 }
             }
         } catch (RuntimeException exception) {
-            return failedFound(record, identity, checked, durable, "live_identity_probe_failed", exception);
+            return failedFound(
+                    record, identity, checked, live, durable,
+                    "live_identity_probe_failed", exception
+            );
         }
-        ResolutionStatus status = live.size() > 1 ? ResolutionStatus.CONFLICT : ResolutionStatus.RESOLVED;
-        String reason = live.size() > 1 ? "multiple_live_profile_aliases" : null;
+        if (unknownPresence) {
+            return failedFound(
+                    record, identity, checked, live, durable,
+                    "loaded_identity_index_incomplete", null
+            );
+        }
+        ResolutionStatus status = multipleLocations || live.size() > 1
+                ? ResolutionStatus.CONFLICT
+                : ResolutionStatus.RESOLVED;
+        String reason = multipleLocations
+                ? "multiple_live_locations_for_uuid"
+                : live.size() > 1 ? "multiple_live_profile_aliases" : null;
         boolean replacementAllowed = status == ResolutionStatus.RESOLVED
                 && live.isEmpty()
                 && durable.lostAwaitingRecovery()
@@ -255,12 +288,13 @@ final class CommandNpcIdentityService {
     private IdentityResolution failedFound(@Nonnull LinkedNpcRecord record,
                                            @Nonnull NpcIdentityRepository.ProfileIdentity identity,
                                            @Nonnull LinkedHashSet<UUID> checked,
+                                           @Nonnull List<UUID> live,
                                            @Nonnull DurableStateFlags durable,
                                            @Nonnull String reason,
-                                           @Nonnull RuntimeException failure) {
+                                           @Nullable Throwable failure) {
         return new IdentityResolution(
                 ResolutionStatus.FAILED, identity.profileId(), null, record.npcUuid,
-                identity.currentNpcUuid(), identity.aliases(), List.copyOf(checked), List.of(),
+                identity.currentNpcUuid(), identity.aliases(), List.copyOf(checked), live,
                 identity.historicalUuidKnown(), durable, false, reason, failure
         );
     }
