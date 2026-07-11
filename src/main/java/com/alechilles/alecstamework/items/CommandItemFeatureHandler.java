@@ -51,6 +51,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
@@ -120,6 +121,9 @@ public final class CommandItemFeatureHandler {
     private final CommandStepExecutionService stepExecutionService;
     private final CommandLinkMutationService linkMutationService;
     private final CommandNpcExistenceService npcExistenceService;
+    private final CommandCanonicalRecordCommitGate canonicalRecordCommitGate;
+    @Nullable
+    private final CommandNpcProfileActionResolver profileActionResolver;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandRespawnService respawnService;
     @Nullable
@@ -202,11 +206,6 @@ public final class CommandItemFeatureHandler {
                 npcNameResolver
         );
         this.companionPlacementService = new CommandCompanionPlacementService();
-        this.recipientService = new CommandRecipientService(
-                linkPolicyService,
-                linkedNpcRecordStore,
-                panelPreferenceService
-        );
         this.stepExecutionService = new CommandStepExecutionService(
                 relocationService,
                 linkedNpcRecordStore,
@@ -215,6 +214,20 @@ public final class CommandItemFeatureHandler {
         this.npcExistenceService = stateSnapshotService != null
                 ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
                 : new CommandNpcExistenceService();
+        this.canonicalRecordCommitGate = new CommandCanonicalRecordCommitGate();
+        CommandNpcIdentityService npcIdentityService = persistenceRuntime != null
+                ? new CommandNpcIdentityService(
+                        persistenceRuntime.getNpcIdentityRepository(), npcExistenceService)
+                : null;
+        this.profileActionResolver = npcIdentityService != null
+                ? new CommandNpcProfileActionResolver(npcIdentityService)
+                : null;
+        this.recipientService = new CommandRecipientService(
+                linkPolicyService,
+                linkedNpcRecordStore,
+                panelPreferenceService,
+                profileActionResolver
+        );
         this.relocationDispatchService = new CommandRelocationDispatchService(
                 relocationService,
                 deathService,
@@ -234,8 +247,7 @@ public final class CommandItemFeatureHandler {
         );
         this.lostRecoveryCoordinator = persistenceRuntime != null
                 ? new CommandLostRecoveryCoordinator(
-                    new CommandNpcIdentityService(
-                            persistenceRuntime.getNpcIdentityRepository(), npcExistenceService),
+                    npcIdentityService,
                     persistenceRuntime.getLostRepository(),
                     persistenceRuntime.getNpcRecoveryOperationRepository(),
                     persistenceRuntime.getNpcLiveAliasRepairRepository(),
@@ -259,7 +271,8 @@ public final class CommandItemFeatureHandler {
                 HYBRID_PATH_DISTANCE_BEFORE_TELEPORT,
                 HYBRID_TELEPORT_DELAY_MS,
                 RECALL_SAFE_SPAWN_DISTANCE,
-                RECALL_FORCE_RELOCATE_DISTANCE
+                RECALL_FORCE_RELOCATE_DISTANCE,
+                profileActionResolver
         );
         this.locateService = new CommandLinkedNpcLocateService(
                 linkMutationService,
@@ -388,8 +401,35 @@ public final class CommandItemFeatureHandler {
             if (linkedRecords.isEmpty()) {
                 continue;
             }
-            for (LinkedNpcRecord record : linkedRecords) {
-                if (record == null || record.npcUuid == null || !record.active || queuedNpcUuids.contains(record.npcUuid)) {
+            if (profileActionResolver != null) {
+                CommandNpcProfileActionResolver.CanonicalRecords canonical =
+                        profileActionResolver.canonicalizeRecords(linkedRecords);
+                if (!canonical.safeToPersist()) {
+                    continue;
+                }
+                linkedRecords = canonical.records();
+                if (canonical.identityChanged()) {
+                    ItemStack canonicalStack =
+                            linkMutationService.writeLinkedNpcRecords(stack, linkedRecords);
+                    short canonicalSlot = slot;
+                    boolean committed = canonicalRecordCommitGate.commitBeforeAction(
+                            true,
+                            () -> {
+                                ItemStackSlotTransaction transaction =
+                                        hotbar.setItemStackForSlot(canonicalSlot, canonicalStack);
+                                return transaction != null && transaction.succeeded();
+                            }
+                    );
+                    if (!committed) {
+                        continue;
+                    }
+                    stack = canonicalStack;
+                }
+            }
+            for (LinkedNpcRecord cachedRecord : linkedRecords) {
+                LinkedNpcRecord record = resolveRelocationRecord(cachedRecord);
+                if (record == null || record.npcUuid == null || !record.active
+                        || queuedNpcUuids.contains(record.npcUuid)) {
                     continue;
                 }
                 if (deathService != null
@@ -458,6 +498,16 @@ public final class CommandItemFeatureHandler {
                 queuedNpcUuids.add(record.npcUuid);
             }
         }
+    }
+
+    @Nullable
+    private LinkedNpcRecord resolveRelocationRecord(@Nullable LinkedNpcRecord record) {
+        if (record == null || record.npcUuid == null || profileActionResolver == null) {
+            return record;
+        }
+        CommandNpcProfileActionResolver.ActionTarget target =
+                profileActionResolver.resolveRelocation(record);
+        return target.isActionable() ? target.resolvedRecord() : null;
     }
 
     private boolean isEligibleForWorldChangeTravel(LinkedNpcRecord record,
@@ -650,6 +700,18 @@ public final class CommandItemFeatureHandler {
 
         List<Candidate> recipients = recipientService.queryRecipients(context);
         List<LinkedNpcRecord> unloadedLinked = recipientService.queryUnloadedLinkedRecords(context, recipients);
+        if (context.itemChanged && context.workingItem != working) {
+            ItemStack canonicalStack = context.workingItem;
+            if (!canonicalRecordCommitGate.commitBeforeAction(
+                    true, () -> updateHeldItem(player, canonicalStack))) {
+                feedbackService.showWarningKey(
+                        player, "tamework.ui.notifications.command.shared.itemNotFound");
+                return false;
+            }
+            working = canonicalStack;
+            updateHeldItem = false;
+            context.itemChanged = false;
+        }
         if (recipients.isEmpty() && unloadedLinked.isEmpty()) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);

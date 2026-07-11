@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 
 /**
  * Executes per-NPC menu move actions (Recall / Return Home) for command items.
@@ -43,6 +45,9 @@ final class CommandMenuMoveService {
     private final long defaultReturnHomeTeleportDelayMs;
     private final double defaultRecallSafeSpawnDistance;
     private final double defaultRecallForceRelocateDistance;
+    private final CommandCanonicalRecordCommitGate canonicalRecordCommitGate;
+    @Nullable
+    private final CommandNpcProfileActionResolver profileActionResolver;
 
     CommandMenuMoveService(CommandResolutionService resolutionService,
                            CommandLinkMutationService linkMutationService,
@@ -58,6 +63,40 @@ final class CommandMenuMoveService {
                            long defaultReturnHomeTeleportDelayMs,
                            double defaultRecallSafeSpawnDistance,
                            double defaultRecallForceRelocateDistance) {
+        this(
+                resolutionService,
+                linkMutationService,
+                deathService,
+                captureService,
+                coopService,
+                lostService,
+                relocationDispatchService,
+                stepExecutionService,
+                feedbackService,
+                defaultReturnHomeTeleportDistance,
+                defaultReturnHomePathDistanceBeforeTeleport,
+                defaultReturnHomeTeleportDelayMs,
+                defaultRecallSafeSpawnDistance,
+                defaultRecallForceRelocateDistance,
+                null
+        );
+    }
+
+    CommandMenuMoveService(CommandResolutionService resolutionService,
+                           CommandLinkMutationService linkMutationService,
+                           CommandLinkedNpcDeathService deathService,
+                           CommandLinkedNpcCaptureService captureService,
+                           CommandLinkedNpcCoopService coopService,
+                           CommandLinkedNpcLostService lostService,
+                           CommandRelocationDispatchService relocationDispatchService,
+                           CommandStepExecutionService stepExecutionService,
+                           CommandFeedbackService feedbackService,
+                           double defaultReturnHomeTeleportDistance,
+                           double defaultReturnHomePathDistanceBeforeTeleport,
+                           long defaultReturnHomeTeleportDelayMs,
+                           double defaultRecallSafeSpawnDistance,
+                           double defaultRecallForceRelocateDistance,
+                           @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this.resolutionService = resolutionService;
         this.linkMutationService = linkMutationService;
         this.deathService = deathService;
@@ -72,6 +111,8 @@ final class CommandMenuMoveService {
         this.defaultReturnHomeTeleportDelayMs = defaultReturnHomeTeleportDelayMs;
         this.defaultRecallSafeSpawnDistance = defaultRecallSafeSpawnDistance;
         this.defaultRecallForceRelocateDistance = defaultRecallForceRelocateDistance;
+        this.canonicalRecordCommitGate = new CommandCanonicalRecordCommitGate();
+        this.profileActionResolver = profileActionResolver;
     }
 
     void applyMenuMoveCommand(Player player,
@@ -116,10 +157,46 @@ final class CommandMenuMoveService {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
+            List<LinkedNpcRecord> linkedRecords = linkMutationService.readLinkedNpcRecords(stack);
+            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkedRecords, npcUuid);
             if (record == null) {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
+            }
+            record = resolveRelocationRecord(record);
+            if (record == null || record.npcUuid == null) {
+                feedbackService.showWarningKey(
+                        player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
+                return;
+            }
+            npcUuid = record.npcUuid;
+            if (profileActionResolver != null) {
+                CommandNpcProfileActionResolver.CanonicalRecords canonical =
+                        profileActionResolver.canonicalizeRecords(linkedRecords);
+                if (!canonical.safeToPersist()) {
+                    feedbackService.showWarningKey(
+                            player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
+                    return;
+                }
+                if (canonical.identityChanged()) {
+                    ItemStack canonicalStack =
+                            linkMutationService.writeLinkedNpcRecords(stack, canonical.records());
+                    short canonicalSlot = slot;
+                    boolean committed = canonicalRecordCommitGate.commitBeforeAction(
+                            true,
+                            () -> {
+                                ItemStackSlotTransaction transaction =
+                                        hotbar.setItemStackForSlot(canonicalSlot, canonicalStack);
+                                return transaction != null && transaction.succeeded();
+                            }
+                    );
+                    if (!committed) {
+                        feedbackService.showWarningKey(
+                                player, "tamework.ui.notifications.command.shared.itemNotFound");
+                        return;
+                    }
+                    stack = canonicalStack;
+                }
             }
             if (deathService != null
                     && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
@@ -294,6 +371,16 @@ final class CommandMenuMoveService {
             return;
         }
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
+    }
+
+    @Nullable
+    private LinkedNpcRecord resolveRelocationRecord(@Nullable LinkedNpcRecord record) {
+        if (record == null || record.npcUuid == null || profileActionResolver == null) {
+            return record;
+        }
+        CommandNpcProfileActionResolver.ActionTarget target =
+                profileActionResolver.resolveRelocation(record);
+        return target.isActionable() ? target.resolvedRecord() : null;
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.LostRepository;
+import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -71,31 +72,33 @@ public final class CommandLinkedNpcLostService {
     private final CommandLinkedNpcCoopService coopService;
     @Nullable
     private final CommandLostTransitionPersistenceService transitionPersistenceService;
+    @Nullable
+    private final CommandNpcProfileActionResolver profileActionResolver;
     private volatile long lastBlockedMutationLogAtMs;
 
     public CommandLinkedNpcLostService() {
-        this(null, null, null, null, null, null, null);
+        this((Path) null, null, null, null, null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath) {
-        this(persistencePath, null, null, null, null, null, null);
+        this(persistencePath, null, null, null, null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath, @Nullable HytaleLogger logger) {
-        this(persistencePath, logger, null, null, null, null, null);
+        this(persistencePath, logger, null, null, null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath,
                                        @Nullable HytaleLogger logger,
                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
-        this(persistencePath, logger, stateSnapshotService, null, null, null, null);
+        this(persistencePath, logger, stateSnapshotService, null, null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath,
                                        @Nullable HytaleLogger logger,
                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                        @Nullable CommandLinkedNpcCaptureService captureService) {
-        this(persistencePath, logger, stateSnapshotService, captureService, null, null, null);
+        this(persistencePath, logger, stateSnapshotService, captureService, null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath,
@@ -103,7 +106,7 @@ public final class CommandLinkedNpcLostService {
                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                        @Nullable CommandLinkedNpcCaptureService captureService,
                                        @Nullable CommandLinkedNpcCoopService coopService) {
-        this(persistencePath, logger, stateSnapshotService, captureService, coopService, null, null);
+        this(persistencePath, logger, stateSnapshotService, captureService, coopService, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable HytaleLogger logger,
@@ -112,7 +115,32 @@ public final class CommandLinkedNpcLostService {
                                        @Nullable CommandLinkedNpcCoopService coopService,
                                        @Nonnull LostRepository repository,
                                        @Nonnull PersistenceHealthService healthService) {
-        this(null, logger, stateSnapshotService, captureService, coopService, repository, healthService);
+        this(null, logger, stateSnapshotService, captureService, coopService, repository, healthService, null);
+    }
+
+    public CommandLinkedNpcLostService(@Nullable HytaleLogger logger,
+                                       @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                       @Nullable CommandLinkedNpcCaptureService captureService,
+                                       @Nullable CommandLinkedNpcCoopService coopService,
+                                       @Nonnull LostRepository repository,
+                                       @Nonnull PersistenceHealthService healthService,
+                                       @Nonnull NpcIdentityRepository identityRepository,
+                                       @Nonnull LoadedNpcIdentityIndex loadedIdentityIndex) {
+        this(
+                null,
+                logger,
+                stateSnapshotService,
+                captureService,
+                coopService,
+                repository,
+                healthService,
+                new CommandNpcProfileActionResolver(
+                        new CommandNpcIdentityService(
+                                identityRepository,
+                                new CommandNpcExistenceService(loadedIdentityIndex)
+                        )
+                )
+        );
     }
 
     @Nonnull
@@ -122,6 +150,7 @@ public final class CommandLinkedNpcLostService {
         }
         CommandLinkedNpcLostService service = new CommandLinkedNpcLostService(
                 legacyPath,
+                null,
                 null,
                 null,
                 null,
@@ -138,7 +167,8 @@ public final class CommandLinkedNpcLostService {
                                         @Nullable CommandLinkedNpcCaptureService captureService,
                                         @Nullable CommandLinkedNpcCoopService coopService,
                                         @Nullable LostRepository repository,
-                                        @Nullable PersistenceHealthService healthService) {
+                                        @Nullable PersistenceHealthService healthService,
+                                        @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this.persistencePath = persistencePath != null ? persistencePath.toAbsolutePath().normalize() : null;
         this.logger = logger;
         this.stateSnapshotService = stateSnapshotService;
@@ -146,6 +176,7 @@ public final class CommandLinkedNpcLostService {
         this.coopService = coopService;
         this.repository = repository;
         this.healthService = healthService;
+        this.profileActionResolver = profileActionResolver;
         this.transitionPersistenceService = repository != null && stateSnapshotService != null
                 ? new CommandLostTransitionPersistenceService(stateSnapshotService, repository)
                 : null;
@@ -163,6 +194,10 @@ public final class CommandLinkedNpcLostService {
         if (!canMutate()) {
             return;
         }
+        if (npcUuid == null) {
+            return;
+        }
+        npcUuid = resolveLostTransitionUuid(npcUuid);
         if (npcUuid == null) {
             return;
         }
@@ -217,6 +252,35 @@ public final class CommandLinkedNpcLostService {
         snapshotsByNpc.put(prepared.npcUuid(), prepared);
         CommandLostTransitionLogger.committed(logger, prepared, ownerUuid);
         persistSnapshots();
+    }
+
+    @Nullable
+    private UUID resolveLostTransitionUuid(@Nonnull UUID droppedNpcUuid) {
+        if (profileActionResolver == null) {
+            return droppedNpcUuid;
+        }
+        CommandNpcProfileActionResolver.ActionTarget target =
+                profileActionResolver.resolveLostTransition(droppedNpcUuid);
+        if (target.isActionable()) {
+            return target.targetNpcUuid();
+        }
+        if (logger != null) {
+            Level level = target.status() == CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED
+                    ? Level.FINE
+                    : Level.WARNING;
+            logger.at(level).log(
+                    "Skipped profile-aware lost transition (droppedNpc="
+                            + droppedNpcUuid
+                            + ", profile="
+                            + target.profileId()
+                            + ", status="
+                            + target.status()
+                            + ", reason="
+                            + target.reason()
+                            + ")."
+            );
+        }
+        return null;
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {

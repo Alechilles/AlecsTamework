@@ -817,7 +817,9 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcCaptureService,
                 commandLinkedNpcCoopService,
                 persistenceRuntime.getLostRepository(),
-                persistenceRuntime.getHealthService()
+                persistenceRuntime.getHealthService(),
+                persistenceRuntime.getNpcIdentityRepository(),
+                commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()
         );
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
         commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);

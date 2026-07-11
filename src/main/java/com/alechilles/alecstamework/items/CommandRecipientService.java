@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Resolves loaded and unloaded command recipients from command context.
@@ -28,15 +29,25 @@ final class CommandRecipientService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandPanelPreferenceService panelPreferenceService;
+    @Nullable
+    private final CommandNpcProfileActionResolver profileActionResolver;
 
     CommandRecipientService(CommandLinkPolicyService linkPolicyService,
                             CommandLinkedNpcRecordStore linkedNpcRecordStore,
                             CommandPanelPreferenceService panelPreferenceService) {
+        this(linkPolicyService, linkedNpcRecordStore, panelPreferenceService, null);
+    }
+
+    CommandRecipientService(CommandLinkPolicyService linkPolicyService,
+                            CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                            CommandPanelPreferenceService panelPreferenceService,
+                            @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
                 : new CommandPanelPreferenceService();
+        this.profileActionResolver = profileActionResolver;
     }
 
     List<Candidate> queryRecipients(Context context) {
@@ -140,6 +151,10 @@ final class CommandRecipientService {
         if (linkedRecords.isEmpty()) {
             return List.of();
         }
+        linkedRecords = canonicalizeActiveStack(context, linkedRecords);
+        if (linkedRecords == null) {
+            return List.of();
+        }
         Set<UUID> loadedUuids = new HashSet<>();
         if (loadedRecipients != null) {
             for (Candidate recipient : loadedRecipients) {
@@ -168,7 +183,8 @@ final class CommandRecipientService {
         if (world == null) {
             return List.of();
         }
-        for (LinkedNpcRecord record : linkedRecords) {
+        for (LinkedNpcRecord cachedRecord : linkedRecords) {
+            LinkedNpcRecord record = resolveRelocationRecord(cachedRecord);
             if (record == null || record.npcUuid == null || loadedUuids.contains(record.npcUuid)) {
                 continue;
             }
@@ -194,6 +210,35 @@ final class CommandRecipientService {
             }
         }
         return unloaded;
+    }
+
+    @Nullable
+    private List<LinkedNpcRecord> canonicalizeActiveStack(
+            Context context,
+            List<LinkedNpcRecord> records) {
+        if (profileActionResolver == null) {
+            return records;
+        }
+        CommandNpcProfileActionResolver.CanonicalRecords canonical =
+                profileActionResolver.canonicalizeRecords(records);
+        if (!canonical.safeToPersist()) {
+            return null;
+        }
+        if (canonical.identityChanged()) {
+            context.workingItem = linkedNpcRecordStore.write(context.workingItem, canonical.records());
+            context.itemChanged = true;
+        }
+        return canonical.records();
+    }
+
+    @Nullable
+    private LinkedNpcRecord resolveRelocationRecord(@Nullable LinkedNpcRecord record) {
+        if (record == null || record.npcUuid == null || profileActionResolver == null) {
+            return record;
+        }
+        CommandNpcProfileActionResolver.ActionTarget target =
+                profileActionResolver.resolveRelocation(record);
+        return target.isActionable() ? target.resolvedRecord() : null;
     }
 
     private Map<UUID, LinkedNpcRecord> mapLinkedRecordsByUuid(List<LinkedNpcRecord> records) {

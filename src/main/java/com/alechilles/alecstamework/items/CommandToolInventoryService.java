@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -68,8 +69,8 @@ final class CommandToolInventoryService {
         if (slot < 0) {
             return false;
         }
-        hotbar.setItemStackForSlot((short) slot, updated);
-        return true;
+        ItemStackSlotTransaction transaction = hotbar.setItemStackForSlot((short) slot, updated);
+        return transaction != null && transaction.succeeded();
     }
 
     boolean setSelectedCommandOnTool(Player player, String toolId, String commandId) {
