@@ -47,6 +47,10 @@ class NpcRecoveryOperationConflictTest {
             new SqliteSchemaMigrator().migrate(connection);
             insertProfile(connection, "profile-a", SOURCE_A);
             insertProfile(connection, "profile-b", SOURCE_B);
+            putProfileState(connection, "profile-a", 0, 0, 1, 0);
+            putProfileState(connection, "profile-b", 0, 0, 1, 0);
+            insertLostSnapshot(connection, "profile-a", "{}");
+            insertLostSnapshot(connection, "profile-b", "{}");
         }
         health = new PersistenceHealthService();
         writeQueue = new PersistenceWriteQueue(connections, health, null);
@@ -112,6 +116,49 @@ class NpcRecoveryOperationConflictTest {
 
         assertEquals(ClaimStatus.CLAIMED, lostOnly.status());
         assertEquals(1, recoveryRowCount());
+    }
+
+    @Test
+    void missingStateNonLostMissingSnapshotAndRecoveredSnapshotAreRejected() throws Exception {
+        try (Connection connection = connections.openConnection()) {
+            execute(connection, "DELETE FROM profile_states WHERE profile_id = 'profile-a'");
+        }
+        assertProfileStateConflict("missing-state");
+
+        try (Connection connection = connections.openConnection()) {
+            putProfileState(connection, "profile-a", 0, 0, 0, 0);
+        }
+        assertProfileStateConflict("not-lost");
+
+        try (Connection connection = connections.openConnection()) {
+            putProfileState(connection, "profile-a", 0, 0, 1, 0);
+            execute(connection, "DELETE FROM npc_snapshots WHERE profile_id = 'profile-a'");
+        }
+        assertProfileStateConflict("missing-snapshot");
+
+        try (Connection connection = connections.openConnection()) {
+            insertLostSnapshot(connection, "profile-a",
+                    "{\"replacementNpcUuid\":\"" + TARGET_B + "\"}");
+        }
+        assertProfileStateConflict("already-recovered");
+        assertEquals(0, recoveryRowCount());
+    }
+
+    @Test
+    void corruptOrMultipleActiveLostSnapshotsFailClosed() throws Exception {
+        try (Connection connection = connections.openConnection()) {
+            execute(connection, "DELETE FROM npc_snapshots WHERE profile_id = 'profile-a'");
+            insertLostSnapshot(connection, "profile-a", "not-json");
+        }
+        assertClaimFailsIntegrity("corrupt-lost-snapshot");
+    }
+
+    @Test
+    void multipleActiveLostSnapshotsFailClosed() throws Exception {
+        try (Connection connection = connections.openConnection()) {
+            insertLostSnapshot(connection, "profile-a", "{}");
+        }
+        assertClaimFailsIntegrity("multiple-lost-snapshots");
     }
 
     @Test
@@ -235,6 +282,16 @@ class NpcRecoveryOperationConflictTest {
         assertNull(result.operation());
     }
 
+    private void assertClaimFailsIntegrity(String operationId) throws Exception {
+        PersistenceWriteQueue.WriteOutcome<NpcRecoveryOperationRepository.ClaimResult> outcome =
+                repository.claim(new RecoveryClaim(operationId, "profile-a", SOURCE_A, TARGET_A))
+                        .completion().get(3, TimeUnit.SECONDS);
+        assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, outcome.status());
+        assertInstanceOf(NpcRecoveryOperationTransactions.RepositoryIntegrityException.class,
+                outcome.failure());
+        assertEquals(0, recoveryRowCount());
+    }
+
     private <T> T committed(PersistenceWriteQueue.WriteSubmission<T> submission) throws Exception {
         assertTrue(submission.accepted());
         PersistenceWriteQueue.WriteOutcome<T> outcome =
@@ -273,6 +330,21 @@ class NpcRecoveryOperationConflictTest {
                 "INSERT INTO npc_uuid_aliases VALUES (?, ?, 0, 1)")) {
             statement.setString(1, npcUuid.toString());
             statement.setString(2, profileId);
+            statement.executeUpdate();
+        }
+    }
+
+    private void insertLostSnapshot(Connection connection,
+                                    String profileId,
+                                    String payloadJson) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO npc_snapshots (
+                    profile_id, snapshot_type, snapshot_version,
+                    payload_json, is_active, created_at_ms
+                ) VALUES (?, 'lost', 1, ?, 1, 1)
+                """)) {
+            statement.setString(1, profileId);
+            statement.setString(2, payloadJson);
             statement.executeUpdate();
         }
     }

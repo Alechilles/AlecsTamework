@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -67,18 +70,68 @@ final class NpcRecoveryConflictStore {
             statement.setString(1, profileId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
-                    return false;
+                    return true;
                 }
                 boolean captured = readBoolean(resultSet, "capture_active", profileId);
                 boolean dead = readBoolean(resultSet, "death_active", profileId);
-                readBoolean(resultSet, "lost_active", profileId);
+                boolean lost = readBoolean(resultSet, "lost_active", profileId);
                 boolean inCoop = readBoolean(resultSet, "in_coop", profileId);
                 if (resultSet.next()) {
                     throw integrity("multiple_profile_state_rows:" + profileId);
                 }
-                return captured || dead || inCoop;
+                return captured || dead || inCoop || !lost
+                        || activeLostSnapshotBlocksRecovery(connection, profileId);
             }
         }
+    }
+
+    private boolean activeLostSnapshotBlocksRecovery(@Nonnull Connection connection,
+                                                      @Nonnull String profileId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT payload_json
+                FROM npc_snapshots
+                WHERE profile_id = ? AND snapshot_type = 'lost' AND is_active = 1
+                ORDER BY created_at_ms DESC, snapshot_id LIMIT 2
+                """)) {
+            statement.setString(1, profileId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return true;
+                }
+                boolean hasReplacement = lostSnapshotHasReplacement(
+                        resultSet.getString("payload_json"),
+                        profileId
+                );
+                if (resultSet.next()) {
+                    throw integrity("multiple_active_lost_snapshots:" + profileId);
+                }
+                return hasReplacement;
+            }
+        }
+    }
+
+    private boolean lostSnapshotHasReplacement(@Nullable String payloadJson,
+                                               @Nonnull String profileId) {
+        JsonObject payload;
+        try {
+            payload = JsonParser.parseString(payloadJson == null ? "" : payloadJson).getAsJsonObject();
+        } catch (RuntimeException exception) {
+            throw new NpcRecoveryOperationTransactions.RepositoryIntegrityException(
+                    "invalid_active_lost_snapshot_json:" + profileId,
+                    exception
+            );
+        }
+        if (!payload.has("replacementNpcUuid")) {
+            return false;
+        }
+        JsonElement replacement = payload.get("replacementNpcUuid");
+        if (replacement == null || replacement.isJsonNull()
+                || !replacement.isJsonPrimitive()
+                || !replacement.getAsJsonPrimitive().isString()) {
+            throw integrity("invalid_lost_replacement_type:" + profileId);
+        }
+        parseRequiredUuid(replacement.getAsString(), profileId);
+        return true;
     }
 
     private boolean hasActiveManagedResident(@Nonnull Connection connection,
@@ -194,6 +247,17 @@ final class NpcRecoveryConflictStore {
                           int index,
                           @Nonnull UUID uuid) throws SQLException {
         statement.setString(index, uuid.toString());
+    }
+
+    private UUID parseRequiredUuid(@Nullable String raw, @Nonnull String profileId) {
+        try {
+            return UUID.fromString(raw == null ? "" : raw);
+        } catch (IllegalArgumentException exception) {
+            throw new NpcRecoveryOperationTransactions.RepositoryIntegrityException(
+                    "invalid_lost_replacement_uuid:" + profileId,
+                    exception
+            );
+        }
     }
 
     @Nonnull
