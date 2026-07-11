@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
@@ -89,7 +90,9 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         snapshotsByNpc.put(npcUuid, snapshot);
-        upsertProfile(snapshot);
+        if (!hasProjectionIdentity(reference, store)) {
+            upsertProfile(snapshot);
+        }
     }
 
     @Nullable
@@ -105,6 +108,28 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         snapshotsByNpc.remove(npcUuid);
+    }
+
+    private boolean hasProjectionIdentity(@Nonnull Ref<EntityStore> reference,
+                                          @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        if (markerType == null) {
+            return false;
+        }
+        return shouldDeferProfileUpsert(store.getComponent(reference, markerType));
+    }
+
+    static boolean shouldDeferProfileUpsert(@Nullable TameworkProjectionIdentityComponent marker) {
+        return marker != null
+                && marker.getProfileId() != null
+                && !marker.getProfileId().isBlank()
+                && marker.getOperationId() != null
+                && !marker.getOperationId().isBlank()
+                && (TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(marker.getProjectionKind())
+                    || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(
+                        marker.getProjectionKind()
+                ));
     }
 
     private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
