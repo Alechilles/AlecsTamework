@@ -20,7 +20,7 @@ import javax.annotation.Nullable;
  * Applies one signed-time-safe provisional breeding cooldown to a parent and its NPC alarm.
  */
 final class BreedingCooldownService {
-    private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
+    static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
 
     void applyParentCooldown(@Nonnull Ref<EntityStore> npcRef,
                              @Nonnull TameworkBreedingComponent breeding,
@@ -28,6 +28,28 @@ final class BreedingCooldownService {
                              @Nullable UUID partnerUuid,
                              long cooldownMs,
                              long nowMs,
+                             @Nonnull Store<EntityStore> store,
+                             @Nullable CommandBuffer<EntityStore> commandBuffer) {
+        applyParentCooldown(
+                npcRef,
+                breeding,
+                npc,
+                partnerUuid,
+                cooldownMs,
+                nowMs,
+                System.currentTimeMillis(),
+                store,
+                commandBuffer
+        );
+    }
+
+    void applyParentCooldown(@Nonnull Ref<EntityStore> npcRef,
+                             @Nonnull TameworkBreedingComponent breeding,
+                             @Nullable NPCEntity npc,
+                             @Nullable UUID partnerUuid,
+                             long cooldownMs,
+                             long nowMs,
+                             long happinessUpdatedAtMs,
                              @Nonnull Store<EntityStore> store,
                              @Nullable CommandBuffer<EntityStore> commandBuffer) {
         if (!npcRef.isValid()) {
@@ -39,7 +61,7 @@ final class BreedingCooldownService {
         breeding.setCooldownStartedAtMs(window.startedAtMs());
         breeding.setCooldownDurationMs(window.durationMs());
         breeding.setLastPartnerUuid(partnerUuid);
-        breeding.setLastHappinessUpdateMs(System.currentTimeMillis());
+        breeding.setLastHappinessUpdateMs(happinessUpdatedAtMs);
         breeding.clearManualBreedingReady();
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
         if (type != null) {

@@ -17,12 +17,23 @@ final class BreedingFertilityOffspringService {
     FertilityRoll rollOffspring(@Nullable Ref<EntityStore> parentARef,
                                 @Nullable Ref<EntityStore> parentBRef,
                                 @Nullable Store<EntityStore> store) {
-        double parentAMultiplier = resolveFertilityMultiplier(parentARef, store);
-        double parentBMultiplier = resolveFertilityMultiplier(parentBRef, store);
+        FertilityMultipliers multipliers = resolveMultipliers(parentARef, parentBRef, store);
+        double parentAMultiplier = multipliers.parentAMultiplier();
+        double parentBMultiplier = multipliers.parentBMultiplier();
         double expected = clampExpectedOffspring(parentAMultiplier * parentBMultiplier);
         double roll = ThreadLocalRandom.current().nextDouble();
         int count = resolveOffspringCount(expected, roll);
         return new FertilityRoll(parentAMultiplier, parentBMultiplier, expected, count);
+    }
+
+    /** Resolves live parent modifiers without sampling the litter roll. */
+    FertilityMultipliers resolveMultipliers(@Nullable Ref<EntityStore> parentARef,
+                                            @Nullable Ref<EntityStore> parentBRef,
+                                            @Nullable Store<EntityStore> store) {
+        return new FertilityMultipliers(
+                resolveFertilityMultiplier(parentARef, store),
+                resolveFertilityMultiplier(parentBRef, store)
+        );
     }
 
     static int resolveOffspringCount(double expectedOffspring, double roll) {
@@ -68,5 +79,8 @@ final class BreedingFertilityOffspringService {
                          double parentBMultiplier,
                          double expectedOffspring,
                          int offspringCount) {
+    }
+
+    record FertilityMultipliers(double parentAMultiplier, double parentBMultiplier) {
     }
 }

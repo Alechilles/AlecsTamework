@@ -134,6 +134,34 @@ public final class BreedingBirthJobRegistry {
         return finish(storeScope, jobId, BreedingBirthJobState.CANCELLED);
     }
 
+    /** Cancels a globally located job when its world/store is already unavailable. */
+    @Nonnull
+    public TerminalResult cancel(@Nonnull UUID jobId) {
+        return finish(jobId, BreedingBirthJobState.CANCELLED);
+    }
+
+    /** Fails a globally located job when execution never obtained a usable store scope. */
+    @Nonnull
+    public TerminalResult fail(@Nonnull UUID jobId) {
+        return finish(jobId, BreedingBirthJobState.FAILED);
+    }
+
+    @Nonnull
+    private TerminalResult finish(UUID jobId, BreedingBirthJobState outcome) {
+        Objects.requireNonNull(jobId, "jobId");
+        Objects.requireNonNull(outcome, "outcome");
+        synchronized (lock) {
+            if (closed) {
+                return new TerminalResult(TerminalStatus.SCOPE_CLOSED, Optional.empty());
+            }
+            JobLocator locator = liveLocator(jobId);
+            if (locator == null) {
+                return new TerminalResult(TerminalStatus.NOT_FOUND, Optional.empty());
+            }
+            return locator.state.finish(jobId, outcome);
+        }
+    }
+
     /** Cancels the active job, if any, containing the current entity UUID. */
     @Nonnull
     public TerminalResult cancelByParentUuid(@Nonnull Object storeScope, @Nonnull UUID parentUuid) {
