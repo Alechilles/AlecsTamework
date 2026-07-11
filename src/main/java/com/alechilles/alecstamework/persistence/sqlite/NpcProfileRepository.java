@@ -534,7 +534,7 @@ public final class NpcProfileRepository {
             insert.setString(2, snapshotType);
             insert.setInt(3, nextVersion);
             insert.setString(4, normalizedPayload);
-            insert.setLong(5, createdAtMs > 0L ? createdAtMs : System.currentTimeMillis());
+            insert.setLong(5, createdAtMs != 0L ? createdAtMs : System.currentTimeMillis());
             insert.executeUpdate();
         }
     }
