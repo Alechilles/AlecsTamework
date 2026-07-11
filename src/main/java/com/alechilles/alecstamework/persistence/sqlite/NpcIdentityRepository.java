@@ -165,6 +165,11 @@ public final class NpcIdentityRepository {
     @Nonnull
     private ProfileFlags loadFlags(@Nonnull Connection connection, @Nonnull String profileId)
             throws SQLException {
+        boolean captured;
+        boolean dead;
+        boolean lost;
+        boolean legacyInCoop;
+        String legacyCoopKey;
         try (PreparedStatement statement = connection.prepareStatement("""
                 SELECT capture_active, death_active, lost_active, in_coop, coop_key
                 FROM profile_states WHERE profile_id = ? LIMIT 1
@@ -174,13 +179,50 @@ public final class NpcIdentityRepository {
                 if (!resultSet.next()) {
                     return ProfileFlags.EMPTY;
                 }
-                return new ProfileFlags(
-                        readBoolean(resultSet, "capture_active"),
-                        readBoolean(resultSet, "death_active"),
-                        readBoolean(resultSet, "lost_active"),
-                        readBoolean(resultSet, "in_coop"),
-                        resultSet.getString("coop_key")
-                );
+                captured = readBoolean(resultSet, "capture_active");
+                dead = readBoolean(resultSet, "death_active");
+                lost = readBoolean(resultSet, "lost_active");
+                legacyInCoop = readBoolean(resultSet, "in_coop");
+                legacyCoopKey = resultSet.getString("coop_key");
+            }
+        }
+        UUID replacementUuid = lost ? loadActiveLostReplacementUuid(connection, profileId) : null;
+        return new ProfileFlags(
+                captured, dead, lost, legacyInCoop, legacyCoopKey, replacementUuid
+        );
+    }
+
+    @Nullable
+    private UUID loadActiveLostReplacementUuid(@Nonnull Connection connection,
+                                               @Nonnull String profileId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT json_type(payload_json, '$.replacementNpcUuid') AS replacement_type,
+                       json_extract(payload_json, '$.replacementNpcUuid') AS replacement_uuid
+                FROM npc_snapshots
+                WHERE profile_id = ? AND snapshot_type = 'lost' AND is_active = 1
+                ORDER BY created_at_ms DESC, snapshot_id LIMIT 2
+                """)) {
+            statement.setString(1, profileId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+                String replacementType = resultSet.getString("replacement_type");
+                UUID replacementUuid = null;
+                if (replacementType != null) {
+                    if (!"text".equals(replacementType)) {
+                        throw new IdentityIntegrityException(
+                                "invalid_lost_replacement_type:" + replacementType);
+                    }
+                    replacementUuid = parseRequiredUuid(
+                            resultSet.getString("replacement_uuid"),
+                            "lost_replacement_uuid"
+                    );
+                }
+                if (resultSet.next()) {
+                    throw new IdentityIntegrityException("multiple_active_lost_snapshots:" + profileId);
+                }
+                return replacementUuid;
             }
         }
     }
@@ -312,8 +354,18 @@ public final class NpcIdentityRepository {
                                boolean dead,
                                boolean lost,
                                boolean legacyInCoop,
-                               @Nullable String legacyCoopKey) {
-        private static final ProfileFlags EMPTY = new ProfileFlags(false, false, false, false, null);
+                               @Nullable String legacyCoopKey,
+                               @Nullable UUID lostReplacementUuid) {
+        private static final ProfileFlags EMPTY =
+                new ProfileFlags(false, false, false, false, null, null);
+
+        public boolean lostAwaitingRecovery() {
+            return lost && lostReplacementUuid == null;
+        }
+
+        public boolean lostAlreadyRecovered() {
+            return lost && lostReplacementUuid != null;
+        }
     }
 
     public record ManagedAssignment(@Nonnull String residentId,
@@ -345,7 +397,7 @@ public final class NpcIdentityRepository {
         }
 
         public boolean replacementSuppressedByDurableState() {
-            return flags.captured() || flags.dead() || flags.lost() || flags.legacyInCoop()
+            return flags.captured() || flags.dead() || flags.lostAlreadyRecovered() || flags.legacyInCoop()
                     || managedAssignment != null || activeRecovery != null;
         }
     }

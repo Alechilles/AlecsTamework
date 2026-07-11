@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for fail-closed profile and historical-UUID resolution. */
@@ -105,6 +106,62 @@ class NpcIdentityRepositoryTest {
         assertEquals(NpcIdentityRepository.LoadStatus.FOUND, result.status());
         assertFalse(result.identity().historicalUuidKnown());
         assertEquals(CURRENT_A, result.identity().currentNpcUuid());
+    }
+
+    @Test
+    void distinguishesLostAwaitingRecoveryFromLostWithReplacement() throws Exception {
+        try (Connection connection = connections.openConnection()) {
+            execute(connection, "INSERT INTO profile_states VALUES "
+                    + "('profile-a', 0, 0, 1, 0, NULL, 10)");
+        }
+
+        NpcIdentityRepository.ProfileIdentity awaiting = repository.load("profile-a", null).identity();
+
+        assertTrue(awaiting.flags().lostAwaitingRecovery());
+        assertNull(awaiting.flags().lostReplacementUuid());
+        assertFalse(awaiting.replacementSuppressedByDurableState());
+
+        UUID replacement = uuid(44L);
+        try (Connection connection = connections.openConnection()) {
+            execute(connection, """
+                    INSERT INTO npc_snapshots (
+                        profile_id, snapshot_type, snapshot_version, payload_json,
+                        is_active, created_at_ms
+                    ) VALUES (
+                        'profile-a', 'lost', 1,
+                        '{"replacementNpcUuid":"00000000-0000-0000-0000-00000000002c"}',
+                        1, 11
+                    )
+                    """);
+        }
+
+        NpcIdentityRepository.ProfileIdentity recovered = repository.load("profile-a", null).identity();
+
+        assertTrue(recovered.flags().lostAlreadyRecovered());
+        assertEquals(replacement, recovered.flags().lostReplacementUuid());
+        assertTrue(recovered.replacementSuppressedByDurableState());
+    }
+
+    @Test
+    void malformedLostReplacementFailsClosed() throws Exception {
+        try (Connection connection = connections.openConnection()) {
+            execute(connection, "INSERT INTO profile_states VALUES "
+                    + "('profile-a', 0, 0, 1, 0, NULL, 10)");
+            execute(connection, """
+                    INSERT INTO npc_snapshots (
+                        profile_id, snapshot_type, snapshot_version, payload_json,
+                        is_active, created_at_ms
+                    ) VALUES (
+                        'profile-a', 'lost', 1,
+                        '{"replacementNpcUuid":"not-a-uuid"}', 1, 11
+                    )
+                    """);
+        }
+
+        NpcIdentityRepository.IdentityLoadResult result = repository.load("profile-a", null);
+
+        assertEquals(NpcIdentityRepository.LoadStatus.FAILED, result.status());
+        assertTrue(result.failureReason().startsWith("invalid_uuid:lost_replacement_uuid"));
     }
 
     @Test
