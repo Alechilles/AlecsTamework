@@ -147,6 +147,9 @@ public final class LoadedNpcIdentityBootstrapService {
 
     void scheduleStartedTarget(@Nonnull ScanTarget target) {
         Objects.requireNonNull(target, "target");
+        if (hasUnresolvedBootstrapFailure()) {
+            bootstrapUniverse();
+        }
         long generation;
         synchronized (stateLock) {
             beginAdditionalAttemptIfIdleLocked();
@@ -158,6 +161,12 @@ public final class LoadedNpcIdentityBootstrapService {
             failedLocations.remove(target.location());
         }
         scheduleTarget(generation, target);
+    }
+
+    private boolean hasUnresolvedBootstrapFailure() {
+        synchronized (stateLock) {
+            return unresolvedGlobalFailure || !failedLocations.isEmpty();
+        }
     }
 
     private long beginReplacementAttemptLocked() {

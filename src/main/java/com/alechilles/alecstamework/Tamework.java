@@ -98,6 +98,7 @@ import com.alechilles.alecstamework.items.CoopDebugLogger;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
+import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
@@ -212,6 +213,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
+import com.hypixel.hytale.server.core.universe.world.events.StartWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
@@ -245,6 +247,7 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
     private CommandLinkedNpcLostService commandLinkedNpcLostService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
+    private LoadedNpcIdentityBootstrapService loadedNpcIdentityBootstrapService;
     private CoopResidentStateSnapshotService coopResidentStateSnapshotService;
     private Path runtimeDataDirectory;
     private TameworkPersistenceRuntime persistenceRuntime;
@@ -761,6 +764,10 @@ public class Tamework extends JavaPlugin {
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
                 persistenceRuntime.getNpcProfileRepository()
         );
+        loadedNpcIdentityBootstrapService = new LoadedNpcIdentityBootstrapService(
+                commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex(),
+                getLogger()
+        );
         api = new TameworkApiImpl(
                 persistenceRuntime,
                 apiEventBus,
@@ -914,6 +921,15 @@ public class Tamework extends JavaPlugin {
         settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);
 
         // Global listener to enforce owner-only interactions.
+        boolean identityBootstrapListenerRegistered = TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                StartWorldEvent.class,
+                loadedNpcIdentityBootstrapService::onStartWorld,
+                "loaded NPC identity bootstrap"
+        );
+        if (identityBootstrapListenerRegistered) {
+            loadedNpcIdentityBootstrapService.bootstrapUniverse();
+        }
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
         TameworkEventRegistrationSupport.registerGlobal(

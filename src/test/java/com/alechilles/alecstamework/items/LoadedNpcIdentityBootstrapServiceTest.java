@@ -196,6 +196,39 @@ class LoadedNpcIdentityBootstrapServiceTest {
     }
 
     @Test
+    void startedWorldRetriesPreviouslyFailedUniverseCoverage() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        UUID recoveredUuid = UUID.fromString("77777777-7777-7777-7777-777777777777");
+        LoadedNpcIdentityBootstrapService.ScanTarget failedTarget =
+                new LoadedNpcIdentityBootstrapService.ScanTarget(
+                        WORLD_A,
+                        Runnable::run,
+                        recorder -> {
+                            throw new IllegalStateException("first scan failed");
+                        }
+                );
+        LoadedNpcIdentityBootstrapService.ScanTarget recoveredTarget =
+                new LoadedNpcIdentityBootstrapService.ScanTarget(
+                        WORLD_A,
+                        Runnable::run,
+                        recorder -> recorder.record(recoveredUuid, null)
+                );
+        LoadedNpcIdentityBootstrapService service = new LoadedNpcIdentityBootstrapService(
+                index,
+                new SequencedTargetSource(List.of(List.of(failedTarget), List.of(recoveredTarget))),
+                (message, error) -> {
+                }
+        );
+
+        service.bootstrapUniverse();
+        service.scheduleStartedTarget(recoveredTarget);
+
+        assertTrue(index.isInitializationComplete());
+        assertTrue(index.probe(recoveredUuid).isKnownLive());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(MISSING_UUID).status());
+    }
+
+    @Test
     void startedWorldRevokesAbsenceUntilItsScanAndExplicitClearRemovesEvidence() {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
         ManualScheduler scheduler = new ManualScheduler();
@@ -227,6 +260,9 @@ class LoadedNpcIdentityBootstrapServiceTest {
         String snapshotSource = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandLinkedNpcStateSnapshotService.java"
         ));
+        String pluginSource = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/Tamework.java"
+        ));
 
         assertTrue(source.contains("public void onStartWorld(@Nonnull StartWorldEvent event)"));
         assertTrue(source.contains("world::execute"));
@@ -236,6 +272,9 @@ class LoadedNpcIdentityBootstrapServiceTest {
         assertTrue(source.contains("LoadedNpcLocationResolver.resolve(store)"));
         assertTrue(snapshotSource.contains("LoadedNpcLocationResolver.resolve(store)"));
         assertTrue(snapshotSource.contains("legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)"));
+        int startWorldRegistration = pluginSource.indexOf("StartWorldEvent.class");
+        int initialBootstrap = pluginSource.indexOf("loadedNpcIdentityBootstrapService.bootstrapUniverse()");
+        assertTrue(startWorldRegistration >= 0 && initialBootstrap > startWorldRegistration);
     }
 
     private static LoadedNpcIdentityBootstrapService service(
