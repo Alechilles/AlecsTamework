@@ -35,9 +35,9 @@ class RespawnTraceDiagnosticsWiringTest {
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "items", "CommandRespawnService.java"
     );
-    private static final Path LOST_RECOVERY_SERVICE = Paths.get(
+    private static final Path LOST_RECOVERY_COORDINATOR = Paths.get(
             "src", "main", "java",
-            "com", "alechilles", "alecstamework", "items", "CommandLostRecoveryService.java"
+            "com", "alechilles", "alecstamework", "items", "CommandLostRecoveryCoordinator.java"
     );
     private static final Path SPAWN_PHYSICS_RESET_SERVICE = Paths.get(
             "src", "main", "java",
@@ -143,21 +143,20 @@ class RespawnTraceDiagnosticsWiringTest {
     }
 
     @Test
-    void lostFallbackReplacementClearsSpawnPhysicsBeforeTraceProbes() throws IOException {
-        String content = Files.readString(LOST_RECOVERY_SERVICE, StandardCharsets.UTF_8);
+    void lostRecoveryClearsPhysicsOnlyInsideDurableProjectionFlow() throws IOException {
+        String content = Files.readString(LOST_RECOVERY_COORDINATOR, StandardCharsets.UTF_8);
         assertTrue(
-                content.contains("RecentRespawnTraceService.Trace respawnTrace = RespawnTraceLogSupport.startTrace("),
-                "Lost fallback replacement traces must be recorded even when debug log emission is disabled."
+                content.contains("projectionSpawner.spawn("),
+                "Lost recovery must use the planned pre-add projection spawner."
         );
         int reset = content.indexOf("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics");
-        int recordReplacement = content.indexOf("RespawnTraceLogSupport.recordReplacement");
-        int scheduleProbe = content.indexOf("RespawnTraceLogSupport.scheduleProbe");
-
         assertTrue(reset >= 0, "Lost-recovery replacements must clear inherited fall and velocity state.");
-        assertTrue(recordReplacement >= 0, "Lost-recovery replacements must still record the trace replacement.");
-        assertTrue(scheduleProbe >= 0, "Lost-recovery replacements must still schedule post-spawn probes.");
-        assertTrue(reset < recordReplacement, "Spawn physics reset should run before replacement trace recording.");
-        assertTrue(recordReplacement < scheduleProbe, "Trace replacement recording should happen before probes.");
+        assertTrue(content.contains("operationRepository.recordProjectionCreated("),
+                "Visible recovery projections must be recorded durably.");
+        assertTrue(content.contains("operationRepository.finalizeRecovery(finalization)"),
+                "Recovery identity must finalize atomically before follow-up effects.");
+        assertTrue(!content.contains("NPCPlugin.get()"),
+                "The coordinator must not retain the old direct/default fallback spawn path.");
     }
 
     @Test
