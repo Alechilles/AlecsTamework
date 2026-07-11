@@ -44,6 +44,10 @@ import javax.annotation.Nullable;
 public final class CommandLinkedNpcStateSnapshotService {
     private final ConcurrentHashMap<UUID, CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> snapshotsByNpc =
             new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, CoopResidentStateSnapshotService.CoopResidentStateSnapshot>
+            fullSnapshotsByNpc = new ConcurrentHashMap<>();
+    private final CoopResidentStateSnapshotService fullStateCaptureService = new CoopResidentStateSnapshotService();
+    private final CoopResidentStateSnapshotCodec fullStateCodec = new CoopResidentStateSnapshotCodec();
     @Nullable
     private final NpcProfileRepository profileRepository;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
@@ -91,6 +95,7 @@ public final class CommandLinkedNpcStateSnapshotService {
         }
         if (reason == RemoveReason.REMOVE) {
             snapshotsByNpc.remove(npcUuid);
+            fullSnapshotsByNpc.remove(npcUuid);
             return;
         }
         refreshFromEntity(reference, store);
@@ -136,9 +141,22 @@ public final class CommandLinkedNpcStateSnapshotService {
         CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot = buildSnapshot(reference, store, npc);
         if (snapshot == null) {
             snapshotsByNpc.remove(npcUuid);
+            fullSnapshotsByNpc.remove(npcUuid);
             return;
         }
         snapshotsByNpc.put(npcUuid, snapshot);
+        CoopResidentStateSnapshotService.CoopResidentStateSnapshot fullSnapshot =
+                fullStateCaptureService.captureSnapshotForPersistence(
+                        reference,
+                        store,
+                        npcUuid,
+                        resolveRoleId(npc)
+                );
+        if (fullSnapshot != null) {
+            fullSnapshotsByNpc.put(npcUuid, fullSnapshot);
+        } else {
+            fullSnapshotsByNpc.remove(npcUuid);
+        }
         if (!hasProjectionIdentity(reference, store)) {
             upsertProfile(snapshot);
         }
@@ -152,11 +170,20 @@ public final class CommandLinkedNpcStateSnapshotService {
         return snapshotsByNpc.get(npcUuid);
     }
 
+    /** Returns an isolated complete snapshot captured at the last live ECS boundary. */
+    @Nullable
+    public CoopResidentStateSnapshotService.CoopResidentStateSnapshot getFullSnapshot(UUID npcUuid) {
+        CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot =
+                npcUuid != null ? fullSnapshotsByNpc.get(npcUuid) : null;
+        return snapshot != null ? fullStateCodec.copy(snapshot) : null;
+    }
+
     public void clearSnapshot(UUID npcUuid) {
         if (npcUuid == null) {
             return;
         }
         snapshotsByNpc.remove(npcUuid);
+        fullSnapshotsByNpc.remove(npcUuid);
     }
 
     private boolean hasProjectionIdentity(@Nonnull Ref<EntityStore> reference,

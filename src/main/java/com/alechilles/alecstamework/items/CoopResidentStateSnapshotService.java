@@ -20,7 +20,6 @@ import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentCompon
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
 import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -45,7 +44,8 @@ import javax.annotation.Nullable;
 public final class CoopResidentStateSnapshotService {
     private final ConcurrentHashMap<UUID, CoopResidentStateSnapshot> snapshotsByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CoopResidentStateSnapshot> recentRemovedByRole = new ConcurrentHashMap<>();
-    private final CoopResidentStateRestorer stateRestorer = new CoopResidentStateRestorer();
+    private final CoopResidentStateSnapshotCodec snapshotCodec = new CoopResidentStateSnapshotCodec();
+    private final CoopResidentStateRestorer stateRestorer = new CoopResidentStateRestorer(snapshotCodec);
 
     @Nullable
     public RemovedCoopResidentCapture onNpcRemoved(@Nullable Ref<EntityStore> reference,
@@ -143,6 +143,15 @@ public final class CoopResidentStateSnapshotService {
         return snapshot;
     }
 
+    /** Captures full restorable state without registering a transient coop-ledger entry. */
+    @Nullable
+    public CoopResidentStateSnapshot captureSnapshotForPersistence(@Nullable Ref<EntityStore> reference,
+                                                                   @Nullable Store<EntityStore> store,
+                                                                   @Nullable UUID npcUuid,
+                                                                   @Nullable String roleId) {
+        return createSnapshot(reference, store, npcUuid, null, -1, roleId);
+    }
+
     @Nullable
     public CoopResidentStateSnapshot consumeRecentRemovedSnapshot(@Nullable String roleId, long maxAgeMs) {
         return consumeRecentRemovedSnapshot(roleId, null, -1, maxAgeMs);
@@ -233,26 +242,26 @@ public final class CoopResidentStateSnapshotService {
         }
         String normalizedCoopId = normalizeIdentifier(coopId);
         String normalizedRoleId = normalizeIdentifier(roleId);
-        CoopResidentStateSnapshot remapped = new CoopResidentStateSnapshot(
+        CoopResidentStateSnapshot remapped = snapshotCodec.copy(new CoopResidentStateSnapshot(
                 currentNpcUuid,
                 normalizedCoopId != null ? normalizedCoopId : sourceSnapshot.coopId(),
                 residentSlot >= 0 ? residentSlot : sourceSnapshot.residentSlot(),
                 normalizedRoleId != null ? normalizedRoleId : sourceSnapshot.roleId(),
-                copyComponent(sourceSnapshot.commandLinks()),
-                copyComponent(sourceSnapshot.owner()),
-                copyComponent(sourceSnapshot.tamed()),
-                copyComponent(sourceSnapshot.npcName()),
-                copyComponent(sourceSnapshot.happiness()),
-                copyComponent(sourceSnapshot.needs()),
-                copyComponent(sourceSnapshot.breeding()),
-                copyComponent(sourceSnapshot.leveling()),
-                copyComponent(sourceSnapshot.traits()),
-                copyComponent(sourceSnapshot.talents()),
-                copyComponent(sourceSnapshot.lifeStage()),
-                copyComponent(sourceSnapshot.attachments()),
+                sourceSnapshot.commandLinks(),
+                sourceSnapshot.owner(),
+                sourceSnapshot.tamed(),
+                sourceSnapshot.npcName(),
+                sourceSnapshot.happiness(),
+                sourceSnapshot.needs(),
+                sourceSnapshot.breeding(),
+                sourceSnapshot.leveling(),
+                sourceSnapshot.traits(),
+                sourceSnapshot.talents(),
+                sourceSnapshot.lifeStage(),
+                sourceSnapshot.attachments(),
                 sourceSnapshot.healthPercent(),
                 System.currentTimeMillis()
-        );
+        ));
         snapshotsByNpc.put(currentNpcUuid, remapped);
         debugCoop(
                 "state snapshot remap store current=" + currentNpcUuid
@@ -449,15 +458,6 @@ public final class CoopResidentStateSnapshotService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    @Nullable
-    @SuppressWarnings("unchecked")
-    private <T extends Component<EntityStore>> T copyComponent(@Nullable T component) {
-        if (component == null) {
-            return null;
-        }
-        return (T) component.clone();
-    }
-
     private void debugCoop(String message) {
         CoopDebugLogger.log(message);
     }
@@ -534,37 +534,36 @@ public final class CoopResidentStateSnapshotService {
             return null;
         }
         TameworkHappinessComponent happiness = resolveHappinessSnapshot(reference, store);
-        TameworkNeedsComponent needs = copyComponent(store.getComponent(reference, TameworkNeedsComponent.getComponentType()));
+        TameworkNeedsComponent needs = store.getComponent(reference, TameworkNeedsComponent.getComponentType());
         TameworkAttachmentsComponent attachments = resolveAttachmentSnapshot(reference, store);
         Double healthPercent = CompanionHealthStateService.captureHealthPercent(reference, store);
-        return new CoopResidentStateSnapshot(
+        return snapshotCodec.copy(new CoopResidentStateSnapshot(
                 npcUuid,
                 normalizeIdentifier(coopId),
                 residentSlot,
                 normalizeIdentifier(roleId),
-                copyComponent(store.getComponent(reference, TameworkCommandLinksComponent.getComponentType())),
-                copyComponent(store.getComponent(reference, TameworkOwnerComponent.getComponentType())),
-                copyComponent(store.getComponent(reference, TameworkTamedComponent.getComponentType())),
-                copyComponent(store.getComponent(reference, TameworkNpcNameComponent.getComponentType())),
+                store.getComponent(reference, TameworkCommandLinksComponent.getComponentType()),
+                store.getComponent(reference, TameworkOwnerComponent.getComponentType()),
+                store.getComponent(reference, TameworkTamedComponent.getComponentType()),
+                store.getComponent(reference, TameworkNpcNameComponent.getComponentType()),
                 happiness,
                 needs,
-                copyComponent(store.getComponent(reference, TameworkBreedingComponent.getComponentType())),
-                copyComponent(store.getComponent(reference, TameworkLevelingComponent.getComponentType())),
-                copyComponent(store.getComponent(reference, TameworkTraitsComponent.getComponentType())),
-                copyComponent(store.getComponent(reference, TameworkTalentsComponent.getComponentType())),
-                copyComponent(store.getComponent(reference, TameworkLifeStageComponent.getComponentType())),
+                store.getComponent(reference, TameworkBreedingComponent.getComponentType()),
+                store.getComponent(reference, TameworkLevelingComponent.getComponentType()),
+                store.getComponent(reference, TameworkTraitsComponent.getComponentType()),
+                store.getComponent(reference, TameworkTalentsComponent.getComponentType()),
+                store.getComponent(reference, TameworkLifeStageComponent.getComponentType()),
                 attachments,
                 healthPercent,
                 System.currentTimeMillis()
-        );
+        ));
     }
 
     @Nullable
     private TameworkHappinessComponent resolveHappinessSnapshot(@Nonnull Ref<EntityStore> reference,
                                                                 @Nonnull Store<EntityStore> store) {
-        TameworkHappinessComponent happiness = copyComponent(
-                store.getComponent(reference, TameworkHappinessComponent.getComponentType())
-        );
+        TameworkHappinessComponent happiness =
+                store.getComponent(reference, TameworkHappinessComponent.getComponentType());
         if (happiness != null) {
             return happiness;
         }
@@ -588,9 +587,8 @@ public final class CoopResidentStateSnapshotService {
     @Nullable
     private TameworkAttachmentsComponent resolveAttachmentSnapshot(@Nonnull Ref<EntityStore> reference,
                                                                    @Nonnull Store<EntityStore> store) {
-        TameworkAttachmentsComponent attachments = copyComponent(
-                store.getComponent(reference, TameworkAttachmentsComponent.getComponentType())
-        );
+        TameworkAttachmentsComponent attachments =
+                store.getComponent(reference, TameworkAttachmentsComponent.getComponentType());
         if (attachments != null && attachments.getAttachmentIds() != null && !attachments.getAttachmentIds().isEmpty()) {
             return attachments;
         }

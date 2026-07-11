@@ -94,6 +94,23 @@ class LostRepositoryTest {
     }
 
     @Test
+    void trackedDeleteQueuedAfterAcceptedUpsertLeavesNoActiveLostState() throws Exception {
+        PersistenceWriteQueue.WriteSubmission<LostRecoveryWriteResult> upsert =
+                repository.upsertTracked(lost(SOURCE_A, null), fullSnapshot(SOURCE_A));
+        PersistenceWriteQueue.WriteSubmission<Void> cancellation = repository.deleteTracked(SOURCE_A);
+
+        LostRecoveryWriteResult written = committed(upsert);
+        assertTrue(cancellation.accepted());
+        PersistenceWriteQueue.WriteOutcome<Void> cancellationOutcome =
+                cancellation.completion().get(3, TimeUnit.SECONDS);
+
+        assertEquals(PersistenceWriteQueue.WriteStatus.COMMITTED, cancellationOutcome.status());
+        assertEquals(LostRecoveryLoadResult.Status.NOT_FOUND,
+                repository.loadAwaitingByProfile(written.profileId()).status());
+        assertTrue(repository.loadAll().isEmpty());
+    }
+
+    @Test
     void tamperedSnapshotHashFailsClosed() throws Exception {
         LostRecoveryWriteResult written = committed(
                 repository.upsertTracked(lost(SOURCE_A, null), fullSnapshot(SOURCE_A)));

@@ -189,17 +189,24 @@ public final class LostRepository {
     }
 
     public boolean deleteAsync(@Nonnull UUID npcUuid) {
+        return deleteTracked(npcUuid).accepted();
+    }
+
+    /** Returns a completion only after ordered lost-state deactivation commits or fails. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Void> deleteTracked(@Nonnull UUID npcUuid) {
         AtomicReference<NpcProfileRepository.ProfileRecord> beforeRef = new AtomicReference<>();
         AtomicReference<NpcProfileRepository.ProfileRecord> afterRef = new AtomicReference<>();
-        return writeQueue.submit(
+        return writeQueue.submitTracked(
                 "lost_delete",
                 connection -> {
                     String profileId = profileRepository.resolveProfileIdInTransaction(connection, npcUuid);
                     beforeRef.set(profileId != null ? profileRepository.loadProfileByIdInTransaction(connection, profileId) : null);
                     deleteInTransaction(connection, npcUuid);
                     afterRef.set(profileId != null ? profileRepository.loadProfileByIdInTransaction(connection, profileId) : null);
+                    return null;
                 },
-                () -> profileRepository.notifyProfileChanged(beforeRef.get(), afterRef.get())
+                ignored -> profileRepository.notifyProfileChanged(beforeRef.get(), afterRef.get())
         );
     }
 

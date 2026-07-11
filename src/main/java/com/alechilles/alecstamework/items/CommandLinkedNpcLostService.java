@@ -69,6 +69,8 @@ public final class CommandLinkedNpcLostService {
     private final CommandLinkedNpcCaptureService captureService;
     @Nullable
     private final CommandLinkedNpcCoopService coopService;
+    @Nullable
+    private final CommandLostTransitionPersistenceService transitionPersistenceService;
     private volatile long lastBlockedMutationLogAtMs;
 
     public CommandLinkedNpcLostService() {
@@ -144,6 +146,9 @@ public final class CommandLinkedNpcLostService {
         this.coopService = coopService;
         this.repository = repository;
         this.healthService = healthService;
+        this.transitionPersistenceService = repository != null && stateSnapshotService != null
+                ? new CommandLostTransitionPersistenceService(stateSnapshotService, repository)
+                : null;
         loadPersistedSnapshots();
     }
 
@@ -181,46 +186,37 @@ public final class CommandLinkedNpcLostService {
         }
         LostLinkedNpcSnapshot current = snapshotsByNpc.get(npcUuid);
         long now = System.currentTimeMillis();
-        long resolvedQueuedAtMs = queuedAtMs > 0L ? queuedAtMs : now;
-        long resolvedDroppedAtMs = droppedAtMs > 0L ? droppedAtMs : now;
-        Vector3d resolvedLastKnown = copyVector(firstNonNull(sourceHintPosition, alternateSourceHintPosition, destination));
-        Vector3d resolvedHome = copyVector(alternateSourceHintPosition);
-        if (current != null) {
-            if (resolvedLastKnown == null) {
-                resolvedLastKnown = copyVector(current.lastKnownPosition());
-            }
-            if (resolvedHome == null) {
-                resolvedHome = copyVector(current.homePosition());
-            }
-            resolvedQueuedAtMs = current.lastRelocationQueuedAtMs() > 0L
-                    ? current.lastRelocationQueuedAtMs()
-                    : resolvedQueuedAtMs;
-        }
-        snapshotsByNpc.put(
+        LostLinkedNpcSnapshot prepared = CommandLostTransitionPersistenceService.prepare(
+                current,
                 npcUuid,
-                new LostLinkedNpcSnapshot(
-                        npcUuid,
-                        resolvedLastKnown,
-                        resolvedHome,
-                        resolvedQueuedAtMs,
-                        resolvedDroppedAtMs,
-                        Math.max(0, retryAttempts),
-                        null,
-                        0L
-                )
+                sourceHintPosition,
+                alternateSourceHintPosition,
+                destination,
+                queuedAtMs,
+                droppedAtMs,
+                retryAttempts,
+                now
         );
-        persistSnapshot(snapshotsByNpc.get(npcUuid));
-        if (logger != null) {
-            logger.at(Level.INFO).log(
-                    "Marked linked companion as lost after relocation retries (npc="
-                            + npcUuid
-                            + ", owner="
-                            + ownerUuid
-                            + ", retries="
-                            + Math.max(0, retryAttempts)
-                            + ")."
-            );
+        if (repository != null) {
+            CommandLostTransitionPersistenceService.PersistStatus status =
+                    transitionPersistenceService != null
+                            ? transitionPersistenceService.persist(
+                                    prepared,
+                                    committed -> {
+                                        snapshotsByNpc.put(committed.npcUuid(), committed);
+                                        CommandLostTransitionLogger.committed(logger, committed, ownerUuid);
+                                    }
+                            )
+                            : CommandLostTransitionPersistenceService.PersistStatus.MISSING_FULL_SNAPSHOT;
+            if (status != CommandLostTransitionPersistenceService.PersistStatus.ACCEPTED_PENDING
+                    && status != CommandLostTransitionPersistenceService.PersistStatus.ALREADY_PENDING) {
+                CommandLostTransitionLogger.rejected(logger, npcUuid, status);
+            }
+            return;
         }
+        snapshotsByNpc.put(prepared.npcUuid(), prepared);
+        CommandLostTransitionLogger.committed(logger, prepared, ownerUuid);
+        persistSnapshots();
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -234,6 +230,10 @@ public final class CommandLinkedNpcLostService {
         UUID npcUuid = npc != null ? npc.getUuid() : null;
         if (npcUuid == null) {
             return;
+        }
+        if (transitionPersistenceService != null) {
+            CommandLostTransitionLogger.cancelled(
+                    logger, npcUuid, transitionPersistenceService.cancel(npcUuid));
         }
         CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot recoverySnapshot =
                 buildRecoverySnapshot(reference, store, npc);
@@ -335,6 +335,10 @@ public final class CommandLinkedNpcLostService {
         if (npcUuid == null) {
             return;
         }
+        if (transitionPersistenceService != null) {
+            CommandLostTransitionLogger.cancelled(
+                    logger, npcUuid, transitionPersistenceService.cancel(npcUuid));
+        }
         LostLinkedNpcSnapshot snapshot = snapshotsByNpc.get(npcUuid);
         if (snapshot == null || !snapshot.isAwaitingRecovery()) {
             return;
@@ -354,6 +358,10 @@ public final class CommandLinkedNpcLostService {
         if (originalNpcUuid == null || replacementNpcUuid == null || originalNpcUuid.equals(replacementNpcUuid)) {
             return;
         }
+        if (transitionPersistenceService != null) {
+            CommandLostTransitionLogger.cancelled(
+                    logger, originalNpcUuid, transitionPersistenceService.cancel(originalNpcUuid));
+        }
         LostLinkedNpcSnapshot existing = snapshotsByNpc.get(originalNpcUuid);
         long now = System.currentTimeMillis();
         Vector3d resolvedLastKnown = copyVector(lastKnownPosition);
@@ -367,7 +375,7 @@ public final class CommandLinkedNpcLostService {
             if (resolvedHome == null) {
                 resolvedHome = copyVector(existing.homePosition());
             }
-            queuedAtMs = existing.lastRelocationQueuedAtMs() > 0L
+            queuedAtMs = existing.lastRelocationQueuedAtMs() != 0L
                     ? existing.lastRelocationQueuedAtMs()
                     : queuedAtMs;
             retries = Math.max(0, existing.relocationRetryAttempts());
@@ -641,19 +649,6 @@ public final class CommandLinkedNpcLostService {
     @Nullable
     private Vector3d copyVector(@Nullable Vector3d value) {
         return value != null ? new Vector3d(value) : null;
-    }
-
-    @Nullable
-    private Vector3d firstNonNull(@Nullable Vector3d first,
-                                  @Nullable Vector3d second,
-                                  @Nullable Vector3d third) {
-        if (first != null) {
-            return first;
-        }
-        if (second != null) {
-            return second;
-        }
-        return third;
     }
 
     @Nullable
