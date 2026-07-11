@@ -15,6 +15,7 @@ public final class ManagedCoopRuntimeServices {
     private final ManagedCoopResidentRepository residentRepository;
     private final CoopLifecycleOperationRepository lifecycleRepository;
     private final ManagedCoopCaptureProfileRepository captureProfileRepository;
+    private final ManagedCoopImportRepository importRepository;
     private final ManagedCoopResidentIndex residentIndex;
     private final ManagedCoopResidentIndexRefreshService residentIndexRefreshService;
     private final ManagedCoopLifecycleOperationIndex lifecycleIndex;
@@ -33,6 +34,7 @@ public final class ManagedCoopRuntimeServices {
                 residentRepository
         );
         captureProfileRepository = new ManagedCoopCaptureProfileRepository(writeQueue, profileRepository);
+        importRepository = new ManagedCoopImportRepository(connectionManager, writeQueue);
         residentIndex = new ManagedCoopResidentIndex();
         residentIndexRefreshService = new ManagedCoopResidentIndexRefreshService(
                 residentRepository,
@@ -70,6 +72,11 @@ public final class ManagedCoopRuntimeServices {
     @Nonnull
     public ManagedCoopCaptureProfileRepository captureProfileRepository() {
         return captureProfileRepository;
+    }
+
+    @Nonnull
+    public ManagedCoopImportRepository importRepository() {
+        return importRepository;
     }
 
     @Nonnull

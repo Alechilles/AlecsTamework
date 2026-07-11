@@ -8,16 +8,24 @@ import javax.annotation.Nonnull;
  * Adds durable identity, managed-coop assignment, lifecycle-operation, and import-conflict storage.
  */
 final class SqliteSchemaV5Migration {
+    private final SqliteManagedCoopImportSchema importSchema = new SqliteManagedCoopImportSchema();
+
     void apply(@Nonnull Connection connection) throws Exception {
         createRecoveryOperations(connection);
         createManagedCoopState(connection);
         createLifecycleOperations(connection);
         createImportConflicts(connection);
-        reconcileLegacyData(connection);
+        importSchema.ensure(connection);
+        reconcileLegacyRows(connection);
         createUniqueIndexes(connection);
     }
 
     void reconcileLegacyData(@Nonnull Connection connection) throws Exception {
+        importSchema.ensure(connection);
+        reconcileLegacyRows(connection);
+    }
+
+    private void reconcileLegacyRows(@Nonnull Connection connection) throws Exception {
         classifyLegacyRecoveryRows(connection);
         classifyLegacyCoopRows(connection);
     }

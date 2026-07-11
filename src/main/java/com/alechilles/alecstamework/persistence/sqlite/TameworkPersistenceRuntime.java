@@ -253,6 +253,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     @Nonnull
+    public ManagedCoopImportRepository getManagedCoopImportRepository() {
+        return managedCoopServices.importRepository();
+    }
+
+    @Nonnull
     public ManagedCoopRuntimeServices getManagedCoopServices() {
         return managedCoopServices;
     }
