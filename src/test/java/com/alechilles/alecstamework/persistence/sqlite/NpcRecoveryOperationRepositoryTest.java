@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -18,6 +19,7 @@ import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperati
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.LoadStatus;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.ReadFailureKind;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryClaim;
+import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryFinalization;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryOperation;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryState;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.TransitionStatus;
@@ -116,7 +118,7 @@ class NpcRecoveryOperationRepositoryTest {
                 0L
         ));
         assertEquals(TransitionStatus.TARGET_CONFLICT, actualConflict.status());
-        assertEquals("operation-a", actualConflict.operation().operationId());
+        assertEquals("operation-b", actualConflict.operation().operationId());
 
         RecoveryOperation unchanged = repository.loadByOperationId("operation-b").operation();
         assertRecovery(unchanged, RecoveryState.SPAWN_CLAIMED, true, 0L);
@@ -127,7 +129,8 @@ class NpcRecoveryOperationRepositoryTest {
     void projectionAndFinalizationUseOptimisticGenerationsAndReplaySafely() throws Exception {
         committed(repository.claim(new RecoveryClaim("operation-a", "profile-a", SOURCE_A, TARGET_A)));
 
-        var prematureFinalize = committed(repository.finalizeOperation("operation-a", "profile-a", 0L));
+        var prematureFinalize = committed(repository.finalizeRecovery(
+                finalization("operation-a", "profile-a", SOURCE_A, TARGET_A, 0L)));
         assertEquals(TransitionStatus.STATE_CONFLICT, prematureFinalize.status());
 
         var staleProjection = committed(repository.recordProjectionCreated(
@@ -159,23 +162,26 @@ class NpcRecoveryOperationRepositoryTest {
         assertEquals(TransitionStatus.REPLAYED, replayedProjection.status());
         assertEquals(1L, replayedProjection.operation().generation());
 
-        var staleFinalize = committed(repository.finalizeOperation("operation-a", "profile-a", 0L));
+        var staleFinalize = committed(repository.finalizeRecovery(
+                finalization("operation-a", "profile-a", SOURCE_A, TARGET_A, 0L)));
         assertEquals(TransitionStatus.GENERATION_CONFLICT, staleFinalize.status());
 
         clock.set(300L);
-        var finalized = committed(repository.finalizeOperation("operation-a", "profile-a", 1L));
+        var finalized = committed(repository.finalizeRecovery(
+                finalization("operation-a", "profile-a", SOURCE_A, TARGET_A, 1L)));
         assertEquals(TransitionStatus.APPLIED, finalized.status());
         assertRecovery(finalized.operation(), RecoveryState.FINALIZED, false, 2L);
         assertEquals(300L, finalized.operation().completedAtMs());
 
-        var replayedFinalize = committed(repository.finalizeOperation("operation-a", "profile-a", 1L));
+        var replayedFinalize = committed(repository.finalizeRecovery(
+                finalization("operation-a", "profile-a", SOURCE_A, TARGET_A, 1L)));
         assertEquals(TransitionStatus.REPLAYED, replayedFinalize.status());
 
         clock.set(400L);
         var nextRecovery = committed(repository.claim(
                 new RecoveryClaim("operation-a-next", "profile-a", TARGET_A, TARGET_C)
         ));
-        assertEquals(ClaimStatus.CLAIMED, nextRecovery.status());
+        assertEquals(ClaimStatus.PROFILE_STATE_CONFLICT, nextRecovery.status());
     }
 
     @Test
@@ -331,5 +337,14 @@ class NpcRecoveryOperationRepositoryTest {
 
     private static UUID uuid(String value) {
         return UUID.fromString(value);
+    }
+
+    private static RecoveryFinalization finalization(String operationId,
+                                                     String profileId,
+                                                     UUID sourceUuid,
+                                                     UUID targetUuid,
+                                                     long generation) {
+        return new RecoveryFinalization(
+                operationId, profileId, sourceUuid, targetUuid, targetUuid, generation, List.of());
     }
 }

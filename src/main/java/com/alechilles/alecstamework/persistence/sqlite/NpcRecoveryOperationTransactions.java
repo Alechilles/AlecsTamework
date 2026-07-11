@@ -4,6 +4,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -12,6 +16,7 @@ import javax.annotation.Nullable;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.ClaimResult;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.ClaimStatus;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryClaim;
+import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryFinalization;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryOperation;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.RecoveryState;
 import static com.alechilles.alecstamework.persistence.sqlite.NpcRecoveryOperationRepository.TransitionResult;
@@ -27,10 +32,12 @@ final class NpcRecoveryOperationTransactions {
 
     private final LongSupplier clock;
     private final NpcRecoveryConflictStore conflictStore;
+    private final NpcRecoveryFinalizationStore finalizationStore;
 
     NpcRecoveryOperationTransactions(@Nonnull LongSupplier clock) {
         this.clock = clock;
         this.conflictStore = new NpcRecoveryConflictStore();
+        this.finalizationStore = new NpcRecoveryFinalizationStore(conflictStore);
     }
 
     @Nonnull
@@ -133,6 +140,9 @@ final class NpcRecoveryOperationTransactions {
         if (!current.profileId().equals(profileId)) {
             return TransitionResult.conflict(TransitionStatus.PROFILE_CONFLICT, current);
         }
+        if (!actualTargetUuid.equals(current.plannedTargetUuid())) {
+            return TransitionResult.conflict(TransitionStatus.TARGET_CONFLICT, current);
+        }
         if ((current.state() == RecoveryState.PROJECTION_CREATED
                 || current.state() == RecoveryState.FINALIZED)
                 && actualTargetUuid.equals(current.actualTargetUuid())) {
@@ -170,34 +180,25 @@ final class NpcRecoveryOperationTransactions {
     }
 
     @Nonnull
-    TransitionResult finalizeOperation(@Nonnull Connection connection,
-                                       @Nonnull String operationId,
-                                       @Nonnull String profileId,
-                                       long expectedGeneration) throws Exception {
-        RecoveryOperation current = findByOperationId(connection, operationId);
-        TransitionResult precondition = terminalPrecondition(
-                current,
-                profileId,
-                expectedGeneration,
-                RecoveryState.FINALIZED,
-                true
-        );
-        if (precondition != null) {
-            return precondition;
+    TransitionResult finalizeRecovery(@Nonnull Connection connection,
+                                      @Nonnull RecoveryFinalization finalization) throws Exception {
+        RecoveryOperation current = findByOperationId(connection, finalization.operationId());
+        if (current == null) {
+            return TransitionResult.notFound();
         }
-        int updated = updateTerminal(
+        TransitionStatus status = finalizationStore.finalizeRecovery(
                 connection,
-                operationId,
-                profileId,
-                RecoveryState.PROJECTION_CREATED,
-                RecoveryState.FINALIZED,
-                expectedGeneration,
-                clock.getAsLong(),
-                null
+                current,
+                finalization,
+                clock.getAsLong()
         );
-        return updated == 1
-                ? TransitionResult.applied(requireOperation(connection, operationId))
-                : concurrentTransitionResult(connection, operationId, profileId, expectedGeneration);
+        if (status == TransitionStatus.APPLIED) {
+            return TransitionResult.applied(requireOperation(connection, finalization.operationId()));
+        }
+        if (status == TransitionStatus.REPLAYED) {
+            return TransitionResult.replayed(current);
+        }
+        return TransitionResult.conflict(status, current);
     }
 
     @Nonnull
@@ -337,6 +338,51 @@ final class NpcRecoveryOperationTransactions {
                 }
                 return operation;
             }
+        }
+    }
+
+    @Nonnull
+    List<RecoveryOperation> findAllActive(@Nonnull Connection connection) throws SQLException {
+        ArrayList<RecoveryOperation> operations = new ArrayList<>();
+        LinkedHashSet<String> profileIds = new LinkedHashSet<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT " + SELECT_COLUMNS + " FROM npc_recovery_operations "
+                        + "WHERE active = 1 ORDER BY created_at_ms, operation_id"
+        ); ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                RecoveryOperation operation = readOperation(resultSet);
+                if (!profileIds.add(operation.profileId())) {
+                    throw new RepositoryIntegrityException(
+                            "multiple_active_recoveries_for_profile:" + operation.profileId()
+                    );
+                }
+                validateActiveForReconciliation(operation);
+                operations.add(operation);
+            }
+        }
+        return List.copyOf(operations);
+    }
+
+    private void validateActiveForReconciliation(@Nonnull RecoveryOperation operation) {
+        if (operation.state() == RecoveryState.FINALIZED
+                || operation.state() == RecoveryState.FAILED
+                || operation.state() == RecoveryState.QUARANTINED) {
+            throw new RepositoryIntegrityException(
+                    "terminal_recovery_marked_active:" + operation.operationId()
+            );
+        }
+        if ((operation.state() == RecoveryState.SPAWN_CLAIMED
+                || operation.state() == RecoveryState.PROJECTION_CREATED)
+                && operation.plannedTargetUuid() == null) {
+            throw new RepositoryIntegrityException(
+                    "active_recovery_missing_planned_target:" + operation.operationId()
+            );
+        }
+        if (operation.state() == RecoveryState.PROJECTION_CREATED
+                && (!Objects.equals(operation.plannedTargetUuid(), operation.actualTargetUuid()))) {
+            throw new RepositoryIntegrityException(
+                    "active_recovery_projection_target_mismatch:" + operation.operationId()
+            );
         }
     }
 

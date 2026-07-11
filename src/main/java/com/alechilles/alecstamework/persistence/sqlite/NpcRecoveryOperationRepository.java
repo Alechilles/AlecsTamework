@@ -2,7 +2,10 @@ package com.alechilles.alecstamework.persistence.sqlite;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 import javax.annotation.Nonnull;
@@ -68,23 +71,17 @@ public final class NpcRecoveryOperationRepository {
         );
     }
 
-    /** Finalizes a projection-created operation and releases its active-profile claim. */
+    /**
+     * Atomically finalizes a projection and every durable identity side effect.
+     * The completion resolves only after the write queue commits or rejects the whole transaction.
+     */
     @Nonnull
-    public PersistenceWriteQueue.WriteSubmission<TransitionResult> finalizeOperation(
-            @Nonnull String operationId,
-            @Nonnull String profileId,
-            long expectedGeneration) {
-        String normalizedOperationId = requireText(operationId, "operationId");
-        String normalizedProfileId = requireText(profileId, "profileId");
-        requireGeneration(expectedGeneration);
+    public PersistenceWriteQueue.WriteSubmission<TransitionResult> finalizeRecovery(
+            @Nonnull RecoveryFinalization finalization) {
+        Objects.requireNonNull(finalization, "finalization");
         return writeQueue.submitTracked(
                 "npc_recovery_finalize",
-                connection -> transactions.finalizeOperation(
-                        connection,
-                        normalizedOperationId,
-                        normalizedProfileId,
-                        expectedGeneration
-                ),
+                connection -> transactions.finalizeRecovery(connection, finalization),
                 null
         );
     }
@@ -147,6 +144,18 @@ public final class NpcRecoveryOperationRepository {
             return LoadResult.failed(ReadFailure.sql(exception));
         } catch (NpcRecoveryOperationTransactions.RepositoryIntegrityException exception) {
             return LoadResult.failed(ReadFailure.integrity(exception));
+        }
+    }
+
+    /** Loads every active operation for restart reconciliation without hiding read failures. */
+    @Nonnull
+    public ActiveOperationsResult loadAllActive() {
+        try (Connection connection = connectionManager.openConnection()) {
+            return ActiveOperationsResult.loaded(transactions.findAllActive(connection));
+        } catch (SQLException exception) {
+            return ActiveOperationsResult.failed(ReadFailure.sql(exception));
+        } catch (NpcRecoveryOperationTransactions.RepositoryIntegrityException exception) {
+            return ActiveOperationsResult.failed(ReadFailure.integrity(exception));
         }
     }
 
@@ -217,6 +226,7 @@ public final class NpcRecoveryOperationRepository {
         REPLAYED,
         NOT_FOUND,
         PROFILE_CONFLICT,
+        SOURCE_CONFLICT,
         TARGET_CONFLICT,
         GENERATION_CONFLICT,
         STATE_CONFLICT
@@ -234,6 +244,11 @@ public final class NpcRecoveryOperationRepository {
         INTEGRITY_VIOLATION
     }
 
+    public enum ActiveOperationsStatus {
+        LOADED,
+        FAILED
+    }
+
     public record RecoveryClaim(@Nonnull String operationId,
                                 @Nonnull String profileId,
                                 @Nullable UUID sourceNpcUuid,
@@ -242,6 +257,33 @@ public final class NpcRecoveryOperationRepository {
             operationId = requireText(operationId, "operationId");
             profileId = requireText(profileId, "profileId");
             Objects.requireNonNull(plannedTargetUuid, "plannedTargetUuid");
+        }
+    }
+
+    /** Exact durable state expected when completing one recovery operation. */
+    public record RecoveryFinalization(@Nonnull String operationId,
+                                       @Nonnull String profileId,
+                                       @Nullable UUID sourceNpcUuid,
+                                       @Nonnull UUID plannedTargetUuid,
+                                       @Nonnull UUID actualTargetUuid,
+                                       long expectedGeneration,
+                                       @Nonnull List<String> toolIds) {
+        public RecoveryFinalization {
+            operationId = requireText(operationId, "operationId");
+            profileId = requireText(profileId, "profileId");
+            Objects.requireNonNull(plannedTargetUuid, "plannedTargetUuid");
+            Objects.requireNonNull(actualTargetUuid, "actualTargetUuid");
+            requireGeneration(expectedGeneration);
+            TreeSet<String> canonicalToolIds = new TreeSet<>();
+            if (toolIds != null) {
+                for (String toolId : toolIds) {
+                    String normalized = normalizeText(toolId);
+                    if (normalized != null) {
+                        canonicalToolIds.add(normalized);
+                    }
+                }
+            }
+            toolIds = List.copyOf(canonicalToolIds);
         }
     }
 
@@ -324,6 +366,24 @@ public final class NpcRecoveryOperationRepository {
         @Nonnull
         static LoadResult failed(@Nonnull ReadFailure failure) {
             return new LoadResult(LoadStatus.FAILED, null, failure);
+        }
+    }
+
+    public record ActiveOperationsResult(@Nonnull ActiveOperationsStatus status,
+                                         @Nonnull List<RecoveryOperation> operations,
+                                         @Nullable ReadFailure failure) {
+        public ActiveOperationsResult {
+            operations = List.copyOf(operations == null ? List.of() : new ArrayList<>(operations));
+        }
+
+        @Nonnull
+        static ActiveOperationsResult loaded(@Nonnull List<RecoveryOperation> operations) {
+            return new ActiveOperationsResult(ActiveOperationsStatus.LOADED, operations, null);
+        }
+
+        @Nonnull
+        static ActiveOperationsResult failed(@Nonnull ReadFailure failure) {
+            return new ActiveOperationsResult(ActiveOperationsStatus.FAILED, List.of(), failure);
         }
     }
 
