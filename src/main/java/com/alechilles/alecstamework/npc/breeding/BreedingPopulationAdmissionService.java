@@ -2,100 +2,109 @@ package com.alechilles.alecstamework.npc.breeding;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Pure hard-cap admission policy for pre-rolled breeding birth plans.
+ * Shared hard-cap admission policy for pre-rolled manual and passive breeding plans.
  *
- * <p>Nearby capacity is enforced independently per canonical population type. Claim and player
- * headroom are total-child constraints. Active manual and passive reservations share the same
- * input and therefore block one another identically. This service does not mutate game state or
- * retain reservations; callers store the exact immutable reservation returned in the result.
+ * <p>Each decision takes one deterministic snapshot of every active registry reservation. Nearby
+ * reservations are filtered by world, distance, and canonical population type. Claim and player
+ * reservations are charged only to matching immutable scopes. Spawn-time rechecks exclude the
+ * current job and can only retain or shrink its existing ordered child admission.
  */
 public final class BreedingPopulationAdmissionService {
-    /** Evaluates initial admission while counting every supplied active reservation. */
+    private final BreedingBirthJobRegistry registry;
+
+    /** Uses the shared registry supplied by the plugin-owned breeding service seam. */
+    public BreedingPopulationAdmissionService(@Nonnull BreedingBirthJobRegistry registry) {
+        this.registry = Objects.requireNonNull(registry, "registry");
+    }
+
+    /** Evaluates initial admission against all active manual and passive reservations. */
     @Nonnull
     public AdmissionResult admit(@Nonnull AdmissionRequest request) {
         Objects.requireNonNull(request, "request");
-        return evaluate(request, null, request.plan().children());
+        return evaluate(request, request.plan().children(), null);
     }
 
     /**
-     * Rechecks capacity at spawn while excluding the current job's already-counted reservation.
-     * The supplied children must be the exact ordered children admitted for this job, so a recheck
-     * can retain or shrink an admission but can never expand it when capacity later increases.
+     * Rechecks every cap while excluding this job's own reservation and preserving shrink-only
+     * plan order.
      */
     @Nonnull
     public AdmissionResult recheckAtSpawn(@Nonnull AdmissionRequest request,
-                                          @Nonnull List<PlannedChild> initiallyAdmittedChildren) {
+                                          @Nonnull BreedingJobAdmission currentAdmission) {
         Objects.requireNonNull(request, "request");
-        Objects.requireNonNull(initiallyAdmittedChildren, "initiallyAdmittedChildren");
-        List<PlannedChild> candidates = List.copyOf(initiallyAdmittedChildren);
-        if (!AdmissionResult.isOrderedSubsequence(request.plan().children(), candidates)) {
-            throw new IllegalArgumentException(
-                    "initiallyAdmittedChildren must preserve source plan order"
-            );
+        Objects.requireNonNull(currentAdmission, "currentAdmission");
+        if (!request.reservationScope().equals(currentAdmission.reservation().scope())) {
+            throw new IllegalArgumentException("Current admission must use the request reservation scope");
         }
-        return evaluate(request, request.jobId(), candidates);
+        if (!BreedingJobAdmission.isOrderedSubsequence(
+                request.plan().children(),
+                currentAdmission.children()
+        )) {
+            throw new IllegalArgumentException("Current admission must preserve source plan order");
+        }
+        return evaluate(request, currentAdmission.children(), request.jobId());
     }
 
     @Nonnull
     private AdmissionResult evaluate(AdmissionRequest request,
-                                     @Nullable UUID excludedJobId,
-                                     List<PlannedChild> candidateChildren) {
-        Objects.requireNonNull(request, "request");
-        ReservationTotals reservations = aggregateReservations(request, excludedJobId);
-        long claimHeadroom = remainingTotalHeadroom(request.claimHeadroom(), reservations.claimChildren());
-        long playerHeadroom = remainingTotalHeadroom(request.playerHeadroom(), reservations.playerChildren());
-        long totalHeadroom = Math.min(claimHeadroom, playerHeadroom);
-        List<PlannedChild> admitted = admitInPlanOrder(
-                request,
-                candidateChildren,
-                reservations.byPopulationType(),
-                totalHeadroom
+                                     List<PlannedChild> candidates,
+                                     @Nullable UUID excludedJobId) {
+        List<BreedingActiveReservation> activeReservations = registry.activeReservations();
+        ReservationUsage usage = ReservationUsage.calculate(request, activeReservations, excludedJobId);
+        long claimHeadroom = remaining(
+                request.capacityHeadroom().claimHeadroom(),
+                usage.claimChildren()
         );
-        ActiveReservation reservation = new ActiveReservation(
-                request.jobId(),
-                countByPopulationType(admitted)
+        PlayerHeadroom playerHeadroom = calculatePlayerHeadroom(request, usage);
+        long combinedTotal = Math.min(claimHeadroom, playerHeadroom.minimum());
+        List<PlannedChild> admittedChildren = admitInPlanOrder(
+                request,
+                candidates,
+                usage.nearbyByPopulationType(),
+                combinedTotal
+        );
+        BreedingJobAdmission admission = BreedingJobAdmission.of(
+                admittedChildren,
+                request.reservationScope()
         );
         return new AdmissionResult(
                 request.plan(),
-                admitted,
-                reservation,
+                admission,
                 toDisplayHeadroom(claimHeadroom),
-                toDisplayHeadroom(playerHeadroom),
-                toDisplayHeadroom(totalHeadroom)
+                toDisplayHeadroom(playerHeadroom.minimum()),
+                toDisplayHeadroom(combinedTotal),
+                playerHeadroom.displayByScope()
         );
     }
 
     @Nonnull
     private List<PlannedChild> admitInPlanOrder(AdmissionRequest request,
-                                                List<PlannedChild> candidateChildren,
-                                                Map<String, Long> reservedByType,
+                                                List<PlannedChild> candidates,
+                                                Map<String, Long> reservedNearbyByType,
                                                 long totalHeadroom) {
-        if (totalHeadroom <= 0L || candidateChildren.isEmpty()) {
+        if (totalHeadroom <= 0L || candidates.isEmpty()) {
             return List.of();
         }
         Map<String, Long> remainingByType = new LinkedHashMap<>();
-        List<PlannedChild> admitted = new ArrayList<>();
-        for (PlannedChild child : candidateChildren) {
+        ArrayList<PlannedChild> admitted = new ArrayList<>();
+        for (PlannedChild child : candidates) {
             if (admitted.size() >= totalHeadroom) {
                 break;
             }
             String populationType = child.populationType();
             long remaining = remainingByType.computeIfAbsent(
                     populationType,
-                    ignored -> nearbyHeadroom(request, reservedByType, populationType)
+                    ignored -> nearbyHeadroom(request, reservedNearbyByType, populationType)
             );
             if (remaining <= 0L) {
                 continue;
@@ -109,261 +118,231 @@ public final class BreedingPopulationAdmissionService {
     }
 
     private long nearbyHeadroom(AdmissionRequest request,
-                                Map<String, Long> reservedByType,
+                                Map<String, Long> reservedNearbyByType,
                                 String populationType) {
         if (request.maxNearby() <= 0) {
             return Long.MAX_VALUE;
         }
         long live = request.liveNearbyByPopulationType().getOrDefault(populationType, 0);
-        long reserved = reservedByType.getOrDefault(populationType, 0L);
-        long used = saturatingAddNonNegative(live, reserved);
+        long reserved = reservedNearbyByType.getOrDefault(populationType, 0L);
+        long used = saturatingAdd(live, reserved);
         return Math.max(0L, (long) request.maxNearby() - used);
     }
 
-    private static long remainingTotalHeadroom(OptionalInt configuredHeadroom, long reservedChildren) {
-        if (configuredHeadroom.isEmpty()) {
-            return Long.MAX_VALUE;
+    private static PlayerHeadroom calculatePlayerHeadroom(AdmissionRequest request,
+                                                           ReservationUsage usage) {
+        if (request.capacityHeadroom().playerHeadroomByScope().isEmpty()) {
+            return new PlayerHeadroom(Long.MAX_VALUE, Map.of());
         }
-        return Math.max(0L, (long) configuredHeadroom.getAsInt() - reservedChildren);
-    }
-
-    private static ReservationTotals aggregateReservations(AdmissionRequest request,
-                                                           @Nullable UUID excludedJobId) {
-        Map<String, Long> byType = aggregateNearbyReservations(
-                request.nearbyReservations(),
-                excludedJobId
-        );
-        long claimTotal = aggregateTotalReservations(request.claimReservations(), excludedJobId);
-        long playerTotal = aggregateTotalReservations(request.playerReservations(), excludedJobId);
-        return new ReservationTotals(byType, claimTotal, playerTotal);
-    }
-
-    private static Map<String, Long> aggregateNearbyReservations(List<ActiveReservation> reservations,
-                                                                 @Nullable UUID excludedJobId) {
-        Map<String, Long> byType = new LinkedHashMap<>();
-        for (ActiveReservation reservation : reservations) {
-            if (excludedJobId != null && excludedJobId.equals(reservation.jobId())) {
-                continue;
-            }
-            for (Map.Entry<String, Integer> entry : reservation.countsByPopulationType().entrySet()) {
-                byType.merge(
-                        entry.getKey(),
-                        (long) entry.getValue(),
-                        BreedingPopulationAdmissionService::saturatingAddNonNegative
-                );
-            }
+        long minimum = Long.MAX_VALUE;
+        Map<BreedingPlayerCapacityScope, Integer> displayByScope = new LinkedHashMap<>();
+        for (Map.Entry<BreedingPlayerCapacityScope, Integer> entry
+                : request.capacityHeadroom().playerHeadroomByScope().entrySet()) {
+            long reserved = usage.playerChildrenByScope().getOrDefault(entry.getKey(), 0L);
+            long available = Math.max(0L, (long) entry.getValue() - reserved);
+            minimum = Math.min(minimum, available);
+            displayByScope.put(entry.getKey(), toDisplayHeadroom(available));
         }
-        return Collections.unmodifiableMap(byType);
+        return new PlayerHeadroom(minimum, Collections.unmodifiableMap(displayByScope));
     }
 
-    private static long aggregateTotalReservations(List<ActiveReservation> reservations,
-                                                   @Nullable UUID excludedJobId) {
-        long total = 0L;
-        for (ActiveReservation reservation : reservations) {
-            if (excludedJobId == null || !excludedJobId.equals(reservation.jobId())) {
-                total = saturatingAddNonNegative(total, reservation.totalChildren());
-            }
-        }
-        return total;
+    private static long remaining(OptionalInt liveHeadroom, long reservedChildren) {
+        return liveHeadroom.isEmpty()
+                ? Long.MAX_VALUE
+                : Math.max(0L, (long) liveHeadroom.getAsInt() - reservedChildren);
     }
 
-    private static Map<String, Integer> countByPopulationType(List<PlannedChild> children) {
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (PlannedChild child : children) {
-            counts.merge(child.populationType(), 1, Math::addExact);
-        }
-        return immutableNormalizedCounts(counts, "admitted counts");
+    private static long saturatingAdd(long left, long right) {
+        return left >= Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
     }
 
-    private static long saturatingAddNonNegative(long left, long right) {
-        if (left >= Long.MAX_VALUE - right) {
-            return Long.MAX_VALUE;
-        }
-        return left + right;
+    private static int toDisplayHeadroom(long value) {
+        return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
     }
 
-    private static int toDisplayHeadroom(long headroom) {
-        return headroom >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, headroom);
-    }
-
-    private static Map<String, Integer> immutableNormalizedCounts(Map<String, Integer> source, String label) {
+    private static Map<String, Integer> immutableCounts(Map<String, Integer> source, String label) {
         Objects.requireNonNull(source, label);
         Map<String, Integer> normalized = new LinkedHashMap<>();
         for (Map.Entry<String, Integer> entry : source.entrySet()) {
-            String key = canonicalPopulationType(entry.getKey());
+            String type = PlannedChild.canonicalPopulationType(entry.getKey());
             Integer count = Objects.requireNonNull(entry.getValue(), label + " count");
             if (count < 0) {
                 throw new IllegalArgumentException(label + " must not contain negative counts");
             }
-            if (count == 0) {
-                continue;
+            if (count > 0) {
+                normalized.merge(type, count, Math::addExact);
             }
-            normalized.merge(key, count, BreedingPopulationAdmissionService::saturatingAddCount);
         }
         return Collections.unmodifiableMap(normalized);
     }
 
-    private static int saturatingAddCount(int left, int right) {
-        long total = (long) left + (long) right;
-        return total >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
-    }
-
-    private static String canonicalPopulationType(String value) {
-        Objects.requireNonNull(value, "populationType");
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.isEmpty()) {
-            throw new IllegalArgumentException("populationType must not be blank");
-        }
-        return normalized;
-    }
-
-    /** Breeding entrypoint label; admission intentionally does not branch on this value. */
+    /** Breeding entrypoint label; both modes intentionally use the identical admission path. */
     public enum BreedingMode {
         MANUAL,
         PASSIVE
     }
 
-    /** Exact active reservation owned by one admitted birth job. */
-    public record ActiveReservation(@Nonnull UUID jobId,
-                                    @Nonnull Map<String, Integer> countsByPopulationType) {
-        public ActiveReservation {
-            Objects.requireNonNull(jobId, "jobId");
-            countsByPopulationType = immutableNormalizedCounts(countsByPopulationType, "reservation counts");
-        }
-
-        /** Returns the exact number of child slots reserved by this job. */
-        public int totalChildren() {
-            long total = 0L;
-            for (int count : countsByPopulationType.values()) {
-                total = saturatingAddNonNegative(total, count);
-            }
-            return total >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
-        }
-    }
-
-    /**
-     * Immutable input snapshot for initial admission or spawn-time recheck.
-     *
-     * <p>Claim and player headroom are measured before the supplied breeding reservations;
-     * {@link OptionalInt#empty()} means that constraint is unlimited. Reservation lists are
-     * scope-specific so out-of-radius, different-claim, and different-owner jobs are not charged
-     * against unrelated constraints.
-     */
-    public record AdmissionRequest(@Nonnull UUID jobId,
-                                   @Nonnull BreedingMode mode,
-                                   @Nonnull BreedingBirthPlan plan,
-                                   int maxNearby,
-                                   @Nonnull Map<String, Integer> liveNearbyByPopulationType,
-                                   @Nonnull List<ActiveReservation> nearbyReservations,
-                                   @Nonnull List<ActiveReservation> claimReservations,
-                                   @Nonnull List<ActiveReservation> playerReservations,
-                                   @Nonnull OptionalInt claimHeadroom,
-                                   @Nonnull OptionalInt playerHeadroom) {
+    /** Immutable capacity input measured for one plan at its intended birth anchor. */
+    public record AdmissionRequest(
+            @Nonnull UUID jobId,
+            @Nonnull String worldId,
+            @Nonnull BreedingMode mode,
+            @Nonnull BreedingBirthPlan plan,
+            @Nonnull BreedingBirthAnchor anchor,
+            @Nonnull BreedingReservationScope reservationScope,
+            int maxNearby,
+            @Nonnull Map<String, Integer> liveNearbyByPopulationType,
+            @Nonnull BreedingCapacityHeadroom capacityHeadroom) {
         public AdmissionRequest {
             Objects.requireNonNull(jobId, "jobId");
+            worldId = requireNonBlank(worldId, "worldId");
             Objects.requireNonNull(mode, "mode");
             Objects.requireNonNull(plan, "plan");
-            liveNearbyByPopulationType = immutableNormalizedCounts(
+            Objects.requireNonNull(anchor, "anchor");
+            Objects.requireNonNull(reservationScope, "reservationScope");
+            liveNearbyByPopulationType = immutableCounts(
                     liveNearbyByPopulationType,
                     "live nearby counts"
             );
-            nearbyReservations = immutableUniqueReservations(nearbyReservations, "nearbyReservations");
-            claimReservations = immutableUniqueReservations(claimReservations, "claimReservations");
-            playerReservations = immutableUniqueReservations(playerReservations, "playerReservations");
-            claimHeadroom = requireNonNegative(claimHeadroom, "claimHeadroom");
-            playerHeadroom = requireNonNegative(playerHeadroom, "playerHeadroom");
+            Objects.requireNonNull(capacityHeadroom, "capacityHeadroom");
+            validateScopeConsistency(worldId, reservationScope, maxNearby, capacityHeadroom);
         }
 
-        /** Uses one already-filtered reservation set for all three scopes. */
-        public AdmissionRequest(@Nonnull UUID jobId,
-                                @Nonnull BreedingMode mode,
-                                @Nonnull BreedingBirthPlan plan,
-                                int maxNearby,
-                                @Nonnull Map<String, Integer> liveNearbyByPopulationType,
-                                @Nonnull List<ActiveReservation> activeReservations,
-                                @Nonnull OptionalInt claimHeadroom,
-                                @Nonnull OptionalInt playerHeadroom) {
-            this(
-                    jobId,
-                    mode,
-                    plan,
-                    maxNearby,
-                    liveNearbyByPopulationType,
-                    activeReservations,
-                    activeReservations,
-                    activeReservations,
-                    claimHeadroom,
-                    playerHeadroom
-            );
-        }
-
-        private static List<ActiveReservation> immutableUniqueReservations(
-                List<ActiveReservation> reservations,
-                String label) {
-            Objects.requireNonNull(reservations, label);
-            List<ActiveReservation> copy = List.copyOf(reservations);
-            Set<UUID> jobIds = new HashSet<>();
-            for (ActiveReservation reservation : copy) {
-                if (!jobIds.add(reservation.jobId())) {
-                    throw new IllegalArgumentException(label + " must contain unique job IDs");
+        private static void validateScopeConsistency(String worldId,
+                                                     BreedingReservationScope reservationScope,
+                                                     int maxNearby,
+                                                     BreedingCapacityHeadroom headroom) {
+            if (maxNearby > 0 && reservationScope.nearbyRadius() <= 0.0) {
+                throw new IllegalArgumentException("A finite nearby cap requires a positive radius");
+            }
+            BreedingClaimCapacityScope claimScope = reservationScope.claimScope();
+            if (headroom.claimHeadroom().isPresent() && claimScope == null) {
+                throw new IllegalArgumentException("Finite claim headroom requires a claim scope");
+            }
+            if (claimScope != null && !worldId.equals(claimScope.worldId())) {
+                throw new IllegalArgumentException("Claim scope world must match request world");
+            }
+            for (BreedingPlayerCapacityScope playerScope : reservationScope.playerScopes()) {
+                if (playerScope.scope() == BreedingPlayerCapacityScope.Scope.PER_WORLD
+                        && !worldId.equals(playerScope.worldId())) {
+                    throw new IllegalArgumentException("Per-world player scope must match request world");
                 }
             }
-            return copy;
+            if (!reservationScope.playerScopes().containsAll(headroom.playerHeadroomByScope().keySet())) {
+                throw new IllegalArgumentException("Player headroom scopes must be reserved by this job");
+            }
         }
 
-        private static OptionalInt requireNonNegative(OptionalInt value, String label) {
+        private static String requireNonBlank(String value, String label) {
             Objects.requireNonNull(value, label);
-            if (value.isPresent() && value.getAsInt() < 0) {
-                throw new IllegalArgumentException(label + " must not be negative");
+            String normalized = value.trim();
+            if (normalized.isEmpty()) {
+                throw new IllegalArgumentException(label + " must not be blank");
             }
-            return value;
+            return normalized;
         }
     }
 
-    /** Immutable admission decision and exact reservation for the admitted child subsequence. */
-    public record AdmissionResult(@Nonnull BreedingBirthPlan sourcePlan,
-                                  @Nonnull List<PlannedChild> admittedChildren,
-                                  @Nonnull ActiveReservation reservation,
-                                  int availableClaimHeadroom,
-                                  int availablePlayerHeadroom,
-                                  int combinedTotalHeadroom) {
+    /** Immutable shrink-only decision and exact reservation matching the admitted children. */
+    public record AdmissionResult(
+            @Nonnull BreedingBirthPlan sourcePlan,
+            @Nonnull BreedingJobAdmission admission,
+            int availableClaimHeadroom,
+            int availablePlayerHeadroom,
+            int combinedTotalHeadroom,
+            @Nonnull Map<BreedingPlayerCapacityScope, Integer> availablePlayerHeadroomByScope) {
         public AdmissionResult {
             Objects.requireNonNull(sourcePlan, "sourcePlan");
-            Objects.requireNonNull(admittedChildren, "admittedChildren");
-            admittedChildren = List.copyOf(admittedChildren);
-            Objects.requireNonNull(reservation, "reservation");
-            if (!isOrderedSubsequence(sourcePlan.children(), admittedChildren)) {
-                throw new IllegalArgumentException("admitted children must preserve source plan order");
-            }
-            if (!countByPopulationType(admittedChildren).equals(reservation.countsByPopulationType())) {
-                throw new IllegalArgumentException("reservation counts must match admitted children");
+            Objects.requireNonNull(admission, "admission");
+            if (!BreedingJobAdmission.isOrderedSubsequence(sourcePlan.children(), admission.children())) {
+                throw new IllegalArgumentException("Admission must preserve source plan order");
             }
             if (availableClaimHeadroom < 0 || availablePlayerHeadroom < 0 || combinedTotalHeadroom < 0) {
-                throw new IllegalArgumentException("reported headroom must not be negative");
+                throw new IllegalArgumentException("Reported headroom must be nonnegative");
             }
+            availablePlayerHeadroomByScope = Map.copyOf(availablePlayerHeadroomByScope);
+        }
+
+        @Nonnull
+        public List<PlannedChild> admittedChildren() {
+            return admission.children();
+        }
+
+        @Nonnull
+        public BreedingBirthReservation reservation() {
+            return admission.reservation();
         }
 
         public int admittedCount() {
-            return admittedChildren.size();
+            return admission.children().size();
         }
 
         public boolean admittedAny() {
-            return !admittedChildren.isEmpty();
-        }
-
-        private static boolean isOrderedSubsequence(List<PlannedChild> source, List<PlannedChild> candidate) {
-            int candidateIndex = 0;
-            for (PlannedChild child : source) {
-                if (candidateIndex < candidate.size() && child.equals(candidate.get(candidateIndex))) {
-                    candidateIndex++;
-                }
-            }
-            return candidateIndex == candidate.size();
+            return !admission.children().isEmpty();
         }
     }
 
-    private record ReservationTotals(Map<String, Long> byPopulationType,
-                                     long claimChildren,
-                                     long playerChildren) {
+    private record PlayerHeadroom(long minimum,
+                                  Map<BreedingPlayerCapacityScope, Integer> displayByScope) {
+    }
+
+    private record ReservationUsage(Map<String, Long> nearbyByPopulationType,
+                                    long claimChildren,
+                                    Map<BreedingPlayerCapacityScope, Long> playerChildrenByScope) {
+        static ReservationUsage calculate(AdmissionRequest request,
+                                          List<BreedingActiveReservation> reservations,
+                                          @Nullable UUID excludedJobId) {
+            Map<String, Long> nearbyByType = new LinkedHashMap<>();
+            long claimChildren = 0L;
+            Map<BreedingPlayerCapacityScope, Long> playerChildrenByScope = new LinkedHashMap<>();
+            for (BreedingActiveReservation active : reservations) {
+                if (excludedJobId != null && excludedJobId.equals(active.jobId())) {
+                    continue;
+                }
+                if (isNearby(request, active)) {
+                    mergeCounts(nearbyByType, active.reservation().countsByPopulationType());
+                }
+                if (Objects.equals(
+                        request.reservationScope().claimScope(),
+                        active.reservation().scope().claimScope()
+                ) && request.reservationScope().claimScope() != null) {
+                    claimChildren = saturatingAdd(claimChildren, active.reservation().totalChildren());
+                }
+                for (BreedingPlayerCapacityScope playerScope
+                        : request.capacityHeadroom().playerHeadroomByScope().keySet()) {
+                    if (active.reservation().scope().playerScopes().contains(playerScope)) {
+                        playerChildrenByScope.merge(
+                                playerScope,
+                                (long) active.reservation().totalChildren(),
+                                BreedingPopulationAdmissionService::saturatingAdd
+                        );
+                    }
+                }
+            }
+            return new ReservationUsage(
+                    Collections.unmodifiableMap(nearbyByType),
+                    claimChildren,
+                    Collections.unmodifiableMap(playerChildrenByScope)
+            );
+        }
+
+        private static boolean isNearby(AdmissionRequest request, BreedingActiveReservation active) {
+            if (request.maxNearby() <= 0 || !request.worldId().equals(active.worldId())) {
+                return false;
+            }
+            double radius = request.reservationScope().nearbyRadius();
+            double radiusSquared = radius * radius;
+            return request.anchor().distanceSquared(active.anchor()) <= radiusSquared;
+        }
+
+        private static void mergeCounts(Map<String, Long> target, Map<String, Integer> source) {
+            for (Map.Entry<String, Integer> entry : source.entrySet()) {
+                target.merge(
+                        entry.getKey(),
+                        (long) entry.getValue(),
+                        BreedingPopulationAdmissionService::saturatingAdd
+                );
+            }
+        }
     }
 }
