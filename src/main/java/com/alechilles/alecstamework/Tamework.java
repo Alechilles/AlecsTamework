@@ -76,6 +76,7 @@ import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteracti
 import com.alechilles.alecstamework.interactions.TameworkFlightBoostInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
+import com.alechilles.alecstamework.interactions.TameworkManagedCoopCaptureCrateInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
@@ -441,6 +442,12 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class, TameworkNameNpcInteraction.CODEC);
         // Register the custom item interaction used by command items.
         Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class, TameworkCommandInteraction.CODEC);
+        // Cut over at the item boundary; ordinary unmanaged use delegates while canonical evidence fails closed.
+        Interaction.CODEC.register(
+                "TameworkManagedCoopCaptureCrate",
+                TameworkManagedCoopCaptureCrateInteraction.class,
+                TameworkManagedCoopCaptureCrateInteraction.CODEC
+        );
         // Register the custom item interactions used by Dragon Reins flight controls.
         Interaction.CODEC.register(
                 "TameworkFlightFlap",
