@@ -109,6 +109,26 @@ class ManagedCoopLifecycleOperationIndexTest {
     }
 
     @Test
+    void activeImportRowsAcceptPersistentOrMetadataOnlySourceEvidence() {
+        ManagedCoopLifecycleOperationIndex index = new ManagedCoopLifecycleOperationIndex();
+        OperationRecord persistent = operation(
+                "import-persistent", OperationKind.IMPORT, "profile-import-a", COOP_A, 0,
+                uuid(7), null, null, OperationState.SOURCE_RETIRE_REQUESTED,
+                2L, true, 0L);
+        OperationRecord metadataOnly = operation(
+                "import-metadata", OperationKind.IMPORT, "profile-import-b", COOP_B, 1,
+                null, null, null, OperationState.SLOT_COMMITTED,
+                1L, true, 0L);
+
+        ManagedCoopLifecycleOperationIndex.RebuildResult result = index.rebuild(
+                ManagedCoopReadResult.loaded(List.of(metadataOnly, persistent)));
+
+        assertTrue(result.rebuilt(), result.detail());
+        assertSame(persistent, index.operationByUuid(uuid(7)));
+        assertSame(metadataOnly, index.operationByProfile("profile-import-b"));
+    }
+
+    @Test
     void terminalGenerationAndUuidShapeMismatchesFailClosed() {
         ArrayList<OperationRecord> invalid = new ArrayList<>();
         invalid.add(operation("inactive", OperationKind.CAPTURE, "profile-inactive", COOP_A, 0,
@@ -130,8 +150,15 @@ class ManagedCoopLifecycleOperationIndexTest {
         invalid.add(operation("release-target-mismatch", OperationKind.RELEASE,
                 "profile-release-target-mismatch", COOP_A, 0, null, uuid(2), uuid(3),
                 OperationState.PROJECTION_CREATED, 2L, true, 0L));
-        invalid.add(operation("unsupported-kind", OperationKind.IMPORT, "profile-import", COOP_A, 0,
+        invalid.add(operation("unsupported-kind", OperationKind.EJECT, "profile-eject", COOP_A, 0,
                 null, uuid(2), null, OperationState.PREPARED, 0L, true, 0L));
+        invalid.add(operation("import-target", OperationKind.IMPORT, "profile-import", COOP_A, 0,
+                null, uuid(2), null, OperationState.PREPARED, 0L, true, 0L));
+        invalid.add(operation("import-state", OperationKind.IMPORT, "profile-import-state", COOP_A, 0,
+                null, null, null, OperationState.SPAWN_CLAIMED, 1L, true, 0L));
+        invalid.add(operation("import-nil-source", OperationKind.IMPORT,
+                "profile-import-nil", COOP_A, 0, new UUID(0L, 0L), null, null,
+                OperationState.PREPARED, 0L, true, 0L));
         invalid.add(operation("nil-source", OperationKind.CAPTURE, "profile-nil", COOP_A, 0,
                 new UUID(0L, 0L), null, null, OperationState.PREPARED, 0L, true, 0L));
 

@@ -271,6 +271,13 @@ public final class ManagedCoopLifecycleOperationIndex {
                     case PROJECTION_CREATED -> 2L;
                     default -> -1L;
                 };
+            } else if (operation.kind() == OperationKind.IMPORT) {
+                expectedOperationGeneration = switch (operation.state()) {
+                    case PREPARED -> 0L;
+                    case SLOT_COMMITTED -> 1L;
+                    case SOURCE_RETIRE_REQUESTED -> 2L;
+                    default -> -1L;
+                };
             } else {
                 expectedOperationGeneration = -1L;
             }
@@ -285,6 +292,14 @@ public final class ManagedCoopLifecycleOperationIndex {
                 requireUuid(operation.sourceNpcUuid(), operation.operationId(), "source");
                 if (operation.plannedTargetUuid() != null || operation.actualTargetUuid() != null) {
                     throw invalid("invalid_capture_uuid_shape:" + operation.operationId());
+                }
+                return;
+            }
+            if (operation.kind() == OperationKind.IMPORT) {
+                if (NIL_UUID.equals(operation.sourceNpcUuid())
+                        || operation.plannedTargetUuid() != null
+                        || operation.actualTargetUuid() != null) {
+                    throw invalid("invalid_import_uuid_shape:" + operation.operationId());
                 }
                 return;
             }
