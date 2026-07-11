@@ -14,16 +14,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Thin live sweep shell over the decomposed managed-coop scanners, planner, and v5 dispatcher.
  *
- * <p>Ancillary production/interaction and removed-block checks remain explicit synchronous ports
- * so they can be extracted from the legacy system independently. Capture and release futures
- * expose immutable outcomes only; this orchestrator never attaches a continuation that captures a
- * world, store, reference, context, block container, or NPC.</p>
+ * <p>Ancillary work receives only copied requests. Production is gated by the one release future
+ * selected for that coop, allowing its implementation to re-resolve the world and current v5
+ * HOUSED residents after the attempt settles. This orchestrator never attaches a continuation
+ * that captures a world, store, reference, context, block container, or NPC.</p>
  */
 public final class ManagedCoopRuntimeSweepOrchestrator {
     public enum SweepStatus {
@@ -105,9 +106,9 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
         int captures = 0;
         int releases = 0;
         for (CoopPlan coop : plan.coops()) {
-            if (coop.produce()) {
-                ancillary.produce(world, coop.context(), gameTimeMs);
-            }
+            ManagedCoopAncillaryRequest ancillaryRequest =
+                    ManagedCoopAncillaryRequest.copyOf(coop.context(), gameTimeMs);
+            CompletableFuture<DispatchOutcome> precedingRelease = null;
             if (coop.branch() == ManagedCoopRuntimeSweepPlanner.Branch.CAPTURE) {
                 Ref<EntityStore> source = world.getEntityRef(coop.candidate().npcUuid());
                 if (source != null && source.isValid()) {
@@ -117,13 +118,18 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                     captures++;
                 }
             } else if (coop.branch() == ManagedCoopRuntimeSweepPlanner.Branch.RELEASE) {
-                dispatched.add(operations.release(coop.context(), coop.resident(), nowMs));
+                precedingRelease = operations.release(coop.context(), coop.resident(), nowMs);
+                dispatched.add(precedingRelease);
                 releases++;
             }
+            if (coop.produce()) {
+                ancillary.produceAfter(ancillaryRequest, precedingRelease);
+            }
             if (coop.syncInteractionState()) {
-                ancillary.syncInteractionState(world, coop.context());
+                ancillary.syncInteractionState(ancillaryRequest);
             }
         }
+        ancillary.retainActiveCoops(plan.activeCoopKeys());
         if (plan.checkRemovedCoops()) {
             removedCoops.reconcile(chunkStore, world, plan.activeCoopKeys(), nowMs);
         }
@@ -158,17 +164,15 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                 status, coops, candidates, captures, releases, removed, operations, detail);
     }
 
-    /**
-     * Synchronous extraction seam for current production and block interaction presentation.
-     * Implementations must not retain the supplied live world/context.
-     */
+    /** Immutable ancillary seam; implementations re-resolve live block state by world name. */
     public interface AncillaryBehavior {
-        void produce(@Nonnull World world,
-                     @Nonnull ManagedCoopContext context,
-                     long gameTimeMs);
+        void produceAfter(
+                @Nonnull ManagedCoopAncillaryRequest request,
+                @Nullable CompletionStage<DispatchOutcome> precedingRelease);
 
-        void syncInteractionState(@Nonnull World world,
-                                  @Nonnull ManagedCoopContext context);
+        void syncInteractionState(@Nonnull ManagedCoopAncillaryRequest request);
+
+        void retainActiveCoops(@Nonnull Set<String> activeCoopKeys);
     }
 
     /**
