@@ -23,9 +23,9 @@ class HarvestDiagnosticsWiringTest {
     private static final Path TAMEWORK_PLUGIN = Paths.get(
             "src", "main", "java", "com", "alechilles", "alecstamework", "Tamework.java"
     );
-    private static final Path INTERACT_EFFECTS = Paths.get(
+    private static final Path HARVEST_EFFECTS = Paths.get(
             "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "TameworkInteractEffects.java"
+            "com", "alechilles", "alecstamework", "npc", "actions", "InteractionHarvestEffects.java"
     );
     private static final Path HARVEST_ALARM_ACTION = Paths.get(
             "src", "main", "java",
@@ -68,7 +68,7 @@ class HarvestDiagnosticsWiringTest {
 
     @Test
     void harvestDebugLogsRequireHarvestToggle() throws IOException {
-        String interactContent = Files.readString(INTERACT_EFFECTS, StandardCharsets.UTF_8);
+        String interactContent = Files.readString(HARVEST_EFFECTS, StandardCharsets.UTF_8);
         String alarmContent = Files.readString(HARVEST_ALARM_ACTION, StandardCharsets.UTF_8);
 
         assertTrue(

@@ -314,7 +314,7 @@ public final class CommandLinkedNpcCaptureService {
                 || snapshot.npcUuid() == null) {
             return;
         }
-        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+        profileRepository.upsertSnapshotAsync(new NpcProfileRepository.ProfileUpdate(
                 snapshot.npcUuid(),
                 snapshot.ownerId(),
                 null,

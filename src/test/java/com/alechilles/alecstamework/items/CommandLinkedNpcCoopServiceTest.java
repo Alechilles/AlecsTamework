@@ -257,6 +257,37 @@ class CommandLinkedNpcCoopServiceTest {
     }
 
     @Test
+    void preparedReleaseCannotConsumeAReplacementSourceResident() {
+        CommandLinkedNpcCoopService service = new CommandLinkedNpcCoopService();
+        UUID originallyPrepared = UUID.randomUUID();
+        UUID replacementResident = UUID.randomUUID();
+        CommandLinkedNpcCoopService.CoopSlotContext slot =
+                CommandLinkedNpcCoopService.CoopSlotContext.of(
+                        "default", "Coop_Chicken", 10, 70, 10, 0
+                );
+        service.captureResident(
+                replacementResident,
+                "tamed_chicken",
+                slot,
+                UUID.randomUUID(),
+                new String[] { "tool-alpha" },
+                "Replacement",
+                null
+        );
+
+        CommandLinkedNpcCoopService.ReleaseResolution resolution = service.resolveRelease(
+                UUID.randomUUID(), originallyPrepared, "tamed_chicken", slot, false
+        );
+
+        assertTrue(resolution.isFailure());
+        assertEquals("source_resident_changed", resolution.failureReason());
+        assertEquals(
+                replacementResident,
+                service.getLedgerSlotSnapshot(slot).housedNpcUuid()
+        );
+    }
+
+    @Test
     void resolveReleaseDoesNotFallbackAcrossDifferentCoordinates() {
         CommandLinkedNpcCoopService service = new CommandLinkedNpcCoopService();
         UUID housedUuid = UUID.randomUUID();

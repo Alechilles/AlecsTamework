@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
@@ -27,22 +29,29 @@ public final class SimpleClaimsTamedDamagePolicy {
 
     private final TamedDamageTargetEligibilityResolver eligibilityResolver;
     private final TamedDamagePolicyAdapter decisionAdapter;
-    private final NativeSimpleClaimsDamageAccess nativeAccess;
+    private final SimpleClaimsDamageCapabilityResolver capabilityResolver;
+    private final SimpleClaimsRawAccessEvaluator rawAccessEvaluator;
     private final DamageServerPermissionBypass serverPermissionBypass;
-    private final LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass;
     private final DamagePolicyWarningSink warningSink;
 
-    /** Creates the production policy over the current SimpleClaims bridge generation. */
+    /** Creates a production policy that resolves the live SimpleClaims generation per decision. */
     public SimpleClaimsTamedDamagePolicy() {
-        this(SimpleClaimsBreedingBridge.initialize());
+        this(
+                new TamedDamageTargetEligibilityResolver(),
+                new SimpleClaimsDamageCapabilityRegistry(),
+                new HytaleDamageServerPermissionBypass(),
+                new ThrottledDamagePolicyWarningSink()
+        );
     }
 
     SimpleClaimsTamedDamagePolicy(@Nonnull SimpleClaimsBreedingBridge bridge) {
         this(
                 new TamedDamageTargetEligibilityResolver(),
-                bridge::evaluateDamageAccess,
+                fixedResolver(
+                        bridge::evaluateDamageAccess,
+                        new ReflectiveLegacySimpleClaimsPartyPermissionBypass(bridge)
+                ),
                 new HytaleDamageServerPermissionBypass(),
-                new ReflectiveLegacySimpleClaimsPartyPermissionBypass(bridge),
                 new ThrottledDamagePolicyWarningSink()
         );
     }
@@ -53,11 +62,24 @@ public final class SimpleClaimsTamedDamagePolicy {
             @Nonnull DamageServerPermissionBypass serverPermissionBypass,
             @Nonnull LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass,
             @Nonnull DamagePolicyWarningSink warningSink) {
+        this(
+                eligibilityResolver,
+                fixedResolver(nativeAccess, legacyPartyBypass),
+                serverPermissionBypass,
+                warningSink
+        );
+    }
+
+    SimpleClaimsTamedDamagePolicy(
+            @Nonnull TamedDamageTargetEligibilityResolver eligibilityResolver,
+            @Nonnull SimpleClaimsDamageCapabilityResolver capabilityResolver,
+            @Nonnull DamageServerPermissionBypass serverPermissionBypass,
+            @Nonnull DamagePolicyWarningSink warningSink) {
         this.eligibilityResolver = eligibilityResolver;
         this.decisionAdapter = new TamedDamagePolicyAdapter();
-        this.nativeAccess = nativeAccess;
+        this.capabilityResolver = capabilityResolver;
+        this.rawAccessEvaluator = new SimpleClaimsRawAccessEvaluator(capabilityResolver);
         this.serverPermissionBypass = serverPermissionBypass;
-        this.legacyPartyBypass = legacyPartyBypass;
         this.warningSink = warningSink;
     }
 
@@ -133,12 +155,57 @@ public final class SimpleClaimsTamedDamagePolicy {
         String permissionKey = normalizePermissionKey(
                 globalConfig != null ? globalConfig.getSimpleClaimsDamageAllowDamagePermissionKey() : null
         );
+        return evaluateLiveClaimPolicy(
+                worldName,
+                targetPosition,
+                attackerPlayerUuid,
+                permissionKey
+        );
+    }
+
+    /**
+     * Evaluates the legacy claim-only public API without invoking population topology.
+     * Damage protection's enable toggle intentionally remains outside this legacy contract.
+     */
+    @Nonnull
+    public SimpleClaimsRawAccessDecision evaluateRawClaimAccess(
+            @Nullable String worldName,
+            @Nullable Vector3d targetPosition,
+            @Nullable UUID attackerPlayerUuid,
+            @Nullable TwGlobalConfig globalConfig) {
+        return rawAccessEvaluator.evaluate(worldName, targetPosition, attackerPlayerUuid, globalConfig);
+    }
+
+    @Nonnull
+    private TamedDamageDecision evaluateLiveClaimPolicy(
+            @Nonnull String worldName,
+            @Nonnull Vector3d targetPosition,
+            @Nonnull UUID attackerPlayerUuid,
+            @Nullable String permissionKey) {
         if (permissionKey != null && hasServerPermission(attackerPlayerUuid, permissionKey)) {
             return TamedDamageDecision.allowEnforced("server-permission-bypass", null, null);
         }
 
+        SimpleClaimsDamageCapabilityResolver.Resolution resolution = resolveCapability();
+        SimpleClaimsDamageGeneration capability = resolution.capability();
+        if (resolution.state() != ClaimProviderState.READY
+                || capability == null) {
+            return failOpen(
+                    false,
+                    null,
+                    "bridge-unavailable",
+                    firstNonBlank(resolution.reason(), "SimpleClaims damage capability is unavailable.")
+            );
+        }
+
         LegacySimpleClaimsPartyPermissionBypass.Result legacyResult = permissionKey != null
-                ? evaluateLegacyBypass(worldName, targetPosition, attackerPlayerUuid, permissionKey)
+                ? evaluateLegacyBypass(
+                        capability.legacyPartyBypass(),
+                        worldName,
+                        targetPosition,
+                        attackerPlayerUuid,
+                        permissionKey
+                )
                 : LegacySimpleClaimsPartyPermissionBypass.Result.notGranted();
         if (legacyResult.status() == LegacySimpleClaimsPartyPermissionBypass.Status.GRANTED) {
             warningSink.warn(
@@ -155,7 +222,7 @@ public final class SimpleClaimsTamedDamagePolicy {
         }
 
         try {
-            TamedDamageDecision decision = decisionAdapter.mapNative(nativeAccess.evaluate(
+            TamedDamageDecision decision = decisionAdapter.mapNative(capability.nativeAccess().evaluate(
                     worldName,
                     targetPosition,
                     attackerPlayerUuid,
@@ -196,6 +263,7 @@ public final class SimpleClaimsTamedDamagePolicy {
 
     @Nonnull
     private LegacySimpleClaimsPartyPermissionBypass.Result evaluateLegacyBypass(
+            @Nonnull LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass,
             @Nonnull String worldName,
             @Nonnull Vector3d targetPosition,
             @Nonnull UUID attackerPlayerUuid,
@@ -209,6 +277,42 @@ public final class SimpleClaimsTamedDamagePolicy {
                     message(throwable)
             );
         }
+    }
+
+    @Nonnull
+    private SimpleClaimsDamageCapabilityResolver.Resolution resolveCapability() {
+        try {
+            SimpleClaimsDamageCapabilityResolver.Resolution resolution = capabilityResolver.resolve();
+            return resolution != null
+                    ? resolution
+                    : SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
+                    ClaimProviderState.ERROR,
+                    ClaimProviderGeneration.NONE,
+                    null,
+                    "SimpleClaims damage capability resolver returned null."
+            );
+        } catch (Throwable throwable) {
+            return SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
+                    ClaimProviderState.ERROR,
+                    ClaimProviderGeneration.NONE,
+                    null,
+                    "SimpleClaims damage capability resolution failed: " + message(throwable)
+            );
+        }
+    }
+
+    @Nonnull
+    private static SimpleClaimsDamageCapabilityResolver fixedResolver(
+            @Nonnull NativeSimpleClaimsDamageAccess nativeAccess,
+            @Nonnull LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass) {
+        SimpleClaimsDamageGeneration generation = SimpleClaimsDamageGeneration.fixed(nativeAccess, legacyPartyBypass);
+        SimpleClaimsDamageCapabilityResolver.Resolution resolution =
+                SimpleClaimsDamageCapabilityResolver.Resolution.ready(
+                        ClaimProviderGeneration.NONE,
+                        null,
+                        generation
+                );
+        return () -> resolution;
     }
 
     @Nonnull
@@ -251,6 +355,11 @@ public final class SimpleClaimsTamedDamagePolicy {
     @Nonnull
     private static String safeDetail(@Nullable String detail) {
         return detail == null || detail.isBlank() ? "none" : detail;
+    }
+
+    @Nonnull
+    private static String firstNonBlank(@Nullable String preferred, @Nonnull String fallback) {
+        return preferred == null || preferred.isBlank() ? fallback : preferred;
     }
 
     @Nonnull

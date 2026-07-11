@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OwnerPopulationAdmissionCoordinatorTest {
@@ -105,6 +107,40 @@ class OwnerPopulationAdmissionCoordinatorTest {
         }
     }
 
+    /** Regression: repeated outer owner/claim cleanup must share one durable owner cancellation. */
+    @Test
+    void ownerCancellationIsIdempotentAndSharesOneJournalClose() throws Exception {
+        try (Harness harness = harness("cancel-idempotent.sqlite")) {
+            UUID ownerUuid = UUID.randomUUID();
+            OwnerPopulationPreparationResult preparation = harness.coordinator.prepareAsync(
+                    newPlan(
+                            UUID.randomUUID().toString(),
+                            UUID.randomUUID(),
+                            ownerUuid,
+                            1,
+                            3L
+                    )
+            ).get(2, TimeUnit.SECONDS);
+            PreparedOwnerPopulationAdmission prepared = preparation.preparedAdmission();
+
+            CompletableFuture<Boolean> first = harness.coordinator.cancelAsync(
+                    prepared,
+                    "first-cancel"
+            );
+            CompletableFuture<Boolean> retry = harness.coordinator.cancelAsync(
+                    prepared,
+                    "retry-must-not-close-again"
+            );
+
+            assertSame(first, retry);
+            assertTrue(first.get(2, TimeUnit.SECONDS));
+            assertTrue(retry.get(2, TimeUnit.SECONDS));
+            assertEquals(0, harness.index.pendingReservationCount());
+            assertEquals(0L, harness.index.counts(ownerUuid, "default").globalPending());
+            assertEquals("FAILED", operationState(harness.connections, prepared.operationId()));
+        }
+    }
+
     @Test
     void persistenceDegradedFailsClosedWithoutLeakingReservation() throws Exception {
         try (Harness harness = harness("degraded-before.sqlite")) {
@@ -126,6 +162,46 @@ class OwnerPopulationAdmissionCoordinatorTest {
             assertEquals(0, harness.index.pendingReservationCount());
             assertEquals(0L, harness.index.counts(ownerUuid, "default").globalPending());
             assertTrue(harness.repository.loadAllStates().isEmpty());
+        }
+    }
+
+    /** Regression: storage can degrade after PREPARED but before the world mutation is claimed. */
+    @Test
+    void persistenceDegradedAfterPreparationFailsClosedBeforeApply() throws Exception {
+        try (Harness harness = harness("degraded-before-apply.sqlite")) {
+            UUID ownerUuid = UUID.randomUUID();
+            OwnerPopulationPreparationResult preparation = harness.coordinator.prepareAsync(
+                    newPlan(
+                            UUID.randomUUID().toString(),
+                            UUID.randomUUID(),
+                            ownerUuid,
+                            1,
+                            7L
+                    )
+            ).get(2, TimeUnit.SECONDS);
+            PreparedOwnerPopulationAdmission prepared = preparation.preparedAdmission();
+            assertTrue(preparation.allowed());
+            assertEquals(1L, harness.index.counts(ownerUuid, "default").globalPending());
+
+            harness.health.markDegraded("injected-before-apply");
+
+            assertFalse(harness.coordinator.claimForApply(
+                    prepared,
+                    7L,
+                    ClaimProviderGeneration.NONE
+            ));
+            assertFalse(harness.coordinator.cancelAsync(
+                    prepared,
+                    "await-pre-apply-health-cancel"
+            ).get(2, TimeUnit.SECONDS));
+
+            assertEquals(0, harness.index.pendingReservationCount());
+            assertEquals(0L, harness.index.counts(ownerUuid, "default").globalCommitted());
+            assertEquals(0L, harness.index.counts(ownerUuid, "default").globalPending());
+            assertEquals(OwnerPopulationReadiness.DEGRADED, harness.index.readiness());
+            // The unhealthy write queue cannot close the durable journal. Leaving APPLYING is
+            // intentional: startup recovery must reconcile it instead of treating it as settled.
+            assertEquals("APPLYING", operationState(harness.connections, prepared.operationId()));
         }
     }
 

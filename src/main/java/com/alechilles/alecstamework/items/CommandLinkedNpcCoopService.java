@@ -7,17 +7,11 @@ import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -25,20 +19,26 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import static com.alechilles.alecstamework.items.CoopLedgerTextCodec.decodeNullableString;
+import static com.alechilles.alecstamework.items.CoopLedgerTextCodec.decodeNullableUuid;
+import static com.alechilles.alecstamework.items.CoopLedgerTextCodec.decodeStringArray;
+import static com.alechilles.alecstamework.items.CoopLedgerTextCodec.encodeNullableString;
+import static com.alechilles.alecstamework.items.CoopLedgerTextCodec.encodeNullableUuid;
+import static com.alechilles.alecstamework.items.CoopLedgerTextCodec.encodeStringArray;
+
 /**
  * Authoritative coop resident ledger and facade for command-item coop status queries.
  */
 public final class CommandLinkedNpcCoopService {
     private static final String FIELD_SEPARATOR = "\t";
-    private static final String ARRAY_SEPARATOR = ";";
     private static final String LEDGER_VERSION = "2";
-    private static final String SNAPSHOT_VERSION = "1";
-    private static final Gson SNAPSHOT_JSON = new Gson();
     private static final int UNKNOWN_COORDINATE = Integer.MIN_VALUE;
+    private static final CoopResidentSnapshotJsonCodec SNAPSHOT_CODEC = new CoopResidentSnapshotJsonCodec();
 
     private final ConcurrentHashMap<String, CoopLedgerEntry> ledgerBySlot = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, String> slotKeyByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, CoopLinkedNpcSnapshot> coopedByNpc = new ConcurrentHashMap<>();
+    private final ThreadLocal<Boolean> populationCommitOwnsLedger = new ThreadLocal<>();
     @Nullable
     private final CoopLedgerRepository repository;
     @Nullable
@@ -238,6 +238,44 @@ public final class CommandLinkedNpcCoopService {
         );
     }
 
+    /** Restores the exact slot/index snapshot captured before a prepared owner mutation. */
+    void restoreLedgerSlotSnapshot(@Nonnull CoopSlotContext context,
+                                   @Nullable CoopLedgerSlotSnapshot snapshot) {
+        String slotKey = buildSlotKey(context);
+        CoopLedgerEntry current = ledgerBySlot.remove(slotKey);
+        if (current != null && current.housedNpcUuid != null) {
+            slotKeyByNpc.remove(current.housedNpcUuid, slotKey);
+            coopedByNpc.remove(current.housedNpcUuid);
+        }
+        if (snapshot == null) {
+            clearLedgerSlot(context);
+            return;
+        }
+        CoopLedgerEntry restored = new CoopLedgerEntry(
+                slotKey,
+                normalizeIdentifier(context.worldName()),
+                normalizeIdentifier(context.coopId()),
+                context.x(),
+                context.y(),
+                context.z(),
+                context.residentSlot(),
+                snapshot.housedNpcUuid(),
+                snapshot.lastReleasedNpcUuid(),
+                snapshot.ownerId(),
+                sanitizeToolIds(snapshot.toolIds()),
+                normalizeRoleId(snapshot.roleId()),
+                snapshot.displayName(),
+                snapshot.housedAtMs(),
+                snapshot.releasedAtMs(),
+                snapshot.stateSnapshot()
+        );
+        ledgerBySlot.put(slotKey, restored);
+        if (restored.housedNpcUuid != null) {
+            putCoopedIndex(restored.housedNpcUuid, slotKey, restored.toSnapshot());
+        }
+        upsertLedgerEntry(restored);
+    }
+
     @Nonnull
     public List<CoopSlotContext> listHousedSlotsForWorld(@Nullable String worldName) {
         String normalizedWorldName = normalizeIdentifier(worldName);
@@ -340,22 +378,38 @@ public final class CommandLinkedNpcCoopService {
         putCoopedIndex(npcUuid, slotKey, next.toSnapshot());
 
         if (occupantChanged || snapshotChanged || previous == null) {
-            enqueueProfileUpdate(
-                    npcUuid,
-                    ownerId,
-                    normalizedRoleId,
-                    displayName,
-                    toolIds,
-                    coopId,
-                    context.residentSlot()
-            );
-            upsertLedgerEntry(next);
+            if (!ledgerPersistenceDeferred()) {
+                enqueueProfileUpdate(
+                        npcUuid,
+                        ownerId,
+                        normalizedRoleId,
+                        displayName,
+                        toolIds,
+                        coopId,
+                        context.residentSlot()
+                );
+                upsertLedgerEntry(next);
+            }
             debugCoop(
                     "ledger capture npc=" + npcUuid
                             + " coop=" + coopId
                             + " slot=" + context.residentSlot()
                             + " world=" + safeWorldLabel(context.worldName())
             );
+        }
+    }
+
+    void captureResidentInPopulationCommit(
+            @Nonnull CoopCaptureLedgerTransaction.CaptureRequest request
+    ) {
+        populationCommitOwnsLedger.set(Boolean.TRUE);
+        try {
+            captureResident(
+                    request.npcUuid(), request.roleId(), request.context(), request.ownerId(),
+                    request.toolIds(), request.displayName(), request.stateSnapshot()
+            );
+        } finally {
+            populationCommitOwnsLedger.remove();
         }
     }
 
@@ -440,9 +494,40 @@ public final class CommandLinkedNpcCoopService {
 
     @Nonnull
     public ReleaseResolution resolveRelease(@Nullable UUID currentNpcUuid,
-                                            @Nullable String roleId,
-                                            @Nullable CoopSlotContext context,
-                                            boolean requireSnapshotOnRelease) {
+                                             @Nullable String roleId,
+                                             @Nullable CoopSlotContext context,
+                                             boolean requireSnapshotOnRelease) {
+        return resolveRelease(
+                currentNpcUuid, null, roleId, context, requireSnapshotOnRelease
+        );
+    }
+
+    @Nonnull
+    ReleaseResolution resolveReleaseInPopulationCommit(
+            @Nonnull UUID currentNpcUuid,
+            @Nonnull UUID expectedHousedNpcUuid,
+            @Nonnull String roleId,
+            @Nonnull CoopSlotContext context,
+            boolean requireSnapshotOnRelease
+    ) {
+        populationCommitOwnsLedger.set(Boolean.TRUE);
+        try {
+            return resolveRelease(
+                    currentNpcUuid, expectedHousedNpcUuid, roleId, context,
+                    requireSnapshotOnRelease
+            );
+        } finally {
+            populationCommitOwnsLedger.remove();
+        }
+    }
+
+    /** Resolves a release only while the slot still houses the prepared canonical resident. */
+    @Nonnull
+    public ReleaseResolution resolveRelease(@Nullable UUID currentNpcUuid,
+                                             @Nullable UUID expectedHousedNpcUuid,
+                                             @Nullable String roleId,
+                                             @Nullable CoopSlotContext context,
+                                             boolean requireSnapshotOnRelease) {
         if (!canMutate()) {
             return ReleaseResolution.failure("persistence_unavailable");
         }
@@ -461,6 +546,11 @@ public final class CommandLinkedNpcCoopService {
                             + " slot=" + context.residentSlot()
             );
             return ReleaseResolution.failure("slot_untracked");
+        }
+
+        if (expectedHousedNpcUuid != null
+                && !expectedHousedNpcUuid.equals(entry.housedNpcUuid)) {
+            return ReleaseResolution.failure("source_resident_changed");
         }
 
         if (entry.housedNpcUuid == null && currentNpcUuid.equals(entry.lastReleasedNpcUuid)) {
@@ -506,16 +596,18 @@ public final class CommandLinkedNpcCoopService {
             entry.roleId = normalizedRoleId;
         }
         ledgerBySlot.put(entry.slotKey, entry);
-        enqueueProfileUpdate(
-                currentNpcUuid,
-                entry.ownerId,
-                entry.roleId,
-                entry.displayName,
-                entry.toolIds,
-                entry.coopId,
-                entry.residentSlot
-        );
-        releaseLedgerEntry(entry, previousNpcUuid, currentNpcUuid);
+        if (!ledgerPersistenceDeferred()) {
+            enqueueProfileUpdate(
+                    currentNpcUuid,
+                    entry.ownerId,
+                    entry.roleId,
+                    entry.displayName,
+                    entry.toolIds,
+                    entry.coopId,
+                    entry.residentSlot
+            );
+            releaseLedgerEntry(entry, previousNpcUuid, currentNpcUuid);
+        }
 
         debugCoop(
                 "release resolved current=" + currentNpcUuid
@@ -905,6 +997,10 @@ public final class CommandLinkedNpcCoopService {
         return false;
     }
 
+    private boolean ledgerPersistenceDeferred() {
+        return Boolean.TRUE.equals(populationCommitOwnsLedger.get());
+    }
+
     private void enqueueProfileUpdate(@Nullable UUID npcUuid,
                                       @Nullable UUID ownerId,
                                       @Nullable String roleId,
@@ -915,7 +1011,7 @@ public final class CommandLinkedNpcCoopService {
         if (profileRepository == null || repository != null || npcUuid == null) {
             return;
         }
-        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+        profileRepository.upsertSnapshotAsync(new NpcProfileRepository.ProfileUpdate(
                 npcUuid,
                 ownerId,
                 null,
@@ -1004,8 +1100,8 @@ public final class CommandLinkedNpcCoopService {
     }
 
     @Nullable
-    private UUID resolveOwnerId(@Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
-                                @Nullable UUID fallbackOwnerId) {
+    UUID resolveOwnerId(@Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
+                        @Nullable UUID fallbackOwnerId) {
         UUID ownerId = fallbackOwnerId;
         if (snapshot != null) {
             TameworkCommandLinksComponent links = snapshot.commandLinks();
@@ -1021,8 +1117,8 @@ public final class CommandLinkedNpcCoopService {
     }
 
     @Nonnull
-    private String[] resolveToolIds(@Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
-                                    @Nullable String[] fallbackToolIds) {
+    String[] resolveToolIds(@Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
+                            @Nullable String[] fallbackToolIds) {
         if (snapshot != null) {
             TameworkCommandLinksComponent links = snapshot.commandLinks();
             if (links != null && links.getToolIds() != null && links.getToolIds().length > 0) {
@@ -1033,8 +1129,8 @@ public final class CommandLinkedNpcCoopService {
     }
 
     @Nullable
-    private String resolveDisplayName(@Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
-                                      @Nullable String fallbackDisplayName) {
+    String resolveDisplayName(@Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
+                              @Nullable String fallbackDisplayName) {
         if (snapshot != null) {
             TameworkNpcNameComponent npcName = snapshot.npcName();
             if (npcName != null && npcName.getName() != null && !npcName.getName().isBlank()) {
@@ -1052,7 +1148,7 @@ public final class CommandLinkedNpcCoopService {
     }
 
     @Nullable
-    private static String normalizeRoleId(@Nullable String roleId) {
+    static String normalizeRoleId(@Nullable String roleId) {
         return normalizeIdentifier(roleId);
     }
 
@@ -1087,77 +1183,6 @@ public final class CommandLinkedNpcCoopService {
         return x != UNKNOWN_COORDINATE
                 && y != UNKNOWN_COORDINATE
                 && z != UNKNOWN_COORDINATE;
-    }
-
-    private String encodeNullableUuid(@Nullable UUID uuid) {
-        return uuid == null ? "" : uuid.toString();
-    }
-
-    @Nullable
-    private UUID decodeNullableUuid(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value.trim());
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private String encodeNullableString(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        return Base64.getUrlEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
-    }
-
-    @Nullable
-    private String decodeNullableString(@Nullable String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            byte[] decoded = Base64.getUrlDecoder().decode(value);
-            String out = new String(decoded, StandardCharsets.UTF_8);
-            return out.isBlank() ? null : out;
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private String encodeStringArray(@Nullable String[] values) {
-        if (values == null || values.length == 0) {
-            return "";
-        }
-        StringBuilder builder = new StringBuilder();
-        for (String value : values) {
-            if (value == null || value.isBlank()) {
-                continue;
-            }
-            if (builder.length() > 0) {
-                builder.append(ARRAY_SEPARATOR);
-            }
-            builder.append(encodeNullableString(value));
-        }
-        return builder.toString();
-    }
-
-    @Nonnull
-    private String[] decodeStringArray(@Nullable String raw) {
-        if (raw == null || raw.isBlank()) {
-            return new String[0];
-        }
-        String[] parts = raw.split(ARRAY_SEPARATOR);
-        ArrayList<String> out = new ArrayList<>(parts.length);
-        for (String value : parts) {
-            String decoded = decodeNullableString(value);
-            if (decoded == null || decoded.isBlank()) {
-                continue;
-            }
-            out.add(decoded);
-        }
-        return out.toArray(new String[0]);
     }
 
     @Nonnull
@@ -1247,209 +1272,14 @@ public final class CommandLinkedNpcCoopService {
     }
 
     @Nullable
-    private String serializeStateSnapshot(
+    String serializeStateSnapshot(
             @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot) {
-        if (snapshot == null || snapshot.npcUuid() == null) {
-            return null;
-        }
-        try {
-            JsonObject payload = new JsonObject();
-            payload.addProperty("version", SNAPSHOT_VERSION);
-            payload.addProperty("npcUuid", snapshot.npcUuid().toString());
-            payload.addProperty("coopId", snapshot.coopId());
-            payload.addProperty("residentSlot", snapshot.residentSlot());
-            payload.addProperty("roleId", snapshot.roleId());
-            payload.addProperty("capturedAtMs", snapshot.capturedAtMs());
-            putComponentJson(payload, "commandLinks", snapshot.commandLinks(), TameworkCommandLinksComponent.class);
-            putComponentJson(payload, "owner", snapshot.owner(), TameworkOwnerComponent.class);
-            putComponentJson(payload, "tamed", snapshot.tamed(), TameworkTamedComponent.class);
-            putComponentJson(payload, "npcName", snapshot.npcName(), TameworkNpcNameComponent.class);
-            putComponentJson(payload, "happiness", snapshot.happiness(),
-                    com.alechilles.alecstamework.npc.components.TameworkHappinessComponent.class);
-            putComponentJson(payload, "needs", snapshot.needs(),
-                    com.alechilles.alecstamework.npc.components.TameworkNeedsComponent.class);
-            putComponentJson(payload, "breeding", snapshot.breeding(),
-                    com.alechilles.alecstamework.npc.components.TameworkBreedingComponent.class);
-            putComponentJson(payload, "leveling", snapshot.leveling(),
-                    com.alechilles.alecstamework.npc.components.TameworkLevelingComponent.class);
-            putComponentJson(payload, "traits", snapshot.traits(),
-                    com.alechilles.alecstamework.npc.components.TameworkTraitsComponent.class);
-            putComponentJson(payload, "talents", snapshot.talents(),
-                    com.alechilles.alecstamework.npc.components.TameworkTalentsComponent.class);
-            putComponentJson(payload, "lifeStage", snapshot.lifeStage(),
-                    com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.class);
-            putComponentJson(payload, "attachments", snapshot.attachments(),
-                    com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.class);
-            if (snapshot.healthPercent() != null) {
-                payload.addProperty("healthPercent", snapshot.healthPercent());
-            }
-            return payload.toString();
-        } catch (Exception ignored) {
-            return null;
-        }
+        return SNAPSHOT_CODEC.serialize(snapshot);
     }
 
     @Nullable
     private CoopResidentStateSnapshotService.CoopResidentStateSnapshot deserializeStateSnapshot(@Nullable String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            JsonElement parsed = JsonParser.parseString(raw);
-            if (parsed == null || !parsed.isJsonObject()) {
-                return null;
-            }
-            JsonObject payload = parsed.getAsJsonObject();
-            String version = getJsonString(payload, "version");
-            if (version != null && !SNAPSHOT_VERSION.equals(version)) {
-                return null;
-            }
-            UUID npcUuid = parseUuid(getJsonString(payload, "npcUuid"));
-            if (npcUuid == null) {
-                return null;
-            }
-            String coopId = normalizeIdentifier(getJsonString(payload, "coopId"));
-            int residentSlot = getJsonInt(payload, "residentSlot", -1);
-            String roleId = normalizeRoleId(getJsonString(payload, "roleId"));
-            long capturedAtMs = Math.max(0L, getJsonLong(payload, "capturedAtMs", 0L));
-            TameworkCommandLinksComponent commandLinks =
-                    parseComponent(payload, "commandLinks", TameworkCommandLinksComponent.class);
-            TameworkOwnerComponent owner = parseComponent(payload, "owner", TameworkOwnerComponent.class);
-            TameworkTamedComponent tamed = parseComponent(payload, "tamed", TameworkTamedComponent.class);
-            TameworkNpcNameComponent npcName = parseComponent(payload, "npcName", TameworkNpcNameComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkHappinessComponent happiness =
-                    parseComponent(payload, "happiness",
-                            com.alechilles.alecstamework.npc.components.TameworkHappinessComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkNeedsComponent needs =
-                    parseComponent(payload, "needs",
-                            com.alechilles.alecstamework.npc.components.TameworkNeedsComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkBreedingComponent breeding =
-                    parseComponent(payload, "breeding",
-                            com.alechilles.alecstamework.npc.components.TameworkBreedingComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkLevelingComponent leveling =
-                    parseComponent(payload, "leveling",
-                            com.alechilles.alecstamework.npc.components.TameworkLevelingComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkTraitsComponent traits =
-                    parseComponent(payload, "traits",
-                            com.alechilles.alecstamework.npc.components.TameworkTraitsComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkTalentsComponent talents =
-                    parseComponent(payload, "talents",
-                            com.alechilles.alecstamework.npc.components.TameworkTalentsComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent lifeStage =
-                    parseComponent(payload, "lifeStage",
-                            com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.class);
-            com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent attachments =
-                    parseComponent(payload, "attachments",
-                            com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.class);
-            Double healthPercent = getJsonDouble(payload, "healthPercent");
-            return new CoopResidentStateSnapshotService.CoopResidentStateSnapshot(
-                    npcUuid,
-                    coopId,
-                    residentSlot,
-                    roleId,
-                    commandLinks,
-                    owner,
-                    tamed,
-                    npcName,
-                    happiness,
-                    needs,
-                    breeding,
-                    leveling,
-                    traits,
-                    talents,
-                    lifeStage,
-                    attachments,
-                    healthPercent,
-                    capturedAtMs
-            );
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private <T> void putComponentJson(@Nonnull JsonObject payload,
-                                      @Nonnull String field,
-                                      @Nullable T component,
-                                      @Nonnull Class<T> componentClass) {
-        if (component == null) {
-            return;
-        }
-        JsonElement value = SNAPSHOT_JSON.toJsonTree(component, componentClass);
-        if (value != null && value.isJsonObject()) {
-            payload.add(field, value.getAsJsonObject());
-        }
-    }
-
-    @Nullable
-    private <T> T parseComponent(@Nonnull JsonObject payload, @Nonnull String field, @Nonnull Class<T> componentClass) {
-        if (!payload.has(field) || !payload.get(field).isJsonObject()) {
-            return null;
-        }
-        try {
-            return SNAPSHOT_JSON.fromJson(payload.getAsJsonObject(field), componentClass);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private String getJsonString(@Nonnull JsonObject payload, @Nonnull String key) {
-        if (!payload.has(key) || payload.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            String value = payload.get(key).getAsString();
-            return value == null || value.isBlank() ? null : value;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private int getJsonInt(@Nonnull JsonObject payload, @Nonnull String key, int fallback) {
-        if (!payload.has(key) || payload.get(key).isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return payload.get(key).getAsInt();
-        } catch (Exception ignored) {
-            return fallback;
-        }
-    }
-
-    private long getJsonLong(@Nonnull JsonObject payload, @Nonnull String key, long fallback) {
-        if (!payload.has(key) || payload.get(key).isJsonNull()) {
-            return fallback;
-        }
-        try {
-            return payload.get(key).getAsLong();
-        } catch (Exception ignored) {
-            return fallback;
-        }
-    }
-
-    @Nullable
-    private Double getJsonDouble(@Nonnull JsonObject payload, @Nonnull String key) {
-        if (!payload.has(key) || payload.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            double value = payload.get(key).getAsDouble();
-            return Double.isFinite(value) ? value : null;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private UUID parseUuid(@Nullable String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (Exception ignored) {
-            return null;
-        }
+        return SNAPSHOT_CODEC.deserialize(raw);
     }
 
     private void debugCoop(@Nonnull String message) {

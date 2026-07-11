@@ -6,6 +6,10 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbeResult;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,6 +50,28 @@ class QuestLinesClaimsProviderProbeTest {
         assertTrue(result.reason().contains("1.3.1"));
     }
 
+    @Test
+    void pluginLocatorDoesNotRunUnderProbeMonitor() throws Exception {
+        CountDownLatch locateEntered = new CountDownLatch(1);
+        CountDownLatch releaseLocate = new CountDownLatch(1);
+        QuestLinesClaimsProviderProbe probe = new QuestLinesClaimsProviderProbe(() -> {
+            locateEntered.countDown();
+            awaitUnchecked(releaseLocate);
+            return ready("plugin-a", new FixturePlugin());
+        });
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            var probing = executor.submit(probe::probe);
+            assertTrue(locateEntered.await(1, TimeUnit.SECONDS));
+            executor.submit(probe::invalidate).get(1, TimeUnit.SECONDS);
+            releaseLocate.countDown();
+            assertEquals(ClaimProviderState.READY, probing.get(1, TimeUnit.SECONDS).state());
+        } finally {
+            releaseLocate.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private static ClaimPluginLocation ready(String pluginToken, Object plugin) {
         return new ClaimPluginLocation(
                 "questlines-claims",
@@ -59,6 +85,15 @@ class QuestLinesClaimsProviderProbeTest {
 
     private static ClaimProviderGeneration generation(String pluginToken) {
         return new ClaimProviderGeneration(pluginToken, pluginToken + "-loader", 0L);
+    }
+
+    private static void awaitUnchecked(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+        }
     }
 
     private static final class FakeLocator implements ClaimPluginLocator {

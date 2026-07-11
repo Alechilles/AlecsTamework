@@ -12,6 +12,7 @@ public record OwnerPopulationCommitResult(@Nonnull Status status,
                                           @Nullable PopulationPersistenceTransition.Result persistenceResult) {
     public enum Status {
         COMMITTED,
+        SOURCE_FINALIZATION_PENDING,
         INVALID_CAPABILITY,
         INDEX_COMMIT_FAILED,
         PERSISTENCE_DEGRADED
@@ -27,6 +28,10 @@ public record OwnerPopulationCommitResult(@Nonnull Status status,
     }
 
     public boolean committed() {
-        return status == Status.COMMITTED;
+        return status == Status.COMMITTED || status == Status.SOURCE_FINALIZATION_PENDING;
+    }
+
+    public boolean sourceFinalizationPending() {
+        return status == Status.SOURCE_FINALIZATION_PENDING;
     }
 }

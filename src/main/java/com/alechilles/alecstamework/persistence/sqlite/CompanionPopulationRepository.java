@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.ownership.CompanionSpawnSourceFinalizationContext;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -23,11 +24,13 @@ import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulatio
 public final class CompanionPopulationRepository {
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
+    private final CoopLedgerRepository coopLedgerRepository;
 
     public CompanionPopulationRepository(@Nonnull SqliteConnectionManager connectionManager,
                                          @Nonnull PersistenceWriteQueue writeQueue) {
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
+        this.coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue);
     }
 
     @Nonnull
@@ -69,6 +72,18 @@ public final class CompanionPopulationRepository {
         );
     }
 
+    /** Completes an exact source-bearing spawn after its world-thread CAS finalizer succeeds. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> completeSourceFinalizationAsync(
+            @Nonnull String operationId
+    ) {
+        return writeQueue.submitTracked(
+                "companion_population_source_finalize",
+                connection -> completeSourceFinalizationInTransaction(connection, operationId),
+                null
+        );
+    }
+
     @Nonnull
     public List<CompanionPopulationStateRecord> loadAllStates() throws Exception {
         try (Connection connection = connectionManager.openConnection();
@@ -102,6 +117,29 @@ public final class CompanionPopulationRepository {
                             created_at_ms, updated_at_ms, completed_at_ms, last_error
                      FROM companion_population_operations
                      WHERE state IN ('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING')
+                     ORDER BY created_at_ms, operation_id
+                     """
+             );
+             ResultSet resultSet = statement.executeQuery()) {
+            List<CompanionPopulationOperationRecord> rows = new ArrayList<>();
+            while (resultSet.next()) {
+                rows.add(readOperation(resultSet));
+            }
+            return List.copyOf(rows);
+        }
+    }
+
+    /** Loads retained breeding rows, including COMMITTED rows used as restart birth evidence. */
+    @Nonnull
+    public List<CompanionPopulationOperationRecord> loadBreedingOperations() throws Exception {
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     """
+                     SELECT operation_id, profile_id, operation_type, state, expected_revision,
+                            old_state_json, new_state_json, target_context_json,
+                            created_at_ms, updated_at_ms, completed_at_ms, last_error
+                     FROM companion_population_operations
+                     WHERE operation_type = 'BREEDING'
                      ORDER BY created_at_ms, operation_id
                      """
              );
@@ -169,6 +207,17 @@ public final class CompanionPopulationRepository {
         if (operation.state() == CompanionPopulationOperationRecord.State.COMMITTED) {
             return result(PopulationPersistenceTransition.ResultStatus.IDEMPOTENT, request.expectedRevision() + 1L, "already_committed");
         }
+        boolean sourceFinalizationRequired = CompanionSpawnSourceFinalizationContext.required(
+                operation.targetContextJson()
+        );
+        if (operation.state() == CompanionPopulationOperationRecord.State.APPLIED
+                && sourceFinalizationRequired) {
+            return result(
+                    PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING,
+                    request.expectedRevision() + 1L,
+                    "source_finalization_pending"
+            );
+        }
         if (operation.state() != CompanionPopulationOperationRecord.State.APPLYING
                 && operation.state() != CompanionPopulationOperationRecord.State.APPLIED) {
             return result(PopulationPersistenceTransition.ResultStatus.INVALID_STATE, -1L, "operation_not_applying");
@@ -187,6 +236,17 @@ public final class CompanionPopulationRepository {
 
         updateProfile(connection, request);
         updatePopulationState(connection, request);
+        CompanionPopulationCoopLedgerMutation.applyIfPresent(
+                connection, coopLedgerRepository, operation.targetContextJson()
+        );
+        if (sourceFinalizationRequired) {
+            markOperationApplied(connection, request.operationId());
+            return result(
+                    PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING,
+                    revision + 1L,
+                    "source_finalization_pending"
+            );
+        }
         finalizeOperation(connection, request.operationId());
         return result(PopulationPersistenceTransition.ResultStatus.COMMITTED, revision + 1L, null);
     }
@@ -263,9 +323,12 @@ public final class CompanionPopulationRepository {
             case UNCHANGED -> "owner_uuid";
             case SET, CLEAR -> "?";
         };
+        String ownerStateExpression = request.ownerMutation().kind() == ProfileOwnerMutation.Kind.UNCHANGED
+                ? "state_json" : "CASE WHEN json_valid(state_json) THEN NULLIF(json_remove(state_json, '$.owner_name'), '{}') ELSE state_json END";
         String uuidExpression = request.currentNpcUuid() == null ? "current_npc_uuid" : "?";
         String sql = "UPDATE npc_profiles SET owner_uuid = " + ownerExpression
                 + ", current_npc_uuid = " + uuidExpression
+                + ", state_json = " + ownerStateExpression
                 + ", last_world_name = ?, updated_at_ms = ?, last_active_at_ms = ? WHERE profile_id = ?";
         long now = System.currentTimeMillis();
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -288,7 +351,6 @@ public final class CompanionPopulationRepository {
             setCurrentAlias(connection, request.profileId(), request.currentNpcUuid(), now);
         }
     }
-
     private void updatePopulationState(@Nonnull Connection connection,
                                        @Nonnull PopulationPersistenceTransition.Commit request) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
@@ -314,7 +376,6 @@ public final class CompanionPopulationRepository {
             }
         }
     }
-
     private void finalizeOperation(@Nonnull Connection connection, @Nonnull String operationId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
                 """
@@ -333,6 +394,39 @@ public final class CompanionPopulationRepository {
         }
     }
 
+    private void markOperationApplied(@Nonnull Connection connection,
+                                      @Nonnull String operationId) throws Exception {
+        if (!advanceOperationInTransaction(
+                connection,
+                operationId,
+                CompanionPopulationOperationRecord.State.APPLYING,
+                CompanionPopulationOperationRecord.State.APPLIED,
+                "source_finalization_pending"
+        )) {
+            throw new IllegalStateException("Population operation changed before source finalization.");
+        }
+    }
+
+    private boolean completeSourceFinalizationInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String operationId
+    ) throws Exception {
+        OperationIdentity operation = findOperation(connection, operationId);
+        if (operation == null) {
+            return false;
+        }
+        if (operation.state() == CompanionPopulationOperationRecord.State.COMMITTED) {
+            return true;
+        }
+        if (operation.state() != CompanionPopulationOperationRecord.State.APPLIED
+                || !CompanionSpawnSourceFinalizationContext.required(
+                operation.targetContextJson()
+        )) {
+            return false;
+        }
+        finalizeOperation(connection, operationId);
+        return true;
+    }
     private boolean advanceOperationInTransaction(@Nonnull Connection connection,
                                                   @Nonnull String operationId,
                                                   @Nonnull CompanionPopulationOperationRecord.State expected,
@@ -386,7 +480,7 @@ public final class CompanionPopulationRepository {
     @Nullable
     private OperationIdentity findOperation(@Nonnull Connection connection, @Nonnull String operationId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT profile_id, state, expected_revision FROM companion_population_operations WHERE operation_id = ?"
+                "SELECT profile_id, state, expected_revision, target_context_json FROM companion_population_operations WHERE operation_id = ?"
         )) {
             statement.setString(1, operationId);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -396,7 +490,8 @@ public final class CompanionPopulationRepository {
                 return new OperationIdentity(
                         resultSet.getString(1),
                         CompanionPopulationOperationRecord.State.valueOf(resultSet.getString(2)),
-                        resultSet.getLong(3)
+                        resultSet.getLong(3),
+                        resultSet.getString(4)
                 );
             }
         }
@@ -495,6 +590,7 @@ public final class CompanionPopulationRepository {
 
     private record OperationIdentity(@Nonnull String profileId,
                                      @Nonnull CompanionPopulationOperationRecord.State state,
-                                     long expectedRevision) {
+                                     long expectedRevision,
+                                     @Nullable String targetContextJson) {
     }
 }

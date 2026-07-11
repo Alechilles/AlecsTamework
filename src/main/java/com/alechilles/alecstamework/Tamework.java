@@ -59,6 +59,7 @@ import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
 import com.alechilles.alecstamework.damage.CompanionCombatExperienceSystem;
 import com.alechilles.alecstamework.damage.RespawnFallDamageGraceSystem;
+import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -137,12 +138,12 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierSe
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
-import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationAdmissionCoordinator;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
 import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
+import com.alechilles.alecstamework.ownership.reconciliation.TameworkPopulationRuntimeLifecycle;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
@@ -897,19 +898,10 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
-        ownerPopulationRuntime = OwnerPopulationRuntime.initialize(persistenceRuntime);
-        CompanionPopulationBootstrapService.BootstrapResult populationBootstrap =
-                ownerPopulationRuntime.bootstrapResult();
-        getLogger().at(Level.INFO).log(
-                "Companion population ledger loaded: profiles="
-                        + populationBootstrap.profileCount()
-                        + ", operations="
-                        + populationBootstrap.nonterminalOperationCount()
-                        + ", global="
-                        + populationBootstrap.globalReadiness()
-                        + ", perWorld="
-                        + populationBootstrap.perWorldReadiness()
+        ownerPopulationRuntime = TameworkPopulationRuntimeLifecycle.initialize(
+                persistenceRuntime, getLogger()
         );
+        commandNpcRelocationService.setRelocationAdmissionService(ownerPopulationRuntime.relocationAdmissionService());
         apiEventBus = new TameworkEventBus(getLogger());
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
         HeldItemAttachmentInteractionService heldItemAttachmentInteractions =
@@ -932,7 +924,9 @@ public class Tamework extends JavaPlugin {
                 apiEventBus,
                 commandLinkedNpcStateSnapshotService,
                 interactionExtensionRegistry,
-                traitEffectRegistry
+                traitEffectRegistry,
+                new SimpleClaimsTamedDamagePolicy(),
+                ownerPopulationRuntime.populationPolicyAuthority()
         );
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
                 () -> api,
@@ -940,30 +934,14 @@ public class Tamework extends JavaPlugin {
         );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(persistenceRuntime);
         apiSelfTestRunner = new ApiSelfTestRunner();
-        commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
-                persistenceRuntime.getCaptureRepository(),
-                persistenceRuntime.getHealthService(),
-                persistenceRuntime.getNpcProfileRepository()
-        );
-        commandLinkedNpcCoopService = new CommandLinkedNpcCoopService(
-                persistenceRuntime.getCoopLedgerRepository(),
-                persistenceRuntime.getHealthService(),
-                persistenceRuntime.getNpcProfileRepository()
-        );
-        commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
-                commandLinkedNpcStateSnapshotService,
-                persistenceRuntime.getDeathRepository(),
-                persistenceRuntime.getHealthService(),
-                persistenceRuntime.getNpcProfileRepository()
-        );
-        commandLinkedNpcLostService = new CommandLinkedNpcLostService(
-                getLogger(),
-                commandLinkedNpcStateSnapshotService,
-                commandLinkedNpcCaptureService,
-                commandLinkedNpcCoopService,
-                persistenceRuntime.getLostRepository(),
-                persistenceRuntime.getHealthService()
-        );
+        TameworkPopulationRuntimeLifecycle.LinkedServices populationServices =
+                TameworkPopulationRuntimeLifecycle.createLinkedServices(
+                        persistenceRuntime, getLogger(), commandLinkedNpcStateSnapshotService
+                );
+        commandLinkedNpcCaptureService = populationServices.capture();
+        commandLinkedNpcCoopService = populationServices.coop();
+        commandLinkedNpcDeathService = populationServices.death();
+        commandLinkedNpcLostService = populationServices.lost();
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
         commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
         getEntityStoreRegistry().registerSystem(
@@ -975,6 +953,13 @@ public class Tamework extends JavaPlugin {
                         coopResidentStateSnapshotService,
                         null
                 )
+        );
+        TameworkPopulationRuntimeLifecycle.registerSystems(
+                getEntityStoreRegistry(),
+                ownerPopulationRuntime,
+                populationServices,
+                ownerComponentType,
+                message -> getLogger().at(Level.WARNING).log(message)
         );
         getChunkStoreRegistry().registerSystem(
                 new CommandCoopManagedWildCaptureSystem(
@@ -1267,6 +1252,11 @@ public class Tamework extends JavaPlugin {
         OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
         CreditorIntegration.start(this);
         initializeOverridesForLoadedWorlds();
+        if (ownerPopulationRuntime != null && itemFeatureRegistry != null) {
+            TameworkPopulationRuntimeLifecycle.start(
+                    ownerPopulationRuntime, Universe.get(), ownerComponentType, itemFeatureRegistry
+            );
+        }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (hStatsIntegration != null) {
             hStatsIntegration.initialize();
@@ -1301,11 +1291,14 @@ public class Tamework extends JavaPlugin {
             apiEventBus.close();
             apiEventBus = null;
         }
+        if (ownerPopulationRuntime != null) {
+            ownerPopulationRuntime.close();
+            ownerPopulationRuntime = null;
+        }
         if (persistenceRuntime != null) {
             persistenceRuntime.close();
             persistenceRuntime = null;
         }
-        ownerPopulationRuntime = null;
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
@@ -1479,6 +1472,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public OwnerMutationScheduler getOwnerMutationScheduler() {
         return ownerPopulationRuntime == null ? null : ownerPopulationRuntime.mutationScheduler();
+    }
+
+    @Nullable
+    public OwnerPopulationRuntime getOwnerPopulationRuntime() {
+        return ownerPopulationRuntime;
     }
 
     @Nullable

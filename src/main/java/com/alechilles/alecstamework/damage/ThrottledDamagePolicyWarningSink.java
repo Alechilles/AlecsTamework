@@ -1,19 +1,15 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.Tamework;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import com.alechilles.alecstamework.integration.claims.ClaimWarningThrottle;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
- * Emits at most one warning per category per minute through the active Tamework logger.
+ * Emits at most one warning per category/provider/context key per minute through the active logger.
  */
 final class ThrottledDamagePolicyWarningSink implements DamagePolicyWarningSink {
-    private static final long WARNING_THROTTLE_MS = 60_000L;
-
-    private final Map<String, AtomicLong> nextWarningByCategory = new ConcurrentHashMap<>();
+    private final ClaimWarningThrottle warningThrottle = new ClaimWarningThrottle();
 
     @Override
     public void warn(@Nonnull String category, @Nonnull String message) {
@@ -21,10 +17,7 @@ final class ThrottledDamagePolicyWarningSink implements DamagePolicyWarningSink 
         if (plugin == null || plugin.getLogger() == null || message.isBlank()) {
             return;
         }
-        long now = System.currentTimeMillis();
-        AtomicLong nextWarning = nextWarningByCategory.computeIfAbsent(category, ignored -> new AtomicLong());
-        long next = nextWarning.get();
-        if (now < next || !nextWarning.compareAndSet(next, now + WARNING_THROTTLE_MS)) {
+        if (!warningThrottle.tryAcquire(category, "simpleclaims", "tamed-damage")) {
             return;
         }
         plugin.getLogger().at(Level.WARNING).log(message);

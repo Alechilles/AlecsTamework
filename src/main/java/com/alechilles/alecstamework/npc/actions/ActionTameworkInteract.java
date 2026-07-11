@@ -16,14 +16,11 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthP
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
 import com.alechilles.alecstamework.npc.alarms.TameworkAlarmService;
-import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.asset.builder.Builder;
-import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
@@ -54,6 +51,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
     private final InteractionResolution resolution;
     private final InteractionSelection selection;
     private final InteractionExecution execution;
+    private final InteractionLegacyAdoptionService legacyAdoptionService;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         super(builder);
@@ -83,7 +81,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
         StdScope sensorSnapshot = null;
         StdScope roleParameterSnapshot = null;
         if (support != null) {
-            roleParameterSnapshot = snapshotRoleParameterScope(support);
+            roleParameterSnapshot = InteractionRoleParameterScope.snapshot(support);
             Scope globalScope = support.getGlobalScope();
             if (globalScope != null) {
                 globalSnapshot = globalScope instanceof StdScope
@@ -161,6 +159,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
                 diagnostics
         );
         this.execution = new InteractionExecution(executor, cooldowns);
+        this.legacyAdoptionService = new InteractionLegacyAdoptionService(selection::logDebug);
     }
 
     @Override
@@ -186,7 +185,17 @@ public class ActionTameworkInteract extends TameworkActionBase {
             selection.logDebug("TameworkInteract: no player resolved for interaction.");
             return false;
         }
-        InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, interactionTarget, role);
+        return executeWithPlayer(npcRef, role, infoProvider, store, interactionTarget, player, true);
+    }
+
+    private boolean executeWithPlayer(Ref<EntityStore> npcRef,
+                                      Role role,
+                                      InfoProvider infoProvider,
+                                      Store<EntityStore> store,
+                                      Ref<EntityStore> playerRef,
+                                      Player player,
+                                      boolean allowLegacyAdoption) {
+        InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, playerRef, role);
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, configParamName);
         selection.logDebug(String.format(
@@ -205,14 +214,21 @@ public class ActionTameworkInteract extends TameworkActionBase {
             ));
             return false;
         }
-        LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
-                LegacyTamedOwnershipBridge.claimForPlayerIfEligible(npcRef, store, player);
-        if (ownerBridgeResult.isClaimed()) {
-            selection.logDebug("TameworkInteract: claimed legacy tamed ownership for player interaction.");
+        if (allowLegacyAdoption) {
+            InteractionLegacyAdoptionService.Attempt attempt = legacyAdoptionService.attempt(
+                    npcRef, store, player, role,
+                    live -> executeWithPlayer(
+                            live.npcRef(), live.role(), infoProvider, live.store(),
+                            live.playerRef(), live.player(), false
+                    )
+            );
+            if (attempt.handled()) {
+                return attempt.succeeded();
+            }
         }
         ResolvedInteraction interaction = selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
         if (interaction == null) {
-            maybeNotifyOwnerDenied(npcRef, store, player);
+            selection.maybeNotifyOwnerDenied(npcRef, store, player);
             selection.logDebug(selection.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
             return false;
         }
@@ -510,25 +526,6 @@ public class ActionTameworkInteract extends TameworkActionBase {
 
     String describeTriggerSource() {
         return triggerSource != null && !triggerSource.isBlank() ? triggerSource : "<unspecified>";
-    }
-
-    private static StdScope snapshotRoleParameterScope(BuilderSupport support) {
-        if (support == null) {
-            return null;
-        }
-        try {
-            Builder<?> roleBuilder = support.getParentSpawnable();
-            BuilderParameters builderParameters = roleBuilder != null ? roleBuilder.getBuilderParameters() : null;
-            return builderParameters != null ? builderParameters.createScope() : null;
-        } catch (RuntimeException | LinkageError ignored) {
-            return null;
-        }
-    }
-
-    private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
-                                        Store<EntityStore> store,
-                                        Player player) {
-        selection.maybeNotifyOwnerDenied(npcRef, store, player);
     }
 
     // Captures the selected interaction entry and cooldown metadata.

@@ -7,25 +7,19 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Handles linked panel row/header actions that mutate command tool state.
  */
 final class CommandPanelActionService {
-    private static final Logger LOGGER = Logger.getLogger(CommandPanelActionService.class.getName());
     private final CommandLinkMutationService linkMutationService;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandFeedbackService feedbackService;
-    private final CommandGroupService groupService;
+    private final CommandPanelGroupActionService groupActionService;
 
     CommandPanelActionService(CommandLinkMutationService linkMutationService,
                               CommandToolInventoryService toolInventoryService,
@@ -36,7 +30,12 @@ final class CommandPanelActionService {
         this.toolInventoryService = toolInventoryService;
         this.panelPreferenceService = panelPreferenceService;
         this.feedbackService = feedbackService;
-        this.groupService = groupService != null ? groupService : new CommandGroupService();
+        this.groupActionService = new CommandPanelGroupActionService(
+                linkMutationService,
+                toolInventoryService,
+                feedbackService,
+                groupService
+        );
     }
 
     void applyLink(Player player,
@@ -65,12 +64,22 @@ final class CommandPanelActionService {
                     npcRef,
                     toolId,
                     config,
-                    stack
+                    stack,
+                    (livePlayer, liveStore, liveTarget) -> applyDeferredLink(
+                            livePlayer,
+                            liveStore,
+                            liveTarget,
+                            toolId,
+                            config
+                    )
             );
             resultHolder[0] = result;
             return result.updatedItem != null ? result.updatedItem : stack;
         });
         LinkToggleResult result = resultHolder[0];
+        if (result != null && result.pending) {
+            return;
+        }
         if (result == null || !result.toggled) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.failed");
             return;
@@ -84,6 +93,43 @@ final class CommandPanelActionService {
             return;
         }
         feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.link.successInactive", result.npcName);
+    }
+
+    private void applyDeferredLink(Player player,
+                                   Store<EntityStore> store,
+                                   Ref<EntityStore> targetRef,
+                                   String toolId,
+                                   TwCommandItemConfig config) {
+        LinkToggleResult[] resultHolder = new LinkToggleResult[1];
+        boolean mutated = toolInventoryService.mutateToolStack(player, toolId, stack -> {
+            LinkToggleResult result = linkMutationService.tryToggleLink(
+                    player,
+                    store,
+                    targetRef,
+                    toolId,
+                    config,
+                    stack,
+                    null
+            );
+            resultHolder[0] = result;
+            return result != null && result.updatedItem != null ? result.updatedItem : stack;
+        });
+        LinkToggleResult result = resultHolder[0];
+        if (!mutated || result == null || !result.toggled || result.updatedItem == null) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.failed");
+            return;
+        }
+        if (!result.linked) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.alreadyLinked");
+        } else if (result.active) {
+            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.link.success", result.npcName);
+        } else {
+            feedbackService.showSuccessKey(
+                    player,
+                    "tamework.ui.notifications.command.link.successInactive",
+                    result.npcName
+            );
+        }
     }
 
     void applyToggleActive(Player player,
@@ -291,190 +337,23 @@ final class CommandPanelActionService {
                                 String toolId,
                                 UUID npcUuid,
                                 String groupId) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return;
-        }
-        String normalizedGroupId = normalizeOptionalGroupId(groupId);
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> {
-                    if (normalizedGroupId != null && groupService.findGroup(stack, normalizedGroupId) == null) {
-                        return stack;
-                    }
-                    return linkMutationService.setLinkedNpcGroup(stack, npcUuid, normalizedGroupId);
-                }
-        );
-        if (!updated && player != null && normalizedGroupId != null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.assignFailed");
-        }
+        groupActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId);
     }
 
     void applyCreateGroup(Player player, String toolId, String name, String colorHex) {
-        LOGGER.log(
-                Level.INFO,
-                "Group create mutation requested: toolId={0} name={1} color={2}",
-                new Object[] { safeForLog(toolId), safeForLog(name), safeForLog(colorHex) }
-        );
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> groupService.createGroup(stack, name, colorHex)
-        );
-        LOGGER.log(
-                Level.INFO,
-                "Group create mutation result: toolId={0} updated={1}",
-                new Object[] { safeForLog(toolId), updated }
-        );
-        if (!updated && player != null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.createFailed");
-            return;
-        }
-        if (player != null) {
-            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.created");
-        }
+        groupActionService.applyCreateGroup(player, toolId, name, colorHex);
     }
 
     void applyRenameGroup(Player player, String toolId, String groupId, String name) {
-        LOGGER.log(
-                Level.INFO,
-                "Group rename mutation requested: toolId={0} groupId={1} newName={2}",
-                new Object[] { safeForLog(toolId), safeForLog(groupId), safeForLog(name) }
-        );
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> groupService.renameGroup(stack, groupId, name)
-        );
-        LOGGER.log(
-                Level.INFO,
-                "Group rename mutation result: toolId={0} groupId={1} updated={2}",
-                new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
-        );
-        if (!updated && player != null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.renameFailed");
-            return;
-        }
-        if (player != null) {
-            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.renamed");
-        }
+        groupActionService.applyRenameGroup(player, toolId, groupId, name);
     }
 
     void applyRecolorGroup(Player player, String toolId, String groupId, String colorHex) {
-        LOGGER.log(
-                Level.INFO,
-                "Group recolor mutation requested: toolId={0} groupId={1} color={2}",
-                new Object[] { safeForLog(toolId), safeForLog(groupId), safeForLog(colorHex) }
-        );
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> groupService.recolorGroup(stack, groupId, colorHex)
-        );
-        LOGGER.log(
-                Level.INFO,
-                "Group recolor mutation result: toolId={0} groupId={1} updated={2}",
-                new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
-        );
-        if (!updated && player != null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.recolorFailed");
-            return;
-        }
-        if (player != null) {
-            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.recolored");
-        }
+        groupActionService.applyRecolorGroup(player, toolId, groupId, colorHex);
     }
 
     void applyDeleteGroup(Player player, String toolId, String groupId) {
-        LOGGER.log(
-                Level.INFO,
-                "Group delete mutation requested: toolId={0} groupId={1}",
-                new Object[] { safeForLog(toolId), safeForLog(groupId) }
-        );
-        boolean updated = toolInventoryService.mutateToolStack(
-                player,
-                toolId,
-                stack -> {
-                    ItemStack updatedStack = groupService.deleteGroup(stack, groupId);
-                    if (updatedStack == stack) {
-                        return stack;
-                    }
-                    return clearGroupAssignments(updatedStack, groupId);
-                }
-        );
-        LOGGER.log(
-                Level.INFO,
-                "Group delete mutation result: toolId={0} groupId={1} updated={2}",
-                new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
-        );
-        if (!updated && player != null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.deleteFailed");
-            return;
-        }
-        if (player != null) {
-            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.deleted");
-        }
-    }
-
-    private ItemStack clearGroupAssignments(ItemStack stack, String groupId) {
-        if (stack == null || stack.isEmpty() || groupId == null || groupId.isBlank()) {
-            return stack;
-        }
-        List<LinkedNpcRecord> records = linkMutationService.readLinkedNpcRecords(stack);
-        if (records.isEmpty()) {
-            return stack;
-        }
-        ArrayList<LinkedNpcRecord> updated = new ArrayList<>(records.size());
-        boolean changed = false;
-        for (LinkedNpcRecord record : records) {
-            if (record == null || record.npcUuid == null) {
-                continue;
-            }
-            if (record.groupId != null && record.groupId.equalsIgnoreCase(groupId.trim())) {
-                updated.add(new LinkedNpcRecord(
-                        record.npcUuid,
-                        record.lastKnownPosition,
-                        record.lastKnownWorldName,
-                        record.homePosition,
-                        record.cachedDisplayName,
-                        record.cachedNameKey,
-                        record.cachedRoleId,
-                        record.cachedCommandState,
-                        record.active,
-                        record.breedingEnabled,
-                        null
-                ));
-                changed = true;
-                continue;
-            }
-            updated.add(record);
-        }
-        if (!changed) {
-            return stack;
-        }
-        return linkMutationService.writeLinkedNpcRecords(stack, updated);
-    }
-
-    private static String safeForLog(String value) {
-        if (value == null) {
-            return "<null>";
-        }
-        String trimmed = value.trim();
-        if (trimmed.isEmpty()) {
-            return "<empty>";
-        }
-        if (trimmed.length() <= 48) {
-            return trimmed;
-        }
-        return trimmed.substring(0, 45) + "...";
-    }
-
-    private String normalizeOptionalGroupId(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        groupActionService.applyDeleteGroup(player, toolId, groupId);
     }
 
     private void applyLoadedNpcBreedingToggle(Player player,

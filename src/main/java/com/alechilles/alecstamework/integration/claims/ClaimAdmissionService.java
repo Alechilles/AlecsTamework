@@ -24,11 +24,12 @@ public final class ClaimAdmissionService {
     private final ReentrantLock lock = new ReentrantLock();
     private final Object reservationAuthority = new Object();
     private final ClaimOccupancyIndex occupancyIndex;
-    private final ClaimPopulationSnapshotService snapshotService;
+    private final ClaimAdmissionEvaluator evaluator;
     private final LongSupplier monotonicClock;
     private final Map<UUID, PendingAdmission> pendingByToken = new HashMap<>();
     private final Map<String, UUID> pendingTokenByProfile = new HashMap<>();
     private final Map<ClaimPopulationKey, Long> pendingByClaim = new HashMap<>();
+    private final ClaimAdmissionMetrics metrics = new ClaimAdmissionMetrics();
     private long lastObservedNanos = Long.MIN_VALUE;
 
     public ClaimAdmissionService(@Nonnull ClaimOccupancyIndex occupancyIndex) {
@@ -39,7 +40,11 @@ public final class ClaimAdmissionService {
                                  @Nonnull ClaimPopulationSnapshotService snapshotService,
                                  @Nonnull LongSupplier monotonicClock) {
         this.occupancyIndex = Objects.requireNonNull(occupancyIndex, "occupancyIndex");
-        this.snapshotService = Objects.requireNonNull(snapshotService, "snapshotService");
+        this.evaluator = new ClaimAdmissionEvaluator(
+                occupancyIndex,
+                Objects.requireNonNull(snapshotService, "snapshotService"),
+                metrics::recordSnapshotDuration
+        );
         this.monotonicClock = Objects.requireNonNull(monotonicClock, "monotonicClock");
     }
 
@@ -50,94 +55,10 @@ public final class ClaimAdmissionService {
     @Nonnull
     public ClaimAdmissionDecision reserve(@Nonnull ClaimAdmissionRequest request,
                                           @Nonnull ClaimLookupSession lookupSession) {
-        Objects.requireNonNull(request, "request");
-        Objects.requireNonNull(lookupSession, "lookupSession");
-        if (!ClaimAdmissionRules.samePolicy(request.policyContext(), lookupSession.context())) {
-            return denied(request, "claim-policy-context-mismatch", 0L, 0L, 0L, null);
-        }
-        if (!request.capEnabled() || ClaimAdmissionRules.transitionsKnownNonPositive(request.transitions())) {
-            return reserveUnconstrained(request, null, false);
-        }
-        if (!occupancyIndex.readiness().allowsPositiveAdmissions() && !request.force()) {
-            return denied(request, "claim-occupancy-not-ready", ClaimAdmissionRules.pessimisticSlots(request), 0L, 0L, null);
-        }
-        ClaimResolution target = resolveTarget(request, lookupSession);
-        if (target.status() == ClaimLookupResult.Status.NO_CLAIM) {
-            return reserveUnconstrained(request, target, true);
-        }
-        if (target.status() == ClaimLookupResult.Status.UNAVAILABLE) {
-            return denied(request, "claim-provider-unavailable", ClaimAdmissionRules.pessimisticSlots(request), 0L, 0L, null);
-        }
-        if (target.status() == ClaimLookupResult.Status.ERROR || target.key() == null) {
-            return denied(request, "claim-lookup-error", ClaimAdmissionRules.pessimisticSlots(request), 0L, 0L, null);
-        }
-        if (request.limitPerClaimChunk() > 0
-                && (target.footprint() == null || target.footprint().chunks().isEmpty())) {
-            return denied(request, "claim-footprint-required", ClaimAdmissionRules.pessimisticSlots(request), 0L, 0L, null);
-        }
-        return reserveAgainstClaim(request, target, lookupSession);
-    }
-
-    @Nonnull
-    private ClaimAdmissionDecision reserveAgainstClaim(ClaimAdmissionRequest request,
-                                                        ClaimResolution target,
-                                                        ClaimLookupSession lookupSession) {
         for (int attempt = 0; attempt < SNAPSHOT_RETRY_LIMIT; attempt++) {
-            ClaimPopulationSnapshot snapshot = snapshotService.snapshot(occupancyIndex, target, lookupSession);
-            if (snapshot.status() != ClaimPopulationSnapshot.Status.READY) {
-                return denied(
-                        request,
-                        snapshot.status() == ClaimPopulationSnapshot.Status.UNAVAILABLE
-                                ? "claim-provider-unavailable"
-                                : "claim-population-snapshot-error",
-                        ClaimAdmissionRules.pessimisticSlots(request),
-                        0L,
-                        0L,
-                        null
-                );
-            }
-            lock.lock();
-            try {
-                long now = observeNow();
-                expireReservationsLocked(now);
-                if (snapshot.occupancyRevision() != occupancyIndex.revision()) {
-                    continue;
-                }
-                ClaimAdmissionDecision precondition = validatePreconditions(request);
-                if (precondition != null) {
-                    return precondition;
-                }
-                ClaimAdmissionRules.TransitionDelta delta = ClaimAdmissionRules.analyzeTransitions(
-                        request.transitions(), snapshot.profileIds()
-                );
-                long pending = pendingByClaim.getOrDefault(target.key(), 0L);
-                long adjustedCommitted = Math.max(0L, snapshot.population() - delta.departures());
-                ClaimCapEvaluator.Evaluation cap = ClaimCapEvaluator.evaluate(
-                        request.limitPerClaimChunk(),
-                        request.limitPerClaimTotal(),
-                        target.footprint() == null ? 0 : target.footprint().chunkCount(),
-                        adjustedCommitted,
-                        pending
-                );
-                if (!cap.valid()) {
-                    return denied(request, cap.reason(), delta.arrivals(), snapshot.population(), pending, cap);
-                }
-                if (!request.force() && !cap.admits(delta.arrivals())) {
-                    return denied(request, "claim-cap-reached", delta.arrivals(), snapshot.population(), pending, cap);
-                }
-                return register(
-                        request,
-                        target,
-                        true,
-                        delta.arrivals(),
-                        delta.departures(),
-                        snapshot.population(),
-                        pending,
-                        cap,
-                        now
-                );
-            } finally {
-                lock.unlock();
+            ClaimAdmissionDecision decision = reserveEvaluated(evaluate(request, lookupSession));
+            if (!"claim-occupancy-changed-during-admission".equals(decision.reason())) {
+                return decision;
             }
         }
         return denied(
@@ -151,9 +72,34 @@ public final class ClaimAdmissionService {
     }
 
     @Nonnull
-    private ClaimAdmissionDecision reserveUnconstrained(ClaimAdmissionRequest request,
-                                                        @Nullable ClaimResolution target,
-                                                        boolean topologyCheckRequired) {
+    public ClaimAdmissionEvaluation evaluate(@Nonnull ClaimAdmissionRequest request,
+                                             @Nonnull ClaimLookupSession lookupSession) {
+        return evaluator.evaluate(request, lookupSession);
+    }
+
+    /** Evaluates against one sweep-scoped immutable committed-occupancy snapshot. */
+    @Nonnull
+    public ClaimAdmissionEvaluation evaluate(@Nonnull ClaimAdmissionRequest request,
+                                             @Nonnull ClaimLookupSession lookupSession,
+                                             @Nullable ClaimOccupancySnapshot sharedSnapshot) {
+        return evaluator.evaluate(request, lookupSession, sharedSnapshot);
+    }
+
+    /** Converts an immutable provider/snapshot evaluation into a pending reservation. */
+    @Nonnull
+    public ClaimAdmissionDecision reserveEvaluated(@Nonnull ClaimAdmissionEvaluation evaluation) {
+        Objects.requireNonNull(evaluation, "evaluation");
+        ClaimAdmissionRequest request = evaluation.request();
+        if (evaluation.status() == ClaimAdmissionEvaluation.Status.DENIED) {
+            return denied(
+                    request,
+                    evaluation.denialReason(),
+                    ClaimAdmissionRules.pessimisticSlots(request),
+                    0L,
+                    0L,
+                    null
+            );
+        }
         lock.lock();
         try {
             long now = observeNow();
@@ -162,11 +108,77 @@ public final class ClaimAdmissionService {
             if (precondition != null) {
                 return precondition;
             }
-            ClaimCapEvaluator.Evaluation cap = ClaimCapEvaluator.evaluate(0, 0, 0, 0L, 0L);
-            return register(request, target, topologyCheckRequired, 0L, 0L, 0L, 0L, cap, now);
+            if (evaluation.status() == ClaimAdmissionEvaluation.Status.UNCONSTRAINED) {
+                ClaimCapEvaluator.Evaluation cap = ClaimCapEvaluator.evaluate(0, 0, 0, 0L, 0L);
+                return register(
+                        request,
+                        evaluation.target(),
+                        evaluation.topologyCheckRequired(),
+                        0L,
+                        0L,
+                        0L,
+                        0L,
+                        cap,
+                        now
+                );
+            }
+            return reserveEvaluatedClaim(evaluation, now);
         } finally {
             lock.unlock();
         }
+    }
+
+    @Nonnull
+    private ClaimAdmissionDecision reserveEvaluatedClaim(
+            @Nonnull ClaimAdmissionEvaluation evaluation,
+            long now
+    ) {
+        ClaimAdmissionRequest request = evaluation.request();
+        ClaimResolution target = evaluation.target();
+        ClaimPopulationSnapshot snapshot = evaluation.snapshot();
+        if (target == null || target.key() == null || snapshot == null) {
+            return denied(request, "claim-evaluation-invalid", 0L, 0L, 0L, null);
+        }
+        if (snapshot.occupancyRevision() != occupancyIndex.revision()) {
+            return denied(
+                    request,
+                    "claim-occupancy-changed-during-admission",
+                    ClaimAdmissionRules.pessimisticSlots(request),
+                    0L,
+                    0L,
+                    null
+            );
+        }
+        ClaimAdmissionRules.TransitionDelta delta = ClaimAdmissionRules.analyzeTransitions(
+                request.transitions(), snapshot.profileIds()
+        );
+        long pending = pendingByClaim.getOrDefault(target.key(), 0L);
+        long adjustedCommitted = Math.max(0L, snapshot.population() - delta.departures());
+        ClaimCapEvaluator.Evaluation cap = ClaimCapEvaluator.evaluate(
+                request.limitPerClaimChunk(),
+                request.limitPerClaimTotal(),
+                target.footprint() == null ? 0 : target.footprint().chunkCount(),
+                adjustedCommitted,
+                pending
+        );
+        metrics.claimCapacityObserved(target.key(), cap.active() && adjustedCommitted > cap.effectiveCapacity());
+        if (!cap.valid()) {
+            return denied(request, cap.reason(), delta.arrivals(), snapshot.population(), pending, cap);
+        }
+        if (!request.force() && !cap.admits(delta.arrivals())) {
+            return denied(request, "claim-cap-reached", delta.arrivals(), snapshot.population(), pending, cap);
+        }
+        return register(
+                request,
+                target,
+                true,
+                delta.arrivals(),
+                delta.departures(),
+                snapshot.population(),
+                pending,
+                cap,
+                now
+        );
     }
 
     /**
@@ -234,6 +246,7 @@ public final class ClaimAdmissionService {
             }
             removePendingIndexes(pending);
             reservation.setState(ClaimAdmissionReservation.State.COMMITTED);
+            metrics.reservationCommitted();
             return true;
         } finally {
             lock.unlock();
@@ -301,11 +314,26 @@ public final class ClaimAdmissionService {
             lock.unlock();
         }
     }
-
+    /** Fails positive admissions closed after a post-apply accounting failure. */
+    public void markReadinessDegraded() { occupancyIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED); }
     public long pendingForClaim(@Nonnull ClaimPopulationKey key) {
         lock.lock();
         try {
             return pendingByClaim.getOrDefault(Objects.requireNonNull(key, "key"), 0L);
+        } finally {
+            lock.unlock();
+        }
+    }
+    /** Returns one consistent reservation/count snapshot plus lock-free snapshot timings. */
+    @Nonnull
+    public ClaimAdmissionMetrics.Snapshot metrics() {
+        lock.lock();
+        try {
+            long pendingSlots = 0L;
+            for (PendingAdmission pending : pendingByToken.values()) {
+                pendingSlots += pending.reservation().reservedSlots();
+            }
+            return metrics.snapshot(occupancyIndex, pendingByToken.size(), pendingSlots);
         } finally {
             lock.unlock();
         }
@@ -334,12 +362,19 @@ public final class ClaimAdmissionService {
                                             long pending,
                                             ClaimCapEvaluator.Evaluation cap,
                                             long nowNanos) {
+        long expiresAtNanos = addLease(nowNanos, request.leaseDurationNanos());
         ClaimAdmissionReservation reservation = new ClaimAdmissionReservation(
-                UUID.randomUUID(), reservationAuthority, request, target, topologyCheckRequired, slots
+                UUID.randomUUID(),
+                reservationAuthority,
+                request,
+                target,
+                topologyCheckRequired,
+                slots,
+                expiresAtNanos
         );
         PendingAdmission pendingAdmission = new PendingAdmission(
                 reservation,
-                addLease(nowNanos, request.leaseDurationNanos())
+                expiresAtNanos
         );
         pendingByToken.put(reservation.tokenId(), pendingAdmission);
         for (ClaimOccupancyTransition transition : request.transitions()) {
@@ -348,6 +383,7 @@ public final class ClaimAdmissionService {
         if (reservation.targetClaimKey() != null && slots > 0L) {
             pendingByClaim.merge(reservation.targetClaimKey(), slots, Long::sum);
         }
+        metrics.reservationCreated();
         long before = cap.remainingHeadroom();
         long after = before == Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(0L, before - slots);
         return new ClaimAdmissionDecision(
@@ -402,15 +438,6 @@ public final class ClaimAdmissionService {
         );
     }
 
-    @Nonnull
-    private ClaimResolution resolveTarget(ClaimAdmissionRequest request,
-                                          ClaimLookupSession lookupSession) {
-        if (request.destinationChunk() == null) {
-            return ClaimResolution.noClaim();
-        }
-        return lookupSession.resolveChunk(request.destinationChunk());
-    }
-
     @Nullable
     private PendingAdmission findPending(ClaimAdmissionReservation reservation) {
         if (!reservation.belongsTo(reservationAuthority)) {
@@ -435,6 +462,7 @@ public final class ClaimAdmissionService {
     private void closePending(PendingAdmission pending, ClaimAdmissionReservation.State terminalState) {
         removePendingIndexes(pending);
         pending.reservation().setState(terminalState);
+        metrics.reservationClosed(terminalState);
     }
 
     private void removePendingIndexes(PendingAdmission pending) {
@@ -477,5 +505,4 @@ public final class ClaimAdmissionService {
     private record PendingAdmission(@Nonnull ClaimAdmissionReservation reservation,
                                     long expiresAtNanos) {
     }
-
 }

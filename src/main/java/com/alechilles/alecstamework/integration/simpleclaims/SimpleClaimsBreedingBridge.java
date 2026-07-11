@@ -77,10 +77,11 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
         if (bridge != null) {
             return bridge;
         }
+        SimpleClaimsBreedingBridge candidate = createBridge();
         synchronized (SimpleClaimsBreedingBridge.class) {
             bridge = cachedBridge;
             if (bridge == null) {
-                bridge = createBridge();
+                bridge = candidate;
                 cachedBridge = bridge;
             }
             return bridge;
@@ -101,6 +102,23 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
         );
     }
 
+    /**
+     * Reflects only the claim-identity and native-damage contracts for one live plugin generation.
+     * Population topology is deliberately excluded so damage evaluation cannot scan claim extents.
+     */
+    @Nonnull
+    public static SimpleClaimsBreedingBridge forDamagePlugin(@Nonnull Object plugin) {
+        ClassLoader classLoader = plugin.getClass().getClassLoader();
+        if (classLoader == null) {
+            classLoader = SimpleClaimsBreedingBridge.class.getClassLoader();
+        }
+        return new SimpleClaimsBreedingBridge(
+                SimpleClaimsClaimLookup.probe(classLoader),
+                SimpleClaimsWorldExtent.notProbedForDamage(),
+                SimpleClaimsNativeDamageAccess.probe(classLoader)
+        );
+    }
+
     @Nonnull
     static SimpleClaimsBreedingBridge forTypesForTests(@Nonnull Class<?> managerType,
                                                        @Nonnull Class<?> chunkType,
@@ -108,6 +126,17 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
         return new SimpleClaimsBreedingBridge(
                 SimpleClaimsClaimLookup.forTypes(managerType, chunkType),
                 SimpleClaimsWorldExtent.forTypes(managerType, chunkType),
+                SimpleClaimsNativeDamageAccess.forTypes(managerType, chunkType, partyType)
+        );
+    }
+
+    @Nonnull
+    static SimpleClaimsBreedingBridge forDamageTypesForTests(@Nonnull Class<?> managerType,
+                                                             @Nonnull Class<?> chunkType,
+                                                             @Nonnull Class<?> partyType) {
+        return new SimpleClaimsBreedingBridge(
+                SimpleClaimsClaimLookup.forTypes(managerType, chunkType),
+                SimpleClaimsWorldExtent.notProbedForDamage(),
                 SimpleClaimsNativeDamageAccess.forTypes(managerType, chunkType, partyType)
         );
     }
@@ -150,20 +179,7 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
     @Nonnull
     @Override
     public ClaimLookupResult lookupClaim(@Nullable String worldName, double blockX, double blockZ) {
-        ClaimResolution resolution = resolveClaim(worldName, blockX, blockZ);
-        return switch (resolution.status()) {
-            case CLAIM_FOUND -> resolution.key() == null
-                    ? ClaimLookupResult.error("SimpleClaims claim key was missing.")
-                    : new ClaimLookupResult(
-                            ClaimLookupResult.Status.CLAIM_FOUND,
-                            resolution.key(),
-                            resolution.claimChunkCount(),
-                            resolution.message()
-                    );
-            case NO_CLAIM -> ClaimLookupResult.noClaim();
-            case UNAVAILABLE -> ClaimLookupResult.unavailable(resolution.message());
-            case ERROR -> ClaimLookupResult.error(resolution.message());
-        };
+        return lookupClaimIdentity(worldName, blockX, blockZ);
     }
 
     /**

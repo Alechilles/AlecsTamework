@@ -37,7 +37,7 @@ public record CompanionPopulationOperationRecord(
             return switch (this) {
                 case PREPARED -> next == APPLYING || next == FAILED;
                 case APPLYING -> next == APPLIED || next == COMPENSATING || next == FAILED;
-                case APPLIED -> next == COMPENSATING || next == FAILED;
+                case APPLIED -> next == COMMITTED || next == COMPENSATING || next == FAILED;
                 case COMPENSATING -> next == FAILED;
                 case COMMITTED, FAILED -> false;
             };

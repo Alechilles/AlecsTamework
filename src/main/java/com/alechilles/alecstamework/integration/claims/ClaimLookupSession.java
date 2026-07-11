@@ -15,13 +15,30 @@ import javax.annotation.Nullable;
  */
 public final class ClaimLookupSession {
     private final ClaimPolicyContext context;
+    private final boolean extentRequired;
+    private final ClaimLookupMetrics sharedMetrics;
     private final Map<LookupKey, ClaimResolution> resolutions = new HashMap<>();
     private long requestCount;
     private long providerCallCount;
     private long cacheHitCount;
 
     public ClaimLookupSession(@Nonnull ClaimPolicyContext context) {
+        this(context, true, null);
+    }
+
+    public ClaimLookupSession(@Nonnull ClaimPolicyContext context, boolean extentRequired) {
+        this(context, extentRequired, null);
+    }
+
+    public ClaimLookupSession(@Nonnull ClaimPolicyContext context,
+                              boolean extentRequired,
+                              @Nullable ClaimLookupMetrics sharedMetrics) {
         this.context = Objects.requireNonNull(context, "context");
+        this.extentRequired = extentRequired;
+        this.sharedMetrics = sharedMetrics;
+        if (sharedMetrics != null) {
+            sharedMetrics.sessionStarted(context);
+        }
     }
 
     @Nonnull
@@ -32,6 +49,9 @@ public final class ClaimLookupSession {
     @Nonnull
     public ClaimResolution resolveBlock(@Nullable String worldName, double blockX, double blockZ) {
         requestCount++;
+        if (sharedMetrics != null) {
+            sharedMetrics.requestRecorded();
+        }
         String normalizedWorld = normalizeWorld(worldName);
         if (normalizedWorld == null) {
             return ClaimResolution.error("Claim lookup world is missing.");
@@ -51,7 +71,13 @@ public final class ClaimLookupSession {
         ClaimResolution cached = resolutions.get(key);
         if (cached != null) {
             cacheHitCount++;
+            if (sharedMetrics != null) {
+                sharedMetrics.cacheHitRecorded();
+            }
             return cached;
+        }
+        if (sharedMetrics != null) {
+            sharedMetrics.uniqueChunkRecorded();
         }
         ClaimResolution resolved = callProvider(normalizedWorld, blockX, blockZ, chunkX, chunkZ);
         resolutions.put(key, resolved);
@@ -96,11 +122,20 @@ public final class ClaimLookupSession {
             return ClaimResolution.unavailable(bridge.getUnavailableReason());
         }
         providerCallCount++;
+        long startedNanos = System.nanoTime();
         try {
-            ClaimResolution resolution = bridge.resolveClaim(worldName, blockX, blockZ);
+            ClaimResolution resolution = extentRequired
+                    ? bridge.resolveClaim(worldName, blockX, blockZ)
+                    : ClaimResolution.fromLookupResult(
+                            bridge.lookupClaim(worldName, blockX, blockZ)
+                    );
             return validateResolution(resolution, worldName, chunkX, chunkZ);
         } catch (RuntimeException | LinkageError exception) {
             return ClaimResolution.error("Claim provider lookup failed: " + exception.getClass().getSimpleName());
+        } finally {
+            if (sharedMetrics != null) {
+                sharedMetrics.providerCallRecorded(System.nanoTime() - startedNanos);
+            }
         }
     }
 

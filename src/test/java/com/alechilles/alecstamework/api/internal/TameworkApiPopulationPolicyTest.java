@@ -6,10 +6,15 @@ import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationAdmissionDecision;
 import com.alechilles.alecstamework.api.PopulationAdmissionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionToken;
+import com.alechilles.alecstamework.api.PopulationBatchAdmissionDecision;
+import com.alechilles.alecstamework.api.PopulationBatchAdmissionRequest;
+import com.alechilles.alecstamework.api.PopulationCapDecisionView;
+import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -74,8 +79,27 @@ class TameworkApiPopulationPolicyTest {
         }
 
         @Override
-        public PopulationAdmissionDecision tryAdmit(PopulationAdmissionRequest request) {
+        public PopulationCapDecisionView evaluateLegacyOwnerCap(UUID ownerUuid) {
+            return new PopulationCapDecisionView(
+                    ownerUuid, true, false, 0, 0, Integer.MAX_VALUE, "GLOBAL", "owner-cap-disabled"
+            );
+        }
+
+        @Override
+        public PopulationDiagnosticsView populationDiagnostics() {
+            return PopulationDiagnosticsView.unavailable();
+        }
+
+        @Override
+        public CompletionStage<PopulationAdmissionDecision> tryAdmit(PopulationAdmissionRequest request) {
             return unavailable.tryAdmit(request);
+        }
+
+        @Override
+        public CompletionStage<PopulationBatchAdmissionDecision> tryAdmitBatch(
+                PopulationBatchAdmissionRequest request
+        ) {
+            return unavailable.tryAdmitBatch(request);
         }
 
         @Override
@@ -84,13 +108,18 @@ class TameworkApiPopulationPolicyTest {
         }
 
         @Override
-        public PopulationAdmissionDecision commit(PopulationAdmissionToken token) {
+        public CompletionStage<PopulationAdmissionDecision> commit(PopulationAdmissionToken token) {
             return unavailable.commit(token);
         }
 
         @Override
-        public PopulationAdmissionDecision cancel(PopulationAdmissionToken token) {
+        public CompletionStage<PopulationAdmissionDecision> cancel(PopulationAdmissionToken token) {
             return unavailable.cancel(token);
+        }
+
+        @Override
+        public CompletionStage<Integer> cleanupExpired() {
+            return unavailable.cleanupExpired();
         }
     }
 }

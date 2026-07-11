@@ -274,6 +274,12 @@ final class SimpleClaimsWorldExtent {
         );
     }
 
+    /** Creates an explicit non-capability for damage-only bridge generations. */
+    @Nonnull
+    static SimpleClaimsWorldExtent notProbedForDamage() {
+        return unavailable("SimpleClaims world extent is not part of the damage capability.");
+    }
+
     private record CacheKey(@Nonnull String worldName, @Nonnull UUID partyId) {
     }
 

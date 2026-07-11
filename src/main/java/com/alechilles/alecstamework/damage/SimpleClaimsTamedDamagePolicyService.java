@@ -17,14 +17,13 @@ final class SimpleClaimsTamedDamagePolicyService {
     private final SimpleClaimsTamedDamagePolicy policy;
 
     SimpleClaimsTamedDamagePolicyService() {
-        this(SimpleClaimsBreedingBridge.initialize());
+        this.policy = new SimpleClaimsTamedDamagePolicy();
     }
 
     SimpleClaimsTamedDamagePolicyService(@Nullable SimpleClaimsBreedingBridge simpleClaimsBridge) {
-        SimpleClaimsBreedingBridge bridge = simpleClaimsBridge == null
-                ? SimpleClaimsBreedingBridge.initialize()
-                : simpleClaimsBridge;
-        this.policy = new SimpleClaimsTamedDamagePolicy(bridge);
+        this.policy = simpleClaimsBridge == null
+                ? new SimpleClaimsTamedDamagePolicy()
+                : new SimpleClaimsTamedDamagePolicy(simpleClaimsBridge);
     }
 
     @Nonnull

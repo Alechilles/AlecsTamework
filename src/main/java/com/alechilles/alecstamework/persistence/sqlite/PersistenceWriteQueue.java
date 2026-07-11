@@ -12,7 +12,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -58,24 +57,13 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private final HytaleLogger logger;
     private final long closeJoinTimeoutMs;
     private final Object lifecycleLock = new Object();
-    private final LinkedBlockingQueue<WriteTask<?>> queue = new LinkedBlockingQueue<>();
-    private final AtomicReference<List<WriteTask<?>>> activeTasks = new AtomicReference<>(List.of());
+    private final LinkedBlockingQueue<PersistenceWriteTask<?>> queue = new LinkedBlockingQueue<>();
+    private final AtomicReference<List<PersistenceWriteTask<?>>> activeTasks = new AtomicReference<>(List.of());
     private final AtomicReference<QueueState> state = new AtomicReference<>(QueueState.OPEN);
     private final Thread workerThread;
-    private final AtomicLong batchesProcessed = new AtomicLong();
-    private final AtomicLong operationsProcessed = new AtomicLong();
-    private final AtomicLong retryAttempts = new AtomicLong();
-    private final AtomicLong failedBatches = new AtomicLong();
-    private final AtomicLong failedAcceptedTasks = new AtomicLong();
-    private final AtomicLong totalBatchSize = new AtomicLong();
-    private final AtomicLong totalWriteDurationNs = new AtomicLong();
-    private final AtomicInteger lastBatchSize = new AtomicInteger();
-    private final AtomicLong lastBatchDurationNs = new AtomicLong();
-    private final AtomicInteger maxBatchSize = new AtomicInteger();
+    private final PersistenceWriteQueueMetrics metrics = new PersistenceWriteQueueMetrics();
     private final AtomicInteger activeBatchSize = new AtomicInteger();
     private final AtomicInteger pendingTaskCount = new AtomicInteger();
-    private final AtomicReference<String> lastFailureReason = new AtomicReference<>();
-    private final AtomicLong lastFailureAtMs = new AtomicLong();
     private final AtomicBoolean drainTimedOut = new AtomicBoolean();
 
     public PersistenceWriteQueue(@Nonnull SqliteConnectionManager connectionManager,
@@ -154,13 +142,13 @@ public final class PersistenceWriteQueue implements AutoCloseable {
             if (state.get() != QueueState.OPEN || !healthService.isHealthy()) {
                 return WriteSubmission.rejected(rejectionReason());
             }
-            WriteTask<T> task = new WriteTask<>(operationName, work, afterCommit);
+            PersistenceWriteTask<T> task = new PersistenceWriteTask<>(operationName, work, afterCommit);
             pendingTaskCount.incrementAndGet();
             if (!queue.offer(task)) {
                 decrementPendingTaskCount(1);
                 return WriteSubmission.rejected("write_queue_offer_failed");
             }
-            return new WriteSubmission<>(true, task.completion);
+            return new WriteSubmission<>(true, task.completion());
         }
     }
 
@@ -189,31 +177,15 @@ public final class PersistenceWriteQueue implements AutoCloseable {
      */
     @Nonnull
     public QueueMetrics getMetrics() {
-        long processedBatches = batchesProcessed.get();
-        long totalDurationNs = totalWriteDurationNs.get();
-        return new QueueMetrics(
-                queue.size(),
-                lastBatchSize.get(),
-                maxBatchSize.get(),
-                processedBatches,
-                operationsProcessed.get(),
-                retryAttempts.get(),
-                failedBatches.get(),
-                processedBatches > 0L ? (double) totalBatchSize.get() / processedBatches : 0.0,
-                processedBatches > 0L ? (double) totalDurationNs / 1_000_000.0 / processedBatches : 0.0,
-                lastBatchDurationNs.get() / 1_000_000.0,
-                lastFailureReason.get(),
-                lastFailureAtMs.get()
-        );
+        return metrics.snapshot(queue.size());
     }
 
     @Nonnull
     public QueueLifecycleMetrics getLifecycleMetrics() {
-        return new QueueLifecycleMetrics(
+        return metrics.lifecycleSnapshot(
                 state.get(),
                 pendingTaskCount.get(),
                 activeBatchSize.get(),
-                failedAcceptedTasks.get(),
                 drainTimedOut.get()
         );
     }
@@ -225,11 +197,11 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                     state.compareAndSet(QueueState.DRAINING, QueueState.CLOSED);
                     break;
                 }
-                WriteTask<?> first = queue.poll(FLUSH_INTERVAL_MS, TimeUnit.MILLISECONDS);
+                PersistenceWriteTask<?> first = queue.poll(FLUSH_INTERVAL_MS, TimeUnit.MILLISECONDS);
                 if (first == null) {
                     continue;
                 }
-                List<WriteTask<?>> batch = new ArrayList<>(MAX_BATCH_SIZE);
+                List<PersistenceWriteTask<?>> batch = new ArrayList<>(MAX_BATCH_SIZE);
                 batch.add(first);
                 queue.drainTo(batch, MAX_BATCH_SIZE - 1);
                 runBatchWithRetry(batch);
@@ -248,7 +220,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         }
     }
 
-    private void runBatchWithRetry(@Nonnull List<WriteTask<?>> batch) {
+    private void runBatchWithRetry(@Nonnull List<PersistenceWriteTask<?>> batch) {
         if (batch.isEmpty()) {
             return;
         }
@@ -261,16 +233,16 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                 long startedNs = System.nanoTime();
                 try {
                     runBatchOnce(batch);
-                    recordBatchSuccess(batch.size(), Math.max(0L, System.nanoTime() - startedNs));
+                    metrics.recordBatchSuccess(batch.size(), Math.max(0L, System.nanoTime() - startedNs));
                     completeBatch(batch, WriteStatus.COMMITTED, null, null);
                     return;
                 } catch (Exception exception) {
-                    if (isTransientBusyFailure(exception) && attempt <= MAX_TRANSIENT_RETRIES) {
-                        retryAttempts.incrementAndGet();
+                    if (SqliteBusyFailureClassifier.isTransient(exception) && attempt <= MAX_TRANSIENT_RETRIES) {
+                        metrics.recordRetry();
                         sleepQuietly(RETRY_BACKOFF_MS * attempt);
                         continue;
                     }
-                    String reason = "sqlite_write_failed:" + batch.getFirst().operationName
+                    String reason = "sqlite_write_failed:" + batch.getFirst().operationName()
                             + ":" + exception.getClass().getSimpleName();
                     markFailure(reason, exception);
                     completeBatch(batch, WriteStatus.FAILED, reason, exception);
@@ -285,11 +257,11 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         }
     }
 
-    private void runBatchOnce(@Nonnull List<WriteTask<?>> batch) throws Exception {
+    private void runBatchOnce(@Nonnull List<PersistenceWriteTask<?>> batch) throws Exception {
         try (Connection connection = connectionManager.openConnection()) {
             connection.setAutoCommit(false);
             try {
-                for (WriteTask<?> task : batch) {
+                for (PersistenceWriteTask<?> task : batch) {
                     task.runWork(connection);
                 }
                 connection.commit();
@@ -301,19 +273,19 @@ public final class PersistenceWriteQueue implements AutoCloseable {
             }
         }
         if (!drainTimedOut.get()) {
-            for (WriteTask<?> task : batch) {
+            for (PersistenceWriteTask<?> task : batch) {
                 runAfterCommit(task);
             }
         }
     }
 
-    private void runAfterCommit(@Nonnull WriteTask<?> task) {
+    private void runAfterCommit(@Nonnull PersistenceWriteTask<?> task) {
         try {
             task.runAfterCommit();
         } catch (Exception exception) {
             if (logger != null) {
                 logger.at(Level.SEVERE).log(
-                        "SQLite after-commit callback failed (" + task.operationName + "): " + exception.getMessage()
+                        "SQLite after-commit callback failed (" + task.operationName() + "): " + exception.getMessage()
                 );
             }
             TameworkTelemetryEvents.recordErrorIfAvailable(
@@ -323,26 +295,26 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                                     "write_queue", "after_commit_callback", "callback_failed",
                                     "SQLite after-commit callback failed."
                             )
-                            .detail("writeOperation", TameworkTelemetryContext.normalizeToken(task.operationName))
+                            .detail("writeOperation", TameworkTelemetryContext.normalizeToken(task.operationName()))
                             .build()
             );
         }
     }
 
-    private void completeBatch(@Nonnull List<WriteTask<?>> batch,
+    private void completeBatch(@Nonnull List<PersistenceWriteTask<?>> batch,
                                @Nonnull WriteStatus status,
                                @Nullable String reason,
                                @Nullable Throwable failure) {
         if (status != WriteStatus.COMMITTED) {
-            failedAcceptedTasks.addAndGet(batch.size());
+            metrics.recordAcceptedFailures(batch.size());
         }
-        for (WriteTask<?> task : batch) {
+        for (PersistenceWriteTask<?> task : batch) {
             task.complete(status, reason, failure);
         }
     }
 
     private void settleQueued(@Nonnull WriteStatus status, @Nonnull String reason) {
-        List<WriteTask<?>> tasks = new ArrayList<>();
+        List<PersistenceWriteTask<?>> tasks = new ArrayList<>();
         queue.drainTo(tasks);
         if (tasks.isEmpty()) {
             return;
@@ -353,9 +325,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
 
     private void markFailure(@Nonnull String reason, @Nonnull Exception exception) {
         healthService.markDegraded(reason);
-        failedBatches.incrementAndGet();
-        lastFailureReason.set(reason);
-        lastFailureAtMs.set(System.currentTimeMillis());
+        metrics.recordBatchFailure(reason);
         TameworkTelemetryEvents.recordErrorIfAvailable(
                 "persistence_write_failed",
                 exception,
@@ -366,35 +336,6 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         if (logger != null) {
             logger.at(Level.SEVERE).log("SQLite write failed (" + reason + "): " + exception.getMessage());
         }
-    }
-
-    private void recordBatchSuccess(int batchSize, long durationNs) {
-        batchesProcessed.incrementAndGet();
-        operationsProcessed.addAndGet(Math.max(0, batchSize));
-        totalBatchSize.addAndGet(Math.max(0, batchSize));
-        totalWriteDurationNs.addAndGet(durationNs);
-        lastBatchSize.set(Math.max(0, batchSize));
-        lastBatchDurationNs.set(durationNs);
-        maxBatchSize.accumulateAndGet(Math.max(0, batchSize), Math::max);
-    }
-
-    private boolean isTransientBusyFailure(@Nonnull Throwable throwable) {
-        Throwable current = throwable;
-        while (current != null) {
-            String message = current.getMessage();
-            if (message != null) {
-                String normalized = message.toLowerCase(Locale.ROOT);
-                if (normalized.contains("sqlite_busy")
-                        || normalized.contains("sqlite_locked")
-                        || normalized.contains("database is locked")
-                        || normalized.contains("database is busy")
-                        || normalized.contains("database table is locked")) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
     }
 
     private boolean isIdle() {
@@ -435,8 +376,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         drainTimedOut.set(true);
         String reason = "persistence_shutdown_drain_timeout";
         healthService.markDegraded(reason);
-        lastFailureReason.set(reason);
-        lastFailureAtMs.set(System.currentTimeMillis());
+        metrics.recordFailureReason(reason);
         state.set(QueueState.CLOSED);
         completeBatch(activeTasks.get(), WriteStatus.DRAIN_TIMED_OUT_UNKNOWN, reason, null);
         settleQueued(WriteStatus.DRAIN_TIMED_OUT_UNKNOWN, reason);
@@ -458,40 +398,6 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private void decrementPendingTaskCount(int count) {
         if (count > 0) {
             pendingTaskCount.updateAndGet(current -> Math.max(0, current - count));
-        }
-    }
-
-    private static final class WriteTask<T> {
-        private final String operationName;
-        private final SqlWork<T> work;
-        @Nullable
-        private final Consumer<T> afterCommit;
-        private final CompletableFuture<WriteOutcome<T>> completion = new CompletableFuture<>();
-        @Nullable
-        private T result;
-
-        private WriteTask(@Nonnull String operationName,
-                          @Nonnull SqlWork<T> work,
-                          @Nullable Consumer<T> afterCommit) {
-            this.operationName = operationName;
-            this.work = work;
-            this.afterCommit = afterCommit;
-        }
-
-        private void runWork(@Nonnull Connection connection) throws Exception {
-            result = work.run(connection);
-        }
-
-        private void runAfterCommit() {
-            if (afterCommit != null) {
-                afterCommit.accept(result);
-            }
-        }
-
-        private void complete(@Nonnull WriteStatus status,
-                              @Nullable String reason,
-                              @Nullable Throwable failure) {
-            completion.complete(new WriteOutcome<>(status, result, reason, failure));
         }
     }
 

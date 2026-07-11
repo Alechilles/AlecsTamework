@@ -35,6 +35,17 @@ public final class ClaimIntegrationProviderSelector {
         };
     }
 
+    /** Builds an immutable unavailable bridge for one operation-scoped registry result. */
+    @Nonnull
+    public static ClaimIntegrationBridge unavailable(@Nullable String providerId,
+                                                     @Nullable String reason) {
+        String resolvedId = providerId == null || providerId.isBlank()
+                ? "unavailable" : providerId.trim();
+        String resolvedReason = reason == null || reason.isBlank()
+                ? "Claim integration provider is unavailable." : reason.trim();
+        return new StaticUnavailableBridge(resolvedId, resolvedReason);
+    }
+
     @Nonnull
     private static ClaimIntegrationBridge availableOrMissing(@Nullable ClaimIntegrationBridge bridge) {
         return bridge == null ? MISSING_BRIDGE : bridge;

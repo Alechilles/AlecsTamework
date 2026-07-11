@@ -21,13 +21,15 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
                                          @Nullable PopulationAdmissionLocation destination,
                                          @Nonnull PopulationAdmissionOperation operation,
                                          int exactSlots,
-                                         @Nonnull PopulationAdmissionForcePolicy forcePolicy) {
+                                         @Nonnull PopulationAdmissionForcePolicy forcePolicy,
+                                         @Nonnull PopulationCompanionLifecycle targetLifecycle) {
     public static final long NEW_PROFILE_REVISION = -1L;
 
     public PopulationAdmissionRequest {
         identity = Objects.requireNonNull(identity, "identity");
         operation = Objects.requireNonNull(operation, "operation");
         forcePolicy = Objects.requireNonNull(forcePolicy, "forcePolicy");
+        targetLifecycle = Objects.requireNonNull(targetLifecycle, "targetLifecycle");
         if (expectedProfileRevision < NEW_PROFILE_REVISION) {
             throw new IllegalArgumentException("Expected profile revision must be -1 or non-negative.");
         }
@@ -46,10 +48,13 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
         if (exactSlots <= 0) {
             throw new IllegalArgumentException("Exact requested slots must be positive.");
         }
-        if (operation != PopulationAdmissionOperation.BREEDING && exactSlots != 1) {
-            throw new IllegalArgumentException("Only breeding admissions may reserve more than one slot.");
+        if (exactSlots != 1) {
+            throw new IllegalArgumentException(
+                    "A single-profile admission reserves one slot; use PopulationBatchAdmissionRequest for batches."
+            );
         }
         validateForce(operation, forcePolicy);
+        validateLifecycle(operation, newOwnerUuid, destination, targetLifecycle);
         validateOperation(
                 operation,
                 expectedProfileRevision,
@@ -59,6 +64,57 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
                 source,
                 destination
         );
+    }
+
+    /**
+     * Convenience constructor for ownership operations with an unambiguous lifecycle result.
+     * Lifecycle-only transitions must use the canonical constructor and name their target state.
+     */
+    public PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity identity,
+                                      @Nullable UUID currentNpcUuid,
+                                      long expectedProfileRevision,
+                                      @Nullable UUID oldOwnerUuid,
+                                      @Nullable UUID newOwnerUuid,
+                                      @Nullable PopulationAdmissionLocation source,
+                                      @Nullable PopulationAdmissionLocation destination,
+                                      @Nonnull PopulationAdmissionOperation operation,
+                                      int exactSlots,
+                                      @Nonnull PopulationAdmissionForcePolicy forcePolicy) {
+        this(
+                identity,
+                currentNpcUuid,
+                expectedProfileRevision,
+                oldOwnerUuid,
+                newOwnerUuid,
+                source,
+                destination,
+                operation,
+                exactSlots,
+                forcePolicy,
+                defaultLifecycle(operation)
+        );
+    }
+
+    private static PopulationCompanionLifecycle defaultLifecycle(PopulationAdmissionOperation operation) {
+        Objects.requireNonNull(operation, "operation");
+        if (operation == PopulationAdmissionOperation.LIFECYCLE_CHANGE) {
+            throw new IllegalArgumentException("LIFECYCLE_CHANGE requires an explicit target lifecycle.");
+        }
+        return operation == PopulationAdmissionOperation.OWNER_CLEAR
+                ? PopulationCompanionLifecycle.RELEASED
+                : PopulationCompanionLifecycle.ACTIVE;
+    }
+
+    private static void validateLifecycle(PopulationAdmissionOperation operation,
+                                          UUID newOwnerUuid,
+                                          PopulationAdmissionLocation destination,
+                                          PopulationCompanionLifecycle lifecycle) {
+        if (lifecycle == PopulationCompanionLifecycle.RELEASED && newOwnerUuid != null) {
+            throw new IllegalArgumentException("A released profile cannot retain an owner.");
+        }
+        if (lifecycle.occupiesPhysicalClaim() && destination == null) {
+            throw new IllegalArgumentException("An active lifecycle requires a destination.");
+        }
     }
 
     private static void validateForce(PopulationAdmissionOperation operation,
@@ -85,9 +141,13 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
                                           PopulationAdmissionLocation source,
                                           PopulationAdmissionLocation destination) {
         switch (operation) {
-            case NEW_OWNERSHIP, LEGACY_ADOPTION, BREEDING -> {
+            case NEW_OWNERSHIP, LEGACY_ADOPTION -> {
                 requireNull(oldOwnerUuid, "old owner", operation);
                 requirePresent(newOwnerUuid, "new owner", operation);
+                requirePresent(destination, "destination", operation);
+            }
+            case BREEDING -> {
+                requireNull(oldOwnerUuid, "old owner", operation);
                 requirePresent(destination, "destination", operation);
             }
             case OWNER_TRANSFER -> {
@@ -122,9 +182,8 @@ public record PopulationAdmissionRequest(@Nonnull PopulationAdmissionIdentity id
                 }
                 requirePresent(source, "source", operation);
                 requirePresent(destination, "destination", operation);
-                if (source.equals(destination)) {
-                    throw new IllegalArgumentException("REHOME requires a different destination.");
-                }
+                // A same-chunk relocation is a valid zero-delta transition and still needs a
+                // mutation-bound capability so its durable revision follows the live move.
             }
             case LIFECYCLE_CHANGE -> {
                 requireExistingProfile(expectedRevision, currentNpcUuid, operation);

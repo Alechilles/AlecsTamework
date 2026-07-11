@@ -24,6 +24,7 @@ public record CompanionPopulationCoverageRecord(
     public enum Dimension {
         GLOBAL_OWNER,
         PER_WORLD_OWNER,
+        PROFILE_STATE,
         WORLD_ENTITIES,
         PLAYER_SAVES,
         BASE_CONTAINER_BLOCKS,

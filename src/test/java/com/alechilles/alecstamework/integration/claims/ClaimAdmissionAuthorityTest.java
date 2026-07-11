@@ -208,6 +208,46 @@ class ClaimAdmissionAuthorityTest {
         assertEquals(1L, service.pendingForClaim(key()));
     }
 
+    @Test
+    void requireClaimStillResolvesLocationForAnUnownedBreedingChild() {
+        ClaimAdmissionTestFixtures.MutableBridge bridge = bridge(key(), footprint(1));
+        ClaimPolicyContext policy = context(bridge);
+        ClaimAdmissionService service = new ClaimAdmissionService(readyIndex(List.of()));
+        ClaimOccupancyTransition unownedChild = new ClaimOccupancyTransition(
+                null,
+                new ClaimOccupancyEntry(
+                        "unowned-child",
+                        null,
+                        CompanionLifecycleState.ACTIVE,
+                        DESTINATION,
+                        1L
+                )
+        );
+        ClaimAdmissionRequest request = new ClaimAdmissionRequest(
+                ClaimAdmissionOperation.BREED,
+                List.of(unownedChild),
+                DESTINATION,
+                policy,
+                0,
+                0,
+                true,
+                false,
+                1_000_000_000L
+        );
+
+        ClaimAdmissionDecision found = service.reserve(request, new ClaimLookupSession(policy));
+
+        assertTrue(found.allowed());
+        assertEquals(0L, found.requestedSlots());
+        assertEquals(1, bridge.calls.get());
+        assertTrue(service.cancel(found.reservation()));
+
+        bridge.resolution.set(ClaimResolution.noClaim());
+        ClaimAdmissionDecision outside = service.reserve(request, new ClaimLookupSession(policy));
+        assertFalse(outside.allowed());
+        assertEquals("claim-required", outside.reason());
+    }
+
     private static List<ClaimOccupancyEntry> existingProfiles(int count, ClaimChunkCoordinate chunk) {
         ArrayList<ClaimOccupancyEntry> entries = new ArrayList<>();
         for (int profile = 0; profile < count; profile++) {

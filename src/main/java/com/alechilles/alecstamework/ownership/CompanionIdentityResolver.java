@@ -20,6 +20,7 @@ public final class CompanionIdentityResolver {
     private final Map<String, UUID> currentUuidByProfile = new HashMap<>();
     private final Map<String, ProvisionalIdentity> provisionalByKey = new HashMap<>();
     private final Map<UUID, ProvisionalIdentity> provisionalByNpcUuid = new HashMap<>();
+    private final Map<String, Integer> provisionalLeaseCountByProfile = new HashMap<>();
 
     /**
      * Atomically replaces the durable alias snapshot. Provisional allocations remain available.
@@ -69,6 +70,11 @@ public final class CompanionIdentityResolver {
             provisionalByKey.putAll(remainingByKey);
             provisionalByNpcUuid.clear();
             provisionalByNpcUuid.putAll(remainingByNpcUuid);
+            provisionalLeaseCountByProfile.keySet().retainAll(
+                    remainingByNpcUuid.values().stream()
+                            .map(ProvisionalIdentity::profileId)
+                            .collect(java.util.stream.Collectors.toSet())
+            );
         } finally {
             lock.unlock();
         }
@@ -114,11 +120,14 @@ public final class CompanionIdentityResolver {
                 if (!existing.npcUuid().equals(npcUuid)) {
                     throw new IllegalArgumentException("Idempotency key was already used for another NPC UUID.");
                 }
+                provisionalLeaseCountByProfile.merge(existing.profileId(), 1, Integer::sum);
                 return new Resolution(existing.profileId(), npcUuid, true);
             }
             ProvisionalIdentity provisionalForNpc = provisionalByNpcUuid.get(npcUuid);
             if (provisionalForNpc != null) {
-                return new Resolution(provisionalForNpc.profileId(), npcUuid, true);
+                throw new IllegalArgumentException(
+                        "NPC UUID already has a provisional identity owned by another operation."
+                );
             }
             String existingProfile = profileByNpcUuid.get(npcUuid);
             if (existingProfile != null) {
@@ -128,6 +137,7 @@ public final class CompanionIdentityResolver {
             ProvisionalIdentity provisional = new ProvisionalIdentity(profileId, npcUuid);
             provisionalByKey.put(normalizedKey, provisional);
             provisionalByNpcUuid.put(npcUuid, provisional);
+            provisionalLeaseCountByProfile.put(profileId, 1);
             profileByNpcUuid.put(npcUuid, profileId);
             currentUuidByProfile.put(profileId, npcUuid);
             return new Resolution(profileId, npcUuid, true);
@@ -180,6 +190,45 @@ public final class CompanionIdentityResolver {
                     normalizedProfile.equals(entry.getValue().profileId()));
             provisionalByNpcUuid.entrySet().removeIf(entry ->
                     normalizedProfile.equals(entry.getValue().profileId()));
+            provisionalLeaseCountByProfile.remove(normalizedProfile);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** Releases an allocation that never reached a durable or live population transition. */
+    public boolean releaseProvisional(@Nonnull String profileId, @Nonnull UUID npcUuid) {
+        String normalizedProfile = OwnerPopulationEntry.normalizeProfileId(profileId);
+        Objects.requireNonNull(npcUuid, "npcUuid");
+        lock.lock();
+        try {
+            ProvisionalIdentity provisional = provisionalByNpcUuid.get(npcUuid);
+            if (provisional == null || !normalizedProfile.equals(provisional.profileId())) {
+                return false;
+            }
+            int leases = provisionalLeaseCountByProfile.getOrDefault(normalizedProfile, 1);
+            if (leases > 1) {
+                provisionalLeaseCountByProfile.put(normalizedProfile, leases - 1);
+                return true;
+            }
+            provisionalLeaseCountByProfile.remove(normalizedProfile);
+            provisionalByNpcUuid.remove(npcUuid, provisional);
+            provisionalByKey.entrySet().removeIf(entry -> provisional.equals(entry.getValue()));
+            profileByNpcUuid.remove(npcUuid, normalizedProfile);
+            currentUuidByProfile.remove(normalizedProfile, npcUuid);
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    boolean isProvisional(@Nonnull String profileId, @Nonnull UUID npcUuid) {
+        String normalizedProfile = OwnerPopulationEntry.normalizeProfileId(profileId);
+        Objects.requireNonNull(npcUuid, "npcUuid");
+        lock.lock();
+        try {
+            ProvisionalIdentity provisional = provisionalByNpcUuid.get(npcUuid);
+            return provisional != null && normalizedProfile.equals(provisional.profileId());
         } finally {
             lock.unlock();
         }

@@ -1,56 +1,40 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProviderSelector;
-import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
 import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
+import com.alechilles.alecstamework.integration.claims.ClaimPolicyContext;
 import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesClaimsBridge;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.ComponentType;
-import com.hypixel.hytale.component.Ref;
+import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.math.util.ChunkUtil;
 import org.joml.Vector3d;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Evaluates optional population-based breeding caps (SimpleClaims + per-player).
+ * Compatibility facade for legacy claim-policy DTOs and pure cap calculations.
+ *
+ * <p>Breeding runtime admission is owned by the shared population coordinators. The live lookup
+ * delegate remains only for the older tame policy adapter until that adapter is retired.</p>
  */
 final class BreedingClaimLimitPolicyService {
-    private static final long WARNING_THROTTLE_MS = 60_000L;
-
-    private final ClaimIntegrationBridge claimBridge;
-    private long nextWarningAtMs;
-
-    BreedingClaimLimitPolicyService() {
-        this(resolveConfiguredClaimBridge());
-    }
+    private final LegacyClaimPopulationLookupService lookupService;
 
     BreedingClaimLimitPolicyService(@Nullable ClaimIntegrationBridge claimBridge) {
-        this.claimBridge = claimBridge == null ? resolveConfiguredClaimBridge() : claimBridge;
+        OwnerPopulationRuntime populationRuntime = resolvePopulationRuntime();
+        ClaimIntegrationBridge resolved = claimBridge == null ? resolveConfiguredClaimBridge() : claimBridge;
+        this.lookupService = new LegacyClaimPopulationLookupService(
+                resolved,
+                populationRuntime == null ? null : populationRuntime.claimOccupancyIndex()
+        );
     }
 
     @Nonnull
@@ -62,7 +46,24 @@ final class BreedingClaimLimitPolicyService {
         if (config == null) {
             config = TwGlobalConfig.defaultConfig();
         }
-        ClaimIntegrationProvider provider = TameworkRuntimeSettings.simpleClaimsProvider(config.getSimpleClaimsProvider());
+        TameworkRuntimeSettings runtimeSettings = TameworkRuntimeSettings.currentOrNull();
+        OwnerPopulationRuntime populationRuntime = resolvePopulationRuntime();
+        if (populationRuntime != null) {
+            ClaimPolicyContext context = populationRuntime.claimProviderRegistry().resolveRequest(
+                    runtimeSettings == null
+                            ? config.getSimpleClaimsProviderRequest()
+                            : runtimeSettings.simpleClaimsProviderRequest(),
+                    runtimeSettings == null ? 0L : runtimeSettings.revision()
+            );
+            return context.bridge() != null
+                    ? context.bridge()
+                    : ClaimIntegrationProviderSelector.unavailable(
+                            context.providerId(), context.reason()
+                    );
+        }
+        ClaimIntegrationProvider provider = TameworkRuntimeSettings.simpleClaimsProvider(
+                config.getSimpleClaimsProvider()
+        );
         return ClaimIntegrationProviderSelector.select(
                 provider,
                 QuestLinesClaimsBridge.initialize(),
@@ -70,177 +71,32 @@ final class BreedingClaimLimitPolicyService {
         );
     }
 
+    @Nullable
+    private static OwnerPopulationRuntime resolvePopulationRuntime() {
+        try {
+            Tamework plugin = Tamework.getInstance();
+            return plugin == null ? null : plugin.getOwnerPopulationRuntime();
+        } catch (RuntimeException | LinkageError failure) {
+            return null;
+        }
+    }
+
     @Nonnull
-    Decision evaluate(@Nullable Store<EntityStore> store,
-                      @Nullable Vector3d spawnPosition,
-                      @Nullable TwBreedingConfig config,
-                      @Nullable String inheritanceRoleId,
-                      @Nullable UUID parentAOwnerId,
-                      @Nullable UUID parentBOwnerId,
-                      @Nullable Map<ClaimReservationKey, Integer> pendingClaimReservations,
-                      @Nullable Map<PlayerReservationKey, Integer> pendingPlayerReservations) {
-        TwGlobalConfig activeGlobalConfig = TwGlobalConfig.resolveActive();
-        if (activeGlobalConfig == null) {
-            activeGlobalConfig = TwGlobalConfig.defaultConfig();
-        }
-        TwGlobalConfig simpleClaimsConfig = TwGlobalConfig.resolveSimpleClaimsSettingsConfig();
-        if (simpleClaimsConfig == null) {
-            simpleClaimsConfig = activeGlobalConfig;
-        }
+    ResolvedClaim resolveClaim(@Nullable String worldName, @Nullable Vector3d position) {
+        return lookupService.resolveClaim(worldName, position);
+    }
 
-        boolean simpleClaimsEnabled = TameworkRuntimeSettings.simpleClaimsEnabled(simpleClaimsConfig.isSimpleClaimsEnabled())
-                && TameworkRuntimeSettings.simpleClaimsProvider(simpleClaimsConfig.getSimpleClaimsProvider())
-                != ClaimIntegrationProvider.OFF;
-        int perPlayerLimit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
-                activeGlobalConfig.getPopulationLimitPerPlayerOwnedTotal()
-        );
-        boolean perPlayerLimitEnabled = perPlayerLimit > 0;
-        if (!simpleClaimsEnabled && !perPlayerLimitEnabled) {
-            return Decision.allowNoPopulationChecks();
-        }
+    @Nonnull
+    CountResult countOwnedPopulationInClaim(@Nonnull Store<EntityStore> store,
+                                            @Nonnull String worldName,
+                                            @Nonnull ClaimReservationKey targetClaim) {
+        return lookupService.countOwnedPopulationInClaim(store, worldName, targetClaim);
+    }
 
-        String worldName = resolveWorldName(store);
-        ClaimReservationKey claimReservationKey = null;
-        List<PlayerReservationKey> playerReservationKeys = new ArrayList<>();
-        List<ConstraintState> activeConstraints = new ArrayList<>();
-
-        if (simpleClaimsEnabled) {
-            if (spawnPosition == null || store == null) {
-                warnFailClosed("SimpleClaims breeding limit check failed: spawn/store context was missing.");
-                return Decision.deny("missing-spawn-context");
-            }
-            if (worldName == null || worldName.isBlank()) {
-                warnFailClosed("SimpleClaims breeding limit check failed: world name was missing.");
-                return Decision.deny("missing-world-name");
-            }
-            if (!claimBridge.isAvailable()) {
-                warnFailClosed(
-                        "Claim integration breeding limit check failed: dependency unavailable ("
-                                + claimBridge.getUnavailableReason()
-                                + ")."
-                );
-                return Decision.deny("claim-provider-unavailable");
-            }
-            ResolvedClaim resolvedClaim = resolveClaim(worldName, spawnPosition);
-            if (resolvedClaim.status() == ClaimResolutionStatus.UNAVAILABLE
-                    || resolvedClaim.status() == ClaimResolutionStatus.ERROR) {
-                warnFailClosed(
-                        "SimpleClaims breeding limit check failed: could not resolve claim context ("
-                                + resolvedClaim.message()
-                                + ")."
-                );
-                return Decision.deny("simpleclaims-lookup-error");
-            }
-            if (resolvedClaim.status() == ClaimResolutionStatus.NO_CLAIM) {
-                if (TameworkRuntimeSettings.simpleClaimsBreedingRequiresClaim(
-                        simpleClaimsConfig.isSimpleClaimsBreedingRequiresClaim()
-                )) {
-                    return Decision.deny("claim-required");
-                }
-            } else if (resolvedClaim.status() == ClaimResolutionStatus.CLAIM_FOUND) {
-                claimReservationKey = resolvedClaim.key();
-                if (claimReservationKey == null) {
-                    return Decision.deny("missing-claim-key");
-                }
-                CountResult countResult = countOwnedPopulationInClaim(
-                        store,
-                        worldName,
-                        claimReservationKey
-                );
-                if (!countResult.success()) {
-                    warnFailClosed(
-                            "SimpleClaims breeding limit check failed: could not count claim population ("
-                                    + countResult.message()
-                                    + ")."
-                    );
-                    return Decision.deny("simpleclaims-population-count-error");
-                }
-                ConstraintState claimConstraint = evaluateClaimConstraint(
-                        simpleClaimsConfig,
-                        resolvedClaim,
-                        countResult.count(),
-                        pendingClaimReservations == null
-                                ? 0
-                                : pendingClaimReservations.getOrDefault(claimReservationKey, 0)
-                );
-                if (claimConstraint != null) {
-                    activeConstraints.add(claimConstraint);
-                }
-            }
-        }
-
-        if (perPlayerLimitEnabled) {
-            boolean inheritOwner = resolveInheritOwner(config, inheritanceRoleId);
-            List<UUID> ownerTargets = resolveOwnerTargets(inheritOwner, parentAOwnerId, parentBOwnerId);
-            if (!ownerTargets.isEmpty()) {
-                TwGlobalConfig.PerPlayerLimitScope scope = TameworkRuntimeSettings.populationPerPlayerLimitScope(
-                        activeGlobalConfig.getPopulationPerPlayerLimitScope()
-                );
-                if (scope == TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
-                        && (worldName == null || worldName.isBlank())) {
-                    return Decision.deny("missing-world-name");
-                }
-                for (UUID ownerId : ownerTargets) {
-                    if (ownerId == null) {
-                        continue;
-                    }
-                    PlayerReservationKey reservationKey = scope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
-                            ? PlayerReservationKey.global(ownerId)
-                            : PlayerReservationKey.perWorld(worldName, ownerId);
-                    playerReservationKeys.add(reservationKey);
-                    int currentCount = countOwnedPopulationForOwner(scope, store, ownerId);
-                    int pendingReservations = pendingPlayerReservations == null
-                            ? 0
-                            : Math.max(0, pendingPlayerReservations.getOrDefault(reservationKey, 0));
-                    int remainingHeadroom = perPlayerLimit - Math.max(0, currentCount) - pendingReservations;
-                    activeConstraints.add(
-                            new ConstraintState(
-                                    ConstraintType.PLAYER,
-                                    perPlayerLimit,
-                                    Math.max(0, currentCount),
-                                    pendingReservations,
-                                    Math.max(0, remainingHeadroom)
-                            )
-                    );
-                }
-            }
-        }
-
-        if (activeConstraints.isEmpty()) {
-            String reason;
-            if (claimReservationKey != null) {
-                reason = "claim-no-cap";
-            } else if (simpleClaimsEnabled) {
-                reason = "outside-claim";
-            } else {
-                reason = "population-cap-no-owner";
-            }
-            return Decision.allowWithoutCap(claimReservationKey, playerReservationKeys, reason);
-        }
-
-        ConstraintState limiting = selectLimitingConstraint(activeConstraints);
-        if (limiting == null) {
-            return Decision.allowWithoutCap(claimReservationKey, playerReservationKeys, "population-cap-noop");
-        }
-        if (limiting.remainingHeadroom() <= 0) {
-            return Decision.denyAtCap(
-                    limiting.type(),
-                    limiting.effectiveCap(),
-                    limiting.currentCount(),
-                    limiting.pendingReservations(),
-                    claimReservationKey,
-                    playerReservationKeys
-            );
-        }
-        return Decision.allowWithCap(
-                limiting.type(),
-                limiting.effectiveCap(),
-                limiting.currentCount(),
-                limiting.pendingReservations(),
-                limiting.remainingHeadroom(),
-                claimReservationKey,
-                playerReservationKeys
-        );
+    @Nonnull
+    CountResult countOwnedPopulationInClaim(@Nonnull String worldName,
+                                            @Nonnull ClaimReservationKey targetClaim) {
+        return lookupService.countOwnedPopulationInClaim(worldName, targetClaim);
     }
 
     @Nonnull
@@ -248,11 +104,7 @@ final class BreedingClaimLimitPolicyService {
                                      @Nonnull ResolvedClaim resolvedClaim,
                                      int currentCount,
                                      int pendingReservations) {
-        if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
-            return Decision.allowNoPopulationChecks();
-        }
-        if (TameworkRuntimeSettings.simpleClaimsProvider(globalConfig.getSimpleClaimsProvider())
-                == ClaimIntegrationProvider.OFF) {
+        if (!claimPolicyEnabled(globalConfig)) {
             return Decision.allowNoPopulationChecks();
         }
         if (resolvedClaim.status() == ClaimResolutionStatus.UNAVAILABLE
@@ -271,33 +123,20 @@ final class BreedingClaimLimitPolicyService {
         if (claimKey == null) {
             return Decision.deny("missing-claim-key");
         }
-        ConstraintState claimConstraint = evaluateClaimConstraint(
-                globalConfig,
-                resolvedClaim,
-                currentCount,
-                pendingReservations
+        ConstraintState constraint = evaluateClaimConstraint(
+                globalConfig, resolvedClaim, currentCount, pendingReservations
         );
-        if (claimConstraint == null) {
+        if (constraint == null) {
             return Decision.allowWithoutCap(claimKey, List.of(), "claim-no-cap");
         }
-        if (claimConstraint.remainingHeadroom() <= 0) {
-            return Decision.denyAtCap(
-                    claimConstraint.type(),
-                    claimConstraint.effectiveCap(),
-                    claimConstraint.currentCount(),
-                    claimConstraint.pendingReservations(),
-                    claimKey,
-                    List.of()
-            );
-        }
-        return Decision.allowWithCap(
-                claimConstraint.type(),
-                claimConstraint.effectiveCap(),
-                claimConstraint.currentCount(),
-                claimConstraint.pendingReservations(),
-                claimConstraint.remainingHeadroom(),
-                claimKey,
-                List.of()
+        return constraint.remainingHeadroom() <= 0
+                ? Decision.denyAtCap(
+                constraint.type(), constraint.effectiveCap(), constraint.currentCount(),
+                constraint.pendingReservations(), claimKey, List.of()
+        )
+                : Decision.allowWithCap(
+                constraint.type(), constraint.effectiveCap(), constraint.currentCount(),
+                constraint.pendingReservations(), constraint.remainingHeadroom(), claimKey, List.of()
         );
     }
 
@@ -305,31 +144,17 @@ final class BreedingClaimLimitPolicyService {
     static Decision evaluatePerPlayerResolved(int perPlayerLimit,
                                               int currentCount,
                                               int pendingReservations) {
-        int safeLimit = Math.max(0, perPlayerLimit);
-        if (safeLimit <= 0) {
+        int limit = Math.max(0, perPlayerLimit);
+        if (limit == 0) {
             return Decision.allowWithoutCap(null, List.of(), "player-cap-disabled");
         }
-        int safeCurrent = Math.max(0, currentCount);
-        int safePending = Math.max(0, pendingReservations);
-        int remaining = safeLimit - safeCurrent - safePending;
-        if (remaining <= 0) {
-            return Decision.denyAtCap(
-                    ConstraintType.PLAYER,
-                    safeLimit,
-                    safeCurrent,
-                    safePending,
-                    null,
-                    List.of()
-            );
-        }
-        return Decision.allowWithCap(
-                ConstraintType.PLAYER,
-                safeLimit,
-                safeCurrent,
-                safePending,
-                remaining,
-                null,
-                List.of()
+        int current = Math.max(0, currentCount);
+        int pending = Math.max(0, pendingReservations);
+        int remaining = limit - current - pending;
+        return remaining <= 0
+                ? Decision.denyAtCap(ConstraintType.PLAYER, limit, current, pending, null, List.of())
+                : Decision.allowWithCap(
+                ConstraintType.PLAYER, limit, current, pending, remaining, null, List.of()
         );
     }
 
@@ -338,270 +163,61 @@ final class BreedingClaimLimitPolicyService {
                                                    @Nonnull ResolvedClaim resolvedClaim,
                                                    int currentCount,
                                                    int pendingReservations) {
-        if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
+        if (!claimPolicyEnabled(globalConfig)
+                || resolvedClaim.status() != ClaimResolutionStatus.CLAIM_FOUND
+                || resolvedClaim.key() == null) {
             return null;
         }
-        if (TameworkRuntimeSettings.simpleClaimsProvider(globalConfig.getSimpleClaimsProvider())
-                == ClaimIntegrationProvider.OFF) {
-            return null;
-        }
-        if (resolvedClaim.status() != ClaimResolutionStatus.CLAIM_FOUND || resolvedClaim.key() == null) {
-            return null;
-        }
-        int safeCurrent = Math.max(0, currentCount);
-        int safePending = Math.max(0, pendingReservations);
-        int claimChunks = Math.max(0, resolvedClaim.claimChunkCount());
-        int chunkCap = resolveSimpleClaimsBreedingLimitPerClaimChunkCap(
-                TameworkRuntimeSettings.simpleClaimsLimitPerClaimChunk(
-                        globalConfig.getSimpleClaimsBreedingLimitPerClaimChunk()
-                ),
-                claimChunks
+        int perChunk = TameworkRuntimeSettings.simpleClaimsLimitPerClaimChunk(
+                globalConfig.getSimpleClaimsBreedingLimitPerClaimChunk()
         );
-        int totalCap = TameworkRuntimeSettings.simpleClaimsLimitPerClaimTotal(
+        int total = TameworkRuntimeSettings.simpleClaimsLimitPerClaimTotal(
                 globalConfig.getSimpleClaimsBreedingLimitPerClaimTotal()
         );
-        boolean chunkCapEnabled = chunkCap > 0;
-        boolean totalCapEnabled = totalCap > 0;
-        if (!chunkCapEnabled && !totalCapEnabled) {
+        int chunkCap = multiplyCap(perChunk, resolvedClaim.claimChunkCount());
+        if (chunkCap <= 0 && total <= 0) {
             return null;
         }
-        int effectiveCap = Integer.MAX_VALUE;
-        if (chunkCapEnabled) {
-            effectiveCap = Math.min(effectiveCap, chunkCap);
-        }
-        if (totalCapEnabled) {
-            effectiveCap = Math.min(effectiveCap, totalCap);
-        }
-        if (effectiveCap == Integer.MAX_VALUE) {
-            return null;
-        }
-        int remaining = effectiveCap - safeCurrent - safePending;
+        int effectiveCap = chunkCap > 0 && total > 0
+                ? Math.min(chunkCap, total)
+                : Math.max(chunkCap, total);
+        int current = Math.max(0, currentCount);
+        int pending = Math.max(0, pendingReservations);
         return new ConstraintState(
                 ConstraintType.CLAIM,
-                Math.max(0, effectiveCap),
-                safeCurrent,
-                safePending,
-                Math.max(0, remaining)
+                effectiveCap,
+                current,
+                pending,
+                Math.max(0, effectiveCap - current - pending)
         );
     }
 
-    private static int resolveSimpleClaimsBreedingLimitPerClaimChunkCap(int perChunk, int claimChunkCount) {
-        if (perChunk <= 0) {
-            return 0;
-        }
-        int safeChunkCount = Math.max(0, claimChunkCount);
-        long multiplied = (long) perChunk * (long) safeChunkCount;
-        if (multiplied > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        return (int) multiplied;
-    }
-
-    @Nullable
-    private static ConstraintState selectLimitingConstraint(@Nonnull List<ConstraintState> constraints) {
-        ConstraintState limiting = null;
-        for (ConstraintState candidate : constraints) {
-            if (candidate == null) {
-                continue;
-            }
-            if (limiting == null || candidate.remainingHeadroom() < limiting.remainingHeadroom()) {
-                limiting = candidate;
-            }
-        }
-        return limiting;
-    }
-
-    @Nonnull
-    ResolvedClaim resolveClaim(@Nullable String worldName, @Nullable Vector3d position) {
-        if (worldName == null || worldName.isBlank() || position == null) {
-            return new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "missing-world-or-position");
-        }
-        ClaimLookupResult lookup = claimBridge.lookupClaim(worldName, position);
-        if (lookup == null) {
-            return new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "lookup-result-null");
-        }
-        return switch (lookup.status()) {
-            case CLAIM_FOUND -> {
-                if (lookup.key() == null) {
-                    yield new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, "claim-key-missing");
-                }
-                yield new ResolvedClaim(
-                        ClaimResolutionStatus.CLAIM_FOUND,
-                        ClaimReservationKey.fromPopulationKey(lookup.key()),
-                        Math.max(0, lookup.claimChunkCount()),
-                        null
-                );
-            }
-            case NO_CLAIM -> new ResolvedClaim(ClaimResolutionStatus.NO_CLAIM, null, 0, null);
-            case UNAVAILABLE -> new ResolvedClaim(ClaimResolutionStatus.UNAVAILABLE, null, 0, lookup.message());
-            case ERROR -> new ResolvedClaim(ClaimResolutionStatus.ERROR, null, 0, lookup.message());
-        };
-    }
-
-    @Nonnull
-    CountResult countOwnedPopulationInClaim(@Nonnull Store<EntityStore> store,
-                                            @Nonnull String worldName,
-                                            @Nonnull ClaimReservationKey targetClaim) {
-        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
-        ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (npcType == null || transformType == null || ownerType == null) {
-            return new CountResult(false, 0, "required component types unavailable");
-        }
-
-        int[] count = new int[] {0};
-        boolean[] failed = new boolean[] {false};
-        String[] failureMessage = new String[] {null};
-        Map<String, ResolvedClaim> claimLookupCache = new HashMap<>();
-
-        store.forEachChunk(
-                Query.and(npcType, transformType, ownerType),
-                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
-                        countOwnedChunkPopulationInClaim(
-                                chunk,
-                                npcType,
-                                transformType,
-                                ownerType,
-                                worldName,
-                                targetClaim,
-                                count,
-                                failed,
-                                failureMessage,
-                                claimLookupCache
-                        )
-        );
-
-        if (failed[0]) {
-            return new CountResult(false, 0, failureMessage[0]);
-        }
-        return new CountResult(true, count[0], null);
-    }
-
-    private void countOwnedChunkPopulationInClaim(@Nonnull ArchetypeChunk<EntityStore> chunk,
-                                                  @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
-                                                  @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
-                                                  @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-                                                  @Nonnull String worldName,
-                                                  @Nonnull ClaimReservationKey targetClaim,
-                                                  @Nonnull int[] count,
-                                                  @Nonnull boolean[] failed,
-                                                  @Nonnull String[] failureMessage,
-                                                  @Nonnull Map<String, ResolvedClaim> claimLookupCache) {
-        if (failed[0]) {
-            return;
-        }
-        int size = chunk.size();
-        for (int i = 0; i < size; i++) {
-            if (failed[0]) {
-                return;
-            }
-            Ref<EntityStore> ref = chunk.getReferenceTo(i);
-            NPCEntity npc = chunk.getComponent(i, npcType);
-            TransformComponent transform = chunk.getComponent(i, transformType);
-            TameworkOwnerComponent owner = chunk.getComponent(i, ownerType);
-            if (ref == null
-                    || !ref.isValid()
-                    || npc == null
-                    || transform == null
-                    || owner == null
-                    || owner.getOwnerId() == null) {
-                continue;
-            }
-            Vector3d position = transform.getPosition();
-            if (position == null) {
-                continue;
-            }
-            String cacheKey = chunkCacheKey(worldName, position);
-            ResolvedClaim resolvedClaim = claimLookupCache.get(cacheKey);
-            if (resolvedClaim == null) {
-                resolvedClaim = resolveClaim(worldName, position);
-                claimLookupCache.put(cacheKey, resolvedClaim);
-            }
-            if (resolvedClaim.status() == ClaimResolutionStatus.UNAVAILABLE
-                    || resolvedClaim.status() == ClaimResolutionStatus.ERROR) {
-                failed[0] = true;
-                failureMessage[0] = resolvedClaim.message();
-                return;
-            }
-            if (resolvedClaim.status() != ClaimResolutionStatus.CLAIM_FOUND || resolvedClaim.key() == null) {
-                continue;
-            }
-            if (targetClaim.equals(resolvedClaim.key())) {
-                count[0]++;
-            }
-        }
-    }
-
-    private int countOwnedPopulationForOwner(@Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
-                                             @Nullable Store<EntityStore> store,
-                                             @Nonnull UUID ownerId) {
-        return OwnerPopulationCapService.countOwnedPopulation(scope, store, ownerId);
-    }
-
+    /** A child with owner inheritance disabled is unowned and consumes no owner reservation. */
     @Nonnull
     static List<UUID> resolveOwnerTargets(boolean inheritOwner,
                                           @Nullable UUID parentAOwnerId,
                                           @Nullable UUID parentBOwnerId) {
-        if (inheritOwner) {
-            if (parentAOwnerId != null) {
-                return List.of(parentAOwnerId);
-            }
-            if (parentBOwnerId != null) {
-                return List.of(parentBOwnerId);
-            }
+        if (!inheritOwner) {
             return List.of();
         }
-        Set<UUID> uniqueOwners = new LinkedHashSet<>();
         if (parentAOwnerId != null) {
-            uniqueOwners.add(parentAOwnerId);
+            return List.of(parentAOwnerId);
         }
-        if (parentBOwnerId != null) {
-            uniqueOwners.add(parentBOwnerId);
-        }
-        return uniqueOwners.isEmpty() ? List.of() : List.copyOf(uniqueOwners);
+        return parentBOwnerId == null ? List.of() : List.of(parentBOwnerId);
     }
 
-    private static boolean resolveInheritOwner(@Nullable TwBreedingConfig config,
-                                               @Nullable String inheritanceRoleId) {
-        if (config == null) {
-            return true;
-        }
-        TwBreedingConfig.InheritanceSettings inheritance = config.resolveInheritance(inheritanceRoleId);
-        return inheritance == null || inheritance.isInheritOwner();
+    private static boolean claimPolicyEnabled(@Nonnull TwGlobalConfig config) {
+        return TameworkRuntimeSettings.simpleClaimsEnabled(config.isSimpleClaimsEnabled())
+                && TameworkRuntimeSettings.simpleClaimsProvider(config.getSimpleClaimsProvider())
+                != ClaimIntegrationProvider.OFF;
     }
 
-    @Nullable
-    private static String resolveWorldName(@Nullable Store<EntityStore> store) {
-        if (store == null || store.getExternalData() == null || store.getExternalData().getWorld() == null) {
-            return null;
+    private static int multiplyCap(int perChunk, int claimChunkCount) {
+        if (perChunk <= 0) {
+            return 0;
         }
-        World world = store.getExternalData().getWorld();
-        return world != null ? world.getName() : null;
-    }
-
-    @Nonnull
-    private static String chunkCacheKey(@Nonnull String worldName, @Nonnull Vector3d position) {
-        int blockX = (int) Math.floor(position.x);
-        int blockZ = (int) Math.floor(position.z);
-        int chunkX = ChunkUtil.chunkCoordinate(blockX);
-        int chunkZ = ChunkUtil.chunkCoordinate(blockZ);
-        return worldName + "|" + chunkX + "|" + chunkZ;
-    }
-
-    private void warnFailClosed(@Nullable String warning) {
-        if (warning == null || warning.isBlank()) {
-            return;
-        }
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getLogger() == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (now < nextWarningAtMs) {
-            return;
-        }
-        nextWarningAtMs = now + WARNING_THROTTLE_MS;
-        plugin.getLogger().at(Level.WARNING).log(warning);
+        long result = (long) perChunk * Math.max(0, claimChunkCount);
+        return result > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) result;
     }
 
     enum ClaimResolutionStatus {
@@ -622,16 +238,6 @@ final class BreedingClaimLimitPolicyService {
             this.allowReason = allowReason;
             this.denyReason = denyReason;
         }
-
-        @Nonnull
-        String allowReason() {
-            return allowReason;
-        }
-
-        @Nonnull
-        String denyReason() {
-            return denyReason;
-        }
     }
 
     record ClaimReservationKey(String providerId,
@@ -640,17 +246,14 @@ final class BreedingClaimLimitPolicyService {
                                UUID ownerId,
                                @Nullable String claimId) {
         ClaimReservationKey(String worldName, UUID partyId) {
-            this("simpleclaims", worldName, "PARTY", partyId, partyId == null ? null : partyId.toString());
+            this("simpleclaims", worldName, "PARTY", partyId,
+                    partyId == null ? null : partyId.toString());
         }
 
         @Nonnull
         static ClaimReservationKey fromPopulationKey(@Nonnull ClaimPopulationKey key) {
             return new ClaimReservationKey(
-                    key.providerId(),
-                    key.worldName(),
-                    key.ownerType(),
-                    key.ownerId(),
-                    key.claimId()
+                    key.providerId(), key.worldName(), key.ownerType(), key.ownerId(), key.claimId()
             );
         }
 
@@ -701,66 +304,42 @@ final class BreedingClaimLimitPolicyService {
                     @Nonnull List<PlayerReservationKey> playerReservationKeys,
                     @Nonnull String reason) {
         Decision {
-            playerReservationKeys = playerReservationKeys == null ? List.of() : List.copyOf(playerReservationKeys);
+            playerReservationKeys = playerReservationKeys == null
+                    ? List.of()
+                    : List.copyOf(playerReservationKeys);
         }
 
         static Decision allowNoPopulationChecks() {
-            return new Decision(true, false, 0, 0, 0, Integer.MAX_VALUE, null, List.of(), "population-caps-disabled");
+            return allowWithoutCap(null, List.of(), "population-caps-disabled");
         }
 
         static Decision allowWithoutCap(@Nullable ClaimReservationKey claimKey,
                                         @Nonnull List<PlayerReservationKey> playerKeys,
                                         @Nonnull String reason) {
-            return new Decision(
-                    true,
-                    false,
-                    0,
-                    0,
-                    0,
-                    Integer.MAX_VALUE,
-                    claimKey,
-                    playerKeys,
-                    reason
-            );
+            return new Decision(true, false, 0, 0, 0, Integer.MAX_VALUE,
+                    claimKey, playerKeys, reason);
         }
 
-        static Decision allowWithCap(@Nonnull ConstraintType constraintType,
+        static Decision allowWithCap(@Nonnull ConstraintType type,
                                      int effectiveCap,
                                      int currentCount,
                                      int pendingReservations,
                                      int remainingHeadroom,
                                      @Nullable ClaimReservationKey claimKey,
                                      @Nonnull List<PlayerReservationKey> playerKeys) {
-            return new Decision(
-                    true,
-                    true,
-                    Math.max(0, effectiveCap),
-                    Math.max(0, currentCount),
-                    Math.max(0, pendingReservations),
-                    Math.max(0, remainingHeadroom),
-                    claimKey,
-                    playerKeys,
-                    constraintType.allowReason()
-            );
+            return new Decision(true, true, Math.max(0, effectiveCap), Math.max(0, currentCount),
+                    Math.max(0, pendingReservations), Math.max(0, remainingHeadroom),
+                    claimKey, playerKeys, type.allowReason);
         }
 
-        static Decision denyAtCap(@Nonnull ConstraintType constraintType,
+        static Decision denyAtCap(@Nonnull ConstraintType type,
                                   int effectiveCap,
                                   int currentCount,
                                   int pendingReservations,
                                   @Nullable ClaimReservationKey claimKey,
                                   @Nonnull List<PlayerReservationKey> playerKeys) {
-            return new Decision(
-                    false,
-                    true,
-                    Math.max(0, effectiveCap),
-                    Math.max(0, currentCount),
-                    Math.max(0, pendingReservations),
-                    0,
-                    claimKey,
-                    playerKeys,
-                    constraintType.denyReason()
-            );
+            return new Decision(false, true, Math.max(0, effectiveCap), Math.max(0, currentCount),
+                    Math.max(0, pendingReservations), 0, claimKey, playerKeys, type.denyReason);
         }
 
         static Decision deny(@Nonnull String reason) {

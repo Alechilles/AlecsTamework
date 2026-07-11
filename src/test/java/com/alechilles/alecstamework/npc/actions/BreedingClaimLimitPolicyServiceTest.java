@@ -212,23 +212,20 @@ class BreedingClaimLimitPolicyServiceTest {
     }
 
     @Test
-    void ownerBasisForNoInheritanceUsesBothDistinctOwners() {
+    void ownerBasisForNoInheritanceLeavesChildUnowned() {
         UUID ownerA = UUID.randomUUID();
         UUID ownerB = UUID.randomUUID();
         List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, ownerA, ownerB);
 
-        assertEquals(2, targets.size());
-        assertEquals(ownerA, targets.get(0));
-        assertEquals(ownerB, targets.get(1));
+        assertTrue(targets.isEmpty());
     }
 
     @Test
-    void ownerBasisForNoInheritanceDeduplicatesSameOwner() {
+    void ownerBasisForNoInheritanceDoesNotReserveSharedOwner() {
         UUID owner = UUID.randomUUID();
         List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, owner, owner);
 
-        assertEquals(1, targets.size());
-        assertEquals(owner, targets.get(0));
+        assertTrue(targets.isEmpty());
     }
 
     private static BreedingClaimLimitPolicyService.ResolvedClaim claimFound(int chunkCount) {

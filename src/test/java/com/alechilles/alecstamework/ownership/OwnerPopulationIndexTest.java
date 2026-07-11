@@ -151,6 +151,34 @@ class OwnerPopulationIndexTest {
     }
 
     @Test
+    void liveOwnerClearAndPermanentReleaseRemainDistinctZeroSlotStates() {
+        OwnerPopulationEntry live = entry("live-clear", OWNER_A, "alpha", 2L);
+        OwnerPopulationEntry permanent = entry("permanent-release", OWNER_A, "alpha", 4L);
+        OwnerPopulationIndex liveIndex = indexWith(List.of(live), OwnerPopulationReadiness.READY);
+        OwnerPopulationIndex releaseIndex = indexWith(List.of(permanent), OwnerPopulationReadiness.READY);
+
+        OwnerPopulationDecision liveClear = liveIndex.reserve(change(
+                live, null, null, CompanionLifecycleState.ACTIVE,
+                OwnerPopulationOperation.OWNER_CLEAR, OwnerPopulationLimitScope.GLOBAL, 1, false
+        ));
+        OwnerPopulationDecision permanentRelease = releaseIndex.reserve(change(
+                permanent, null, null, CompanionLifecycleState.RELEASED,
+                OwnerPopulationOperation.OWNER_CLEAR, OwnerPopulationLimitScope.GLOBAL, 1, false
+        ));
+
+        assertTrue(liveClear.allowed());
+        assertTrue(permanentRelease.allowed());
+        claimAndCommit(liveIndex, liveClear.reservation());
+        claimAndCommit(releaseIndex, permanentRelease.reservation());
+        assertEquals(CompanionLifecycleState.ACTIVE,
+                liveIndex.entry(live.profileId()).orElseThrow().lifecycleState());
+        assertEquals(CompanionLifecycleState.RELEASED,
+                releaseIndex.entry(permanent.profileId()).orElseThrow().lifecycleState());
+        assertCounts(liveIndex, OWNER_A, "alpha", 0L, 0L, 0L, 0L);
+        assertCounts(releaseIndex, OWNER_A, "alpha", 0L, 0L, 0L, 0L);
+    }
+
+    @Test
     void disabledLimitTracksPopulationWithoutReadinessDenial() {
         OwnerPopulationIndex index = new OwnerPopulationIndex(new AtomicLong(300L)::get);
 
@@ -164,6 +192,31 @@ class OwnerPopulationIndexTest {
         assertCounts(index, OWNER_A, "alpha", 0L, 1L, 0L, 1L);
         claimAndCommit(index, decision.reservation());
         assertCounts(index, OWNER_A, "alpha", 1L, 0L, 1L, 0L);
+    }
+
+    @Test
+    void canonicalReloadGateRejectsEvenForcedOrDisabledTransitionsUntilReleased() {
+        OwnerPopulationIndex index = readyIndex(new AtomicLong(350L));
+        assertTrue(index.tryBeginCanonicalReload());
+        assertFalse(index.tryBeginCanonicalReload());
+
+        OwnerPopulationDecision disabled = index.reserve(acquire(
+                "reload-disabled", OWNER_A, "alpha", OwnerPopulationLimitScope.GLOBAL, 0, false
+        ));
+        OwnerPopulationDecision forced = index.reserve(acquire(
+                "reload-forced", OWNER_A, "alpha", OwnerPopulationLimitScope.GLOBAL, 1, true
+        ));
+
+        assertFalse(disabled.allowed());
+        assertFalse(forced.allowed());
+        assertEquals("owner-population-canonical-reload", disabled.reason());
+        assertEquals("owner-population-canonical-reload", forced.reason());
+        index.finishCanonicalReload();
+        OwnerPopulationDecision admitted = index.reserve(acquire(
+                "reload-disabled", OWNER_A, "alpha", OwnerPopulationLimitScope.GLOBAL, 0, false
+        ));
+        assertTrue(admitted.allowed());
+        assertTrue(index.cancel(admitted.reservation()));
     }
 
     @Test
@@ -290,6 +343,43 @@ class OwnerPopulationIndexTest {
         long expected = CompanionLifecycleState.values().length;
 
         assertCounts(index, OWNER_A, "alpha", expected, 0L, expected, 0L);
+    }
+
+    @Test
+    void diagnosticsTrackReservationLifecycleAndOverCapBuckets() {
+        AtomicLong clock = new AtomicLong(0L);
+        OwnerPopulationIndex index = readyIndex(clock);
+
+        OwnerPopulationDecision canceled = index.reserve(acquire(
+                "metrics-canceled", OWNER_A, "alpha", OwnerPopulationLimitScope.GLOBAL, 1, false
+        ));
+        assertTrue(index.cancel(canceled.reservation()));
+
+        OwnerPopulationDecision committed = index.reserve(acquire(
+                "metrics-committed", OWNER_A, "alpha", OwnerPopulationLimitScope.GLOBAL, 1, false
+        ));
+        claimAndCommit(index, committed.reservation());
+
+        OwnerPopulationDecision forced = index.reserve(acquire(
+                "metrics-forced", OWNER_A, "alpha", OwnerPopulationLimitScope.GLOBAL, 1, true
+        ));
+        claimAndCommit(index, forced.reservation());
+
+        OwnerPopulationDecision expiring = index.reserve(acquireWithLease(
+                "metrics-expired", OWNER_B, "alpha", OwnerPopulationLimitScope.GLOBAL, 1, false, 10L
+        ));
+        clock.set(10L);
+        assertEquals(1, index.expireReservations());
+        assertFalse(index.claimForApply(expiring.reservation()));
+
+        OwnerPopulationMetrics.Snapshot metrics = index.metrics(OwnerPopulationLimitScope.GLOBAL, 1);
+        assertEquals(4L, metrics.reservationsCreated());
+        assertEquals(2L, metrics.reservationsCommitted());
+        assertEquals(1L, metrics.reservationsCanceled());
+        assertEquals(1L, metrics.reservationsExpired());
+        assertEquals(2L, metrics.committedGlobalSlots());
+        assertEquals(0L, metrics.pendingGlobalSlots());
+        assertEquals(1L, metrics.overCapBuckets());
     }
 
     private static OwnerPopulationIndex readyIndex(AtomicLong clock) {

@@ -1,5 +1,13 @@
 package com.alechilles.alecstamework.integration.questlinesclaims;
 
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.extractMessage;
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.findMethod;
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.firstFailure;
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.normalizeText;
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.parseInteger;
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.parseUuid;
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.readValue;
+
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimFootprint;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
@@ -9,8 +17,8 @@ import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.claims.ClaimResolution;
 import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
+import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.ReflectedValue;
 import java.lang.reflect.Array;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -54,10 +62,11 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
         if (bridge != null) {
             return bridge;
         }
+        QuestLinesClaimsBridge candidate = createBridge();
         synchronized (QuestLinesClaimsBridge.class) {
             bridge = cachedBridge;
             if (bridge == null) {
-                bridge = createBridge();
+                bridge = candidate;
                 cachedBridge = bridge;
             }
             return bridge;
@@ -336,16 +345,6 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
         return CoordinateRead.success(new ClaimChunkCoordinate(worldName, chunkX, chunkZ));
     }
 
-    @Nullable
-    private static Throwable firstFailure(@Nonnull ReflectedValue... values) {
-        for (ReflectedValue value : values) {
-            if (value.failure() != null) {
-                return value.failure();
-            }
-        }
-        return null;
-    }
-
     @Nonnull
     private static ClaimResolution reflectionError(@Nonnull String field, @Nonnull ReflectedValue value) {
         return ClaimResolution.error(
@@ -367,121 +366,14 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
         return normalizeText(value);
     }
 
-    @Nullable
-    private static String normalizeText(@Nullable Object value) {
-        if (value == null) {
-            return null;
-        }
-        String text = String.valueOf(value).trim();
-        return text.isBlank() ? null : text;
-    }
-
-    @Nullable
-    private static UUID parseUuid(@Nullable Object value) {
-        if (value instanceof UUID uuid) {
-            return uuid;
-        }
-        String text = normalizeText(value);
-        if (text == null) {
-            return null;
-        }
-        try {
-            return UUID.fromString(text);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private static Integer parseInteger(@Nullable Object value) {
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        String text = normalizeText(value);
-        if (text == null) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(text);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    @Nonnull
-    private static ReflectedValue readValue(@Nonnull Object target, @Nonnull String... methodNames) {
-        for (String methodName : methodNames) {
-            Method method = findMethod(target.getClass(), methodName);
-            if (method == null) {
-                continue;
-            }
-            try {
-                return ReflectedValue.success(methodName, method.invoke(target));
-            } catch (Throwable throwable) {
-                return ReflectedValue.failure(methodName, unwrapInvocation(throwable));
-            }
-        }
-        return ReflectedValue.missing();
-    }
-
-    @Nullable
-    private static Method findMethod(@Nonnull Class<?> type,
-                                     @Nonnull String name,
-                                     Class<?>... parameterTypes) {
-        try {
-            return type.getMethod(name, parameterTypes);
-        } catch (NoSuchMethodException ignored) {
-            return null;
-        }
-    }
-
     @Nonnull
     private static QuestLinesClaimsBridge unavailable(@Nullable String reason) {
         return new QuestLinesClaimsBridge(false, reason, null, null);
     }
 
-    @Nullable
-    private static Throwable unwrapInvocation(@Nullable Throwable throwable) {
-        Throwable current = throwable;
-        while (current instanceof InvocationTargetException invocation && invocation.getCause() != null) {
-            current = invocation.getCause();
-        }
-        return current;
-    }
-
-    @Nonnull
-    private static String extractMessage(@Nullable Throwable throwable) {
-        Throwable unwrapped = unwrapInvocation(throwable);
-        if (unwrapped == null) {
-            return "unknown error";
-        }
-        String message = unwrapped.getMessage();
-        return message == null || message.isBlank() ? unwrapped.getClass().getSimpleName() : message;
-    }
-
     static void clearCachedBridgeForTests() {
         synchronized (QuestLinesClaimsBridge.class) {
             cachedBridge = null;
-        }
-    }
-
-    private record ReflectedValue(boolean methodFound,
-                                  @Nullable String methodName,
-                                  @Nullable Object value,
-                                  @Nullable Throwable failure) {
-        @Nonnull
-        static ReflectedValue success(@Nonnull String methodName, @Nullable Object value) {
-            return new ReflectedValue(true, methodName, value, null);
-        }
-
-        @Nonnull
-        static ReflectedValue failure(@Nonnull String methodName, @Nullable Throwable failure) {
-            return new ReflectedValue(true, methodName, null, failure);
-        }
-
-        @Nonnull
-        static ReflectedValue missing() {
-            return new ReflectedValue(false, null, null, null);
         }
     }
 

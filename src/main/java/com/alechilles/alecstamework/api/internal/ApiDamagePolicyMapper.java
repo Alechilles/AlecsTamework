@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.Vector3View;
 import com.alechilles.alecstamework.damage.TamedDamageDecision;
+import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicyResolver;
+import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -58,6 +60,28 @@ final class ApiDamagePolicyMapper {
                 decision.reason(),
                 ownership,
                 claimAccess
+        );
+    }
+
+    @Nonnull
+    static OwnershipPolicyView withLiveOwnerPolicy(
+            @Nonnull OwnershipPolicyView persisted,
+            @Nonnull TamedDamageOwnerPolicyResolver.Resolution live
+    ) {
+        UUID ownerId = live.policy().ownerUuid();
+        return new OwnershipPolicyView(
+                persisted.profileId(),
+                persisted.currentNpcUuid(),
+                ownerId,
+                Objects.equals(ownerId, persisted.ownerUuid()) ? persisted.ownerName() : null,
+                live.roleId(),
+                persisted.tamed(),
+                persisted.inCoop(),
+                persisted.coopId(),
+                persisted.coopSlot(),
+                live.policy().blockOwnerDamage(),
+                live.policy().blockAllPlayerDamageIfOwned(),
+                live.policy().invulnerableIfOwned()
         );
     }
 

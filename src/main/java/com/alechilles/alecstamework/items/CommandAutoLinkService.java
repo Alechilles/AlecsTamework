@@ -239,8 +239,39 @@ public final class CommandAutoLinkService {
                 npcRef,
                 resolution.toolId(),
                 config,
-                stack
+                stack,
+                (livePlayer, liveStore, liveTarget) -> {
+                    ItemStack current = candidate.container().getItemStack(candidate.slot());
+                    if (current == null || current.isEmpty()) {
+                        return;
+                    }
+                    String currentToolId = current.getFromMetadataOrNull(
+                            TameworkMetadataKeys.COMMAND_TOOL_ID,
+                            Codec.STRING
+                    );
+                    if (!resolution.toolId().equals(currentToolId)) {
+                        return;
+                    }
+                    LinkToggleResult deferred = linkMutationService.tryToggleLink(
+                            livePlayer,
+                            liveStore,
+                            liveTarget,
+                            resolution.toolId(),
+                            config,
+                            current,
+                            null
+                    );
+                    if (deferred.toggled && deferred.linked && deferred.updatedItem != null) {
+                        candidate.container().setItemStackForSlot(
+                                candidate.slot(),
+                                deferred.updatedItem
+                        );
+                    }
+                }
         );
+        if (result != null && result.pending) {
+            return false;
+        }
         if (result == null || !result.toggled || !result.linked || result.updatedItem == null) {
             return false;
         }

@@ -5,6 +5,7 @@ package com.alechilles.alecstamework.integration.claims;
  */
 public enum ClaimOccupancyReadiness {
     LOADING,
+    RECONCILING,
     READY,
     DEGRADED;
 

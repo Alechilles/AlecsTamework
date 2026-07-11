@@ -49,6 +49,27 @@ class ClaimPopulationSnapshotServiceTest {
         }
     }
 
+    @Test
+    void lookupOnlyPopulationSkipsOccupiedChunksFromOtherWorlds() {
+        ClaimPopulationKey key = ClaimPopulationKey.simpleClaims("world", PARTY);
+        ClaimResolution lookupOnly = ClaimResolution.foundWithoutFootprint(key, 0);
+        ConstantBridge bridge = new ConstantBridge(lookupOnly);
+        ClaimLookupSession session = new ClaimLookupSession(context(bridge));
+        ClaimOccupancyIndex index = readyIndex(List.of(
+                active("target-world", new ClaimChunkCoordinate("world", 1, 1)),
+                active("other-world", new ClaimChunkCoordinate("other", 1, 1))
+        ));
+
+        ClaimPopulationSnapshot snapshot = new ClaimPopulationSnapshotService().snapshot(
+                index,
+                lookupOnly,
+                session
+        );
+
+        assertEquals(Set.of("target-world"), snapshot.profileIds());
+        assertEquals(1L, session.providerCallCount());
+    }
+
     private void assertLookupScaling(int profileCount, int uniqueChunks) {
         ClaimPopulationKey key = ClaimPopulationKey.simpleClaims("world", PARTY);
         ClaimResolution lookupOnly = ClaimResolution.foundWithoutFootprint(key, 0);

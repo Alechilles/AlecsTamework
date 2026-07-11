@@ -19,6 +19,7 @@ public record ClaimAdmissionRequest(@Nonnull ClaimAdmissionOperation operation,
                                     @Nonnull ClaimPolicyContext policyContext,
                                     int limitPerClaimChunk,
                                     int limitPerClaimTotal,
+                                    boolean requireClaim,
                                     boolean force,
                                     long leaseDurationNanos) {
     public ClaimAdmissionRequest {
@@ -50,6 +51,32 @@ public record ClaimAdmissionRequest(@Nonnull ClaimAdmissionOperation operation,
         return limitPerClaimChunk > 0 || limitPerClaimTotal > 0;
     }
 
+    public boolean policyEnabled() {
+        return capEnabled() || requireClaim;
+    }
+
+    /** Compatibility constructor for admission-cap-only callers. */
+    public ClaimAdmissionRequest(@Nonnull ClaimAdmissionOperation operation,
+                                 @Nonnull List<ClaimOccupancyTransition> transitions,
+                                 @Nullable ClaimChunkCoordinate destinationChunk,
+                                 @Nonnull ClaimPolicyContext policyContext,
+                                 int limitPerClaimChunk,
+                                 int limitPerClaimTotal,
+                                 boolean force,
+                                 long leaseDurationNanos) {
+        this(
+                operation,
+                transitions,
+                destinationChunk,
+                policyContext,
+                limitPerClaimChunk,
+                limitPerClaimTotal,
+                false,
+                force,
+                leaseDurationNanos
+        );
+    }
+
     public boolean hasPhysicalDestination() {
         return destinationChunk != null;
     }
@@ -70,6 +97,7 @@ public record ClaimAdmissionRequest(@Nonnull ClaimAdmissionOperation operation,
                 policyContext,
                 limitPerClaimChunk,
                 limitPerClaimTotal,
+                false,
                 force,
                 leaseDurationNanos
         );

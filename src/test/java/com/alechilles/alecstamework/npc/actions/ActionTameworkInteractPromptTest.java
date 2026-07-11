@@ -45,7 +45,7 @@ class ActionTameworkInteractPromptTest {
                 "src/main/java/com/alechilles/alecstamework/npc/actions/ActionTameworkInteractPrompt.java"
         ));
 
-        int claimIndex = source.indexOf("claimLegacyOwnershipForPrompt(npcRef, store, player, ctx)");
+        int claimIndex = source.indexOf("claimLegacyOwnershipForPrompt(npcRef, store, player)");
         int selectIndex = source.indexOf("selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx)");
 
         assertTrue(claimIndex >= 0, "Prompt path should claim legacy tamed ownership.");

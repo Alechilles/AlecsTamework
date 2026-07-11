@@ -22,18 +22,35 @@ public final class SqliteSchemaMigrator {
     public static final String MIGRATION_NAME_LEGACY_DAT_IMPORT_V2 = "legacy_dat_import_v2";
 
     public void migrate(@Nonnull Connection connection) throws Exception {
+        migrateThrough(connection, SCHEMA_VERSION_V6);
+    }
+
+    /**
+     * Applies every Tamework-owned schema migration up to the requested version.
+     *
+     * <p>Version 5 is intentionally not owned here. Passing 5 applies through v4 and preserves
+     * any independently recorded v5 migration so the population v6 upgrade can be verified
+     * against both rollout orders.</p>
+     */
+    void migrateThrough(@Nonnull Connection connection, int targetVersion) throws Exception {
+        if (targetVersion < SCHEMA_VERSION_V2 || targetVersion > SCHEMA_VERSION_V6) {
+            throw new IllegalArgumentException("Unsupported schema target: " + targetVersion);
+        }
         createMigrationsTable(connection);
-        if (!isVersionApplied(connection, SCHEMA_VERSION_V2)) {
+        if (targetVersion >= SCHEMA_VERSION_V2 && !isVersionApplied(connection, SCHEMA_VERSION_V2)) {
             applySchemaV2(connection);
             recordMigration(connection, SCHEMA_VERSION_V2, MIGRATION_NAME_SCHEMA_V2);
         }
-        if (!isVersionApplied(connection, SCHEMA_VERSION_V3)) {
+        if (targetVersion >= SCHEMA_VERSION_V3 && !isVersionApplied(connection, SCHEMA_VERSION_V3)) {
             applySchemaV3(connection);
             recordMigration(connection, SCHEMA_VERSION_V3, MIGRATION_NAME_SCHEMA_V3);
         }
-        if (!isVersionApplied(connection, SCHEMA_VERSION_V4)) {
+        if (targetVersion >= SCHEMA_VERSION_V4 && !isVersionApplied(connection, SCHEMA_VERSION_V4)) {
             applySchemaV4(connection);
             recordMigration(connection, SCHEMA_VERSION_V4, MIGRATION_NAME_SCHEMA_V4);
+        }
+        if (targetVersion < SCHEMA_VERSION_V6) {
+            return;
         }
         if (!isVersionApplied(connection, SCHEMA_VERSION_V6)) {
             applySchemaV6(connection);
@@ -287,6 +304,7 @@ public final class SqliteSchemaMigrator {
                     CREATE INDEX IF NOT EXISTS idx_companion_population_reconciliation_state
                     ON companion_population_reconciliation(coverage_dimension, state, updated_at_ms)
                     """);
+            createCompanionPopulationEvidenceTable(statement);
             statement.execute("""
                     INSERT OR IGNORE INTO companion_population_state (
                         profile_id, ownership_world_name, lifecycle_state,
@@ -316,6 +334,7 @@ public final class SqliteSchemaMigrator {
 
     private void reconcileSchemaV6Data(@Nonnull Connection connection) throws Exception {
         try (Statement statement = connection.createStatement()) {
+            createCompanionPopulationEvidenceTable(statement);
             statement.execute("""
                     INSERT OR IGNORE INTO companion_population_state (
                         profile_id, ownership_world_name, lifecycle_state,
@@ -341,6 +360,36 @@ public final class SqliteSchemaMigrator {
                     LEFT JOIN profile_states s ON s.profile_id = p.profile_id
                     """);
         }
+    }
+
+    private void createCompanionPopulationEvidenceTable(@Nonnull Statement statement) throws Exception {
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS companion_population_reconciliation_evidence (
+                    coverage_key TEXT NOT NULL,
+                    scan_generation TEXT NOT NULL,
+                    evidence_key TEXT NOT NULL,
+                    npc_uuid TEXT NOT NULL,
+                    owner_uuid TEXT,
+                    evidence_kind TEXT NOT NULL,
+                    ownership_world_name TEXT,
+                    physical_world_name TEXT,
+                    physical_chunk_x INTEGER,
+                    physical_chunk_z INTEGER,
+                    source TEXT NOT NULL,
+                    observed_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (coverage_key, scan_generation, evidence_key),
+                    CHECK ((physical_world_name IS NULL AND physical_chunk_x IS NULL AND physical_chunk_z IS NULL)
+                        OR (physical_world_name IS NOT NULL AND physical_chunk_x IS NOT NULL AND physical_chunk_z IS NOT NULL))
+                )
+                """);
+        statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_companion_population_evidence_identity
+                ON companion_population_reconciliation_evidence(npc_uuid, scan_generation)
+                """);
+        statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_companion_population_evidence_source
+                ON companion_population_reconciliation_evidence(coverage_key, scan_generation)
+                """);
     }
 
     private boolean hasColumn(@Nonnull Connection connection,

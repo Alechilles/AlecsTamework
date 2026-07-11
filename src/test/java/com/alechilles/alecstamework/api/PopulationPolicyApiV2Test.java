@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.internal.UnavailablePopulationPolicyAuth
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,6 +43,44 @@ class PopulationPolicyApiV2Test {
                 OWNER_A, false, true, 5, -1, 0, "PER_WORLD", "owner-cap-world-context-required"
         );
         assertEquals(-1, view.currentCount());
+    }
+
+    @Test
+    void durableAdmissionStagesAreCompletionAwareWhileApplyClaimRemainsSynchronous() throws Exception {
+        assertEquals(
+                CompletionStage.class,
+                PopulationAdmissionApi.class.getMethod(
+                        "tryAdmit", PopulationAdmissionRequest.class
+                ).getReturnType()
+        );
+        assertEquals(
+                CompletionStage.class,
+                PopulationAdmissionApi.class.getMethod(
+                        "tryAdmitBatch", PopulationBatchAdmissionRequest.class
+                ).getReturnType()
+        );
+        assertEquals(
+                PopulationAdmissionDecision.class,
+                PopulationAdmissionApi.class.getMethod(
+                        "claimForApply", PopulationAdmissionToken.class
+                ).getReturnType()
+        );
+        assertEquals(
+                CompletionStage.class,
+                PopulationAdmissionApi.class.getMethod(
+                        "commit", PopulationAdmissionToken.class
+                ).getReturnType()
+        );
+        assertEquals(
+                CompletionStage.class,
+                PopulationAdmissionApi.class.getMethod(
+                        "cancel", PopulationAdmissionToken.class
+                ).getReturnType()
+        );
+        assertEquals(
+                CompletionStage.class,
+                PopulationAdmissionApi.class.getMethod("cleanupExpired").getReturnType()
+        );
     }
 
     @Test
@@ -117,7 +156,25 @@ class PopulationPolicyApiV2Test {
     }
 
     @Test
-    void provisionalBatchAndUnavailableAuthorityFailClosedWithoutIssuingToken() {
+    void ownerClearCanPreserveLiveLifecycleOrDeclarePermanentRelease() {
+        PopulationAdmissionIdentity canonical = new PopulationAdmissionIdentity("profile-clear", null, null);
+        PopulationAdmissionRequest liveClear = new PopulationAdmissionRequest(
+                canonical, NPC, 7L, OWNER_A, null, SOURCE, DESTINATION,
+                PopulationAdmissionOperation.OWNER_CLEAR, 1, PopulationAdmissionForcePolicy.ENFORCE,
+                PopulationCompanionLifecycle.ACTIVE
+        );
+        PopulationAdmissionRequest permanentRelease = new PopulationAdmissionRequest(
+                canonical, NPC, 7L, OWNER_A, null, SOURCE, null,
+                PopulationAdmissionOperation.OWNER_CLEAR, 1, PopulationAdmissionForcePolicy.ENFORCE,
+                PopulationCompanionLifecycle.RELEASED
+        );
+
+        assertEquals(PopulationCompanionLifecycle.ACTIVE, liveClear.targetLifecycle());
+        assertEquals(PopulationCompanionLifecycle.RELEASED, permanentRelease.targetLifecycle());
+    }
+
+    @Test
+    void provisionalSingleAndExplicitBatchUnavailableAuthorityFailClosedWithoutIssuingToken() {
         PopulationAdmissionRequest request = new PopulationAdmissionRequest(
                 new PopulationAdmissionIdentity(null, "birth-job-a", "birth-attempt-a"),
                 null,
@@ -127,16 +184,101 @@ class PopulationPolicyApiV2Test {
                 null,
                 DESTINATION,
                 PopulationAdmissionOperation.BREEDING,
-                3,
+                1,
                 PopulationAdmissionForcePolicy.ENFORCE
         );
 
-        PopulationAdmissionDecision decision = UnavailablePopulationPolicyAuthority.INSTANCE.tryAdmit(request);
+        PopulationAdmissionDecision decision = UnavailablePopulationPolicyAuthority.INSTANCE
+                .tryAdmit(request)
+                .toCompletableFuture()
+                .join();
 
         assertEquals(PopulationAdmissionDecision.Status.UNAVAILABLE, decision.status());
         assertFalse(decision.accepted());
         assertNull(decision.token());
         assertEquals(OwnerPopulationCapDecisionViewV2.UNKNOWN_COUNT, decision.committedCount());
+
+        PopulationBatchAdmissionRequest batch = new PopulationBatchAdmissionRequest(
+                "birth-batch-a",
+                java.util.List.of(request),
+                PopulationBatchAdmissionMode.EXACT
+        );
+        PopulationBatchAdmissionDecision batchDecision = UnavailablePopulationPolicyAuthority.INSTANCE
+                .tryAdmitBatch(batch)
+                .toCompletableFuture()
+                .join();
+        assertEquals(PopulationBatchAdmissionDecision.Status.UNAVAILABLE, batchDecision.status());
+        assertEquals(0, batchDecision.admittedUnits());
+    }
+
+    @Test
+    void unownedBreedingStillRequiresDestinationAndSingleRequestsCannotImplyMultipleChildren() {
+        PopulationAdmissionIdentity identity = new PopulationAdmissionIdentity(
+                null,
+                "unowned-child-a",
+                "unowned-birth-a"
+        );
+        PopulationAdmissionRequest request = new PopulationAdmissionRequest(
+                identity,
+                NPC,
+                PopulationAdmissionRequest.NEW_PROFILE_REVISION,
+                null,
+                null,
+                null,
+                DESTINATION,
+                PopulationAdmissionOperation.BREEDING,
+                1,
+                PopulationAdmissionForcePolicy.ENFORCE
+        );
+
+        assertNull(request.newOwnerUuid());
+        assertThrows(IllegalArgumentException.class, () -> new PopulationAdmissionRequest(
+                identity, NPC, PopulationAdmissionRequest.NEW_PROFILE_REVISION,
+                null, null, null, null, PopulationAdmissionOperation.BREEDING,
+                1, PopulationAdmissionForcePolicy.ENFORCE
+        ));
+        assertThrows(IllegalArgumentException.class, () -> new PopulationAdmissionRequest(
+                identity, NPC, PopulationAdmissionRequest.NEW_PROFILE_REVISION,
+                null, null, null, DESTINATION, PopulationAdmissionOperation.BREEDING,
+                2, PopulationAdmissionForcePolicy.ENFORCE
+        ));
+    }
+
+    @Test
+    void explicitBatchRequiresDistinctPerChildIdentityAndCurrentUuid() {
+        PopulationAdmissionRequest first = unownedChild(
+                "child-a",
+                "birth-a",
+                UUID.fromString("00000000-0000-0000-0000-000000000211")
+        );
+        PopulationAdmissionRequest second = unownedChild(
+                "child-b",
+                "birth-b",
+                UUID.fromString("00000000-0000-0000-0000-000000000212")
+        );
+
+        PopulationBatchAdmissionRequest batch = new PopulationBatchAdmissionRequest(
+                "batch-a",
+                java.util.List.of(first, second),
+                PopulationBatchAdmissionMode.EXACT
+        );
+
+        assertEquals(2, batch.units().size());
+        assertThrows(IllegalArgumentException.class, () -> new PopulationBatchAdmissionRequest(
+                "batch-duplicate-profile",
+                java.util.List.of(first, first),
+                PopulationBatchAdmissionMode.EXACT
+        ));
+        PopulationAdmissionRequest duplicateUuid = unownedChild(
+                "child-c",
+                "birth-c",
+                first.currentNpcUuid()
+        );
+        assertThrows(IllegalArgumentException.class, () -> new PopulationBatchAdmissionRequest(
+                "batch-duplicate-uuid",
+                java.util.List.of(first, duplicateUuid),
+                PopulationBatchAdmissionMode.EXACT
+        ));
     }
 
     @Test
@@ -154,5 +296,22 @@ class PopulationPolicyApiV2Test {
         assertThrows(IllegalArgumentException.class, () -> new PopulationAdmissionToken(
                 UUID.randomUUID(), UUID.randomUUID(), 0L, -1L, "provider", OwnerPopulationCapDecisionViewV2.Readiness.READY
         ));
+    }
+
+    private static PopulationAdmissionRequest unownedChild(String profileId,
+                                                           String idempotencyKey,
+                                                           UUID npcUuid) {
+        return new PopulationAdmissionRequest(
+                new PopulationAdmissionIdentity(null, profileId, idempotencyKey),
+                npcUuid,
+                PopulationAdmissionRequest.NEW_PROFILE_REVISION,
+                null,
+                null,
+                null,
+                DESTINATION,
+                PopulationAdmissionOperation.BREEDING,
+                1,
+                PopulationAdmissionForcePolicy.ENFORCE
+        );
     }
 }

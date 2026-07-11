@@ -26,7 +26,6 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
@@ -50,9 +49,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
-import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
-import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
-import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
@@ -93,10 +89,6 @@ public final class CommandItemFeatureHandler {
     private static final double RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
-    private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
-    private static final float RELEASE_DESPAWN_DELAY_SECONDS = 4.0F;
-    private static final float CULL_DAMAGE_AMOUNT = 2.1474836E9F;
-    private static final String[] RELEASE_STATE_CANDIDATES = new String[] { "Flee", "Wander", "Idle" };
 
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
@@ -122,6 +114,9 @@ public final class CommandItemFeatureHandler {
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandRespawnService respawnService;
     private final CommandLostRecoveryService lostRecoveryService;
+    private final CommandOwnerReleaseService ownerReleaseService;
+    private final CommandOwnerCullService ownerCullService;
+    private final CommandRespawnMenuService respawnMenuService;
     private final CommandMenuMoveService menuMoveService;
     private final CommandLinkedNpcLocateService locateService;
     private final CommandPanelPreferenceService panelPreferenceService;
@@ -225,6 +220,26 @@ public final class CommandItemFeatureHandler {
                 respawnService,
                 stepExecutionService,
                 lostService
+        );
+        this.ownerReleaseService = new CommandOwnerReleaseService(
+                linkPolicyService,
+                stepExecutionService,
+                feedbackService,
+                npcNameResolver
+        );
+        this.ownerCullService = new CommandOwnerCullService(
+                linkPolicyService,
+                linkMutationService,
+                feedbackService,
+                npcNameResolver
+        );
+        this.respawnMenuService = new CommandRespawnMenuService(
+                deathService,
+                lostService,
+                linkMutationService,
+                respawnService,
+                lostRecoveryService,
+                feedbackService
         );
         this.menuMoveService = new CommandMenuMoveService(
                 resolutionService,
@@ -540,7 +555,27 @@ public final class CommandItemFeatureHandler {
         }
 
         if (targetRef != null && config.isLinkEnabled() && config.isLinkUseTogglesMembership()) {
-            LinkToggleResult link = linkMutationService.tryToggleLink(player, store, targetRef, tool.toolId, config, working);
+            LinkToggleResult link = linkMutationService.tryToggleLink(
+                    player,
+                    store,
+                    targetRef,
+                    tool.toolId,
+                    config,
+                    working,
+                    (livePlayer, liveStore, liveTarget) -> handleDeferredLink(
+                            livePlayer,
+                            liveStore,
+                            liveTarget,
+                            tool.toolId,
+                            config
+                    )
+            );
+            if (link.pending) {
+                if (updateHeldItem) {
+                    updateHeldItem(player, working);
+                }
+                return true;
+            }
             if (link.toggled) {
                 if (link.updatedItem != null) {
                     working = link.updatedItem;
@@ -761,9 +796,9 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid),
                 npcUuid -> panelActionService.applyToggleBreeding(player, toolId, npcUuid),
-                npcUuid -> applyMenuRelease(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuCull(player, toolId, config, npcUuid),
-                npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
+                npcUuid -> ownerReleaseService.release(player, toolId, config, npcUuid),
+                npcUuid -> ownerCullService.cull(player, toolId, config, npcUuid),
+                npcUuid -> respawnMenuService.respawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuLocate(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
@@ -901,351 +936,6 @@ public final class CommandItemFeatureHandler {
                 hotbar.setItemStackForSlot(slot, updatedStack);
                 feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.unlink.success");
             }
-            return;
-        }
-        feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
-    }
-
-    private void applyMenuRelease(Player player,
-                                  String toolId,
-                                  TwCommandItemConfig config,
-                                  UUID npcUuid) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.unavailable");
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        if (store == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.unavailable");
-            return;
-        }
-        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-        if (npcRef == null || !npcRef.isValid()) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.mustBeLoaded");
-            return;
-        }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.mustBeLoaded");
-            return;
-        }
-        if (!canApplyNearbyReleaseCull(player, config, npcRef, store)) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.ownedNearbyOnly");
-            return;
-        }
-        clearNpcTamedOwnershipAndLinks(npcRef, store);
-        trySetReleaseState(npcRef, npc, store);
-        npc.setToDespawn();
-        npc.setDespawnTime(RELEASE_DESPAWN_DELAY_SECONDS);
-        String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
-        if (displayName == null || displayName.isBlank()) {
-            displayName = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultMobName");
-        }
-        feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.release.success", displayName);
-    }
-
-    private void applyMenuCull(Player player,
-                               String toolId,
-                               TwCommandItemConfig config,
-                               UUID npcUuid) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.unavailable");
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        if (store == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.unavailable");
-            return;
-        }
-        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-        if (npcRef == null || !npcRef.isValid()) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.mustBeLoaded");
-            return;
-        }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.mustBeLoaded");
-            return;
-        }
-        if (!canApplyNearbyReleaseCull(player, config, npcRef, store)) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.ownedNearbyOnly");
-            return;
-        }
-        DamageCause cause = DamageCause.COMMAND != null ? DamageCause.COMMAND : DamageCause.PHYSICAL;
-        if (cause == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.unavailable");
-            return;
-        }
-        clearNpcCommandLinks(npcRef, store);
-        removeNpcFromAllCommandToolRecords(player, npcUuid);
-        DeathComponent.tryAddComponent(store, npcRef, new Damage(Damage.NULL_SOURCE, cause, CULL_DAMAGE_AMOUNT));
-        String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
-        if (displayName == null || displayName.isBlank()) {
-            displayName = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultMobName");
-        }
-        feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.cull.success", displayName);
-    }
-
-    private boolean canApplyNearbyReleaseCull(Player player,
-                                              TwCommandItemConfig config,
-                                              Ref<EntityStore> npcRef,
-                                              Store<EntityStore> store) {
-        if (player == null || npcRef == null || !npcRef.isValid() || store == null) {
-            return false;
-        }
-        UUID ownerUuid = player.getUuid();
-        if (ownerUuid == null) {
-            return false;
-        }
-        boolean requireTamed = config != null && config.isRequireTamed();
-        return linkPolicyService.passesOwnerAndTamed(
-                resolveLinkingRequireOwner(),
-                requireTamed,
-                npcRef,
-                ownerUuid,
-                store
-        );
-    }
-
-    private boolean resolveLinkingRequireOwner() {
-        TwGlobalConfig global = TwGlobalConfig.resolveActive();
-        TwGlobalConfig resolved = global != null ? global : TwGlobalConfig.defaultConfig();
-        return TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
-    }
-
-    private void clearNpcTamedOwnershipAndLinks(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return;
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (ownerType != null) {
-            TameworkOwnerComponent owner = store.getComponent(npcRef, ownerType);
-            if (owner != null && (owner.getOwnerId() != null || owner.getOwnerName() != null)) {
-                owner.setOwnerId(null);
-                owner.setOwnerName(null);
-                store.putComponent(npcRef, ownerType, owner);
-            }
-        }
-
-        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
-        if (tamedType != null) {
-            TameworkTamedComponent tamed = store.getComponent(npcRef, tamedType);
-            if (tamed != null && tamed.isTamed()) {
-                tamed.setTamed(false);
-                store.putComponent(npcRef, tamedType, tamed);
-            }
-        }
-
-        clearNpcCommandLinks(npcRef, store);
-    }
-
-    private void clearNpcCommandLinks(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return;
-        }
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType == null) {
-            return;
-        }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
-        if (links == null) {
-            return;
-        }
-        links.setOwnerId(null);
-        links.setToolIds(new String[0]);
-        links.setHomePosition(null);
-        store.putComponent(npcRef, linksType, links);
-    }
-
-    private void removeNpcFromAllCommandToolRecords(Player player, UUID npcUuid) {
-        if (player == null || npcUuid == null) {
-            return;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
-            return;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        short capacity = hotbar.getCapacity();
-        boolean changed = false;
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack stack = hotbar.getItemStack(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-            if (stackToolId == null || stackToolId.isBlank()) {
-                continue;
-            }
-            ItemStack updated = linkMutationService.removeLinkedNpcRecord(stack, npcUuid);
-            if (updated == stack) {
-                continue;
-            }
-            hotbar.setItemStackForSlot(slot, updated);
-            changed = true;
-        }
-        if (!changed) {
-            return;
-        }
-    }
-
-    private void trySetReleaseState(Ref<EntityStore> npcRef,
-                                    NPCEntity npc,
-                                    Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || npc == null || store == null) {
-            return;
-        }
-        for (String state : RELEASE_STATE_CANDIDATES) {
-            if (state == null || state.isBlank()) {
-                continue;
-            }
-            if (stepExecutionService.applyState(npcRef, npc, store, state, null)) {
-                return;
-            }
-            if (!state.startsWith("$") && stepExecutionService.applyState(npcRef, npc, store, "$" + state, null)) {
-                return;
-            }
-        }
-    }
-
-    private void applyMenuRespawn(Player player,
-                                  String toolId,
-                                  UUID npcUuid) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return;
-        }
-        if (deathService == null && lostService == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.trackingUnavailable");
-            return;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
-            return;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        short capacity = hotbar.getCapacity();
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack stack = hotbar.getItemStack(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-            if (stackToolId == null || !stackToolId.equals(toolId)) {
-                continue;
-            }
-            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
-            if (record == null) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
-                return;
-            }
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
-                    deathService != null ? deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) : null;
-            if (deadSnapshot != null) {
-                String roleId = deadSnapshot.roleId();
-                if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
-                    roleId = record.cachedRoleId;
-                }
-                TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-                if (!TameworkRuntimeSettings.reviveSystemEnabled(companionSettings.isDeadRespawnEnabled())) {
-                    feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.disabled");
-                    return;
-                }
-                long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
-                if (remainingMs > 0L) {
-                    feedbackService.showWarningKey(
-                            player,
-                            "tamework.ui.notifications.command.respawn.cooldownRemaining",
-                            formatDuration(player, remainingMs)
-                    );
-                    return;
-                }
-                double safeSpawnDistance = resolvePositiveDouble(
-                        companionSettings.getRecallSafeSpawnDistance(),
-                        RECALL_SAFE_SPAWN_DISTANCE
-                );
-                long followRetryDelayMs = resolvePositiveLong(
-                        companionSettings.getDeadRespawnFollowRetryDelayMs(),
-                        RESPAWN_FOLLOW_RETRY_DELAY_MS
-                );
-                ItemStack updatedStack = respawnService.respawnDeadLinkedNpc(
-                        player,
-                        playerRef,
-                        store,
-                        toolId,
-                        stack,
-                        record,
-                        deadSnapshot,
-                        safeSpawnDistance,
-                        followRetryDelayMs
-                );
-                if (updatedStack == null) {
-                    feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.failed");
-                    return;
-                }
-                hotbar.setItemStackForSlot(slot, updatedStack);
-                String name = deadSnapshot.displayName();
-                if (name == null || name.isBlank()) {
-                    name = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultCompanionName");
-                }
-                feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.respawn.success", name);
-                return;
-            }
-            if (lostService == null || !lostService.isLost(npcUuid)) {
-                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.notDeadOrLost");
-                return;
-            }
-            String roleId = record.cachedRoleId;
-            TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-            double safeSpawnDistance = resolvePositiveDouble(
-                    companionSettings.getRecallSafeSpawnDistance(),
-                    RECALL_SAFE_SPAWN_DISTANCE
-            );
-            CommandLostRecoveryService.Result recoveryResult = lostRecoveryService.recoverLostLinkedNpc(
-                    player,
-                    playerRef,
-                    store,
-                    toolId,
-                    stack,
-                    record,
-                    safeSpawnDistance
-            );
-            if (!recoveryResult.isSuccess()) {
-                String errorMessage = recoveryResult.errorMessage();
-                if (errorMessage == null || errorMessage.isBlank()) {
-                    errorMessage = LocalizedText.resolve(player, "tamework.ui.notifications.command.respawn.recoverFailed");
-                }
-                feedbackService.showWarning(player, errorMessage);
-                return;
-            }
-            hotbar.setItemStackForSlot(slot, recoveryResult.updatedStack());
-            String recoveredName = recoveryResult.recoveredName();
-            if (recoveredName == null || recoveredName.isBlank()) {
-                recoveredName = record.cachedDisplayName;
-            }
-            if (recoveredName == null || recoveredName.isBlank()) {
-                recoveredName = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultCompanionName");
-            }
-            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.respawn.recovered", recoveredName);
             return;
         }
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
@@ -1644,16 +1334,6 @@ public final class CommandItemFeatureHandler {
         return null;
     }
 
-    private String formatDuration(Player player, long remainingMs) {
-        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        if (minutes <= 0L) {
-            return LocalizedText.format(player, "tamework.ui.shared.duration.seconds", seconds);
-        }
-        return LocalizedText.format(player, "tamework.ui.shared.duration.minutesSeconds", minutes, seconds);
-    }
-
     private ItemStack findCommandToolStack(Player player, String toolId) {
         return toolInventoryService.findToolStack(player, toolId);
     }
@@ -1732,6 +1412,47 @@ public final class CommandItemFeatureHandler {
 
     private boolean updateHeldItem(Player player, ItemStack updated) {
         return toolInventoryService.updateHeldItem(player, updated);
+    }
+
+    private void handleDeferredLink(Player player,
+                                    Store<EntityStore> store,
+                                    Ref<EntityStore> targetRef,
+                                    String toolId,
+                                    TwCommandItemConfig config) {
+        LinkToggleResult[] resultHolder = new LinkToggleResult[1];
+        boolean mutated = toolInventoryService.mutateToolStack(player, toolId, stack -> {
+            LinkToggleResult result = linkMutationService.tryToggleLink(
+                    player,
+                    store,
+                    targetRef,
+                    toolId,
+                    config,
+                    stack,
+                    null
+            );
+            resultHolder[0] = result;
+            return result != null && result.updatedItem != null ? result.updatedItem : stack;
+        });
+        LinkToggleResult result = resultHolder[0];
+        if (!mutated || result == null || !result.toggled || result.updatedItem == null) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.failed");
+            return;
+        }
+        if (result.linked && !result.active) {
+            feedbackService.showSuccessKey(
+                    player,
+                    "tamework.ui.notifications.command.link.successInactive",
+                    result.npcName
+            );
+            return;
+        }
+        feedbackService.showSuccessKey(
+                player,
+                result.linked
+                        ? "tamework.ui.notifications.command.link.success"
+                        : "tamework.ui.notifications.command.link.unlinked",
+                result.npcName
+        );
     }
 
     private record LoadedCompanionTalentContext(@Nonnull Ref<EntityStore> npcRef,

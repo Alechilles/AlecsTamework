@@ -15,9 +15,17 @@ public final class ClaimPopulationSnapshotService {
                                             @Nonnull ClaimResolution target,
                                             @Nonnull ClaimLookupSession lookupSession) {
         Objects.requireNonNull(index, "index");
+        return snapshot(index.snapshot(), target, lookupSession);
+    }
+
+    /** Builds a claim view from one caller-owned immutable occupancy snapshot. */
+    @Nonnull
+    public ClaimPopulationSnapshot snapshot(@Nonnull ClaimOccupancySnapshot occupancy,
+                                            @Nonnull ClaimResolution target,
+                                            @Nonnull ClaimLookupSession lookupSession) {
+        Objects.requireNonNull(occupancy, "occupancy");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(lookupSession, "lookupSession");
-        ClaimOccupancySnapshot occupancy = index.snapshot();
         return switch (target.status()) {
             case NO_CLAIM -> result(
                     ClaimPopulationSnapshot.Status.NO_CLAIM, null, null, Set.of(), occupancy.revision(), null
@@ -78,6 +86,9 @@ public final class ClaimPopulationSnapshotService {
                                                                 @Nonnull ClaimLookupSession lookupSession) {
         LinkedHashSet<String> profiles = new LinkedHashSet<>();
         for (Map.Entry<ClaimChunkCoordinate, Set<String>> entry : occupancy.profilesByChunk().entrySet()) {
+            if (!targetKey.worldName().equals(entry.getKey().worldName())) {
+                continue;
+            }
             ClaimResolution resolved = lookupSession.resolveChunk(entry.getKey());
             if (resolved.status() == ClaimLookupResult.Status.UNAVAILABLE) {
                 return result(

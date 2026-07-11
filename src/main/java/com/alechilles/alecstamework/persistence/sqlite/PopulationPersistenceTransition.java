@@ -68,6 +68,7 @@ public final class PopulationPersistenceTransition {
     public enum ResultStatus {
         PREPARED,
         COMMITTED,
+        SOURCE_FINALIZATION_PENDING,
         IDEMPOTENT,
         REVISION_CONFLICT,
         IDENTITY_CONFLICT,
@@ -82,6 +83,7 @@ public final class PopulationPersistenceTransition {
         public boolean isSuccess() {
             return status == ResultStatus.PREPARED
                     || status == ResultStatus.COMMITTED
+                    || status == ResultStatus.SOURCE_FINALIZATION_PENDING
                     || status == ResultStatus.IDEMPOTENT;
         }
     }

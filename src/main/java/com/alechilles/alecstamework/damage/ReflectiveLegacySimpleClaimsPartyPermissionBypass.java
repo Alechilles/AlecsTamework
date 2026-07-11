@@ -33,15 +33,19 @@ final class ReflectiveLegacySimpleClaimsPartyPermissionBypass
     private final String unavailableReason;
 
     ReflectiveLegacySimpleClaimsPartyPermissionBypass(@Nonnull SimpleClaimsBreedingBridge bridge) {
+        this(bridge, ReflectiveLegacySimpleClaimsPartyPermissionBypass.class.getClassLoader());
+    }
+
+    ReflectiveLegacySimpleClaimsPartyPermissionBypass(@Nonnull SimpleClaimsBreedingBridge bridge,
+                                                       @Nonnull ClassLoader classLoader) {
         this.bridge = bridge;
         Method resolvedGetInstance = null;
         Method resolvedGetPartyById = null;
         Method resolvedHasPartyPermission = null;
         String failure = null;
         try {
-            ClassLoader loader = ReflectiveLegacySimpleClaimsPartyPermissionBypass.class.getClassLoader();
-            Class<?> managerType = Class.forName(MANAGER_CLASS, false, loader);
-            Class<?> partyType = Class.forName(PARTY_CLASS, false, loader);
+            Class<?> managerType = Class.forName(MANAGER_CLASS, false, classLoader);
+            Class<?> partyType = Class.forName(PARTY_CLASS, false, classLoader);
             resolvedGetInstance = managerType.getMethod("getInstance");
             resolvedGetPartyById = managerType.getMethod("getPartyById", UUID.class);
             resolvedHasPartyPermission = partyType.getMethod("hasPartyPermission", UUID.class, String.class);

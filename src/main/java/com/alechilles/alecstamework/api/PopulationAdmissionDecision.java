@@ -54,6 +54,7 @@ public record PopulationAdmissionDecision(@Nonnull Status status,
         APPLYING,
         COMMITTED,
         CANCELED,
+        DEGRADED,
         DENIED,
         UNAVAILABLE
     }

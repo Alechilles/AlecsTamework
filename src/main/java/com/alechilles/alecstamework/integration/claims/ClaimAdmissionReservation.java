@@ -25,6 +25,7 @@ public final class ClaimAdmissionReservation {
     private final ClaimLookupResult.Status topologyStatus;
     private final boolean topologyCheckRequired;
     private final long reservedSlots;
+    private final long expiresAtMonotonicNanos;
     private volatile State state = State.RESERVED;
 
     ClaimAdmissionReservation(@Nonnull UUID tokenId,
@@ -32,7 +33,8 @@ public final class ClaimAdmissionReservation {
                               @Nonnull ClaimAdmissionRequest request,
                               @Nullable ClaimResolution target,
                               boolean topologyCheckRequired,
-                              long reservedSlots) {
+                              long reservedSlots,
+                              long expiresAtMonotonicNanos) {
         this.tokenId = Objects.requireNonNull(tokenId, "tokenId");
         this.authority = Objects.requireNonNull(authority, "authority");
         this.operation = request.operation();
@@ -48,6 +50,7 @@ public final class ClaimAdmissionReservation {
         this.topologyStatus = target == null ? null : target.status();
         this.topologyCheckRequired = topologyCheckRequired;
         this.reservedSlots = Math.max(0L, reservedSlots);
+        this.expiresAtMonotonicNanos = expiresAtMonotonicNanos;
     }
 
     @Nonnull
@@ -102,6 +105,11 @@ public final class ClaimAdmissionReservation {
         return reservedSlots;
     }
 
+    /** Monotonic deadline captured by the reservation authority. */
+    public long expiresAtMonotonicNanos() {
+        return expiresAtMonotonicNanos;
+    }
+
     @Nonnull
     public State state() {
         return state;
@@ -115,7 +123,7 @@ public final class ClaimAdmissionReservation {
         return topologyStatus;
     }
 
-    boolean topologyCheckRequired() {
+    public boolean topologyCheckRequired() {
         return topologyCheckRequired;
     }
 

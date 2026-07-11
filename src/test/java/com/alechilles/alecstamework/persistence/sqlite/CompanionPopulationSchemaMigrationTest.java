@@ -20,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPopulationSchemaMigrationTest {
+    private static final int RESERVED_SCHEMA_VERSION_V5 = 5;
+
     @TempDir
     Path tempDir;
 
@@ -37,7 +39,8 @@ class CompanionPopulationSchemaMigrationTest {
                     Set.of(
                             "companion_population_state",
                             "companion_population_operations",
-                            "companion_population_reconciliation"
+                            "companion_population_reconciliation",
+                            "companion_population_reconciliation_evidence"
                     ),
                     existingTables(connection)
             );
@@ -47,6 +50,26 @@ class CompanionPopulationSchemaMigrationTest {
             assertTrue(indexes.contains("idx_companion_population_operations_state"));
             assertTrue(indexes.contains("uq_companion_population_nonterminal_profile"));
             assertTrue(indexes.contains("idx_companion_population_reconciliation_state"));
+            assertTrue(indexes.contains("idx_companion_population_evidence_identity"));
+            assertTrue(indexes.contains("idx_companion_population_evidence_source"));
+        }
+    }
+
+    @Test
+    void repeatV6MigrationRepairsDatabasesThatPredateDurableEvidenceStaging() throws Exception {
+        SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve("v6-evidence-repair.sqlite"));
+        SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
+        try (Connection connection = connections.openConnection(); Statement statement = connection.createStatement()) {
+            migrator.migrate(connection);
+            statement.execute("DROP TABLE companion_population_reconciliation_evidence");
+
+            assertFalse(tableExists(connection, "companion_population_reconciliation_evidence"));
+            assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V6));
+
+            migrator.migrate(connection);
+
+            assertTrue(tableExists(connection, "companion_population_reconciliation_evidence"));
+            assertTrue(existingIndexes(connection).contains("idx_companion_population_evidence_identity"));
         }
     }
 
@@ -145,11 +168,82 @@ class CompanionPopulationSchemaMigrationTest {
         }
     }
 
+    @Test
+    void everySupportedPriorSchemaUpgradesThroughV6WithoutLosingProfiles() throws Exception {
+        for (int priorVersion : new int[]{2, 3, 4, RESERVED_SCHEMA_VERSION_V5}) {
+            SqliteConnectionManager connections = new SqliteConnectionManager(
+                    tempDir.resolve("upgrade-v" + priorVersion + ".sqlite")
+            );
+            SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
+            try (Connection connection = connections.openConnection()) {
+                migrator.migrateThrough(connection, priorVersion);
+                String profileId = insertProfile(connection);
+                String ownerUuid = UUID.randomUUID().toString();
+                String worldName = "world-v" + priorVersion;
+                setProfileOwnership(connection, profileId, ownerUuid, worldName);
+                if (priorVersion == RESERVED_SCHEMA_VERSION_V5) {
+                    installReservedV5Fixture(connection, migrator);
+                }
+
+                migrator.migrate(connection);
+
+                assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V2));
+                assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V3));
+                assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V4));
+                assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V6));
+                assertEquals(
+                        priorVersion == RESERVED_SCHEMA_VERSION_V5,
+                        migrator.isVersionApplied(connection, RESERVED_SCHEMA_VERSION_V5)
+                );
+                assertBackfilledProfile(connection, profileId, worldName);
+                assertEquals(ownerUuid, profileOwner(connection, profileId));
+                if (priorVersion == RESERVED_SCHEMA_VERSION_V5) {
+                    assertEquals("schema_v5_external_fixture", migrationName(
+                            connection, RESERVED_SCHEMA_VERSION_V5
+                    ));
+                    assertEquals(1, scalarInt(connection, "SELECT fixture_value FROM coop_v5_integrity_marker"));
+                }
+            }
+        }
+    }
+
+    @Test
+    void v6CoordinatesWithBothPresentAndAbsentReservedV5MarkerAndTable() throws Exception {
+        SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
+        for (boolean v5Present : new boolean[]{false, true}) {
+            SqliteConnectionManager connections = new SqliteConnectionManager(
+                    tempDir.resolve("v5-" + (v5Present ? "present" : "absent") + ".sqlite")
+            );
+            try (Connection connection = connections.openConnection()) {
+                migrator.migrateThrough(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V4);
+                if (v5Present) {
+                    installReservedV5Fixture(connection, migrator);
+                }
+
+                migrator.migrate(connection);
+
+                assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V6));
+                assertEquals(
+                        v5Present,
+                        migrator.isVersionApplied(connection, RESERVED_SCHEMA_VERSION_V5)
+                );
+                assertEquals(v5Present, tableExists(connection, "coop_v5_integrity_marker"));
+                if (v5Present) {
+                    assertEquals("schema_v5_external_fixture", migrationName(
+                            connection, RESERVED_SCHEMA_VERSION_V5
+                    ));
+                    assertEquals(1, scalarInt(connection, "SELECT fixture_value FROM coop_v5_integrity_marker"));
+                }
+            }
+        }
+    }
+
     private static Set<String> existingTables(Connection connection) throws Exception {
         Set<String> wanted = Set.of(
                 "companion_population_state",
                 "companion_population_operations",
-                "companion_population_reconciliation"
+                "companion_population_reconciliation",
+                "companion_population_reconciliation_evidence"
         );
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
@@ -163,6 +257,103 @@ class CompanionPopulationSchemaMigrationTest {
                 }
             }
             return names.build().collect(Collectors.toSet());
+        }
+    }
+
+    private static void installReservedV5Fixture(
+            Connection connection,
+            SqliteSchemaMigrator migrator
+    ) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE coop_v5_integrity_marker (fixture_value INTEGER NOT NULL)");
+            statement.execute("INSERT INTO coop_v5_integrity_marker (fixture_value) VALUES (1)");
+        }
+        migrator.recordMigration(
+                connection,
+                RESERVED_SCHEMA_VERSION_V5,
+                "schema_v5_external_fixture"
+        );
+    }
+
+    private static void setProfileOwnership(
+            Connection connection,
+            String profileId,
+            String ownerUuid,
+            String worldName
+    ) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE npc_profiles SET owner_uuid = ?, last_world_name = ? WHERE profile_id = ?"
+        )) {
+            statement.setString(1, ownerUuid);
+            statement.setString(2, worldName);
+            statement.setString(3, profileId);
+            assertEquals(1, statement.executeUpdate());
+        }
+    }
+
+    private static void assertBackfilledProfile(
+            Connection connection,
+            String profileId,
+            String worldName
+    ) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT ownership_world_name, lifecycle_state, source
+                FROM companion_population_state
+                WHERE profile_id = ?
+                """
+        )) {
+            statement.setString(1, profileId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                assertEquals(worldName, resultSet.getString("ownership_world_name"));
+                assertEquals("UNKNOWN_DORMANT", resultSet.getString("lifecycle_state"));
+                assertEquals("schema_v6_legacy_backfill", resultSet.getString("source"));
+                assertFalse(resultSet.next());
+            }
+        }
+    }
+
+    private static String profileOwner(Connection connection, String profileId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT owner_uuid FROM npc_profiles WHERE profile_id = ?"
+        )) {
+            statement.setString(1, profileId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                return resultSet.getString(1);
+            }
+        }
+    }
+
+    private static String migrationName(Connection connection, int version) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT name FROM schema_migrations WHERE version = ?"
+        )) {
+            statement.setInt(1, version);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                return resultSet.getString(1);
+            }
+        }
+    }
+
+    private static int scalarInt(Connection connection, String sql) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            assertTrue(resultSet.next());
+            return resultSet.getInt(1);
+        }
+    }
+
+    private static boolean tableExists(Connection connection, String tableName) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?"
+        )) {
+            statement.setString(1, tableName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
         }
     }
 

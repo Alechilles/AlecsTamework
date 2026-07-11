@@ -7,6 +7,9 @@ import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
 import com.alechilles.alecstamework.persistence.sqlite.ProfileOwnerMutation;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +26,7 @@ public final class OwnerPopulationAdmissionCoordinator {
     private final OwnerPopulationIndex index;
     private final CompanionPopulationRepository repository;
     private final PersistenceHealthService persistenceHealth;
+    private final OwnerPopulationJournalTerminality terminality;
 
     public OwnerPopulationAdmissionCoordinator(@Nonnull OwnerPopulationIndex index,
                                                @Nonnull CompanionPopulationRepository repository,
@@ -30,10 +34,20 @@ public final class OwnerPopulationAdmissionCoordinator {
         this.index = Objects.requireNonNull(index, "index");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
+        this.terminality = new OwnerPopulationJournalTerminality(index, persistenceHealth);
     }
 
     @Nonnull
     public CompletableFuture<OwnerPopulationPreparationResult> prepareAsync(
+            @Nonnull OwnerPopulationAdmissionPlan plan
+    ) {
+        OwnerPopulationReservationPreparation reservation = reserveInMemory(plan);
+        return prepareReservedAsync(reservation);
+    }
+
+    /** Performs only the short in-memory compare/headroom/reservation phase. */
+    @Nonnull
+    OwnerPopulationReservationPreparation reserveInMemory(
             @Nonnull OwnerPopulationAdmissionPlan plan
     ) {
         Objects.requireNonNull(plan, "plan");
@@ -46,28 +60,69 @@ public final class OwnerPopulationAdmissionCoordinator {
                     original,
                     "owner-population-persistence-degraded"
             );
-            return CompletableFuture.completedFuture(
-                    new OwnerPopulationPreparationResult(false, denied.reason(), denied, null)
+            return new OwnerPopulationReservationPreparation(
+                    false,
+                    denied.reason(),
+                    plan,
+                    denied
             );
         }
 
         OwnerPopulationDecision decision = index.reserve(plan.transition());
         if (!decision.allowed()) {
-            return CompletableFuture.completedFuture(
-                    new OwnerPopulationPreparationResult(false, decision.reason(), decision, null)
+            return new OwnerPopulationReservationPreparation(
+                    false,
+                    decision.reason(),
+                    plan,
+                    decision
             );
         }
+        return new OwnerPopulationReservationPreparation(true, decision.reason(), plan, decision);
+    }
+
+    /** Submits durability only after any outer combined reservation mutex has been released. */
+    @Nonnull
+    CompletableFuture<OwnerPopulationPreparationResult> prepareReservedAsync(
+            @Nonnull OwnerPopulationReservationPreparation reserved
+    ) {
+        Objects.requireNonNull(reserved, "reserved");
+        if (!reserved.allowed()) {
+            return CompletableFuture.completedFuture(new OwnerPopulationPreparationResult(
+                    false,
+                    reserved.reason(),
+                    reserved.decision(),
+                    null
+            ));
+        }
+        OwnerPopulationAdmissionPlan plan = reserved.plan();
+        OwnerPopulationDecision decision = reserved.decision();
         UUID operationId = decision.reservation().tokenId();
         PopulationPersistenceTransition.Prepare persistencePrepare =
                 new PopulationPersistenceTransition.Prepare(
                         operationRecord(operationId, plan),
                         plan.baselineState()
                 );
-        PersistenceWriteQueue.WriteSubmission<PopulationPersistenceTransition.Result> submission =
-                repository.prepareAsync(persistencePrepare);
-        return submission.completion().thenCompose(outcome ->
-                finishPreparation(plan, decision, operationId, outcome)
-        );
+        try {
+            PersistenceWriteQueue.WriteSubmission<PopulationPersistenceTransition.Result> submission =
+                    repository.prepareAsync(persistencePrepare);
+            if (submission == null || submission.completion() == null) {
+                return terminality.preparationStartFailed(
+                        decision, "owner-population-prepare-stage-missing"
+                );
+            }
+            return submission.completion().handle((outcome, failure) -> {
+                if (failure != null || outcome == null) {
+                    return terminality.preparationStartFailed(
+                            decision, "owner-population-prepare-completion-failed"
+                    );
+                }
+                return finishPreparation(plan, decision, operationId, outcome);
+            }).thenCompose(result -> result);
+        } catch (RuntimeException | LinkageError failure) {
+            return terminality.preparationStartFailed(
+                    decision, "owner-population-prepare-start-failed"
+            );
+        }
     }
 
     /**
@@ -77,6 +132,10 @@ public final class OwnerPopulationAdmissionCoordinator {
                                  long currentSettingsRevision,
                                  @Nonnull ClaimProviderGeneration currentProviderGeneration) {
         Objects.requireNonNull(prepared, "prepared");
+        if (!persistenceHealth.isHealthy()) {
+            cancelAsync(prepared, "owner-population-persistence-degraded-before-apply");
+            return false;
+        }
         ClaimProviderGeneration generation = currentProviderGeneration == null
                 ? ClaimProviderGeneration.NONE
                 : currentProviderGeneration;
@@ -94,8 +153,7 @@ public final class OwnerPopulationAdmissionCoordinator {
         if (index.claimForApply(prepared.reservation())) {
             return true;
         }
-        prepared.setState(PreparedOwnerPopulationAdmission.State.CANCELED);
-        closeApplyingJournal(prepared.operationId(), "owner-population-reservation-expired");
+        cancelAsync(prepared, "owner-population-reservation-expired");
         return false;
     }
 
@@ -119,7 +177,10 @@ public final class OwnerPopulationAdmissionCoordinator {
         }
         if (!index.commit(prepared.reservation())) {
             prepared.setState(PreparedOwnerPopulationAdmission.State.CANCELED);
-            closeApplyingJournal(prepared.operationId(), "owner-population-index-commit-failed");
+            terminality.degrade("owner_population_index_commit_failed");
+            terminality.observeJournalClose(closeApplyingJournal(
+                    prepared.operationId(), "owner-population-index-commit-failed"
+            ), "owner_population_index_failure_journal_close_failed");
             return CompletableFuture.completedFuture(new OwnerPopulationCommitResult(
                     OwnerPopulationCommitResult.Status.INDEX_COMMIT_FAILED,
                     "owner-population-index-commit-failed",
@@ -129,9 +190,69 @@ public final class OwnerPopulationAdmissionCoordinator {
 
         PopulationPersistenceTransition.Commit persistenceCommit =
                 persistenceCommit(prepared.operationId(), prepared.plan());
-        return repository.commitAsync(persistenceCommit).completion().thenApply(outcome ->
-                finishCommit(prepared, outcome)
-        );
+        try {
+            PersistenceWriteQueue.WriteSubmission<PopulationPersistenceTransition.Result> submission =
+                    repository.commitAsync(persistenceCommit);
+            if (submission == null || submission.completion() == null) {
+                return terminality.commitStartFailed(
+                        prepared, "owner-population-commit-stage-missing"
+                );
+            }
+            return submission.completion().handle((outcome, failure) ->
+                    failure == null && outcome != null
+                            ? finishCommit(prepared, outcome)
+                            : terminality.commitStartFailedResult(
+                                    prepared, "owner-population-commit-completion-failed"
+                            )
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            return terminality.commitStartFailed(
+                    prepared, "owner-population-commit-start-failed"
+            );
+        }
+    }
+
+    /** Marks a source-bearing population transition terminal after its exact source CAS succeeds. */
+    @Nonnull
+    public CompletableFuture<Boolean> completeSourceFinalizationAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared
+    ) {
+        Objects.requireNonNull(prepared, "prepared");
+        final CompletableFuture<Boolean> completion;
+        synchronized (prepared) {
+            CompletableFuture<Boolean> existing = prepared.sourceFinalizationCompletion();
+            if (existing != null) {
+                return existing;
+            }
+            if (prepared.state() == PreparedOwnerPopulationAdmission.State.COMMITTED) {
+                return CompletableFuture.completedFuture(true);
+            }
+            if (!prepared.transition(
+                    PreparedOwnerPopulationAdmission.State.SOURCE_FINALIZATION_PENDING,
+                    PreparedOwnerPopulationAdmission.State.SOURCE_FINALIZING
+            )) {
+                return CompletableFuture.completedFuture(false);
+            }
+            completion = new CompletableFuture<>();
+            prepared.sourceFinalizationCompletion(completion);
+        }
+        try {
+            PersistenceWriteQueue.WriteSubmission<Boolean> submission =
+                    repository.completeSourceFinalizationAsync(prepared.operationId().toString());
+            if (submission == null || submission.completion() == null) {
+                finishSourceFinalization(prepared, completion, false);
+            } else {
+                submission.completion().whenComplete((outcome, failure) -> finishSourceFinalization(
+                        prepared,
+                        completion,
+                        failure == null && outcome != null && outcome.isCommitted()
+                                && Boolean.TRUE.equals(outcome.value())
+                ));
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            finishSourceFinalization(prepared, completion, false);
+        }
+        return completion;
     }
 
     /**
@@ -144,14 +265,52 @@ public final class OwnerPopulationAdmissionCoordinator {
         String normalizedReason = reason == null || reason.isBlank()
                 ? "owner-population-canceled"
                 : reason.trim();
-        PreparedOwnerPopulationAdmission.State current = prepared.state();
-        if ((current != PreparedOwnerPopulationAdmission.State.PREPARED
-                && current != PreparedOwnerPopulationAdmission.State.APPLYING)
-                || !prepared.transition(current, PreparedOwnerPopulationAdmission.State.CANCELED)) {
-            return CompletableFuture.completedFuture(false);
+        CompletableFuture<Boolean> completion;
+        synchronized (prepared) {
+            CompletableFuture<Boolean> existing = prepared.cancellationCompletion();
+            if (existing != null) {
+                return existing;
+            }
+            PreparedOwnerPopulationAdmission.State current = prepared.state();
+            if (current == PreparedOwnerPopulationAdmission.State.CANCELED) {
+                return CompletableFuture.completedFuture(true);
+            }
+            if ((current != PreparedOwnerPopulationAdmission.State.PREPARED
+                    && current != PreparedOwnerPopulationAdmission.State.APPLYING)
+                    || !prepared.transition(current, PreparedOwnerPopulationAdmission.State.CANCELED)) {
+                return CompletableFuture.completedFuture(false);
+            }
+            completion = new CompletableFuture<>();
+            prepared.cancellationCompletion(completion);
         }
-        index.cancel(prepared.reservation());
-        return closeApplyingJournal(prepared.operationId(), normalizedReason);
+        final boolean indexCanceled;
+        final CompletableFuture<Boolean> close;
+        try {
+            indexCanceled = index.cancel(prepared.reservation());
+            close = closeApplyingJournal(prepared.operationId(), normalizedReason);
+        } catch (RuntimeException | LinkageError failure) {
+            terminality.degrade("owner_population_cancel_start_failed");
+            completion.complete(false);
+            return completion;
+        }
+        close.whenComplete((closed, failure) -> {
+            boolean success = indexCanceled && failure == null && Boolean.TRUE.equals(closed);
+            if (!success) {
+                terminality.degrade("owner_population_cancel_journal_close_failed");
+            }
+            completion.complete(success);
+        });
+        return completion;
+    }
+
+    /** Fails positive owner admissions closed after a post-apply accounting failure. */
+    void markReadinessDegraded(@Nonnull String reason) {
+        terminality.degrade(reason);
+    }
+
+    /** Quarantines new admissions without poisoning persistence needed to finish in-flight work. */
+    void markAdmissionReadinessDegraded() {
+        index.setReadiness(OwnerPopulationReadiness.DEGRADED);
     }
 
     @Nonnull
@@ -173,21 +332,42 @@ public final class OwnerPopulationAdmissionCoordinator {
                     new OwnerPopulationPreparationResult(false, denied.reason(), denied, null)
             );
         }
-        PersistenceWriteQueue.WriteSubmission<Boolean> applying = repository.advanceOperationAsync(
-                operationId.toString(),
-                CompanionPopulationOperationRecord.State.PREPARED,
-                CompanionPopulationOperationRecord.State.APPLYING,
-                null
-        );
-        return applying.completion().thenApply(advanceOutcome -> {
+        final PersistenceWriteQueue.WriteSubmission<Boolean> applying;
+        try {
+            applying = repository.advanceOperationAsync(
+                    operationId.toString(),
+                    CompanionPopulationOperationRecord.State.PREPARED,
+                    CompanionPopulationOperationRecord.State.APPLYING,
+                    null
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            index.cancel(decision.reservation());
+            terminality.degrade("owner_population_journal_apply_start_failed");
+            return CompletableFuture.completedFuture(terminality.deniedPreparation(
+                    decision, "owner-population-prepare-finalize-failed"
+            ));
+        }
+        if (applying == null || applying.completion() == null) {
+            index.cancel(decision.reservation());
+            terminality.degrade("owner_population_journal_apply_stage_missing");
+            return CompletableFuture.completedFuture(terminality.deniedPreparation(
+                    decision, "owner-population-prepare-finalize-failed"
+            ));
+        }
+        return applying.completion().handle((advanceOutcome, failure) -> {
+            if (failure != null || advanceOutcome == null) {
+                index.cancel(decision.reservation());
+                terminality.degrade("owner_population_journal_apply_failed");
+                return terminality.deniedPreparation(
+                        decision, "owner-population-prepare-finalize-failed"
+                );
+            }
             if (!advanceOutcome.isCommitted() || !Boolean.TRUE.equals(advanceOutcome.value())) {
                 index.cancel(decision.reservation());
-                persistenceHealth.markDegraded("owner_population_journal_apply_failed");
-                OwnerPopulationDecision denied = deniedWithoutReservation(
-                        decision,
-                        "owner-population-prepare-finalize-failed"
+                terminality.degrade("owner_population_journal_apply_failed");
+                return terminality.deniedPreparation(
+                        decision, "owner-population-prepare-finalize-failed"
                 );
-                return new OwnerPopulationPreparationResult(false, denied.reason(), denied, null);
             }
             PreparedOwnerPopulationAdmission prepared =
                     new PreparedOwnerPopulationAdmission(operationId, plan, decision);
@@ -206,8 +386,16 @@ public final class OwnerPopulationAdmissionCoordinator {
             @Nonnull PersistenceWriteQueue.WriteOutcome<PopulationPersistenceTransition.Result> outcome
     ) {
         PopulationPersistenceTransition.Result result = outcome.value();
-        if (outcome.isCommitted()
-                && result != null
+        if (outcome.isCommitted() && result != null
+                && result.status() == PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING) {
+            prepared.setState(PreparedOwnerPopulationAdmission.State.SOURCE_FINALIZATION_PENDING);
+            return new OwnerPopulationCommitResult(
+                    OwnerPopulationCommitResult.Status.SOURCE_FINALIZATION_PENDING,
+                    "owner-population-source-finalization-pending",
+                    result
+            );
+        }
+        if (outcome.isCommitted() && result != null
                 && (result.status() == PopulationPersistenceTransition.ResultStatus.COMMITTED
                 || result.status() == PopulationPersistenceTransition.ResultStatus.IDEMPOTENT)) {
             prepared.setState(PreparedOwnerPopulationAdmission.State.COMMITTED);
@@ -217,7 +405,7 @@ public final class OwnerPopulationAdmissionCoordinator {
                     result
             );
         }
-        persistenceHealth.markDegraded("owner_population_final_durability_failed");
+        terminality.degrade("owner_population_final_durability_failed");
         prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
         return new OwnerPopulationCommitResult(
                 OwnerPopulationCommitResult.Status.PERSISTENCE_DEGRADED,
@@ -226,18 +414,42 @@ public final class OwnerPopulationAdmissionCoordinator {
         );
     }
 
+    private void finishSourceFinalization(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull CompletableFuture<Boolean> completion,
+            boolean succeeded
+    ) {
+        if (succeeded) {
+            prepared.setState(PreparedOwnerPopulationAdmission.State.COMMITTED);
+        } else {
+            prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
+            terminality.degrade("owner_population_source_finalization_commit_failed");
+        }
+        completion.complete(succeeded);
+    }
+
     @Nonnull
     private CompletableFuture<Boolean> closeApplyingJournal(@Nonnull UUID operationId,
                                                             @Nonnull String reason) {
-        PersistenceWriteQueue.WriteSubmission<Boolean> close = repository.advanceOperationAsync(
-                operationId.toString(),
-                CompanionPopulationOperationRecord.State.APPLYING,
-                CompanionPopulationOperationRecord.State.FAILED,
-                reason
-        );
-        return close.completion().thenApply(outcome ->
-                outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())
-        );
+        try {
+            PersistenceWriteQueue.WriteSubmission<Boolean> close = repository.advanceOperationAsync(
+                    operationId.toString(),
+                    CompanionPopulationOperationRecord.State.APPLYING,
+                    CompanionPopulationOperationRecord.State.FAILED,
+                    reason
+            );
+            if (close == null || close.completion() == null) {
+                return CompletableFuture.completedFuture(false);
+            }
+            return close.completion().handle((outcome, failure) ->
+                    failure == null
+                            && outcome != null
+                            && outcome.isCommitted()
+                            && Boolean.TRUE.equals(outcome.value())
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(false);
+        }
     }
 
     @Nonnull
@@ -252,14 +464,44 @@ public final class OwnerPopulationAdmissionCoordinator {
                 plan.transition().operation().name(),
                 CompanionPopulationOperationRecord.State.PREPARED,
                 plan.baselineState().revision(),
-                plan.oldStateJson(),
-                plan.newStateJson(),
+                recoveryStateJson(
+                        plan.oldStateJson(),
+                        plan.baselineState().ownerUuid(),
+                        plan.baselineState().lifecycleState(),
+                        plan.baselineState().ownershipWorldName()
+                ),
+                recoveryStateJson(
+                        plan.newStateJson(),
+                        plan.transition().newOwnerId(),
+                        plan.transition().lifecycleState().name(),
+                        plan.transition().destinationWorldName()
+                ),
                 plan.targetContextJson(),
                 now,
                 now,
                 0L,
                 null
         );
+    }
+
+    @Nonnull
+    private static String recoveryStateJson(@Nonnull String original,
+                                            @Nullable UUID ownerUuid,
+                                            @Nonnull String lifecycleState,
+                                            @Nullable String ownershipWorldName) {
+        JsonObject json = JsonParser.parseString(original).getAsJsonObject();
+        if (ownerUuid == null) {
+            json.add("ownerUuid", JsonNull.INSTANCE);
+        } else {
+            json.addProperty("ownerUuid", ownerUuid.toString());
+        }
+        json.addProperty("lifecycleState", lifecycleState);
+        if (ownershipWorldName == null || ownershipWorldName.isBlank()) {
+            json.add("ownershipWorldName", JsonNull.INSTANCE);
+        } else {
+            json.addProperty("ownershipWorldName", ownershipWorldName.trim());
+        }
+        return json.toString();
     }
 
     @Nonnull

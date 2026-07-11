@@ -76,7 +76,8 @@ public final class SqliteConnectionManager {
     private void initializeSessionPragmas(@Nonnull Connection connection) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA journal_mode=WAL");
-            statement.execute("PRAGMA synchronous=NORMAL");
+            // Admission journals are write-ahead authority, including across host power loss.
+            statement.execute("PRAGMA synchronous=FULL");
             statement.execute("PRAGMA foreign_keys=ON");
             statement.execute("PRAGMA busy_timeout=5000");
         }

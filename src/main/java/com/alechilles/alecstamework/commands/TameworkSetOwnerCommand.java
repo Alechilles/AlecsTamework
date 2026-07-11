@@ -1,7 +1,13 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
+import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCommitResult;
+import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
+import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -57,16 +63,72 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
             ownerName = OwnerNameUtil.resolve(player);
         }
 
-        ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-        if (type != null) {
-            store.putComponent(candidate.ref, type, new TameworkOwnerComponent(newOwner, ownerName));
+        Tamework plugin = Tamework.getInstance();
+        OwnerMutationScheduler scheduler = plugin == null ? null : plugin.getOwnerMutationScheduler();
+        if (scheduler == null) {
+            commandContext.sender().sendMessage(Message.raw("Owner mutation service is unavailable."));
+            return;
         }
 
+        ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
+        TameworkOwnerComponent existing = type == null ? null : store.getComponent(candidate.ref, type);
+        UUID oldOwner = existing == null ? null : existing.getOwnerId();
         String ownerText = newOwner == null ? "null" : newOwner.toString();
-        commandContext.sender().sendMessage(Message.raw("Set owner for NPC " + candidate.npcUuid + " to " + ownerText));
+        scheduler.schedule(
+                candidate.ref,
+                store,
+                newOwner,
+                ownerName,
+                CompanionLifecycleState.ACTIVE,
+                resolveOperation(oldOwner, newOwner, true),
+                true,
+                "setowner-command:" + candidate.npcUuid + ":" + UUID.randomUUID(),
+                new OwnerMutationScheduler.MutationCallbacks() {
+                    @Override
+                    public void onDenied(String reason, OwnerPopulationDecision decision) {
+                        playerRef.sendMessage(Message.raw(
+                                "Could not set owner for NPC " + candidate.npcUuid + ": " + reason
+                        ));
+                    }
+
+                    @Override
+                    public void onCommitted(OwnerPopulationCommitResult result) {
+                        playerRef.sendMessage(Message.raw(
+                                "Set owner for NPC " + candidate.npcUuid + " to " + ownerText
+                        ));
+                    }
+
+                    @Override
+                    public void onDurabilityDegraded(String reason) {
+                        playerRef.sendMessage(Message.raw(
+                                "Owner was applied to NPC " + candidate.npcUuid
+                                        + ", but persistence is degraded: " + reason
+                        ));
+                    }
+                }
+        );
     }
 
-    private static UUID parseOwner(String raw, UUID defaultOwner) {
+    static OwnerPopulationOperation resolveOperation(UUID oldOwner, UUID newOwner) {
+        return resolveOperation(oldOwner, newOwner, false);
+    }
+
+    static OwnerPopulationOperation resolveOperation(UUID oldOwner, UUID newOwner, boolean force) {
+        if (force) {
+            return OwnerPopulationOperation.ADMIN_FORCE;
+        }
+        if (newOwner == null) {
+            return OwnerPopulationOperation.OWNER_CLEAR;
+        }
+        if (oldOwner == null) {
+            return OwnerPopulationOperation.NEW_OWNERSHIP;
+        }
+        return oldOwner.equals(newOwner)
+                ? OwnerPopulationOperation.LIFECYCLE_CHANGE
+                : OwnerPopulationOperation.OWNER_TRANSFER;
+    }
+
+    static UUID parseOwner(String raw, UUID defaultOwner) {
         if (raw == null || raw.isBlank()) {
             return defaultOwner;
         }

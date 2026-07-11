@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -55,6 +57,44 @@ class SimpleClaimsTamedDamagePolicyTest {
         assertEquals(0, nativeCalls.get());
         assertEquals(0, serverPermissionCalls.get());
         assertEquals(0, legacyCalls.get());
+    }
+
+    @Test
+    void disabledMasterAndProtectionDoNotProbePluginLifecycle() throws Exception {
+        AtomicInteger resolutions = new AtomicInteger();
+        SimpleClaimsTamedDamagePolicy policy = new SimpleClaimsTamedDamagePolicy(
+                new TamedDamageTargetEligibilityResolver(),
+                () -> {
+                    resolutions.incrementAndGet();
+                    return SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
+                            ClaimProviderState.ABSENT,
+                            ClaimProviderGeneration.NONE,
+                            null,
+                            "not installed"
+                    );
+                },
+                (attacker, permission) -> false,
+                (category, message) -> { }
+        );
+
+        policy.evaluateResolvedEligibility(
+                TamedDamageOwnerPolicy.unowned(),
+                TamedDamageTargetEligibilityResolver.Status.ELIGIBLE,
+                "world",
+                POSITION,
+                ATTACKER,
+                config(false, true)
+        );
+        policy.evaluateResolvedEligibility(
+                TamedDamageOwnerPolicy.unowned(),
+                TamedDamageTargetEligibilityResolver.Status.ELIGIBLE,
+                "world",
+                POSITION,
+                ATTACKER,
+                config(true, false)
+        );
+
+        assertEquals(0, resolutions.get());
     }
 
     @Test
@@ -166,6 +206,98 @@ class SimpleClaimsTamedDamagePolicyTest {
         assertEquals("target-not-tamed", nonTamed.reason());
         assertEquals("attacker-unattributed", environment.reason());
         assertEquals(0, nativeCalls.get());
+    }
+
+    @Test
+    void runtimeAndRawApiResolveTheSameReplacementGenerationWithoutRestart() throws Exception {
+        UUID partyId = UUID.randomUUID();
+        AtomicReference<SimpleClaimsDamageCapabilityResolver.Resolution> current = new AtomicReference<>();
+        current.set(SimpleClaimsDamageCapabilityResolver.Resolution.ready(
+                new ClaimProviderGeneration("plugin-a", "loader-a", 1L),
+                "1.0.38",
+                policyGeneration(SimpleClaimsBreedingBridge.DamageAccessStatus.DENIED, partyId)
+        ));
+        SimpleClaimsTamedDamagePolicy policy = new SimpleClaimsTamedDamagePolicy(
+                new TamedDamageTargetEligibilityResolver(),
+                current::get,
+                (attacker, permission) -> false,
+                (category, message) -> { }
+        );
+
+        TamedDamageDecision runtimeDenied = evaluateEligible(policy);
+        SimpleClaimsRawAccessDecision rawDenied = policy.evaluateRawClaimAccess(
+                "world", POSITION, ATTACKER, config(true, true));
+
+        current.set(SimpleClaimsDamageCapabilityResolver.Resolution.ready(
+                new ClaimProviderGeneration("plugin-b", "loader-b", 2L),
+                "1.0.39",
+                policyGeneration(SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED, partyId)
+        ));
+        TamedDamageDecision runtimeAllowed = evaluateEligible(policy);
+        SimpleClaimsRawAccessDecision rawAllowed = policy.evaluateRawClaimAccess(
+                "world", POSITION, ATTACKER, config(true, true));
+
+        assertEquals(TamedDamageDecision.Status.DENY_CLAIM, runtimeDenied.status());
+        assertEquals(SimpleClaimsRawAccessDecision.Status.DENIED, rawDenied.status());
+        assertEquals(TamedDamageDecision.Status.ALLOW_ENFORCED, runtimeAllowed.status());
+        assertEquals(SimpleClaimsRawAccessDecision.Status.ALLOWED, rawAllowed.status());
+    }
+
+    @Test
+    void absentDamageProviderFailsOpenThenReadyGenerationEnforces() throws Exception {
+        AtomicReference<SimpleClaimsDamageCapabilityResolver.Resolution> current = new AtomicReference<>(
+                SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
+                        ClaimProviderState.ABSENT,
+                        ClaimProviderGeneration.NONE,
+                        null,
+                        "not installed"
+                )
+        );
+        SimpleClaimsTamedDamagePolicy policy = new SimpleClaimsTamedDamagePolicy(
+                new TamedDamageTargetEligibilityResolver(),
+                current::get,
+                (attacker, permission) -> false,
+                (category, message) -> { }
+        );
+
+        TamedDamageDecision absent = evaluateEligible(policy);
+        current.set(SimpleClaimsDamageCapabilityResolver.Resolution.ready(
+                new ClaimProviderGeneration("plugin-a", "loader-a", 1L),
+                "1.0.38",
+                new SimpleClaimsDamageGeneration(
+                        (world, position, attacker, key) -> new SimpleClaimsBreedingBridge.DamageAccessResult(
+                                SimpleClaimsBreedingBridge.DamageAccessStatus.DENIED, null, null),
+                        (world, position, attacker, key) ->
+                                LegacySimpleClaimsPartyPermissionBypass.Result.notGranted(),
+                        (world, position) -> new SimpleClaimsClaimIdentityAccess.Result(
+                                SimpleClaimsClaimIdentityAccess.Status.NO_CLAIM, null, null),
+                        true,
+                        true,
+                        null
+                )
+        ));
+        TamedDamageDecision ready = evaluateEligible(policy);
+
+        assertEquals(TamedDamageDecision.Status.ALLOW_FAIL_OPEN, absent.status());
+        assertEquals(TamedDamageDecision.Status.DENY_CLAIM, ready.status());
+    }
+
+    private static SimpleClaimsDamageGeneration policyGeneration(
+            SimpleClaimsBreedingBridge.DamageAccessStatus status,
+            UUID partyId) {
+        return new SimpleClaimsDamageGeneration(
+                (world, position, attacker, key) ->
+                        new SimpleClaimsBreedingBridge.DamageAccessResult(status, partyId, null),
+                (world, position, attacker, key) -> LegacySimpleClaimsPartyPermissionBypass.Result.notGranted(),
+                (world, position) -> new SimpleClaimsClaimIdentityAccess.Result(
+                        SimpleClaimsClaimIdentityAccess.Status.CLAIM_FOUND,
+                        partyId,
+                        null
+                ),
+                true,
+                true,
+                null
+        );
     }
 
     private static TamedDamageDecision evaluateEligible(SimpleClaimsTamedDamagePolicy policy) throws Exception {

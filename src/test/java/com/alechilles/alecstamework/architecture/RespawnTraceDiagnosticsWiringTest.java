@@ -37,7 +37,7 @@ class RespawnTraceDiagnosticsWiringTest {
     );
     private static final Path LOST_RECOVERY_SERVICE = Paths.get(
             "src", "main", "java",
-            "com", "alechilles", "alecstamework", "items", "CommandLostRecoveryService.java"
+            "com", "alechilles", "alecstamework", "items", "CommandLostFallbackSpawnService.java"
     );
     private static final Path SPAWN_PHYSICS_RESET_SERVICE = Paths.get(
             "src", "main", "java",
@@ -45,7 +45,7 @@ class RespawnTraceDiagnosticsWiringTest {
     );
     private static final Path BREEDING_OFFSPRING_SERVICE = Paths.get(
             "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "BreedingOffspringService.java"
+            "com", "alechilles", "alecstamework", "npc", "actions", "BreedingOffspringPostSpawnService.java"
     );
     private static final Path DEATH_SERVICE = Paths.get(
             "src", "main", "java",
@@ -131,7 +131,7 @@ class RespawnTraceDiagnosticsWiringTest {
                         && content.contains("RespawnTraceLogSupport.startTrace(traceBranch"),
                 "Replacement traces must be recorded even when debug log emission is disabled."
         );
-        int reset = content.indexOf("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics");
+        int reset = content.indexOf("resetSpawnedCompanionPhysics(");
         int recordReplacement = content.indexOf("RespawnTraceLogSupport.recordReplacement");
         int scheduleProbe = content.indexOf("RespawnTraceLogSupport.scheduleProbe");
 
@@ -146,7 +146,7 @@ class RespawnTraceDiagnosticsWiringTest {
     void lostFallbackReplacementClearsSpawnPhysicsBeforeTraceProbes() throws IOException {
         String content = Files.readString(LOST_RECOVERY_SERVICE, StandardCharsets.UTF_8);
         assertTrue(
-                content.contains("RecentRespawnTraceService.Trace respawnTrace = RespawnTraceLogSupport.startTrace("),
+                content.contains("RecentRespawnTraceService.Trace trace = RespawnTraceLogSupport.startTrace("),
                 "Lost fallback replacement traces must be recorded even when debug log emission is disabled."
         );
         int reset = content.indexOf("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics");
@@ -177,13 +177,16 @@ class RespawnTraceDiagnosticsWiringTest {
     @Test
     void breedingOffspringUsesSpawnPhysicsResetAndFallDamageGrace() throws IOException {
         String content = Files.readString(BREEDING_OFFSPRING_SERVICE, StandardCharsets.UTF_8);
-        int reset = content.indexOf("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics");
-        int protection = content.indexOf("RecentSpawnProtectionService.getInstance().record");
-        int progression = content.indexOf("progressionService.applyOffspringState");
+        int reset = content.indexOf("() -> physicsReset[0] = resetPhysics(request)");
+        int protection = content.indexOf("() -> protectSpawn(request)");
+        int progression = content.indexOf("() -> applyProgression(request, childCooldown)");
 
         assertTrue(reset >= 0, "Breeding offspring must clear inherited fall and velocity state after spawn.");
         assertTrue(protection >= 0, "Breeding offspring must receive short fall-damage grace after spawn.");
         assertTrue(progression >= 0, "Breeding offspring progression state must still be applied.");
+        assertTrue(content.contains("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics"));
+        assertTrue(content.contains("RecentSpawnProtectionService.getInstance().record"));
+        assertTrue(content.contains("progressionService.applyOffspringState"));
         assertTrue(reset < protection, "Spawn physics reset should run before fall-damage grace is recorded.");
         assertTrue(protection < progression, "Spawn protection should be registered before further offspring setup.");
     }

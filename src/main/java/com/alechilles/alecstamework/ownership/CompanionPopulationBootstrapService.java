@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionIdentityRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRepository;
@@ -23,6 +27,7 @@ public final class CompanionPopulationBootstrapService {
     private static final EnumSet<CompanionPopulationCoverageRecord.Dimension> GLOBAL_REQUIRED =
             EnumSet.of(
                     CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER,
+                    CompanionPopulationCoverageRecord.Dimension.PROFILE_STATE,
                     CompanionPopulationCoverageRecord.Dimension.WORLD_ENTITIES,
                     CompanionPopulationCoverageRecord.Dimension.PLAYER_SAVES,
                     CompanionPopulationCoverageRecord.Dimension.BASE_CONTAINER_BLOCKS,
@@ -35,6 +40,7 @@ public final class CompanionPopulationBootstrapService {
     private final PersistenceHealthService persistenceHealth;
     private final OwnerPopulationIndex index;
     private final CompanionIdentityResolver identityResolver;
+    private final ClaimOccupancyIndex claimOccupancyIndex;
 
     public CompanionPopulationBootstrapService(
             @Nonnull CompanionPopulationRepository populationRepository,
@@ -42,7 +48,8 @@ public final class CompanionPopulationBootstrapService {
             @Nonnull CompanionIdentityRepository identityRepository,
             @Nonnull PersistenceHealthService persistenceHealth,
             @Nonnull OwnerPopulationIndex index,
-            @Nonnull CompanionIdentityResolver identityResolver
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull ClaimOccupancyIndex claimOccupancyIndex
     ) {
         this.populationRepository = Objects.requireNonNull(populationRepository, "populationRepository");
         this.coverageRepository = Objects.requireNonNull(coverageRepository, "coverageRepository");
@@ -50,12 +57,32 @@ public final class CompanionPopulationBootstrapService {
         this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
         this.index = Objects.requireNonNull(index, "index");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
+        this.claimOccupancyIndex = Objects.requireNonNull(claimOccupancyIndex, "claimOccupancyIndex");
     }
 
     @Nonnull
     public BootstrapResult load() {
+        return load(true);
+    }
+
+    /** Loads entries while admissions remain RECONCILING until buffered live observations replay. */
+    @Nonnull
+    public BootstrapResult loadForReconciliation() {
+        return load(false);
+    }
+
+    /** Publishes readiness derived by a preceding reconciliation snapshot load. */
+    public void publishReadiness(@Nonnull BootstrapResult result) {
+        Objects.requireNonNull(result, "result");
+        index.setReadiness(result.globalReadiness(), result.perWorldReadiness());
+        claimOccupancyIndex.setReadiness(toClaimReadiness(result.globalReadiness()));
+    }
+
+    @Nonnull
+    private BootstrapResult load(boolean publishFinalReadiness) {
         if (!persistenceHealth.isHealthy()) {
             index.replaceCommittedEntries(List.of(), OwnerPopulationReadiness.DEGRADED);
+            claimOccupancyIndex.replaceCommittedEntries(List.of(), ClaimOccupancyReadiness.DEGRADED);
             return new BootstrapResult(
                     OwnerPopulationReadiness.DEGRADED,
                     OwnerPopulationReadiness.DEGRADED,
@@ -71,6 +98,7 @@ public final class CompanionPopulationBootstrapService {
                     populationRepository.loadNonterminalOperations();
             List<CompanionPopulationCoverageRecord> coverage = coverageRepository.loadAll();
             List<OwnerPopulationEntry> entries = toOwnerEntries(states);
+            List<ClaimOccupancyEntry> claimEntries = toClaimEntries(states);
             identityResolver.replaceDurableAliases(identityRepository.loadAllAliases());
 
             OwnerPopulationReadiness global = deriveGlobalReadiness(coverage, operations);
@@ -80,8 +108,19 @@ public final class CompanionPopulationBootstrapService {
                     entries,
                     global
             );
-            index.replaceCommittedEntries(entries, OwnerPopulationReadiness.LOADING);
-            index.setReadiness(global, perWorld);
+            OwnerPopulationReadiness loadedGlobal = publishFinalReadiness
+                    ? global
+                    : OwnerPopulationReadiness.RECONCILING;
+            OwnerPopulationReadiness loadedPerWorld = publishFinalReadiness
+                    ? perWorld
+                    : OwnerPopulationReadiness.RECONCILING;
+            index.replaceCommittedEntries(entries, loadedGlobal, loadedPerWorld);
+            claimOccupancyIndex.replaceCommittedEntries(
+                    claimEntries,
+                    publishFinalReadiness
+                            ? toClaimReadiness(global)
+                            : ClaimOccupancyReadiness.RECONCILING
+            );
             return new BootstrapResult(
                     global,
                     perWorld,
@@ -95,6 +134,7 @@ public final class CompanionPopulationBootstrapService {
                     "population_bootstrap_failed:" + exception.getClass().getSimpleName()
             );
             index.replaceCommittedEntries(List.of(), OwnerPopulationReadiness.DEGRADED);
+            claimOccupancyIndex.replaceCommittedEntries(List.of(), ClaimOccupancyReadiness.DEGRADED);
             return new BootstrapResult(
                     OwnerPopulationReadiness.DEGRADED,
                     OwnerPopulationReadiness.DEGRADED,
@@ -104,6 +144,45 @@ public final class CompanionPopulationBootstrapService {
                     "population-bootstrap-failed"
             );
         }
+    }
+
+    @Nonnull
+    private static List<ClaimOccupancyEntry> toClaimEntries(
+            @Nonnull List<CompanionPopulationStateRecord> states
+    ) {
+        List<ClaimOccupancyEntry> entries = new ArrayList<>(states.size());
+        for (CompanionPopulationStateRecord state : states) {
+            String physicalWorld = normalizeWorld(state.physicalWorldName());
+            ClaimChunkCoordinate physicalChunk = physicalWorld == null
+                    || state.physicalChunkX() == null
+                    || state.physicalChunkZ() == null
+                    ? null
+                    : new ClaimChunkCoordinate(
+                            physicalWorld,
+                            state.physicalChunkX(),
+                            state.physicalChunkZ()
+                    );
+            entries.add(new ClaimOccupancyEntry(
+                    state.profileId(),
+                    state.ownerUuid(),
+                    CompanionLifecycleState.valueOf(state.lifecycleState()),
+                    physicalChunk,
+                    state.revision()
+            ));
+        }
+        return List.copyOf(entries);
+    }
+
+    @Nonnull
+    private static ClaimOccupancyReadiness toClaimReadiness(
+            @Nonnull OwnerPopulationReadiness readiness
+    ) {
+        return switch (readiness) {
+            case READY -> ClaimOccupancyReadiness.READY;
+            case DEGRADED -> ClaimOccupancyReadiness.DEGRADED;
+            case LOADING -> ClaimOccupancyReadiness.LOADING;
+            case RECONCILING -> ClaimOccupancyReadiness.RECONCILING;
+        };
     }
 
     @Nonnull

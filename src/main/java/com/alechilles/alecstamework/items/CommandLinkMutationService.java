@@ -51,6 +51,16 @@ final class CommandLinkMutationService {
                                    String toolId,
                                    TwCommandItemConfig config,
                                    ItemStack workingItem) {
+        return tryToggleLink(player, store, targetRef, toolId, config, workingItem, null);
+    }
+
+    LinkToggleResult tryToggleLink(Player player,
+                                   Store<EntityStore> store,
+                                   Ref<EntityStore> targetRef,
+                                   String toolId,
+                                   TwCommandItemConfig config,
+                                   ItemStack workingItem,
+                                   @Nullable DeferredLinkHandler deferredHandler) {
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         if (npc == null) {
             return LinkToggleResult.notToggled();
@@ -61,9 +71,25 @@ final class CommandLinkMutationService {
         }
         boolean requireOwner = resolveLinkingRequireOwner();
         LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
-                requireOwner
-                        ? LegacyTamedOwnershipBridge.claimForPlayerIfEligible(targetRef, store, player)
+                requireOwner && deferredHandler != null
+                        ? LegacyTamedOwnershipBridge.claimForPlayerIfEligible(
+                                targetRef,
+                                store,
+                                player,
+                                context -> {
+                                    if (context.player() != null && deferredHandler != null) {
+                                        deferredHandler.onOwnershipApplied(
+                                                context.player(),
+                                                context.store(),
+                                                context.npcRef()
+                                        );
+                                    }
+                                }
+                        )
                         : LegacyTamedOwnershipBridge.resolveOwner(targetRef, store);
+        if (ownerBridgeResult.isScheduled()) {
+            return LinkToggleResult.pending();
+        }
         UUID ownerId = ownerBridgeResult.getOwnerId();
         if (requireOwner && (ownerId == null || !ownerId.equals(playerId))) {
             return LinkToggleResult.notToggled();
@@ -343,6 +369,13 @@ final class CommandLinkMutationService {
             count++;
         }
         return count;
+    }
+
+    @FunctionalInterface
+    interface DeferredLinkHandler {
+        void onOwnershipApplied(Player player,
+                                Store<EntityStore> store,
+                                Ref<EntityStore> targetRef);
     }
 
     static final class ActiveToggleResult {

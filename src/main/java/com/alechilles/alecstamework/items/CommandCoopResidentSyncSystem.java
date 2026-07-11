@@ -1,10 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
-import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
-import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.alechilles.alecstamework.util.StoreScopedState;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
@@ -19,11 +16,8 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import org.joml.Vector3i;
-import com.hypixel.hytale.server.core.asset.type.model.config.Model;
-import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -31,7 +25,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -42,6 +38,7 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
     private static final long SWEEP_INTERVAL_MS = 0L;
 
     private final CommandLinkedNpcCoopService coopService;
+    private final CoopPopulationMutationService populationMutationService;
     @Nullable
     private final CommandLinkedNpcCaptureService captureService;
     @Nullable
@@ -60,6 +57,7 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
     private final ComponentType<EntityStore, UUIDComponent> uuidType;
 
     private final StoreScopedState<TickState> statesByStore = new StoreScopedState<>(TickState::new);
+    private final Set<UUID> releaseInFlight = ConcurrentHashMap.newKeySet();
 
     public CommandCoopResidentSyncSystem(@Nonnull CommandLinkedNpcCoopService coopService,
                                          @Nullable CommandLinkedNpcCaptureService captureService,
@@ -71,6 +69,7 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
                                          @Nullable ComponentType<EntityStore, NPCEntity> npcType,
                                          @Nullable ComponentType<EntityStore, UUIDComponent> uuidType) {
         this.coopService = coopService;
+        this.populationMutationService = new CoopPopulationMutationService(coopService);
         this.captureService = captureService;
         this.relocationService = relocationService;
         this.lostService = lostService;
@@ -221,71 +220,102 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
                                         @Nullable NPCEntity npc) {
         TwCoopConfig config = TwCoopConfig.resolveForCoop(slotContext.coopId());
         boolean requireSnapshotOnRelease = config == null || config.getIdentityRules().isRequireSnapshotOnRelease();
-
-        CommandLinkedNpcCoopService.ReleaseResolution releaseResolution =
-                coopService.resolveRelease(currentUuid, roleId, slotContext, requireSnapshotOnRelease);
-        if (releaseResolution.isFailure()
+        CommandLinkedNpcCoopService.CoopLedgerSlotSnapshot ledger =
+                coopService.getLedgerSlotSnapshot(slotContext);
+        if ((ledger == null || ledger.housedNpcUuid() == null)
                 && requireSnapshotOnRelease
-                && shouldAttemptLegacyBootstrap(releaseResolution.failureReason())
                 && bootstrapLegacyReleasedResident(reference, store, currentUuid, roleId, slotContext)) {
-            releaseResolution = coopService.resolveRelease(currentUuid, roleId, slotContext, requireSnapshotOnRelease);
+            ledger = coopService.getLedgerSlotSnapshot(slotContext);
         }
-        if (releaseResolution.isFailure()) {
-            if (requireSnapshotOnRelease && npc != null) {
-                npc.setToDespawn();
-            }
+        if (ledger == null || ledger.housedNpcUuid() == null || roleId == null
+                || !releaseInFlight.add(currentUuid)) {
             return;
         }
-        if (releaseResolution.alreadyReconciled()) {
-            return;
-        }
+        populationMutationService.scheduleRelease(
+                reference,
+                store,
+                currentUuid,
+                roleId,
+                slotContext,
+                requireSnapshotOnRelease,
+                new CoopPopulationMutationService.ReleaseCallbacks() {
+                    @Override
+                    public void onReleased(
+                            @Nonnull CommandLinkedNpcCoopService.ReleaseResolution resolution,
+                            @Nonnull String profileId
+                    ) {
+                        releaseInFlight.remove(currentUuid);
+                        CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot =
+                                resolution.stateSnapshot();
+                        CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot linkedSnapshot =
+                                resolution.linkedSnapshot();
+                        UUID previousUuid = resolution.previousNpcUuid();
+                        if (previousUuid != null && !previousUuid.equals(currentUuid)) {
+                            UUID ownerId = linkedSnapshot != null
+                                    ? linkedSnapshot.ownerId()
+                                    : stateSnapshot != null && stateSnapshot.owner() != null
+                                    ? stateSnapshot.owner().getOwnerId()
+                                    : null;
+                            TameworkCommandLinksComponent links = stateSnapshot == null
+                                    ? null
+                                    : stateSnapshot.commandLinks();
+                            remapLinkedRecords(store, previousUuid, currentUuid, ownerId, links);
+                            clearTransientState(previousUuid);
+                        }
+                        debugCoop("release owner admission applied profile=" + profileId
+                                + " current=" + currentUuid);
+                    }
 
-        CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot = releaseResolution.stateSnapshot();
-        if (stateSnapshot != null) {
-            if (coopStateSnapshotService != null) {
-                coopStateSnapshotService.applySnapshot(reference, store, commandBuffer, stateSnapshot);
-            }
-            applySnapshotAttachmentsImmediately(reference, commandBuffer, store, npc, stateSnapshot, slotContext);
-        } else if (requireSnapshotOnRelease) {
-            if (npc != null) {
-                npc.setToDespawn();
-            }
-            return;
-        }
+                    @Override
+                    public void onDenied(@Nonnull String reason) {
+                        releaseInFlight.remove(currentUuid);
+                        despawnReleasedResident(store, currentUuid, npc);
+                        debugCoop("release owner admission denied current=" + currentUuid
+                                + " reason=" + reason);
+                    }
 
-        CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot linkedSnapshot = releaseResolution.linkedSnapshot();
-        if (stateSnapshot == null && linkedSnapshot != null) {
-            applyLinksToRespawnedNpc(reference, commandBuffer, linkedSnapshot);
-        }
+                    @Override
+                    public void onReconciled() {
+                        releaseInFlight.remove(currentUuid);
+                    }
 
-        UUID previousUuid = releaseResolution.previousNpcUuid();
-        if (previousUuid != null && !previousUuid.equals(currentUuid)) {
-            UUID ownerId = linkedSnapshot != null
-                    ? linkedSnapshot.ownerId()
-                    : stateSnapshot != null && stateSnapshot.owner() != null
-                    ? stateSnapshot.owner().getOwnerId()
-                    : null;
-            TameworkCommandLinksComponent links = stateSnapshot != null
-                    ? stateSnapshot.commandLinks()
-                    : null;
-            remapLinkedRecords(store, previousUuid, currentUuid, ownerId, links);
-            clearTransientState(previousUuid);
-            debugCoop(
-                    "release remap old=" + previousUuid
-                            + " new=" + currentUuid
-                            + " coop=" + slotContext.coopId()
-                            + " slot=" + slotContext.residentSlot()
-            );
-        }
+                    @Override
+                    public void onCompensated(@Nonnull String reason) {
+                        releaseInFlight.remove(currentUuid);
+                        despawnReleasedResident(store, currentUuid, npc);
+                        debugCoop("release owner admission compensated current=" + currentUuid
+                                + " reason=" + reason);
+                    }
+                }
+        );
     }
 
-    private boolean shouldAttemptLegacyBootstrap(@Nullable String failureReason) {
-        if (failureReason == null || failureReason.isBlank()) {
-            return false;
+    private static void despawnReleasedResident(@Nonnull Store<EntityStore> originalStore,
+                                                @Nonnull UUID currentUuid,
+                                                @Nullable NPCEntity fallbackNpc) {
+        NPCEntity liveNpc = null;
+        try {
+            World world = originalStore.getExternalData() == null
+                    ? null
+                    : originalStore.getExternalData().getWorld();
+            Store<EntityStore> liveStore = world == null || world.getEntityStore() == null
+                    ? null
+                    : world.getEntityStore().getStore();
+            Ref<EntityStore> liveRef = world == null ? null : world.getEntityRef(currentUuid);
+            if (liveStore != null && liveRef != null && liveRef.isValid()) {
+                liveNpc = liveStore.getComponent(liveRef, NPCEntity.getComponentType());
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+            // The captured NPC remains a best-effort fallback for compensation cleanup.
         }
-        return "slot_untracked".equals(failureReason)
-                || "release_without_capture".equals(failureReason)
-                || "snapshot_missing".equals(failureReason);
+        NPCEntity target = liveNpc == null ? fallbackNpc : liveNpc;
+        try {
+            if (target != null) {
+                target.setToDespawn();
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+            // The restored coop ledger remains canonical; lifecycle reconciliation handles residue.
+        }
     }
 
     private boolean bootstrapLegacyReleasedResident(@Nonnull Ref<EntityStore> reference,
@@ -399,113 +429,6 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
                 remapped = CommandLinkedNpcRecordRemapService.remapLinkedNpcRecordsInHotbar(linkedOwner, previousUuid, currentUuid);
             }
         }
-    }
-
-    private void applyLinksToRespawnedNpc(@Nonnull Ref<EntityStore> reference,
-                                          @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                          @Nonnull CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot snapshot) {
-        if (commandLinksType == null) {
-            return;
-        }
-        String[] toolIds = snapshot.toolIds();
-        if (toolIds == null || toolIds.length == 0) {
-            return;
-        }
-        commandBuffer.putComponent(
-                reference,
-                commandLinksType,
-                new TameworkCommandLinksComponent(snapshot.ownerId(), toolIds)
-        );
-    }
-
-    private void applySnapshotAttachmentsImmediately(@Nonnull Ref<EntityStore> reference,
-                                                     @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                                     @Nonnull Store<EntityStore> store,
-                                                     @Nullable NPCEntity npc,
-                                                     @Nonnull CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
-                                                     @Nonnull CommandLinkedNpcCoopService.CoopSlotContext slotContext) {
-        TameworkAttachmentsComponent attachmentsComponent = snapshot.attachments();
-        if (attachmentsComponent == null) {
-            return;
-        }
-        Map<String, String> attachmentSelections = attachmentsComponent.getAttachmentIds();
-        if (attachmentSelections.isEmpty()) {
-            return;
-        }
-        Map<String, String> currentSelections = CompanionModelAttachmentService.resolveCurrentAttachments(reference, store);
-        if (currentSelections.equals(attachmentSelections)) {
-            debugCoop(
-                    "release attachment apply skipped already current raw current=" + snapshot.npcUuid()
-                            + " coop=" + slotContext.coopId()
-                            + " slot=" + slotContext.residentSlot()
-            );
-            return;
-        }
-
-        ModelComponent modelComponent = store.getComponent(reference, ModelComponent.getComponentType());
-        if (modelComponent == null || modelComponent.getModel() == null) {
-            debugCoop(
-                    "release attachment apply skipped missing model current=" + snapshot.npcUuid()
-                            + " coop=" + slotContext.coopId()
-                            + " slot=" + slotContext.residentSlot()
-            );
-            return;
-        }
-        Model model = modelComponent.getModel();
-        ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(model.getModelAssetId());
-        if (modelAsset == null) {
-            debugCoop(
-                    "release attachment apply skipped missing model asset current=" + snapshot.npcUuid()
-                            + " coop=" + slotContext.coopId()
-                            + " slot=" + slotContext.residentSlot()
-            );
-            return;
-        }
-        Map<String, String> filteredSelections = CompanionModelAttachmentService.filterAttachmentSelections(
-                attachmentSelections,
-                CompanionModelAttachmentService.resolveAttachmentOptionIds(modelAsset)
-        );
-        if (filteredSelections.isEmpty()) {
-            debugCoop(
-                    "release attachment apply skipped no valid attachments current=" + snapshot.npcUuid()
-                            + " coop=" + slotContext.coopId()
-                            + " slot=" + slotContext.residentSlot()
-            );
-            return;
-        }
-        if (currentSelections.equals(filteredSelections)) {
-            debugCoop(
-                    "release attachment apply skipped already current filtered current=" + snapshot.npcUuid()
-                            + " coop=" + slotContext.coopId()
-                            + " slot=" + slotContext.residentSlot()
-            );
-            return;
-        }
-        Model updatedModel = CompanionModelScaleService.createScaledModel(
-                reference,
-                store,
-                modelAsset,
-                model.getScale(),
-                filteredSelections
-        );
-        if (updatedModel == null) {
-            debugCoop(
-                    "release attachment apply skipped model build failed current=" + snapshot.npcUuid()
-                            + " coop=" + slotContext.coopId()
-                            + " slot=" + slotContext.residentSlot()
-            );
-            return;
-        }
-        commandBuffer.putComponent(reference, ModelComponent.getComponentType(), new ModelComponent(updatedModel));
-        if (npc != null && npc.getRole() != null) {
-            npc.getRole().updateMotionControllers(reference, updatedModel, updatedModel.getBoundingBox(), store);
-        }
-        debugCoop(
-                "release attachment apply immediate current=" + snapshot.npcUuid()
-                        + " coop=" + slotContext.coopId()
-                        + " slot=" + slotContext.residentSlot()
-                        + " count=" + filteredSelections.size()
-        );
     }
 
     private void clearTransientState(@Nullable UUID uuid) {

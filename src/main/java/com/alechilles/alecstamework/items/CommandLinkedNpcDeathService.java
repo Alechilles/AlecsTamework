@@ -65,12 +65,12 @@ public final class CommandLinkedNpcDeathService {
     private static final String REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY = "ReviveCooldownMultiplier";
 
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
+    private final java.util.Set<UUID> permanentlyReleasedDeaths = ConcurrentHashMap.newKeySet();
     @Nullable
     private final DeathRepository repository;
     @Nullable
     private final PersistenceHealthService healthService;
-    @Nullable
-    private final NpcProfileRepository profileRepository;
+    private final CommandLinkedNpcDeathProfileWriter profileWriter;
     private final Path persistencePath;
     private final Object persistenceLock = new Object();
     @Nullable
@@ -117,7 +117,7 @@ public final class CommandLinkedNpcDeathService {
         this.stateSnapshotService = stateSnapshotService;
         this.repository = repository;
         this.healthService = healthService;
-        this.profileRepository = profileRepository;
+        this.profileWriter = new CommandLinkedNpcDeathProfileWriter(profileRepository, repository == null);
         loadPersistedSnapshots();
     }
 
@@ -131,6 +131,7 @@ public final class CommandLinkedNpcDeathService {
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
         UUID npcUuid = npc != null ? npc.getUuid() : null;
         if (npcUuid != null) {
+            permanentlyReleasedDeaths.remove(npcUuid);
             if (deadByNpc.remove(npcUuid) != null) {
                 deleteSnapshot(npcUuid);
             }
@@ -138,9 +139,6 @@ public final class CommandLinkedNpcDeathService {
     }
 
     public void onNpcRemoved(Ref<EntityStore> reference, RemoveReason reason, Store<EntityStore> store) {
-        if (!canMutate()) {
-            return;
-        }
         if (reference == null || store == null) {
             return;
         }
@@ -150,16 +148,29 @@ public final class CommandLinkedNpcDeathService {
         }
         UUID npcUuid = npc.getUuid();
         if (!wasDeathRemoval(reference, reason, store)) {
+            permanentlyReleasedDeaths.remove(npcUuid);
+            if (!canMutate()) {
+                return;
+            }
             if (deadByNpc.remove(npcUuid) != null) {
                 deleteSnapshot(npcUuid);
             }
             return;
         }
         TameworkCommandLinksComponent links = store.getComponent(reference, TameworkCommandLinksComponent.getComponentType());
-        if (links == null || links.getToolIds() == null || links.getToolIds().length == 0) {
+        String deathRoleId = resolveRoleId(npc);
+        if (!CompanionRevivePolicy.supportsRevive(deathRoleId, links)) {
+            permanentlyReleasedDeaths.add(npcUuid);
+            if (!canMutate()) {
+                return;
+            }
             if (deadByNpc.remove(npcUuid) != null) {
                 deleteSnapshot(npcUuid);
             }
+            return;
+        }
+        permanentlyReleasedDeaths.remove(npcUuid);
+        if (!canMutate()) {
             return;
         }
         if (stateSnapshotService != null) {
@@ -222,7 +233,7 @@ public final class CommandLinkedNpcDeathService {
                         )
                 );
                 DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
-                enqueueProfileUpdate(persisted, null, null);
+                profileWriter.enqueue(persisted, null, null);
                 persistSnapshot(persisted);
                 logRespawnTraceDeath(npcUuid, diedAtMs, deathDetails, reference, store, reason);
                 return;
@@ -382,9 +393,14 @@ public final class CommandLinkedNpcDeathService {
                 )
         );
         DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
-        enqueueProfileUpdate(persisted, null, null);
+        profileWriter.enqueue(persisted, null, null);
         persistSnapshot(persisted);
         logRespawnTraceDeath(npcUuid, diedAtMs, deathDetails, reference, store, reason);
+    }
+
+    /** Reports deaths that have no supported revive path and must release owner capacity. */
+    public boolean isPermanentlyReleasedDeath(@Nullable UUID npcUuid) {
+        return npcUuid != null && permanentlyReleasedDeaths.contains(npcUuid);
     }
 
     @Nullable
@@ -496,7 +512,7 @@ public final class CommandLinkedNpcDeathService {
                     snapshot.lifeStageGender()
             );
             deadByNpc.put(snapshot.npcUuid(), updated);
-            enqueueProfileUpdate(updated, null, null);
+            profileWriter.enqueue(updated, null, null);
             persistSnapshot(updated);
             markedReady++;
         }
@@ -632,30 +648,6 @@ public final class CommandLinkedNpcDeathService {
                         + (state.reason() != null ? state.reason() : "unknown")
         );
         return false;
-    }
-
-    private void enqueueProfileUpdate(@Nullable DeadLinkedNpcSnapshot snapshot,
-                                      @Nullable String coopId,
-                                      @Nullable Integer coopSlot) {
-        if (profileRepository == null
-                || repository != null
-                || snapshot == null
-                || snapshot.npcUuid() == null) {
-            return;
-        }
-        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
-                snapshot.npcUuid(),
-                snapshot.ownerId(),
-                snapshot.ownerName(),
-                snapshot.roleId(),
-                snapshot.displayName(),
-                snapshot.customName(),
-                snapshot.tamed(),
-                coopId,
-                coopSlot,
-                null,
-                snapshot.toolIds()
-        ));
     }
 
     private String encodeSnapshot(DeadLinkedNpcSnapshot snapshot) {

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -8,7 +9,13 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
+import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
+import com.alechilles.alecstamework.ownership.CompanionPopulationPreparationResult;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
+import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
+import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
+import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -21,62 +28,186 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Applies and resolves owner/tamed/name state on NPC entities during spawner flows.
  */
 final class SpawnerNpcStateService {
 
-    void applyOwner(ItemFeatureConfig config,
-                    Ref<EntityStore> npcRef,
-                    NPCEntity npc,
-                    Ref<EntityStore> playerRef,
-                    UUID ownerUuid,
-                    World world) {
-        if (npc == null) {
-            return;
+    boolean applyOwner(ItemFeatureConfig config,
+                       Ref<EntityStore> npcRef,
+                       NPCEntity npc,
+                       Ref<EntityStore> playerRef,
+                       UUID ownerUuid,
+                       @Nullable String capturedProfileId,
+                       @Nullable UUID previousNpcUuid,
+                       World world,
+                       @Nullable OwnerApplyCallbacks callbacks) {
+        OwnerApplyCallbacks safeCallbacks = callbacks == null ? OwnerApplyCallbacks.NOOP : callbacks;
+        Store<EntityStore> store = world != null && world.getEntityStore() != null
+                ? world.getEntityStore().getStore()
+                : null;
+        if (npc == null || npcRef == null || !npcRef.isValid() || store == null) {
+            safeCallbacks.onDenied("spawner-owner-target-unavailable", null);
+            return false;
         }
-        if (world != null && npcRef != null && npcRef.isValid()) {
-            Store<EntityStore> store = world.getEntityStore().getStore();
-            ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-            if (type != null) {
-                String ownerName = null;
-                if (ownerUuid != null) {
-                    Player ownerPlayer = null;
-                    if (playerRef != null) {
-                        ownerPlayer = store.getComponent(playerRef, Player.getComponentType());
+        OwnerMutationScheduler scheduler = resolveMutationScheduler();
+        if (scheduler == null) {
+            safeCallbacks.onDenied("owner-mutation-scheduler-unavailable", null);
+            return false;
+        }
+        String ownerName = resolveOwnerName(ownerUuid, playerRef, world, store);
+        UUID npcUuid = npc.getUuid();
+        if (npcUuid == null) {
+            safeCallbacks.onDenied("spawner-owner-uuid-unavailable", null);
+            return false;
+        }
+        OwnerPopulationOperation operation = previousNpcUuid == null
+                ? OwnerPopulationOperation.NEW_OWNERSHIP
+                : OwnerPopulationOperation.RESTORE;
+        OwnerMutationScheduler.MutationCallbacks mutationCallbacks = new OwnerMutationScheduler.MutationCallbacks() {
+                    @Override
+                    public void onDenied(@Nonnull String reason, @Nullable OwnerPopulationDecision decision) {
+                        safeCallbacks.onDenied(reason, decision);
                     }
-                    if (ownerPlayer != null && ownerUuid.equals(ownerPlayer.getUuid())) {
-                        ownerName = OwnerNameUtil.resolve(ownerPlayer);
-                    } else {
-                        Ref<EntityStore> ownerRef = world.getEntityRef(ownerUuid);
-                        if (ownerRef != null) {
-                            Player resolvedOwner = store.getComponent(ownerRef, Player.getComponentType());
-                            if (resolvedOwner != null) {
-                                ownerName = OwnerNameUtil.resolve(resolvedOwner);
-                            }
-                        }
+
+                    @Override
+                    public void onPopulationDenied(@Nonnull CompanionPopulationPreparationResult result) {
+                        safeCallbacks.onPopulationDenied(result);
                     }
-                }
-                store.putComponent(npcRef, type, new TameworkOwnerComponent(ownerUuid, ownerName));
-            }
+
+                    @Override
+                    public boolean beforeApply(@Nonnull String profileId) {
+                        return safeCallbacks.beforeApply(profileId);
+                    }
+
+                    @Override
+                    public void onApplyCompensated(@Nonnull String profileId, @Nonnull String reason) {
+                        safeCallbacks.onApplyCompensated(profileId, reason);
+                    }
+
+                    @Override
+                    public void onApplied(@Nonnull OwnerPopulationDecision decision) {
+                        applyMasterTarget(config, npc, playerRef, ownerUuid, world);
+                        safeCallbacks.onApplied();
+                    }
+
+                    @Override
+                    public void onDurabilityDegraded(@Nonnull String reason) {
+                        safeCallbacks.onDurabilityDegraded(reason);
+                    }
+                };
+        String idempotencyKey = "spawner-spawn:"
+                + (previousNpcUuid == null ? "new" : previousNpcUuid)
+                + ":"
+                + npcUuid;
+        if (previousNpcUuid == null) {
+            return scheduler.schedule(
+                    npcRef,
+                    store,
+                    ownerUuid,
+                    ownerName,
+                    CompanionLifecycleState.ACTIVE,
+                    operation,
+                    false,
+                    idempotencyKey,
+                    mutationCallbacks
+            );
         }
-        if (config == null || !config.isSpawnAssignsOwner()) {
-            return;
+        CompanionIdentityResolver identityResolver = resolveIdentityResolver();
+        String canonicalProfileId = capturedProfileId == null || capturedProfileId.isBlank()
+                ? identityResolver == null
+                        ? null
+                        : identityResolver.resolveProfileId(previousNpcUuid).orElse(null)
+                : capturedProfileId.trim();
+        OwnerPopulationOperation restoreOperation = operation;
+        if (canonicalProfileId == null && identityResolver != null) {
+            canonicalProfileId = identityResolver.resolveOrAllocate(
+                    previousNpcUuid,
+                    idempotencyKey + ":legacy-item"
+            ).profileId();
+            restoreOperation = OwnerPopulationOperation.LEGACY_ADOPTION;
         }
-        Role role = npc.getRole();
-        if (role == null) {
+        if (canonicalProfileId == null) {
+            safeCallbacks.onDenied("spawner-restore-canonical-profile-unavailable", null);
+            return false;
+        }
+        return scheduler.scheduleRestore(
+                npcRef,
+                store,
+                canonicalProfileId,
+                previousNpcUuid,
+                readOwnerId(npcRef, store),
+                ownerUuid,
+                ownerName,
+                CompanionLifecycleState.ACTIVE,
+                restoreOperation,
+                false,
+                idempotencyKey,
+                mutationCallbacks
+        );
+    }
+
+    @Nullable
+    private OwnerMutationScheduler resolveMutationScheduler() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin == null ? null : plugin.getOwnerMutationScheduler();
+    }
+
+    @Nullable
+    private CompanionIdentityResolver resolveIdentityResolver() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin == null ? null : plugin.getCompanionIdentityResolver();
+    }
+
+    @Nullable
+    private UUID readOwnerId(@Nonnull Ref<EntityStore> npcRef,
+                             @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
+        TameworkOwnerComponent owner = type == null ? null : store.getComponent(npcRef, type);
+        return owner == null ? null : owner.getOwnerId();
+    }
+
+    @Nullable
+    private String resolveOwnerName(@Nullable UUID ownerUuid,
+                                    @Nullable Ref<EntityStore> playerRef,
+                                    @Nonnull World world,
+                                    @Nonnull Store<EntityStore> store) {
+        if (ownerUuid == null) {
+            return null;
+        }
+        Player ownerPlayer = playerRef == null
+                ? null
+                : store.getComponent(playerRef, Player.getComponentType());
+        if (ownerPlayer != null && ownerUuid.equals(ownerPlayer.getUuid())) {
+            return OwnerNameUtil.resolve(ownerPlayer);
+        }
+        Ref<EntityStore> ownerRef = world.getEntityRef(ownerUuid);
+        Player resolvedOwner = ownerRef == null || !ownerRef.isValid()
+                ? null
+                : store.getComponent(ownerRef, Player.getComponentType());
+        return resolvedOwner == null ? null : OwnerNameUtil.resolve(resolvedOwner);
+    }
+
+    void applyMasterTarget(@Nullable ItemFeatureConfig config,
+                           @Nonnull NPCEntity npc,
+                           @Nullable Ref<EntityStore> playerRef,
+                           @Nullable UUID ownerUuid,
+                           @Nonnull World world) {
+        if (config == null || !config.isSpawnAssignsOwner() || npc.getRole() == null) {
             return;
         }
         Ref<EntityStore> ownerRef = playerRef;
-        if (ownerUuid != null && world != null) {
+        if (ownerUuid != null) {
             Ref<EntityStore> resolved = world.getEntityRef(ownerUuid);
-            if (resolved != null) {
+            if (resolved != null && resolved.isValid()) {
                 ownerRef = resolved;
             }
         }
-        if (ownerRef != null) {
-            role.setMarkedTarget("MasterTarget", ownerRef);
+        if (ownerRef != null && ownerRef.isValid()) {
+            npc.getRole().setMarkedTarget("MasterTarget", ownerRef);
         }
     }
 
@@ -165,6 +296,30 @@ final class SpawnerNpcStateService {
             return TameworkNpcNameComponent.NameSource.valueOf(sourceRaw);
         } catch (IllegalArgumentException ex) {
             return null;
+        }
+    }
+
+    interface OwnerApplyCallbacks {
+        OwnerApplyCallbacks NOOP = new OwnerApplyCallbacks() {
+        };
+
+        default void onApplied() {
+        }
+
+        default boolean beforeApply(@Nonnull String profileId) {
+            return true;
+        }
+
+        default void onApplyCompensated(@Nonnull String profileId, @Nonnull String reason) {
+        }
+
+        default void onPopulationDenied(@Nonnull CompanionPopulationPreparationResult result) {
+        }
+
+        default void onDenied(@Nonnull String reason, @Nullable OwnerPopulationDecision decision) {
+        }
+
+        default void onDurabilityDegraded(@Nonnull String reason) {
         }
     }
 }

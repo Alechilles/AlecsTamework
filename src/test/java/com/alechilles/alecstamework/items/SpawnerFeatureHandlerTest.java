@@ -4,9 +4,12 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SpawnerFeatureHandlerTest {
@@ -36,30 +39,36 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
-    void spawnUpdatesHeldItemBeforeWorldMutationAndSnapshotClear() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
+    void spawnPreparesPopulationBeforePhysicalSpawnAndFinalizesSourceAfterCommit() throws Exception {
+        String release = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerPreparedSpawnService.java"
+        ));
+        String continuation = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CompanionSpawnCommitContinuation.java"
+        ));
 
-        int updateHeldItem = source.indexOf("playerInventoryService.updateHeldItem(player, updated)");
-        int spawnEntity = source.indexOf("npcPlugin.spawnEntity(");
-        int clearCapturedSnapshot = source.indexOf("linkedNpcSyncService.clearCapturedSnapshotIfPresent(capturedNpcUuid)");
-
-        assertTrue(updateHeldItem >= 0, "spawn path must update held item");
-        assertTrue(spawnEntity >= 0, "spawn path must spawn an entity");
-        assertTrue(clearCapturedSnapshot >= 0, "spawn path must clear captured snapshot");
-        assertTrue(updateHeldItem < spawnEntity, "item consumption must happen before world mutation");
-        assertTrue(updateHeldItem < clearCapturedSnapshot, "item consumption must happen before snapshot clear");
+        assertTrue(release.indexOf("admission.prepareAsync(request)")
+                < release.indexOf("executor.spawnAndCommit("));
+        assertTrue(release.contains("source.prepare(finalizedItem)"));
+        assertTrue(continuation.indexOf("boolean liveApplied = runLive")
+                < continuation.indexOf("runSource(sourceFinalization, live)"));
+        assertTrue(continuation.contains("finishSourceDurability("));
     }
 
     @Test
-    void spawnRollsBackHeldItemWhenWorldMutationFailsAfterConsume() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
+    void spawnAndPreAddFailureCancelWithoutTouchingTheSourceItem() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CompanionPreparedSpawnService.java"
+        ));
 
-        int spawnFailure = source.indexOf("spawn denied reason=spawn-entity-failed");
-        int rollbackHeldItem = source.indexOf("playerInventoryService.updateHeldItem(player, itemStack)");
+        int spawn = source.indexOf("SpawnAttempt attempt = spawn(");
+        int ambiguityGuard = source.indexOf("if (attempt.outcomeAmbiguous())", spawn);
+        int cancel = source.indexOf("admissionService.cancelAsync", spawn);
+        int commit = source.indexOf("admissionService.commitLiveAsync", spawn);
 
-        assertTrue(spawnFailure >= 0, "spawn failure path must still be present");
-        assertTrue(rollbackHeldItem >= 0, "spawn failure after consumption must roll the held item back");
-        assertTrue(spawnFailure < rollbackHeldItem, "rollback should be tied to spawn failure handling");
+        assertTrue(spawn >= 0 && ambiguityGuard > spawn && cancel > ambiguityGuard);
+        assertTrue(cancel < commit, "failed spawn/pre-add must cancel rather than commit live capacity");
+        assertFalse(source.contains("SpawnerSourceItemTransaction"));
     }
 
     @Test
@@ -68,10 +77,25 @@ class SpawnerFeatureHandlerTest {
 
         int quantityGuard = source.indexOf("itemStack.getQuantity() != 1");
         int capturedMetadata = source.indexOf(".withMetadata(TameworkMetadataKeys.CAPTURED");
+        int canonicalProfileMetadata = source.indexOf("TameworkMetadataKeys.COMPANION_PROFILE_ID");
 
         assertTrue(quantityGuard >= 0, "capture path must reject stacked spawner items");
         assertTrue(capturedMetadata >= 0, "capture path must write captured metadata");
+        assertTrue(canonicalProfileMetadata >= 0, "capture path must persist canonical profile identity");
         assertTrue(quantityGuard < capturedMetadata, "stack guard must run before captured metadata is stamped");
+    }
+
+    @Test
+    void wildCaptureDoesNotInventAnOwnerWhenPreservingOwnership() {
+        assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(null, false));
+    }
+
+    @Test
+    void captureOwnerMetadataPreservesOrClearsTheExistingOwnerExactly() {
+        UUID owner = UUID.randomUUID();
+
+        assertEquals(owner, SpawnerFeatureHandler.resolveCapturedOwnerMetadata(owner, false));
+        assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(owner, true));
     }
 
     private static ItemFeatureConfig buildSpawnerConfigForInteraction(ItemFeatureConfig baseConfig,

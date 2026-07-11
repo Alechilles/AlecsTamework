@@ -1,20 +1,41 @@
 package com.alechilles.alecstamework.api;
 
 import javax.annotation.Nonnull;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
-/** Mutation-bound population API; callers must complete or cancel every reserved token. */
+/**
+ * Mutation-bound population API; callers must complete or cancel every reserved token.
+ *
+ * <p>Preparation, commit, and cancellation may perform durable persistence work and therefore
+ * complete asynchronously. {@link #claimForApply(PopulationAdmissionToken)} is the only
+ * synchronous stage; it performs in-memory/context revalidation and is safe to call immediately
+ * before a world mutation.</p>
+ */
 public interface PopulationAdmissionApi {
     @Nonnull
-    PopulationAdmissionDecision tryAdmit(@Nonnull PopulationAdmissionRequest request);
+    CompletionStage<PopulationAdmissionDecision> tryAdmit(@Nonnull PopulationAdmissionRequest request);
+
+    @Nonnull
+    CompletionStage<PopulationBatchAdmissionDecision> tryAdmitBatch(
+            @Nonnull PopulationBatchAdmissionRequest request
+    );
 
     @Nonnull
     PopulationAdmissionDecision claimForApply(@Nonnull PopulationAdmissionToken token);
 
     @Nonnull
-    PopulationAdmissionDecision commit(@Nonnull PopulationAdmissionToken token);
+    CompletionStage<PopulationAdmissionDecision> commit(@Nonnull PopulationAdmissionToken token);
 
     @Nonnull
-    PopulationAdmissionDecision cancel(@Nonnull PopulationAdmissionToken token);
+    CompletionStage<PopulationAdmissionDecision> cancel(@Nonnull PopulationAdmissionToken token);
+
+    /**
+     * Asynchronously closes a bounded set of expired, unclaimed capabilities and their durable
+     * journals. Implementations may also invoke this opportunistically before new preparations.
+     */
+    @Nonnull
+    CompletionStage<Integer> cleanupExpired();
 
     /** Compatibility fallback used until a runtime admission coordinator is injected. */
     @Nonnull
@@ -26,11 +47,23 @@ public interface PopulationAdmissionApi {
         private static final String REASON = "population-admission-authority-unavailable";
         private static final PopulationAdmissionApi INSTANCE = new PopulationAdmissionApi() {
             @Override
-            public PopulationAdmissionDecision tryAdmit(PopulationAdmissionRequest request) {
+            public CompletionStage<PopulationAdmissionDecision> tryAdmit(PopulationAdmissionRequest request) {
                 if (request == null) {
                     throw new NullPointerException("request");
                 }
-                return PopulationAdmissionDecision.unavailable(REASON);
+                return CompletableFuture.completedFuture(PopulationAdmissionDecision.unavailable(REASON));
+            }
+
+            @Override
+            public CompletionStage<PopulationBatchAdmissionDecision> tryAdmitBatch(
+                    PopulationBatchAdmissionRequest request
+            ) {
+                if (request == null) {
+                    throw new NullPointerException("request");
+                }
+                return CompletableFuture.completedFuture(
+                        PopulationBatchAdmissionDecision.unavailable(request.units().size(), REASON)
+                );
             }
 
             @Override
@@ -42,19 +75,24 @@ public interface PopulationAdmissionApi {
             }
 
             @Override
-            public PopulationAdmissionDecision commit(PopulationAdmissionToken token) {
+            public CompletionStage<PopulationAdmissionDecision> commit(PopulationAdmissionToken token) {
                 if (token == null) {
                     throw new NullPointerException("token");
                 }
-                return PopulationAdmissionDecision.unavailable(REASON);
+                return CompletableFuture.completedFuture(PopulationAdmissionDecision.unavailable(REASON));
             }
 
             @Override
-            public PopulationAdmissionDecision cancel(PopulationAdmissionToken token) {
+            public CompletionStage<PopulationAdmissionDecision> cancel(PopulationAdmissionToken token) {
                 if (token == null) {
                     throw new NullPointerException("token");
                 }
-                return PopulationAdmissionDecision.unavailable(REASON);
+                return CompletableFuture.completedFuture(PopulationAdmissionDecision.unavailable(REASON));
+            }
+
+            @Override
+            public CompletionStage<Integer> cleanupExpired() {
+                return CompletableFuture.completedFuture(0);
             }
         };
 

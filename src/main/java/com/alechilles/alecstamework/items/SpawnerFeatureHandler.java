@@ -4,20 +4,12 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.alechilles.alecstamework.npc.actions.TameClaimLimitPolicyService;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
-import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
-import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
-import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.math.vector.Rotation3f;
-import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -25,10 +17,7 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import it.unimi.dsi.fastutil.Pair;
-import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -55,7 +44,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerNpcIdentityService npcIdentityService;
     private final SpawnerCaptureFinalizerService captureFinalizerService;
     private final SpawnerCapturePolicyService capturePolicyService;
-    private final TameClaimLimitPolicyService tameClaimLimitPolicyService;
+    private final SpawnerPreparedSpawnService preparedSpawnService;
     @Nullable
     private final CommandNpcRelocationService relocationService;
     @Nullable
@@ -97,7 +86,20 @@ public final class SpawnerFeatureHandler {
                 ownershipPolicyService,
                 npcIdentityService
         );
-        this.tameClaimLimitPolicyService = new TameClaimLimitPolicyService();
+        this.preparedSpawnService = new SpawnerPreparedSpawnService(
+                spawnPositionService,
+                rolePolicyService,
+                ownershipPolicyService,
+                itemStackMetadataService,
+                playerInventoryService,
+                npcStateService,
+                attachmentService,
+                progressionMetadataService,
+                linkedNpcSyncService,
+                effectService,
+                coopService,
+                this::logSpawnerFlowDebug
+        );
         this.coopService = coopService;
         this.relocationService = relocationService;
         this.lostService = lostService;
@@ -248,7 +250,7 @@ public final class SpawnerFeatureHandler {
         if (config == null || !config.isSpawnerEnabled()) {
             return false;
         }
-        if (isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
+        if (itemStackMetadataService.isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
             return false;
         }
         if (!itemStackMetadataService.isFilledItem(itemStack, config)) {
@@ -295,215 +297,16 @@ public final class SpawnerFeatureHandler {
         return spawnFromItem(player, itemStack, config, null, emptyItemIdOverride);
     }
 
-    private boolean spawnFromItem(Player player, ItemStack itemStack, ItemFeatureConfig config, Integer hotbarSlot, String emptyItemIdOverride) {
+    private boolean spawnFromItem(Player player, ItemStack itemStack, ItemFeatureConfig config,
+                                  Integer hotbarSlot, String emptyItemIdOverride) {
         if (player == null || itemStack == null || config == null) {
             logSpawnerFlowDebug("spawn denied reason=invalid-input");
             return false;
         }
-        UUID playerUuid = player.getUuid();
-        config = buildSpawnerConfigForInteraction(config, null);
-        if (config == null) {
-            logSpawnerFlowDebug("spawn denied reason=missing-config player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-        if (!config.isSpawnerEnabled()) {
-            logSpawnerFlowDebug("spawn denied reason=spawner-disabled player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-        if (isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
-            logSpawnerFlowDebug("spawn denied reason=cooldown player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-        if (!itemStackMetadataService.isFilledItem(itemStack, config)) {
-            logSpawnerFlowDebug("spawn denied reason=item-not-filled player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-        UUID capturedNpcUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING);
-        CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
-                linkedNpcSyncService.getCapturedSnapshot(capturedNpcUuid);
-
-        String roleId = rolePolicyService.resolveSpawnRoleId(itemStack);
-        if (roleId == null || roleId.isBlank()) {
-            logSpawnerFlowDebug("spawn denied reason=missing-role player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-        if (!rolePolicyService.isRoleAllowed(roleId, config)) {
-            logSpawnerFlowDebug("spawn denied reason=role-not-allowed player=" + playerUuid + " role=" + roleId);
-            return false;
-        }
-
-        World world = player.getWorld();
-        if (world == null) {
-            logSpawnerFlowDebug("spawn denied reason=missing-world player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-
-        Vector3d spawnPosition = spawnPositionService.resolveSpawnPosition(player, config);
-        if (spawnPosition == null) {
-            logSpawnerFlowDebug("spawn denied reason=no-spawn-position player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-        if (!spawnPositionService.isWithinSpawnDistance(player, spawnPosition, config)) {
-            logSpawnerFlowDebug("spawn denied reason=spawn-distance player=" + playerUuid + " maxDistance=" + config.getSpawnMaxDistance());
-            return false;
-        }
-
-        UUID ownerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING);
-        UUID captureSourceOwnerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID, Codec.UUID_STRING);
-        UUID ownerForSpawnPolicy = SpawnerOwnershipPolicyService.resolveSpawnPolicyOwner(
-                ownerUuid,
-                captureSourceOwnerUuid,
-                config
+        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(config, null);
+        return resolved != null && preparedSpawnService.schedule(
+                player, itemStack, resolved, hotbarSlot, emptyItemIdOverride
         );
-        if (!ownershipPolicyService.isSpawnAllowed(playerUuid, ownerForSpawnPolicy, config)) {
-            logSpawnerFlowDebug(
-                    "spawn denied by ownership policy item=" + itemStack.getItemId()
-                            + " player=" + playerUuid
-                            + " itemOwner=" + ownerUuid
-                            + " captureSourceOwner=" + captureSourceOwnerUuid
-                            + " ownerForPolicy=" + ownerForSpawnPolicy
-                            + " requireOwnerOverride=" + config.getSpawnRequireOwnerOverride()
-                            + " ownerRestricted=" + config.isSpawnOwnerRestricted()
-                            + " captureClearsOwner=" + config.isCaptureClearsOwner()
-            );
-            return false;
-        }
-        boolean tamed = Boolean.TRUE.equals(itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TAMED, Codec.BOOLEAN));
-        Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
-        if (store == null) {
-            logSpawnerFlowDebug("spawn denied reason=missing-store player=" + playerUuid);
-            return false;
-        }
-        if (ownerUuid == null && config.isSpawnAssignsOwner()) {
-            UUID playerId = playerUuid;
-            OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(store, playerId);
-            if (!decision.allowed()) {
-                OwnerMessageUtil.sendPopulationCapReached(
-                        player,
-                        decision.currentCount(),
-                        decision.limit(),
-                        decision.scope()
-                );
-                logSpawnerFlowDebug(
-                        "spawn denied reason=owner-cap player=" + playerUuid
-                                + " current=" + decision.currentCount()
-                                + " limit=" + decision.limit()
-                                + " scope=" + decision.scope()
-                );
-                return false;
-            }
-            TameClaimLimitPolicyService.TameLimitDecision claimDecision =
-                    tameClaimLimitPolicyService.evaluateForTame(store, spawnPosition);
-            if (!claimDecision.allowed()) {
-                if (claimDecision.claimCapReached()) {
-                    OwnerMessageUtil.sendClaimPopulationCapReached(
-                            player,
-                            claimDecision.currentCount(),
-                            claimDecision.effectiveCap()
-                    );
-                }
-                logSpawnerFlowDebug(
-                        "spawn denied reason=claim-cap player=" + playerUuid
-                                + " current=" + claimDecision.currentCount()
-                                + " limit=" + claimDecision.effectiveCap()
-                );
-                return false;
-            }
-            ownerUuid = playerId;
-        }
-
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin == null) {
-            logSpawnerFlowDebug("spawn denied reason=npc-plugin-missing player=" + playerUuid);
-            return false;
-        }
-        int roleIndex = npcPlugin.getIndex(roleId);
-        if (roleIndex < 0) {
-            logSpawnerFlowDebug("spawn denied reason=unknown-role player=" + playerUuid + " role=" + roleId);
-            return false;
-        }
-        Ref<EntityStore> playerRef = player.getReference();
-        Rotation3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
-        ItemStack updated = itemStack;
-        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
-            String emptyItemId = emptyItemIdOverride != null
-                    ? emptyItemIdOverride
-                    : itemStackMetadataService.resolveEmptyItemId(itemStack.getItemId());
-            if (emptyItemId != null && !emptyItemId.isBlank()) {
-                updated = itemStackMetadataService.swapItemId(updated, emptyItemId);
-            }
-            updated = itemStackMetadataService.clearCapturedMetadata(updated);
-        }
-        updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs());
-
-        boolean updatedOk = hotbarSlot != null
-                ? playerInventoryService.updateHotbarSlot(player, hotbarSlot, updated)
-                : playerInventoryService.updateHeldItem(player, updated);
-        if (!updatedOk) {
-            logger.at(Level.WARNING).log("Spawner spawn: failed to update held item.");
-            logSpawnerFlowDebug("spawn denied reason=update-held-item-failed player=" + playerUuid + " item=" + itemStack.getItemId());
-            return false;
-        }
-
-        Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
-        if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            logSpawnerFlowDebug("spawn denied reason=spawn-entity-failed player=" + playerUuid + " role=" + roleId);
-            boolean rollbackOk = hotbarSlot != null
-                    ? playerInventoryService.updateHotbarSlot(player, hotbarSlot, itemStack)
-                    : playerInventoryService.updateHeldItem(player, itemStack);
-            if (!rollbackOk) {
-                logger.at(Level.WARNING).log("Spawner spawn: failed to roll back held item after spawn failure.");
-            }
-            return false;
-        }
-
-        Ref<EntityStore> npcRef = spawned.first();
-        NPCEntity npc = spawned.second();
-        attachmentService.applyAttachments(itemStack, npcRef, npc, store);
-        npcStateService.applyOwner(config, npcRef, npc, playerRef, ownerUuid, world);
-        npcStateService.applyTamed(npcRef, tamed, world);
-        npcStateService.applyCapturedName(itemStack, npcRef, store);
-        progressionMetadataService.applyNpcProgressionFromItem(itemStack, npcRef, store);
-        refreshProgressionAfterRestore(npcRef, npc, store);
-        progressionMetadataService.applyNpcHealthFromItem(itemStack, npcRef, store);
-        linkedNpcSyncService.restoreCommandLinksFromCapturedSnapshot(npcRef, store, ownerUuid, capturedSnapshot);
-        UUID spawnedNpcUuid = npc.getUuid();
-        if (capturedNpcUuid != null && spawnedNpcUuid != null) {
-            linkedNpcSyncService.remapLinkedNpcRecordsAfterRespawn(player, capturedNpcUuid, spawnedNpcUuid);
-        }
-        linkedNpcSyncService.clearCapturedSnapshotIfPresent(capturedNpcUuid);
-        if (coopService != null && capturedNpcUuid != null) {
-            coopService.clearCoopSnapshot(capturedNpcUuid);
-        }
-
-        effectService.playSpawnEffects(world, npcRef, config);
-        logSpawnerFlowDebug(
-                "spawn success item=" + itemStack.getItemId()
-                        + " role=" + roleId
-                        + " player=" + playerUuid
-                        + " spawnedNpc=" + spawnedNpcUuid
-                        + " appliedOwner=" + ownerUuid
-                        + " captureSourceOwner=" + captureSourceOwnerUuid
-                        + " assignsOwner=" + config.isSpawnAssignsOwner()
-        );
-        return true;
-    }
-
-    /**
-     * Re-applies restored lifecycle state to model scale and growth scheduling.
-     *
-     * <p>Spawn flows can bootstrap tamed progression before item metadata restore, which leaves same-role offspring
-     * (for example Cat_Pet babies) visually at adult scale unless lifecycle refresh is run again post-restore.
-     */
-    private void refreshProgressionAfterRestore(@Nullable Ref<EntityStore> npcRef,
-                                                @Nullable NPCEntity npc,
-                                                @Nullable Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return;
-        }
-        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
-        CompanionLifeStageService.refreshLifeStage(npcRef, npc, store);
-        CompanionLifeStageService.ensureGrowthTickScheduled(npcRef, npc, store);
     }
 
     private ItemFeatureConfig resolveConfigForItem(ItemStack itemStack) {
@@ -524,47 +327,9 @@ public final class SpawnerFeatureHandler {
         }
         return null;
     }
-
-
     private ItemFeatureConfig buildSpawnerConfigForInteraction(ItemFeatureConfig baseConfig,
                                                                Boolean spawnAssignsOwnerOverride) {
-        if (baseConfig == null) {
-            return null;
-        }
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.current();
-        boolean captureClearsOwner = settings.captureClearsOwner();
-        boolean spawnAssignsOwner = spawnAssignsOwnerOverride != null
-                ? spawnAssignsOwnerOverride
-                : settings.spawnSetsOwner();
-        return ItemFeatureConfig.builder()
-                .spawnerEnabled(baseConfig.isSpawnerEnabled())
-                .whistleEnabled(baseConfig.isWhistleEnabled())
-                .captureClearsOwner(captureClearsOwner)
-                .captureRequireTamed(baseConfig.isCaptureRequireTamed())
-                .captureOwnerRestricted(baseConfig.isCaptureOwnerRestricted())
-                .spawnAssignsOwner(spawnAssignsOwner)
-                .spawnOwnerRestricted(baseConfig.isSpawnOwnerRestricted())
-                .whistleRadius(baseConfig.getWhistleRadius())
-                .spawnerRoleAllowlist(baseConfig.getSpawnerRoleAllowlist())
-                .spawnerRoleDenylist(baseConfig.getSpawnerRoleDenylist())
-                .spawnerRoleListMode(baseConfig.getSpawnerRoleListMode())
-                                .captureRequireOwnerOverride(baseConfig.getCaptureRequireOwnerOverride())
-                .spawnRequireOwnerOverride(baseConfig.getSpawnRequireOwnerOverride())
-                .captureParticleSystem(baseConfig.getCaptureParticleSystem())
-                .spawnParticleSystem(baseConfig.getSpawnParticleSystem())
-                .captureSoundEvent(baseConfig.getCaptureSoundEvent())
-                .spawnSoundEvent(baseConfig.getSpawnSoundEvent())
-                .captureCooldownMs(baseConfig.getCaptureCooldownMs())
-                .spawnCooldownMs(baseConfig.getSpawnCooldownMs())
-                .captureMaxDistance(baseConfig.getCaptureMaxDistance())
-                .spawnMaxDistance(baseConfig.getSpawnMaxDistance())
-                .spawnerFilledItemId(baseConfig.getSpawnerFilledItemId())
-                .spawnerIconDefault(baseConfig.getSpawnerIconDefault())
-                .spawnerIconOverrides(baseConfig.getSpawnerIconOverrides())
-                .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
-                .spawnerIconOverrideGroups(baseConfig.getSpawnerIconOverrideGroups())
-                .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
-                .build();
+        return SpawnerInteractionConfigResolver.resolve(baseConfig, spawnAssignsOwnerOverride);
     }
 
     // Called by NPC action chains to capture an NPC into the held spawner item.
@@ -628,10 +393,7 @@ public final class SpawnerFeatureHandler {
         Store<EntityStore> worldStore = world != null ? world.getEntityStore().getStore() : null;
         UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
         UUID existingOwner = npcStateService.resolveOwnerFromComponent(targetRef, world);
-        UUID ownerToStore = null;
-        if (!config.isCaptureClearsOwner()) {
-            ownerToStore = existingOwner != null ? existingOwner : player.getUuid();
-        }
+        UUID ownerToStore = resolveCapturedOwnerMetadata(existingOwner, config.isCaptureClearsOwner());
         String snapshotDisplayName = (captureInfo.capturedName() != null
                 && captureInfo.capturedName().name() != null
                 && !captureInfo.capturedName().name().isBlank())
@@ -652,15 +414,6 @@ public final class SpawnerFeatureHandler {
                 }
             }
         }
-        linkedNpcSyncService.publishCapturedLinkedNpcSnapshot(
-                targetRef,
-                world,
-                targetUuid,
-                existingOwner,
-                snapshotRoleId,
-                snapshotDisplayName
-        );
-
         ItemStack updated = itemStackMetadataService.swapItemId(itemStack, config.getSpawnerFilledItemId())
                 .withMetadata(TameworkMetadataKeys.CAPTURED, Codec.BOOLEAN, true)
                 .withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING, targetUuid);
@@ -699,59 +452,119 @@ public final class SpawnerFeatureHandler {
         }
         updated = itemDisplayMetadataService.applyCapturedDisplayMetadata(updated, config);
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
-
-        if (!playerInventoryService.updateHeldItem(player, updated)) {
-            logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
-            return false;
-        }
-        if (targetUuid != null) {
-            if (relocationService != null) {
-                relocationService.cancelPendingRelocation(targetUuid);
-            }
-            if (lostService != null) {
-                lostService.clearLostSnapshot(targetUuid);
-            }
-            if (coopService != null) {
-                coopService.clearCoopSnapshot(targetUuid);
-            }
-        }
-        effectService.playCaptureEffects(world, targetRef, config);
-        captureFinalizerService.clearOwnerIfConfigured(player, config, targetRef);
-        captureFinalizerService.despawnNpc(player, targetRef, null);
-
-        logger.at(Level.FINE).log(
-                "Spawner stub: capture request item=" + itemStack.getItemId()
-                        + " targetUuid=" + targetUuid
-                        + " captureClearsOwner=" + config.isCaptureClearsOwner()
+        ItemStack capturedItem = updated;
+        ItemFeatureConfig finalizedConfig = config;
+        UUID finalizedOwnerToStore = ownerToStore;
+        String finalizedSnapshotRoleId = snapshotRoleId;
+        String finalizedSnapshotDisplayName = snapshotDisplayName;
+        Integer sourceHotbarSlot = resolveSourceHotbarSlot(player, null);
+        SpawnerSourceItemTransaction sourceItem = new SpawnerSourceItemTransaction(
+                playerInventoryService,
+                player,
+                sourceHotbarSlot,
+                itemStack,
+                logger,
+                "Spawner capture"
         );
-        logSpawnerFlowDebug(
-                "capture success item=" + itemStack.getItemId()
-                        + " player=" + player.getUuid()
-                        + " targetUuid=" + targetUuid
-                        + " existingOwner=" + existingOwner
-                        + " storedOwner=" + ownerToStore
-                        + " captureClearsOwner=" + config.isCaptureClearsOwner()
+        return captureFinalizerService.finalizeCapture(
+                player,
+                finalizedConfig,
+                targetRef,
+                new SpawnerCaptureFinalizerService.CaptureCallbacks() {
+                    @Override
+                    public boolean beforeApply(String profileId) {
+                        ItemStack profiledItem = capturedItem.withMetadata(
+                                TameworkMetadataKeys.COMPANION_PROFILE_ID,
+                                Codec.STRING,
+                                profileId
+                        );
+                        if (!sourceItem.prepare(profiledItem)) {
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    @Override
+                    public void onApplyCompensated(String profileId, String reason) {
+                        sourceItem.compensate();
+                    }
+
+                    @Override
+                    public void onApplied(String profileId,
+                                          com.alechilles.alecstamework.ownership.OwnerMutationContext context) {
+                        sourceItem.commit();
+                        linkedNpcSyncService.publishCapturedLinkedNpcSnapshot(
+                                context.npcRef(),
+                                world,
+                                context.npcUuid(),
+                                finalizedOwnerToStore,
+                                finalizedSnapshotRoleId,
+                                finalizedSnapshotDisplayName
+                        );
+                        UUID liveUuid = context.npcUuid();
+                        if (relocationService != null) {
+                            relocationService.cancelPendingRelocation(liveUuid);
+                        }
+                        if (lostService != null) {
+                            lostService.clearLostSnapshot(liveUuid);
+                        }
+                        if (coopService != null) {
+                            coopService.clearCoopSnapshot(liveUuid);
+                        }
+                        effectService.playCaptureEffects(world, context.npcRef(), finalizedConfig);
+                        logger.at(Level.FINE).log(
+                                "Spawner stub: capture request item=" + itemStack.getItemId()
+                                        + " targetUuid=" + targetUuid
+                                        + " captureClearsOwner=" + finalizedConfig.isCaptureClearsOwner()
+                        );
+                        logSpawnerFlowDebug(
+                                "capture success item=" + itemStack.getItemId()
+                                        + " player=" + player.getUuid()
+                                        + " targetUuid=" + targetUuid
+                                        + " existingOwner=" + existingOwner
+                                        + " storedOwner=" + finalizedOwnerToStore
+                                        + " captureClearsOwner=" + finalizedConfig.isCaptureClearsOwner()
+                        );
+                    }
+
+                    @Override
+                    public void onDenied(String reason) {
+                        logSpawnerFlowDebug(
+                                "capture denied reason=" + reason
+                                        + " player=" + player.getUuid()
+                                        + " targetUuid=" + targetUuid
+                        );
+                    }
+
+                    @Override
+                    public void onDurabilityDegraded(String reason) {
+                        logger.at(Level.WARNING).log(
+                                "Spawner capture ownership durability degraded after apply: " + reason
+                        );
+                    }
+                }
         );
-        return true;
     }
 
+    @Nullable
+    private Integer resolveSourceHotbarSlot(Player player, @Nullable Integer explicitSlot) {
+        if (explicitSlot != null && explicitSlot >= 0) {
+            return explicitSlot;
+        }
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        return activeSlot < 0 ? null : (int) activeSlot;
+    }
+
+    @Nullable
+    static UUID resolveCapturedOwnerMetadata(@Nullable UUID existingOwner, boolean captureClearsOwner) {
+        return captureClearsOwner ? null : existingOwner;
+    }
     private void logSpawnerFlowDebug(String message) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || !instance.isDebugSpawnerEnabled()) {
             return;
         }
         logger.at(Level.INFO).log("Spawner flow debug: " + message);
-    }
-
-    private boolean isCooldownActive(ItemStack itemStack, String key, int cooldownMs) {
-        if (itemStack == null || key == null || cooldownMs <= 0) {
-            return false;
-        }
-        Long until = itemStack.getFromMetadataOrNull(key, Codec.LONG);
-        if (until == null) {
-            return false;
-        }
-        return until > System.currentTimeMillis();
     }
 
 }

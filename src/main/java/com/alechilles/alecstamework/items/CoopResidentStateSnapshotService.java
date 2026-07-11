@@ -12,10 +12,8 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
-import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
-import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
@@ -46,6 +44,8 @@ import javax.annotation.Nullable;
 public final class CoopResidentStateSnapshotService {
     private final ConcurrentHashMap<UUID, CoopResidentStateSnapshot> snapshotsByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CoopResidentStateSnapshot> recentRemovedByRole = new ConcurrentHashMap<>();
+    private final CoopResidentSnapshotApplicationService applicationService =
+            new CoopResidentSnapshotApplicationService();
 
     @Nullable
     public RemovedCoopResidentCapture onNpcRemoved(@Nullable Ref<EntityStore> reference,
@@ -344,41 +344,13 @@ public final class CoopResidentStateSnapshotService {
         if (reference == null || !reference.isValid() || store == null || commandBuffer == null || snapshot == null) {
             return;
         }
-        putIfPresent(commandBuffer, reference, TameworkCommandLinksComponent.getComponentType(), snapshot.commandLinks());
-        putIfPresent(commandBuffer, reference, TameworkOwnerComponent.getComponentType(), snapshot.owner());
-        putIfPresent(commandBuffer, reference, TameworkTamedComponent.getComponentType(), snapshot.tamed());
-        putIfPresent(commandBuffer, reference, TameworkNpcNameComponent.getComponentType(), snapshot.npcName());
-        applyDisplayNameIfPresent(reference, commandBuffer, snapshot.npcName());
-        putIfPresent(commandBuffer, reference, TameworkHappinessComponent.getComponentType(), snapshot.happiness());
-        putIfPresent(commandBuffer, reference, TameworkNeedsComponent.getComponentType(), snapshot.needs());
-        putIfPresent(commandBuffer, reference, TameworkBreedingComponent.getComponentType(), snapshot.breeding());
-        putIfPresent(commandBuffer, reference, TameworkLevelingComponent.getComponentType(), snapshot.leveling());
-        putIfPresent(commandBuffer, reference, TameworkTraitsComponent.getComponentType(), snapshot.traits());
-        putIfPresent(commandBuffer, reference, TameworkTalentsComponent.getComponentType(), snapshot.talents());
-        putIfPresent(commandBuffer, reference, TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
-        putIfPresent(commandBuffer, reference, TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
-        if (snapshot.healthPercent() != null) {
-            commandBuffer.run(bufferStore -> applyRestoredHealth(reference, bufferStore, snapshot.healthPercent()));
-        }
+        applicationService.applyBuffered(reference, store, commandBuffer, snapshot);
     }
 
     void applyRestoredHealth(@Nullable Ref<EntityStore> reference,
                              @Nullable Store<EntityStore> store,
                              @Nullable Double healthPercent) {
-        if (reference == null || !reference.isValid() || store == null || healthPercent == null) {
-            return;
-        }
-        CompanionStatModifierService.applyTraitModifiers(reference, store);
-        CompanionHealthStateService.applyStoredHealthPercent(reference, store, healthPercent);
-    }
-
-    private void applyDisplayNameIfPresent(@Nonnull Ref<EntityStore> reference,
-                                           @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                           @Nullable TameworkNpcNameComponent npcName) {
-        if (npcName == null || npcName.getName() == null || npcName.getName().isBlank()) {
-            return;
-        }
-        NpcDisplayNameComponentService.putPersistentAndRuntimeName(commandBuffer, reference, npcName.getName());
+        applicationService.applyHealth(reference, store, healthPercent);
     }
 
     @Nullable
@@ -462,16 +434,6 @@ public final class CoopResidentStateSnapshotService {
             return null;
         }
         return (T) component.clone();
-    }
-
-    private <T extends Component<EntityStore>> void putIfPresent(@Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                                                  @Nonnull Ref<EntityStore> reference,
-                                                                  @Nullable ComponentType<EntityStore, T> type,
-                                                                  @Nullable T component) {
-        if (type == null || component == null) {
-            return;
-        }
-        commandBuffer.putComponent(reference, type, copyComponent(component));
     }
 
     private void debugCoop(String message) {

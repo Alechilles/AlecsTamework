@@ -1,19 +1,19 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.query.Query;
-import org.joml.Vector3d;
+import com.hypixel.hytale.component.spatial.SpatialResource;
+import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.List;
 import java.util.Locale;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /**
  * Resolves same-type population keys and nearby counts for breeding overcrowding checks.
@@ -49,28 +49,21 @@ final class BreedingPopulationTypeService {
         if (npcType == null || transformType == null) {
             return 0;
         }
+        SpatialResource<Ref<EntityStore>, EntityStore> entitySpatialResource =
+                store.getResource(EntityModule.get().getEntitySpatialResourceType());
+        if (entitySpatialResource == null) {
+            return 0;
+        }
         final double radiusSq = Math.max(0.0, radius) * Math.max(0.0, radius);
-        final int[] count = new int[] {0};
-        store.forEachChunk(
-                Query.and(npcType, transformType),
-                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
-                        countChunk(chunk, npcType, transformType, center, radiusSq, config, typeKey, count)
-        );
-        return count[0];
-    }
-
-    private void countChunk(@Nonnull ArchetypeChunk<EntityStore> chunk,
-                            @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
-                            @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
-                            @Nonnull Vector3d center,
-                            double radiusSq,
-                            @Nullable TwBreedingConfig config,
-                            @Nonnull String typeKey,
-                            @Nonnull int[] countRef) {
-        int size = chunk.size();
-        for (int i = 0; i < size; i++) {
-            NPCEntity npc = chunk.getComponent(i, npcType);
-            TransformComponent transform = chunk.getComponent(i, transformType);
+        List<Ref<EntityStore>> nearby = SpatialResource.getThreadLocalReferenceList();
+        entitySpatialResource.getSpatialStructure().collect(center, Math.max(0.0, radius), nearby);
+        int count = 0;
+        for (Ref<EntityStore> ref : nearby) {
+            if (ref == null || !ref.isValid()) {
+                continue;
+            }
+            NPCEntity npc = store.getComponent(ref, npcType);
+            TransformComponent transform = store.getComponent(ref, transformType);
             if (npc == null || transform == null) {
                 continue;
             }
@@ -90,8 +83,9 @@ final class BreedingPopulationTypeService {
             if (!Double.isFinite(distanceSq) || distanceSq > radiusSq) {
                 continue;
             }
-            countRef[0]++;
+            count++;
         }
+        return count;
     }
 
     @Nullable

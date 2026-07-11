@@ -99,6 +99,29 @@ class SimpleClaimsCapabilitiesTest {
     }
 
     @Test
+    void damageGenerationNeverProbesOrCallsPopulationExtent() {
+        FixtureClaimManager manager = claimedWorld(false);
+        SimpleClaimsBreedingBridge bridge = SimpleClaimsBreedingBridge.forDamageTypesForTests(
+                FixtureClaimManager.class,
+                FixtureChunk.class,
+                FixtureParty.class
+        );
+
+        ClaimLookupResult lookup = bridge.lookupClaimIdentity("world", 1.0, 1.0);
+        SimpleClaimsBreedingBridge.DamageAccessResult damage = bridge.evaluateDamageAccess(
+                "world",
+                new Vector3d(1, 0, 1),
+                ATTACKER_ID,
+                "ignored.legacy.key"
+        );
+
+        assertFalse(bridge.isExtentAvailable());
+        assertEquals(ClaimLookupResult.Status.CLAIM_FOUND, lookup.status());
+        assertEquals(SimpleClaimsBreedingBridge.DamageAccessStatus.DENIED, damage.status());
+        assertEquals(0, manager.getChunksCalls);
+    }
+
+    @Test
     void lookupValidationAndInvocationFailuresMapToExplicitErrors() {
         SimpleClaimsClaimLookup lookup = SimpleClaimsClaimLookup.forTypes(
                 FixtureClaimManager.class,

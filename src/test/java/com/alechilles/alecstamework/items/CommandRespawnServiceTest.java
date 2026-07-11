@@ -56,7 +56,7 @@ class CommandRespawnServiceTest {
                 "src", "main", "java", "com", "alechilles", "alecstamework", "items", "CommandRespawnService.java"
         ), StandardCharsets.UTF_8);
 
-        int restoreIndex = source.indexOf("applyRespawnRecoveryState(spawnedRef, store, deadSnapshot);");
+        int restoreIndex = source.indexOf("progressionRestoreService.applyRecovery(spawnedRef, store, snapshot);");
         int bootstrapIndex = source.indexOf(
                 "CompanionProgressionBootstrapService.ensureProgressionComponents(spawnedRef, store, roleId);"
         );

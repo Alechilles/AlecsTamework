@@ -42,6 +42,35 @@ class ClaimLookupSessionTest {
         assertEquals(1L, session.providerCallCount());
     }
 
+    @Test
+    void aggregateMetricsBoundProviderCallsByUniqueChunksAtLargeCandidateCounts() {
+        for (int candidateCount : new int[]{100, 1_000, 5_000}) {
+            ClaimChunkCoordinate chunk = new ClaimChunkCoordinate("world", 0, 0);
+            ClaimPopulationKey key = ClaimPopulationKey.simpleClaims("world", UUID.randomUUID());
+            CountingBridge bridge = new CountingBridge(ClaimResolution.found(
+                    key,
+                    new ClaimFootprint(java.util.List.of(chunk))
+            ));
+            ClaimLookupMetrics metrics = new ClaimLookupMetrics();
+            ClaimLookupSession session = new ClaimLookupSession(
+                    context(bridge, "instance-" + candidateCount, 1L),
+                    true,
+                    metrics
+            );
+
+            for (int candidate = 0; candidate < candidateCount; candidate++) {
+                session.resolveBlock("world", candidate % 31, (candidate * 7) % 31);
+            }
+
+            ClaimLookupMetrics.Snapshot snapshot = metrics.snapshot();
+            assertEquals(candidateCount, snapshot.requests());
+            assertEquals(1L, snapshot.uniqueChunks());
+            assertEquals(1L, snapshot.providerCalls());
+            assertEquals(candidateCount - 1L, snapshot.cacheHits());
+            assertEquals(1, bridge.calls.get());
+        }
+    }
+
     private static ClaimPolicyContext context(ClaimIntegrationBridge bridge,
                                               String instanceToken,
                                               long contractGeneration) {

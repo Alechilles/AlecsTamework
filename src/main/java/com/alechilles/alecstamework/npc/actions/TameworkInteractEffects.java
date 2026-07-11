@@ -20,7 +20,6 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModifyStat
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.PlaySoundEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetOwnerEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetRoleEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetStateEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEffect;
@@ -40,18 +39,12 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Tamework interact effects. */
 final class TameworkInteractEffects {
-    private static final String CONTAINER_BUCKET_ITEM_ID = "Container_Bucket";
-    private static final String DECO_BUCKET_ITEM_ID = "Deco_Bucket";
-    private static final String HARVEST_ADD_ITEM_BUCKET_PARAM = "HarvestAddItemBucket";
-    private static final String HARVEST_ADD_ITEM_DECO_BUCKET_PARAM = "HarvestAddItemDecoBucket";
-    private static final String HARVEST_TIMEOUT_PARAMETER = "HarvestTimeout";
     private final ActionTameworkInteract owner;
     private final InteractionInventoryEffects inventoryEffects;
     private final InteractionPresentationEffects presentationEffects;
@@ -60,6 +53,8 @@ final class TameworkInteractEffects {
     private final InteractionMountEffects mountEffects;
     private final InteractionHookEffects hookEffects;
     private final InteractionBreedingEffects breedingEffects;
+    private final InteractionOwnerContinuationEffects ownerContinuationEffects;
+    private final InteractionHarvestEffects harvestEffects;
     @Nullable
     private final InteractionExtensionRuntime extensionRuntime;
 
@@ -73,6 +68,8 @@ final class TameworkInteractEffects {
         this.mountEffects = new InteractionMountEffects(owner);
         this.hookEffects = new InteractionHookEffects(owner);
         this.breedingEffects = new InteractionBreedingEffects(owner);
+        this.ownerContinuationEffects = new InteractionOwnerContinuationEffects(owner, stateEffects);
+        this.harvestEffects = new InteractionHarvestEffects(owner, inventoryEffects, stateEffects);
         this.extensionRuntime = extensionRuntime;
     }
 
@@ -87,6 +84,57 @@ final class TameworkInteractEffects {
                                Player player,
                                InteractionContextSnapshot ctx,
                                boolean harvestInteraction) {
+        InteractionOwnerContinuationEffects.OwnerEffectAttempt ownerAttempt =
+                ownerContinuationEffects.applyOwnerEffect(
+                        effects,
+                        npcRef,
+                        store,
+                        player,
+                        role,
+                        (liveNpcRef, liveStore, livePlayer, liveRole, liveContext) ->
+                        applyCustomEffectsWithoutOwner(
+                                interactionConfigId,
+                                interactionIndex,
+                                entry,
+                                effects,
+                                liveNpcRef,
+                                liveRole,
+                                infoProvider,
+                                liveStore,
+                                livePlayer,
+                                liveContext,
+                                harvestInteraction
+                        )
+                );
+        if (ownerAttempt.present()) {
+            return ownerAttempt.applied();
+        }
+        return applyCustomEffectsWithoutOwner(
+                interactionConfigId,
+                interactionIndex,
+                entry,
+                effects,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                harvestInteraction
+        );
+    }
+
+    private boolean applyCustomEffectsWithoutOwner(@Nullable String interactionConfigId,
+                                                   int interactionIndex,
+                                                   @Nonnull InteractionEntry entry,
+                                                   Effects effects,
+                                                   Ref<EntityStore> npcRef,
+                                                   Role role,
+                                                   InfoProvider infoProvider,
+                                                   Store<EntityStore> store,
+                                                   Player player,
+                                                   InteractionContextSnapshot ctx,
+                                                   boolean harvestInteraction) {
         boolean applied = false;
         if (entry instanceof CustomInteraction customInteraction) {
             applied |= applyPresetEffects(
@@ -112,10 +160,6 @@ final class TameworkInteractEffects {
         SetTamedEffect setTamed = effects.getSetTamed();
         if (setTamed != null) {
             applied |= stateEffects.applySetTamed(setTamed, npcRef, store);
-        }
-        SetOwnerEffect setOwner = effects.getSetOwner();
-        if (setOwner != null) {
-            applied |= stateEffects.applySetOwner(setOwner, npcRef, store, player);
         }
         ModifyStatsEffect modifyStats = effects.getModifyStats();
         if (modifyStats != null) {
@@ -191,8 +235,21 @@ final class TameworkInteractEffects {
         return applied;
     }
 
-    boolean applyStartTaming(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        return stateEffects.applyStartTaming(npcRef, store, player);
+    boolean applyStartTaming(Ref<EntityStore> npcRef,
+                             Store<EntityStore> store,
+                             Player player,
+                             @Nullable InteractionStateEffects.OwnerAppliedContinuation continuation) {
+        return ownerContinuationEffects.applyStartTaming(npcRef, store, player, continuation);
+    }
+
+    Role resolveLiveRole(Ref<EntityStore> npcRef,
+                         Store<EntityStore> store,
+                         @Nullable Role fallback) {
+        return ownerContinuationEffects.resolveLiveRole(npcRef, store, fallback);
+    }
+
+    InteractionContextSnapshot refreshContext(@Nullable Player player, @Nullable Role role) {
+        return ownerContinuationEffects.refreshContext(player, role);
     }
 
     boolean applyTameRoleChange(TameInteraction interaction,
@@ -263,43 +320,21 @@ final class TameworkInteractEffects {
     }
 
     boolean applyStartHarvest(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
-        return stateEffects.applyStartHarvest(npcRef, role, store);
+        return harvestEffects.applyStartHarvest(npcRef, role, store);
     }
 
     boolean isHarvestCooldownReady(Ref<EntityStore> npcRef,
                                    Role role,
                                    Store<EntityStore> store,
                                    InteractionContextSnapshot ctx) {
-        double baseSeconds = resolveHarvestTimeoutSeconds(role, ctx);
-        logHarvestDebug("TameworkHarvestDebug: cooldown-ready-request"
-                + " role=" + roleName(role)
-                + " held=" + heldItem(ctx)
-                + " baseSeconds=" + baseSeconds);
-        boolean ready = ActionTameworkHarvestAlarm.isHarvestCooldownReady(npcRef, role, store, baseSeconds);
-        logHarvestDebug("TameworkHarvestDebug: cooldown-ready-response"
-                + " role=" + roleName(role)
-                + " held=" + heldItem(ctx)
-                + " baseSeconds=" + baseSeconds
-                + " ready=" + ready);
-        return ready;
+        return harvestEffects.isCooldownReady(npcRef, role, store, ctx);
     }
 
     boolean ensureHarvestCooldownAfterState(Ref<EntityStore> npcRef,
                                             Role role,
                                             Store<EntityStore> store,
                                             InteractionContextSnapshot ctx) {
-        double baseSeconds = resolveHarvestTimeoutSeconds(role, ctx);
-        logHarvestDebug("TameworkHarvestDebug: cooldown-ensure-request"
-                + " role=" + roleName(role)
-                + " held=" + heldItem(ctx)
-                + " baseSeconds=" + baseSeconds);
-        boolean applied = ActionTameworkHarvestAlarm.ensureHarvestCooldownActive(npcRef, role, store, baseSeconds);
-        logHarvestDebug("TameworkHarvestDebug: cooldown-ensure-response"
-                + " role=" + roleName(role)
-                + " held=" + heldItem(ctx)
-                + " baseSeconds=" + baseSeconds
-                + " applied=" + applied);
-        return applied;
+        return harvestEffects.ensureCooldownAfterState(npcRef, role, store, ctx);
     }
 
     void logHarvestExecution(String stage,
@@ -307,12 +342,7 @@ final class TameworkInteractEffects {
                              int interactionIndex,
                              Role role,
                              InteractionContextSnapshot ctx) {
-        logHarvestDebug("TameworkHarvestDebug: execution"
-                + " stage=" + stage
-                + " config=" + text(interactionConfigId)
-                + " index=" + interactionIndex
-                + " role=" + roleName(role)
-                + " held=" + heldItem(ctx));
+        harvestEffects.logExecution(stage, interactionConfigId, interactionIndex, role, ctx);
     }
 
     void logMountExecution(String stage,
@@ -328,62 +358,12 @@ final class TameworkInteractEffects {
                 + " held=" + heldItem(ctx));
     }
 
-    private double resolveHarvestTimeoutSeconds(Role role, InteractionContextSnapshot ctx) {
-        String[] timeoutRange = owner.getRoleStringArrayParam(role, ctx, HARVEST_TIMEOUT_PARAMETER);
-        double rangeSeconds = HarvestAlarmTimeBasis.resolveTemporalRangeSeconds(
-                timeoutRange,
-                ThreadLocalRandom.current()::nextDouble
-        );
-        if (rangeSeconds > 0.0) {
-            return rangeSeconds;
-        }
-        return owner.getRoleNumberParam(role, ctx, HARVEST_TIMEOUT_PARAMETER, 0.0);
-    }
-
     HarvestContainerOutcome applyHarvestContainerTransform(Ref<EntityStore> npcRef,
                                                            Store<EntityStore> store,
                                                            Role role,
                                                            Player player,
                                                            InteractionContextSnapshot ctx) {
-        String bucketOutput = owner.getRoleStringParam(role, ctx, HARVEST_ADD_ITEM_BUCKET_PARAM);
-        String decoBucketOutput = owner.getRoleStringParam(role, ctx, HARVEST_ADD_ITEM_DECO_BUCKET_PARAM);
-        boolean hasBucketOutput = bucketOutput != null && !bucketOutput.isBlank();
-        boolean hasDecoBucketOutput = decoBucketOutput != null && !decoBucketOutput.isBlank();
-        if (!hasBucketOutput && !hasDecoBucketOutput) {
-            logHarvestContainerDiagnostic(role, ctx, HarvestContainerResult.NOT_CONFIGURED, bucketOutput, decoBucketOutput, false);
-            return new HarvestContainerOutcome(HarvestContainerResult.NOT_CONFIGURED, false);
-        }
-        String activeItem = ctx != null ? ctx.activeItemId : null;
-        boolean transformed = false;
-        if (hasBucketOutput && CONTAINER_BUCKET_ITEM_ID.equalsIgnoreCase(activeItem)) {
-            transformed = inventoryEffects.replaceHeldItem(player, ctx, CONTAINER_BUCKET_ITEM_ID, bucketOutput);
-        } else if (hasDecoBucketOutput && DECO_BUCKET_ITEM_ID.equalsIgnoreCase(activeItem)) {
-            transformed = inventoryEffects.replaceHeldItem(player, ctx, DECO_BUCKET_ITEM_ID, decoBucketOutput);
-        }
-        if (!transformed) {
-            logHarvestContainerDiagnostic(role, ctx, HarvestContainerResult.FAILED, bucketOutput, decoBucketOutput, false);
-            return new HarvestContainerOutcome(HarvestContainerResult.FAILED, false);
-        }
-        String harvestBonusMode = owner.getRoleStringParam(
-                role,
-                ctx,
-                CompanionHarvestBonusService.HARVEST_BONUS_MODE_PARAM
-        );
-        boolean preserveCooldown =
-                CompanionHarvestBonusService.shouldPreserveCooldown(harvestBonusMode, npcRef, store);
-        if (preserveCooldown) {
-            CompanionHarvestBonusService.markCooldownSkip(npcRef, store);
-        }
-        logHarvestContainerDiagnostic(
-                role,
-                ctx,
-                HarvestContainerResult.APPLIED,
-                bucketOutput,
-                decoBucketOutput,
-                harvestBonusMode,
-                preserveCooldown
-        );
-        return new HarvestContainerOutcome(HarvestContainerResult.APPLIED, preserveCooldown);
+        return harvestEffects.applyContainerTransform(npcRef, store, role, player, ctx);
     }
 
     // Mounts the interacting player using the mount helper.
@@ -548,39 +528,6 @@ final class TameworkInteractEffects {
             return;
         }
         owner.logUnsupported(message);
-    }
-
-    private void logHarvestContainerDiagnostic(Role role,
-                                               InteractionContextSnapshot ctx,
-                                               HarvestContainerResult result,
-                                               @Nullable String bucketOutput,
-                                               @Nullable String decoBucketOutput,
-                                               boolean preserveCooldown) {
-        logHarvestContainerDiagnostic(role, ctx, result, bucketOutput, decoBucketOutput, null, preserveCooldown);
-    }
-
-    private void logHarvestContainerDiagnostic(Role role,
-                                               InteractionContextSnapshot ctx,
-                                               HarvestContainerResult result,
-                                               @Nullable String bucketOutput,
-                                               @Nullable String decoBucketOutput,
-                                               @Nullable String harvestBonusMode,
-                                               boolean preserveCooldown) {
-        logHarvestDebug("TameworkHarvestDebug: container"
-                + " role=" + roleName(role)
-                + " held=" + heldItem(ctx)
-                + " bucketOutput=" + text(bucketOutput)
-                + " decoBucketOutput=" + text(decoBucketOutput)
-                + " harvestBonusMode=" + text(harvestBonusMode)
-                + " result=" + result
-                + " preserveCooldown=" + preserveCooldown);
-    }
-
-    private void logHarvestDebug(String message) {
-        Tamework instance = Tamework.getInstance();
-        if (instance != null && instance.isDebugHarvestEnabled() && instance.getLogger() != null) {
-            instance.getLogger().at(Level.INFO).log(message);
-        }
     }
 
     private void logMountDebug(String message) {

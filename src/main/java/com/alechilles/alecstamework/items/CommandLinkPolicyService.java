@@ -52,7 +52,7 @@ final class CommandLinkPolicyService {
                               String toolId,
                               Store<EntityStore> store) {
         MembershipMode mode = membershipMode != null ? membershipMode : MembershipMode.LinkedOnly;
-        boolean linked = isLinked(npcRef, playerUuid, toolId, store, requireOwner);
+        boolean linked = isLinked(npcRef, playerUuid, toolId, store);
         boolean owner = isOwnedByPlayer(npcRef, playerUuid, store);
         boolean master = isMasterTargetedToPlayer(npc, playerRef);
         return switch (mode) {
@@ -83,11 +83,7 @@ final class CommandLinkPolicyService {
 
     UUID resolveOwnerId(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         TameworkOwnerComponent owner = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
-        if (owner != null && owner.getOwnerId() != null) {
-            return owner.getOwnerId();
-        }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        return links != null ? links.getOwnerId() : null;
+        return owner != null ? owner.getOwnerId() : null;
     }
 
     String resolveRoleId(NPCEntity npc) {
@@ -168,17 +164,27 @@ final class CommandLinkPolicyService {
     private boolean isLinked(Ref<EntityStore> npcRef,
                              UUID playerUuid,
                              String toolId,
-                             Store<EntityStore> store,
-                             boolean requireOwner) {
+                             Store<EntityStore> store) {
         TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
         if (links == null || toolId == null || toolId.isBlank()) {
             return false;
         }
-        UUID ownerId = links.getOwnerId();
-        if (requireOwner && ownerId != null && !ownerId.equals(playerUuid)) {
-            return false;
-        }
-        return links.containsToolId(toolId);
+        return isLinkAuthorized(
+                resolveOwnerId(npcRef, store),
+                links.getOwnerId(),
+                playerUuid,
+                links.containsToolId(toolId)
+        );
+    }
+
+    static boolean isLinkAuthorized(UUID canonicalOwnerId,
+                                    UUID linkOwnerId,
+                                    UUID playerUuid,
+                                    boolean containsToolId) {
+        return containsToolId
+                && canonicalOwnerId != null
+                && canonicalOwnerId.equals(playerUuid)
+                && canonicalOwnerId.equals(linkOwnerId);
     }
 
     private boolean isOwnedByPlayer(Ref<EntityStore> npcRef, UUID playerUuid, Store<EntityStore> store) {

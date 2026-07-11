@@ -43,6 +43,53 @@ class CompanionIdentityResolverTest {
         );
     }
 
+    /** Regression: a competing operation cannot release or take over another key's provisional identity. */
+    @Test
+    void provisionalIdentityRemainsOwnedByItsIdempotencyKeyUntilExplicitRelease() {
+        UUID npcUuid = UUID.randomUUID();
+        CompanionIdentityResolver resolver = new CompanionIdentityResolver();
+        CompanionIdentityResolver.Resolution original =
+                resolver.resolveOrAllocate(npcUuid, "owner-operation");
+
+        assertEquals(original, resolver.resolveOrAllocate(npcUuid, "owner-operation"));
+        assertThrows(IllegalArgumentException.class, () ->
+                resolver.resolveOrAllocate(npcUuid, "competing-operation")
+        );
+        assertFalse(resolver.releaseProvisional("another-profile", npcUuid));
+        assertFalse(resolver.releaseProvisional(original.profileId(), UUID.randomUUID()));
+        assertEquals(original.profileId(), resolver.resolveProfileId(npcUuid).orElseThrow());
+
+        assertTrue(resolver.releaseProvisional(original.profileId(), npcUuid));
+        assertEquals(original.profileId(), resolver.resolveProfileId(npcUuid).orElseThrow());
+        assertTrue(resolver.releaseProvisional(original.profileId(), npcUuid));
+        assertTrue(resolver.resolveProfileId(npcUuid).isEmpty());
+        CompanionIdentityResolver.Resolution replacement =
+                resolver.resolveOrAllocate(npcUuid, "replacement-operation");
+        assertTrue(replacement.provisional());
+        assertFalse(original.profileId().equals(replacement.profileId()));
+    }
+
+    /** Regression: canceling one duplicate schedule cannot release another schedule's identity. */
+    @Test
+    void sameKeyProvisionalIdentityIsRetainedUntilEveryResolveLeaseCloses() {
+        UUID npcUuid = UUID.randomUUID();
+        CompanionIdentityResolver resolver = new CompanionIdentityResolver();
+        CompanionIdentityResolver.Resolution first =
+                resolver.resolveOrAllocate(npcUuid, "shared-operation");
+        CompanionIdentityResolver.Resolution second =
+                resolver.resolveOrAllocate(npcUuid, "shared-operation");
+
+        assertEquals(first, second);
+        assertTrue(resolver.releaseProvisional(first.profileId(), npcUuid));
+        assertEquals(first.profileId(), resolver.resolveProfileId(npcUuid).orElseThrow());
+        assertThrows(IllegalArgumentException.class, () ->
+                resolver.resolveOrAllocate(npcUuid, "competing-operation")
+        );
+
+        assertTrue(resolver.releaseProvisional(first.profileId(), npcUuid));
+        assertTrue(resolver.resolveProfileId(npcUuid).isEmpty());
+    }
+
     @Test
     void existingAliasWinsWithoutAllocatingAnotherProfile() {
         UUID npcUuid = UUID.randomUUID();
@@ -72,6 +119,26 @@ class CompanionIdentityResolverTest {
                 resolver.resolveOrAllocate(npcUuid, "another-operation");
         assertFalse(durable.provisional());
         assertEquals(provisional.profileId(), durable.profileId());
+    }
+
+    @Test
+    void durablePreparationPromotionInvalidatesAllOutstandingProvisionalLeases() {
+        UUID npcUuid = UUID.randomUUID();
+        CompanionIdentityResolver resolver = new CompanionIdentityResolver();
+        CompanionIdentityResolver.Resolution first =
+                resolver.resolveOrAllocate(npcUuid, "shared-prepare");
+        CompanionIdentityResolver.Resolution duplicate =
+                resolver.resolveOrAllocate(npcUuid, "shared-prepare");
+        assertEquals(first, duplicate);
+
+        resolver.markDurable(first.profileId(), npcUuid);
+
+        assertFalse(resolver.releaseProvisional(first.profileId(), npcUuid));
+        assertFalse(resolver.releaseProvisional(first.profileId(), npcUuid));
+        CompanionIdentityResolver.Resolution retry =
+                resolver.resolveOrAllocate(npcUuid, "different-retry-key");
+        assertFalse(retry.provisional());
+        assertEquals(first.profileId(), retry.profileId());
     }
 
     @Test

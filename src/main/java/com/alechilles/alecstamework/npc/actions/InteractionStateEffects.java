@@ -2,15 +2,11 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModifyStatsEffect;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.OwnerSource;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetOwnerEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetStateEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StatDelta;
-import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
-import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.assetstore.map.IndexedLookupTableAssetMap;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
@@ -21,10 +17,8 @@ import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffec
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
@@ -33,9 +27,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
-import java.util.UUID;
 import java.util.logging.Level;
-import org.joml.Vector3d;
+import javax.annotation.Nullable;
 
 /** Applies interaction effects that change NPC ownership, stats, or states. */
 final class InteractionStateEffects {
@@ -44,7 +37,8 @@ final class InteractionStateEffects {
     private static final int EFFECT_INDEX_UNRESOLVED = Integer.MIN_VALUE;
     private static final int DISABLE_DESPAWN_SPAWN_CONFIGURATION = Integer.MIN_VALUE;
     private static int tranquilizerEffectIndex = EFFECT_INDEX_UNRESOLVED;
-    private final TameClaimLimitPolicyService claimLimitPolicyService = new TameClaimLimitPolicyService();
+    private final InteractionOwnerAdmissionService ownerAdmissionService =
+            new InteractionOwnerAdmissionService();
     /**
      * Cross-template swaps (for example wild -> tamed livestock) can fail when preserving
      * state/substate names from the source role. Interaction-driven role changes should
@@ -52,28 +46,21 @@ final class InteractionStateEffects {
      */
     private static final boolean PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE = false;
 
-    // Marks the NPC as tamed and assigns owner based on the interacting player.
-    boolean applyStartTaming(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (isNewPlayerOwnershipAcquisitionDenied(npcRef, store, player, ownerType)) {
-            return false;
-        }
-        clearTranquilizerEffect(npcRef, store);
-        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
-        if (tamedType != null) {
-            store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
-        }
-        if (ownerType != null && player != null) {
-            PlayerRef ref = player.getPlayerRef();
-            UUID ownerId = player.getUuid();
-            String ownerName = ref != null ? ref.getUsername() : null;
-            store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
-        }
-        detachFromSpawnReferences(npcRef, store);
-        applyDisableSpawnDrivenDespawn(npcRef, store);
-        logDespawnDebug("start_taming", npcRef, store, null);
-        CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
-        return true;
+    // Schedules ownership and applies the rest of the tame bundle only after the owner write succeeds.
+    boolean applyStartTaming(Ref<EntityStore> npcRef,
+                             Store<EntityStore> store,
+                             Player player,
+                             @Nullable OwnerAppliedContinuation continuation) {
+        OwnerAppliedContinuation safeContinuation = continuation == null
+                ? OwnerAppliedContinuation.NOOP
+                : continuation;
+        return ownerAdmissionService.scheduleStartTaming(
+                npcRef, store, player,
+                (targetRef, targetStore, resolvedPlayer) -> {
+                    applyTameBundleAfterOwnership(targetRef, targetStore);
+                    safeContinuation.onApplied(targetRef, targetStore, resolvedPlayer);
+                }
+        );
     }
 
     // Starts the harvest state using the default substate if available.
@@ -109,96 +96,37 @@ final class InteractionStateEffects {
     }
 
     // Sets the owner component based on the configured source.
-    boolean applySetOwner(SetOwnerEffect effect, Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        if (effect == null || npcRef == null || store == null) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (ownerType == null) {
-            return false;
-        }
-        OwnerSource source = effect.getSource();
-        UUID ownerId = null;
-        String ownerName = null;
-        switch (source) {
-            case Player -> {
-                if (player == null) {
-                    return false;
-                }
-                if (isNewPlayerOwnershipAcquisitionDenied(npcRef, store, player, ownerType)) {
-                    return false;
-                }
-                ownerId = player.getUuid();
-                PlayerRef ref = player.getPlayerRef();
-                ownerName = ref != null ? ref.getUsername() : null;
-            }
-            case None -> {
-                ownerId = null;
-                ownerName = null;
-            }
-            case Custom -> {
-                String uuidText = effect.getUuid();
-                if (uuidText != null && !uuidText.isBlank()) {
-                    try {
-                        ownerId = UUID.fromString(uuidText.trim());
-                    } catch (IllegalArgumentException ignored) {
-                        ownerId = null;
-                    }
-                }
-                ownerName = effect.getName();
-                if (ownerId == null && (ownerName == null || ownerName.isBlank())) {
-                    return false;
-                }
-            }
-        }
-        store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
-        return true;
-    }
-
-    private boolean isNewPlayerOwnershipAcquisitionDenied(Ref<EntityStore> npcRef,
-                                                          Store<EntityStore> store,
-                                                          Player player,
-                                                          ComponentType<EntityStore, TameworkOwnerComponent> ownerType) {
-        if (npcRef == null || !npcRef.isValid() || store == null || player == null || ownerType == null) {
-            return false;
-        }
-        UUID playerId = player.getUuid();
-        if (playerId == null) {
-            return false;
-        }
-        TameworkOwnerComponent existingOwner = store.getComponent(npcRef, ownerType);
-        if (existingOwner != null && existingOwner.getOwnerId() != null) {
-            return false;
-        }
-        OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(store, playerId);
-        if (decision.allowed()) {
-            BreedingClaimLimitPolicyService.Decision claimDecision =
-                    claimLimitPolicyService.evaluate(store, resolvePosition(npcRef, store));
-            if (claimDecision.allowed()) {
-                return false;
-            }
-            if ("claim-cap-reached".equals(claimDecision.reason())) {
-                OwnerMessageUtil.sendClaimPopulationCapReached(
-                        player,
-                        claimDecision.currentCount(),
-                        claimDecision.effectiveCap()
-                );
-            }
-            return true;
-        }
-        OwnerMessageUtil.sendPopulationCapReached(
-                player,
-                decision.currentCount(),
-                decision.limit(),
-                decision.scope()
+    boolean applySetOwner(SetOwnerEffect effect,
+                          Ref<EntityStore> npcRef,
+                          Store<EntityStore> store,
+                          Player player,
+                          @Nullable OwnerAppliedContinuation continuation) {
+        return ownerAdmissionService.scheduleSetOwner(
+                effect, npcRef, store, player,
+                continuation == null ? OwnerAppliedContinuation.NOOP : continuation
         );
-        return true;
     }
 
-    private Vector3d resolvePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        ComponentType<EntityStore, TransformComponent> transformType = TransformComponent.getComponentType();
-        TransformComponent transform = transformType == null ? null : store.getComponent(npcRef, transformType);
-        return transform == null ? null : transform.getPosition();
+    void applyTameBundleAfterOwnership(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        clearTranquilizerEffect(npcRef, store);
+        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
+        if (tamedType != null) {
+            store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
+        }
+        detachFromSpawnReferences(npcRef, store);
+        applyDisableSpawnDrivenDespawn(npcRef, store);
+        logDespawnDebug("start_taming", npcRef, store, null);
+        CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
+    }
+
+    @FunctionalInterface
+    interface OwnerAppliedContinuation {
+        OwnerAppliedContinuation NOOP = (npcRef, store, player) -> {
+        };
+
+        void onApplied(Ref<EntityStore> npcRef,
+                       Store<EntityStore> store,
+                       @Nullable Player player);
     }
 
     // Applies stat deltas from a modify stats effect.
