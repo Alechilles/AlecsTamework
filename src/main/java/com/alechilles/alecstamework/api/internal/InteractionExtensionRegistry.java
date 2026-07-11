@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.api.InteractionRequirementContext;
 import com.alechilles.alecstamework.api.InteractionRequirementHandler;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.hypixel.hytale.logger.HytaleLogger;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -23,6 +24,8 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
     private final HytaleLogger logger;
     private final ConcurrentHashMap<String, InteractionRequirementHandler> requirementHandlers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, InteractionEffectHandler> effectHandlers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, InteractionRequirementHandler> builtInRequirementHandlers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, InteractionEffectHandler> builtInEffectHandlers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, InteractionPresetDefinition> presets = new ConcurrentHashMap<>();
 
     public InteractionExtensionRegistry(@Nullable HytaleLogger logger) {
@@ -33,6 +36,7 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
     @Nonnull
     public AutoCloseable registerRequirement(@Nonnull String id, @Nonnull InteractionRequirementHandler handler) {
         String normalizedId = requireNormalizedId(id, "requirement");
+        rejectReservedId(normalizedId, "requirement");
         InteractionRequirementHandler normalizedHandler = Objects.requireNonNull(handler, "handler");
         requirementHandlers.put(normalizedId, normalizedHandler);
         return () -> requirementHandlers.remove(normalizedId, normalizedHandler);
@@ -42,6 +46,7 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
     @Nonnull
     public AutoCloseable registerEffect(@Nonnull String id, @Nonnull InteractionEffectHandler handler) {
         String normalizedId = requireNormalizedId(id, "effect");
+        rejectReservedId(normalizedId, "effect");
         InteractionEffectHandler normalizedHandler = Objects.requireNonNull(handler, "handler");
         effectHandlers.put(normalizedId, normalizedHandler);
         return () -> effectHandlers.remove(normalizedId, normalizedHandler);
@@ -52,6 +57,7 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
     public AutoCloseable registerPreset(@Nonnull InteractionPresetDefinition preset) {
         InteractionPresetDefinition normalizedPreset = Objects.requireNonNull(preset, "preset");
         String normalizedId = requireNormalizedId(normalizedPreset.id(), "preset");
+        rejectReservedId(normalizedId, "preset");
         presets.put(normalizedId, normalizedPreset);
         return () -> presets.remove(normalizedId, normalizedPreset);
     }
@@ -65,13 +71,13 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
     @Override
     @Nonnull
     public Set<String> listRequirementIds() {
-        return Set.copyOf(requirementHandlers.keySet());
+        return combinedIds(requirementHandlers.keySet(), builtInRequirementHandlers.keySet());
     }
 
     @Override
     @Nonnull
     public Set<String> listEffectIds() {
-        return Set.copyOf(effectHandlers.keySet());
+        return combinedIds(effectHandlers.keySet(), builtInEffectHandlers.keySet());
     }
 
     @Override
@@ -96,7 +102,10 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
         if (normalizedId == null) {
             return false;
         }
-        InteractionRequirementHandler handler = requirementHandlers.get(normalizedId);
+        InteractionRequirementHandler handler = builtInRequirementHandlers.get(normalizedId);
+        if (handler == null) {
+            handler = requirementHandlers.get(normalizedId);
+        }
         if (handler == null) {
             return false;
         }
@@ -117,7 +126,10 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
         if (normalizedId == null) {
             return false;
         }
-        InteractionEffectHandler handler = effectHandlers.get(normalizedId);
+        InteractionEffectHandler handler = builtInEffectHandlers.get(normalizedId);
+        if (handler == null) {
+            handler = effectHandlers.get(normalizedId);
+        }
         if (handler == null) {
             return false;
         }
@@ -129,6 +141,18 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
         }
     }
 
+    /** Registers an implementation-owned requirement under the reserved {@code tamework:} namespace. */
+    public void registerBuiltInRequirement(@Nonnull String id, @Nonnull InteractionRequirementHandler handler) {
+        String normalizedId = requireBuiltInId(id, "requirement");
+        builtInRequirementHandlers.put(normalizedId, Objects.requireNonNull(handler, "handler"));
+    }
+
+    /** Registers an implementation-owned effect under the reserved {@code tamework:} namespace. */
+    public void registerBuiltInEffect(@Nonnull String id, @Nonnull InteractionEffectHandler handler) {
+        String normalizedId = requireBuiltInId(id, "effect");
+        builtInEffectHandlers.put(normalizedId, Objects.requireNonNull(handler, "handler"));
+    }
+
     @Nonnull
     private String requireNormalizedId(@Nullable String rawId, @Nonnull String typeName) {
         String normalized = normalizeId(rawId);
@@ -136,6 +160,28 @@ public final class InteractionExtensionRegistry implements InteractionExtensionA
             throw new IllegalArgumentException(typeName + " id must be nonblank.");
         }
         return normalized;
+    }
+
+    @Nonnull
+    private String requireBuiltInId(@Nullable String rawId, @Nonnull String typeName) {
+        String normalized = requireNormalizedId(rawId, typeName);
+        if (!normalized.startsWith("tamework:")) {
+            throw new IllegalArgumentException("built-in " + typeName + " id must use the tamework: namespace.");
+        }
+        return normalized;
+    }
+
+    private void rejectReservedId(@Nonnull String normalizedId, @Nonnull String typeName) {
+        if (normalizedId.startsWith("tamework:")) {
+            throw new IllegalArgumentException(typeName + " id uses the reserved tamework: namespace.");
+        }
+    }
+
+    @Nonnull
+    private static Set<String> combinedIds(@Nonnull Set<String> first, @Nonnull Set<String> second) {
+        HashSet<String> combined = new HashSet<>(first);
+        combined.addAll(second);
+        return Set.copyOf(combined);
     }
 
     @Nullable

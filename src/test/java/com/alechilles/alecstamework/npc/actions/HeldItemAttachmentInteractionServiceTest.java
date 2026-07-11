@@ -1,0 +1,57 @@
+package com.alechilles.alecstamework.npc.actions;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Pure behavior coverage for held-item attachment planning and model gates. */
+class HeldItemAttachmentInteractionServiceTest {
+    @Test
+    void modelGateRequiresSlotAndOptionalSupportedValue() {
+        Map<String, Set<String>> options = Map.of(
+                "Saddle", Set.of("None", "Yes"),
+                "SaddleBlanket", Set.of("None", "Blue")
+        );
+
+        assertTrue(HeldItemAttachmentInteractionService.supportsOptions(options, "SaddleBlanket", List.of()));
+        assertTrue(HeldItemAttachmentInteractionService.supportsOptions(options, "Saddle", List.of("Yes")));
+        assertFalse(HeldItemAttachmentInteractionService.supportsOptions(options, "Saddle", List.of("Red")));
+        assertFalse(HeldItemAttachmentInteractionService.supportsOptions(options, "Missing", List.of()));
+    }
+
+    @Test
+    void updatePreservesUnrelatedStoredSelections() {
+        Map<String, String> updated = HeldItemAttachmentInteractionService.buildUpdatedSelections(
+                Map.of("Coat", "Brown", "Saddle", "None"),
+                Map.of("Coat", "Black", "Temporary", "Visible"),
+                "Saddle",
+                "Yes"
+        );
+
+        assertEquals(Map.of("Coat", "Brown", "Saddle", "Yes"), updated);
+    }
+
+    @Test
+    void updateFallsBackToLiveStateAndRejectsAlreadyAppliedValue() {
+        Map<String, String> updated = HeldItemAttachmentInteractionService.buildUpdatedSelections(
+                Map.of(),
+                Map.of("Coat", "Black"),
+                "SaddleBlanket",
+                "Blue"
+        );
+
+        assertEquals(Map.of("Coat", "Black", "SaddleBlanket", "Blue"), updated);
+        assertNull(HeldItemAttachmentInteractionService.buildUpdatedSelections(
+                Map.of("SaddleBlanket", "Blue"),
+                Map.of(),
+                "SaddleBlanket",
+                "Blue"
+        ));
+    }
+}

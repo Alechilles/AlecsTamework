@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InteractionExtensionRegistryTest {
@@ -91,6 +92,28 @@ class InteractionExtensionRegistryTest {
         assertFalse(registry.applyEffect(
                 new InteractionEffectSpec("throwing.fx", null, List.of(), null),
                 new InteractionEffectContext("cfg", 1, null, null, null, null, null, null, null, false)
+        ));
+    }
+
+    @Test
+    void builtInsUseReservedNamespaceAndCannotBeOverridden() {
+        InteractionExtensionRegistry registry = new InteractionExtensionRegistry(null);
+        registry.registerBuiltInRequirement("tamework:model_supports_attachment", (context, spec) -> true);
+        registry.registerBuiltInEffect("tamework:set_attachment_from_held_item", (context, spec) -> true);
+
+        assertTrue(registry.listRequirementIds().contains("tamework:model_supports_attachment"));
+        assertTrue(registry.listEffectIds().contains("tamework:set_attachment_from_held_item"));
+        assertThrows(IllegalArgumentException.class, () -> registry.registerRequirement(
+                "tamework:model_supports_attachment",
+                (context, spec) -> false
+        ));
+        assertThrows(IllegalArgumentException.class, () -> registry.registerEffect(
+                "tamework:set_attachment_from_held_item",
+                (context, spec) -> false
+        ));
+        assertThrows(IllegalArgumentException.class, () -> registry.registerBuiltInEffect(
+                "other:set_attachment",
+                (context, spec) -> true
         ));
     }
 }

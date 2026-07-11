@@ -28,8 +28,16 @@ Capability: `INTERACTION_EXTENSIONS`
 ## ID Rules
 - IDs must be nonblank.
 - IDs are normalized to lowercase internally.
-- Re-registering the same ID replaces the previous handler/preset.
+- The `tamework:` namespace is reserved for built-in handlers and cannot be registered through the public API.
+- Re-registering the same non-reserved ID replaces the previous handler/preset.
 - Closing the returned `AutoCloseable` unregisters that exact registration.
+
+## Built-in Attachment Extensions
+
+- `tamework:model_supports_attachment` is a custom requirement whose `Param` names an attachment slot. Optional `Values` require at least one supported option.
+- `tamework:set_attachment_from_held_item` is a custom effect whose `Param` names an attachment slot and whose `Values` contain exact `ItemId=AttachmentValue` mappings.
+
+The attachment effect owns item consumption. It validates the live held item and current model before changing persisted/live attachment state, and it does not consume an item when the mutation fails or is already applied.
 
 ## Runtime Behavior
 - Requirement handlers return `boolean` pass/fail.

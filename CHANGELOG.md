@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Added reserved built-in interaction extensions for model-supported attachment gates and atomic held-item-to-attachment mappings, allowing asset packs to equip persisted NPC appearance attachments without per-item Java handlers.
 - Added a private server licensing template for negotiated custom plugins,
   private forks, and server-specific adaptations of Tamework systems.
 - Added `TwDynamicAttachmentsConfig` so mods can conditionally change NPC model attachments by role, display name, needs, happiness, traits, life stage, gender, tamed state, ownership, owner name/UUID, or NPC state, with permanent and reversible while-matching persistence modes and percentage thresholds for needs and happiness rules.

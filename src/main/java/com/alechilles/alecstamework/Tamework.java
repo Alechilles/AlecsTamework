@@ -77,6 +77,7 @@ import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
+import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -890,6 +891,16 @@ public class Tamework extends JavaPlugin {
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
         apiEventBus = new TameworkEventBus(getLogger());
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
+        HeldItemAttachmentInteractionService heldItemAttachmentInteractions =
+                new HeldItemAttachmentInteractionService(getLogger());
+        interactionExtensionRegistry.registerBuiltInRequirement(
+                HeldItemAttachmentInteractionService.MODEL_SUPPORT_REQUIREMENT_ID,
+                heldItemAttachmentInteractions::modelSupportsAttachment
+        );
+        interactionExtensionRegistry.registerBuiltInEffect(
+                HeldItemAttachmentInteractionService.SET_FROM_HELD_ITEM_EFFECT_ID,
+                heldItemAttachmentInteractions::setAttachmentFromHeldItem
+        );
         traitEffectRegistry = new TraitEffectRegistry(getLogger(), persistenceRuntime.getNpcProfileRepository());
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(

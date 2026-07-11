@@ -156,6 +156,40 @@ Example:
 }
 ```
 
+### Built-in attachment extensions
+
+Tamework reserves the `tamework:` extension namespace for implementation-owned requirements and effects. Downstream packs can use these built-ins without shipping Java:
+
+- Requirement `tamework:model_supports_attachment`: set `Param` to an attachment slot. Optional `Values` require at least one listed option to exist on the current model.
+- Effect `tamework:set_attachment_from_held_item`: set `Param` to an attachment slot and provide exact `ItemId=AttachmentValue` entries in `Values`.
+
+The held-item effect revalidates the live hotbar item, validates the slot and option against the current model, preserves unrelated stored selections, applies the live model, persists the selection, and consumes one item. Failed or already-applied mutations do not consume an item. Do not combine it with `RemoveItemsHand`; consumption is part of the built-in effect.
+
+```json
+{
+  "Type": "Custom",
+  "Requires": {
+    "All": {
+      "IsTamed": true,
+      "PlayerIsOwner": true,
+      "ItemsInHand": [{ "Items": ["Example_Saddle"] }],
+      "Custom": [{
+        "Id": "tamework:model_supports_attachment",
+        "Param": "Saddle",
+        "Values": ["Yes"]
+      }]
+    }
+  },
+  "Effects": {
+    "Custom": [{
+      "Id": "tamework:set_attachment_from_held_item",
+      "Param": "Saddle",
+      "Values": ["Example_Saddle=Yes"]
+    }]
+  }
+}
+```
+
 ### `TameworkLaunchProjectile`
 Launches a projectile using a solved high-angle ballistic arc instead of the source entity's current look pitch.
 
