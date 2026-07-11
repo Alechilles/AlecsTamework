@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityCom
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationKind;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import java.util.Objects;
@@ -43,6 +44,11 @@ final class ManagedCoopCaptureRetirementIndexEvidence implements StateEvidenceGa
         if (!pair.available()) {
             return EvidenceDecision.rejected(pair.failure());
         }
+        ResidentRecord resident = pair.residents().residentByProfile(ready.profileId());
+        String sourceFailure = entitySourceFailure(resident);
+        if (sourceFailure != null) {
+            return EvidenceDecision.rejected(sourceFailure);
+        }
         if (ready.durableState() == OperationState.COMPLETE) {
             return completedReplayMatches(ready, pair)
                     ? EvidenceDecision.alreadyComplete()
@@ -52,7 +58,6 @@ final class ManagedCoopCaptureRetirementIndexEvidence implements StateEvidenceGa
             return EvidenceDecision.rejected("source_retirement_state_not_committed");
         }
         OperationRecord operation = pair.operations().operationById(ready.operationId());
-        ResidentRecord resident = pair.residents().residentByProfile(ready.profileId());
         RetirementCommand command = command(operation, resident);
         if (command == null || !readyMatches(ready, command)
                 || !activeEvidenceMatches(pair, command, operation, resident)
@@ -74,6 +79,10 @@ final class ManagedCoopCaptureRetirementIndexEvidence implements StateEvidenceGa
         OperationRecord operation = pair.operations().operationById(observation.operationId());
         ResidentRecord resident = operation != null
                 ? pair.residents().residentByProfile(operation.profileId()) : null;
+        String sourceFailure = entitySourceFailure(resident);
+        if (sourceFailure != null) {
+            return EvidenceDecision.rejected(sourceFailure);
+        }
         RetirementCommand command = command(operation, resident);
         if (command == null || !removalMatches(observation, command)
                 || !activeEvidenceMatches(pair, command, operation, resident)
@@ -94,6 +103,10 @@ final class ManagedCoopCaptureRetirementIndexEvidence implements StateEvidenceGa
         }
         OperationRecord operation = pair.operations().operationById(command.operationId());
         ResidentRecord resident = pair.residents().residentByProfile(command.profileId());
+        String sourceFailure = entitySourceFailure(resident);
+        if (sourceFailure != null) {
+            return EvidenceDecision.rejected(sourceFailure);
+        }
         RetirementCommand current = command(operation, resident);
         if (!command.equals(current)
                 || !activeEvidenceMatches(pair, command, operation, resident)
@@ -133,6 +146,7 @@ final class ManagedCoopCaptureRetirementIndexEvidence implements StateEvidenceGa
                                           @Nullable ResidentRecord resident) {
         return exactActiveOperation(command, operation)
                 && exactHousedResident(command, resident)
+                && entitySourceFailure(resident) == null
                 && sameOperation(pair.operations().operationByProfile(command.profileId()), command)
                 && sameOperation(pair.operations().operationByUuid(command.sourceNpcUuid()), command)
                 && sameOperation(pair.operations().operationAt(
@@ -181,6 +195,7 @@ final class ManagedCoopCaptureRetirementIndexEvidence implements StateEvidenceGa
     private boolean completedReplayMatches(RetirementReady ready, SnapshotPair pair) {
         ResidentRecord resident = pair.residents().residentByProfile(ready.profileId());
         boolean residentMatches = resident != null && resident.active()
+                && entitySourceFailure(resident) == null
                 && resident.state() == ResidentState.HOUSED
                 && resident.residentId().equals(ready.residentId())
                 && resident.authorityKey().equals(ready.authorityKey())
@@ -261,6 +276,28 @@ final class ManagedCoopCaptureRetirementIndexEvidence implements StateEvidenceGa
         }
         return expectedGeneration != Long.MAX_VALUE
                 && residentGeneration == expectedGeneration + 1L;
+    }
+
+    @Nullable
+    private String entitySourceFailure(@Nullable ResidentRecord resident) {
+        if (resident == null || resident.snapshotJson() == null || resident.snapshotHash() == null) {
+            return "capture_source_snapshot_evidence_missing";
+        }
+        try {
+            if (!resident.snapshotHash().equals(
+                    ManagedCoopCaptureClaimValidator.snapshotSha256(resident.snapshotJson()))) {
+                return "capture_source_snapshot_hash_mismatch";
+            }
+        } catch (RuntimeException exception) {
+            return "capture_source_snapshot_hash_invalid";
+        }
+        ManagedCoopCaptureSourceEvidence.ReadResult source =
+                ManagedCoopCaptureSourceEvidence.read(resident.snapshotJson());
+        return switch (source.status()) {
+            case ENTITY_SOURCE -> null;
+            case CAPTURED_ITEM -> "capture_source_requires_item_retirement_receipt";
+            case INVALID -> "capture_source_snapshot_marker_invalid";
+        };
     }
 
     private SnapshotPair coherentSnapshots() {

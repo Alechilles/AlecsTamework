@@ -4,11 +4,13 @@ import com.alechilles.alecstamework.items.ManagedCoopCaptureCoordinator.Retireme
 import com.alechilles.alecstamework.items.ManagedCoopCaptureSourceRetirementService.EvidenceDecision;
 import com.alechilles.alecstamework.items.ManagedCoopCaptureSourceRetirementService.EvidenceStatus;
 import com.alechilles.alecstamework.items.ManagedCoopCaptureSourceRetirementService.RemovalObservation;
+import com.alechilles.alecstamework.items.ManagedCoopCaptureSourceRetirementService.RetirementCommand;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationKind;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadResult;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
@@ -28,7 +30,9 @@ class ManagedCoopCaptureRetirementIndexEvidenceTest {
     private static final UUID SOURCE = new UUID(0L, 61L);
     private static final ManagedCoopAuthorityKey AUTHORITY =
             new ManagedCoopAuthorityKey("world-a", 4, 5, 6);
-    private static final String HASH = "b".repeat(64);
+    private static final String ENTITY_SNAPSHOT = "{}";
+    private static final String HASH =
+            ManagedCoopCaptureClaimValidator.snapshotSha256(ENTITY_SNAPSHOT);
 
     @Test
     void resolvesOnlyExactSourceRetireOperationAndHousedResident() {
@@ -92,7 +96,46 @@ class ManagedCoopCaptureRetirementIndexEvidenceTest {
         assertEquals(EvidenceStatus.ALREADY_COMPLETE, decision.status());
     }
 
+    @Test
+    void capturedItemAndInvalidMarkersNeverAuthorizeEntityRetirement() {
+        String itemSnapshot = ManagedCoopCaptureSourceEvidence.markCapturedItem(
+                ENTITY_SNAPSHOT,
+                new ManagedCoopCaptureSourceEvidence.CapturedItemSource(
+                        new UUID(0L, 62L), (short) 2,
+                        "Tool_Capture_Crate", "c".repeat(64))
+        );
+        Fixture item = fixture(ResidentState.HOUSED, true, itemSnapshot);
+        Fixture invalid = fixture(
+                ResidentState.HOUSED,
+                true,
+                "{\"_tameworkCaptureSource\":\"invalid\"}"
+        );
+
+        EvidenceDecision itemReady = item.evidence.resolve(ready(
+                OperationState.SOURCE_RETIRE_REQUESTED, 2L, item.snapshotHash));
+        EvidenceDecision itemRemoval = item.evidence.resolve(removal());
+        EvidenceDecision itemRevalidation = item.evidence.revalidate(command(item.snapshotHash));
+        EvidenceDecision invalidReady = invalid.evidence.resolve(ready(
+                OperationState.SOURCE_RETIRE_REQUESTED, 2L, invalid.snapshotHash));
+
+        assertEquals(EvidenceStatus.REJECTED, itemReady.status());
+        assertTrue(itemReady.detail().contains("item_retirement_receipt"));
+        assertEquals(EvidenceStatus.REJECTED, itemRemoval.status());
+        assertTrue(itemRemoval.detail().contains("item_retirement_receipt"));
+        assertEquals(EvidenceStatus.REJECTED, itemRevalidation.status());
+        assertTrue(itemRevalidation.detail().contains("item_retirement_receipt"));
+        assertEquals(EvidenceStatus.REJECTED, invalidReady.status());
+        assertTrue(invalidReady.detail().contains("marker_invalid"));
+    }
+
     private static Fixture fixture(ResidentState residentState, boolean activeOperation) {
+        return fixture(residentState, activeOperation, ENTITY_SNAPSHOT);
+    }
+
+    private static Fixture fixture(ResidentState residentState,
+                                   boolean activeOperation,
+                                   String snapshotJson) {
+        String snapshotHash = ManagedCoopCaptureClaimValidator.snapshotSha256(snapshotJson);
         ManagedCoopResidentIndex residents = new ManagedCoopResidentIndex();
         ManagedCoopLifecycleOperationIndex operations =
                 new ManagedCoopLifecycleOperationIndex();
@@ -103,13 +146,13 @@ class ManagedCoopCaptureRetirementIndexEvidenceTest {
         UUID deployedUuid = residentState == ResidentState.DEPLOYED ? SOURCE : null;
         ResidentRecord resident = new ResidentRecord(
                 "resident-a", AUTHORITY, "coop-a", 1, "profile-a", "tamed_test",
-                SOURCE, SOURCE, deployedUuid, "{}", HASH, 1, residentState,
+                SOURCE, SOURCE, deployedUuid, snapshotJson, snapshotHash, 1, residentState,
                 0L, true, -500L, 0L, -500L, -500L
         );
         OperationRecord operation = new OperationRecord(
                 "capture-a", OperationKind.CAPTURE, "profile-a", AUTHORITY,
                 "coop-a", 1, SOURCE, null, null,
-                OperationState.SOURCE_RETIRE_REQUESTED, HASH,
+                OperationState.SOURCE_RETIRE_REQUESTED, snapshotHash,
                 0L, 2L, 0, true, -500L, -400L, 0L, null
         );
         assertTrue(residents.rebuild(
@@ -120,15 +163,20 @@ class ManagedCoopCaptureRetirementIndexEvidenceTest {
         AtomicBoolean compositeTrusted = new AtomicBoolean(true);
         return new Fixture(
                 compositeTrusted,
+                snapshotHash,
                 new ManagedCoopCaptureRetirementIndexEvidence(
                         compositeTrusted::get, residents, operations)
         );
     }
 
     private static RetirementReady ready(OperationState state, long generation) {
+        return ready(state, generation, HASH);
+    }
+
+    private static RetirementReady ready(OperationState state, long generation, String hash) {
         return new RetirementReady(
                 SOURCE, "profile-a", "resident-a", "capture-a", AUTHORITY,
-                "coop-a", 1, HASH, generation, state, 1L
+                "coop-a", 1, hash, generation, state, 1L
         );
     }
 
@@ -144,7 +192,15 @@ class ManagedCoopCaptureRetirementIndexEvidenceTest {
         );
     }
 
+    private static RetirementCommand command(String snapshotHash) {
+        return new RetirementCommand(
+                SOURCE, "profile-a", "resident-a", "capture-a", AUTHORITY,
+                "coop-a", 1, snapshotHash, 0L, 2L
+        );
+    }
+
     private record Fixture(AtomicBoolean compositeTrusted,
+                           String snapshotHash,
                            ManagedCoopCaptureRetirementIndexEvidence evidence) {
     }
 }

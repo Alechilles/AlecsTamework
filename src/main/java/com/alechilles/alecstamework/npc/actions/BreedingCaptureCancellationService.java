@@ -252,7 +252,8 @@ public final class BreedingCaptureCancellationService {
 
     /** Why an active birth job is being cancelled. */
     public enum CancellationReason {
-        COOP_CAPTURE
+        COOP_CAPTURE,
+        CAPTURE_CRATE
     }
 
     /** High-level result of the registry-first cancellation. */
