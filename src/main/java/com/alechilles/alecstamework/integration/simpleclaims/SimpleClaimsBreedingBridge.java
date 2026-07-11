@@ -89,7 +89,11 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
 
     @Nonnull
     private static SimpleClaimsBreedingBridge createBridge() {
-        ClassLoader classLoader = SimpleClaimsBreedingBridge.class.getClassLoader();
+        return forClassLoader(SimpleClaimsBreedingBridge.class.getClassLoader());
+    }
+
+    @Nonnull
+    static SimpleClaimsBreedingBridge forClassLoader(@Nonnull ClassLoader classLoader) {
         return new SimpleClaimsBreedingBridge(
                 SimpleClaimsClaimLookup.probe(classLoader),
                 SimpleClaimsWorldExtent.probe(classLoader),

@@ -1,12 +1,14 @@
 package com.alechilles.alecstamework.integration.questlinesclaims;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimFootprint;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
 import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
+import com.alechilles.alecstamework.integration.claims.ClaimPluginLocation;
 import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.claims.ClaimResolution;
+import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -72,16 +74,19 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
 
     @Nonnull
     private static QuestLinesClaimsBridge createBridge() {
+        ClaimPluginLocation location = new HytaleClaimPluginLocator(
+                PROVIDER_ID,
+                HytaleClaimPluginLocator.QUESTLINES_PLUGIN_IDENTIFIER
+        ).locate();
+        if (location.state() != ClaimProviderState.READY || location.pluginInstance() == null) {
+            return unavailable(location.reason());
+        }
+        return forPlugin(location.pluginInstance());
+    }
+
+    @Nonnull
+    static QuestLinesClaimsBridge forPlugin(@Nonnull Object claimsPlugin) {
         try {
-            Class.forName(
-                    "net.evilcraft.questlinesclaims.api.QuestLinesClaimsAPI",
-                    false,
-                    QuestLinesClaimsBridge.class.getClassLoader()
-            );
-            Object claimsPlugin = resolveLoadedPlugin(Tamework.getInstance(), "QuestLinesClaims");
-            if (claimsPlugin == null) {
-                return unavailable("QuestLinesClaims plugin is not loaded.");
-            }
             Method getApi = claimsPlugin.getClass().getMethod("getApi");
             Object api = getApi.invoke(claimsPlugin);
             if (api == null) {
@@ -94,24 +99,6 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
             return new QuestLinesClaimsBridge(true, null, api, lookup);
         } catch (Throwable throwable) {
             return unavailable(extractMessage(throwable));
-        }
-    }
-
-    @Nullable
-    private static Object resolveLoadedPlugin(@Nullable Tamework plugin, @Nonnull String pluginName) {
-        if (plugin == null) {
-            return null;
-        }
-        try {
-            Method getServer = plugin.getClass().getMethod("getServer");
-            Object server = getServer.invoke(plugin);
-            if (server == null) {
-                return null;
-            }
-            Method getPlugin = server.getClass().getMethod("getPlugin", String.class);
-            return getPlugin.invoke(server, pluginName);
-        } catch (Throwable ignored) {
-            return null;
         }
     }
 
