@@ -1,0 +1,185 @@
+package com.alechilles.alecstamework.items;
+
+import com.alechilles.alecstamework.items.ManagedCoopChunkScanner.ScanResult;
+import com.alechilles.alecstamework.items.ManagedCoopRuntimeOperationDispatcher.DispatchOutcome;
+import com.alechilles.alecstamework.items.ManagedCoopRuntimeSweepPlanner.CoopPlan;
+import com.alechilles.alecstamework.items.ManagedCoopRuntimeSweepPlanner.SweepPlan;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * Thin live sweep shell over the decomposed managed-coop scanners, planner, and v5 dispatcher.
+ *
+ * <p>Ancillary production/interaction and removed-block checks remain explicit synchronous ports
+ * so they can be extracted from the legacy system independently. Capture and release futures
+ * expose immutable outcomes only; this orchestrator never attaches a continuation that captures a
+ * world, store, reference, context, block container, or NPC.</p>
+ */
+public final class ManagedCoopRuntimeSweepOrchestrator {
+    public enum SweepStatus {
+        COMPLETED,
+        WORLD_UNAVAILABLE,
+        CONTEXT_SCAN_UNAVAILABLE
+    }
+
+    public record SweepOutcome(@Nonnull SweepStatus status,
+                               int managedCoops,
+                               int captureCandidates,
+                               int captureDispatches,
+                               int releaseDispatches,
+                               boolean removedCheckDispatched,
+                               @Nonnull List<CompletableFuture<DispatchOutcome>> operations,
+                               @Nullable String detail) {
+        public SweepOutcome {
+            Objects.requireNonNull(status, "status");
+            operations = List.copyOf(operations);
+        }
+    }
+
+    private final ManagedCoopChunkScanner contextScanner;
+    private final ManagedCoopRuntimeCandidateScanner candidateScanner;
+    private final ManagedCoopRuntimeSweepPlanner planner;
+    private final ManagedCoopRuntimeOperationDispatcher operations;
+    private final AncillaryBehavior ancillary;
+    private final RemovedCoopReconciler removedCoops;
+
+    public ManagedCoopRuntimeSweepOrchestrator(
+            @Nonnull ManagedCoopChunkScanner contextScanner,
+            @Nonnull ManagedCoopRuntimeCandidateScanner candidateScanner,
+            @Nonnull ManagedCoopRuntimeSweepPlanner planner,
+            @Nonnull ManagedCoopRuntimeOperationDispatcher operations,
+            @Nonnull AncillaryBehavior ancillary,
+            @Nonnull RemovedCoopReconciler removedCoops) {
+        this.contextScanner = Objects.requireNonNull(contextScanner, "contextScanner");
+        this.candidateScanner = Objects.requireNonNull(candidateScanner, "candidateScanner");
+        this.planner = Objects.requireNonNull(planner, "planner");
+        this.operations = Objects.requireNonNull(operations, "operations");
+        this.ancillary = Objects.requireNonNull(ancillary, "ancillary");
+        this.removedCoops = Objects.requireNonNull(removedCoops, "removedCoops");
+    }
+
+    /** Executes one already-throttled world sweep on the chunk/entity stores' owning thread. */
+    @Nonnull
+    public SweepOutcome sweep(@Nonnull Store<ChunkStore> chunkStore,
+                              @Nonnull World world,
+                              int gameHour,
+                              long gameTimeMs,
+                              long nowMs) {
+        Objects.requireNonNull(chunkStore, "chunkStore");
+        Objects.requireNonNull(world, "world");
+        Store<EntityStore> entityStore = entityStore(world);
+        if (entityStore == null) {
+            return outcome(SweepStatus.WORLD_UNAVAILABLE, 0, 0, 0, 0, false,
+                    List.of(), "managed_coop_world_or_entity_store_unavailable");
+        }
+        entityStore.assertThread();
+        ScanResult contexts = contextScanner.scan(chunkStore, world);
+        if (!contexts.reliable()) {
+            return outcome(SweepStatus.CONTEXT_SCAN_UNAVAILABLE, 0, 0, 0, 0, false,
+                    List.of(), contexts.detail());
+        }
+
+        boolean captureDemand = planner.needsCaptureCandidates(
+                contexts.contexts(), gameHour, nowMs);
+        ManagedCoopRuntimeCandidateScanner.ScanResult candidates = captureDemand
+                ? candidateScanner.scan(entityStore)
+                : new ManagedCoopRuntimeCandidateScanner.ScanResult(
+                        ManagedCoopRuntimeCandidateScanner.ScanStatus.COMPLETE,
+                        List.of(), 0, 0, null);
+        List<ManagedCoopCaptureCandidate> candidateValues =
+                candidates.status() == ManagedCoopRuntimeCandidateScanner.ScanStatus.COMPLETE
+                        ? candidates.candidates() : List.of();
+        SweepPlan plan = planner.plan(
+                contexts.contexts(), candidateValues, gameHour, nowMs, true);
+        ArrayList<CompletableFuture<DispatchOutcome>> dispatched = new ArrayList<>();
+        int captures = 0;
+        int releases = 0;
+        for (CoopPlan coop : plan.coops()) {
+            if (coop.produce()) {
+                ancillary.produce(world, coop.context(), gameTimeMs);
+            }
+            if (coop.branch() == ManagedCoopRuntimeSweepPlanner.Branch.CAPTURE) {
+                Ref<EntityStore> source = world.getEntityRef(coop.candidate().npcUuid());
+                if (source != null && source.isValid()) {
+                    // capture() consumes the live arguments synchronously before returning.
+                    dispatched.add(operations.capture(
+                            entityStore, source, coop.context(), coop.candidate()));
+                    captures++;
+                }
+            } else if (coop.branch() == ManagedCoopRuntimeSweepPlanner.Branch.RELEASE) {
+                dispatched.add(operations.release(coop.context(), coop.resident(), nowMs));
+                releases++;
+            }
+            if (coop.syncInteractionState()) {
+                ancillary.syncInteractionState(world, coop.context());
+            }
+        }
+        if (plan.checkRemovedCoops()) {
+            removedCoops.reconcile(chunkStore, world, plan.activeCoopKeys(), nowMs);
+        }
+        String candidateDetail = candidates.status()
+                == ManagedCoopRuntimeCandidateScanner.ScanStatus.COMPLETE
+                ? null : candidates.detail();
+        return outcome(
+                SweepStatus.COMPLETED,
+                plan.coops().size(),
+                candidateValues.size(),
+                captures,
+                releases,
+                plan.checkRemovedCoops(),
+                dispatched,
+                candidateDetail);
+    }
+
+    @Nullable
+    private Store<EntityStore> entityStore(World world) {
+        return world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+    }
+
+    private SweepOutcome outcome(SweepStatus status,
+                                 int coops,
+                                 int candidates,
+                                 int captures,
+                                 int releases,
+                                 boolean removed,
+                                 List<CompletableFuture<DispatchOutcome>> operations,
+                                 @Nullable String detail) {
+        return new SweepOutcome(
+                status, coops, candidates, captures, releases, removed, operations, detail);
+    }
+
+    /**
+     * Synchronous extraction seam for current production and block interaction presentation.
+     * Implementations must not retain the supplied live world/context.
+     */
+    public interface AncillaryBehavior {
+        void produce(@Nonnull World world,
+                     @Nonnull ManagedCoopContext context,
+                     long gameTimeMs);
+
+        void syncInteractionState(@Nonnull World world,
+                                  @Nonnull ManagedCoopContext context);
+    }
+
+    /**
+     * Synchronous removal-detection seam. Implementations must release confirmed removed-coop
+     * residents through {@link ManagedCoopRuntimeOperationDispatcher}, never a legacy ledger.
+     */
+    @FunctionalInterface
+    public interface RemovedCoopReconciler {
+        void reconcile(@Nonnull Store<ChunkStore> chunkStore,
+                       @Nonnull World world,
+                       @Nonnull Set<String> activeCoopKeys,
+                       long nowMs);
+    }
+}
