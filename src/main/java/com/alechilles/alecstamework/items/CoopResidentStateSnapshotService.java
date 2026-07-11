@@ -152,6 +152,18 @@ public final class CoopResidentStateSnapshotService {
         return createSnapshot(reference, store, npcUuid, null, -1, roleId);
     }
 
+    /** Captures durable managed-coop state without populating the legacy transient sidecar. */
+    @Nullable
+    public CoopResidentStateSnapshot captureSnapshotForManagedCoopPersistence(
+            @Nullable Ref<EntityStore> reference,
+            @Nullable Store<EntityStore> store,
+            @Nullable UUID npcUuid,
+            @Nullable String coopId,
+            int residentSlot,
+            @Nullable String roleId) {
+        return createSnapshot(reference, store, npcUuid, coopId, residentSlot, roleId);
+    }
+
     @Nullable
     public CoopResidentStateSnapshot consumeRecentRemovedSnapshot(@Nullable String roleId, long maxAgeMs) {
         return consumeRecentRemovedSnapshot(roleId, null, -1, maxAgeMs);

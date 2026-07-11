@@ -64,6 +64,45 @@ class ManagedCoopOccupancyServiceTest {
     }
 
     @Test
+    void exactDeployedUuidRecapturesItsReservedSlotAndGeneration() throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 1);
+        ResidentRecord deployed = resident(
+                0, "profile-a", uuid(2), uuid(1), ResidentState.DEPLOYED, 8L);
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index(
+                List.of(authority("coop_chicken", AuthorityState.TWORK_MANAGED)),
+                List.of(deployed)
+        ));
+
+        ManagedCoopOccupancyService.CapturePlacement placement =
+                service.resolveCapturePlacement(context, uuid(2), "profile-a");
+
+        assertEquals(ManagedCoopOccupancyService.CapturePlacementStatus.RECAPTURE, placement.status());
+        assertEquals(0, placement.residentSlot());
+        assertEquals(8L, placement.expectedResidentGeneration());
+    }
+
+    @Test
+    void historicalAliasAndProfileUuidMismatchCannotRecapture() throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 2);
+        ResidentRecord deployed = resident(
+                0, "profile-a", uuid(2), uuid(1), ResidentState.DEPLOYED, 8L);
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index(
+                List.of(authority("coop_chicken", AuthorityState.TWORK_MANAGED)),
+                List.of(deployed)
+        ));
+
+        ManagedCoopOccupancyService.CapturePlacement historical =
+                service.resolveCapturePlacement(context, uuid(1), "profile-a");
+        ManagedCoopOccupancyService.CapturePlacement wrongUuid =
+                service.resolveCapturePlacement(context, uuid(3), "profile-a");
+
+        assertEquals(ManagedCoopOccupancyService.CapturePlacementStatus.REJECTED, historical.status());
+        assertEquals("managed_coop_capture_source_not_current_deployed_resident", historical.detail());
+        assertEquals(ManagedCoopOccupancyService.CapturePlacementStatus.REJECTED, wrongUuid.status());
+        assertEquals("managed_coop_capture_profile_already_managed_by_other_uuid", wrongUuid.detail());
+    }
+
+    @Test
     void persistedAuthorityMismatchOrTransitionBlocksMutation() throws Exception {
         ManagedCoopContext context = context("coop_chicken", 3);
         ManagedCoopOccupancyService conflict = new ManagedCoopOccupancyService(index(
@@ -139,11 +178,20 @@ class ManagedCoopOccupancyServiceTest {
                                            String profileId,
                                            UUID npcUuid,
                                            ResidentState state) {
+        return resident(slot, profileId, npcUuid, npcUuid, state, 0L);
+    }
+
+    private static ResidentRecord resident(int slot,
+                                           String profileId,
+                                           UUID residentUuid,
+                                           UUID sourceUuid,
+                                           ResidentState state,
+                                           long generation) {
         return new ResidentRecord(
                 "resident-" + profileId, KEY, "coop_chicken", slot, profileId, "Mob_Chicken",
-                npcUuid, npcUuid, state == ResidentState.DEPLOYED ? npcUuid : null,
+                residentUuid, sourceUuid, state == ResidentState.DEPLOYED ? residentUuid : null,
                 "{}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 1,
-                state, 0L, true, -100L, 0L, -100L, -90L
+                state, generation, true, -100L, 0L, -100L, -90L
         );
     }
 

@@ -44,6 +44,30 @@ public final class ManagedCoopOccupancyService {
         }
     }
 
+    public enum CapturePlacementStatus {
+        NEW_SLOT,
+        RECAPTURE,
+        REJECTED
+    }
+
+    /** Immutable admission result for a new capture or an exact deployed-resident recapture. */
+    public record CapturePlacement(@Nonnull CapturePlacementStatus status,
+                                   int residentSlot,
+                                   long expectedResidentGeneration,
+                                   @Nullable String detail) {
+        public CapturePlacement {
+            Objects.requireNonNull(status, "status");
+            if (status != CapturePlacementStatus.REJECTED
+                    && (residentSlot < 0 || expectedResidentGeneration < 0L)) {
+                throw new IllegalArgumentException("accepted capture placement must be valid");
+            }
+        }
+
+        public boolean permitted() {
+            return status != CapturePlacementStatus.REJECTED;
+        }
+    }
+
     private final ManagedCoopResidentIndex index;
     private final BooleanSupplier trustGate;
 
@@ -62,6 +86,11 @@ public final class ManagedCoopOccupancyService {
     public View inspect(@Nonnull ManagedCoopContext context) {
         Objects.requireNonNull(context, "context");
         ManagedCoopResidentIndex.Snapshot snapshot = index.snapshot();
+        return inspect(context, snapshot);
+    }
+
+    @Nonnull
+    private View inspect(ManagedCoopContext context, ManagedCoopResidentIndex.Snapshot snapshot) {
         if (!indexesTrusted() || snapshot.revision() == 0L) {
             return new View(AuthorityStatus.INDEX_UNAVAILABLE, snapshot.revision(), List.of());
         }
@@ -93,9 +122,60 @@ public final class ManagedCoopOccupancyService {
         );
     }
 
+    /**
+     * Resolves capacity without losing an existing resident's generation.
+     *
+     * <p>A deployed resident continues to own its durable slot. It may only be captured back into
+     * that same managed coop when the live UUID is the exact current deployed UUID. Historical
+     * source aliases and profile/UUID disagreements are rejected as stale projections.</p>
+     */
+    @Nonnull
+    public CapturePlacement resolveCapturePlacement(@Nonnull ManagedCoopContext context,
+                                                     @Nonnull UUID sourceNpcUuid,
+                                                     @Nullable String stableProfileId) {
+        Objects.requireNonNull(context, "context");
+        Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
+        ManagedCoopResidentIndex.Snapshot snapshot = index.snapshot();
+        View view = inspect(context, snapshot);
+        if (!view.permitsCaptureClaim()) {
+            return rejected("managed_coop_capture_" + view.status().name().toLowerCase(Locale.ROOT));
+        }
+
+        ResidentRecord byUuid = snapshot.residentByUuid(sourceNpcUuid);
+        ResidentRecord byProfile = stableProfileId == null || stableProfileId.isBlank()
+                ? null
+                : snapshot.residentByProfile(stableProfileId.trim());
+        if (byUuid != null) {
+            if (byProfile != null && !byProfile.residentId().equals(byUuid.residentId())) {
+                return rejected("managed_coop_capture_profile_uuid_conflict");
+            }
+            if (isExactRecapture(context, sourceNpcUuid, stableProfileId, byUuid)) {
+                return new CapturePlacement(
+                        CapturePlacementStatus.RECAPTURE,
+                        byUuid.residentSlot(),
+                        byUuid.generation(),
+                        null
+                );
+            }
+            return rejected("managed_coop_capture_source_not_current_deployed_resident");
+        }
+        if (byProfile != null) {
+            return rejected("managed_coop_capture_profile_already_managed_by_other_uuid");
+        }
+
+        int slot = firstEmptySlot(context, view);
+        return slot < 0
+                ? rejected("managed_coop_capture_capacity_unavailable")
+                : new CapturePlacement(CapturePlacementStatus.NEW_SLOT, slot, 0L, null);
+    }
+
     /** Returns the first free configured slot, or {@code -1} when full or fail-closed. */
     public int firstEmptySlot(@Nonnull ManagedCoopContext context) {
         View view = inspect(context);
+        return firstEmptySlot(context, view);
+    }
+
+    private int firstEmptySlot(ManagedCoopContext context, View view) {
         if (!view.permitsCaptureClaim()) {
             return -1;
         }
@@ -112,6 +192,27 @@ public final class ManagedCoopOccupancyService {
             }
         }
         return -1;
+    }
+
+    private boolean isExactRecapture(ManagedCoopContext context,
+                                     UUID sourceNpcUuid,
+                                     @Nullable String stableProfileId,
+                                     ResidentRecord resident) {
+        int maximum = Math.max(0, context.config().getLifecycleRules().getMaxResidents());
+        boolean profileMatches = stableProfileId == null || stableProfileId.isBlank()
+                || resident.profileId().equals(stableProfileId.trim());
+        return resident.state() == ResidentState.DEPLOYED
+                && sourceNpcUuid.equals(resident.residentUuid())
+                && sourceNpcUuid.equals(resident.deployedNpcUuid())
+                && resident.authorityKey().equals(context.authorityKey())
+                && normalize(resident.coopId()).equals(context.coopId())
+                && resident.residentSlot() >= 0
+                && resident.residentSlot() < maximum
+                && profileMatches;
+    }
+
+    private CapturePlacement rejected(String detail) {
+        return new CapturePlacement(CapturePlacementStatus.REJECTED, -1, -1L, detail);
     }
 
     /** Returns the first strictly housed slot eligible for a new release operation. */
