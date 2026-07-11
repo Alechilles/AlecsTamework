@@ -153,8 +153,8 @@ final class LinkedNpcPanelStatusTextService {
         );
     }
 
-    private static String formatRemainingTime(long remainingMs, String language) {
-        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
+    static String formatRemainingTime(long remainingMs, String language) {
+        long totalSeconds = ceilMillisToSeconds(remainingMs);
         long minutes = totalSeconds / 60L;
         long seconds = totalSeconds % 60L;
         if (minutes <= 0L) {
@@ -163,8 +163,8 @@ final class LinkedNpcPanelStatusTextService {
         return LocalizedText.format(language, "tamework.ui.shared.duration.minutesSeconds", minutes, seconds);
     }
 
-    private static String formatRemainingClock(long remainingMs) {
-        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
+    static String formatRemainingClock(long remainingMs) {
+        long totalSeconds = ceilMillisToSeconds(remainingMs);
         long hours = totalSeconds / 3600L;
         long minutes = (totalSeconds % 3600L) / 60L;
         long seconds = totalSeconds % 60L;
@@ -172,5 +172,9 @@ final class LinkedNpcPanelStatusTextService {
             return String.format("%d:%02d:%02d", hours, minutes, seconds);
         }
         return String.format("%d:%02d", minutes, seconds);
+    }
+
+    private static long ceilMillisToSeconds(long remainingMs) {
+        return remainingMs > 0L ? 1L + ((remainingMs - 1L) / 1000L) : 0L;
     }
 }

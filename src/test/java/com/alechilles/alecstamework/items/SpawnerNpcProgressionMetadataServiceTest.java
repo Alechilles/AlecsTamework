@@ -3,8 +3,10 @@ package com.alechilles.alecstamework.items;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import org.junit.jupiter.api.Test;
 
 class SpawnerNpcProgressionMetadataServiceTest {
@@ -90,5 +92,71 @@ class SpawnerNpcProgressionMetadataServiceTest {
         );
 
         assertEquals("Male", capturedGender);
+    }
+
+    @Test
+    void restoredNegativeCooldownReconstructsNegativeStart() {
+        BreedingTimeService.CooldownTiming timing =
+                SpawnerBreedingStateRestoreService.resolveRestoredCooldownTiming(
+                        -1_000L,
+                        null,
+                        -3_000L
+                );
+
+        assertEquals(-1_000L, timing.deadlineMs());
+        assertEquals(-3_000L, timing.startedAtMs());
+        assertEquals(2_000L, timing.durationMs());
+    }
+
+    @Test
+    void metadataRoundTripKeepsExistingNegativeCooldownWindow() {
+        TameworkBreedingComponent existing = new TameworkBreedingComponent(
+                "TestConfig",
+                50.0,
+                -5_000L,
+                false,
+                true,
+                -1_000L,
+                null,
+                -4_000L,
+                3_000L
+        );
+
+        BreedingTimeService.CooldownTiming timing =
+                SpawnerBreedingStateRestoreService.resolveRestoredCooldownTiming(
+                        -1_000L,
+                        existing,
+                        -2_000L
+                );
+
+        assertEquals(-1_000L, timing.deadlineMs());
+        assertEquals(-4_000L, timing.startedAtMs());
+        assertEquals(3_000L, timing.durationMs());
+    }
+
+    @Test
+    void zeroCooldownMetadataClearsExistingWindow() {
+        TameworkBreedingComponent existing = new TameworkBreedingComponent(
+                "TestConfig",
+                50.0,
+                -5_000L,
+                false,
+                true,
+                -1_000L,
+                null,
+                -4_000L,
+                3_000L
+        );
+
+        BreedingTimeService.CooldownTiming timing =
+                SpawnerBreedingStateRestoreService.resolveRestoredCooldownTiming(
+                        0L,
+                        existing,
+                        -2_000L
+                );
+
+        assertEquals(0L, timing.deadlineMs());
+        assertEquals(0L, timing.startedAtMs());
+        assertEquals(0L, timing.durationMs());
     }
 }

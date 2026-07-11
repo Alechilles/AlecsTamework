@@ -40,7 +40,7 @@ final class CommandLinkedPanelCooldownSnapshotService {
         if (!active) {
             return new CooldownSnapshot(true, true, breeding.isEnabled(), false, 0L, 1.0);
         }
-        long remainingGameMs = Math.max(0L, until - now);
+        long remainingGameMs = BreedingTimeService.remainingDurationMs(until, now);
         long remainingRealMs = BreedingTimeService.toEstimatedRealDurationMs(remainingGameMs, store);
         double ratio = resolveBreedingCooldownRatio(breeding, npcRef, store, resolvedRoleId, remainingGameMs);
         return new CooldownSnapshot(true, true, breeding.isEnabled(), true, remainingRealMs, ratio);
@@ -69,7 +69,7 @@ final class CommandLinkedPanelCooldownSnapshotService {
         if (!active) {
             return new CooldownSnapshot(true, true, true, false, 0L, 1.0);
         }
-        long remainingGameMs = Math.max(0L, untilMs - nowMs);
+        long remainingGameMs = BreedingTimeService.remainingDurationMs(untilMs, nowMs);
         long remainingRealMs = BreedingTimeService.toEstimatedRealDurationMs(remainingGameMs, store);
         double ratio = resolveCooldownRatio(remainingGameMs, startedAtMs, durationMs, untilMs);
         return new CooldownSnapshot(true, true, true, true, remainingRealMs, ratio);
@@ -152,7 +152,9 @@ final class CommandLinkedPanelCooldownSnapshotService {
     }
 
     private static long resolveWindowDurationMs(long startedAtMs, long untilMs) {
-        return startedAtMs != 0L && untilMs > startedAtMs ? untilMs - startedAtMs : 0L;
+        return startedAtMs != 0L && untilMs != 0L && untilMs > startedAtMs
+                ? BreedingTimeService.saturatingSubtract(untilMs, startedAtMs)
+                : 0L;
     }
 
     private static String resolveHarvestAlarmName() {

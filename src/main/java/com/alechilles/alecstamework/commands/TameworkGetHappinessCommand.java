@@ -138,9 +138,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         boolean cooldownActive = breeding.isCooldownActive(now);
         long cooldownUntilMs = breeding.getCooldownUntilMs();
-        long cooldownRemainingMs = cooldownActive
-                ? Math.max(0L, cooldownUntilMs - now)
-                : 0L;
+        long cooldownRemainingMs = BreedingTimeService.remainingDurationMs(cooldownUntilMs, now);
         double cooldownRemainingRealSeconds = resolveApproximateRealSeconds(cooldownRemainingMs, rateCurrent);
         return new BreedingSnapshot(
                 true,

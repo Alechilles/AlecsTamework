@@ -663,20 +663,10 @@ public final class CompanionLifeStageService {
     }
 
     private static boolean hasLegacyTimelineTimestamp(TameworkLifeStageComponent component, long nowGameMs) {
-        return isLegacyTimestamp(component.getBornAtMs(), nowGameMs)
-                || isLegacyTimestamp(component.getAdolescentAtMs(), nowGameMs)
-                || isLegacyTimestamp(component.getAdultAtMs(), nowGameMs)
-                || isLegacyTimestamp(component.getFullyGrownAtMs(), nowGameMs);
-    }
-
-    private static boolean isLegacyTimestamp(long value, long nowGameMs) {
-        if (value <= 0L) {
-            return false;
-        }
-        if (nowGameMs < 0L) {
-            return true;
-        }
-        return value > 946684800000L;
+        return LegacyWorldTimestampClassifier.shouldTranslate(component.getBornAtMs(), nowGameMs)
+                || LegacyWorldTimestampClassifier.shouldTranslate(component.getAdolescentAtMs(), nowGameMs)
+                || LegacyWorldTimestampClassifier.shouldTranslate(component.getAdultAtMs(), nowGameMs)
+                || LegacyWorldTimestampClassifier.shouldTranslate(component.getFullyGrownAtMs(), nowGameMs);
     }
 
     private static long migrateLegacyAbsoluteTimestamp(long legacyTimestampMs,
@@ -684,7 +674,7 @@ public final class CompanionLifeStageService {
                                                        long nowGameMs,
                                                        TwBreedingConfig.TimerBasis timerBasis,
                                                        Store<EntityStore> store) {
-        if (legacyTimestampMs <= 0L || !isLegacyTimestamp(legacyTimestampMs, nowGameMs)) {
+        if (!LegacyWorldTimestampClassifier.shouldTranslate(legacyTimestampMs, nowGameMs)) {
             return legacyTimestampMs;
         }
         long deltaRealMs = legacyTimestampMs - nowRealMs;

@@ -43,6 +43,75 @@ public final class BreedingTimeService {
     }
 
     /**
+     * Adds a signed timestamp and duration without wrapping across the {@code long} boundary.
+     */
+    public static long saturatingAdd(long timestampMs, long durationMs) {
+        try {
+            return Math.addExact(timestampMs, durationMs);
+        } catch (ArithmeticException ignored) {
+            return durationMs >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
+        }
+    }
+
+    /**
+     * Subtracts two signed timestamps without wrapping across the {@code long} boundary.
+     */
+    public static long saturatingSubtract(long leftMs, long rightMs) {
+        try {
+            return Math.subtractExact(leftMs, rightMs);
+        } catch (ArithmeticException ignored) {
+            return leftMs >= 0L && rightMs < 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
+        }
+    }
+
+    /** Returns a deadline for a positive duration, or the zero sentinel when no duration exists. */
+    public static long deadlineAfter(long nowMs, long durationMs) {
+        if (durationMs <= 0L) {
+            return 0L;
+        }
+        long deadlineMs = saturatingAdd(nowMs, durationMs);
+        // Zero is the persisted "unset" sentinel, so avoid emitting it for a real cooldown.
+        return deadlineMs != 0L ? deadlineMs : 1L;
+    }
+
+    /** Returns a nonzero cooldown start for a positive duration, preserving signed world time. */
+    public static long cooldownStartedAt(long nowMs, long durationMs) {
+        if (durationMs <= 0L) {
+            return 0L;
+        }
+        return nowMs != 0L ? nowMs : -1L;
+    }
+
+    /** Returns whether a nonzero signed deadline remains in the future. */
+    public static boolean isDeadlineActive(long deadlineMs, long nowMs) {
+        return deadlineMs != 0L && nowMs < deadlineMs;
+    }
+
+    /**
+     * Returns the nonnegative time remaining until a signed deadline, saturating on overflow.
+     */
+    public static long remainingDurationMs(long deadlineMs, long nowMs) {
+        if (!isDeadlineActive(deadlineMs, nowMs)) {
+            return 0L;
+        }
+        return Math.max(0L, saturatingSubtract(deadlineMs, nowMs));
+    }
+
+    /** Reconstructs cooldown window metadata from a persisted signed deadline. */
+    public static CooldownTiming reconstructCooldownTiming(long deadlineMs, long nowMs) {
+        long durationMs = remainingDurationMs(deadlineMs, nowMs);
+        long startedAtMs = cooldownStartedAt(nowMs, durationMs);
+        return new CooldownTiming(deadlineMs, startedAtMs, durationMs);
+    }
+
+    /** Immutable signed cooldown window reconstructed at restore time. */
+    public record CooldownTiming(long deadlineMs, long startedAtMs, long durationMs) {
+        public CooldownTiming {
+            durationMs = Math.max(0L, durationMs);
+        }
+    }
+
+    /**
      * Converts configured seconds into a game-time duration according to breeding timing basis.
      */
     public static long toGameDurationMs(double configuredSeconds,

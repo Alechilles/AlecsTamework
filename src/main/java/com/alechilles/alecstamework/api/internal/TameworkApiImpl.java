@@ -1217,7 +1217,7 @@ public final class TameworkApiImpl
         } else {
             breeding.setReady(false);
         }
-        breeding.setLastHappinessUpdateMs(now);
+        breeding.setLastHappinessUpdateMs(System.currentTimeMillis());
         if (isBlank(breeding.getConfigId())) {
             TwBreedingConfig config = BreedingConfigResolver.resolveConfig(target.reference(), target.store(), breeding);
             if (config != null && !isBlank(config.getId())) {

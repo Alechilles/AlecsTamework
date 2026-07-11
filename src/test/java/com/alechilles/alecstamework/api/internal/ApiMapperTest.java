@@ -87,6 +87,54 @@ class ApiMapperTest {
         assertEquals("Long", attachments.currentAttachmentIds().get("Tail"));
     }
 
+    @Test
+    void breedingViewPreservesSignedDeadlineAndSaturatesRemainingDuration() {
+        TameworkBreedingComponent negativeDeadline = new TameworkBreedingComponent(
+                "breed-config",
+                70.0,
+                1L,
+                false,
+                true,
+                -100L,
+                null,
+                -250L,
+                150L
+        );
+        var negativeView = ApiMapper.mapBreeding(
+                "breed-config",
+                negativeDeadline,
+                -250L,
+                70.0,
+                65.0,
+                true,
+                1.0
+        );
+        TameworkBreedingComponent overflowingDeadline = new TameworkBreedingComponent(
+                "breed-config",
+                70.0,
+                1L,
+                false,
+                true,
+                Long.MAX_VALUE,
+                null,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE
+        );
+        var overflowView = ApiMapper.mapBreeding(
+                "breed-config",
+                overflowingDeadline,
+                Long.MIN_VALUE,
+                70.0,
+                65.0,
+                true,
+                1.0
+        );
+
+        assertEquals(-100L, negativeView.cooldownUntilMs());
+        assertEquals(150L, negativeView.cooldownRemainingMs());
+        assertEquals(Long.MAX_VALUE, overflowView.cooldownRemainingMs());
+    }
+
     private static final class BeanWithInternalData {
         @SuppressWarnings("unused")
         private final String id = "example";

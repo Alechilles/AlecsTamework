@@ -138,7 +138,7 @@ public final class CompanionProgressionBootstrapService {
                 existing.setValue(clamped);
                 changed = true;
             }
-            if (existing.getLastUpdateMs() <= 0L) {
+            if (!HappinessTimestampPolicy.isValid(existing.getLastUpdateMs())) {
                 existing.setLastUpdateMs(now);
                 changed = true;
             }
@@ -181,9 +181,9 @@ public final class CompanionProgressionBootstrapService {
         double happinessValue = happiness != null
                 ? happiness.getValue()
                 : resolveInitialHappinessValue(npcRef, store, null);
-        long lastUpdateMs = happiness != null && happiness.getLastUpdateMs() > 0L
+        long lastUpdateMs = happiness != null && HappinessTimestampPolicy.isValid(happiness.getLastUpdateMs())
                 ? happiness.getLastUpdateMs()
-                : now;
+                : System.currentTimeMillis();
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         boolean ready = happinessValue >= TameworkRuntimeSettings.breedingHappinessThreshold(
                 config.resolveHappiness(roleId).getThreshold(),
@@ -192,7 +192,6 @@ public final class CompanionProgressionBootstrapService {
         TameworkBreedingComponent existing = store.getComponent(npcRef, breedingType);
         if (existing != null) {
             boolean changed = false;
-            boolean readyWhenEnabled = existing.isEnabled() && ready;
             String resolvedConfigId = config.getId();
             if (resolvedConfigId != null
                     && !resolvedConfigId.isBlank()
@@ -211,23 +210,33 @@ public final class CompanionProgressionBootstrapService {
                 existing.setLastHappinessUpdateMs(lastUpdateMs);
                 changed = true;
             }
+            long originalCooldownUntilMs = existing.getCooldownUntilMs();
             long migratedCooldownUntilMs = migrateLegacyCooldownUntilMs(
-                    existing.getCooldownUntilMs(),
+                    originalCooldownUntilMs,
                     now,
                     config,
                     roleId,
                     store
             );
-            if (migratedCooldownUntilMs != existing.getCooldownUntilMs()) {
+            boolean cooldownMigrated = migratedCooldownUntilMs != originalCooldownUntilMs;
+            if (cooldownMigrated) {
                 existing.setCooldownUntilMs(migratedCooldownUntilMs);
                 changed = true;
             }
             long cooldownDurationMs = existing.getCooldownDurationMs();
             long cooldownStartedAtMs = existing.getCooldownStartedAtMs();
-            if (migratedCooldownUntilMs > now && cooldownDurationMs <= 0L) {
-                cooldownDurationMs = Math.max(0L, migratedCooldownUntilMs - now);
-                cooldownStartedAtMs = cooldownDurationMs > 0L ? now : 0L;
-            } else if (migratedCooldownUntilMs <= now && (cooldownDurationMs > 0L || cooldownStartedAtMs > 0L)) {
+            boolean cooldownActive = BreedingTimeService.isDeadlineActive(migratedCooldownUntilMs, now);
+            if (shouldReconstructCooldownTiming(
+                    cooldownMigrated,
+                    cooldownActive,
+                    cooldownStartedAtMs,
+                    cooldownDurationMs
+            )) {
+                BreedingTimeService.CooldownTiming timing =
+                        BreedingTimeService.reconstructCooldownTiming(migratedCooldownUntilMs, now);
+                cooldownDurationMs = timing.durationMs();
+                cooldownStartedAtMs = timing.startedAtMs();
+            } else if (!cooldownActive && (cooldownDurationMs > 0L || cooldownStartedAtMs != 0L)) {
                 cooldownDurationMs = 0L;
                 cooldownStartedAtMs = 0L;
             }
@@ -239,6 +248,7 @@ public final class CompanionProgressionBootstrapService {
                 existing.setCooldownStartedAtMs(cooldownStartedAtMs);
                 changed = true;
             }
+            boolean readyWhenEnabled = existing.isEnabled() && ready && !cooldownActive;
             if (existing.isReady() != readyWhenEnabled) {
                 existing.setReady(readyWhenEnabled);
                 changed = true;
@@ -384,11 +394,11 @@ public final class CompanionProgressionBootstrapService {
                                                      TwBreedingConfig breedingConfig,
                                                      @Nullable String roleId,
                                                      Store<EntityStore> store) {
-        if (cooldownUntilMs <= 0L || nowGameMs >= 0L || cooldownUntilMs < 0L) {
+        if (!LegacyWorldTimestampClassifier.shouldTranslate(cooldownUntilMs, nowGameMs)) {
             return cooldownUntilMs;
         }
         long nowRealMs = System.currentTimeMillis();
-        long remainingRealMs = cooldownUntilMs - nowRealMs;
+        long remainingRealMs = BreedingTimeService.remainingDurationMs(cooldownUntilMs, nowRealMs);
         if (remainingRealMs <= 0L) {
             return 0L;
         }
@@ -403,7 +413,15 @@ public final class CompanionProgressionBootstrapService {
         if (remainingGameMs <= 0L) {
             return 0L;
         }
-        return nowGameMs + remainingGameMs;
+        return BreedingTimeService.deadlineAfter(nowGameMs, remainingGameMs);
+    }
+
+    static boolean shouldReconstructCooldownTiming(boolean cooldownMigrated,
+                                                   boolean cooldownActive,
+                                                   long cooldownStartedAtMs,
+                                                   long cooldownDurationMs) {
+        return cooldownActive
+                && (cooldownMigrated || cooldownStartedAtMs == 0L || cooldownDurationMs <= 0L);
     }
 
     private static double resolveSizeMultiplier(Ref<EntityStore> npcRef,

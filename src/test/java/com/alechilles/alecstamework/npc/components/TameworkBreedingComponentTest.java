@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.npc.components;
 
+import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.codec.validation.ValidationResults;
 import java.util.UUID;
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -74,5 +77,49 @@ class TameworkBreedingComponentTest {
 
         assertFalse(component.isManualBreedingReadyFor(playerUuid, 1000L));
         assertEquals(0L, component.getManualBreedingUntilMs());
+    }
+
+    @Test
+    void constructorSetterAndClonePreserveNegativeCooldownStart() {
+        TameworkBreedingComponent component = new TameworkBreedingComponent(
+                "TestConfig",
+                42.0,
+                -5_000L,
+                false,
+                true,
+                -1_000L,
+                UUID.randomUUID(),
+                -3_000L,
+                2_000L
+        );
+
+        assertEquals(-3_000L, component.getCooldownStartedAtMs());
+        component.setCooldownStartedAtMs(-4_000L);
+        TameworkBreedingComponent cloned = component.clone();
+
+        assertEquals(-1_000L, cloned.getCooldownUntilMs());
+        assertEquals(-4_000L, cloned.getCooldownStartedAtMs());
+        assertEquals(2_000L, cloned.getCooldownDurationMs());
+    }
+
+    @Test
+    void codecPreservesNegativeCooldownTimestamps() {
+        String json = """
+                {
+                  "CooldownUntilMs": -1000,
+                  "CooldownStartedAtMs": -3000,
+                  "CooldownDurationMs": 2000
+                }
+                """;
+        ExtraInfo extraInfo = new ExtraInfo(ExtraInfo.UNSET_VERSION, ValidationResults::new);
+
+        TameworkBreedingComponent decoded = TameworkBreedingComponent.CODEC.decode(
+                BsonDocument.parse(json),
+                extraInfo
+        );
+
+        assertEquals(-1_000L, decoded.getCooldownUntilMs());
+        assertEquals(-3_000L, decoded.getCooldownStartedAtMs());
+        assertEquals(2_000L, decoded.getCooldownDurationMs());
     }
 }

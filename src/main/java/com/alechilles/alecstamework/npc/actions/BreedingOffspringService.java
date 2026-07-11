@@ -27,10 +27,7 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
-import com.hypixel.hytale.server.npc.util.Alarm;
 import it.unimi.dsi.fastutil.Pair;
-import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +41,6 @@ import javax.annotation.Nullable;
  * Completes pair matching by applying cooldowns and orchestrating offspring spawn.
  */
 final class BreedingOffspringService {
-    private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
     private static final String HEARTS_PARTICLE = "Hearts";
     private static final String BREEDING_PAIR_HOOK_ID = "Tamework.Breeding.Pair.Start";
     private static final String BREEDING_PAIR_STATE = "BreedPair";
@@ -63,6 +59,7 @@ final class BreedingOffspringService {
     private final BreedingOffspringProgressionService progressionService;
     private final BreedingParticleOffsetResolver particleOffsetResolver;
     private final BreedingClaimLimitPolicyService claimLimitPolicyService;
+    private final BreedingCooldownService cooldownService;
 
     BreedingOffspringService(BreedingPartnerService partnerService) {
         this.partnerService = partnerService;
@@ -71,6 +68,7 @@ final class BreedingOffspringService {
         this.progressionService = new BreedingOffspringProgressionService();
         this.particleOffsetResolver = new BreedingParticleOffsetResolver();
         this.claimLimitPolicyService = new BreedingClaimLimitPolicyService();
+        this.cooldownService = new BreedingCooldownService();
     }
 
     boolean tryCompletePairing(Ref<EntityStore> sourceRef,
@@ -200,7 +198,7 @@ final class BreedingOffspringService {
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         CooldownResolution sourceCooldown = resolveCooldown(config, sourceRef, store);
         CooldownResolution partnerCooldown = resolveCooldown(config, partner.ref, store);
-        applyParentCooldown(
+        cooldownService.applyParentCooldown(
                 sourceRef,
                 sourceBreeding,
                 sourceNpc,
@@ -210,7 +208,7 @@ final class BreedingOffspringService {
                 store,
                 commandBuffer
         );
-        applyParentCooldown(
+        cooldownService.applyParentCooldown(
                 partner.ref,
                 livePartnerBreeding,
                 partnerNpc,
@@ -283,53 +281,6 @@ final class BreedingOffspringService {
             return null;
         }
         return store.getComponent(npcRef, type);
-    }
-
-    private void applyParentCooldown(Ref<EntityStore> npcRef,
-                                     TameworkBreedingComponent breeding,
-                                     NPCEntity npc,
-                                     UUID partnerUuid,
-                                     long cooldownMs,
-                                     long now,
-                                     Store<EntityStore> store,
-                                     @Nullable CommandBuffer<EntityStore> commandBuffer) {
-        if (npcRef == null || !npcRef.isValid() || breeding == null || store == null) {
-            return;
-        }
-        long durationMs = Math.max(0L, cooldownMs);
-        long until = now + durationMs;
-        breeding.setReady(false);
-        breeding.setCooldownUntilMs(until);
-        breeding.setCooldownStartedAtMs(durationMs > 0L ? now : 0L);
-        breeding.setCooldownDurationMs(durationMs);
-        breeding.setLastPartnerUuid(partnerUuid);
-        breeding.setLastHappinessUpdateMs(now);
-        breeding.clearManualBreedingReady();
-        ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
-        if (type != null) {
-            putComponent(npcRef, store, commandBuffer, type, breeding);
-        }
-        if (npc != null) {
-            applyCooldownAlarm(npcRef, npc, until, store);
-        }
-    }
-
-    private void applyCooldownAlarm(Ref<EntityStore> npcRef,
-                                    NPCEntity npc,
-                                    long cooldownUntilMs,
-                                    Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || npc == null || store == null || cooldownUntilMs == 0L) {
-            return;
-        }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return;
-        }
-        Alarm alarm = alarmStore.get(npc, BREEDING_COOLDOWN_ALARM_NAME);
-        if (alarm == null) {
-            return;
-        }
-        alarm.set(npcRef, Instant.ofEpochMilli(cooldownUntilMs), store);
     }
 
     private void moveParentsToPairingPosition(Ref<EntityStore> parentARef,

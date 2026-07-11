@@ -104,7 +104,7 @@ final class InteractionBreedingEffects {
         }
         long manualSelectionUntilMs = ManualBreedingClock.nowMs() + (long) resolveManualSelectionSeconds(interaction) * 1000L;
         breeding.markManualBreedingReady(playerUuid, manualSelectionUntilMs);
-        breeding.setLastHappinessUpdateMs(breedingNowMs);
+        breeding.setLastHappinessUpdateMs(System.currentTimeMillis());
         store.putComponent(npcRef, breedingType, breeding);
         if (offspringService.tryCompleteManualPairing(npcRef, store, breeding, config, playerUuid)) {
             owner.logDebug("TameworkInteract: breeding pair matched and offspring spawn queued.");

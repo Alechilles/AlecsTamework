@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.HappinessTimestampPolicy;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentMigrationService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -400,7 +401,7 @@ final class CommandRespawnService {
         }
         boolean hasHappinessData = (snapshot.happinessConfigId() != null && !snapshot.happinessConfigId().isBlank())
                 || snapshot.happinessValue() != null
-                || snapshot.happinessLastUpdateMs() > 0L
+                || HappinessTimestampPolicy.isValid(snapshot.happinessLastUpdateMs())
                 || snapshot.breedingHappiness() != null;
         if (!hasHappinessData) {
             return;
@@ -410,7 +411,7 @@ final class CommandRespawnService {
                 : snapshot.breedingHappiness() != null
                 ? snapshot.breedingHappiness()
                 : 0.0;
-        long lastUpdateMs = snapshot.happinessLastUpdateMs() > 0L
+        long lastUpdateMs = HappinessTimestampPolicy.isValid(snapshot.happinessLastUpdateMs())
                 ? snapshot.happinessLastUpdateMs()
                 : System.currentTimeMillis();
         TameworkHappinessComponent component = new TameworkHappinessComponent(
@@ -431,7 +432,7 @@ final class CommandRespawnService {
         boolean hasBreedingData = (snapshot.breedingConfigId() != null && !snapshot.breedingConfigId().isBlank())
                 || snapshot.breedingHappiness() != null
                 || snapshot.breedingEnabled()
-                || snapshot.breedingCooldownUntilMs() > 0L
+                || snapshot.breedingCooldownUntilMs() != 0L
                 || snapshot.breedingLastPartnerUuid() != null;
         if (!hasBreedingData) {
             return;
@@ -442,32 +443,35 @@ final class CommandRespawnService {
                 : snapshot.breedingHappiness() != null
                 ? snapshot.breedingHappiness()
                 : 0.0;
-        boolean ready = false;
-        String configId = snapshot.breedingConfigId();
-        if (snapshot.breedingEnabled() && configId != null && !configId.isBlank()) {
-            ready = resolveBreedingReadiness(configId, happiness, spawnedRef, store);
-        }
         long lastHappinessUpdateMs = resolveRestoredHappinessTimestamp(spawnedRef, store);
         long cooldownUntilMs = snapshot.breedingCooldownUntilMs();
-        long cooldownDurationMs = 0L;
-        long cooldownStartedAtMs = 0L;
-        if (cooldownUntilMs > 0L) {
-            long now = BreedingTimeService.resolveCurrentTimeMs(store);
-            cooldownDurationMs = Math.max(0L, cooldownUntilMs - now);
-            cooldownStartedAtMs = cooldownDurationMs > 0L ? now : 0L;
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
+        BreedingTimeService.CooldownTiming timing =
+                resolveRespawnCooldownTiming(cooldownUntilMs, now);
+        boolean ready = false;
+        String configId = snapshot.breedingConfigId();
+        if (snapshot.breedingEnabled()
+                && configId != null
+                && !configId.isBlank()
+                && !BreedingTimeService.isDeadlineActive(cooldownUntilMs, now)) {
+            ready = resolveBreedingReadiness(configId, happiness, spawnedRef, store);
         }
         TameworkBreedingComponent component = new TameworkBreedingComponent(
                 configId,
                 happiness,
-                lastHappinessUpdateMs > 0L ? lastHappinessUpdateMs : System.currentTimeMillis(),
+                HappinessTimestampPolicy.orNow(lastHappinessUpdateMs),
                 ready,
                 snapshot.breedingEnabled(),
                 cooldownUntilMs,
                 snapshot.breedingLastPartnerUuid(),
-                cooldownStartedAtMs,
-                cooldownDurationMs
+                timing.startedAtMs(),
+                timing.durationMs()
         );
         store.putComponent(spawnedRef, breedingType, component);
+    }
+
+    static BreedingTimeService.CooldownTiming resolveRespawnCooldownTiming(long cooldownUntilMs, long nowMs) {
+        return BreedingTimeService.reconstructCooldownTiming(cooldownUntilMs, nowMs);
     }
 
     private void applyRespawnTraitsState(Ref<EntityStore> spawnedRef,
@@ -548,10 +552,10 @@ final class CommandRespawnService {
             return;
         }
         boolean hasLifeStageData = (snapshot.lifeStage() != null && !snapshot.lifeStage().isBlank())
-                || snapshot.lifeStageBornAtMs() > 0L
-                || snapshot.lifeStageAdolescentAtMs() > 0L
-                || snapshot.lifeStageAdultAtMs() > 0L
-                || snapshot.lifeStageFullyGrownAtMs() > 0L;
+                || snapshot.lifeStageBornAtMs() != 0L
+                || snapshot.lifeStageAdolescentAtMs() != 0L
+                || snapshot.lifeStageAdultAtMs() != 0L
+                || snapshot.lifeStageFullyGrownAtMs() != 0L;
         if (!hasLifeStageData) {
             CompanionLifeStageService.ensureLifeStageComponent(spawnedRef, store);
             applyRespawnGender(spawnedRef, store, type, snapshot.lifeStageGender());

@@ -161,7 +161,7 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
         this.ready = ready;
         this.enabled = enabled;
         this.cooldownUntilMs = cooldownUntilMs;
-        this.cooldownStartedAtMs = Math.max(0L, cooldownStartedAtMs);
+        this.cooldownStartedAtMs = cooldownStartedAtMs;
         this.cooldownDurationMs = Math.max(0L, cooldownDurationMs);
         this.lastPartnerUuid = lastPartnerUuid;
         this.manualBreedingPlayerUuid = manualBreedingPlayerUuid;
@@ -226,7 +226,7 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
     }
 
     public void setCooldownStartedAtMs(long cooldownStartedAtMs) {
-        this.cooldownStartedAtMs = Math.max(0L, cooldownStartedAtMs);
+        this.cooldownStartedAtMs = cooldownStartedAtMs;
     }
 
     public long getCooldownDurationMs() {

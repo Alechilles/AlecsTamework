@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -84,6 +85,16 @@ class CommandRespawnServiceTest {
                 source.contains("CompanionTalentService.ensureTalentsComponent(npcRef, store, roleId);"),
                 "Shared progression bootstrap should repair missing talent storage during revive, lost recovery, and load repair."
         );
+    }
+
+    @Test
+    void respawnReconstructsActiveNegativeCooldownWithoutChangingDeadlineSign() {
+        BreedingTimeService.CooldownTiming timing =
+                CommandRespawnService.resolveRespawnCooldownTiming(-1_000L, -3_500L);
+
+        assertEquals(-1_000L, timing.deadlineMs());
+        assertEquals(-3_500L, timing.startedAtMs());
+        assertEquals(2_500L, timing.durationMs());
     }
 
     private static TwAttachmentMigrationConfig attachmentMigrationConfig(String sourceSlot,

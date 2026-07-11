@@ -420,10 +420,10 @@ final class BreedingOffspringProgressionService {
         }
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         long cooldownDurationMs = Math.max(0L, childCooldownMs);
-        long cooldownUntilMs = now + cooldownDurationMs;
+        long cooldownUntilMs = BreedingTimeService.deadlineAfter(now, cooldownDurationMs);
         breeding.setReady(false);
         breeding.setCooldownUntilMs(cooldownUntilMs);
-        breeding.setCooldownStartedAtMs(cooldownDurationMs > 0L ? now : 0L);
+        breeding.setCooldownStartedAtMs(BreedingTimeService.cooldownStartedAt(now, cooldownDurationMs));
         breeding.setCooldownDurationMs(cooldownDurationMs);
         breeding.setLastPartnerUuid(null);
         breeding.clearManualBreedingReady();

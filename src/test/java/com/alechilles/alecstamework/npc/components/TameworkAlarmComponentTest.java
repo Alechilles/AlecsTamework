@@ -65,6 +65,15 @@ class TameworkAlarmComponentTest {
         assertEquals(-1000L, cloned.getAlarm("Harvest_Ready").getUntilMs());
     }
 
+    @Test
+    void alarmDurationSaturatesAcrossSignedTimestampExtremes() {
+        TameworkAlarmComponent component = new TameworkAlarmComponent();
+
+        component.setAlarm("Breeding_Cooldown", Long.MIN_VALUE, Long.MAX_VALUE);
+
+        assertEquals(Long.MAX_VALUE, component.getAlarm("Breeding_Cooldown").getDurationMs());
+    }
+
     private static String[] alarmNames(TameworkAlarmComponent.AlarmEntry[] alarms) {
         String[] names = new String[alarms.length];
         for (int i = 0; i < alarms.length; i++) {

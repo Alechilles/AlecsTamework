@@ -81,7 +81,7 @@ public final class TameworkSetBreedingReadyCommand extends AbstractPlayerCommand
         } else {
             breeding.setReady(false);
         }
-        breeding.setLastHappinessUpdateMs(now);
+        breeding.setLastHappinessUpdateMs(System.currentTimeMillis());
         maybeUpdateConfigId(candidate.ref, store, breeding);
         store.putComponent(candidate.ref, breedingType, breeding);
 

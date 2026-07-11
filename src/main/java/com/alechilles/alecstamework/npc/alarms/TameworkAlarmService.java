@@ -43,7 +43,7 @@ public final class TameworkAlarmService {
         component = component == null ? new TameworkAlarmComponent() : component.clone();
 
         long durationMs = secondsToMillis(durationSeconds);
-        long untilMs = addSaturating(before.nowMs, durationMs);
+        long untilMs = deadlineAfter(before.nowMs, durationMs);
         component.setAlarm(alarmName, before.nowMs, durationMs, untilMs);
         store.putComponent(npcRef, type, component);
 
@@ -130,6 +130,15 @@ public final class TameworkAlarmService {
             return Long.MIN_VALUE;
         }
         return value + delta;
+    }
+
+    /** Adds a positive duration without emitting the durable zero/unset sentinel. */
+    static long deadlineAfter(long nowMs, long durationMs) {
+        if (durationMs <= 0L) {
+            return 0L;
+        }
+        long deadlineMs = addSaturating(nowMs, durationMs);
+        return deadlineMs != 0L ? deadlineMs : 1L;
     }
 
     private static void log(String stage,

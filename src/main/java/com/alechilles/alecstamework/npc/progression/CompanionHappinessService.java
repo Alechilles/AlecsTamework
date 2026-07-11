@@ -337,7 +337,9 @@ public final class CompanionHappinessService {
                 CompanionHappinessModifierService.resolve(npcRef, store, happinessConfig);
         double target = clamp(modifierSnapshot.target(), rules.min, rules.max);
         long lastUpdateMs = happiness.getLastUpdateMs();
-        long elapsedMs = lastUpdateMs > 0L ? Math.max(0L, now - lastUpdateMs) : 0L;
+        long elapsedMs = HappinessTimestampPolicy.isValid(lastUpdateMs)
+                ? Math.max(0L, now - lastUpdateMs)
+                : 0L;
         double elapsedMinutes = elapsedMs / (SECONDS_PER_MINUTE * 1000.0);
         double convergenceStep = rules.convergencePerMinute * elapsedMinutes;
         double converged = moveToward(previous, target, convergenceStep);

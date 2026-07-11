@@ -93,7 +93,7 @@ public final class TameworkAlarmComponent implements Component<EntityStore> {
         if (name == null || name.isBlank()) {
             return;
         }
-        long durationMs = untilMs > startedAtMs ? untilMs - startedAtMs : 0L;
+        long durationMs = durationBetween(startedAtMs, untilMs);
         setAlarm(new AlarmEntry(name, untilMs, startedAtMs, durationMs));
     }
 
@@ -102,6 +102,17 @@ public final class TameworkAlarmComponent implements Component<EntityStore> {
             return;
         }
         setAlarm(new AlarmEntry(name, untilMs, startedAtMs, durationMs));
+    }
+
+    private static long durationBetween(long startedAtMs, long untilMs) {
+        if (untilMs <= startedAtMs) {
+            return 0L;
+        }
+        try {
+            return Math.subtractExact(untilMs, startedAtMs);
+        } catch (ArithmeticException ignored) {
+            return Long.MAX_VALUE;
+        }
     }
 
     public void clearAlarm(@Nullable String name) {

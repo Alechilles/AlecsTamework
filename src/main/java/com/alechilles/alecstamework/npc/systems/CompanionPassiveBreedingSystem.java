@@ -33,14 +33,10 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
         TickState tickState = statesByStore.get(store);
         SweepRuntimeSettings runtimeSettings = resolveRuntimeSettings(tickState, store);
         long schedulerNowMs = resolveSchedulerNowMs(store, runtimeSettings.basis());
-        if (tickState.lastSchedulerNowMs > 0L && schedulerNowMs < tickState.lastSchedulerNowMs) {
-            tickState.nextSweepAtMs = 0L;
-        }
-        tickState.lastSchedulerNowMs = schedulerNowMs;
-        if (schedulerNowMs < tickState.nextSweepAtMs) {
+        long intervalMs = resolveIntervalMs(runtimeSettings, store);
+        if (!tickState.sweepSchedule.shouldRun(schedulerNowMs, intervalMs)) {
             return;
         }
-        tickState.nextSweepAtMs = schedulerNowMs + resolveIntervalMs(runtimeSettings, store);
         try {
             sweepService.runSweep(store, BreedingTimeService.resolveCurrentTimeMs(store));
         } catch (Throwable throwable) {
@@ -51,14 +47,30 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     @Nonnull
     private SweepRuntimeSettings resolveRuntimeSettings(@Nonnull TickState tickState,
                                                         @Nonnull Store<EntityStore> store) {
-        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
         SweepRuntimeSettings cached = tickState.cachedRuntimeSettings;
-        if (cached != null && nowMs < tickState.nextRuntimeSettingsRefreshAtMs) {
+        if (cached == null) {
+            return refreshRuntimeSettings(tickState, store);
+        }
+        long nowMs = resolveSchedulerNowMs(store, cached.basis());
+        if (!tickState.runtimeSettingsRefreshSchedule.shouldRun(
+                nowMs,
+                RUNTIME_SETTINGS_REFRESH_INTERVAL_MS
+        )) {
             return cached;
         }
+        return refreshRuntimeSettings(tickState, store);
+    }
+
+    @Nonnull
+    private SweepRuntimeSettings refreshRuntimeSettings(@Nonnull TickState tickState,
+                                                        @Nonnull Store<EntityStore> store) {
         SweepRuntimeSettings resolved = computeRuntimeSettings();
         tickState.cachedRuntimeSettings = resolved;
-        tickState.nextRuntimeSettingsRefreshAtMs = nowMs + RUNTIME_SETTINGS_REFRESH_INTERVAL_MS;
+        long nowMs = resolveSchedulerNowMs(store, resolved.basis());
+        tickState.runtimeSettingsRefreshSchedule.restart(
+                nowMs,
+                RUNTIME_SETTINGS_REFRESH_INTERVAL_MS
+        );
         return resolved;
     }
 
@@ -119,11 +131,10 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     }
 
     private static final class TickState {
-        private long nextSweepAtMs;
-        private long lastSchedulerNowMs;
+        private final SignedIntervalSchedule sweepSchedule = new SignedIntervalSchedule();
+        private final SignedIntervalSchedule runtimeSettingsRefreshSchedule = new SignedIntervalSchedule();
         @Nullable
         private SweepRuntimeSettings cachedRuntimeSettings;
-        private long nextRuntimeSettingsRefreshAtMs;
     }
 
     private static void log(@Nonnull Level level, @Nullable String message) {

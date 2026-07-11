@@ -31,6 +31,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
@@ -179,9 +180,10 @@ final class ApiMapper {
                                                     @Nullable Boolean eligible,
                                                     double fertilityMultiplier) {
         boolean cooldownActive = component.isCooldownActive(nowMs);
-        long cooldownRemainingMs = cooldownActive
-                ? Math.max(0L, component.getCooldownUntilMs() - nowMs)
-                : 0L;
+        long cooldownRemainingMs = BreedingTimeService.remainingDurationMs(
+                component.getCooldownUntilMs(),
+                nowMs
+        );
         return new ProgressionView.BreedingView(
                 configId,
                 component.isEnabled(),

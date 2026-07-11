@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class LinkedNpcPanelStatusTextServiceTest {
 
@@ -170,5 +171,14 @@ class LinkedNpcPanelStatusTextServiceTest {
                 LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.happiness.unavailable.inCoop"),
                 LinkedNpcPanelStatusTextService.resolveUnavailableHappinessText(inCoopEntry)
         );
+    }
+
+    @Test
+    void saturatedCooldownFormattingNeverWrapsNegative() {
+        String clock = LinkedNpcPanelStatusTextService.formatRemainingClock(Long.MAX_VALUE);
+        String duration = LinkedNpcPanelStatusTextService.formatRemainingTime(Long.MAX_VALUE, null);
+
+        assertFalse(clock.startsWith("-"));
+        assertFalse(duration.contains("-"));
     }
 }
