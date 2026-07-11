@@ -1,18 +1,25 @@
 package com.alechilles.alecstamework.integration.simpleclaims;
 
+import com.alechilles.alecstamework.integration.claims.ClaimFootprint;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
 import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
 import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
-import org.joml.Vector3d;
-import java.lang.reflect.Method;
+import com.alechilles.alecstamework.integration.claims.ClaimResolution;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3d;
 
 /**
- * Reflective bridge to SimpleClaims for optional Tamework claim integrations.
+ * Compatibility facade over independently probed SimpleClaims 1.0.38 capabilities.
+ *
+ * <p>Claim lookup remains usable when world extent or native damage methods are absent. Extent
+ * failures are explicit on the rich resolution path so per-chunk consumers fail closed, while
+ * total-only and lookup-only consumers can use {@link #lookupClaimIdentity} independently.</p>
  */
 public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge {
+    private static final String PROVIDER_ID = "simpleclaims";
+
     @Nullable
     private static volatile SimpleClaimsBreedingBridge cachedBridge;
 
@@ -31,6 +38,9 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
     }
 
     public record ClaimInfo(UUID partyId, int claimChunkCount) {
+        public ClaimInfo {
+            claimChunkCount = Math.max(0, claimChunkCount);
+        }
     }
 
     public record LookupResult(LookupStatus status,
@@ -43,52 +53,25 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
                                      @Nullable String message) {
     }
 
-    private final boolean available;
-    @Nullable
-    private final String unavailableReason;
-    @Nullable
-    private final Method claimManagerGetInstance;
-    @Nullable
-    private final Method claimManagerGetChunkRawCoords;
-    @Nullable
-    private final Method claimManagerGetPartyById;
-    @Nullable
-    private final Method claimManagerGetAmountOfClaims;
-    @Nullable
-    private final Method claimManagerGetPartyFromPlayer;
-    @Nullable
-    private final Method chunkInfoGetPartyOwner;
-    @Nullable
-    private final Method partyInfoIsOwnerOrMember;
-    @Nullable
-    private final Method partyInfoHasPartyPermission;
-    @Nullable
-    private final Method partyInfoGetId;
+    @Nonnull
+    private final SimpleClaimsClaimLookup lookup;
+    @Nonnull
+    private final SimpleClaimsWorldExtent extent;
+    @Nonnull
+    private final SimpleClaimsNativeTamedDamagePolicy damagePolicy;
+    @Nonnull
+    private final SimpleClaimsNativeDamageAccess damageAccess;
 
-    private SimpleClaimsBreedingBridge(boolean available,
-                                       @Nullable String unavailableReason,
-                                       @Nullable Method claimManagerGetInstance,
-                                       @Nullable Method claimManagerGetChunkRawCoords,
-                                       @Nullable Method claimManagerGetPartyById,
-                                       @Nullable Method claimManagerGetAmountOfClaims,
-                                       @Nullable Method claimManagerGetPartyFromPlayer,
-                                       @Nullable Method chunkInfoGetPartyOwner,
-                                       @Nullable Method partyInfoIsOwnerOrMember,
-                                       @Nullable Method partyInfoHasPartyPermission,
-                                       @Nullable Method partyInfoGetId) {
-        this.available = available;
-        this.unavailableReason = unavailableReason;
-        this.claimManagerGetInstance = claimManagerGetInstance;
-        this.claimManagerGetChunkRawCoords = claimManagerGetChunkRawCoords;
-        this.claimManagerGetPartyById = claimManagerGetPartyById;
-        this.claimManagerGetAmountOfClaims = claimManagerGetAmountOfClaims;
-        this.claimManagerGetPartyFromPlayer = claimManagerGetPartyFromPlayer;
-        this.chunkInfoGetPartyOwner = chunkInfoGetPartyOwner;
-        this.partyInfoIsOwnerOrMember = partyInfoIsOwnerOrMember;
-        this.partyInfoHasPartyPermission = partyInfoHasPartyPermission;
-        this.partyInfoGetId = partyInfoGetId;
+    private SimpleClaimsBreedingBridge(@Nonnull SimpleClaimsClaimLookup lookup,
+                                       @Nonnull SimpleClaimsWorldExtent extent,
+                                       @Nonnull SimpleClaimsNativeDamageAccess damageAccess) {
+        this.lookup = lookup;
+        this.extent = extent;
+        this.damageAccess = damageAccess;
+        this.damagePolicy = new SimpleClaimsNativeTamedDamagePolicy(damageAccess);
     }
 
+    @Nonnull
     public static SimpleClaimsBreedingBridge initialize() {
         SimpleClaimsBreedingBridge bridge = cachedBridge;
         if (bridge != null) {
@@ -104,287 +87,228 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
         }
     }
 
+    @Nonnull
     private static SimpleClaimsBreedingBridge createBridge() {
-        try {
-            Class<?> claimManagerClass = Class.forName("com.buuz135.simpleclaims.claim.ClaimManager");
-            Class<?> chunkInfoClass = Class.forName("com.buuz135.simpleclaims.claim.chunk.ChunkInfo");
-            Class<?> partyInfoClass = Class.forName("com.buuz135.simpleclaims.claim.party.PartyInfo");
-            Method getInstance = claimManagerClass.getMethod("getInstance");
-            Method getChunkRawCoords = claimManagerClass.getMethod(
-                    "getChunkRawCoords",
-                    String.class,
-                    int.class,
-                    int.class
-            );
-            Method getPartyById = claimManagerClass.getMethod("getPartyById", UUID.class);
-            Method getAmountOfClaims = claimManagerClass.getMethod("getAmountOfClaims", partyInfoClass);
-            Method getPartyFromPlayer = claimManagerClass.getMethod("getPartyFromPlayer", UUID.class);
-            Method getPartyOwner = chunkInfoClass.getMethod("getPartyOwner");
-            Method isOwnerOrMember = partyInfoClass.getMethod("isOwnerOrMember", UUID.class);
-            Method hasPartyPermission = partyInfoClass.getMethod("hasPartyPermission", UUID.class, String.class);
-            Method getPartyId = partyInfoClass.getMethod("getId");
-            return new SimpleClaimsBreedingBridge(
-                    true,
-                    null,
-                    getInstance,
-                    getChunkRawCoords,
-                    getPartyById,
-                    getAmountOfClaims,
-                    getPartyFromPlayer,
-                    getPartyOwner,
-                    isOwnerOrMember,
-                    hasPartyPermission,
-                    getPartyId
-            );
-        } catch (Throwable throwable) {
-            return unavailable(extractMessage(throwable));
-        }
+        ClassLoader classLoader = SimpleClaimsBreedingBridge.class.getClassLoader();
+        return new SimpleClaimsBreedingBridge(
+                SimpleClaimsClaimLookup.probe(classLoader),
+                SimpleClaimsWorldExtent.probe(classLoader),
+                SimpleClaimsNativeDamageAccess.probe(classLoader)
+        );
     }
 
+    @Nonnull
+    static SimpleClaimsBreedingBridge forTypesForTests(@Nonnull Class<?> managerType,
+                                                       @Nonnull Class<?> chunkType,
+                                                       @Nonnull Class<?> partyType) {
+        return new SimpleClaimsBreedingBridge(
+                SimpleClaimsClaimLookup.forTypes(managerType, chunkType),
+                SimpleClaimsWorldExtent.forTypes(managerType, chunkType),
+                SimpleClaimsNativeDamageAccess.forTypes(managerType, chunkType, partyType)
+        );
+    }
+
+    @Override
     public boolean isAvailable() {
-        return available;
+        return lookup.isAvailable();
     }
 
     @Nullable
+    @Override
     public String getUnavailableReason() {
-        return unavailableReason;
+        return lookup.unavailableReason();
+    }
+
+    public boolean isExtentAvailable() {
+        return extent.isAvailable();
+    }
+
+    @Nullable
+    public String getExtentUnavailableReason() {
+        return extent.unavailableReason();
+    }
+
+    public boolean isDamagePolicyAvailable() {
+        return damageAccess.isAvailable();
+    }
+
+    @Nullable
+    public String getDamagePolicyUnavailableReason() {
+        return damageAccess.unavailableReason();
     }
 
     @Nonnull
     @Override
     public String providerId() {
-        return "simpleclaims";
+        return PROVIDER_ID;
     }
 
     @Nonnull
     @Override
     public ClaimLookupResult lookupClaim(@Nullable String worldName, double blockX, double blockZ) {
-        LookupResult lookup = lookupSimpleClaimsClaim(worldName, blockX, blockZ);
-        return switch (lookup.status()) {
-            case CLAIM_FOUND -> {
-                ClaimInfo claimInfo = lookup.claimInfo();
-                if (claimInfo == null || claimInfo.partyId() == null) {
-                    yield ClaimLookupResult.error("SimpleClaims claim info was missing.");
-                }
-                yield ClaimLookupResult.found(
-                        ClaimPopulationKey.simpleClaims(worldName, claimInfo.partyId()),
-                        claimInfo.claimChunkCount()
-                );
-            }
+        ClaimResolution resolution = resolveClaim(worldName, blockX, blockZ);
+        return switch (resolution.status()) {
+            case CLAIM_FOUND -> resolution.key() == null
+                    ? ClaimLookupResult.error("SimpleClaims claim key was missing.")
+                    : new ClaimLookupResult(
+                            ClaimLookupResult.Status.CLAIM_FOUND,
+                            resolution.key(),
+                            resolution.claimChunkCount(),
+                            resolution.message()
+                    );
             case NO_CLAIM -> ClaimLookupResult.noClaim();
-            case UNAVAILABLE -> ClaimLookupResult.unavailable(lookup.message());
-            case ERROR -> ClaimLookupResult.error(lookup.message());
+            case UNAVAILABLE -> ClaimLookupResult.unavailable(resolution.message());
+            case ERROR -> ClaimLookupResult.error(resolution.message());
         };
     }
 
+    /**
+     * Resolves only claim identity. Lookup-only and total-only policies use this path so they never
+     * touch provider topology or a provider-global claim-count method.
+     */
+    @Nonnull
+    public ClaimLookupResult lookupClaimIdentity(@Nullable String worldName, double blockX, double blockZ) {
+        SimpleClaimsClaimLookup.Result result = lookup.lookup(worldName, blockX, blockZ);
+        if (result.status() != SimpleClaimsClaimLookup.Status.CLAIM_FOUND) {
+            return mapLookupFailure(result).toLookupResult();
+        }
+        String world = normalizeWorld(worldName);
+        UUID partyId = result.partyId();
+        if (world == null || partyId == null) {
+            return ClaimLookupResult.error("SimpleClaims claim identity was incomplete.");
+        }
+        return ClaimLookupResult.found(ClaimPopulationKey.simpleClaims(world, partyId), 0);
+    }
+
+    @Nonnull
+    public ClaimLookupResult lookupClaimIdentity(@Nullable String worldName, @Nullable Vector3d position) {
+        if (position == null) {
+            return ClaimLookupResult.error("Position is missing.");
+        }
+        return lookupClaimIdentity(worldName, position.x, position.z);
+    }
+
+    @Nonnull
+    @Override
+    public ClaimResolution resolveClaim(@Nullable String worldName, double blockX, double blockZ) {
+        SimpleClaimsClaimLookup.Result lookupResult = lookup.lookup(worldName, blockX, blockZ);
+        if (lookupResult.status() != SimpleClaimsClaimLookup.Status.CLAIM_FOUND) {
+            return mapLookupFailure(lookupResult);
+        }
+        String world = normalizeWorld(worldName);
+        UUID partyId = lookupResult.partyId();
+        if (world == null || partyId == null) {
+            return ClaimResolution.error("SimpleClaims claim identity was incomplete.");
+        }
+        ClaimPopulationKey key = ClaimPopulationKey.simpleClaims(world, partyId);
+        SimpleClaimsWorldExtent.Result extentResult = extent.resolve(world, partyId);
+        if (extentResult.status() == SimpleClaimsWorldExtent.Status.AVAILABLE) {
+            ClaimFootprint footprint = extentResult.footprint();
+            return footprint == null
+                    ? ClaimResolution.error("SimpleClaims world extent was missing its footprint.")
+                    : ClaimResolution.found(key, footprint);
+        }
+        String message = "SimpleClaims world extent "
+                + extentResult.status().name().toLowerCase()
+                + ": "
+                + safeMessage(extentResult.message());
+        return extentResult.status() == SimpleClaimsWorldExtent.Status.UNAVAILABLE
+                ? ClaimResolution.unavailable(message)
+                : ClaimResolution.error(message);
+    }
+
+    @Nonnull
     public LookupResult lookupSimpleClaimsClaim(@Nullable String worldName, @Nullable Vector3d position) {
         if (position == null) {
-            return lookupSimpleClaimsClaim(worldName, 0.0, 0.0);
+            return new LookupResult(LookupStatus.ERROR, null, "Position is missing.");
         }
         return lookupSimpleClaimsClaim(worldName, position.x, position.z);
     }
 
+    @Nonnull
     public LookupResult lookupSimpleClaimsClaim(@Nullable String worldName, double blockX, double blockZ) {
-        if (!available) {
-            return new LookupResult(LookupStatus.UNAVAILABLE, null, unavailableReason);
-        }
-        if (worldName == null || worldName.isBlank()) {
-            return new LookupResult(LookupStatus.ERROR, null, "World name is missing.");
-        }
-        if (!Double.isFinite(blockX) || !Double.isFinite(blockZ)) {
-            return new LookupResult(LookupStatus.ERROR, null, "Position is not finite.");
-        }
-        Object claimManager = resolveClaimManagerForLookup();
-        if (claimManager == null) {
-            return new LookupResult(LookupStatus.UNAVAILABLE, null, unavailableReason);
-        }
-        return lookupClaimInternal(claimManager, worldName, blockX, blockZ);
+        ClaimResolution resolution = resolveClaim(worldName, blockX, blockZ);
+        return switch (resolution.status()) {
+            case CLAIM_FOUND -> {
+                ClaimPopulationKey key = resolution.key();
+                if (key == null) {
+                    yield new LookupResult(LookupStatus.ERROR, null, "SimpleClaims claim key was missing.");
+                }
+                yield new LookupResult(
+                        LookupStatus.CLAIM_FOUND,
+                        new ClaimInfo(key.ownerId(), resolution.claimChunkCount()),
+                        resolution.message()
+                );
+            }
+            case NO_CLAIM -> new LookupResult(LookupStatus.NO_CLAIM, null, null);
+            case UNAVAILABLE -> new LookupResult(LookupStatus.UNAVAILABLE, null, resolution.message());
+            case ERROR -> new LookupResult(LookupStatus.ERROR, null, resolution.message());
+        };
     }
 
+    @Nonnull
     public DamageAccessResult evaluateDamageAccess(@Nullable String worldName,
                                                    @Nullable Vector3d position,
                                                    @Nullable UUID attackerPlayerUuid,
                                                    @Nullable String allowDamagePermissionKey) {
-        if (!available) {
-            return new DamageAccessResult(DamageAccessStatus.UNAVAILABLE, null, unavailableReason);
-        }
-        if (attackerPlayerUuid == null) {
-            return new DamageAccessResult(DamageAccessStatus.ALLOWED, null, "attacker-missing");
-        }
-        if (worldName == null || worldName.isBlank()) {
-            return new DamageAccessResult(DamageAccessStatus.LOOKUP_ERROR, null, "World name is missing.");
-        }
-        if (position == null || !Double.isFinite(position.x) || !Double.isFinite(position.z)) {
-            return new DamageAccessResult(DamageAccessStatus.LOOKUP_ERROR, null, "Position is not finite.");
-        }
-        Object claimManager = resolveClaimManagerForDamage();
-        if (claimManager == null) {
-            return new DamageAccessResult(DamageAccessStatus.UNAVAILABLE, null, unavailableReason);
-        }
-
-        LookupResult lookup = lookupClaimInternal(claimManager, worldName, position.x, position.z);
-        if (lookup.status() == LookupStatus.NO_CLAIM) {
-            return new DamageAccessResult(DamageAccessStatus.ALLOWED, null, null);
-        }
-        if (lookup.status() == LookupStatus.UNAVAILABLE) {
-            return new DamageAccessResult(DamageAccessStatus.UNAVAILABLE, null, lookup.message());
-        }
-        if (lookup.status() == LookupStatus.ERROR) {
-            return new DamageAccessResult(DamageAccessStatus.LOOKUP_ERROR, null, lookup.message());
-        }
-        ClaimInfo claimInfo = lookup.claimInfo();
-        if (claimInfo == null || claimInfo.partyId() == null) {
-            return new DamageAccessResult(DamageAccessStatus.LOOKUP_ERROR, null, "Claim info was missing.");
-        }
-        try {
-            Object claimParty = claimManagerGetPartyById.invoke(claimManager, claimInfo.partyId());
-            if (claimParty == null) {
-                return new DamageAccessResult(
-                        DamageAccessStatus.LOOKUP_ERROR,
-                        claimInfo.partyId(),
-                        "SimpleClaims claim party could not be resolved."
-                );
-            }
-            if (claimManagerGetPartyFromPlayer != null && partyInfoGetId != null) {
-                Object attackerParty = claimManagerGetPartyFromPlayer.invoke(claimManager, attackerPlayerUuid);
-                if (attackerParty != null) {
-                    Object attackerPartyId = partyInfoGetId.invoke(attackerParty);
-                    if (attackerPartyId instanceof UUID attackerPartyUuid
-                            && attackerPartyUuid.equals(claimInfo.partyId())) {
-                        return new DamageAccessResult(DamageAccessStatus.ALLOWED, claimInfo.partyId(), "attacker-party-match");
-                    }
-                }
-            }
-            if (!(partyInfoIsOwnerOrMember.invoke(claimParty, attackerPlayerUuid) instanceof Boolean isOwnerOrMember)) {
-                return new DamageAccessResult(
-                        DamageAccessStatus.LOOKUP_ERROR,
-                        claimInfo.partyId(),
-                        "SimpleClaims membership check did not return a boolean."
-                );
-            }
-            if (isOwnerOrMember) {
-                return new DamageAccessResult(DamageAccessStatus.ALLOWED, claimInfo.partyId(), "attacker-member");
-            }
-            String permissionKey = allowDamagePermissionKey == null ? "" : allowDamagePermissionKey.trim();
-            if (!permissionKey.isBlank()) {
-                Object hasPermissionValue = partyInfoHasPartyPermission.invoke(claimParty, attackerPlayerUuid, permissionKey);
-                if (!(hasPermissionValue instanceof Boolean hasPermission)) {
-                    return new DamageAccessResult(
-                            DamageAccessStatus.LOOKUP_ERROR,
-                            claimInfo.partyId(),
-                            "SimpleClaims permission check did not return a boolean."
-                    );
-                }
-                if (hasPermission) {
-                    return new DamageAccessResult(
-                            DamageAccessStatus.ALLOWED,
-                            claimInfo.partyId(),
-                            "attacker-permission"
-                    );
-                }
-            }
-            return new DamageAccessResult(DamageAccessStatus.DENIED, claimInfo.partyId(), "attacker-not-allowed");
-        } catch (Throwable throwable) {
-            return new DamageAccessResult(
-                    DamageAccessStatus.LOOKUP_ERROR,
-                    claimInfo.partyId(),
-                    extractMessage(throwable)
+        SimpleClaimsNativeTamedDamagePolicy.Decision decision = damagePolicy.evaluate(
+                worldName,
+                position,
+                attackerPlayerUuid
+        );
+        return switch (decision.status()) {
+            case ALLOWED, SKIPPED -> new DamageAccessResult(
+                    DamageAccessStatus.ALLOWED,
+                    decision.claimPartyId(),
+                    decision.message()
             );
-        }
+            case DENIED -> new DamageAccessResult(
+                    DamageAccessStatus.DENIED,
+                    decision.claimPartyId(),
+                    decision.message()
+            );
+            case ALLOW_FAIL_OPEN -> new DamageAccessResult(
+                    decision.accessStatus() == SimpleClaimsNativeDamageAccess.Status.UNAVAILABLE
+                            ? DamageAccessStatus.UNAVAILABLE
+                            : DamageAccessStatus.LOOKUP_ERROR,
+                    decision.claimPartyId(),
+                    decision.message()
+            );
+        };
+    }
+
+    @Nonnull
+    SimpleClaimsWorldExtent.Result resolveWorldExtent(@Nullable String worldName, @Nullable UUID partyId) {
+        return extent.resolve(worldName, partyId);
+    }
+
+    @Nonnull
+    private static ClaimResolution mapLookupFailure(@Nonnull SimpleClaimsClaimLookup.Result result) {
+        return switch (result.status()) {
+            case CLAIM_FOUND -> ClaimResolution.error("SimpleClaims claim mapping was incomplete.");
+            case NO_CLAIM -> ClaimResolution.noClaim();
+            case UNAVAILABLE -> ClaimResolution.unavailable(result.message());
+            case ERROR -> ClaimResolution.error(result.message());
+        };
     }
 
     @Nullable
-    private Object resolveClaimManagerForLookup() {
-        if (claimManagerGetInstance == null
-                || claimManagerGetChunkRawCoords == null
-                || claimManagerGetPartyById == null
-                || claimManagerGetAmountOfClaims == null
-                || chunkInfoGetPartyOwner == null) {
+    private static String normalizeWorld(@Nullable String worldName) {
+        if (worldName == null) {
             return null;
         }
-        try {
-            return claimManagerGetInstance.invoke(null);
-        } catch (Throwable throwable) {
-            return null;
-        }
+        String trimmed = worldName.trim();
+        return trimmed.isBlank() ? null : trimmed;
     }
 
-    @Nullable
-    private Object resolveClaimManagerForDamage() {
-        if (claimManagerGetInstance == null
-                || claimManagerGetChunkRawCoords == null
-                || claimManagerGetPartyById == null
-                || chunkInfoGetPartyOwner == null
-                || claimManagerGetPartyFromPlayer == null
-                || partyInfoIsOwnerOrMember == null
-                || partyInfoHasPartyPermission == null) {
-            return null;
-        }
-        try {
-            return claimManagerGetInstance.invoke(null);
-        } catch (Throwable throwable) {
-            return null;
-        }
-    }
-
-    private LookupResult lookupClaimInternal(@Nullable Object claimManager,
-                                             @Nullable String worldName,
-                                             double blockX,
-                                             double blockZ) {
-        if (claimManager == null || worldName == null || worldName.isBlank()) {
-            return new LookupResult(LookupStatus.ERROR, null, "Claim manager/world context is missing.");
-        }
-        try {
-            int rawX = (int) Math.floor(blockX);
-            int rawZ = (int) Math.floor(blockZ);
-            Object chunkInfo = claimManagerGetChunkRawCoords.invoke(claimManager, worldName, rawX, rawZ);
-            if (chunkInfo == null) {
-                return new LookupResult(LookupStatus.NO_CLAIM, null, null);
-            }
-            Object partyIdValue = chunkInfoGetPartyOwner.invoke(chunkInfo);
-            if (!(partyIdValue instanceof UUID partyId)) {
-                return new LookupResult(LookupStatus.ERROR, null, "SimpleClaims chunk owner was not a UUID.");
-            }
-            Object party = claimManagerGetPartyById.invoke(claimManager, partyId);
-            if (party == null) {
-                return new LookupResult(
-                        LookupStatus.ERROR,
-                        null,
-                        "SimpleClaims claim owner party could not be resolved for " + partyId + "."
-                );
-            }
-            Object countValue = claimManagerGetAmountOfClaims != null
-                    ? claimManagerGetAmountOfClaims.invoke(claimManager, party)
-                    : Integer.valueOf(0);
-            if (!(countValue instanceof Number countNumber)) {
-                return new LookupResult(LookupStatus.ERROR, null, "SimpleClaims claim count was not numeric.");
-            }
-            int claimChunkCount = Math.max(0, countNumber.intValue());
-            return new LookupResult(LookupStatus.CLAIM_FOUND, new ClaimInfo(partyId, claimChunkCount), null);
-        } catch (Throwable throwable) {
-            return new LookupResult(LookupStatus.ERROR, null, extractMessage(throwable));
-        }
-    }
-
-    private static SimpleClaimsBreedingBridge unavailable(@Nullable String reason) {
-        return new SimpleClaimsBreedingBridge(false, reason, null, null, null, null, null, null, null, null, null);
+    @Nonnull
+    private static String safeMessage(@Nullable String message) {
+        return message == null || message.isBlank() ? "unknown error" : message;
     }
 
     static void clearCachedBridgeForTests() {
         synchronized (SimpleClaimsBreedingBridge.class) {
             cachedBridge = null;
         }
-    }
-
-    @Nullable
-    private static String extractMessage(@Nullable Throwable throwable) {
-        if (throwable == null) {
-            return null;
-        }
-        String message = throwable.getMessage();
-        if (message == null || message.isBlank()) {
-            return throwable.getClass().getSimpleName();
-        }
-        return message;
     }
 }
