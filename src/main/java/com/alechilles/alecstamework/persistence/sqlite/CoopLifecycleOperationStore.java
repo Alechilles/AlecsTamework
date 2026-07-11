@@ -110,6 +110,23 @@ final class CoopLifecycleOperationStore {
         }
     }
 
+    boolean hasResidentUuidConflict(Connection connection,
+                                    String residentId,
+                                    UUID targetUuid) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT 1 FROM managed_coop_residents
+                WHERE active = 1 AND resident_id <> ?
+                  AND ? IN (resident_uuid, source_npc_uuid, deployed_npc_uuid)
+                LIMIT 1
+                """)) {
+            statement.setString(1, residentId);
+            statement.setString(2, targetUuid.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        }
+    }
+
     boolean uuidMappedToDifferentProfile(Connection connection,
                                          UUID npcUuid,
                                          String profileId) throws SQLException {

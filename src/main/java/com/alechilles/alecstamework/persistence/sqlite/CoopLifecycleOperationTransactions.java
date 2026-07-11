@@ -278,6 +278,8 @@ final class CoopLifecycleOperationTransactions {
             return "deployed_capture_precondition_conflict";
         }
         if (store.hasUuidClaimConflict(connection, request.residentId(), request.sourceNpcUuid())
+                || store.hasResidentUuidConflict(
+                        connection, request.residentId(), request.sourceNpcUuid())
                 || store.uuidMappedToDifferentProfile(
                         connection, request.sourceNpcUuid(), request.profileId())) {
             return "capture_uuid_conflict";
@@ -303,6 +305,8 @@ final class CoopLifecycleOperationTransactions {
         if (request.plannedTargetUuid().equals(resident.residentUuid())
                 || request.plannedTargetUuid().equals(resident.sourceNpcUuid())
                 || store.hasUuidClaimConflict(connection, request.residentId(), request.plannedTargetUuid())
+                || store.hasResidentUuidConflict(
+                        connection, request.residentId(), request.plannedTargetUuid())
                 || store.uuidHasProfileMapping(connection, request.plannedTargetUuid())
                 || store.findTargetConflict(connection, request.operationId(), request.plannedTargetUuid()) != null
                 || store.hasRecoveryTargetConflict(connection, request.plannedTargetUuid())) {
@@ -353,6 +357,8 @@ final class CoopLifecycleOperationTransactions {
             return "releasing_resident_state_conflict";
         }
         if (store.hasUuidClaimConflict(connection, resident.residentId(), actualTargetUuid)
+                || store.hasResidentUuidConflict(
+                        connection, resident.residentId(), actualTargetUuid)
                 || store.uuidHasProfileMapping(connection, actualTargetUuid)
                 || store.findTargetConflict(connection, operation.operationId(), actualTargetUuid) != null
                 || store.hasRecoveryTargetConflict(connection, actualTargetUuid)) {

@@ -158,6 +158,51 @@ class CoopLifecycleOperationRepositoryTest {
         assertResident(recaptured, ResidentState.HOUSED, true, 3L, TARGET_A);
         assertEquals(TARGET_A, recaptured.sourceNpcUuid());
         assertNull(recaptured.deployedNpcUuid());
+
+        var sameVersionReplay = committed(residents.finishCapture(
+                "resident-a", 2L, TARGET_A, "{\"state\":1}",
+                "snapshot-capture-a-again", 1, 310L));
+        assertEquals(ManagedCoopResidentRepository.MutationStatus.IDEMPOTENT,
+                sameVersionReplay.status());
+        var changedVersionReplay = committed(residents.finishCapture(
+                "resident-a", 2L, TARGET_A, "{\"state\":1}",
+                "snapshot-capture-a-again", 2, 311L));
+        assertEquals(ManagedCoopResidentRepository.MutationStatus.CONFLICT,
+                changedVersionReplay.status());
+    }
+
+    @Test
+    void crossColumnResidentUuidReferencesBlockCaptureAndReleaseWithoutClaims() throws Exception {
+        insertResidentWithUnclaimedSourceReference(TARGET_B);
+
+        CaptureRequest conflictingCapture = capture(
+                "capture-a", "resident-a", "profile-a", TARGET_B, 0, 0L, 100L);
+        MutationResult captureConflict = committed(operations.prepareCapture(conflictingCapture));
+        assertEquals(MutationStatus.CONFLICT, captureConflict.status());
+        assertEquals("capture_uuid_conflict", captureConflict.detail());
+        assertNull(operations.load("capture-a"));
+
+        houseResidentA();
+        MutationResult releaseConflict = committed(
+                operations.prepareRelease(release("release-a", TARGET_B, 0L, 200L)));
+        assertEquals(MutationStatus.CONFLICT, releaseConflict.status());
+        assertEquals("release_target_uuid_conflict", releaseConflict.detail());
+        assertEquals(ResidentState.HOUSED, residents.loadById("resident-a").state());
+    }
+
+    @Test
+    void releaseRejectsSnapshotHashThatDoesNotMatchHousedResident() throws Exception {
+        houseResidentA();
+        ReleaseRequest staleSnapshot = new ReleaseRequest(
+                "release-a", "resident-a", COOP, "Coop_Chicken", 0,
+                "profile-a", TARGET_A, "stale-snapshot-hash", 0L, 200L);
+
+        MutationResult conflict = committed(operations.prepareRelease(staleSnapshot));
+        assertEquals(MutationStatus.CONFLICT, conflict.status());
+        assertEquals("housed_release_precondition_conflict", conflict.detail());
+        assertNull(operations.load("release-a"));
+        assertResident(residents.loadById("resident-a"),
+                ResidentState.HOUSED, true, 0L, SOURCE_A);
     }
 
     @Test
@@ -352,6 +397,31 @@ class CoopLifecycleOperationRepositoryTest {
                 newAlias.executeUpdate();
                 connection.commit();
             }
+        }
+    }
+
+    private void insertResidentWithUnclaimedSourceReference(UUID sourceReference) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO managed_coop_residents (
+                         resident_id, authority_id, world_name, coop_id, x, y, z, resident_slot,
+                         profile_id, role_id, resident_uuid, source_npc_uuid, deployed_npc_uuid,
+                         snapshot_json, snapshot_hash, snapshot_version, state, generation, active,
+                         captured_at_ms, released_at_ms, created_at_ms, updated_at_ms
+                     ) VALUES (
+                         'resident-b', ?, ?, 'coop_chicken', ?, ?, ?, 1,
+                         'profile-b', 'Mob_Chicken', ?, ?, NULL,
+                         '{}', 'snapshot-b', 1, 'HOUSED', 0, 1, 1, 0, 1, 1
+                     )
+                     """)) {
+            statement.setString(1, COOP.authorityId());
+            statement.setString(2, COOP.worldName());
+            statement.setInt(3, COOP.x());
+            statement.setInt(4, COOP.y());
+            statement.setInt(5, COOP.z());
+            statement.setString(6, SOURCE_B.toString());
+            statement.setString(7, sourceReference.toString());
+            statement.executeUpdate();
         }
     }
 

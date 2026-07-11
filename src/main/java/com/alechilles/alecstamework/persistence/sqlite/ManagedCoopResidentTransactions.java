@@ -216,7 +216,8 @@ final class ManagedCoopResidentTransactions {
         if (resident.state() == ResidentState.HOUSED
                 && resident.generation() == expectedGeneration + 1
                 && sourceNpcUuid.equals(resident.sourceNpcUuid())
-                && Objects.equals(snapshotHash, resident.snapshotHash())) {
+                && Objects.equals(snapshotHash, resident.snapshotHash())
+                && resident.snapshotVersion() == Math.max(1, snapshotVersion)) {
             return result(MutationStatus.IDEMPOTENT, resident, null);
         }
         if (resident.state() != ResidentState.DEPLOYED || resident.generation() != expectedGeneration

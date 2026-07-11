@@ -87,7 +87,8 @@ final class CoopLifecycleOperationRules {
         return resident != null && matchesResident(request.authorityKey(), request.coopId(),
                 request.residentSlot(), request.profileId(), resident)
                 && resident.state() == ResidentState.HOUSED
-                && resident.generation() == request.expectedResidentGeneration();
+                && resident.generation() == request.expectedResidentGeneration()
+                && Objects.equals(request.snapshotHash(), resident.snapshotHash());
     }
 
     static boolean releasingResidentMatches(OperationRecord operation,
