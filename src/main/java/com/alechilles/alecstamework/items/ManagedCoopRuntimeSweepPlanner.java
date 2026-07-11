@@ -61,12 +61,15 @@ public final class ManagedCoopRuntimeSweepPlanner {
     }
 
     private final OccupancyGateway occupancy;
+    private final LifecycleGateway lifecycle;
     private final Map<String, Long> nextCaptureAt = new HashMap<>();
     private final Map<String, Long> nextReleaseAt = new HashMap<>();
     private final Map<String, Boolean> lastRoaming = new HashMap<>();
     private long nextRemovedCoopCheckAtMs;
 
-    public ManagedCoopRuntimeSweepPlanner(@Nonnull ManagedCoopOccupancyService occupancy) {
+    public ManagedCoopRuntimeSweepPlanner(
+            @Nonnull ManagedCoopOccupancyService occupancy,
+            @Nonnull ManagedCoopLifecycleAdmissionGuard lifecycle) {
         this(new OccupancyGateway() {
             @Override
             public boolean permitsCapture(ManagedCoopContext context,
@@ -81,11 +84,17 @@ public final class ManagedCoopRuntimeSweepPlanner {
                 int slot = occupancy.firstHousedSlot(context);
                 return slot < 0 ? null : occupancy.residentAt(context, slot);
             }
-        });
+        }, context -> lifecycle.inspect(context).allowed());
     }
 
     ManagedCoopRuntimeSweepPlanner(@Nonnull OccupancyGateway occupancy) {
+        this(occupancy, context -> true);
+    }
+
+    ManagedCoopRuntimeSweepPlanner(@Nonnull OccupancyGateway occupancy,
+                                   @Nonnull LifecycleGateway lifecycle) {
         this.occupancy = Objects.requireNonNull(occupancy, "occupancy");
+        this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
     }
 
     /** Fast preflight used to avoid an entity-store scan when every coop is roaming or throttled. */
@@ -102,7 +111,8 @@ public final class ManagedCoopRuntimeSweepPlanner {
                 continue;
             }
             TwCoopConfig.LifecycleRules rules = context.config().getLifecycleRules();
-            if (!shouldRoam(gameHour, rules)
+            if (lifecycle.permitsNormalWork(context)
+                    && !shouldRoam(gameHour, rules)
                     && rules.isCaptureWildNPCsInRange()
                     && rules.getWildCaptureRadius() > 0.0
                     && nowMs >= nextCaptureAt.getOrDefault(context.coopKey(), 0L)) {
@@ -144,6 +154,10 @@ public final class ManagedCoopRuntimeSweepPlanner {
         ArrayList<CoopPlan> plans = new ArrayList<>(contexts.size());
         for (ManagedCoopContext context : contexts) {
             if (context == null) {
+                continue;
+            }
+            if (!lifecycle.permitsNormalWork(context)) {
+                plans.add(none(context, false));
                 continue;
             }
             boolean roaming = shouldRoam(gameHour, context.config().getLifecycleRules());
@@ -279,5 +293,10 @@ public final class ManagedCoopRuntimeSweepPlanner {
 
         @Nullable
         ResidentRecord firstHoused(@Nonnull ManagedCoopContext context);
+    }
+
+    @FunctionalInterface
+    interface LifecycleGateway {
+        boolean permitsNormalWork(@Nonnull ManagedCoopContext context);
     }
 }

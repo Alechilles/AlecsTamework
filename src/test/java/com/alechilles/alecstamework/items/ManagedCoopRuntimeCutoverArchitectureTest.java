@@ -16,6 +16,7 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
             "ManagedCoopChunkScanner.java",
             "ManagedCoopCaptureCandidate.java",
             "ManagedCoopRuntimeCandidateScanner.java",
+            "ManagedCoopLifecycleAdmissionGuard.java",
             "ManagedCoopRuntimeSweepPlanner.java",
             "ManagedCoopRuntimeOperationDispatcher.java",
             "HytaleManagedCoopReleaseProjectionGateway.java",

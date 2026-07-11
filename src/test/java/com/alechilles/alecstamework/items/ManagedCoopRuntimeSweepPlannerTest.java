@@ -82,6 +82,27 @@ class ManagedCoopRuntimeSweepPlannerTest {
         assertTrue(reliable.activeCoopKeys().isEmpty());
     }
 
+    @Test
+    void activeLifecycleBlocksReleaseCaptureAndTransitionProduce() throws Exception {
+        FakeOccupancy occupancy = new FakeOccupancy();
+        ManagedCoopContext context = context(0, 2, 6, 18, true, false, 10.0,
+                new String[] {"hen"});
+        occupancy.housed.put(context.coopKey(), resident(context));
+        ManagedCoopRuntimeSweepPlanner planner =
+                new ManagedCoopRuntimeSweepPlanner(occupancy, ignored -> false);
+
+        assertFalse(planner.needsCaptureCandidates(List.of(context), 22, 1_000L));
+        var roaming = planner.plan(
+                List.of(context), List.of(), 6, 1_000L, true).coops().getFirst();
+        var enclosed = planner.plan(
+                List.of(context), List.of(candidate(7, "hen", 1.0, true)),
+                22, 2_000L, true).coops().getFirst();
+
+        assertEquals(ManagedCoopRuntimeSweepPlanner.Branch.NONE, roaming.branch());
+        assertFalse(roaming.produce());
+        assertEquals(ManagedCoopRuntimeSweepPlanner.Branch.NONE, enclosed.branch());
+    }
+
     private static ManagedCoopCaptureCandidate candidate(long id,
                                                           String role,
                                                           double x,
