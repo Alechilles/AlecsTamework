@@ -99,6 +99,7 @@ import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityBootstrapService;
+import com.alechilles.alecstamework.items.RecoveryProjectionReconciliationService;
 import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
@@ -153,6 +154,7 @@ import com.alechilles.alecstamework.npc.systems.DynamicAttachmentEvaluationSyste
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandLinkedRevivableDropSuppressionSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.RecoveryProjectionReconciliationSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTranquilizerPeakSystem;
@@ -767,6 +769,18 @@ public class Tamework extends JavaPlugin {
         loadedNpcIdentityBootstrapService = new LoadedNpcIdentityBootstrapService(
                 commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex(),
                 getLogger()
+        );
+        RecoveryProjectionReconciliationService recoveryProjectionReconciliationService =
+                new RecoveryProjectionReconciliationService(
+                        persistenceRuntime.getNpcRecoveryOperationRepository());
+        getEntityStoreRegistry().registerSystem(
+                new RecoveryProjectionReconciliationSystem(
+                        recoveryProjectionReconciliationService,
+                        NPCEntity.getComponentType(),
+                        UUIDComponent.getComponentType(),
+                        projectionIdentityComponentType,
+                        commandLinksComponentType
+                )
         );
         api = new TameworkApiImpl(
                 persistenceRuntime,
