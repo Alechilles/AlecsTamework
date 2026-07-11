@@ -55,7 +55,13 @@ Captured Tamework NPC names are stored on the spawner item and restored on spawn
 Captured attachment IDs are stored on the spawner item and can be displayed with player-friendly labels from
 `TwAttachmentDisplayConfig`.
 
+Filled spawners also carry the canonical companion profile identity used by population accounting. Capture moves an owned companion to `CAPTURED`: it keeps consuming one owner slot unless capture clears ownership, but it stops occupying a physical claim. Spawn/release reserves destination owner and claim capacity before creating the NPC. The exact source stack is finalized only after a live NPC with the planned canonical identity exists; a denial or pre-spawn failure keeps the filled item intact, while a late durability failure is reported as degraded.
+
+Older filled items without a canonical profile ID are adopted through their stable legacy identity. Adoption is cap-checked and cannot create a second active representation of the same companion. Existing over-cap legacy companions are preserved during upgrade reconciliation, but a copied or newly restored item cannot bypass later admissions.
+
 `Capture.ClearsOwner` and `Spawn.AssignsOwner` are controlled by `/tw settings`. Older configs that still contain those fields continue to load, but new item configs should not author them.
+
+If `CaptureClearsOwner` is disabled, spawning the same stored profile for the same owner is an ownership zero-delta but still a `+1` physical claim admission because `CAPTURED` does not occupy a claim. If capture clears ownership and `SpawnSetsOwner` is enabled, the spawn is a new owner admission for the spawning player.
 
 ## Icon overrides
 Optional overrides for filled spawner icons based on attachments or role.

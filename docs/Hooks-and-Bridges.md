@@ -82,3 +82,21 @@ NPC instructions using the hook:
 - Command-item move/home commands use this bridge pattern with hook ids:
   - `Tamework.Command.MoveToPosition.RaycastHit`
   - `Tamework.Command.MoveToPosition.StoredHome`
+
+## Claim provider bridge
+
+Claim-aware population limits use an optional, provider-neutral bridge. The verified contracts are:
+
+- QuestLines Claims exactly `1.3.1` (`net.evilcraft:QuestLinesClaims`).
+- SimpleClaims `>=1.0.38 <1.1.0` (`Buuz135:SimpleClaims`).
+
+The provider is resolved once per top-level operation, not retained permanently by tame, spawn, or breeding services. A `/tw settings` change or claim-plugin lifecycle change therefore affects the next operation while an already-prepared operation keeps its original settings revision and provider generation.
+
+Provider selection is strict:
+
+- An explicit provider is never substituted.
+- `Auto` tries QuestLines Claims first and tries SimpleClaims only when QuestLines Claims is absent or disabled.
+- If QuestLines Claims is installed but not ready, incompatible, or errors during probing, `Auto` does not fall through to SimpleClaims.
+- Active population-rule errors fail closed. SimpleClaims damage lookup/invocation errors fail open.
+
+Claim population and SimpleClaims damage are independent capabilities. The legacy `SimpleClaimsEnabled` value is the master claim-integration switch, but population also requires a non-`Off` provider plus a relevant population rule, while damage also requires `ProtectTamedFromNonMembers`. QuestLines Claims supplies population policy only; damage protection remains SimpleClaims-specific.

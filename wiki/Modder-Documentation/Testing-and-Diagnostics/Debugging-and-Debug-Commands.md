@@ -35,6 +35,8 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw debugreviveready`
 - `/tw debugcrashtelemetry [flush|simulate]`
 
+`/tw npcclean <roleId>` is a destructive, role-scoped cleanup for NPCs proven unowned. It waits until both canonical owner-population and claim-occupancy reconciliation are `READY`; while either index is unavailable it removes nothing. Once ready, live owners, canonical profiles with owners, unresolved canonical profile state, and pending ownership transitions are protected and reported as skipped.
+
 ## Debug toggles
 - `/tw debughook [on|off]`
 - `/tw debugprompt [on|off]`

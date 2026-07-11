@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- Added a durable owned-companion population ledger with startup reconciliation, crash-recoverable admission journals, global/per-world readiness, and indexed claim occupancy so limits remain authoritative across active, unloaded, captured, cooped, dead, lost, restoring, and dormant companion states.
+- Added Public API `0.7.0` world-aware population preflight, reservation-backed single and breeding-batch admissions, and population/provider/reconciliation diagnostics for integrations that create, restore, transfer, or place companions.
 - Added reserved built-in interaction extensions for model-supported attachment gates and atomic held-item-to-attachment mappings, allowing asset packs to equip persisted NPC appearance attachments without per-item Java handlers.
 - Added a private server licensing template for negotiated custom plugins,
   private forks, and server-specific adaptations of Tamework systems.
@@ -26,6 +28,10 @@
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
 
 ### Changed
+- Per-player population limits now count canonical owned companion profiles instead of only loaded NPC entities. Dormant companions retain their ownership world for per-world limits, transfers reserve destination capacity first, and existing over-cap companions remain intact while later acquisitions are blocked.
+- Claim companion limits are now explicit placement-admission caps. Owned active and durably unloaded companions occupy claims; captured, cooped, dead, and lost companions do not. Natural movement is never blocked, but can make a claim over-cap until occupancy falls.
+- Claim providers are resolved for each operation and react to live settings/plugin lifecycle changes. `Auto` uses QuestLines Claims first and considers SimpleClaims only when QuestLines Claims is absent or disabled; an installed but incompatible or broken QuestLines Claims fails active population admissions closed instead of silently falling back.
+- SimpleClaims tamed-companion protection now follows its native full-world, admin, member-permission, player-ally, party-ally, and outsider policy. The configured `AllowDamagePermissionKey` is a Hytale server permission; the old raw SimpleClaims party-key grant remains for one compatibility release with a deprecation warning.
 - Updated Alec's Tamework from GPL-3.0 to a source-available license that allows unmodified dependency use and example/template reuse while reserving forks, modified copies, and Tamework system reuse for separate written permission.
 - Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.
 - Renamed the Dragon Reins prototype to Flightmaster's Reins and replaced the recipe-page placeholder with a dedicated reins model and texture.
@@ -37,6 +43,15 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed coop capture and release crash windows so the coop resident record, companion population state, and recovery journal finish together; a failed source check rolls the whole transition back instead of leaving a ghost resident or reopening capacity.
+- Fixed breeding retries after restart to reuse stable pair and child identities and close every admitted unit exactly once, preventing late callbacks or partial spawns from producing duplicate offspring or leaking reserved capacity.
+- Fixed permanent culls/releases and deaths without a supported revive path to release their owner slot durably, while dead companions that can be revived keep their slot.
+- Fixed `/tw npcclean` to wait for authoritative owner and claim reconciliation and protect unresolved or transitioning companion identities from bulk removal.
+- Fixed custom `SetOwner` effects so a missing or malformed UUID is rejected; an owner name alone can no longer clear or overwrite ownership.
+- Fixed runtime and Public API damage decisions to use the same live owner precedence and role-resolved protection settings.
+- Closed population-limit bypasses across tame/set-owner, ownership transfer, legacy adoption, captured-spawner release, coop release, recall/teleport, revive, lost recovery, and manual/passive breeding by reserving owner and destination-claim capacity before mutation and committing or canceling it with the result.
+- Fixed claim population checks to fail closed while their active policy or durable index is unavailable, without changing SimpleClaims damage errors' fail-open behavior.
+- Fixed QuestLines Claims discovery and multi-chunk extent handling against the verified `1.3.1` contract, and constrained SimpleClaims compatibility to `>=1.0.38 <1.1.0`.
 - Rebuilt the avatar-flight launch particle sequence with scene-lit, translucent custom wind sprites, rotating arcs, curved orbiting charge motes, helical launch streaks, upward mist, and radial ground dust, drawing from Hytale's battleaxe whirlwind and Wind Spirit effects.
 - Fixed transformed avatar flight leaving a local-only copy of the owner's armor floating under the dragon after mounting or toggling armor visibility.
 - Fixed experimental avatar-flight fake rider attachments to keep original model paths for player clothing, armor, and third-party equipment instead of generating runtime rider asset variants that could crash other clients.

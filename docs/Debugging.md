@@ -98,6 +98,7 @@ XP can be diagnosed with a reason such as not tamed or owned, disabled harvest X
 - `/tw gettamed`, `/tw settamed`
 - `/tw getalarm [AlarmName] [NpcUuid]`
 - `/tw getflockdebug`
+- `/tw npcclean <roleId>` removes only matching NPCs proven unowned. It is unavailable until both owner-population and claim-occupancy reconciliation are `READY`, and it skips canonical identities with an owner or pending transition.
 - `/tw reloadconfig` (item-feature assets only)
 
 ## Timestamp note
