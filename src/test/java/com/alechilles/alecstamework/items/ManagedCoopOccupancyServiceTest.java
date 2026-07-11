@@ -1,0 +1,154 @@
+package com.alechilles.alecstamework.items;
+
+import com.alechilles.alecstamework.config.assets.TwCoopConfig;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadResult;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityRecord;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Verifies fail-closed managed occupancy and first-slot selection. */
+class ManagedCoopOccupancyServiceTest {
+    private static final ManagedCoopAuthorityKey KEY =
+            new ManagedCoopAuthorityKey("world", 1, 2, 3);
+
+    @Test
+    void unreadIndexBlocksCaptureAndRelease() throws Exception {
+        ManagedCoopOccupancyService service =
+                new ManagedCoopOccupancyService(new ManagedCoopResidentIndex());
+
+        ManagedCoopOccupancyService.View view = service.inspect(context("coop_chicken", 3));
+
+        assertEquals(ManagedCoopOccupancyService.AuthorityStatus.INDEX_UNAVAILABLE, view.status());
+        assertEquals(-1, service.firstEmptySlot(context("coop_chicken", 3)));
+        assertEquals(-1, service.firstHousedSlot(context("coop_chicken", 3)));
+    }
+
+    @Test
+    void newConfiguredCoopMayClaimFirstSlotAfterSuccessfulEmptyRefresh() throws Exception {
+        ManagedCoopResidentIndex index = index(List.of(), List.of());
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index);
+        ManagedCoopContext context = context("coop_chicken", 3);
+
+        ManagedCoopOccupancyService.View view = service.inspect(context);
+
+        assertEquals(ManagedCoopOccupancyService.AuthorityStatus.UNREGISTERED, view.status());
+        assertTrue(view.permitsCaptureClaim());
+        assertEquals(0, service.firstEmptySlot(context));
+    }
+
+    @Test
+    void committedRowsOwnCapacityAndOnlyHousedRowsRelease() throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 3);
+        ResidentRecord deployed = resident(0, "profile-a", uuid(1), ResidentState.DEPLOYED);
+        ResidentRecord housed = resident(2, "profile-b", uuid(2), ResidentState.HOUSED);
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index(
+                List.of(authority("coop_chicken", AuthorityState.TWORK_MANAGED)),
+                List.of(deployed, housed)
+        ));
+
+        assertEquals(1, service.firstEmptySlot(context));
+        assertEquals(2, service.firstHousedSlot(context));
+        assertEquals(housed, service.residentAt(context, 2));
+        assertEquals(2, service.housedResidentsForWorld(" WORLD ").getFirst().residentSlot());
+        assertEquals(deployed, service.residentByUuid(uuid(1)));
+    }
+
+    @Test
+    void persistedAuthorityMismatchOrTransitionBlocksMutation() throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 3);
+        ManagedCoopOccupancyService conflict = new ManagedCoopOccupancyService(index(
+                List.of(authority("coop_duck", AuthorityState.TWORK_MANAGED)),
+                List.of()
+        ));
+        ManagedCoopOccupancyService importing = new ManagedCoopOccupancyService(index(
+                List.of(authority("coop_chicken", AuthorityState.IMPORTING_TO_TWORK)),
+                List.of(resident(0, "profile-a", uuid(1), ResidentState.HOUSED))
+        ));
+
+        assertEquals(ManagedCoopOccupancyService.AuthorityStatus.COOP_ID_CONFLICT,
+                conflict.inspect(context).status());
+        assertEquals(ManagedCoopOccupancyService.AuthorityStatus.TRANSITION_BLOCKED,
+                importing.inspect(context).status());
+        assertEquals(-1, conflict.firstEmptySlot(context));
+        assertNull(importing.residentAt(context, 0));
+        assertTrue(importing.housedResidentsForWorld("world").isEmpty());
+    }
+
+    @Test
+    void rejectedRefreshRetainsEvidenceButBlocksCapacityDecisions() throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 3);
+        ManagedCoopResidentIndex index = index(
+                List.of(authority("coop_chicken", AuthorityState.TWORK_MANAGED)),
+                List.of(resident(0, "profile-a", uuid(1), ResidentState.HOUSED))
+        );
+        ManagedCoopResidentIndex.Snapshot lastKnownGood = index.snapshot();
+        index.rebuild(
+                ManagedCoopReadResult.integrityFailure(new IllegalStateException("corrupt")),
+                ManagedCoopReadResult.loaded(List.of())
+        );
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index);
+
+        assertEquals(lastKnownGood.revision(), index.snapshot().revision());
+        assertEquals(ManagedCoopOccupancyService.AuthorityStatus.INDEX_UNAVAILABLE,
+                service.inspect(context).status());
+        assertEquals(-1, service.firstEmptySlot(context));
+        assertTrue(service.housedResidentsForWorld("world").isEmpty());
+    }
+
+    private static ManagedCoopResidentIndex index(List<AuthorityRecord> authorities,
+                                                  List<ResidentRecord> residents) {
+        ManagedCoopResidentIndex index = new ManagedCoopResidentIndex();
+        index.rebuild(ManagedCoopReadResult.loaded(authorities), ManagedCoopReadResult.loaded(residents));
+        return index;
+    }
+
+    private static AuthorityRecord authority(String coopId, AuthorityState state) {
+        return new AuthorityRecord(
+                KEY.authorityId(), KEY, coopId, state, true, 1,
+                -100L, -90L, null
+        );
+    }
+
+    private static ResidentRecord resident(int slot,
+                                           String profileId,
+                                           UUID npcUuid,
+                                           ResidentState state) {
+        return new ResidentRecord(
+                "resident-" + profileId, KEY, "coop_chicken", slot, profileId, "Mob_Chicken",
+                npcUuid, npcUuid, state == ResidentState.DEPLOYED ? npcUuid : null,
+                "{}", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 1,
+                state, 0L, true, -100L, 0L, -100L, -90L
+        );
+    }
+
+    private static ManagedCoopContext context(String coopId, int maxResidents) throws Exception {
+        var constructor = TwCoopConfig.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        TwCoopConfig config = constructor.newInstance();
+        set(config, "id", "Coop_Config");
+        set(config, "enabled", true);
+        set(config, "coopId", coopId);
+        set(config.getLifecycleRules(), "maxResidents", maxResidents);
+        return new ManagedCoopContext(KEY, coopId, 0, config, null);
+    }
+
+    private static void set(Object target, String fieldName, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    private static UUID uuid(int suffix) {
+        return UUID.fromString(String.format("00000000-0000-0000-0000-%012d", suffix));
+    }
+}

@@ -77,7 +77,10 @@ public final class ManagedCoopResidentIndexRefreshService {
     }
 
     @Nullable
-    private String typedFailure(@Nonnull String label, @Nonnull ManagedCoopReadResult<?> result) {
+    private String typedFailure(@Nonnull String label, @Nullable ManagedCoopReadResult<?> result) {
+        if (result == null) {
+            return label + ":missing_read_result";
+        }
         if (result.status() == ManagedCoopReadResult.Status.LOADED) {
             return null;
         }

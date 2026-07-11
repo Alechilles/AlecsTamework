@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.items.ManagedCoopLifecycleOperationIndex;
+import com.alechilles.alecstamework.items.ManagedCoopLifecycleOperationIndexRefreshService;
+import com.alechilles.alecstamework.items.ManagedCoopOccupancyService;
 import com.alechilles.alecstamework.items.ManagedCoopResidentIndex;
 import com.alechilles.alecstamework.items.ManagedCoopResidentIndexRefreshService;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -13,6 +16,9 @@ public final class ManagedCoopRuntimeServices {
     private final ManagedCoopCaptureProfileRepository captureProfileRepository;
     private final ManagedCoopResidentIndex residentIndex;
     private final ManagedCoopResidentIndexRefreshService residentIndexRefreshService;
+    private final ManagedCoopLifecycleOperationIndex lifecycleIndex;
+    private final ManagedCoopLifecycleOperationIndexRefreshService lifecycleIndexRefreshService;
+    private final ManagedCoopOccupancyService occupancyService;
 
     ManagedCoopRuntimeServices(@Nonnull SqliteConnectionManager connectionManager,
                                @Nonnull PersistenceWriteQueue writeQueue,
@@ -31,6 +37,13 @@ public final class ManagedCoopRuntimeServices {
                 residentIndex,
                 logger
         );
+        lifecycleIndex = new ManagedCoopLifecycleOperationIndex();
+        lifecycleIndexRefreshService = new ManagedCoopLifecycleOperationIndexRefreshService(
+                lifecycleRepository,
+                lifecycleIndex,
+                logger
+        );
+        occupancyService = new ManagedCoopOccupancyService(residentIndex);
     }
 
     @Nonnull
@@ -56,5 +69,20 @@ public final class ManagedCoopRuntimeServices {
     @Nonnull
     public ManagedCoopResidentIndexRefreshService residentIndexRefreshService() {
         return residentIndexRefreshService;
+    }
+
+    @Nonnull
+    public ManagedCoopLifecycleOperationIndex lifecycleIndex() {
+        return lifecycleIndex;
+    }
+
+    @Nonnull
+    public ManagedCoopLifecycleOperationIndexRefreshService lifecycleIndexRefreshService() {
+        return lifecycleIndexRefreshService;
+    }
+
+    @Nonnull
+    public ManagedCoopOccupancyService occupancyService() {
+        return occupancyService;
     }
 }

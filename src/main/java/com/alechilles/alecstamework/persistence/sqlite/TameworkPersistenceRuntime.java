@@ -196,6 +196,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         if (health.isHealthy()) {
             runtime.runLegacyDatImport(logger);
             managedCoopServices.residentIndexRefreshService().refresh();
+            managedCoopServices.lifecycleIndexRefreshService().refresh();
             runtime.scheduleSnapshotPruning();
             runtime.scheduleDatabaseMaintenance();
         }

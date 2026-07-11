@@ -13,6 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
@@ -55,6 +56,7 @@ public final class ManagedCoopResidentIndex {
 
     private final AtomicReference<Snapshot> current = new AtomicReference<>(Snapshot.empty());
     private final AtomicLong revisions = new AtomicLong();
+    private final AtomicBoolean trusted = new AtomicBoolean();
 
     /**
      * Atomically replaces this index only when both persistence snapshots loaded successfully and
@@ -65,12 +67,14 @@ public final class ManagedCoopResidentIndex {
             @Nonnull ManagedCoopReadResult<List<AuthorityRecord>> authoritiesResult,
             @Nonnull ManagedCoopReadResult<List<ResidentRecord>> residentsResult) {
         if (authoritiesResult == null || residentsResult == null) {
+            trusted.set(false);
             return new RebuildResult(RebuildStatus.REJECTED, "missing_managed_coop_read_result");
         }
         if (authoritiesResult.status() != ManagedCoopReadResult.Status.LOADED
                 || residentsResult.status() != ManagedCoopReadResult.Status.LOADED
                 || authoritiesResult.value() == null
                 || residentsResult.value() == null) {
+            trusted.set(false);
             return new RebuildResult(RebuildStatus.REJECTED, "managed_coop_snapshot_not_loaded");
         }
         final Snapshot replacement;
@@ -81,10 +85,17 @@ public final class ManagedCoopResidentIndex {
                     residentsResult.value()
             );
         } catch (RuntimeException exception) {
+            trusted.set(false);
             return new RebuildResult(RebuildStatus.REJECTED, exception.getMessage());
         }
         current.set(replacement);
+        trusted.set(true);
         return new RebuildResult(RebuildStatus.REBUILT, null);
+    }
+
+    /** Returns whether the last complete persistence read validated successfully. */
+    public boolean isTrusted() {
+        return trusted.get();
     }
 
     /** Returns the current immutable point-in-time index. */
