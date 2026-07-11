@@ -26,9 +26,11 @@ final class NpcRecoveryOperationTransactions {
             """;
 
     private final LongSupplier clock;
+    private final NpcRecoveryConflictStore conflictStore;
 
     NpcRecoveryOperationTransactions(@Nonnull LongSupplier clock) {
         this.clock = clock;
+        this.conflictStore = new NpcRecoveryConflictStore();
     }
 
     @Nonnull
@@ -42,6 +44,13 @@ final class NpcRecoveryOperationTransactions {
         if (!profileExists(connection, claim.profileId())) {
             return ClaimResult.conflict(ClaimStatus.PROFILE_NOT_FOUND, null);
         }
+        if (conflictStore.sourceMapsToDifferentProfile(
+                connection, claim.profileId(), claim.sourceNpcUuid())) {
+            return ClaimResult.conflict(ClaimStatus.SOURCE_CONFLICT, null);
+        }
+        if (conflictStore.profileStateBlocksRecovery(connection, claim.profileId())) {
+            return ClaimResult.conflict(ClaimStatus.PROFILE_STATE_CONFLICT, null);
+        }
         RecoveryOperation active = findActiveByProfile(connection, claim.profileId(), true);
         if (active != null) {
             return ClaimResult.conflict(ClaimStatus.PROFILE_CONFLICT, active);
@@ -53,6 +62,9 @@ final class NpcRecoveryOperationTransactions {
         );
         if (targetConflict != null) {
             return ClaimResult.conflict(ClaimStatus.TARGET_CONFLICT, targetConflict);
+        }
+        if (conflictStore.targetHasCrossDomainEvidence(connection, claim.plannedTargetUuid())) {
+            return ClaimResult.conflict(ClaimStatus.TARGET_CONFLICT, null);
         }
 
         long nowMs = clock.getAsLong();
@@ -93,6 +105,9 @@ final class NpcRecoveryOperationTransactions {
         RecoveryOperation targetConflict = findTargetConflict(connection, operationId, actualTargetUuid);
         if (targetConflict != null) {
             return TransitionResult.conflict(TransitionStatus.TARGET_CONFLICT, targetConflict);
+        }
+        if (conflictStore.targetHasCrossDomainEvidence(connection, actualTargetUuid)) {
+            return TransitionResult.conflict(TransitionStatus.TARGET_CONFLICT, current);
         }
         int updated = updateProjection(
                 connection,
@@ -417,11 +432,11 @@ final class NpcRecoveryOperationTransactions {
     }
 
     static final class RepositoryIntegrityException extends RuntimeException {
-        private RepositoryIntegrityException(@Nonnull String message) {
+        RepositoryIntegrityException(@Nonnull String message) {
             super(message);
         }
 
-        private RepositoryIntegrityException(@Nonnull String message, @Nonnull Throwable cause) {
+        RepositoryIntegrityException(@Nonnull String message, @Nonnull Throwable cause) {
             super(message, cause);
         }
     }

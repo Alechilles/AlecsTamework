@@ -206,6 +206,8 @@ public final class NpcRecoveryOperationRepository {
         REPLAYED,
         PROFILE_NOT_FOUND,
         OPERATION_CONFLICT,
+        SOURCE_CONFLICT,
+        PROFILE_STATE_CONFLICT,
         PROFILE_CONFLICT,
         TARGET_CONFLICT
     }
