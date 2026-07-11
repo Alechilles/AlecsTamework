@@ -45,7 +45,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final CoopLedgerRepository coopLedgerRepository;
     private final DeathRepository deathRepository;
     private final LostRepository lostRepository;
+    private final ManagedCoopResidentRepository managedCoopResidentRepository;
+    private final CoopLifecycleOperationRepository coopLifecycleOperationRepository;
+    private final NpcIdentityRepository npcIdentityRepository;
     private final NpcProfileRepository npcProfileRepository;
+    private final NpcRecoveryOperationRepository npcRecoveryOperationRepository;
     private final SqliteSchemaMigrator schemaMigrator;
     @Nullable
     private final HytaleLogger logger;
@@ -61,7 +65,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                        @Nonnull CoopLedgerRepository coopLedgerRepository,
                                        @Nonnull DeathRepository deathRepository,
                                        @Nonnull LostRepository lostRepository,
+                                       @Nonnull ManagedCoopResidentRepository managedCoopResidentRepository,
+                                       @Nonnull CoopLifecycleOperationRepository coopLifecycleOperationRepository,
+                                       @Nonnull NpcIdentityRepository npcIdentityRepository,
                                        @Nonnull NpcProfileRepository npcProfileRepository,
+                                       @Nonnull NpcRecoveryOperationRepository npcRecoveryOperationRepository,
                                        @Nonnull SqliteSchemaMigrator schemaMigrator,
                                        @Nullable HytaleLogger logger) {
         this.runtimeDataDirectory = runtimeDataDirectory;
@@ -75,7 +83,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.coopLedgerRepository = coopLedgerRepository;
         this.deathRepository = deathRepository;
         this.lostRepository = lostRepository;
+        this.managedCoopResidentRepository = managedCoopResidentRepository;
+        this.coopLifecycleOperationRepository = coopLifecycleOperationRepository;
+        this.npcIdentityRepository = npcIdentityRepository;
         this.npcProfileRepository = npcProfileRepository;
+        this.npcRecoveryOperationRepository = npcRecoveryOperationRepository;
         this.schemaMigrator = schemaMigrator;
         this.logger = logger;
     }
@@ -142,6 +154,17 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         CoopLedgerRepository coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue, npcProfileRepository);
         DeathRepository deathRepository = new DeathRepository(connectionManager, writeQueue, npcProfileRepository);
         LostRepository lostRepository = new LostRepository(connectionManager, writeQueue, npcProfileRepository);
+        ManagedCoopResidentRepository managedCoopResidentRepository =
+                new ManagedCoopResidentRepository(connectionManager, writeQueue);
+        CoopLifecycleOperationRepository coopLifecycleOperationRepository =
+                new CoopLifecycleOperationRepository(
+                        connectionManager,
+                        writeQueue,
+                        managedCoopResidentRepository
+                );
+        NpcIdentityRepository npcIdentityRepository = new NpcIdentityRepository(connectionManager);
+        NpcRecoveryOperationRepository npcRecoveryOperationRepository =
+                new NpcRecoveryOperationRepository(connectionManager, writeQueue);
 
         TameworkPersistenceRuntime runtime = new TameworkPersistenceRuntime(
                 normalizedDataDir,
@@ -155,7 +178,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 coopLedgerRepository,
                 deathRepository,
                 lostRepository,
+                managedCoopResidentRepository,
+                coopLifecycleOperationRepository,
+                npcIdentityRepository,
                 npcProfileRepository,
+                npcRecoveryOperationRepository,
                 schemaMigrator,
                 logger
         );
@@ -209,8 +236,28 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     @Nonnull
+    public ManagedCoopResidentRepository getManagedCoopResidentRepository() {
+        return managedCoopResidentRepository;
+    }
+
+    @Nonnull
+    public CoopLifecycleOperationRepository getCoopLifecycleOperationRepository() {
+        return coopLifecycleOperationRepository;
+    }
+
+    @Nonnull
+    public NpcIdentityRepository getNpcIdentityRepository() {
+        return npcIdentityRepository;
+    }
+
+    @Nonnull
     public NpcProfileRepository getNpcProfileRepository() {
         return npcProfileRepository;
+    }
+
+    @Nonnull
+    public NpcRecoveryOperationRepository getNpcRecoveryOperationRepository() {
+        return npcRecoveryOperationRepository;
     }
 
     @Nonnull

@@ -43,7 +43,7 @@ final class SqliteSchemaV5Migration {
                         updated_at_ms INTEGER NOT NULL,
                         completed_at_ms INTEGER NOT NULL DEFAULT 0,
                         last_error TEXT,
-                        FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE
+                        FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE RESTRICT
                     )
                     """);
             statement.execute("CREATE INDEX IF NOT EXISTS idx_recovery_operations_profile ON npc_recovery_operations(profile_id)");
