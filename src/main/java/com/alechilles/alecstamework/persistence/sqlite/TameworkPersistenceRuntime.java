@@ -9,13 +9,9 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -37,8 +33,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private static final long VACUUM_INTERVAL_HOURS = 24L;
     private static final long STARTUP_VACUUM_DELAY_MINUTES = 2L;
     private static final long MAINTENANCE_SHUTDOWN_TIMEOUT_SECONDS = 2L;
-    private static final DateTimeFormatter BACKUP_SUFFIX_FORMAT =
-            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
     private final Path runtimeDataDirectory;
     private final Path sqlitePath;
@@ -93,8 +87,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         Path sqlitePath = normalizedDataDir.resolve(SQLITE_FILENAME);
         PersistenceHealthService health = new PersistenceHealthService();
         SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
-        PersistenceWriteQueue writeQueue = new PersistenceWriteQueue(connectionManager, health, logger);
         SqliteSchemaMigrator schemaMigrator = new SqliteSchemaMigrator();
+        SqliteMigrationBackupService backupService = new SqliteMigrationBackupService();
         ScheduledExecutorService maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "tamework-persistence-maintenance");
             thread.setDaemon(true);
@@ -102,7 +96,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         });
 
         try {
-            backupAndResetPreV2SqliteIfNeeded(sqlitePath, connectionManager, schemaMigrator);
+            backupService.backupBeforeVersion(
+                    sqlitePath,
+                    connectionManager,
+                    schemaMigrator,
+                    SqliteSchemaMigrator.SCHEMA_VERSION_V5
+            );
             try (Connection connection = connectionManager.openConnection()) {
                 connection.setAutoCommit(false);
                 try {
@@ -134,6 +133,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 logger.at(Level.SEVERE).log("SQLite schema bootstrap failed: " + ex.getMessage());
             }
         }
+
+        PersistenceWriteQueue writeQueue = new PersistenceWriteQueue(connectionManager, health, logger);
 
         NpcProfileRepository npcProfileRepository = new NpcProfileRepository(connectionManager, writeQueue);
         ApiProfileDataRepository apiProfileDataRepository = new ApiProfileDataRepository(connectionManager, writeQueue);
@@ -215,6 +216,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PersistenceWriteQueue.QueueMetrics getWriteQueueMetrics() {
         return writeQueue.getMetrics();
+    }
+
+    @Nonnull
+    public PersistenceWriteQueue.QueueLifecycleMetrics getWriteQueueLifecycleMetrics() {
+        return writeQueue.getLifecycleMetrics();
     }
 
     public boolean awaitWriteQueueIdle(long timeoutMs) {
@@ -395,33 +401,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         if (logger != null) {
             logger.at(Level.WARNING).log(message);
         }
-    }
-
-    private static void backupAndResetPreV2SqliteIfNeeded(@Nonnull Path sqlitePath,
-                                                           @Nonnull SqliteConnectionManager connectionManager,
-                                                           @Nonnull SqliteSchemaMigrator schemaMigrator) throws Exception {
-        if (!Files.exists(sqlitePath)) {
-            return;
-        }
-        boolean alreadyV2 = false;
-        try (Connection connection = connectionManager.openConnection()) {
-            alreadyV2 = schemaMigrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V2);
-        } catch (Exception ex) {
-            if (isSqliteDriverUnavailable(ex)) {
-                throw ex;
-            }
-            alreadyV2 = false;
-        }
-        if (alreadyV2) {
-            return;
-        }
-
-        String suffix = BACKUP_SUFFIX_FORMAT.format(Instant.now());
-        Path backupPath = sqlitePath.resolveSibling("tamework_pre_v2_" + suffix + ".sqlite.bak");
-        Files.copy(sqlitePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
-        Files.deleteIfExists(sqlitePath);
-        Files.deleteIfExists(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-wal"));
-        Files.deleteIfExists(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-shm"));
     }
 
     @Override

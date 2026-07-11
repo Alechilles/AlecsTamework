@@ -69,6 +69,7 @@ final class LegacyDatImporter {
                 for (CommandLinkedNpcLostService.LostLinkedNpcSnapshot row : lostRows) {
                     lostRepository.upsertInTransaction(connection, row);
                 }
+                schemaMigrator.reconcileSchemaV5Data(connection);
                 schemaMigrator.recordMigration(
                         connection,
                         SqliteSchemaMigrator.MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2,

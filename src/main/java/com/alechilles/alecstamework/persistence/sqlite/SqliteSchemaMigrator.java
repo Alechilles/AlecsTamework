@@ -7,17 +7,21 @@ import java.sql.Statement;
 import javax.annotation.Nonnull;
 
 /**
- * Applies SQLite schema migrations.
+ * Applies ordered SQLite schema migrations and delegates the larger v5 migration.
  */
 public final class SqliteSchemaMigrator {
     public static final int SCHEMA_VERSION_V2 = 2;
     public static final int SCHEMA_VERSION_V3 = 3;
     public static final int SCHEMA_VERSION_V4 = 4;
+    public static final int SCHEMA_VERSION_V5 = 5;
     public static final int MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2 = 2001;
     public static final String MIGRATION_NAME_SCHEMA_V2 = "schema_v2";
     public static final String MIGRATION_NAME_SCHEMA_V3 = "schema_v3_api_profile_data";
     public static final String MIGRATION_NAME_SCHEMA_V4 = "schema_v4_coop_state_snapshot";
+    public static final String MIGRATION_NAME_SCHEMA_V5 = "schema_v5_identity_and_lifecycle_operations";
     public static final String MIGRATION_NAME_LEGACY_DAT_IMPORT_V2 = "legacy_dat_import_v2";
+
+    private final SqliteSchemaV5Migration schemaV5Migration = new SqliteSchemaV5Migration();
 
     public void migrate(@Nonnull Connection connection) throws Exception {
         createMigrationsTable(connection);
@@ -33,6 +37,16 @@ public final class SqliteSchemaMigrator {
             applySchemaV4(connection);
             recordMigration(connection, SCHEMA_VERSION_V4, MIGRATION_NAME_SCHEMA_V4);
         }
+        if (!isVersionApplied(connection, SCHEMA_VERSION_V5)) {
+            schemaV5Migration.apply(connection);
+            recordMigration(connection, SCHEMA_VERSION_V5, MIGRATION_NAME_SCHEMA_V5);
+        } else {
+            schemaV5Migration.reconcileLegacyData(connection);
+        }
+    }
+
+    void reconcileSchemaV5Data(@Nonnull Connection connection) throws Exception {
+        schemaV5Migration.reconcileLegacyData(connection);
     }
 
     private void createMigrationsTable(@Nonnull Connection connection) throws Exception {
@@ -94,7 +108,6 @@ public final class SqliteSchemaMigrator {
                     """);
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_profiles_owner_uuid ON npc_profiles(owner_uuid)");
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_profiles_current_uuid ON npc_profiles(current_npc_uuid)");
-
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS npc_uuid_aliases (
                         npc_uuid TEXT PRIMARY KEY,
@@ -106,7 +119,6 @@ public final class SqliteSchemaMigrator {
                     """);
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_uuid_aliases_profile_id ON npc_uuid_aliases(profile_id)");
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_uuid_aliases_current_profile ON npc_uuid_aliases(is_current, profile_id)");
-
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS npc_tool_links (
                         profile_id TEXT NOT NULL,
@@ -120,7 +132,6 @@ public final class SqliteSchemaMigrator {
                     """);
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_tool_links_tool_uuid ON npc_tool_links(tool_uuid)");
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_tool_links_profile_id ON npc_tool_links(profile_id)");
-
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS npc_snapshots (
                         snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,7 +146,6 @@ public final class SqliteSchemaMigrator {
                     """);
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_snapshots_profile_type_active ON npc_snapshots(profile_id, snapshot_type, is_active)");
             statement.execute("CREATE INDEX IF NOT EXISTS idx_npc_snapshots_type_active_created ON npc_snapshots(snapshot_type, is_active, created_at_ms)");
-
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS coop_slots (
                         world_name TEXT NOT NULL,
@@ -157,7 +167,6 @@ public final class SqliteSchemaMigrator {
             statement.execute("CREATE INDEX IF NOT EXISTS idx_coop_slots_profile_id ON coop_slots(profile_id)");
             statement.execute("CREATE INDEX IF NOT EXISTS idx_coop_slots_last_released_npc_uuid ON coop_slots(last_released_npc_uuid)");
             statement.execute("CREATE INDEX IF NOT EXISTS idx_coop_slots_world_coop ON coop_slots(world_name, coop_id)");
-
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS profile_states (
                         profile_id TEXT PRIMARY KEY,
@@ -175,8 +184,7 @@ public final class SqliteSchemaMigrator {
 
     private void applySchemaV3(@Nonnull Connection connection) throws Exception {
         try (Statement statement = connection.createStatement()) {
-            statement.execute(
-                    """
+            statement.execute("""
                     CREATE TABLE IF NOT EXISTS api_profile_data (
                         profile_id TEXT NOT NULL,
                         namespace TEXT NOT NULL,
@@ -187,11 +195,8 @@ public final class SqliteSchemaMigrator {
                         PRIMARY KEY (profile_id, namespace, data_key),
                         FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE
                     )
-                    """
-            );
-            statement.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_api_profile_data_profile_namespace ON api_profile_data(profile_id, namespace)"
-            );
+                    """);
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_api_profile_data_profile_namespace ON api_profile_data(profile_id, namespace)");
         }
     }
 
@@ -210,8 +215,7 @@ public final class SqliteSchemaMigrator {
         try (PreparedStatement statement = connection.prepareStatement("PRAGMA table_info(" + tableName + ")");
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
-                String existing = resultSet.getString("name");
-                if (columnName.equalsIgnoreCase(existing)) {
+                if (columnName.equalsIgnoreCase(resultSet.getString("name"))) {
                     return true;
                 }
             }
