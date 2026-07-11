@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,6 +77,40 @@ class OwnerPopulationCapServiceTest {
         assertEquals(
                 "owner-population-reconciling",
                 decision.reason()
+        );
+    }
+
+    @Test
+    void perWorldLegacyCountWithoutWorldContextReturnsConservativeSentinel() {
+        UUID ownerId = UUID.fromString("00000000-0000-0000-0000-000000000731");
+        OwnerPopulationIndex index = new OwnerPopulationIndex();
+        index.replaceCommittedEntries(List.of(
+                new OwnerPopulationEntry(
+                        "profile-a",
+                        ownerId,
+                        "alpha",
+                        CompanionLifecycleState.ACTIVE,
+                        1L
+                )
+        ), OwnerPopulationReadiness.READY);
+
+        assertEquals(
+                Integer.MAX_VALUE,
+                OwnerPopulationCapService.countOwnedPopulation(
+                        index,
+                        OwnerPopulationLimitScope.PER_WORLD,
+                        null,
+                        ownerId
+                )
+        );
+        assertEquals(
+                1,
+                OwnerPopulationCapService.countOwnedPopulation(
+                        index,
+                        OwnerPopulationLimitScope.GLOBAL,
+                        null,
+                        ownerId
+                )
         );
     }
 }

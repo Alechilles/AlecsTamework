@@ -15,6 +15,9 @@ class CompanionPermanentDeathHoldTest {
         assertTrue(CompanionPermanentDeathHold.isHold(
                 (DeferredCorpseRemoval) hold.clone()
         ));
+        assertTrue(CompanionPermanentDeathHold.isHold(
+                new DeferredCorpseRemoval(Double.MAX_VALUE, "Particles_Test")
+        ));
         assertFalse(CompanionPermanentDeathHold.isHold(
                 new DeferredCorpseRemoval(5.0, "Particles_Test")
         ));

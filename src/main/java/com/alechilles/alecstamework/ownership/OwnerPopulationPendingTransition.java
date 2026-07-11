@@ -8,6 +8,8 @@ record OwnerPopulationPendingTransition(OwnerPopulationReservation reservation,
                                         OwnerPopulationEntry current,
                                         OwnerPopulationEntry proposed,
                                         Set<OwnerPopulationScopeKey> additions,
+                                        OwnerPopulationScopeKey constrainedKey,
+                                        boolean positiveDelta,
                                         long expiresAtNanos) {
     OwnerPopulationPendingTransition {
         additions = Set.copyOf(additions);

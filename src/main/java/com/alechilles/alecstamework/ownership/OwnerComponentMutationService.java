@@ -27,6 +27,45 @@ public final class OwnerComponentMutationService {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
     }
 
+    /**
+     * Rolls back an unjournaled direct removal while the durable owner slot remains committed.
+     *
+     * <p>This is deliberately a repair operation rather than a new admission: the reconciliation
+     * observer has already established that no prepared release or durable RELEASED operation
+     * authorized the removal. Keeping the write in this facade preserves the single owner-component
+     * mutation boundary and degrades readiness if the buffered repair cannot be queued.</p>
+     */
+    public boolean restoreUnauthorizedRemovalBuffered(
+            @Nonnull Ref<EntityStore> npcRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull TameworkOwnerComponent removedOwner
+    ) {
+        Objects.requireNonNull(store, "store");
+        Objects.requireNonNull(commandBuffer, "commandBuffer");
+        Objects.requireNonNull(removedOwner, "removedOwner");
+        if (!npcRef.isValid() || !removedOwner.hasOwner()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        if (ownerType == null) {
+            markReadinessDegradedSafely("owner_component_repair_type_unavailable");
+            return false;
+        }
+        TameworkOwnerComponent current = store.getComponent(npcRef, ownerType);
+        if (current != null) {
+            return sameComponent(removedOwner, current);
+        }
+        try {
+            commandBuffer.putComponent(npcRef, ownerType, removedOwner.clone());
+            return true;
+        } catch (RuntimeException | LinkageError exception) {
+            markReadinessDegradedSafely("owner_component_repair_buffer_failed");
+            return false;
+        }
+    }
+
     @Nonnull
     public MutationResult applyImmediate(@Nonnull Ref<EntityStore> npcRef,
                                          @Nonnull Store<EntityStore> store,

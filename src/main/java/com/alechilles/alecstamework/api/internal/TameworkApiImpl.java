@@ -113,7 +113,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public final class TameworkApiImpl
-        implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi {
+        implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi,
+        AutoCloseable {
     static final String API_VERSION = "0.7.0";
     static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
@@ -332,6 +333,17 @@ public final class TameworkApiImpl
     @Override
     public EnumSet<TameworkApiCapability> getCapabilities() {
         return capabilities.clone();
+    }
+
+    /** Drops reflected optional-claim contracts after a settings change. */
+    public void onRuntimeSettingsChanged() {
+        damagePolicy.onRuntimeSettingsChanged();
+    }
+
+    /** Releases optional-plugin references owned by this API instance. */
+    @Override
+    public void close() {
+        damagePolicy.close();
     }
 
     @Override

@@ -298,6 +298,21 @@ class OwnerPopulationIndexTest {
     }
 
     @Test
+    void claimForApplyRejectsReservationWhenExternalAdoptionConsumesItsHeadroom() {
+        OwnerPopulationIndex index = readyIndex(new AtomicLong(550L));
+        OwnerPopulationDecision reserved = index.reserve(acquire(
+                "reserved", OWNER_A, "alpha", OwnerPopulationLimitScope.GLOBAL, 1, false
+        ));
+        assertTrue(reserved.allowed());
+
+        index.reconcileCommittedEntry(entry("external", OWNER_A, "alpha", 0L));
+
+        assertFalse(index.claimForApply(reserved.reservation()));
+        assertTrue(index.cancel(reserved.reservation()));
+        assertCounts(index, OWNER_A, "alpha", 1L, 0L, 1L, 0L);
+    }
+
+    @Test
     void reservationCapabilityCannotBeReplayedAgainstAnotherIndex() {
         OwnerPopulationIndex source = readyIndex(new AtomicLong(600L));
         OwnerPopulationIndex foreign = readyIndex(new AtomicLong(600L));

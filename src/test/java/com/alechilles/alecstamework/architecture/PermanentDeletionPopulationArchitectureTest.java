@@ -78,11 +78,21 @@ class PermanentDeletionPopulationArchitectureTest {
 
         String coordinator = read("ownership", "CompanionPermanentDeathCoordinator.java");
         int schedule = coordinator.indexOf("scheduler.schedulePermanentRelease(");
+        if (schedule < 0) {
+            schedule = coordinator.indexOf("scheduler.schedule(");
+        }
         int callback = coordinator.indexOf("public void onApplied", schedule);
         int nativeDeath = coordinator.indexOf("DeathComponent.tryAddComponent", callback);
         assertTrue(schedule >= 0 && callback > schedule && nativeDeath > callback);
         assertTrue(coordinator.contains("context.addProperty(\"permanentDeath\", true)"));
         assertTrue(coordinator.contains("beforeApply"));
+        int durableCallback = coordinator.indexOf("public void onPopulationCommitted", callback);
+        int barrierRelease = coordinator.indexOf("pendingByNpc.remove", durableCallback);
+        assertTrue(durableCallback > callback && barrierRelease > durableCallback);
+        assertFalse(coordinator.substring(callback, durableCallback).contains("pendingByNpc.remove"));
+        int degradedCallback = coordinator.indexOf("public void onDurabilityDegraded", durableCallback);
+        assertFalse(coordinator.substring(degradedCallback).contains("pendingByNpc.remove"));
+        assertTrue(coordinator.contains("CompanionPermanentDeathHold.create("));
 
         String fallback = read("npc", "systems", "CompanionPermanentDeathFallbackSystem.java");
         assertFalse(fallback.contains("tryRemoveComponent"));
@@ -91,11 +101,18 @@ class PermanentDeletionPopulationArchitectureTest {
         assertTrue(fallback.contains("commandBuffer.putComponent("));
 
         String retention = read("npc", "systems", "CompanionPermanentDeathRetentionSystem.java");
+        assertTrue(retention.contains("Order.AFTER, NPCSystems.OnDeathSystem.class"));
         assertTrue(retention.contains("Order.BEFORE, DeathSystems.TickCorpseRemoval.class"));
         assertTrue(retention.contains("Order.BEFORE, DeathSystems.CorpseRemoval.class"));
         assertTrue(retention.contains("isDurablyReleased(npcUuid)"));
         assertTrue(retention.contains("CompanionPermanentDeathHold.isHold(current)"));
         assertTrue(retention.contains("coordinator.interceptExistingDeath("));
+        int pendingBarrier = retention.indexOf("coordinator.isPending(npcUuid)");
+        int durableRelease = retention.indexOf("isDurablyReleased(npcUuid)");
+        assertTrue(pendingBarrier >= 0 && durableRelease > pendingBarrier);
+        assertTrue(retention.contains("else if (hasCanonicalCompanion(npcUuid))"));
+        assertTrue(retention.contains("retainDurabilityHold(ref, store, commandBuffer)"));
+        assertTrue(retention.contains("npc.getRole().getDeathAnimationTime()"));
 
         String registration = read("ownership", "reconciliation", "CompanionPopulationSystemRegistration.java");
         assertTrue(registration.contains("new CompanionPermanentDeathDamageGateSystem("));

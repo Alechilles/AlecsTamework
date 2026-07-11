@@ -142,6 +142,17 @@ public final class ClaimOccupancyIndex {
         }
     }
 
+    /** Validates a prepared snapshot and its subject transitions at one index linearization point. */
+    boolean matchesSnapshotAndTransitions(long expectedRevision,
+                                          @Nonnull List<ClaimOccupancyTransition> transitions) {
+        lock.lock();
+        try {
+            return revision == expectedRevision && matchesTransitionsLocked(transitions);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     boolean applyTransitions(@Nonnull List<ClaimOccupancyTransition> transitions) {
         lock.lock();
         try {

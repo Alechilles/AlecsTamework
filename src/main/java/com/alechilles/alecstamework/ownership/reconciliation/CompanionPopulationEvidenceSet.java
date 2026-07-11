@@ -206,6 +206,10 @@ public final class CompanionPopulationEvidenceSet {
                                    @Nullable PhysicalLocation physicalLocation,
                                    int observationCount,
                                    @Nonnull Set<String> sources) {
+        /** A corpse is a physical representation, but it is not live claim occupancy. */
+        public boolean livePhysical() {
+            return physical && !deathObserved;
+        }
     }
 
     public record PhysicalLocation(@Nonnull String worldName, int chunkX, int chunkZ) {

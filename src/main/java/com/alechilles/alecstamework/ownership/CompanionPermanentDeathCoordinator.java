@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.systems.CompanionPermanentDeathHold;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -23,16 +24,20 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Converts a non-revivable companion death into a durable APPLYING owner-release operation. Normal
+ * Converts a non-revivable companion death into a durable owner-release operation. Normal
  * lethal damage is paused before {@link DeathComponent}; direct-death paths retain their corpse
- * until the same durable transition has applied.
+ * until the canonical {@link CompanionLifecycleState#RELEASED} transition commits to SQLite.
  */
 public final class CompanionPermanentDeathCoordinator {
-    private final OwnerMutationScheduler scheduler;
+    private final PermanentReleaseScheduler scheduler;
     private final ConcurrentHashMap<UUID, PendingDeath> pendingByNpc = new ConcurrentHashMap<>();
     private volatile WarningSink warningSink = message -> { };
 
     public CompanionPermanentDeathCoordinator(@Nonnull OwnerMutationScheduler scheduler) {
+        this(adapt(scheduler));
+    }
+
+    CompanionPermanentDeathCoordinator(@Nonnull PermanentReleaseScheduler scheduler) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
@@ -85,10 +90,9 @@ public final class CompanionPermanentDeathCoordinator {
         JsonObject context = new JsonObject();
         context.addProperty("permanentDeath", true);
         context.addProperty("deathSource", pending.source());
-        boolean scheduled = scheduler.schedulePermanentRelease(
+        boolean scheduled = scheduler.schedule(
                 npcRef,
                 store,
-                true,
                 "permanent-death:" + pending.npcUuid(),
                 context.toString(),
                 callbacks(pending)
@@ -114,6 +118,16 @@ public final class CompanionPermanentDeathCoordinator {
                                   @Nonnull String profileId,
                                   @Nonnull OwnerMutationContext context) {
                 applyDeath(context, pending);
+            }
+
+            @Override
+            public void onPopulationCommitted(@Nonnull CompanionPopulationCommitResult result) {
+                OwnerPopulationCommitResult ownerCommit = result.ownerCommit();
+                if (!result.committed() || ownerCommit == null || !ownerCommit.committed()) {
+                    warn("Permanent companion death stayed held after a non-durable commit: npc="
+                            + pending.npcUuid() + ", reason=" + result.reason());
+                    return;
+                }
                 pendingByNpc.remove(pending.npcUuid(), pending);
             }
 
@@ -121,6 +135,11 @@ public final class CompanionPermanentDeathCoordinator {
             public void onApplyCompensated(@Nonnull String profileId,
                                            @Nonnull String reason,
                                            @Nonnull OwnerMutationContext context) {
+                if (reason.endsWith("-ambiguous")) {
+                    warn("Permanent companion death stayed held after an ambiguous live write: npc="
+                            + pending.npcUuid() + ", reason=" + reason);
+                    return;
+                }
                 pendingByNpc.remove(pending.npcUuid(), pending);
             }
 
@@ -134,8 +153,7 @@ public final class CompanionPermanentDeathCoordinator {
 
             @Override
             public void onDurabilityDegraded(@Nonnull String reason) {
-                pendingByNpc.remove(pending.npcUuid(), pending);
-                warn("Permanent companion death entered recovery quarantine: npc="
+                warn("Permanent companion death remains held in recovery quarantine: npc="
                         + pending.npcUuid() + ", reason=" + reason);
             }
         };
@@ -171,7 +189,7 @@ public final class CompanionPermanentDeathCoordinator {
             throw new IllegalStateException("Permanent-death target disappeared before apply.");
         }
         if (!pending.subtractHealth()) {
-            releaseExistingDeathHold(context);
+            retainExistingDeathHold(context);
             return;
         }
         Damage damage = pending.damage();
@@ -183,6 +201,7 @@ public final class CompanionPermanentDeathCoordinator {
         if (stats == null || health == null) {
             throw new IllegalStateException("Permanent-death target has no health state.");
         }
+        installDeathHold(context);
         damage.setAmount(pending.finalDamage());
         float remaining = stats.subtractStatValue(
                 DefaultEntityStatTypes.getHealth(), pending.finalDamage()
@@ -196,22 +215,38 @@ public final class CompanionPermanentDeathCoordinator {
         }
     }
 
-    private static void releaseExistingDeathHold(@Nonnull OwnerMutationContext context) {
+    private static void retainExistingDeathHold(@Nonnull OwnerMutationContext context) {
         if (!hasDeathComponent(context)) {
             throw new IllegalStateException("Prepared direct-death target is no longer dead.");
         }
+        installDeathHold(context);
+    }
+
+    private static void installDeathHold(@Nonnull OwnerMutationContext context) {
         NPCEntity npc = context.store().getComponent(
                 context.npcRef(), NPCEntity.getComponentType()
         );
-        double delaySeconds = npc == null || npc.getRole() == null
-                ? 0.0 : Math.max(0.0, npc.getRole().getDeathAnimationTime());
         String deathParticles = npc == null || npc.getRole() == null
                 ? null : npc.getRole().getDeathParticles();
         context.store().putComponent(
                 context.npcRef(),
                 DeferredCorpseRemoval.getComponentType(),
-                new DeferredCorpseRemoval(delaySeconds, deathParticles)
+                CompanionPermanentDeathHold.create(deathParticles)
         );
+    }
+
+    @Nonnull
+    private static PermanentReleaseScheduler adapt(@Nonnull OwnerMutationScheduler scheduler) {
+        OwnerMutationScheduler safeScheduler = Objects.requireNonNull(scheduler, "scheduler");
+        return (npcRef, store, idempotencyKey, durableContextJson, callbacks) ->
+                safeScheduler.schedulePermanentRelease(
+                        npcRef,
+                        store,
+                        true,
+                        idempotencyKey,
+                        durableContextJson,
+                        callbacks
+                );
     }
 
     private static boolean isLethal(@Nonnull OwnerMutationContext context, float finalDamage) {
@@ -260,5 +295,14 @@ public final class CompanionPermanentDeathCoordinator {
     @FunctionalInterface
     public interface WarningSink {
         void warn(@Nonnull String message);
+    }
+
+    @FunctionalInterface
+    interface PermanentReleaseScheduler {
+        boolean schedule(@Nonnull Ref<EntityStore> npcRef,
+                         @Nonnull Store<EntityStore> store,
+                         @Nonnull String idempotencyKey,
+                         @Nonnull String durableContextJson,
+                         @Nonnull OwnerMutationScheduler.MutationCallbacks callbacks);
     }
 }

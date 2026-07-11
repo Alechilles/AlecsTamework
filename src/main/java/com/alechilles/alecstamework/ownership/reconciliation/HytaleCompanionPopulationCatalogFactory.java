@@ -9,11 +9,13 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.playerdata.PlayerStorage;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -33,7 +35,27 @@ public final class HytaleCompanionPopulationCatalogFactory {
             @Nonnull CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository,
             @Nonnull CustomContainerReconciliationRegistry customContainers
     ) {
+        return create(
+                universe,
+                ownerType,
+                itemFeatures,
+                legacyEvidenceRepository,
+                customContainers,
+                PersistentWorldDirectoryCatalog.filesystem()
+        );
+    }
+
+    @Nonnull
+    static BuildResult create(
+            @Nonnull Universe universe,
+            @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository,
+            @Nonnull CustomContainerReconciliationRegistry customContainers,
+            @Nonnull PersistentWorldDirectoryCatalog persistentWorldDirectories
+    ) {
         Objects.requireNonNull(universe, "universe");
+        Objects.requireNonNull(persistentWorldDirectories, "persistentWorldDirectories");
         LegacyCapturedItemEvidenceReader itemReader = new LegacyCapturedItemEvidenceReader(itemFeatures);
         RecursiveItemContainerEvidenceScanner itemContainers =
                 new RecursiveItemContainerEvidenceScanner(itemReader);
@@ -54,7 +76,8 @@ public final class HytaleCompanionPopulationCatalogFactory {
                 knownIdentities.npcUuids(),
                 mutableSourceEpoch,
                 sources,
-                incompleteReasons
+                incompleteReasons,
+                persistentWorldDirectories
         );
         worlds = new WorldResult(worlds.sealed() && knownIdentities.complete());
         boolean playersSealed = addPlayerSources(
@@ -112,8 +135,12 @@ public final class HytaleCompanionPopulationCatalogFactory {
             @Nonnull Set<UUID> knownNpcUuids,
             @Nonnull String mutableSourceEpoch,
             @Nonnull List<CompanionPopulationEvidenceSource> sources,
-            @Nonnull List<String> reasons
+            @Nonnull List<String> reasons,
+            @Nonnull PersistentWorldDirectoryCatalog persistentWorldDirectories
     ) {
+        Optional<PersistentWorldDirectoryCatalog.Snapshot> savedBefore = savedWorldSnapshot(
+                universe, persistentWorldDirectories, reasons, "before"
+        );
         Map<String, World> before = new TreeMap<>(universe.getWorlds());
         boolean complete = true;
         for (Map.Entry<String, World> entry : before.entrySet()) {
@@ -151,7 +178,52 @@ public final class HytaleCompanionPopulationCatalogFactory {
             complete = false;
             reasons.add("world-catalog-changed-during-snapshot");
         }
+        Optional<PersistentWorldDirectoryCatalog.Snapshot> savedAfter = savedWorldSnapshot(
+                universe, persistentWorldDirectories, reasons, "after"
+        );
+        if (savedBefore.isEmpty() || savedAfter.isEmpty()) {
+            complete = false;
+        } else if (!savedBefore.equals(savedAfter)) {
+            complete = false;
+            reasons.add("persisted-world-catalog-changed-during-snapshot");
+        } else {
+            PersistentWorldDirectoryCatalog.Coverage coverage = savedBefore.orElseThrow().compareToLiveWorlds(
+                    liveWorldSavePaths(before)
+            );
+            if (!coverage.complete()) {
+                complete = false;
+                for (Path missing : coverage.missingWorldDirectories()) {
+                    reasons.add("persisted-world-not-live:" + missing.getFileName());
+                }
+            }
+        }
         return new WorldResult(complete);
+    }
+
+    private static Optional<PersistentWorldDirectoryCatalog.Snapshot> savedWorldSnapshot(
+            @Nonnull Universe universe,
+            @Nonnull PersistentWorldDirectoryCatalog persistentWorldDirectories,
+            @Nonnull List<String> reasons,
+            @Nonnull String phase
+    ) {
+        try {
+            return Optional.of(persistentWorldDirectories.snapshot(universe.getWorldsPath()));
+        } catch (Exception exception) {
+            reasons.add("persisted-world-catalog-unavailable:" + phase
+                    + ":" + exception.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
+    @Nonnull
+    private static List<Path> liveWorldSavePaths(@Nonnull Map<String, World> worlds) {
+        List<Path> paths = new ArrayList<>();
+        for (World world : worlds.values()) {
+            if (world != null) {
+                paths.add(world.getSavePath());
+            }
+        }
+        return List.copyOf(paths);
     }
 
     private static boolean addPlayerSources(

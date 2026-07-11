@@ -14,8 +14,10 @@ import org.junit.jupiter.api.io.TempDir;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.dormant;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.insertScenario;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.physical;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.physicalDead;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.updateTargetContext;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Covers restore and rehome recovery decisions that depend on exact physical-location evidence. */
@@ -88,6 +90,42 @@ class CompanionPopulationOperationRecoveryLocationTest {
             assertEquals(CompanionPopulationOperationRecord.State.FAILED, harness.operationState());
             assertEquals(previousUuid, harness.state().currentNpcUuid());
             assertEquals(CompanionLifecycleState.CAPTURED.name(), harness.state().lifecycleState());
+        }
+    }
+
+    @Test
+    void restoredLiveReplacementAndPersistedCorpseQuarantineDuplicateProfile() throws Exception {
+        try (CompanionPopulationOperationRecoveryTestSupport.Harness harness = harness(
+                "restore-corpse-duplicate.sqlite"
+        )) {
+            UUID corpseUuid = UUID.randomUUID();
+            UUID restoredUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", corpseUuid, ownerUuid, ownerUuid,
+                    CompanionLifecycleState.DEAD_REVIVABLE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.RESTORE,
+                    CompanionPopulationOperationRecord.State.APPLYING, false
+            );
+            updateTargetContext(harness, "{\"previousNpcUuid\":\"" + corpseUuid
+                    + "\",\"plannedNpcUuid\":\"" + restoredUuid
+                    + "\",\"world\":\"default\",\"chunkX\":0,\"chunkZ\":0}");
+            CompanionPopulationEvidenceSet evidence = new CompanionPopulationEvidenceSet(List.of(
+                    physical(restoredUuid, ownerUuid, "default", 0, 0),
+                    physicalDead(corpseUuid, ownerUuid, "default", 0, 0)
+            ));
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult recovery =
+                    harness.recovery().recoverAsync(
+                            harness.repository().loadNonterminalOperations(), evidence
+                    ).get(3, TimeUnit.SECONDS);
+            CompanionPopulationRepairRepository.RepairResult repair = harness.repair().mergeAsync(evidence)
+                    .completion().get(3, TimeUnit.SECONDS).value();
+
+            assertEquals(1, recovery.committed());
+            assertTrue(recovery.complete());
+            assertFalse(repair.merged());
+            assertEquals("duplicate-physical-profile-representation", repair.reason());
         }
     }
 

@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
@@ -191,6 +192,92 @@ class ClaimAdmissionAuthorityTest {
     }
 
     @Test
+    void applyRefreshExcludesItsOwnPendingSlot() {
+        ClaimOccupancyIndex index = readyIndex(List.of());
+        ClaimAdmissionTestFixtures.MutableBridge bridge = bridge(key(), footprint(1));
+        ClaimPolicyContext policy = context(bridge);
+        ClaimAdmissionService service = new ClaimAdmissionService(index);
+        ClaimAdmissionDecision decision = service.reserve(
+                request(List.of(newActive("last-slot")), policy, 1, 1),
+                new ClaimLookupSession(policy)
+        );
+
+        assertTrue(decision.allowed());
+        assertEquals(1L, service.pendingForClaim(key()));
+        assertTrue(service.claimForApply(decision.reservation(), new ClaimLookupSession(policy)));
+        assertEquals(ClaimAdmissionReservation.State.APPLYING, decision.reservation().state());
+    }
+
+    @Test
+    void naturalMovementBetweenReserveAndApplyConsumesTheReservedHeadroom() {
+        ClaimOccupancyIndex index = readyIndex(List.of());
+        ClaimAdmissionTestFixtures.MutableBridge bridge = bridge(key(), footprint(1));
+        ClaimPolicyContext policy = context(bridge);
+        ClaimAdmissionService service = new ClaimAdmissionService(index);
+        ClaimAdmissionDecision decision = service.reserve(
+                request(List.of(newActive("reserved")), policy, 1, 1),
+                new ClaimLookupSession(policy)
+        );
+
+        assertTrue(index.observeMovement(
+                entry("walker", CompanionLifecycleState.ACTIVE, DESTINATION, 1L)
+        ));
+
+        assertFalse(service.claimForApply(decision.reservation(), new ClaimLookupSession(policy)));
+        assertEquals(ClaimAdmissionReservation.State.INVALIDATED, decision.reservation().state());
+        assertEquals(0L, service.pendingForClaim(key()));
+    }
+
+    @Test
+    void externalAdoptionBetweenReserveAndApplyConsumesTheReservedHeadroom() {
+        ClaimOccupancyIndex index = readyIndex(List.of());
+        ClaimAdmissionTestFixtures.MutableBridge bridge = bridge(key(), footprint(1));
+        ClaimPolicyContext policy = context(bridge);
+        ClaimAdmissionService service = new ClaimAdmissionService(index);
+        ClaimAdmissionDecision decision = service.reserve(
+                request(List.of(newActive("reserved")), policy, 1, 1),
+                new ClaimLookupSession(policy)
+        );
+
+        index.reconcileCommittedEntry(
+                entry("adopted", CompanionLifecycleState.ACTIVE, DESTINATION, 1L)
+        );
+
+        assertFalse(service.claimForApply(decision.reservation(), new ClaimLookupSession(policy)));
+        assertEquals(ClaimAdmissionReservation.State.INVALIDATED, decision.reservation().state());
+        assertEquals(0, service.pendingReservationCount());
+    }
+
+    @Test
+    void occupancyChangeDuringApplySnapshotFailsClosed() {
+        ClaimOccupancyIndex index = readyIndex(List.of());
+        ClaimAdmissionTestFixtures.MutableBridge bridge = bridge(key(), footprint(1));
+        ClaimPolicyContext policy = context(bridge);
+        AtomicInteger clockReads = new AtomicInteger();
+        ClaimAdmissionService service = new ClaimAdmissionService(
+                index,
+                new ClaimPopulationSnapshotService(),
+                () -> {
+                    int read = clockReads.incrementAndGet();
+                    if (read == 2) {
+                        index.observeMovement(
+                                entry("racing-walker", CompanionLifecycleState.ACTIVE, DESTINATION, 1L)
+                        );
+                    }
+                    return read;
+                }
+        );
+        ClaimAdmissionDecision decision = service.reserve(
+                request(List.of(newActive("reserved")), policy, 1, 1),
+                new ClaimLookupSession(policy)
+        );
+
+        assertFalse(service.claimForApply(decision.reservation(), new ClaimLookupSession(policy)));
+        assertEquals(ClaimAdmissionReservation.State.INVALIDATED, decision.reservation().state());
+        assertEquals(1, index.snapshot().profilesIn(footprint(1)).size());
+    }
+
+    @Test
     void forceAdmissionIsStillCountedWhenClaimIsAlreadyOverCap() {
         ClaimOccupancyIndex index = readyIndex(existingProfiles(3, DESTINATION));
         ClaimAdmissionTestFixtures.MutableBridge bridge = bridge(key(), footprint(1));
@@ -206,6 +293,25 @@ class ClaimAdmissionAuthorityTest {
         assertTrue(forced.forced());
         assertEquals(1L, forced.requestedSlots());
         assertEquals(1L, service.pendingForClaim(key()));
+    }
+
+    @Test
+    void forceApplyStillBypassesHeadroomConsumedAfterReservation() {
+        ClaimOccupancyIndex index = readyIndex(List.of());
+        ClaimAdmissionTestFixtures.MutableBridge bridge = bridge(key(), footprint(1));
+        ClaimPolicyContext policy = context(bridge);
+        ClaimAdmissionService service = new ClaimAdmissionService(index);
+        ClaimAdmissionDecision forced = service.reserve(
+                request(List.of(newActive("forced")), policy, 1, 1, true, 1_000_000L),
+                new ClaimLookupSession(policy)
+        );
+        index.reconcileCommittedEntry(
+                entry("adopted", CompanionLifecycleState.ACTIVE, DESTINATION, 1L)
+        );
+
+        assertTrue(service.claimForApply(forced.reservation(), new ClaimLookupSession(policy)));
+        assertEquals(ClaimAdmissionReservation.State.APPLYING, forced.reservation().state());
+        assertEquals(2, bridge.calls.get(), "force still refreshes provider topology before apply");
     }
 
     @Test
@@ -260,4 +366,5 @@ class ClaimAdmissionAuthorityTest {
                                                                    ClaimFootprint footprint) {
         return new ClaimAdmissionTestFixtures.MutableBridge(ClaimResolution.found(key, footprint));
     }
+
 }

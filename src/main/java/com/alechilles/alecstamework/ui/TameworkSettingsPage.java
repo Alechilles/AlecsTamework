@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
+import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.codec.Codec;
@@ -363,6 +365,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = values.toGlobalSettingsSnapshot();
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
             return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
+        }
+        OwnerPopulationRuntime populationRuntime = plugin.getOwnerPopulationRuntime();
+        if (populationRuntime != null) {
+            populationRuntime.claimProviderRegistry().onSettingsChanged();
+        }
+        if (plugin.getApi() instanceof TameworkApiImpl implementation) {
+            implementation.onRuntimeSettingsChanged();
         }
 
         return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));

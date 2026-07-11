@@ -42,6 +42,7 @@ class ClaimAdmissionLifecycleTest {
         assertEquals(0L, decision.requestedSlots());
         assertEquals(0, bridge.calls.get(), "known zero-delta rehydrate must not probe a provider");
         assertTrue(service.claimForApply(decision.reservation(), new ClaimLookupSession(policy)));
+        assertEquals(0, bridge.calls.get(), "apply recheck must preserve the provider-free zero-delta path");
         assertTrue(service.commit(decision.reservation()));
         assertEquals(CompanionLifecycleState.ACTIVE, index.entry("subject").orElseThrow().lifecycleState());
     }

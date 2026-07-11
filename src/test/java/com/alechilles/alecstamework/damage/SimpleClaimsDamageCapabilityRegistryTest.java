@@ -66,6 +66,64 @@ class SimpleClaimsDamageCapabilityRegistryTest {
         assertEquals(false, resolution.capability().claimIdentityAvailable());
     }
 
+    @Test
+    void damageRangeAllowsBuildMetadataButRejectsUnverifiedPrereleases() {
+        AtomicInteger reflections = new AtomicInteger();
+        SimpleClaimsDamageCapabilityRegistry buildRegistry = new SimpleClaimsDamageCapabilityRegistry(
+                new FakeLocator(ready("plugin-build", "1.0.38+vendor.7")),
+                plugin -> {
+                    reflections.incrementAndGet();
+                    return generation(SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED, true);
+                }
+        );
+
+        assertEquals(ClaimProviderState.READY, buildRegistry.resolve().state());
+        assertEquals(1, reflections.get());
+        for (String version : new String[]{
+                "1.0.37+vendor.7",
+                "1.0.38-rc.1",
+                "1.0.99-beta+vendor.7",
+                "1.1.0+vendor.7"
+        }) {
+            SimpleClaimsDamageCapabilityRegistry prereleaseRegistry =
+                    new SimpleClaimsDamageCapabilityRegistry(
+                            new FakeLocator(ready("plugin-prerelease", version)),
+                            plugin -> {
+                                reflections.incrementAndGet();
+                                return generation(
+                                        SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED,
+                                        true
+                                );
+                            }
+                    );
+            assertEquals(
+                    ClaimProviderState.INCOMPATIBLE,
+                    prereleaseRegistry.resolve().state(),
+                    () -> "Unsupported damage-contract release should be rejected: " + version
+            );
+        }
+        assertEquals(1, reflections.get(), "Rejected versions must not reach reflection.");
+    }
+
+    @Test
+    void closeIsIdempotentAndPreventsFurtherPluginLocationAccess() {
+        FakeLocator locator = new FakeLocator(ready("plugin-a", "1.0.38"));
+        SimpleClaimsDamageCapabilityRegistry registry = new SimpleClaimsDamageCapabilityRegistry(
+                locator,
+                plugin -> generation(SimpleClaimsBreedingBridge.DamageAccessStatus.ALLOWED, true)
+        );
+
+        assertEquals(ClaimProviderState.READY, registry.resolve().state());
+        assertEquals(1, locator.locateCalls.get());
+
+        registry.close();
+        registry.close();
+
+        assertEquals(ClaimProviderState.ERROR, registry.resolve().state());
+        assertEquals(1, locator.locateCalls.get());
+        assertEquals(1, locator.closeCalls.get());
+    }
+
     private static SimpleClaimsDamageGeneration generation(
             SimpleClaimsBreedingBridge.DamageAccessStatus status,
             boolean identityAvailable) {
@@ -112,6 +170,8 @@ class SimpleClaimsDamageCapabilityRegistryTest {
 
     private static final class FakeLocator implements ClaimPluginLocator {
         private final AtomicReference<ClaimPluginLocation> location;
+        private final AtomicInteger locateCalls = new AtomicInteger();
+        private final AtomicInteger closeCalls = new AtomicInteger();
 
         private FakeLocator(ClaimPluginLocation location) {
             this.location = new AtomicReference<>(location);
@@ -119,7 +179,13 @@ class SimpleClaimsDamageCapabilityRegistryTest {
 
         @Override
         public ClaimPluginLocation locate() {
+            locateCalls.incrementAndGet();
             return location.get();
+        }
+
+        @Override
+        public void close() {
+            closeCalls.incrementAndGet();
         }
     }
 }

@@ -919,13 +919,13 @@ public class Tamework extends JavaPlugin {
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
                 persistenceRuntime.getNpcProfileRepository()
         );
+        SimpleClaimsTamedDamagePolicy damagePolicy = new SimpleClaimsTamedDamagePolicy();
         api = new TameworkApiImpl(
-                persistenceRuntime,
-                apiEventBus,
+                persistenceRuntime, apiEventBus,
                 commandLinkedNpcStateSnapshotService,
                 interactionExtensionRegistry,
                 traitEffectRegistry,
-                new SimpleClaimsTamedDamagePolicy(),
+                damagePolicy,
                 ownerPopulationRuntime.populationPolicyAuthority()
         );
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
@@ -982,9 +982,7 @@ public class Tamework extends JavaPlugin {
         // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(new DamageTargetMemorySystem());
         getEntityStoreRegistry().registerSystem(new RespawnFallDamageGraceSystem());
-        getEntityStoreRegistry().registerSystem(
-                new OwnerDamageFilterSystem(getLogger())
-        );
+        getEntityStoreRegistry().registerSystem(new OwnerDamageFilterSystem(getLogger(), damagePolicy));
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
         getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());
         getEntityStoreRegistry().registerSystem(new CompanionCombatExperienceSystem());
@@ -1283,6 +1281,9 @@ public class Tamework extends JavaPlugin {
             companionXpEventDebugLogService = null;
         }
         overrideInitializedScopeKeys.clear();
+        if (api instanceof TameworkApiImpl implementation) {
+            implementation.close();
+        }
         api = null;
         if (persistenceRuntime != null) {
             persistenceRuntime.getNpcProfileRepository().setChangeObserver(null);

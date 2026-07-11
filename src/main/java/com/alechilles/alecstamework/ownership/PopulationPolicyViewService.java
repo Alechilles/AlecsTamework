@@ -185,7 +185,8 @@ final class PopulationPolicyViewService {
                 reservations(owner),
                 reservations(claim),
                 lookups(lookup, claim, policy.claimContext()),
-                reconciliation()
+                reconciliation(),
+                activeRules(policy)
         );
     }
 
@@ -240,7 +241,23 @@ final class PopulationPolicyViewService {
                 lookup.sessions(), lookup.requests(), lookup.uniqueChunks(), lookup.providerCalls(),
                 lookup.cacheHits(), lookup.providerStateChanges(), claim.snapshotCount(),
                 claim.totalSnapshotNanos(), claim.lastSnapshotNanos(),
-                lookup.lastProviderCallNanos(), provider(currentContext)
+                lookup.lastProviderCallNanos(), claim.targetedRefreshCount(),
+                claim.totalTargetedRefreshNanos(), claim.lastTargetedRefreshNanos(),
+                provider(currentContext)
+        );
+    }
+
+    @Nonnull
+    private static PopulationDiagnosticsView.ActiveRulesView activeRules(
+            @Nonnull CompanionAdmissionPolicyResolver.Policy policy
+    ) {
+        return new PopulationDiagnosticsView.ActiveRulesView(
+                OwnerPopulationOperation.BREEDING.name(),
+                Math.max(0, policy.limit()),
+                policy.scope().name(),
+                Math.max(0, policy.claimLimitPerChunk()),
+                Math.max(0, policy.claimLimitTotal()),
+                policy.requireClaim()
         );
     }
 

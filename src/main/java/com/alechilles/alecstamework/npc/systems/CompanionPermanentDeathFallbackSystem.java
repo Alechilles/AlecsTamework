@@ -25,7 +25,7 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 
 /**
- * Retains direct-death corpses until their permanent owner release reaches durable APPLYING state.
+ * Retains direct-death corpses until their canonical owner release commits durably.
  */
 public final class CompanionPermanentDeathFallbackSystem extends DeathSystems.OnDeathSystem {
     private final CompanionPermanentDeathCoordinator coordinator;

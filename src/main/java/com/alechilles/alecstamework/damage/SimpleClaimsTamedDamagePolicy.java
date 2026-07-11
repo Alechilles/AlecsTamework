@@ -10,6 +10,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
@@ -22,7 +23,7 @@ import org.joml.Vector3d;
  * raw-party grant for one compatibility release, and fails open only when optional integration
  * access cannot be evaluated.</p>
  */
-public final class SimpleClaimsTamedDamagePolicy {
+public final class SimpleClaimsTamedDamagePolicy implements AutoCloseable {
     private static final String WARN_FAIL_OPEN = "simpleclaims-damage-fail-open";
     private static final String WARN_LEGACY_BYPASS = "simpleclaims-legacy-damage-bypass";
     private static final String WARN_PERMISSION = "simpleclaims-damage-server-permission";
@@ -33,6 +34,7 @@ public final class SimpleClaimsTamedDamagePolicy {
     private final SimpleClaimsRawAccessEvaluator rawAccessEvaluator;
     private final DamageServerPermissionBypass serverPermissionBypass;
     private final DamagePolicyWarningSink warningSink;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     /** Creates a production policy that resolves the live SimpleClaims generation per decision. */
     public SimpleClaimsTamedDamagePolicy() {
@@ -281,6 +283,14 @@ public final class SimpleClaimsTamedDamagePolicy {
 
     @Nonnull
     private SimpleClaimsDamageCapabilityResolver.Resolution resolveCapability() {
+        if (closed.get()) {
+            return SimpleClaimsDamageCapabilityResolver.Resolution.unavailable(
+                    ClaimProviderState.ERROR,
+                    ClaimProviderGeneration.NONE,
+                    null,
+                    "SimpleClaims damage policy is shut down."
+            );
+        }
         try {
             SimpleClaimsDamageCapabilityResolver.Resolution resolution = capabilityResolver.resolve();
             return resolution != null
@@ -298,6 +308,21 @@ public final class SimpleClaimsTamedDamagePolicy {
                     null,
                     "SimpleClaims damage capability resolution failed: " + message(throwable)
             );
+        }
+    }
+
+    /** Invalidates reflected SimpleClaims contracts after settings or plugin lifecycle changes. */
+    public void onRuntimeSettingsChanged() {
+        if (!closed.get()) {
+            capabilityResolver.invalidate();
+        }
+    }
+
+    /** Releases the optional plugin generation retained by the live resolver. */
+    @Override
+    public void close() {
+        if (closed.compareAndSet(false, true)) {
+            capabilityResolver.close();
         }
     }
 

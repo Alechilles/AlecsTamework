@@ -217,7 +217,8 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
     ) {
         ComponentType<ChunkStore, EntityChunk> entityChunkType = EntityChunk.getComponentType();
         ComponentType<EntityStore, UUIDComponent> uuidType = UUIDComponent.getComponentType();
-        if (entityChunkType == null || uuidType == null) {
+        ComponentType<EntityStore, DeathComponent> deathType = DeathComponent.getComponentType();
+        if (entityChunkType == null || uuidType == null || deathType == null) {
             throw new IllegalStateException("Saved entity reconciliation component types are not registered.");
         }
         EntityChunk entityChunk = holder.getComponent(entityChunkType);
@@ -238,11 +239,7 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             if (owner == null && !knownNpcUuids.contains(npcUuid)) {
                 continue;
             }
-            CompanionPopulationEvidence.Kind kind = entity.getComponent(
-                    DeathComponent.getComponentType()
-            ) == null
-                    ? CompanionPopulationEvidence.Kind.PHYSICAL_ENTITY
-                    : CompanionPopulationEvidence.Kind.PHYSICAL_DEAD_ENTITY;
+            CompanionPopulationEvidence.Kind kind = entityKind(entity.getComponent(deathType) != null);
             evidence.add(new CompanionPopulationEvidence(
                     "world/" + worldName + "/chunk-" + chunkX + "," + chunkZ + "/entity-" + npcUuid,
                     npcUuid,
@@ -256,6 +253,13 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             ));
         }
         return List.copyOf(evidence);
+    }
+
+    @Nonnull
+    static CompanionPopulationEvidence.Kind entityKind(boolean deathComponentPresent) {
+        return deathComponentPresent
+                ? CompanionPopulationEvidence.Kind.PHYSICAL_DEAD_ENTITY
+                : CompanionPopulationEvidence.Kind.PHYSICAL_ENTITY;
     }
 
     @Nonnull

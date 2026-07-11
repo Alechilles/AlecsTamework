@@ -109,19 +109,21 @@ public final class CompanionPopulationRepairRepository {
                 && !existing.currentNpcUuid().equals(evidence.npcUuid())) {
             return RepairPlan.conflict(evidence, "historical-uuid-has-physical-representation");
         }
-        boolean releasedCopy = existing != null
+        // A detached ownerless representation is not evidence that an explicit release was undone.
+        boolean preserveReleased = existing != null
                 && existing.state() != null
                 && CompanionLifecycleState.RELEASED.name().equals(existing.state().lifecycleState())
-                && !evidence.physical();
+                && (!evidence.physical()
+                || (evidence.ownerObserved() && evidence.observedOwnerUuid() == null));
         if (existing != null
-                && !releasedCopy
+                && !preserveReleased
                 && existing.ownerUuid() != null
                 && evidence.observedOwnerUuid() != null
                 && !existing.ownerUuid().equals(evidence.observedOwnerUuid())) {
             return RepairPlan.conflict(evidence, "durable-owner-conflicts-with-evidence");
         }
 
-        UUID desiredOwner = releasedCopy
+        UUID desiredOwner = preserveReleased
                 ? existing.ownerUuid()
                 : existing != null && existing.ownerUuid() != null
                 ? existing.ownerUuid()
@@ -129,7 +131,7 @@ public final class CompanionPopulationRepairRepository {
         UUID desiredCurrent = existing != null && existing.currentNpcUuid() != null
                 ? existing.currentNpcUuid()
                 : evidence.npcUuid();
-        State desiredState = desiredState(existing, evidence);
+        State desiredState = preserveReleased ? existing.state() : desiredState(existing, evidence);
         String desiredWorld = firstNonBlank(
                 desiredState.ownershipWorldName(),
                 existing != null ? existing.profileLastWorldName() : null,
@@ -142,7 +144,18 @@ public final class CompanionPopulationRepairRepository {
     @Nonnull
     private State desiredState(@Nullable Existing existing,
                                @Nonnull CompanionPopulationEvidenceSet.ResolvedEvidence evidence) {
-        if (evidence.physical()) {
+        if (evidence.deathObserved()) {
+            CompanionPopulationEvidenceSet.PhysicalLocation location = evidence.physicalLocation();
+            return new State(
+                    location.worldName(),
+                    CompanionLifecycleState.DEAD_REVIVABLE.name(),
+                    location.worldName(),
+                    location.chunkX(),
+                    location.chunkZ(),
+                    "reconciliation-world-dead-entity"
+            );
+        }
+        if (evidence.livePhysical()) {
             CompanionPopulationEvidenceSet.PhysicalLocation location = evidence.physicalLocation();
             return new State(
                     location.worldName(),

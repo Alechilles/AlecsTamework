@@ -79,6 +79,7 @@ public final class CompanionPopulationSystemRegistration {
         ));
         registry.registerSystem(new CompanionOwnerComponentReconciliationSystem(
                 runtime.runtimeReconciler(),
+                runtime.mutationService(),
                 ownerType,
                 UUIDComponent.getComponentType(),
                 TransformComponent.getComponentType()

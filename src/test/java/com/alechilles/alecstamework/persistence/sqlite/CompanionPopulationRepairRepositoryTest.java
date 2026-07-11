@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationEvidence;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationEvidenceSet;
@@ -48,6 +52,53 @@ class CompanionPopulationRepairRepositoryTest {
             assertEquals("default", states.getFirst().physicalWorldName());
             assertEquals(2, states.getFirst().physicalChunkX());
             assertEquals(3, states.getFirst().physicalChunkZ());
+        }
+    }
+
+    @Test
+    void savedCorpseRepairsToDeadRevivableWithoutClaimOccupancy() throws Exception {
+        try (Harness harness = harness("dead-physical.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            CompanionPopulationRepairRepository.RepairResult result = harness.repair.mergeAsync(
+                    new CompanionPopulationEvidenceSet(List.of(
+                            deadPhysical("corpse", npcUuid, ownerUuid, "default", 2, 3)
+                    ))
+            ).completion().get(2, TimeUnit.SECONDS).value();
+
+            assertTrue(result.merged());
+            CompanionPopulationStateRecord state = harness.population.loadAllStates().getFirst();
+            assertEquals(ownerUuid, state.ownerUuid());
+            assertEquals(CompanionLifecycleState.DEAD_REVIVABLE.name(), state.lifecycleState());
+            assertEquals("default", state.physicalWorldName());
+            ClaimChunkCoordinate chunk = new ClaimChunkCoordinate("default", 2, 3);
+            ClaimOccupancyIndex claimIndex = new ClaimOccupancyIndex();
+            claimIndex.replaceCommittedEntries(List.of(new ClaimOccupancyEntry(
+                    state.profileId(), state.ownerUuid(), CompanionLifecycleState.DEAD_REVIVABLE,
+                    chunk, state.revision()
+            )), ClaimOccupancyReadiness.READY);
+            assertEquals(0, claimIndex.snapshot().occupiedProfileCount());
+            assertFalse(claimIndex.snapshot().profilesByChunk().containsKey(chunk));
+        }
+    }
+
+    @Test
+    void ownerlessCorpseCannotReopenAnExplicitlyReleasedProfile() throws Exception {
+        try (Harness harness = harness("released-corpse.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            insertReleasedProfile(harness.connections, npcUuid);
+
+            CompanionPopulationRepairRepository.RepairResult result = harness.repair.mergeAsync(
+                    new CompanionPopulationEvidenceSet(List.of(
+                            deadPhysical("corpse", npcUuid, null, "default", 2, 3)
+                    ))
+            ).completion().get(2, TimeUnit.SECONDS).value();
+
+            assertTrue(result.merged());
+            CompanionPopulationStateRecord state = harness.population.loadAllStates().getFirst();
+            assertNull(state.ownerUuid());
+            assertEquals(CompanionLifecycleState.RELEASED.name(), state.lifecycleState());
+            assertNull(state.physicalWorldName());
         }
     }
 
@@ -231,6 +282,36 @@ class CompanionPopulationRepairRepositoryTest {
         );
     }
 
+    private static void insertReleasedProfile(SqliteConnectionManager connections, UUID npcUuid)
+            throws Exception {
+        try (Connection connection = connections.openConnection()) {
+            try (PreparedStatement profile = connection.prepareStatement("""
+                    INSERT INTO npc_profiles (
+                        profile_id, current_npc_uuid, owner_uuid, last_world_name,
+                        created_at_ms, updated_at_ms, last_active_at_ms
+                    ) VALUES ('profile', ?, NULL, 'default', 1, 1, 1)
+                    """)) {
+                profile.setString(1, npcUuid.toString());
+                profile.executeUpdate();
+            }
+            try (PreparedStatement alias = connection.prepareStatement("""
+                    INSERT INTO npc_uuid_aliases (npc_uuid, profile_id, is_current, mapped_at_ms)
+                    VALUES (?, 'profile', 1, 1)
+                    """)) {
+                alias.setString(1, npcUuid.toString());
+                alias.executeUpdate();
+            }
+            try (PreparedStatement state = connection.prepareStatement("""
+                    INSERT INTO companion_population_state (
+                        profile_id, ownership_world_name, lifecycle_state, physical_world_name,
+                        physical_chunk_x, physical_chunk_z, revision, source, created_at_ms, updated_at_ms
+                    ) VALUES ('profile', 'default', 'RELEASED', NULL, NULL, NULL, 1, 'test', 1, 1)
+                    """)) {
+                state.executeUpdate();
+            }
+        }
+    }
+
     private static CompanionPopulationEvidence physical(String key,
                                                           UUID npcUuid,
                                                           UUID ownerUuid,
@@ -242,6 +323,25 @@ class CompanionPopulationRepairRepositoryTest {
                 npcUuid,
                 ownerUuid,
                 CompanionPopulationEvidence.Kind.PHYSICAL_ENTITY,
+                world,
+                world,
+                chunkX,
+                chunkZ,
+                "test"
+        );
+    }
+
+    private static CompanionPopulationEvidence deadPhysical(String key,
+                                                              UUID npcUuid,
+                                                              UUID ownerUuid,
+                                                              String world,
+                                                              int chunkX,
+                                                              int chunkZ) {
+        return new CompanionPopulationEvidence(
+                key,
+                npcUuid,
+                ownerUuid,
+                CompanionPopulationEvidence.Kind.PHYSICAL_DEAD_ENTITY,
                 world,
                 world,
                 chunkX,

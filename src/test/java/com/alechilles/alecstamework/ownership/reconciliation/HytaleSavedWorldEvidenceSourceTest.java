@@ -18,6 +18,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HytaleSavedWorldEvidenceSourceTest {
     @Test
+    void classifiesSavedDeathComponentsAsDeadPhysicalEvidence() {
+        assertEquals(
+                CompanionPopulationEvidence.Kind.PHYSICAL_DEAD_ENTITY,
+                HytaleSavedWorldEvidenceSource.entityKind(true)
+        );
+        assertEquals(
+                CompanionPopulationEvidence.Kind.PHYSICAL_ENTITY,
+                HytaleSavedWorldEvidenceSource.entityKind(false)
+        );
+    }
+
+    @Test
     void scansTheSnapshottedChunkCatalogInStableIndexOrder() throws Exception {
         long firstIndex = ChunkUtil.indexChunk(1, 1);
         long secondIndex = ChunkUtil.indexChunk(4, 2);

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.integration.simpleclaims;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.integration.claims.ClaimPluginLocation;
 import com.alechilles.alecstamework.integration.claims.ClaimPluginLocator;
+import com.alechilles.alecstamework.integration.claims.ClaimPluginVersionCompatibility;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderCapability;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbe;
@@ -207,22 +208,7 @@ public final class SimpleClaimsProviderProbe implements ClaimProviderProbe {
     }
 
     private static boolean supported(String version) {
-        if (version == null) {
-            return false;
-        }
-        String core = version.trim().split("[-+]", 2)[0];
-        String[] parts = core.split("\\.");
-        if (parts.length < 3) {
-            return false;
-        }
-        try {
-            int major = Integer.parseInt(parts[0]);
-            int minor = Integer.parseInt(parts[1]);
-            int patch = Integer.parseInt(parts[2]);
-            return major == 1 && minor == 0 && patch >= 38;
-        } catch (NumberFormatException ignored) {
-            return false;
-        }
+        return ClaimPluginVersionCompatibility.supportsSimpleClaims(version);
     }
 
     private static String displayVersion(String version) {

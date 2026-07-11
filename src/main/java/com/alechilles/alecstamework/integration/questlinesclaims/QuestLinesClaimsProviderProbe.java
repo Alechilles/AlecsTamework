@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.integration.questlinesclaims;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.integration.claims.ClaimPluginLocation;
 import com.alechilles.alecstamework.integration.claims.ClaimPluginLocator;
+import com.alechilles.alecstamework.integration.claims.ClaimPluginVersionCompatibility;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderCapability;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbe;
@@ -17,8 +18,6 @@ import javax.annotation.Nonnull;
 /** Lifecycle-aware QuestLines Claims 1.3.1 contract probe. */
 public final class QuestLinesClaimsProviderProbe implements ClaimProviderProbe {
     private static final String PROVIDER_ID = "questlines-claims";
-    private static final String SUPPORTED_VERSION = "1.3.1";
-
     private final ClaimPluginLocator locator;
     private final AtomicLong observationSequence = new AtomicLong();
     private ClaimProviderGeneration cachedLocationGeneration = ClaimProviderGeneration.NONE;
@@ -196,10 +195,7 @@ public final class QuestLinesClaimsProviderProbe implements ClaimProviderProbe {
     }
 
     private static boolean supported(String version) {
-        return version != null
-                && (version.equals(SUPPORTED_VERSION)
-                || version.startsWith(SUPPORTED_VERSION + "+")
-                || version.startsWith(SUPPORTED_VERSION + "-"));
+        return ClaimPluginVersionCompatibility.supportsQuestLinesClaims(version);
     }
 
     private static String displayVersion(String version) {

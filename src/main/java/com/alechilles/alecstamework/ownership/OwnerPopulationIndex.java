@@ -204,6 +204,8 @@ public final class OwnerPopulationIndex {
                 draft.current(),
                 draft.proposed(),
                 draft.additions(),
+                draft.constrainedKey(),
+                draft.positiveDelta(),
                 addLease(nowNanos, request.leaseDurationNanos())
         );
         pendingByToken.put(reservation.tokenId(), transition);
@@ -240,11 +242,35 @@ public final class OwnerPopulationIndex {
                 expireTransition(transition);
                 return false;
             }
+            if (!hasApplyHeadroom(transition)) {
+                return false;
+            }
             reservation.setState(OwnerPopulationReservation.ReservationState.APPLYING);
             return true;
         } finally {
             lock.unlock();
         }
+    }
+
+    private boolean hasApplyHeadroom(OwnerPopulationPendingTransition transition) {
+        OwnerPopulationTransitionRequest request = transition.request();
+        if (!transition.positiveDelta() || request.limit() <= 0 || request.force()) {
+            return true;
+        }
+        if (canonicalReloadInProgress
+                || !readiness.forScope(request.limitScope()).allowsPositiveCappedAdmissions()) {
+            return false;
+        }
+        OwnerPopulationScopeKey key = transition.constrainedKey();
+        long ownPending = transition.additions().contains(key) ? 1L : 0L;
+        if (key == null || ownPending == 0L) {
+            return false;
+        }
+        long committed = count(committedCounts, key);
+        long allPending = count(pendingCounts, key);
+        long otherPending = Math.max(0L, allPending - ownPending);
+        long remaining = (long) request.limit() - committed;
+        return remaining >= ownPending && otherPending <= remaining - ownPending;
     }
 
     /** Commits once; repeated commits of the same successfully committed capability are harmless. */

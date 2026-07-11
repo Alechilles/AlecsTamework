@@ -51,8 +51,8 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         this(logger, new SimpleClaimsTamedDamagePolicy());
     }
 
-    OwnerDamageFilterSystem(HytaleLogger logger,
-                            @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy) {
+    public OwnerDamageFilterSystem(HytaleLogger logger,
+                                   @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy) {
         this.ownerType = TameworkOwnerComponent.getComponentType();
         this.linksType = TameworkCommandLinksComponent.getComponentType();
         this.npcNameType = TameworkNpcNameComponent.getComponentType();

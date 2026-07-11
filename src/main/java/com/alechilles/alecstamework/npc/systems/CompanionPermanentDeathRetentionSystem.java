@@ -25,6 +25,7 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DeathSystems;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeferredCorpseRemoval;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.systems.NPCSystems;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -51,6 +52,7 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
     private final Query<EntityStore> query;
     private final ConcurrentHashMap<UUID, Long> retryAfterByNpc = new ConcurrentHashMap<>();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
+            new SystemDependency<>(Order.AFTER, NPCSystems.OnDeathSystem.class),
             new SystemDependency<>(Order.BEFORE, DeathSystems.TickCorpseRemoval.class),
             new SystemDependency<>(Order.BEFORE, DeathSystems.CorpseRemoval.class)
     );
@@ -87,6 +89,10 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
         }
         Ref<EntityStore> ref = chunk.getReferenceTo(index);
         UUID npcUuid = identity.getUuid();
+        if (coordinator.isPending(npcUuid)) {
+            retainDurabilityHold(ref, store, commandBuffer);
+            return;
+        }
         TameworkOwnerComponent owner = store.getComponent(ref, ownerType);
         if (owner != null && owner.getOwnerId() != null) {
             retainOwnedPermanentDeath(ref, store, commandBuffer, npcUuid, owner.getOwnerId(), death);
@@ -95,6 +101,8 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
         retryAfterByNpc.remove(npcUuid);
         if (isDurablyReleased(npcUuid)) {
             resumeCorpseRemoval(ref, store, commandBuffer);
+        } else if (hasCanonicalCompanion(npcUuid)) {
+            retainDurabilityHold(ref, store, commandBuffer);
         }
     }
 
@@ -111,11 +119,7 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
             retryAfterByNpc.remove(npcUuid);
             return;
         }
-        commandBuffer.putComponent(
-                ref,
-                corpseRemovalType,
-                CompanionPermanentDeathHold.create(deathParticles(ref, store))
-        );
+        retainDurabilityHold(ref, store, commandBuffer);
         long now = System.nanoTime();
         Long retryAfter = retryAfterByNpc.get(npcUuid);
         if (coordinator.isPending(npcUuid) || (retryAfter != null && now < retryAfter)) {
@@ -125,15 +129,31 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
         coordinator.interceptExistingDeath(ref, store, npcUuid, ownerUuid, death);
     }
 
+    private void retainDurabilityHold(@Nonnull Ref<EntityStore> ref,
+                                      @Nonnull Store<EntityStore> store,
+                                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        commandBuffer.putComponent(
+                ref,
+                corpseRemovalType,
+                CompanionPermanentDeathHold.create(deathParticles(ref, store))
+        );
+    }
+
     private boolean isDurablyReleased(@Nonnull UUID npcUuid) {
-        String profileId = identityResolver.resolveProfileId(npcUuid).orElse(null);
-        if (profileId == null) {
-            return false;
-        }
-        OwnerPopulationEntry entry = ownerIndex.entry(profileId).orElse(null);
+        OwnerPopulationEntry entry = canonicalEntry(npcUuid);
         return entry != null
                 && entry.ownerId() == null
                 && entry.lifecycleState() == CompanionLifecycleState.RELEASED;
+    }
+
+    private boolean hasCanonicalCompanion(@Nonnull UUID npcUuid) {
+        return canonicalEntry(npcUuid) != null;
+    }
+
+    @Nullable
+    private OwnerPopulationEntry canonicalEntry(@Nonnull UUID npcUuid) {
+        String profileId = identityResolver.resolveProfileId(npcUuid).orElse(null);
+        return profileId == null ? null : ownerIndex.entry(profileId).orElse(null);
     }
 
     private void resumeCorpseRemoval(@Nonnull Ref<EntityStore> ref,
@@ -144,9 +164,18 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
             return;
         }
         String particles = current == null ? deathParticles(ref, store) : current.getDeathParticles();
+        double delaySeconds = deathDelaySeconds(ref, store);
         commandBuffer.putComponent(
-                ref, corpseRemovalType, new DeferredCorpseRemoval(0.0, particles)
+                ref, corpseRemovalType, new DeferredCorpseRemoval(delaySeconds, particles)
         );
+    }
+
+    private static double deathDelaySeconds(@Nonnull Ref<EntityStore> ref,
+                                            @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
+        return npc == null || npc.getRole() == null
+                ? 0.0
+                : Math.max(0.0, npc.getRole().getDeathAnimationTime());
     }
 
     @Nullable

@@ -216,6 +216,53 @@ class CompanionPopulationOperationRecoveryServiceTest {
     }
 
     @Test
+    void applyingRevivableDeathCommitsCorpseAsDeadInsteadOfUnloaded() throws Exception {
+        try (Harness harness = harness("revivable-death-corpse.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, ownerUuid, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.DEAD_REVIVABLE,
+                    "default", "default", OwnerPopulationOperation.LIFECYCLE_CHANGE,
+                    CompanionPopulationOperationRecord.State.APPLYING, false
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(List.of(
+                    physicalDead(npcUuid, ownerUuid, "default", 0, 0)
+            ));
+
+            assertTrue(result.complete());
+            assertEquals(1, result.committed());
+            assertEquals(CompanionLifecycleState.DEAD_REVIVABLE.name(), harness.state().lifecycleState());
+            assertEquals("default", harness.state().physicalWorldName());
+        }
+    }
+
+    @Test
+    void applyingReviveClosesWhenOnlyTheOldCorpseStillExists() throws Exception {
+        try (Harness harness = harness("revive-corpse-still-present.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, ownerUuid, ownerUuid,
+                    CompanionLifecycleState.DEAD_REVIVABLE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.RESTORE,
+                    CompanionPopulationOperationRecord.State.APPLYING, false
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(List.of(
+                    physicalDead(npcUuid, ownerUuid, "default", 0, 0)
+            ));
+
+            assertTrue(result.complete());
+            assertEquals(0, result.committed());
+            assertEquals(1, result.canceled());
+            assertEquals(CompanionLifecycleState.DEAD_REVIVABLE.name(), harness.state().lifecycleState());
+            assertEquals(CompanionPopulationOperationRecord.State.FAILED, harness.operationState());
+        }
+    }
+
+    @Test
     void permanentReleaseFailsClosedWhenOldOwnerWriteWasNotApplied() throws Exception {
         try (Harness harness = harness("permanent-release-old-owner.sqlite")) {
             UUID npcUuid = UUID.randomUUID();

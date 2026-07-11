@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.integration.claims.ClaimPluginLocation;
 import com.alechilles.alecstamework.integration.claims.ClaimPluginLocator;
+import com.alechilles.alecstamework.integration.claims.ClaimPluginVersionCompatibility;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
@@ -48,6 +49,14 @@ final class SimpleClaimsDamageCapabilityRegistry
     @Nonnull
     @Override
     public Resolution resolve() {
+        if (isClosed()) {
+            return Resolution.unavailable(
+                    ClaimProviderState.ERROR,
+                    ClaimProviderGeneration.NONE,
+                    null,
+                    "SimpleClaims damage capability registry is shut down."
+            );
+        }
         long observation = observationSequence.incrementAndGet();
         ClaimPluginLocation location = locate();
         if (location.state() != ClaimProviderState.READY || location.pluginInstance() == null) {
@@ -93,8 +102,12 @@ final class SimpleClaimsDamageCapabilityRegistry
         return publishReady(observation, snapshot.cacheEpoch(), location, capability);
     }
 
-    void invalidate() {
+    @Override
+    public void invalidate() {
         synchronized (this) {
+            if (closed) {
+                return;
+            }
             cacheEpoch = increment(cacheEpoch);
             clearCached();
         }
@@ -103,11 +116,18 @@ final class SimpleClaimsDamageCapabilityRegistry
     @Override
     public void close() {
         synchronized (this) {
+            if (closed) {
+                return;
+            }
             closed = true;
             cacheEpoch = increment(cacheEpoch);
             clearCached();
         }
         locator.close();
+    }
+
+    private synchronized boolean isClosed() {
+        return closed;
     }
 
     @Nonnull
@@ -186,22 +206,7 @@ final class SimpleClaimsDamageCapabilityRegistry
     }
 
     private static boolean supported(String version) {
-        if (version == null) {
-            return false;
-        }
-        String core = version.trim().split("[-+]", 2)[0];
-        String[] parts = core.split("\\.");
-        if (parts.length < 3) {
-            return false;
-        }
-        try {
-            int major = Integer.parseInt(parts[0]);
-            int minor = Integer.parseInt(parts[1]);
-            int patch = Integer.parseInt(parts[2]);
-            return major == 1 && minor == 0 && patch >= 38;
-        } catch (NumberFormatException ignored) {
-            return false;
-        }
+        return ClaimPluginVersionCompatibility.supportsSimpleClaims(version);
     }
 
     @Nonnull

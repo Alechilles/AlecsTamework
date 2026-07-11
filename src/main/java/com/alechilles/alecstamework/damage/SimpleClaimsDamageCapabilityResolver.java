@@ -7,9 +7,18 @@ import javax.annotation.Nullable;
 
 /** Resolves the currently live SimpleClaims damage generation for one top-level decision. */
 @FunctionalInterface
-interface SimpleClaimsDamageCapabilityResolver {
+interface SimpleClaimsDamageCapabilityResolver extends AutoCloseable {
     @Nonnull
     Resolution resolve();
+
+    /** Drops any reflected generation retained by this resolver. */
+    default void invalidate() {
+    }
+
+    /** Releases optional-plugin references. Fixed test resolvers have nothing to release. */
+    @Override
+    default void close() {
+    }
 
     record Resolution(@Nonnull ClaimProviderState state,
                       @Nonnull ClaimProviderGeneration generation,

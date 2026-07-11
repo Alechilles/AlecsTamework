@@ -124,12 +124,20 @@ class PopulationPolicyViewServiceTest {
                 )
         );
 
-        PopulationDiagnosticsView.ProviderContextView provider = service.diagnostics().claimLookups().provider();
+        PopulationDiagnosticsView diagnostics = service.diagnostics();
+        PopulationDiagnosticsView.ProviderContextView provider = diagnostics.claimLookups().provider();
+        PopulationDiagnosticsView.ActiveRulesView rules = diagnostics.activeRules();
 
         assertEquals("SIMPLE_CLAIMS", provider.requestedProvider());
         assertEquals("simpleclaims", provider.providerId());
         assertEquals("READY", provider.state());
         assertEquals(77L, provider.settingsRevision());
+        assertEquals("BREEDING", rules.operation());
+        assertEquals(0, rules.ownerLimit());
+        assertEquals("GLOBAL", rules.ownerScope());
+        assertEquals(2, rules.claimLimitPerChunk());
+        assertEquals(0, rules.claimLimitTotal());
+        assertEquals(false, rules.requireClaim());
     }
 
     @Test
@@ -151,13 +159,18 @@ class PopulationPolicyViewServiceTest {
         OwnerPopulationCapDecisionViewV2 cap = service.evaluate(
                 new OwnerPopulationCapRequestV2(OWNER, null, 1)
         );
-        PopulationDiagnosticsView.ProviderContextView provider =
-                service.diagnostics().claimLookups().provider();
+        PopulationDiagnosticsView diagnostics = service.diagnostics();
+        PopulationDiagnosticsView.ProviderContextView provider = diagnostics.claimLookups().provider();
+        PopulationDiagnosticsView.ActiveRulesView rules = diagnostics.activeRules();
 
         assertEquals(5, cap.limit());
         assertEquals("SIMPLE_CLAIMS", provider.requestedProvider());
         assertEquals("simpleclaims", provider.providerId());
         assertEquals(77L, provider.settingsRevision());
+        assertEquals(5, rules.ownerLimit());
+        assertEquals(2, rules.claimLimitPerChunk());
+        assertEquals(3, rules.claimLimitTotal());
+        assertTrue(rules.requireClaim());
     }
 
     @Test

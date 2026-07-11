@@ -51,6 +51,25 @@ class QuestLinesClaimsProviderProbeTest {
     }
 
     @Test
+    void exactReleaseAllowsBuildMetadataButRejectsUnverifiedPrereleases() {
+        ClaimProviderProbeResult build = new QuestLinesClaimsProviderProbe(
+                new FakeLocator(ready("plugin-build", "1.3.1+vendor.7", new FixturePlugin()))
+        ).probe();
+
+        assertEquals(ClaimProviderState.READY, build.state());
+        for (String version : new String[]{"1.3.1-rc.1", "1.3.1-beta+vendor.7"}) {
+            ClaimProviderProbeResult prerelease = new QuestLinesClaimsProviderProbe(
+                    new FakeLocator(ready("plugin-prerelease", version, new FixturePlugin()))
+            ).probe();
+            assertEquals(
+                    ClaimProviderState.INCOMPATIBLE,
+                    prerelease.state(),
+                    () -> "Unverified prerelease should be rejected: " + version
+            );
+        }
+    }
+
+    @Test
     void pluginLocatorDoesNotRunUnderProbeMonitor() throws Exception {
         CountDownLatch locateEntered = new CountDownLatch(1);
         CountDownLatch releaseLocate = new CountDownLatch(1);
@@ -73,10 +92,14 @@ class QuestLinesClaimsProviderProbeTest {
     }
 
     private static ClaimPluginLocation ready(String pluginToken, Object plugin) {
+        return ready(pluginToken, "1.3.1", plugin);
+    }
+
+    private static ClaimPluginLocation ready(String pluginToken, String version, Object plugin) {
         return new ClaimPluginLocation(
                 "questlines-claims",
                 ClaimProviderState.READY,
-                "1.3.1",
+                version,
                 null,
                 generation(pluginToken),
                 plugin

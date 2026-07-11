@@ -25,6 +25,7 @@ public final class ClaimAdmissionService {
     private final Object reservationAuthority = new Object();
     private final ClaimOccupancyIndex occupancyIndex;
     private final ClaimAdmissionEvaluator evaluator;
+    private final ClaimApplyHeadroomValidator applyHeadroomValidator;
     private final LongSupplier monotonicClock;
     private final Map<UUID, PendingAdmission> pendingByToken = new HashMap<>();
     private final Map<String, UUID> pendingTokenByProfile = new HashMap<>();
@@ -45,6 +46,7 @@ public final class ClaimAdmissionService {
                 Objects.requireNonNull(snapshotService, "snapshotService"),
                 metrics::recordSnapshotDuration
         );
+        this.applyHeadroomValidator = new ClaimApplyHeadroomValidator(occupancyIndex);
         this.monotonicClock = Objects.requireNonNull(monotonicClock, "monotonicClock");
     }
 
@@ -182,8 +184,8 @@ public final class ClaimAdmissionService {
     }
 
     /**
-     * Claims a reservation exactly once after checking the current settings/provider generation
-     * and, when relevant, freshly resolving the target topology.
+     * Claims a reservation exactly once after rebuilding its provider, topology, and occupancy
+     * evaluation without holding the reservation lock.
      */
     public boolean claimForApply(@Nonnull ClaimAdmissionReservation reservation,
                                  @Nonnull ClaimLookupSession refreshedSession) {
@@ -192,13 +194,16 @@ public final class ClaimAdmissionService {
         if (!reservation.belongsTo(reservationAuthority)) {
             return false;
         }
-        boolean contextMatches = ClaimAdmissionRules.sameStoredPolicy(reservation, refreshedSession.context());
-        ClaimResolution refreshed = null;
-        if (contextMatches && reservation.topologyCheckRequired() && reservation.destinationChunk() != null) {
-            refreshed = refreshedSession.resolveChunk(reservation.destinationChunk());
+        if (reservation.state() != ClaimAdmissionReservation.State.RESERVED) {
+            return false;
         }
-        boolean topologyMatches = !reservation.topologyCheckRequired()
-                || ClaimAdmissionRules.sameTopology(reservation, refreshed);
+        long refreshStarted = System.nanoTime();
+        ClaimAdmissionEvaluation refreshed;
+        try {
+            refreshed = evaluator.evaluateForApply(reservation, refreshedSession);
+        } finally {
+            metrics.recordTargetedRefreshDuration(System.nanoTime() - refreshStarted);
+        }
 
         lock.lock();
         try {
@@ -211,8 +216,16 @@ public final class ClaimAdmissionService {
                 closePending(pending, ClaimAdmissionReservation.State.EXPIRED);
                 return false;
             }
-            if (!contextMatches || !topologyMatches
-                    || !occupancyIndex.matchesTransitions(reservation.transitions())) {
+            long allPending = reservation.targetClaimKey() == null
+                    ? 0L
+                    : pendingByClaim.getOrDefault(reservation.targetClaimKey(), 0L);
+            ClaimApplyHeadroomValidator.Result validation = applyHeadroomValidator.validate(
+                    reservation, refreshed, allPending
+            );
+            if (validation.claimKey() != null) {
+                metrics.claimCapacityObserved(validation.claimKey(), validation.overCap());
+            }
+            if (!validation.valid()) {
                 closePending(pending, ClaimAdmissionReservation.State.INVALIDATED);
                 return false;
             }

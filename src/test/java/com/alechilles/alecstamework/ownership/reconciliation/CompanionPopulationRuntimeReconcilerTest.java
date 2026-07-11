@@ -101,6 +101,31 @@ class CompanionPopulationRuntimeReconcilerTest {
     }
 
     @Test
+    void directOwnerRemovalRetainsCanonicalSlotAndWarnsUntilJournaledClear() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(npcUuid, ownerUuid)) {
+            List<String> warnings = new ArrayList<>();
+            harness.reconciler.setWarningSink(warnings::add);
+
+            CompanionPopulationRuntimeReconciler.ObservationOutcome result =
+                    harness.reconciler.observeOwnerComponentRemoval(
+                            npcUuid, ownerUuid, "default", 0, 0, "owner-component-removed"
+                    );
+
+            assertEquals(
+                    CompanionPopulationRuntimeReconciler.ObservationOutcome.REJECTED_UNJOURNALED_CLEAR,
+                    result
+            );
+            assertEquals(ownerUuid, harness.ownerIndex.entry(harness.profileId).orElseThrow().ownerId());
+            assertEquals(1L, harness.ownerIndex.counts(ownerUuid, "default").globalCommitted());
+            assertTrue(harness.claimIndex.entry(harness.profileId).orElseThrow().occupiesClaim());
+            assertEquals(0L, harness.writer.metrics().observations());
+            assertEquals(1, warnings.size());
+        }
+    }
+
+    @Test
     void warningSinkFailureCannotSuppressDurableObservationQueueing() {
         UUID npcUuid = UUID.randomUUID();
         UUID oldOwner = UUID.randomUUID();

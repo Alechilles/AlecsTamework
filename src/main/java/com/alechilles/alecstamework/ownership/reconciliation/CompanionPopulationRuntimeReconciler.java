@@ -74,7 +74,8 @@ public final class CompanionPopulationRuntimeReconciler
                 lifecycleState,
                 new ClaimChunkCoordinate(worldName, chunkX, chunkZ),
                 source,
-                true
+                true,
+                false
         );
     }
 
@@ -93,7 +94,32 @@ public final class CompanionPopulationRuntimeReconciler
                 CompanionLifecycleState.ACTIVE,
                 new ClaimChunkCoordinate(worldName, chunkX, chunkZ),
                 source,
+                false,
                 false
+        );
+    }
+
+    /**
+     * Distinguishes an explicit journaled owner clear from an unjournaled component removal.
+     * The removed owner is retained until a pending transition or durable RELEASED entry proves
+     * the clear was authorized.
+     */
+    @Nonnull
+    ObservationOutcome observeOwnerComponentRemoval(@Nonnull UUID npcUuid,
+                                                     @Nullable UUID removedOwnerUuid,
+                                                     @Nonnull String worldName,
+                                                     int chunkX,
+                                                     int chunkZ,
+                                                     @Nonnull String source) {
+        return observe(
+                npcUuid,
+                removedOwnerUuid,
+                worldName,
+                CompanionLifecycleState.ACTIVE,
+                new ClaimChunkCoordinate(worldName, chunkX, chunkZ),
+                source,
+                false,
+                true
         );
     }
 
@@ -107,7 +133,7 @@ public final class CompanionPopulationRuntimeReconciler
                 || lifecycleState == CompanionLifecycleState.UNLOADED) {
             throw new IllegalArgumentException("Dormant observations cannot use a physical lifecycle state.");
         }
-        return observe(npcUuid, ownerUuid, ownershipWorldName, lifecycleState, null, source, true);
+        return observe(npcUuid, ownerUuid, ownershipWorldName, lifecycleState, null, source, true, false);
     }
 
     @Nonnull
@@ -117,7 +143,8 @@ public final class CompanionPopulationRuntimeReconciler
                                        @Nonnull CompanionLifecycleState lifecycleState,
                                        @Nullable ClaimChunkCoordinate physicalChunk,
                                        @Nonnull String source,
-                                       boolean deferInFlight) {
+                                       boolean deferInFlight,
+                                       boolean ownerComponentRemoval) {
         ObservationResult result;
         synchronized (reloadLock) {
             result = observeLocked(
@@ -127,7 +154,8 @@ public final class CompanionPopulationRuntimeReconciler
                     lifecycleState,
                     physicalChunk,
                     source,
-                    deferInFlight
+                    deferInFlight,
+                    ownerComponentRemoval
             );
         }
         if (result.observation() != null) {
@@ -150,7 +178,8 @@ public final class CompanionPopulationRuntimeReconciler
                                              @Nonnull CompanionLifecycleState lifecycleState,
                                              @Nullable ClaimChunkCoordinate physicalChunk,
                                              @Nonnull String source,
-                                             boolean deferInFlight) {
+                                             boolean deferInFlight,
+                                             boolean ownerComponentRemoval) {
         Objects.requireNonNull(npcUuid, "npcUuid");
         Objects.requireNonNull(lifecycleState, "lifecycleState");
         String profileId = identityResolver.resolveProfileId(npcUuid)
@@ -192,6 +221,19 @@ public final class CompanionPopulationRuntimeReconciler
                     observation,
                     null
             );
+        }
+        if (ownerComponentRemoval && currentOwner != null) {
+            if (currentOwner.ownerId() == null
+                    && currentOwner.lifecycleState() == CompanionLifecycleState.RELEASED) {
+                return ObservationResult.only(ObservationOutcome.AUTHORIZED_RELEASE);
+            }
+            if (currentOwner.ownerId() != null) {
+                return new ObservationResult(
+                        ObservationOutcome.REJECTED_UNJOURNALED_CLEAR,
+                        null,
+                        new OwnerWarning(currentOwner, null)
+                );
+            }
         }
 
         ClaimOccupancyEntry currentClaim = claimIndex.entry(profileId).orElse(null);
@@ -464,7 +506,9 @@ public final class CompanionPopulationRuntimeReconciler
         ADOPTED,
         UPDATED,
         NO_CHANGE,
-        SUPPRESSED_IN_FLIGHT
+        SUPPRESSED_IN_FLIGHT,
+        AUTHORIZED_RELEASE,
+        REJECTED_UNJOURNALED_CLEAR
     }
 
     private record ObservationResult(@Nonnull ObservationOutcome outcome,

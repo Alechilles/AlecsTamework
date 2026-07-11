@@ -31,6 +31,15 @@ final class ClaimAdmissionEvaluator {
     }
 
     @Nonnull
+    ClaimAdmissionEvaluation evaluateForApply(@Nonnull ClaimAdmissionReservation reservation,
+                                              @Nonnull ClaimLookupSession lookupSession) {
+        ClaimAdmissionRequest rebuilt = reservation.rebuildRequest(lookupSession.context());
+        return ClaimAdmissionRules.sameStoredPolicy(reservation, lookupSession.context())
+                ? evaluate(rebuilt, lookupSession)
+                : denied(rebuilt, "claim-policy-context-mismatch");
+    }
+
+    @Nonnull
     ClaimAdmissionEvaluation evaluate(@Nonnull ClaimAdmissionRequest request,
                                       @Nonnull ClaimLookupSession lookupSession,
                                       @Nullable ClaimOccupancySnapshot sharedSnapshot) {

@@ -9,8 +9,27 @@ public record PopulationDiagnosticsView(@Nonnull ReadinessView readiness,
                                         @Nonnull ReservationMetricsView ownerReservations,
                                         @Nonnull ReservationMetricsView claimReservations,
                                         @Nonnull LookupMetricsView claimLookups,
-                                        @Nonnull ReconciliationView reconciliation) {
+                                        @Nonnull ReconciliationView reconciliation,
+                                        @Nonnull ActiveRulesView activeRules) {
     public static final long UNKNOWN = -1L;
+
+    /** Preserves the original diagnostics constructor for existing API consumers. */
+    public PopulationDiagnosticsView(@Nonnull ReadinessView readiness,
+                                     @Nonnull CountView counts,
+                                     @Nonnull ReservationMetricsView ownerReservations,
+                                     @Nonnull ReservationMetricsView claimReservations,
+                                     @Nonnull LookupMetricsView claimLookups,
+                                     @Nonnull ReconciliationView reconciliation) {
+        this(
+                readiness,
+                counts,
+                ownerReservations,
+                claimReservations,
+                claimLookups,
+                reconciliation,
+                ActiveRulesView.unknown()
+        );
+    }
 
     @Nonnull
     public static PopulationDiagnosticsView unavailable() {
@@ -56,7 +75,52 @@ public record PopulationDiagnosticsView(@Nonnull ReadinessView readiness,
                                     long totalSnapshotNanos,
                                     long lastSnapshotNanos,
                                     long lastProviderCallNanos,
+                                    long targetedRefreshCount,
+                                    long totalTargetedRefreshNanos,
+                                    long lastTargetedRefreshNanos,
                                     @Nullable ProviderContextView provider) {
+        /** Preserves the original lookup-metrics constructor for existing API consumers. */
+        public LookupMetricsView(long sessions,
+                                 long requests,
+                                 long uniqueChunks,
+                                 long providerCalls,
+                                 long cacheHits,
+                                 long providerStateChanges,
+                                 long snapshotCount,
+                                 long totalSnapshotNanos,
+                                 long lastSnapshotNanos,
+                                 long lastProviderCallNanos,
+                                 @Nullable ProviderContextView provider) {
+            this(
+                    sessions,
+                    requests,
+                    uniqueChunks,
+                    providerCalls,
+                    cacheHits,
+                    providerStateChanges,
+                    snapshotCount,
+                    totalSnapshotNanos,
+                    lastSnapshotNanos,
+                    lastProviderCallNanos,
+                    0L,
+                    0L,
+                    0L,
+                    provider
+            );
+        }
+    }
+
+    /** Effective values for the operation represented by this diagnostics snapshot. */
+    public record ActiveRulesView(@Nonnull String operation,
+                                  int ownerLimit,
+                                  @Nonnull String ownerScope,
+                                  int claimLimitPerChunk,
+                                  int claimLimitTotal,
+                                  boolean requireClaim) {
+        @Nonnull
+        public static ActiveRulesView unknown() {
+            return new ActiveRulesView("UNKNOWN", -1, "UNKNOWN", -1, -1, false);
+        }
     }
 
     public record ProviderContextView(@Nullable String requestedProvider,

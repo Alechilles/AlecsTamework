@@ -105,6 +105,36 @@ class CompanionPopulationEvidenceSetTest {
                 set.evidence().getFirst().lifecycleKind());
     }
 
+    @Test
+    void savedCorpseAndDeathSnapshotResolveAsOneDeadNonliveRepresentation() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                deadPhysical("corpse", npcUuid, ownerUuid, "default", 2, 3),
+                dormant("snapshot", npcUuid, ownerUuid, CompanionPopulationEvidence.Kind.DEATH_SNAPSHOT)
+        ));
+
+        assertTrue(set.isConflictFree());
+        CompanionPopulationEvidenceSet.ResolvedEvidence resolved = set.evidence().getFirst();
+        assertTrue(resolved.physical());
+        assertTrue(resolved.deathObserved());
+        assertFalse(resolved.livePhysical());
+        assertEquals(CompanionPopulationEvidence.Kind.PHYSICAL_DEAD_ENTITY, resolved.lifecycleKind());
+    }
+
+    @Test
+    void liveAndDeadObservationsForTheSameUuidQuarantineReviveAmbiguity() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                physical("live", npcUuid, ownerUuid, "default", 2, 3),
+                deadPhysical("corpse", npcUuid, ownerUuid, "default", 2, 3)
+        ));
+
+        assertFalse(set.isConflictFree());
+        assertEquals("conflicting-physical-death-evidence", set.conflicts().getFirst().reason());
+    }
+
     static CompanionPopulationEvidence physical(String key,
                                                   UUID npcUuid,
                                                   UUID ownerUuid,
@@ -134,6 +164,25 @@ class CompanionPopulationEvidenceSetTest {
                 null,
                 null,
                 null,
+                "test"
+        );
+    }
+
+    static CompanionPopulationEvidence deadPhysical(String key,
+                                                      UUID npcUuid,
+                                                      UUID ownerUuid,
+                                                      String world,
+                                                      int chunkX,
+                                                      int chunkZ) {
+        return new CompanionPopulationEvidence(
+                key,
+                npcUuid,
+                ownerUuid,
+                CompanionPopulationEvidence.Kind.PHYSICAL_DEAD_ENTITY,
+                world,
+                world,
+                chunkX,
+                chunkZ,
                 "test"
         );
     }

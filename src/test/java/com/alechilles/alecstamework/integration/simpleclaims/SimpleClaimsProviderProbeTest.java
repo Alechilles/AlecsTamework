@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbeResult;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,6 +56,32 @@ class SimpleClaimsProviderProbeTest {
 
         assertEquals(ClaimProviderState.INCOMPATIBLE, result.state());
         assertTrue(result.reason().contains("<1.1.0"));
+    }
+
+    @Test
+    void releaseRangeAllowsBuildMetadataButRejectsPrereleaseAndLowerBoundary() {
+        ClaimProviderProbeResult build = new SimpleClaimsProviderProbe(
+                new FakeLocator(ready("plugin-build", "1.0.38+vendor.7")),
+                ignored -> fixtureBridge()
+        ).probe();
+
+        assertEquals(ClaimProviderState.READY, build.state());
+        AtomicInteger reflections = new AtomicInteger();
+        for (String version : new String[]{"1.0.37+vendor.7", "1.0.38-rc.1", "1.0.99-beta+vendor.7"}) {
+            ClaimProviderProbeResult rejected = new SimpleClaimsProviderProbe(
+                    new FakeLocator(ready("plugin-rejected", version)),
+                    ignored -> {
+                        reflections.incrementAndGet();
+                        return fixtureBridge();
+                    }
+            ).probe();
+            assertEquals(
+                    ClaimProviderState.INCOMPATIBLE,
+                    rejected.state(),
+                    () -> "Unsupported release should be rejected: " + version
+            );
+        }
+        assertEquals(0, reflections.get(), "Rejected versions must not reach reflection.");
     }
 
     @Test

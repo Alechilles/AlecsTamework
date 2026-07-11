@@ -17,6 +17,11 @@ public final class ClaimAdmissionReservation {
     private final ClaimAdmissionOperation operation;
     private final List<ClaimOccupancyTransition> transitions;
     private final ClaimChunkCoordinate destinationChunk;
+    private final int limitPerClaimChunk;
+    private final int limitPerClaimTotal;
+    private final boolean requireClaim;
+    private final boolean force;
+    private final long leaseDurationNanos;
     private final String providerId;
     private final ClaimProviderGeneration providerGeneration;
     private final long settingsRevision;
@@ -40,6 +45,11 @@ public final class ClaimAdmissionReservation {
         this.operation = request.operation();
         this.transitions = request.transitions();
         this.destinationChunk = request.destinationChunk();
+        this.limitPerClaimChunk = request.limitPerClaimChunk();
+        this.limitPerClaimTotal = request.limitPerClaimTotal();
+        this.requireClaim = request.requireClaim();
+        this.force = request.force();
+        this.leaseDurationNanos = request.leaseDurationNanos();
         this.providerId = request.policyContext().providerId();
         this.providerGeneration = request.policyContext().providerGeneration();
         this.settingsRevision = request.policyContext().settingsRevision();
@@ -117,6 +127,20 @@ public final class ClaimAdmissionReservation {
 
     List<ClaimOccupancyTransition> transitions() {
         return transitions;
+    }
+
+    ClaimAdmissionRequest rebuildRequest(@Nonnull ClaimPolicyContext refreshedContext) {
+        return new ClaimAdmissionRequest(
+                operation,
+                transitions,
+                destinationChunk,
+                refreshedContext,
+                limitPerClaimChunk,
+                limitPerClaimTotal,
+                requireClaim,
+                force,
+                leaseDurationNanos
+        );
     }
 
     ClaimLookupResult.Status topologyStatus() {

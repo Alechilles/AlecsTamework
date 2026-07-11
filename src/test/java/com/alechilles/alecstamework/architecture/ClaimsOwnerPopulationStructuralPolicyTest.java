@@ -54,6 +54,36 @@ class ClaimsOwnerPopulationStructuralPolicyTest {
         assertTrue(source.contains("ClaimPopulationSnapshotService"));
     }
 
+    @Test
+    void settingsAndShutdownOwnBothOptionalClaimCapabilityCaches() throws IOException {
+        String plugin = Files.readString(JAVA_ROOT.resolve("Tamework.java"));
+        String settings = Files.readString(JAVA_ROOT.resolve("ui/TameworkSettingsPage.java"));
+        String api = Files.readString(JAVA_ROOT.resolve("api/internal/TameworkApiImpl.java"));
+
+        assertTrue(plugin.contains("new OwnerDamageFilterSystem(getLogger(), damagePolicy)"));
+        assertTrue(plugin.contains("implementation.close()"));
+        assertTrue(settings.contains("populationRuntime.claimProviderRegistry().onSettingsChanged()"));
+        assertTrue(settings.contains("implementation.onRuntimeSettingsChanged()"));
+        assertTrue(api.contains("damagePolicy.onRuntimeSettingsChanged()"));
+        assertTrue(api.contains("damagePolicy.close()"));
+    }
+
+    @Test
+    void directOwnerComponentRemovalCannotBecomeAnUnjournaledRelease() throws IOException {
+        String source = Files.readString(JAVA_ROOT.resolve(
+                "ownership/reconciliation/CompanionOwnerComponentReconciliationSystem.java"
+        ));
+
+        assertTrue(source.contains("observeRemoval(ref, component, store, \"owner-component-removed\")"));
+        assertTrue(source.contains("outcome != CompanionPopulationRuntimeReconciler.ObservationOutcome."
+                + "SUPPRESSED_IN_FLIGHT"));
+        assertTrue(source.contains("outcome != CompanionPopulationRuntimeReconciler.ObservationOutcome."
+                + "AUTHORIZED_RELEASE"));
+        assertTrue(source.contains("mutationService.restoreUnauthorizedRemovalBuffered("));
+        assertFalse(source.contains("commandBuffer.putComponent(ref, ownerType, component.clone())"));
+        assertFalse(source.contains("observe(ref, null, store, \"owner-component-removed\")"));
+    }
+
     private static void assertLineLimit(String relativePath, int limit) throws IOException {
         Path path = JAVA_ROOT.resolve(relativePath);
         int lines = Files.readAllLines(path).size();

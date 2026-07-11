@@ -107,11 +107,22 @@ public final class OwnerPopulationCapService {
                                            @Nonnull UUID ownerId) {
         OwnerPopulationIndex index = resolveIndex();
         OwnerPopulationLimitScope indexScope = toIndexScope(scope);
-        if (index == null || !index.readiness(indexScope).allowsPositiveCappedAdmissions()) {
+        String worldName = resolveWorldName(store);
+        return countOwnedPopulation(index, indexScope, worldName, ownerId);
+    }
+
+    static int countOwnedPopulation(@Nullable OwnerPopulationIndex index,
+                                    @Nonnull OwnerPopulationLimitScope scope,
+                                    @Nullable String worldName,
+                                    @Nonnull UUID ownerId) {
+        if (scope == OwnerPopulationLimitScope.PER_WORLD && worldName == null) {
             return Integer.MAX_VALUE;
         }
-        OwnerPopulationCounts counts = index.counts(ownerId, resolveWorldName(store));
-        return saturatingInt(indexScope == OwnerPopulationLimitScope.GLOBAL
+        if (index == null || !index.readiness(scope).allowsPositiveCappedAdmissions()) {
+            return Integer.MAX_VALUE;
+        }
+        OwnerPopulationCounts counts = index.counts(ownerId, worldName);
+        return saturatingInt(scope == OwnerPopulationLimitScope.GLOBAL
                 ? counts.globalCommitted() + counts.globalPending()
                 : counts.worldCommitted() + counts.worldPending());
     }

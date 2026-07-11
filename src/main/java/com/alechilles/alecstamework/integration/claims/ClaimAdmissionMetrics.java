@@ -10,6 +10,9 @@ public final class ClaimAdmissionMetrics {
     private final AtomicLong snapshotCount = new AtomicLong();
     private final AtomicLong totalSnapshotNanos = new AtomicLong();
     private final AtomicLong lastSnapshotNanos = new AtomicLong();
+    private final AtomicLong targetedRefreshCount = new AtomicLong();
+    private final AtomicLong totalTargetedRefreshNanos = new AtomicLong();
+    private final AtomicLong lastTargetedRefreshNanos = new AtomicLong();
     private long reservationsCreated;
     private long reservationsCommitted;
     private long reservationsCanceled;
@@ -42,6 +45,13 @@ public final class ClaimAdmissionMetrics {
         lastSnapshotNanos.set(safeElapsed);
     }
 
+    void recordTargetedRefreshDuration(long elapsedNanos) {
+        long safeElapsed = Math.max(0L, elapsedNanos);
+        targetedRefreshCount.incrementAndGet();
+        totalTargetedRefreshNanos.updateAndGet(current -> saturatedAdd(current, safeElapsed));
+        lastTargetedRefreshNanos.set(safeElapsed);
+    }
+
     void claimCapacityObserved(ClaimPopulationKey key, boolean overCap) {
         if (key == null) {
             return;
@@ -72,7 +82,10 @@ public final class ClaimAdmissionMetrics {
                 observedOverCapClaims.size(),
                 snapshotCount.get(),
                 totalSnapshotNanos.get(),
-                lastSnapshotNanos.get()
+                lastSnapshotNanos.get(),
+                targetedRefreshCount.get(),
+                totalTargetedRefreshNanos.get(),
+                lastTargetedRefreshNanos.get()
         );
     }
 
@@ -94,6 +107,9 @@ public final class ClaimAdmissionMetrics {
                            long observedOverCapClaimBuckets,
                            long snapshotCount,
                            long totalSnapshotNanos,
-                           long lastSnapshotNanos) {
+                           long lastSnapshotNanos,
+                           long targetedRefreshCount,
+                           long totalTargetedRefreshNanos,
+                           long lastTargetedRefreshNanos) {
     }
 }
