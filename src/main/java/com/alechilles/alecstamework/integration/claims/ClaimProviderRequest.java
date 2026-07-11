@@ -36,4 +36,18 @@ public record ClaimProviderRequest(@Nullable String configuredValue,
     public String displayValue() {
         return configuredValue == null || configuredValue.isBlank() ? "Auto" : configuredValue.trim();
     }
+
+    /**
+     * Builds a stable diagnostic that includes both the config field path and the rejected value.
+     */
+    @Nonnull
+    public String invalidDiagnostic(@Nonnull String fieldPath) {
+        if (valid) {
+            throw new IllegalStateException("A valid claim provider request has no invalid diagnostic.");
+        }
+        String normalizedPath = fieldPath == null || fieldPath.isBlank()
+                ? "<unknown-field>"
+                : fieldPath.trim();
+        return "Invalid claim provider at " + normalizedPath + ": '" + displayValue() + "'.";
+    }
 }

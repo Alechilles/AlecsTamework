@@ -13,8 +13,11 @@ import com.alechilles.alecstamework.api.NameItemConfigView;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
+import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
+import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.api.PolicyApi;
+import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
@@ -42,6 +45,9 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
+import com.alechilles.alecstamework.damage.TamedDamageDecision;
+import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicy;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
@@ -107,7 +113,7 @@ import javax.annotation.Nullable;
 
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi {
-    static final String API_VERSION = "0.6.0";
+    static final String API_VERSION = "0.7.0";
     static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
@@ -121,6 +127,8 @@ public final class TameworkApiImpl
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final SimpleClaimsBreedingBridge simpleClaimsBridge;
+    private final SimpleClaimsTamedDamagePolicy damagePolicy;
+    private final PopulationPolicyAuthority populationPolicyAuthority;
     private final InteractionExtensionApi interactionExtensionApi;
     private final TraitEffectApi traitEffectApi;
     private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
@@ -271,12 +279,48 @@ public final class TameworkApiImpl
                            @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                            @Nonnull InteractionExtensionApi interactionExtensionApi,
                            @Nonnull TraitEffectApi traitEffectApi) {
+        this(
+                persistenceRuntime,
+                eventBus,
+                stateSnapshotService,
+                interactionExtensionApi,
+                traitEffectApi,
+                new SimpleClaimsTamedDamagePolicy()
+        );
+    }
+
+    TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
+                    @Nonnull TameworkEventBus eventBus,
+                    @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                    @Nonnull InteractionExtensionApi interactionExtensionApi,
+                    @Nonnull TraitEffectApi traitEffectApi,
+                    @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy) {
+        this(
+                persistenceRuntime,
+                eventBus,
+                stateSnapshotService,
+                interactionExtensionApi,
+                traitEffectApi,
+                damagePolicy,
+                UnavailablePopulationPolicyAuthority.INSTANCE
+        );
+    }
+
+    TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
+                    @Nonnull TameworkEventBus eventBus,
+                    @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                    @Nonnull InteractionExtensionApi interactionExtensionApi,
+                    @Nonnull TraitEffectApi traitEffectApi,
+                    @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
+                    @Nonnull PopulationPolicyAuthority populationPolicyAuthority) {
         this.persistenceRuntime = Objects.requireNonNull(persistenceRuntime);
         this.profileRepository = Objects.requireNonNull(persistenceRuntime.getNpcProfileRepository());
         this.profileDataRepository = Objects.requireNonNull(persistenceRuntime.getApiProfileDataRepository());
         this.eventBus = Objects.requireNonNull(eventBus);
         this.stateSnapshotService = stateSnapshotService;
         this.simpleClaimsBridge = SimpleClaimsBreedingBridge.initialize();
+        this.damagePolicy = Objects.requireNonNull(damagePolicy);
+        this.populationPolicyAuthority = Objects.requireNonNull(populationPolicyAuthority);
         this.interactionExtensionApi = Objects.requireNonNull(interactionExtensionApi);
         this.traitEffectApi = Objects.requireNonNull(traitEffectApi);
     }
@@ -872,116 +916,43 @@ public final class TameworkApiImpl
     public DamagePolicyDecisionView evaluateDamage(String profileId, @Nullable UUID attackerPlayerUuid) {
         Optional<OwnershipPolicyView> ownership = getOwnershipByProfileId(profileId);
         if (ownership.isEmpty()) {
-            OwnershipPolicyView missing = new OwnershipPolicyView(
-                    profileId == null ? "" : profileId,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    false,
-                    null,
-                    null,
-                    false,
-                    false,
-                    false
-            );
-            return new DamagePolicyDecisionView(
-                    profileId == null ? "" : profileId,
-                    attackerPlayerUuid,
-                    true,
-                    DamagePolicyDecisionView.Status.UNAVAILABLE,
-                    "profile-not-found",
-                    missing,
-                    null
-            );
+            return ApiDamagePolicyMapper.profileMissing(profileId, attackerPlayerUuid);
         }
 
-        OwnershipPolicyView policy = ownership.get();
-        if (policy.ownerUuid() != null && policy.invulnerableIfOwned()) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    false,
-                    DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
-                    "invulnerable-if-owned",
-                    policy,
-                    null
-            );
-        }
-        if (policy.ownerUuid() != null && attackerPlayerUuid != null) {
-            if (policy.blockAllPlayerDamageIfOwned()) {
-                return new DamagePolicyDecisionView(
-                        policy.profileId(),
-                        attackerPlayerUuid,
-                        false,
-                        DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
-                        "block-all-player-damage-if-owned",
-                        policy,
-                        null
-                );
-            }
-            if (policy.blockOwnerDamage() && attackerPlayerUuid.equals(policy.ownerUuid())) {
-                return new DamagePolicyDecisionView(
-                        policy.profileId(),
-                        attackerPlayerUuid,
-                        false,
-                        DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
-                        "block-owner-damage",
-                        policy,
-                        null
-                );
-            }
-        }
-
-        ClaimAccessDecisionView claimAccess = evaluateClaimAccess(policy.profileId(), attackerPlayerUuid);
-        if (!claimAccess.allowed()) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    false,
-                    DamagePolicyDecisionView.Status.DENIED_CLAIM_PROTECTION,
-                    claimAccess.reason() != null ? claimAccess.reason() : "claim-protection-denied",
-                    policy,
-                    claimAccess
-            );
-        }
-        if (claimAccess.status() == ClaimAccessDecisionView.Status.ALLOW_FAIL_OPEN) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    true,
-                    DamagePolicyDecisionView.Status.ALLOWED_FAIL_OPEN,
-                    claimAccess.reason() != null ? claimAccess.reason() : "claim-lookup-failed-open",
-                    policy,
-                    claimAccess
-            );
-        }
-        if (claimAccess.status() == ClaimAccessDecisionView.Status.SKIPPED
-                || claimAccess.status() == ClaimAccessDecisionView.Status.UNAVAILABLE) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    true,
-                    DamagePolicyDecisionView.Status.ALLOWED_SKIPPED,
-                    claimAccess.reason() != null ? claimAccess.reason() : "claim-check-skipped",
-                    policy,
-                    claimAccess
-            );
-        }
-        return new DamagePolicyDecisionView(
-                policy.profileId(),
+        OwnershipPolicyView policy = ownership.orElseThrow();
+        ResolvedLiveNpc liveNpc = resolveLiveNpc(policy.currentNpcUuid());
+        Vector3d targetPosition = liveNpc != null
+                && liveNpc.transform() != null
+                && liveNpc.transform().getPosition() != null
+                ? new Vector3d(liveNpc.transform().getPosition())
+                : null;
+        String worldName = liveNpc != null ? liveNpc.world().getName() : null;
+        TamedDamageDecision decision = damagePolicy.evaluate(
+                new TamedDamageOwnerPolicy(
+                        policy.ownerUuid(),
+                        policy.blockOwnerDamage(),
+                        policy.blockAllPlayerDamageIfOwned(),
+                        policy.invulnerableIfOwned()
+                ),
+                liveNpc != null ? liveNpc.reference() : null,
+                liveNpc != null ? liveNpc.store() : null,
+                worldName,
+                targetPosition,
                 attackerPlayerUuid,
-                true,
-                DamagePolicyDecisionView.Status.ALLOWED,
-                "allowed",
+                resolveSimpleClaimsConfig()
+        );
+        return ApiDamagePolicyMapper.map(
                 policy,
-                claimAccess
+                attackerPlayerUuid,
+                decision,
+                worldName,
+                ApiMapper.mapVector(targetPosition)
         );
     }
 
     @Nonnull
     @Override
+    @Deprecated(since = "0.7.0", forRemoval = false)
     public PopulationCapDecisionView evaluatePopulationCap(@Nullable UUID ownerUuid) {
         OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(null, ownerUuid);
         return new PopulationCapDecisionView(
@@ -994,6 +965,18 @@ public final class TameworkApiImpl
                 decision.scope() != null ? decision.scope().name() : null,
                 decision.reason()
         );
+    }
+
+    @Nonnull
+    @Override
+    public OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(@Nonnull OwnerPopulationCapRequestV2 request) {
+        return populationPolicyAuthority.evaluateOwnerCap(Objects.requireNonNull(request, "request"));
+    }
+
+    @Nonnull
+    @Override
+    public PopulationAdmissionApi populationAdmissions() {
+        return populationPolicyAuthority;
     }
 
     @Nonnull

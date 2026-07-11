@@ -1,0 +1,264 @@
+package com.alechilles.alecstamework.damage;
+
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Optional;
+import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.joml.Vector3d;
+
+/**
+ * Shared owner-first and SimpleClaims-native tamed-target damage policy.
+ *
+ * <p>Both the runtime damage filter and public API call this class. It resolves eligibility from
+ * the live target, treats the configurable bypass as a server permission, retains the historical
+ * raw-party grant for one compatibility release, and fails open only when optional integration
+ * access cannot be evaluated.</p>
+ */
+public final class SimpleClaimsTamedDamagePolicy {
+    private static final String WARN_FAIL_OPEN = "simpleclaims-damage-fail-open";
+    private static final String WARN_LEGACY_BYPASS = "simpleclaims-legacy-damage-bypass";
+    private static final String WARN_PERMISSION = "simpleclaims-damage-server-permission";
+
+    private final TamedDamageTargetEligibilityResolver eligibilityResolver;
+    private final TamedDamagePolicyAdapter decisionAdapter;
+    private final NativeSimpleClaimsDamageAccess nativeAccess;
+    private final DamageServerPermissionBypass serverPermissionBypass;
+    private final LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass;
+    private final DamagePolicyWarningSink warningSink;
+
+    /** Creates the production policy over the current SimpleClaims bridge generation. */
+    public SimpleClaimsTamedDamagePolicy() {
+        this(SimpleClaimsBreedingBridge.initialize());
+    }
+
+    SimpleClaimsTamedDamagePolicy(@Nonnull SimpleClaimsBreedingBridge bridge) {
+        this(
+                new TamedDamageTargetEligibilityResolver(),
+                bridge::evaluateDamageAccess,
+                new HytaleDamageServerPermissionBypass(),
+                new ReflectiveLegacySimpleClaimsPartyPermissionBypass(bridge),
+                new ThrottledDamagePolicyWarningSink()
+        );
+    }
+
+    SimpleClaimsTamedDamagePolicy(
+            @Nonnull TamedDamageTargetEligibilityResolver eligibilityResolver,
+            @Nonnull NativeSimpleClaimsDamageAccess nativeAccess,
+            @Nonnull DamageServerPermissionBypass serverPermissionBypass,
+            @Nonnull LegacySimpleClaimsPartyPermissionBypass legacyPartyBypass,
+            @Nonnull DamagePolicyWarningSink warningSink) {
+        this.eligibilityResolver = eligibilityResolver;
+        this.decisionAdapter = new TamedDamagePolicyAdapter();
+        this.nativeAccess = nativeAccess;
+        this.serverPermissionBypass = serverPermissionBypass;
+        this.legacyPartyBypass = legacyPartyBypass;
+        this.warningSink = warningSink;
+    }
+
+    /**
+     * Evaluates owner protection and, when active and eligible, native SimpleClaims damage access.
+     */
+    @Nonnull
+    public TamedDamageDecision evaluate(
+            @Nullable TamedDamageOwnerPolicy ownerPolicy,
+            @Nullable Ref<EntityStore> targetRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable String worldName,
+            @Nullable Vector3d targetPosition,
+            @Nullable UUID attackerPlayerUuid,
+            @Nullable TwGlobalConfig globalConfig) {
+        boolean integrationEnabled = globalConfig != null
+                && TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled());
+        boolean protectionEnabled = globalConfig != null
+                && TameworkRuntimeSettings.simpleClaimsProtectTamedFromNonMembers(
+                globalConfig.isSimpleClaimsDamageProtectTamedFromNonMembers()
+        );
+
+        Optional<TamedDamageDecision> earlyDecision = decisionAdapter.evaluatePreconditions(
+                ownerPolicy,
+                attackerPlayerUuid,
+                integrationEnabled,
+                protectionEnabled,
+                TamedDamageTargetEligibilityResolver.Status.ELIGIBLE
+        );
+        if (earlyDecision.isPresent()) {
+            return earlyDecision.get();
+        }
+
+        TamedDamageTargetEligibilityResolver.Status eligibility = eligibilityResolver.resolve(targetRef, store);
+        return evaluateResolvedEligibility(
+                ownerPolicy,
+                eligibility,
+                worldName,
+                targetPosition,
+                attackerPlayerUuid,
+                globalConfig
+        );
+    }
+
+    @Nonnull
+    TamedDamageDecision evaluateResolvedEligibility(
+            @Nullable TamedDamageOwnerPolicy ownerPolicy,
+            @Nonnull TamedDamageTargetEligibilityResolver.Status eligibility,
+            @Nullable String worldName,
+            @Nullable Vector3d targetPosition,
+            @Nullable UUID attackerPlayerUuid,
+            @Nullable TwGlobalConfig globalConfig) {
+        boolean integrationEnabled = globalConfig != null
+                && TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled());
+        boolean protectionEnabled = globalConfig != null
+                && TameworkRuntimeSettings.simpleClaimsProtectTamedFromNonMembers(
+                globalConfig.isSimpleClaimsDamageProtectTamedFromNonMembers()
+        );
+        Optional<TamedDamageDecision> eligibilityDecision = decisionAdapter.evaluatePreconditions(
+                ownerPolicy,
+                attackerPlayerUuid,
+                integrationEnabled,
+                protectionEnabled,
+                eligibility
+        );
+        if (eligibilityDecision.isPresent()) {
+            return eligibilityDecision.get();
+        }
+        if (worldName == null || worldName.isBlank() || !isFinite(targetPosition)) {
+            return failOpen(false, null, "lookup-context-missing", "Target/world context was missing.");
+        }
+
+        String permissionKey = normalizePermissionKey(
+                globalConfig != null ? globalConfig.getSimpleClaimsDamageAllowDamagePermissionKey() : null
+        );
+        if (permissionKey != null && hasServerPermission(attackerPlayerUuid, permissionKey)) {
+            return TamedDamageDecision.allowEnforced("server-permission-bypass", null, null);
+        }
+
+        LegacySimpleClaimsPartyPermissionBypass.Result legacyResult = permissionKey != null
+                ? evaluateLegacyBypass(worldName, targetPosition, attackerPlayerUuid, permissionKey)
+                : LegacySimpleClaimsPartyPermissionBypass.Result.notGranted();
+        if (legacyResult.status() == LegacySimpleClaimsPartyPermissionBypass.Status.GRANTED) {
+            warningSink.warn(
+                    WARN_LEGACY_BYPASS,
+                    "Tamework granted SimpleClaims tamed damage through the deprecated raw-party "
+                            + "AllowDamagePermissionKey compatibility path. Migrate this grant to the Hytale "
+                            + "server permission before the next major release."
+            );
+            return TamedDamageDecision.allowEnforced(
+                    "legacy-party-permission-bypass",
+                    legacyResult.claimPartyId(),
+                    legacyResult.message()
+            );
+        }
+
+        try {
+            TamedDamageDecision decision = decisionAdapter.mapNative(nativeAccess.evaluate(
+                    worldName,
+                    targetPosition,
+                    attackerPlayerUuid,
+                    permissionKey
+            ));
+            if (decision.status() == TamedDamageDecision.Status.ALLOW_FAIL_OPEN) {
+                warningSink.warn(
+                        WARN_FAIL_OPEN,
+                        "SimpleClaims tamed damage evaluation failed open: reason="
+                                + decision.reason()
+                                + ", detail="
+                                + safeDetail(decision.detail())
+                                + "."
+                );
+            }
+            return decision;
+        } catch (Throwable throwable) {
+            return failOpen(false, null, "lookup-error", message(throwable));
+        }
+    }
+
+    private boolean hasServerPermission(@Nonnull UUID attackerPlayerUuid,
+                                        @Nonnull String permissionKey) {
+        try {
+            return serverPermissionBypass.isGranted(attackerPlayerUuid, permissionKey);
+        } catch (Throwable throwable) {
+            warningSink.warn(
+                    WARN_PERMISSION,
+                    "Tamework could not evaluate the configured server damage permission '"
+                            + permissionKey
+                            + "'; native SimpleClaims policy will still run: "
+                            + message(throwable)
+                            + "."
+            );
+            return false;
+        }
+    }
+
+    @Nonnull
+    private LegacySimpleClaimsPartyPermissionBypass.Result evaluateLegacyBypass(
+            @Nonnull String worldName,
+            @Nonnull Vector3d targetPosition,
+            @Nonnull UUID attackerPlayerUuid,
+            @Nonnull String permissionKey) {
+        try {
+            return legacyPartyBypass.evaluate(worldName, targetPosition, attackerPlayerUuid, permissionKey);
+        } catch (Throwable throwable) {
+            return new LegacySimpleClaimsPartyPermissionBypass.Result(
+                    LegacySimpleClaimsPartyPermissionBypass.Status.ERROR,
+                    null,
+                    message(throwable)
+            );
+        }
+    }
+
+    @Nonnull
+    private TamedDamageDecision failOpen(boolean claimAccessAvailable,
+                                         @Nullable UUID claimPartyId,
+                                         @Nonnull String reason,
+                                         @Nullable String detail) {
+        warningSink.warn(
+                WARN_FAIL_OPEN,
+                "SimpleClaims tamed damage evaluation failed open: reason="
+                        + reason
+                        + ", detail="
+                        + safeDetail(detail)
+                        + "."
+        );
+        return TamedDamageDecision.allowFailOpen(
+                reason,
+                claimAccessAvailable,
+                claimPartyId,
+                detail
+        );
+    }
+
+    private static boolean isFinite(@Nullable Vector3d position) {
+        return position != null
+                && Double.isFinite(position.x)
+                && Double.isFinite(position.y)
+                && Double.isFinite(position.z);
+    }
+
+    @Nullable
+    private static String normalizePermissionKey(@Nullable String permissionKey) {
+        if (permissionKey == null) {
+            return null;
+        }
+        String normalized = permissionKey.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    @Nonnull
+    private static String safeDetail(@Nullable String detail) {
+        return detail == null || detail.isBlank() ? "none" : detail;
+    }
+
+    @Nonnull
+    private static String message(@Nullable Throwable throwable) {
+        if (throwable == null) {
+            return "unknown error";
+        }
+        String message = throwable.getMessage();
+        return message == null || message.isBlank() ? throwable.getClass().getSimpleName() : message;
+    }
+}

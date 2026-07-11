@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -28,6 +29,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -90,6 +92,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private final World world;
 
     private TameworkSettingsValues currentValues;
+    private ClaimProviderRequest currentClaimProviderRequest;
     private String statusLine = "";
     private String warningLine = "";
     private boolean applyInProgress;
@@ -100,7 +103,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.world = Objects.requireNonNull(world, "world");
-        this.currentValues = TameworkSettingsValues.fromRuntime();
+        loadCurrentValues();
+        showInvalidProviderWarning();
     }
 
     @Override
@@ -135,9 +139,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         switch (action) {
             case ACTION_CLOSE -> close();
             case ACTION_REFRESH -> {
-                currentValues = TameworkSettingsValues.fromRuntime();
+                loadCurrentValues();
                 statusLine = resolveText("tamework.ui.settings.status.refreshed");
-                warningLine = "";
+                showInvalidProviderWarning();
                 refreshUi();
             }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
@@ -237,7 +241,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Entries", populationScopeEntries());
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Value", currentValues.populationPerPlayerLimitScope().configValue());
         commandBuilder.set("#TwSettingsClaimProviderDropdown.Entries", claimProviderEntries());
-        commandBuilder.set("#TwSettingsClaimProviderDropdown.Value", currentValues.simpleClaimsProvider().configValue());
+        commandBuilder.set("#TwSettingsClaimProviderDropdown.Value", currentClaimProviderRequest.displayValue());
         commandBuilder.set("#TwSettingsSimpleClaimsEnabledCheck.Value", currentValues.simpleClaimsEnabled());
         commandBuilder.set("#TwSettingsClaimLimitChunkInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimChunk()));
         commandBuilder.set("#TwSettingsClaimLimitTotalInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimTotal()));
@@ -311,7 +315,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         refreshUi();
                         return;
                     }
-                    currentValues = TameworkSettingsValues.fromRuntime();
+                    loadCurrentValues();
                     if (outcome == null) {
                         statusLine = "";
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
@@ -441,11 +445,17 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         }
 
         TwGlobalConfig.PerPlayerLimitScope scope = TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(payload.populationScope);
-        String providerValue = trim(payload.claimProvider);
-        if (providerValue.isBlank()) {
-            providerValue = currentValues.simpleClaimsProvider().configValue();
+        ClaimProviderRequest claimProviderRequest = TameworkSettingsValidation.resolveClaimProvider(
+                payload.claimProvider,
+                currentClaimProviderRequest
+        );
+        if (!claimProviderRequest.valid()) {
+            return ParseResult.failure(formatText(
+                    "tamework.ui.settings.validation.claimProvider",
+                    claimProviderRequest.displayValue()
+            ));
         }
-        ClaimIntegrationProvider claimProvider = ClaimIntegrationProvider.fromConfigValue(providerValue);
+        ClaimIntegrationProvider claimProvider = claimProviderRequest.provider();
         String tickPolicyModeValue = trim(payload.needsTickPolicyMode);
         if (tickPolicyModeValue.isBlank()) {
             tickPolicyModeValue = currentValues.needsTickPolicyMode().toConfigValue();
@@ -572,7 +582,17 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     }
 
     private List<DropdownEntryInfo> claimProviderEntries() {
-        return List.of(
+        List<DropdownEntryInfo> entries = new ArrayList<>();
+        if (!currentClaimProviderRequest.valid()) {
+            entries.add(new DropdownEntryInfo(
+                    LocalizableString.fromString(formatText(
+                            "tamework.ui.settings.claimProvider.invalid",
+                            currentClaimProviderRequest.displayValue()
+                    )),
+                    currentClaimProviderRequest.displayValue()
+            ));
+        }
+        entries.addAll(List.of(
                 new DropdownEntryInfo(
                         LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.auto")),
                         ClaimIntegrationProvider.AUTO.configValue()
@@ -589,7 +609,23 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.off")),
                         ClaimIntegrationProvider.OFF.configValue()
                 )
-        );
+        ));
+        return List.copyOf(entries);
+    }
+
+    private void loadCurrentValues() {
+        TameworkSettingsValues.RuntimeState state = TameworkSettingsValues.fromRuntimeState();
+        currentValues = state.values();
+        currentClaimProviderRequest = state.claimProviderRequest();
+    }
+
+    private void showInvalidProviderWarning() {
+        warningLine = currentClaimProviderRequest.valid()
+                ? ""
+                : formatText(
+                        "tamework.ui.settings.warning.invalidClaimProvider",
+                        currentClaimProviderRequest.displayValue()
+                );
     }
 
     private List<DropdownEntryInfo> needsTickPolicyModeEntries() {

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -56,7 +57,14 @@ public final class TameworkRuntimeSettings {
 
     @Nonnull
     public ClaimIntegrationProvider simpleClaimsProvider() {
-        return ClaimIntegrationProvider.fromConfigValue(values.simpleClaimsProvider());
+        ClaimProviderRequest request = simpleClaimsProviderRequest();
+        return request.valid() ? request.provider() : ClaimIntegrationProvider.OFF;
+    }
+
+    /** Returns the provider request with any invalid legacy value intact for fail-closed policy resolution. */
+    @Nonnull
+    public ClaimProviderRequest simpleClaimsProviderRequest() {
+        return values.simpleClaimsProviderRequest();
     }
 
     public boolean simpleClaimsEnabled() {

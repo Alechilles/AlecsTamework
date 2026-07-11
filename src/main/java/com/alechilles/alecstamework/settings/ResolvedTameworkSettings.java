@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.settings;
 
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 
@@ -45,6 +46,12 @@ public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
                                        boolean recallTeleportingEnabled,
                                        boolean telemetryEnabled,
                                        boolean telemetryBreadcrumbsEnabled) {
+
+    /** Preserves an invalid explicit legacy provider instead of silently converting it to Auto. */
+    @Nonnull
+    public ClaimProviderRequest simpleClaimsProviderRequest() {
+        return ClaimProviderRequest.fromConfigValue(simpleClaimsProvider);
+    }
 
     @Nonnull
     public TameworkSettingsStore.GlobalSettingsSnapshot toSnapshot() {

@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.persistence;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
@@ -162,6 +162,17 @@ public final class TameworkSettingsStore {
                                              @Nullable HytaleLogger logger) {
         Objects.requireNonNull(globalSettingsFile, "globalSettingsFile");
         Objects.requireNonNull(snapshot, "snapshot");
+
+        ClaimProviderRequest providerRequest = ClaimProviderRequest.fromConfigValue(snapshot.simpleClaimsProvider());
+        if (!providerRequest.valid()) {
+            if (logger != null) {
+                logger.at(Level.WARNING).log(
+                        "Refusing to save Tamework settings. "
+                                + providerRequest.invalidDiagnostic("simpleClaims.provider")
+                );
+            }
+            return false;
+        }
 
         GlobalSettingsDocument document = createDocument(snapshot);
 
@@ -479,6 +490,7 @@ public final class TameworkSettingsStore {
             if (parsed == null) {
                 return null;
             }
+            logInvalidClaimProvider(parsed, globalSettingsFile, logger);
             return parsed;
         } catch (JsonSyntaxException syntaxException) {
             if (logger != null) {
@@ -558,7 +570,26 @@ public final class TameworkSettingsStore {
 
     @Nonnull
     private static String normalizeClaimProvider(@Nullable String provider) {
-        return ClaimIntegrationProvider.fromConfigValue(provider).configValue();
+        ClaimProviderRequest request = ClaimProviderRequest.fromConfigValue(provider);
+        if (!request.valid()) {
+            throw new IllegalArgumentException(request.invalidDiagnostic("simpleClaims.provider"));
+        }
+        return request.provider().configValue();
+    }
+
+    private static void logInvalidClaimProvider(@Nonnull GlobalSettingsDocument document,
+                                                @Nonnull Path settingsFile,
+                                                @Nullable HytaleLogger logger) {
+        if (document.simpleClaims == null || logger == null) {
+            return;
+        }
+        ClaimProviderRequest request = ClaimProviderRequest.fromConfigValue(document.simpleClaims.provider);
+        if (!request.valid()) {
+            logger.at(Level.WARNING).log(
+                    request.invalidDiagnostic("simpleClaims.provider")
+                            + " Population claim policy is INVALID in " + settingsFile + "."
+            );
+        }
     }
 
     @Nonnull
