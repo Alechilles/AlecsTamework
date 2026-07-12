@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan;
 import com.alechilles.alecstamework.npc.breeding.BreedingFertilitySnapshot;
 import com.alechilles.alecstamework.npc.breeding.BreedingJobAdmission;
 import com.alechilles.alecstamework.npc.breeding.BreedingJobExecutionService;
+import com.alechilles.alecstamework.npc.breeding.BreedingJobDiagnosticSnapshot;
+import com.alechilles.alecstamework.npc.breeding.BreedingJobDiagnosticsService;
 import com.alechilles.alecstamework.npc.breeding.BreedingJobScheduler;
 import com.alechilles.alecstamework.npc.breeding.BreedingParentIdentity;
 import com.alechilles.alecstamework.npc.breeding.BreedingPlayerCapacityScope;
@@ -55,8 +57,10 @@ class BreedingCaptureCancellationServiceTest {
                 events,
                 liveState
         );
+        BreedingJobDiagnosticsService diagnostics = new BreedingJobDiagnosticsService();
+        assertTrue(diagnostics.register(scope, job));
         BreedingCaptureCancellationService service =
-                new BreedingCaptureCancellationService(registry, gateway);
+                new BreedingCaptureCancellationService(registry, gateway, diagnostics);
 
         BreedingCaptureCancellationService.SnapshotHandoff<ParentBreedingSnapshot> handoff =
                 service.cancelThenCaptureSnapshotInScope(
@@ -80,6 +84,14 @@ class BreedingCaptureCancellationServiceTest {
         assertTrue(handoff.cancellation().capturedParent().orElseThrow().restored());
         assertTrue(handoff.cancellation().partner().orElseThrow().restored());
         assertEquals(0, registry.activeJobCount(scope));
+        BreedingJobDiagnosticSnapshot diagnostic = diagnostics.find(job.jobId()).orElseThrow();
+        assertEquals(BreedingJobDiagnosticSnapshot.Outcome.CANCELLED, diagnostic.outcome());
+        assertEquals("capture-cancelled:COOP_CAPTURE", diagnostic.reason());
+        assertEquals(
+                BreedingJobDiagnosticSnapshot.RollbackStatus.COMPLETED,
+                diagnostic.rollbackStatus()
+        );
+        assertEquals("first=RESTORED,second=RESTORED", diagnostic.rollbackDetail());
     }
 
     @Test

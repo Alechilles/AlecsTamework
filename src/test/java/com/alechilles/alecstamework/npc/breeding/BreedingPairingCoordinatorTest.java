@@ -161,9 +161,26 @@ class BreedingPairingCoordinatorTest {
         assertEquals(EFFECTS_FAILED, effectsFailure.status());
         assertEquals(1, effectsRollback.get());
         assertTrue(effectsServices.jobRegistry().find(effectsScope, uuid(200L)).orElseThrow().state().isTerminal());
+        BreedingJobDiagnosticSnapshot effectsDiagnostics = effectsServices.jobDiagnostics()
+                .find(uuid(200L))
+                .orElseThrow();
+        assertEquals(BreedingJobDiagnosticSnapshot.Outcome.EFFECTS_FAILED, effectsDiagnostics.outcome());
+        assertEquals("effects-rejected", effectsDiagnostics.reason());
+        assertEquals(
+                BreedingJobDiagnosticSnapshot.RollbackStatus.ATTEMPTED,
+                effectsDiagnostics.rollbackStatus()
+        );
+        assertEquals(1, effectsDiagnostics.initialCapacity().admittedChildren());
         assertEquals(EFFECTS_FAILED, schedulerFailure.status());
         assertEquals(1, schedulerRollback.get());
         assertTrue(schedulerServices.jobRegistry().find(schedulerScope, uuid(300L)).orElseThrow().state().isTerminal());
+        BreedingJobDiagnosticSnapshot schedulerDiagnostics = schedulerServices.jobDiagnostics()
+                .find(uuid(300L))
+                .orElseThrow();
+        assertEquals(
+                "effects-or-schedule-error:IllegalStateException",
+                schedulerDiagnostics.reason()
+        );
     }
 
     private static BreedingPairingCoordinator coordinator(

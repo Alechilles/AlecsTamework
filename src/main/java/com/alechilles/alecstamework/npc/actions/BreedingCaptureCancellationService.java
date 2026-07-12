@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthJob;
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthJobRegistry;
+import com.alechilles.alecstamework.npc.breeding.BreedingJobDiagnosticSnapshot;
+import com.alechilles.alecstamework.npc.breeding.BreedingJobDiagnosticsService;
 import com.alechilles.alecstamework.npc.breeding.BreedingParentIdentity;
 import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.hypixel.hytale.component.Store;
@@ -23,22 +25,36 @@ import javax.annotation.Nullable;
 public final class BreedingCaptureCancellationService {
     private final BreedingBirthJobRegistry jobRegistry;
     private final ParentRollbackGateway parentRollbackGateway;
+    @Nullable
+    private final BreedingJobDiagnosticsService diagnosticsService;
 
     /** Uses the one runtime registry shared by manual and passive breeding entrypoints. */
     public BreedingCaptureCancellationService() {
+        this(TameworkBreedingServices.shared());
+    }
+
+    private BreedingCaptureCancellationService(TameworkBreedingServices services) {
         this(
-                TameworkBreedingServices.shared().jobRegistry(),
-                new BreedingCaptureParentRollbackService()
+                services.jobRegistry(),
+                new BreedingCaptureParentRollbackService(),
+                services.jobDiagnostics()
         );
     }
 
     BreedingCaptureCancellationService(@Nonnull BreedingBirthJobRegistry jobRegistry,
                                        @Nonnull ParentRollbackGateway parentRollbackGateway) {
+        this(jobRegistry, parentRollbackGateway, null);
+    }
+
+    BreedingCaptureCancellationService(@Nonnull BreedingBirthJobRegistry jobRegistry,
+                                       @Nonnull ParentRollbackGateway parentRollbackGateway,
+                                       @Nullable BreedingJobDiagnosticsService diagnosticsService) {
         this.jobRegistry = Objects.requireNonNull(jobRegistry, "jobRegistry");
         this.parentRollbackGateway = Objects.requireNonNull(
                 parentRollbackGateway,
                 "parentRollbackGateway"
         );
+        this.diagnosticsService = diagnosticsService;
     }
 
     /** Cancels by current entity UUID before the caller captures a coop snapshot. */
@@ -157,6 +173,7 @@ public final class BreedingCaptureCancellationService {
                 false,
                 capturedIsFirst ? cancelledJob.secondParent().entityUuid() : capturedParentUuid
         );
+        recordCancellationDiagnostics(cancelledJob, reason, first, second);
         return new CancellationResult(
                 CancellationStatus.CANCELLED,
                 reason,
@@ -208,6 +225,52 @@ public final class BreedingCaptureCancellationService {
         } catch (RuntimeException exception) {
             return new ParentRollbackReport(liveIdentity, ParentRollbackStatus.ERROR, false);
         }
+    }
+
+    private void recordCancellationDiagnostics(BreedingBirthJob job,
+                                               CancellationReason reason,
+                                               ParentRollbackReport first,
+                                               ParentRollbackReport second) {
+        if (diagnosticsService == null) {
+            return;
+        }
+        diagnosticsService.recordOutcome(
+                job.jobId(),
+                BreedingJobDiagnosticSnapshot.Outcome.CANCELLED,
+                0,
+                "capture-cancelled:" + reason,
+                combinedRollbackStatus(first.status(), second.status()),
+                "first=" + first.status() + ",second=" + second.status()
+        );
+    }
+
+    private BreedingJobDiagnosticSnapshot.RollbackStatus combinedRollbackStatus(
+            ParentRollbackStatus first,
+            ParentRollbackStatus second) {
+        boolean firstCompleted = rollbackCompleted(first);
+        boolean secondCompleted = rollbackCompleted(second);
+        if (firstCompleted && secondCompleted) {
+            return BreedingJobDiagnosticSnapshot.RollbackStatus.COMPLETED;
+        }
+        if (firstCompleted || secondCompleted) {
+            return BreedingJobDiagnosticSnapshot.RollbackStatus.PARTIAL;
+        }
+        if (!rollbackFailed(first) && !rollbackFailed(second)) {
+            return BreedingJobDiagnosticSnapshot.RollbackStatus.SKIPPED;
+        }
+        if (!rollbackFailed(first) || !rollbackFailed(second)) {
+            return BreedingJobDiagnosticSnapshot.RollbackStatus.PARTIAL;
+        }
+        return BreedingJobDiagnosticSnapshot.RollbackStatus.FAILED;
+    }
+
+    private boolean rollbackCompleted(ParentRollbackStatus status) {
+        return status == ParentRollbackStatus.RESTORED;
+    }
+
+    private boolean rollbackFailed(ParentRollbackStatus status) {
+        return status == ParentRollbackStatus.ERROR
+                || status == ParentRollbackStatus.SKIPPED_RESTORE_FAILED;
     }
 
     @Nonnull

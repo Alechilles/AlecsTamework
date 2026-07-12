@@ -15,6 +15,7 @@ import static com.alechilles.alecstamework.npc.breeding.BreedingJobExecutionServ
 import static com.alechilles.alecstamework.npc.breeding.BreedingJobExecutionService.ExecutionStatus.PARENTS_INVALID;
 import static com.alechilles.alecstamework.npc.breeding.BreedingPopulationAdmissionService.BreedingMode.PASSIVE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for job-ID-only delayed execution and cooldown outcome policy. */
 class BreedingJobExecutionServiceTest {
@@ -38,6 +39,14 @@ class BreedingJobExecutionServiceTest {
         assertEquals(0, fixture.runtime.rollbackCalls.get());
         assertEquals(BreedingJobExecutionService.ExecutionStatus.TERMINAL, replay.status());
         assertEquals(1, fixture.runtime.spawnCalls.get());
+        BreedingJobDiagnosticSnapshot diagnostics = fixture.services.jobDiagnostics()
+                .find(fixture.job.jobId())
+                .orElseThrow();
+        assertEquals(BreedingJobDiagnosticSnapshot.Outcome.COMPLETED, diagnostics.outcome());
+        assertEquals(1, diagnostics.spawnedChildren());
+        assertTrue(diagnostics.spawnedCountFinal());
+        assertEquals(1, diagnostics.spawnCapacity().admittedChildren());
+        assertTrue(diagnostics.spawnCapacity().liveNearbyByPopulationType().isEmpty());
     }
 
     @Test
@@ -50,6 +59,15 @@ class BreedingJobExecutionServiceTest {
         assertEquals(BreedingBirthJobState.CANCELLED, result.job().orElseThrow().state());
         assertEquals(1, fixture.runtime.rollbackCalls.get());
         assertEquals(0, fixture.runtime.spawnCalls.get());
+        BreedingJobDiagnosticSnapshot diagnostics = fixture.services.jobDiagnostics()
+                .find(fixture.job.jobId())
+                .orElseThrow();
+        assertEquals(BreedingJobDiagnosticSnapshot.Outcome.PARENTS_INVALID, diagnostics.outcome());
+        assertEquals("missing", diagnostics.reason());
+        assertEquals(
+                BreedingJobDiagnosticSnapshot.RollbackStatus.ATTEMPTED,
+                diagnostics.rollbackStatus()
+        );
     }
 
     @Test
@@ -79,9 +97,19 @@ class BreedingJobExecutionServiceTest {
 
         assertEquals(FAILED, failedResult.status());
         assertEquals(1, failed.runtime.rollbackCalls.get());
+        BreedingJobDiagnosticSnapshot failedDiagnostics = failed.services.jobDiagnostics()
+                .find(failed.job.jobId())
+                .orElseThrow();
+        assertEquals(0, failedDiagnostics.spawnedChildren());
+        assertEquals("all-child-spawns-failed=2", failedDiagnostics.reason());
         assertEquals(COMPLETED, partialResult.status());
         assertEquals(1, partialResult.spawnedChildren());
         assertEquals(0, partial.runtime.rollbackCalls.get());
+        BreedingJobDiagnosticSnapshot partialDiagnostics = partial.services.jobDiagnostics()
+                .find(partial.job.jobId())
+                .orElseThrow();
+        assertEquals(1, partialDiagnostics.spawnedChildren());
+        assertEquals("child-spawn-failures=1", partialDiagnostics.reason());
     }
 
     @Test
@@ -95,6 +123,29 @@ class BreedingJobExecutionServiceTest {
         assertEquals(COMPLETED, result.status());
         assertEquals(0, result.spawnedChildren());
         assertEquals(0, fixture.runtime.spawnCalls.get());
+        assertEquals(0, fixture.runtime.rollbackCalls.get());
+    }
+
+    @Test
+    void postCompletionFailureKeepsExactSuccessfulBirthDiagnostic() {
+        Fixture fixture = fixture(plan(1), scope(), 8, Map.of(), index -> true, true);
+        fixture.runtime.throwOnCompleted = true;
+        fixture.execution.execute(fixture.job.jobId());
+
+        BreedingJobExecutionService.ExecutionResult result =
+                fixture.execution.execute(fixture.job.jobId());
+
+        assertEquals(COMPLETED, result.status());
+        assertEquals(1, result.spawnedChildren());
+        BreedingJobDiagnosticSnapshot diagnostics = fixture.services.jobDiagnostics()
+                .find(fixture.job.jobId())
+                .orElseThrow();
+        assertEquals(BreedingJobDiagnosticSnapshot.Outcome.COMPLETED, diagnostics.outcome());
+        assertEquals(1, diagnostics.spawnedChildren());
+        assertEquals(
+                "post-completion-follow-up-error:IllegalStateException",
+                diagnostics.reason()
+        );
         assertEquals(0, fixture.runtime.rollbackCalls.get());
     }
 
@@ -123,6 +174,7 @@ class BreedingJobExecutionServiceTest {
     @Test
     void asynchronousSchedulingFailureCallbackRollsBackAndFailsJob() {
         Fixture fixture = fixture(plan(1), scope(), 8, Map.of(), index -> true, true);
+        fixture.runtime.throwOnRollback = true;
 
         BreedingJobExecutionService.ExecutionResult result =
                 fixture.execution.failScheduledJob(fixture.job.jobId());
@@ -131,6 +183,13 @@ class BreedingJobExecutionServiceTest {
         assertEquals(BreedingBirthJobState.FAILED, result.job().orElseThrow().state());
         assertEquals(1, fixture.runtime.rollbackCalls.get());
         assertEquals(0, fixture.runtime.spawnCalls.get());
+        assertEquals(
+                BreedingJobDiagnosticSnapshot.RollbackStatus.FAILED,
+                fixture.services.jobDiagnostics()
+                        .find(fixture.job.jobId())
+                        .orElseThrow()
+                        .rollbackStatus()
+        );
     }
 
     private static Fixture fixture(BreedingBirthPlan plan,
@@ -158,6 +217,24 @@ class BreedingJobExecutionServiceTest {
                 ANCHOR
         );
         services.jobRegistry().register(storeScope, job);
+        services.jobDiagnostics().register(storeScope, job);
+        BreedingPopulationAdmissionService.AdmissionRequest initialRequest =
+                new BreedingPopulationAdmissionService.AdmissionRequest(
+                        jobId,
+                        WORLD,
+                        PASSIVE,
+                        plan,
+                        ANCHOR,
+                        scope,
+                        0,
+                        Map.of(),
+                        BreedingCapacityHeadroom.unlimited()
+                );
+        services.jobDiagnostics().recordInitialAdmission(
+                jobId,
+                initialRequest,
+                services.populationAdmissionService().admit(initialRequest)
+        );
         services.jobRegistry().advance(
                 storeScope,
                 jobId,
@@ -179,7 +256,7 @@ class BreedingJobExecutionServiceTest {
                 (scheduledJobId, delay) -> scheduled.add(scheduledJobId),
                 5L
         );
-        return new Fixture(job, execution, runtime, scheduled);
+        return new Fixture(services, job, execution, runtime, scheduled);
     }
 
     private static BreedingBirthPlan plan(int children) {
@@ -206,7 +283,8 @@ class BreedingJobExecutionServiceTest {
         return new UUID(0L, value);
     }
 
-    private record Fixture(BreedingBirthJob job,
+    private record Fixture(TameworkBreedingServices services,
+                           BreedingBirthJob job,
                            BreedingJobExecutionService<String> execution,
                            FakeRuntime runtime,
                            List<UUID> scheduledJobIds) {
@@ -224,6 +302,8 @@ class BreedingJobExecutionServiceTest {
         private final AtomicInteger rollbackCalls = new AtomicInteger();
         private boolean throwOnResolve;
         private boolean throwOnHearts;
+        private boolean throwOnCompleted;
+        private boolean throwOnRollback;
 
         private FakeRuntime(Object storeScope,
                             BreedingReservationScope reservationScope,
@@ -285,11 +365,17 @@ class BreedingJobExecutionServiceTest {
 
         @Override
         public void onCompleted(BreedingBirthJob job, int spawnedChildren, String context) {
+            if (throwOnCompleted) {
+                throw new IllegalStateException("follow-up failed");
+            }
         }
 
         @Override
         public void rollbackProvisionalCooldown(BreedingBirthJob job) {
             rollbackCalls.incrementAndGet();
+            if (throwOnRollback) {
+                throw new IllegalStateException("rollback failed");
+            }
         }
     }
 }

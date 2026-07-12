@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthJob;
+import com.alechilles.alecstamework.npc.breeding.BreedingJobDiagnosticSnapshot;
 import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -61,12 +62,25 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         }
 
         BreedingSnapshot breeding = resolveBreedingSnapshot(candidate.ref, store, snapshot.value());
-        BreedingBirthJob activeJob = TameworkBreedingServices.shared()
-                .jobRegistry()
+        TameworkBreedingServices breedingServices = TameworkBreedingServices.shared();
+        BreedingBirthJob displayedJob = breedingServices.jobRegistry()
                 .findActiveByParentUuid(store, candidate.npcUuid)
                 .orElse(null);
+        BreedingJobDiagnosticSnapshot jobDiagnostics = null;
+        if (displayedJob != null) {
+            jobDiagnostics = breedingServices.jobDiagnostics().find(displayedJob.jobId()).orElse(null);
+        } else {
+            jobDiagnostics = breedingServices.jobDiagnostics()
+                    .findLatestByParentUuid(store, candidate.npcUuid)
+                    .orElse(null);
+            if (jobDiagnostics != null) {
+                displayedJob = breedingServices.jobRegistry()
+                        .find(store, jobDiagnostics.jobId())
+                        .orElse(null);
+            }
+        }
         commandContext.sender().sendMessage(Message.raw(
-                buildMessage(candidate.npcUuid, snapshot, breeding, activeJob)));
+                buildMessage(candidate.npcUuid, snapshot, breeding, displayedJob, jobDiagnostics)));
     }
 
     @Nullable
@@ -169,7 +183,8 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
     private static String buildMessage(@Nonnull UUID npcUuid,
                                        @Nonnull HappinessSnapshot happiness,
                                        @Nonnull BreedingSnapshot breeding,
-                                       @Nullable BreedingBirthJob activeJob) {
+                                       @Nullable BreedingBirthJob displayedJob,
+                                       @Nullable BreedingJobDiagnosticSnapshot jobDiagnostics) {
         StringBuilder message = new StringBuilder();
         message.append("Happiness for NPC ")
                 .append(npcUuid)
@@ -194,7 +209,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
 
         if (!breeding.hasComponent()) {
             message.append(". Breeding component: none");
-            appendActiveJob(message, npcUuid, activeJob);
+            appendBreedingJob(message, npcUuid, displayedJob, jobDiagnostics);
             message.append(".");
             return message.toString();
         }
@@ -226,28 +241,80 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         } else {
             message.append(", threshold=n/a, eligible=n/a");
         }
-        appendActiveJob(message, npcUuid, activeJob);
+        appendBreedingJob(message, npcUuid, displayedJob, jobDiagnostics);
         message.append(".");
         return message.toString();
     }
 
-    private static void appendActiveJob(StringBuilder message,
-                                        UUID npcUuid,
-                                        @Nullable BreedingBirthJob activeJob) {
-        if (activeJob == null) {
+    static void appendBreedingJob(StringBuilder message,
+                                  UUID npcUuid,
+                                  @Nullable BreedingBirthJob displayedJob,
+                                  @Nullable BreedingJobDiagnosticSnapshot diagnostics) {
+        if (displayedJob == null) {
             message.append(". Active breeding job: none");
             return;
         }
-        UUID partner = activeJob.firstParent().entityUuid().equals(npcUuid)
-                ? activeJob.secondParent().entityUuid()
-                : activeJob.firstParent().entityUuid();
-        message.append(". Active breeding job: id=").append(activeJob.jobId())
-                .append(", state=").append(activeJob.state())
-                .append(", mode=").append(activeJob.mode())
+        UUID partner = displayedJob.firstParent().entityUuid().equals(npcUuid)
+                ? displayedJob.secondParent().entityUuid()
+                : displayedJob.firstParent().entityUuid();
+        message.append(displayedJob.state().isTerminal()
+                        ? ". Latest breeding job: id="
+                        : ". Active breeding job: id=")
+                .append(displayedJob.jobId())
+                .append(", state=").append(displayedJob.state())
+                .append(", mode=").append(displayedJob.mode())
                 .append(", partner=").append(partner)
-                .append(", planned=").append(activeJob.plan().children().size())
-                .append(", admitted=").append(activeJob.initiallyAdmittedChildren().size())
-                .append(", outstanding=").append(activeJob.admittedChildren().size());
+                .append(", planned=").append(displayedJob.plan().children().size())
+                .append(", admitted=").append(displayedJob.initiallyAdmittedChildren().size())
+                .append(", outstanding=").append(displayedJob.admittedChildren().size());
+        appendJobDiagnostics(message, diagnostics);
+    }
+
+    private static void appendJobDiagnostics(
+            StringBuilder message,
+            @Nullable BreedingJobDiagnosticSnapshot diagnostics) {
+        if (diagnostics == null) {
+            message.append(", spawned=unknown");
+            return;
+        }
+        message.append(", spawned=")
+                .append(diagnostics.spawnedCountFinal()
+                        ? diagnostics.spawnedChildren()
+                        : "pending");
+        appendCapacity(message, "initialPopulation", diagnostics.initialCapacity());
+        appendCapacity(message, "spawnPopulation", diagnostics.spawnCapacity());
+        message.append(", outcome=").append(diagnostics.outcome());
+        if (diagnostics.reason() != null) {
+            message.append(", reason=").append(diagnostics.reason());
+        }
+        message.append(", rollback=").append(diagnostics.rollbackStatus());
+        if (diagnostics.rollbackDetail() != null) {
+            message.append("[").append(diagnostics.rollbackDetail()).append("]");
+        }
+    }
+
+    private static void appendCapacity(
+            StringBuilder message,
+            String label,
+            @Nullable BreedingJobDiagnosticSnapshot.CapacitySnapshot capacity) {
+        if (capacity == null) {
+            return;
+        }
+        message.append(", ").append(label).append("={admitted=")
+                .append(capacity.admittedChildren())
+                .append(", maxNearby=").append(capacity.maxNearby())
+                .append(", liveNearby=").append(capacity.liveNearbyByPopulationType())
+                .append(", claimHeadroom=").append(formatHeadroom(capacity.availableClaimHeadroom()))
+                .append(", playerHeadroom=").append(formatHeadroom(capacity.availablePlayerHeadroom()))
+                .append(", totalHeadroom=").append(formatHeadroom(capacity.combinedTotalHeadroom()));
+        if (!capacity.availablePlayerHeadroomByScope().isEmpty()) {
+            message.append(", playerScopes=").append(capacity.availablePlayerHeadroomByScope());
+        }
+        message.append("}");
+    }
+
+    private static String formatHeadroom(int headroom) {
+        return headroom == Integer.MAX_VALUE ? "unlimited" : Integer.toString(headroom);
     }
 
     @Nonnull

@@ -17,6 +17,7 @@ public final class TameworkBreedingServices implements AutoCloseable {
     private final BreedingBirthJobRegistry jobRegistry;
     private final BreedingBirthPlanService birthPlanService;
     private final BreedingPopulationAdmissionService populationAdmissionService;
+    private final BreedingJobDiagnosticsService jobDiagnosticsService;
 
     /** Creates isolated production services. Prefer {@link #shared()} from runtime entrypoints. */
     public TameworkBreedingServices() {
@@ -38,6 +39,7 @@ public final class TameworkBreedingServices implements AutoCloseable {
         this.jobRegistry = Objects.requireNonNull(jobRegistry, "jobRegistry");
         this.birthPlanService = Objects.requireNonNull(birthPlanService, "birthPlanService");
         this.populationAdmissionService = new BreedingPopulationAdmissionService(jobRegistry);
+        this.jobDiagnosticsService = new BreedingJobDiagnosticsService();
     }
 
     /** Returns the shared plugin-wide seam consumed by both breeding entrypoints. */
@@ -75,15 +77,23 @@ public final class TameworkBreedingServices implements AutoCloseable {
         return populationAdmissionService;
     }
 
+    /** Returns process-local birth outcome and capacity diagnostics for operator commands. */
+    @Nonnull
+    public BreedingJobDiagnosticsService jobDiagnostics() {
+        return jobDiagnosticsService;
+    }
+
     /** Permanently closes one world/store scope and releases its reservations. */
     public void clearScope(@Nonnull Object storeScope) {
         jobRegistry.clearScope(storeScope);
+        jobDiagnosticsService.clearScope(storeScope);
     }
 
     /** Permanently closes this service bundle and releases every active reservation. */
     @Override
     public void close() {
         jobRegistry.clearAll();
+        jobDiagnosticsService.clearAll();
     }
 
     private static final class SharedHolder {

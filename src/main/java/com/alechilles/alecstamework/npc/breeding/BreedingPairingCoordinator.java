@@ -69,6 +69,12 @@ public final class BreedingPairingCoordinator {
                     : PairingStatus.REGISTRY_REJECTED;
             return new PairingResult(status, registered.job(), registered.status().name());
         }
+        services.jobDiagnostics().register(request.storeScope(), job);
+        services.jobDiagnostics().recordInitialAdmission(
+                job.jobId(),
+                prepared.capacityDecision().request(),
+                admission
+        );
         return applyEffectsAndSchedule(request, job);
     }
 
@@ -97,8 +103,9 @@ public final class BreedingPairingCoordinator {
     private PairingResult applyEffectsAndSchedule(PairingRequest request, BreedingBirthJob job) {
         try {
             if (!request.registeredEffects().apply(job)) {
-                rollbackSafely(request, job);
+                BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(request, job);
                 services.jobRegistry().fail(request.storeScope(), job.jobId());
+                recordEffectsFailure(job, "effects-rejected", rollback);
                 return new PairingResult(PairingStatus.EFFECTS_FAILED, Optional.of(job), "effects-rejected");
             }
             BreedingBirthJobRegistry.TransitionResult advanced = services.jobRegistry().advance(
@@ -108,25 +115,45 @@ public final class BreedingPairingCoordinator {
                     BreedingBirthJobState.APPROACHING
             );
             if (advanced.status() != BreedingBirthJobRegistry.TransitionStatus.APPLIED) {
-                rollbackSafely(request, job);
+                BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(request, job);
                 services.jobRegistry().fail(request.storeScope(), job.jobId());
+                recordEffectsFailure(job, advanced.status().name(), rollback);
                 return new PairingResult(PairingStatus.EFFECTS_FAILED, advanced.job(), advanced.status().name());
             }
             scheduler.schedule(job.jobId(), approachDelayMs);
             return new PairingResult(PairingStatus.ACCEPTED, advanced.job(), null);
         } catch (RuntimeException exception) {
-            rollbackSafely(request, job);
+            BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(request, job);
             services.jobRegistry().fail(request.storeScope(), job.jobId());
-            return new PairingResult(PairingStatus.EFFECTS_FAILED, Optional.of(job), exception.getClass().getSimpleName());
+            String reason = "effects-or-schedule-error:" + exception.getClass().getSimpleName();
+            recordEffectsFailure(job, reason, rollback);
+            return new PairingResult(PairingStatus.EFFECTS_FAILED, Optional.of(job), reason);
         }
     }
 
-    private void rollbackSafely(PairingRequest request, BreedingBirthJob job) {
+    private BreedingJobDiagnosticSnapshot.RollbackStatus rollbackSafely(
+            PairingRequest request,
+            BreedingBirthJob job) {
         try {
             request.rollbackEffects().rollback(job);
+            return BreedingJobDiagnosticSnapshot.RollbackStatus.ATTEMPTED;
         } catch (RuntimeException ignored) {
             // Rollback is fingerprint guarded and best effort; the registry still terminates the job.
+            return BreedingJobDiagnosticSnapshot.RollbackStatus.FAILED;
         }
+    }
+
+    private void recordEffectsFailure(BreedingBirthJob job,
+                                      String reason,
+                                      BreedingJobDiagnosticSnapshot.RollbackStatus rollback) {
+        services.jobDiagnostics().recordOutcome(
+                job.jobId(),
+                BreedingJobDiagnosticSnapshot.Outcome.EFFECTS_FAILED,
+                0,
+                reason,
+                rollback,
+                null
+        );
     }
 
     public enum PairingStatus {
