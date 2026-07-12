@@ -7,9 +7,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Isolates the reflective access and scalar conversion needed by the QuestLines Claims bridge.
+ * Isolates cached method accessors and scalar conversion for the QuestLines Claims bridge.
  */
 final class QuestLinesReflectionAccess {
+    static final MethodFinder PUBLIC_METHODS = QuestLinesReflectionAccess::findMethod;
+
     private QuestLinesReflectionAccess() {
     }
 
@@ -65,19 +67,16 @@ final class QuestLinesReflectionAccess {
     }
 
     @Nonnull
-    static ReflectedValue readValue(@Nonnull Object target, @Nonnull String... methodNames) {
+    static Accessor resolveAccessor(@Nonnull Class<?> type,
+                                    @Nonnull MethodFinder methodFinder,
+                                    @Nonnull String... methodNames) {
         for (String methodName : methodNames) {
-            Method method = findMethod(target.getClass(), methodName);
-            if (method == null) {
-                continue;
-            }
-            try {
-                return ReflectedValue.success(methodName, method.invoke(target));
-            } catch (Throwable throwable) {
-                return ReflectedValue.failure(methodName, unwrapInvocation(throwable));
+            Method method = methodFinder.find(type, methodName);
+            if (method != null) {
+                return Accessor.found(methodName, method);
             }
         }
-        return ReflectedValue.missing();
+        return Accessor.missing();
     }
 
     @Nullable
@@ -108,6 +107,40 @@ final class QuestLinesReflectionAccess {
         }
         String message = unwrapped.getMessage();
         return message == null || message.isBlank() ? unwrapped.getClass().getSimpleName() : message;
+    }
+
+    @FunctionalInterface
+    interface MethodFinder {
+        @Nullable
+        Method find(@Nonnull Class<?> type,
+                    @Nonnull String name,
+                    @Nonnull Class<?>... parameterTypes);
+    }
+
+    record Accessor(boolean methodFound,
+                    @Nullable String methodName,
+                    @Nullable Method method) {
+        @Nonnull
+        static Accessor found(@Nonnull String methodName, @Nonnull Method method) {
+            return new Accessor(true, methodName, method);
+        }
+
+        @Nonnull
+        static Accessor missing() {
+            return new Accessor(false, null, null);
+        }
+
+        @Nonnull
+        ReflectedValue read(@Nonnull Object target) {
+            if (!methodFound || method == null || methodName == null) {
+                return ReflectedValue.missing();
+            }
+            try {
+                return ReflectedValue.success(methodName, method.invoke(target));
+            } catch (Throwable throwable) {
+                return ReflectedValue.failure(methodName, unwrapInvocation(throwable));
+            }
+        }
     }
 
     record ReflectedValue(boolean methodFound,

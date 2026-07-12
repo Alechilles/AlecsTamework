@@ -1,12 +1,11 @@
 package com.alechilles.alecstamework.integration.questlinesclaims;
 
 import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.extractMessage;
-import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.findMethod;
 import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.firstFailure;
 import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.normalizeText;
 import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.parseInteger;
 import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.parseUuid;
-import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.readValue;
+import static com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.resolveAccessor;
 
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimFootprint;
@@ -17,19 +16,28 @@ import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.claims.ClaimResolution;
 import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
+import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.Accessor;
+import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.MethodFinder;
 import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesReflectionAccess.ReflectedValue;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Reflection bridge to QuestLines Claims' public API.
+ *
+ * <p>Each instance belongs to one observed plugin generation. Claim and coordinate accessor
+ * bundles, including missing accessors, are cached by runtime class for that generation.</p>
  */
 public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
     private static final String PROVIDER_ID = "questlines-claims";
@@ -42,15 +50,27 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
     private final Object api;
     @Nullable
     private final Method getClaimAtBlock;
+    private final MethodFinder methodFinder;
+    private final ConcurrentMap<Class<?>, ClaimAccessorBundle> claimAccessors = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Class<?>, CoordinateAccessorBundle> coordinateAccessors = new ConcurrentHashMap<>();
 
     private QuestLinesClaimsBridge(boolean available,
                                    @Nullable String unavailableReason,
                                    @Nullable Object api,
                                    @Nullable Method getClaimAtBlock) {
+        this(available, unavailableReason, api, getClaimAtBlock, QuestLinesReflectionAccess.PUBLIC_METHODS);
+    }
+
+    private QuestLinesClaimsBridge(boolean available,
+                                   @Nullable String unavailableReason,
+                                   @Nullable Object api,
+                                   @Nullable Method getClaimAtBlock,
+                                   @Nonnull MethodFinder methodFinder) {
         this.available = available;
         this.unavailableReason = unavailableReason;
         this.api = api;
         this.getClaimAtBlock = getClaimAtBlock;
+        this.methodFinder = Objects.requireNonNull(methodFinder, "methodFinder");
     }
 
     /** Resolves the current plugin generation without retaining a process-wide bridge. */
@@ -61,10 +81,18 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
 
     @Nonnull
     static QuestLinesClaimsBridge forApiForTests(@Nonnull Object api) {
-        Method lookup = findMethod(api.getClass(), "getClaimAtBlock", String.class, int.class, int.class);
+        return forApiForTests(api, QuestLinesReflectionAccess.PUBLIC_METHODS);
+    }
+
+    @Nonnull
+    static QuestLinesClaimsBridge forApiForTests(@Nonnull Object api,
+                                                 @Nonnull MethodFinder methodFinder) {
+        Method lookup = methodFinder.find(
+                api.getClass(), "getClaimAtBlock", String.class, int.class, int.class
+        );
         return lookup == null
                 ? unavailable("QuestLines Claims API getClaimAtBlock(String,int,int) was not found.")
-                : new QuestLinesClaimsBridge(true, null, api, lookup);
+                : new QuestLinesClaimsBridge(true, null, api, lookup, methodFinder);
     }
 
     @Nonnull
@@ -87,7 +115,9 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
             if (api == null) {
                 return unavailable("QuestLinesClaims API is null.");
             }
-            Method lookup = findMethod(api.getClass(), "getClaimAtBlock", String.class, int.class, int.class);
+            Method lookup = QuestLinesReflectionAccess.findMethod(
+                    api.getClass(), "getClaimAtBlock", String.class, int.class, int.class
+            );
             if (lookup == null) {
                 return unavailable("QuestLinesClaims API getClaimAtBlock(String,int,int) was not found.");
             }
@@ -151,7 +181,10 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
 
     @Nonnull
     private ClaimResolution mapClaim(@Nonnull String requestedWorld, @Nonnull Object claim) {
-        ReflectedValue ownerValue = readValue(claim, "getOwnerUuid", "getOwnerId");
+        ClaimAccessorBundle accessors = claimAccessors.computeIfAbsent(
+                claim.getClass(), this::discoverClaimAccessors
+        );
+        ReflectedValue ownerValue = accessors.owner().read(claim);
         if (ownerValue.failure() != null) {
             return reflectionError("claim owner", ownerValue);
         }
@@ -160,32 +193,33 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
             return ClaimResolution.error("QuestLines claim owner UUID is missing.");
         }
 
-        ReflectedValue ownerTypeValue = readValue(claim, "getOwnerType");
+        ReflectedValue ownerTypeValue = accessors.ownerType().read(claim);
         if (ownerTypeValue.failure() != null) {
             return reflectionError("claim owner type", ownerTypeValue);
         }
         String ownerType = normalizeOwnerType(ownerTypeValue.value());
 
-        ClaimResolution worldError = validateClaimWorld(requestedWorld, claim);
+        ClaimResolution worldError = validateClaimWorld(requestedWorld, claim, accessors);
         if (worldError != null) {
             return worldError;
         }
 
-        FootprintRead footprintRead = readFootprint(requestedWorld, claim);
+        FootprintRead footprintRead = readFootprint(requestedWorld, claim, accessors);
         if (footprintRead.error() != null) {
             return ClaimResolution.error(footprintRead.error());
         }
+        ClaimFootprint footprint = footprintRead.footprint();
+        if (footprint == null) {
+            return ClaimResolution.error("QuestLines claim extent did not produce a complete footprint.");
+        }
 
-        ReflectedValue claimIdValue = readValue(claim, "getClaimId", "getId");
+        ReflectedValue claimIdValue = accessors.claimId().read(claim);
         if (claimIdValue.failure() != null) {
             return reflectionError("claim id", claimIdValue);
         }
         String claimId = normalizeClaimId(claimIdValue.value());
-        if (claimId == null && footprintRead.footprint() != null) {
-            claimId = FOOTPRINT_ID_PREFIX + footprintRead.footprint().digest();
-        }
         if (claimId == null) {
-            return ClaimResolution.error("QuestLines claim ID is missing and no complete footprint is available.");
+            claimId = FOOTPRINT_ID_PREFIX + footprint.digest();
         }
 
         ClaimPopulationKey key = ClaimPopulationKey.questLines(
@@ -194,14 +228,25 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
                 ownerId,
                 claimId
         );
-        return footprintRead.footprint() != null
-                ? ClaimResolution.found(key, footprintRead.footprint())
-                : ClaimResolution.foundWithoutFootprint(key, footprintRead.chunkCount());
+        return ClaimResolution.found(key, footprint);
+    }
+
+    @Nonnull
+    private ClaimAccessorBundle discoverClaimAccessors(@Nonnull Class<?> claimType) {
+        return new ClaimAccessorBundle(
+                resolveAccessor(claimType, methodFinder, "getOwnerUuid", "getOwnerId"),
+                resolveAccessor(claimType, methodFinder, "getOwnerType"),
+                resolveAccessor(claimType, methodFinder, "getWorldName"),
+                resolveAccessor(claimType, methodFinder, "getChunks"),
+                resolveAccessor(claimType, methodFinder, "getClaimId", "getId")
+        );
     }
 
     @Nullable
-    private static ClaimResolution validateClaimWorld(@Nonnull String requestedWorld, @Nonnull Object claim) {
-        ReflectedValue worldValue = readValue(claim, "getWorldName");
+    private static ClaimResolution validateClaimWorld(@Nonnull String requestedWorld,
+                                                      @Nonnull Object claim,
+                                                      @Nonnull ClaimAccessorBundle accessors) {
+        ReflectedValue worldValue = accessors.world().read(claim);
         if (worldValue.failure() != null) {
             return reflectionError("claim world", worldValue);
         }
@@ -215,28 +260,23 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
     }
 
     @Nonnull
-    private static FootprintRead readFootprint(@Nonnull String requestedWorld, @Nonnull Object claim) {
-        ReflectedValue chunksValue = readValue(claim, "getChunks");
+    private FootprintRead readFootprint(@Nonnull String requestedWorld,
+                                        @Nonnull Object claim,
+                                        @Nonnull ClaimAccessorBundle accessors) {
+        ReflectedValue chunksValue = accessors.chunks().read(claim);
         if (chunksValue.failure() != null) {
             return FootprintRead.error("QuestLines getChunks failed: " + extractMessage(chunksValue.failure()));
         }
-        if (chunksValue.methodFound()) {
-            return mapChunkElements(requestedWorld, chunksValue.value());
+        if (!chunksValue.methodFound()) {
+            return FootprintRead.error(
+                    "QuestLines claim getChunks() accessor is missing; verified 1.3.1 extent is required."
+            );
         }
-
-        ReflectedValue numericValue = readValue(claim, "getChunkCount", "getChunksCount");
-        if (numericValue.failure() != null) {
-            return FootprintRead.error("QuestLines numeric chunk count failed: " + extractMessage(numericValue.failure()));
-        }
-        Integer numericCount = parseInteger(numericValue.value());
-        if (!numericValue.methodFound() || numericCount == null || numericCount <= 0) {
-            return FootprintRead.error("QuestLines claim chunk extent is missing or empty.");
-        }
-        return FootprintRead.scalar(numericCount);
+        return mapChunkElements(requestedWorld, chunksValue.value());
     }
 
     @Nonnull
-    private static FootprintRead mapChunkElements(@Nonnull String requestedWorld, @Nullable Object rawChunks) {
+    private FootprintRead mapChunkElements(@Nonnull String requestedWorld, @Nullable Object rawChunks) {
         ChunkSnapshot snapshot = snapshotChunks(rawChunks);
         if (snapshot.error() != null) {
             return FootprintRead.error(snapshot.error());
@@ -270,7 +310,7 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
     }
 
     @Nonnull
-    private static ChunkSnapshot snapshotChunks(@Nullable Object rawChunks) {
+    private ChunkSnapshot snapshotChunks(@Nullable Object rawChunks) {
         if (rawChunks == null) {
             return ChunkSnapshot.error("QuestLines getChunks returned null.");
         }
@@ -279,8 +319,12 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
                 return ChunkSnapshot.success(new ArrayList<>(collection));
             }
             if (rawChunks instanceof Map<?, ?> map) {
-                ArrayList<Object> elements = new ArrayList<>(map.size());
-                for (Map.Entry<?, ?> entry : new ArrayList<>(map.entrySet())) {
+                ArrayList<Map.Entry<?, ?>> entries = new ArrayList<>(map.size());
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    entries.add(new AbstractMap.SimpleImmutableEntry<>(entry));
+                }
+                ArrayList<Object> elements = new ArrayList<>(entries.size());
+                for (Map.Entry<?, ?> entry : entries) {
                     Object candidate = coordinateLike(entry.getValue()) ? entry.getValue() : entry.getKey();
                     elements.add(candidate);
                 }
@@ -302,20 +346,17 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
         }
     }
 
-    private static boolean coordinateLike(@Nullable Object value) {
-        return value != null
-                && (findMethod(value.getClass(), "getChunkX") != null || findMethod(value.getClass(), "getX") != null)
-                && (findMethod(value.getClass(), "getChunkZ") != null || findMethod(value.getClass(), "getZ") != null);
-    }
-
     @Nonnull
-    private static CoordinateRead readCoordinate(@Nullable Object element) {
+    private CoordinateRead readCoordinate(@Nullable Object element) {
         if (element == null) {
             return CoordinateRead.error("QuestLines claim chunks contained a null element.");
         }
-        ReflectedValue xValue = readValue(element, "getChunkX", "getX");
-        ReflectedValue zValue = readValue(element, "getChunkZ", "getZ");
-        ReflectedValue worldValue = readValue(element, "getWorldName", "getWorld");
+        CoordinateAccessorBundle accessors = coordinateAccessors.computeIfAbsent(
+                element.getClass(), this::discoverCoordinateAccessors
+        );
+        ReflectedValue xValue = accessors.x().read(element);
+        ReflectedValue zValue = accessors.z().read(element);
+        ReflectedValue worldValue = accessors.world().read(element);
         if (xValue.failure() != null || zValue.failure() != null || worldValue.failure() != null) {
             Throwable failure = firstFailure(xValue, zValue, worldValue);
             return CoordinateRead.error("QuestLines claim chunk accessor failed: " + extractMessage(failure));
@@ -329,6 +370,24 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
             );
         }
         return CoordinateRead.success(new ClaimChunkCoordinate(worldName, chunkX, chunkZ));
+    }
+
+    private boolean coordinateLike(@Nullable Object value) {
+        if (value == null) {
+            return false;
+        }
+        return coordinateAccessors.computeIfAbsent(
+                value.getClass(), this::discoverCoordinateAccessors
+        ).hasCoordinates();
+    }
+
+    @Nonnull
+    private CoordinateAccessorBundle discoverCoordinateAccessors(@Nonnull Class<?> coordinateType) {
+        return new CoordinateAccessorBundle(
+                resolveAccessor(coordinateType, methodFinder, "getChunkX", "getX"),
+                resolveAccessor(coordinateType, methodFinder, "getChunkZ", "getZ"),
+                resolveAccessor(coordinateType, methodFinder, "getWorldName", "getWorld")
+        );
     }
 
     @Nonnull
@@ -358,21 +417,30 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
     }
 
     private record FootprintRead(@Nullable ClaimFootprint footprint,
-                                 int chunkCount,
                                  @Nullable String error) {
         @Nonnull
         static FootprintRead complete(@Nonnull ClaimFootprint footprint) {
-            return new FootprintRead(footprint, footprint.chunkCount(), null);
-        }
-
-        @Nonnull
-        static FootprintRead scalar(int count) {
-            return new FootprintRead(null, Math.max(0, count), null);
+            return new FootprintRead(footprint, null);
         }
 
         @Nonnull
         static FootprintRead error(@Nonnull String message) {
-            return new FootprintRead(null, 0, message);
+            return new FootprintRead(null, message);
+        }
+    }
+
+    private record ClaimAccessorBundle(@Nonnull Accessor owner,
+                                       @Nonnull Accessor ownerType,
+                                       @Nonnull Accessor world,
+                                       @Nonnull Accessor chunks,
+                                       @Nonnull Accessor claimId) {
+    }
+
+    private record CoordinateAccessorBundle(@Nonnull Accessor x,
+                                            @Nonnull Accessor z,
+                                            @Nonnull Accessor world) {
+        boolean hasCoordinates() {
+            return x.methodFound() && z.methodFound();
         }
     }
 

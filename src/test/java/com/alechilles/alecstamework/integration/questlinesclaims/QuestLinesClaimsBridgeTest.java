@@ -5,10 +5,15 @@ import com.alechilles.alecstamework.integration.claims.ClaimFootprint;
 import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
 import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
 import com.alechilles.alecstamework.integration.claims.ClaimResolution;
+import java.util.AbstractCollection;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
@@ -126,6 +131,59 @@ class QuestLinesClaimsBridgeTest {
     }
 
     @Test
+    void mapExtentAcceptsCoordinatesFromValuesAndKeys() {
+        FakeChunk first = new FakeChunk(-4, 7, "world");
+        FakeChunk second = new FakeChunk(12, -9, "world");
+        Map<String, FakeChunk> coordinatesAsValues = new LinkedHashMap<>();
+        coordinatesAsValues.put("first", first);
+        coordinatesAsValues.put("second", second);
+        Map<FakeChunk, String> coordinatesAsKeys = new LinkedHashMap<>();
+        coordinatesAsKeys.put(first, "first");
+        coordinatesAsKeys.put(second, "second");
+
+        ClaimResolution valueResult = QuestLinesClaimsBridge.forApiForTests(
+                new FakeApi(claim(31, FakeOwnerType.PLAYER, UUID.randomUUID(), "world", coordinatesAsValues))
+        ).resolveClaim("world", 0, 0);
+        ClaimResolution keyResult = QuestLinesClaimsBridge.forApiForTests(
+                new FakeApi(claim(32, FakeOwnerType.PLAYER, UUID.randomUUID(), "world", coordinatesAsKeys))
+        ).resolveClaim("world", 0, 0);
+
+        assertEquals(ClaimLookupResult.Status.CLAIM_FOUND, valueResult.status());
+        assertEquals(ClaimLookupResult.Status.CLAIM_FOUND, keyResult.status());
+        assertEquals(valueResult.footprint().chunks(), keyResult.footprint().chunks());
+    }
+
+    @Test
+    void arrayExtentProducesACompleteFootprint() {
+        FakeChunk[] array = chunks("world", 5).toArray(FakeChunk[]::new);
+        FakeClaim claim = claim(41, FakeOwnerType.PLAYER, UUID.randomUUID(), "world", array);
+
+        ClaimResolution result = QuestLinesClaimsBridge.forApiForTests(
+                new FakeApi(claim)
+        ).resolveClaim("world", 0, 0);
+
+        assertEquals(ClaimLookupResult.Status.CLAIM_FOUND, result.status());
+        assertNotNull(result.footprint());
+        assertEquals(5, result.footprint().chunkCount());
+    }
+
+    @Test
+    void collectionIsSnapshottedBeforeCoordinateTraversal() {
+        SnapshotClearingCollection<FakeChunk> mutating = new SnapshotClearingCollection<>(
+                chunks("world", 4)
+        );
+        FakeClaim claim = claim(51, FakeOwnerType.PLAYER, UUID.randomUUID(), "world", mutating);
+
+        ClaimResolution result = QuestLinesClaimsBridge.forApiForTests(
+                new FakeApi(claim)
+        ).resolveClaim("world", 0, 0);
+
+        assertTrue(mutating.isEmpty(), "The source should mutate immediately after yielding its snapshot.");
+        assertEquals(ClaimLookupResult.Status.CLAIM_FOUND, result.status());
+        assertEquals(4, result.claimChunkCount());
+    }
+
+    @Test
     void emptyChunkCollectionIsAnExplicitContractError() {
         FakeClaim claim = claim(9, FakeOwnerType.PLAYER, UUID.randomUUID(), "world", Set.of());
         QuestLinesClaimsBridge bridge = QuestLinesClaimsBridge.forApiForTests(new FakeApi(claim));
@@ -203,16 +261,37 @@ class QuestLinesClaimsBridgeTest {
     }
 
     @Test
-    void numericChunkCountRemainsACompatibilityFallbackWhenGetChunksIsAbsent() {
+    void numericChunkCountCannotSubstituteForVerifiedGetChunksExtent() {
         LegacyClaim claim = new LegacyClaim(7, UUID.randomUUID(), "world", 3);
         QuestLinesClaimsBridge bridge = QuestLinesClaimsBridge.forApiForTests(new LegacyApi(claim));
 
         ClaimResolution result = bridge.resolveClaim("world", 0, 0);
 
-        assertEquals(ClaimLookupResult.Status.CLAIM_FOUND, result.status());
-        assertEquals(3, result.claimChunkCount());
+        assertEquals(ClaimLookupResult.Status.ERROR, result.status());
         assertNull(result.footprint());
-        assertEquals("7", result.key().claimId());
+        assertNull(result.key());
+        assertTrue(result.message().contains("getChunks() accessor is missing"));
+    }
+
+    @Test
+    void missingClaimIdWithoutCompleteFootprintNeverSynthesizesIdentity() {
+        ClaimResolution malformed = QuestLinesClaimsBridge.forApiForTests(new FakeApi(claim(
+                null,
+                FakeOwnerType.PLAYER,
+                UUID.randomUUID(),
+                "world",
+                List.of(new MalformedChunk(0, "world"))
+        ))).resolveClaim("world", 0, 0);
+        ClaimResolution missingExtent = QuestLinesClaimsBridge.forApiForTests(new LegacyApi(
+                new LegacyClaim(null, UUID.randomUUID(), "world", 4)
+        )).resolveClaim("world", 0, 0);
+
+        assertEquals(ClaimLookupResult.Status.ERROR, malformed.status());
+        assertNull(malformed.key());
+        assertTrue(malformed.message().contains("missing X, Z, or world"));
+        assertEquals(ClaimLookupResult.Status.ERROR, missingExtent.status());
+        assertNull(missingExtent.key());
+        assertTrue(missingExtent.message().contains("getChunks() accessor is missing"));
     }
 
     @Test
@@ -239,6 +318,38 @@ class QuestLinesClaimsBridgeTest {
             chunks.add(new FakeChunk(i - 2, i * 2 - 3, worldName));
         }
         return chunks;
+    }
+
+    private static final class SnapshotClearingCollection<E> extends AbstractCollection<E> {
+        private final ArrayList<E> values;
+
+        private SnapshotClearingCollection(Collection<E> values) {
+            this.values = new ArrayList<>(values);
+        }
+
+        @Override
+        public Iterator<E> iterator() {
+            return values.iterator();
+        }
+
+        @Override
+        public int size() {
+            return values.size();
+        }
+
+        @Override
+        public Object[] toArray() {
+            Object[] snapshot = values.toArray();
+            values.clear();
+            return snapshot;
+        }
+
+        @Override
+        public <T> T[] toArray(T[] target) {
+            T[] snapshot = values.toArray(target);
+            values.clear();
+            return snapshot;
+        }
     }
 
     public enum FakeOwnerType {
@@ -352,19 +463,19 @@ class QuestLinesClaimsBridgeTest {
     }
 
     public static final class LegacyClaim {
-        private final int claimId;
+        private final Object claimId;
         private final UUID ownerUuid;
         private final String worldName;
         private final int chunkCount;
 
-        LegacyClaim(int claimId, UUID ownerUuid, String worldName, int chunkCount) {
+        LegacyClaim(Object claimId, UUID ownerUuid, String worldName, int chunkCount) {
             this.claimId = claimId;
             this.ownerUuid = ownerUuid;
             this.worldName = worldName;
             this.chunkCount = chunkCount;
         }
 
-        public int getClaimId() {
+        public Object getClaimId() {
             return claimId;
         }
 
