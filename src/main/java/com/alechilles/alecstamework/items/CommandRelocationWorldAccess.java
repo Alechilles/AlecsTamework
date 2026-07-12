@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Component;
@@ -132,21 +133,21 @@ final class CommandRelocationWorldAccess {
     }
 
     void execute(World world, Runnable task, Runnable rejected) {
-        try {
-            if (world == null || !world.isAlive()) {
-                runRejected(rejected);
-                return;
-            }
-            world.execute(() -> {
-                try {
-                    task.run();
-                } catch (RuntimeException | LinkageError exception) {
-                    runRejected(rejected);
-                }
-            });
-        } catch (RuntimeException | LinkageError exception) {
+        if (world == null) {
             runRejected(rejected);
+            return;
         }
+        LeaseBoundWorldDispatcher.execute(
+                world,
+                () -> {
+                    try {
+                        task.run();
+                    } catch (RuntimeException | LinkageError exception) {
+                        runRejected(rejected);
+                    }
+                },
+                () -> runRejected(rejected)
+        );
     }
 
     private static void runRejected(Runnable rejected) {

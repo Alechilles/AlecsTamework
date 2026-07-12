@@ -18,7 +18,7 @@ final class CommandRelocationAdmissionGate {
 
     boolean ensure(PendingRelocation pending,
                    CompanionRelocationAdmissionService.Request request,
-                   Consumer<Runnable> dispatcher,
+                   Dispatcher dispatcher,
                    BooleanSupplier stillCurrent,
                    Runnable ready,
                    Consumer<String> denied) {
@@ -58,7 +58,7 @@ final class CommandRelocationAdmissionGate {
      * the first live mutation; this method never dispatches or retries on its success path.
      */
     boolean claimForApply(PendingRelocation pending,
-                          Consumer<Runnable> dispatcher,
+                          Dispatcher dispatcher,
                           BooleanSupplier stillCurrent,
                           Consumer<String> denied) {
         if (pending.admissionApplying()) {
@@ -108,7 +108,7 @@ final class CommandRelocationAdmissionGate {
 
     void cancel(PendingRelocation pending,
                 boolean retry,
-                Consumer<Runnable> dispatcher,
+                Dispatcher dispatcher,
                 BooleanSupplier stillCurrent,
                 @Nullable Runnable continuation,
                 Consumer<String> failed) {
@@ -146,7 +146,7 @@ final class CommandRelocationAdmissionGate {
     }
 
     void commit(PendingRelocation pending,
-                Consumer<Runnable> dispatcher,
+                Dispatcher dispatcher,
                 BiConsumer<CompanionRelocationAdmissionService.Decision, Throwable> completed) {
         CompanionRelocationAdmissionService.Admission admission = pending.beginCommit();
         CompanionRelocationAdmissionService service = authority;
@@ -181,7 +181,7 @@ final class CommandRelocationAdmissionGate {
             CompanionRelocationAdmissionService service,
             @Nullable CompanionRelocationAdmissionService.Decision decision,
             @Nullable Throwable failure,
-            Consumer<Runnable> dispatcher,
+            Dispatcher dispatcher,
             BooleanSupplier stillCurrent,
             Runnable ready,
             Consumer<String> denied
@@ -234,7 +234,7 @@ final class CommandRelocationAdmissionGate {
             PendingRelocation pending,
             CompanionRelocationAdmissionService service,
             @Nullable CompanionRelocationAdmissionService.Admission admission,
-            Consumer<Runnable> dispatcher,
+            Dispatcher dispatcher,
             BooleanSupplier stillCurrent,
             Consumer<String> denied,
             String reason
@@ -313,11 +313,11 @@ final class CommandRelocationAdmissionGate {
         }
     }
 
-    private static void dispatch(Consumer<Runnable> dispatcher,
-                                 Runnable completion,
-                                 Runnable rejected) {
+    private static void dispatch(Dispatcher dispatcher,
+                                  Runnable completion,
+                                  Runnable rejected) {
         try {
-            dispatcher.accept(completion);
+            dispatcher.dispatch(completion, rejected);
         } catch (RuntimeException | LinkageError exception) {
             safeRun(rejected);
         }
@@ -360,5 +360,10 @@ final class CommandRelocationAdmissionGate {
         } catch (RuntimeException | LinkageError ignored) {
             // Admission state is already terminal; callbacks are deliberately best effort.
         }
+    }
+
+    @FunctionalInterface
+    interface Dispatcher {
+        void dispatch(Runnable task, Runnable rejected);
     }
 }

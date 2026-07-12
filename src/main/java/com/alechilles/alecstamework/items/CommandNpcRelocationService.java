@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionRelocationAdmissionService;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -446,7 +447,7 @@ public final class CommandNpcRelocationService {
         return admissionGate.ensure(
                 pending,
                 request,
-                world::execute,
+                leaseBoundDispatcher(world),
                 () -> pendingByNpc.get(pending.npcUuid) == pending,
                 () -> scheduleTryApply(world, pending.npcUuid, 0L),
                 reason -> denyAdmission(pending, reason)
@@ -466,7 +467,7 @@ public final class CommandNpcRelocationService {
                                                             PendingRelocation pending) {
         return pending.admissionApplying() || admissionGate.claimForApply(
                 pending,
-                world::execute,
+                leaseBoundDispatcher(world),
                 () -> pendingByNpc.get(pending.npcUuid) == pending,
                 reason -> denyAdmission(pending, reason)
         );
@@ -486,7 +487,7 @@ public final class CommandNpcRelocationService {
         admissionGate.cancel(
                 pending,
                 retry,
-                world == null ? Runnable::run : world::execute,
+                leaseBoundDispatcher(world),
                 () -> pendingByNpc.get(pending.npcUuid) == pending,
                 continuation,
                 reason -> denyAdmission(pending, reason)
@@ -494,7 +495,7 @@ public final class CommandNpcRelocationService {
     }
 
     private void commitAdmission(World world, UUID npcUuid, PendingRelocation pending) {
-        admissionGate.commit(pending, world::execute, (decision, failure) -> {
+        admissionGate.commit(pending, leaseBoundDispatcher(world), (decision, failure) -> {
             if (pendingByNpc.get(npcUuid) != pending) {
                 return;
             }
@@ -510,7 +511,7 @@ public final class CommandNpcRelocationService {
 
     void commitUnconfirmedRelocationAsLost(
             @Nullable World world, UUID npcUuid, PendingRelocation pending, long droppedAtMs) {
-        admissionGate.commit(pending, world == null ? Runnable::run : world::execute, (decision, failure) -> {
+        admissionGate.commit(pending, leaseBoundDispatcher(world), (decision, failure) -> {
             if (failure != null || decision == null
                     || decision.status() != CompanionRelocationAdmissionService.Status.COMMITTED) {
                 logTravelDiagnostic(Level.WARNING,
@@ -1120,6 +1121,17 @@ public final class CommandNpcRelocationService {
         } catch (RuntimeException | LinkageError exception) {
             dispatch.run();
         }
+    }
+
+    private static CommandRelocationAdmissionGate.Dispatcher leaseBoundDispatcher(
+            @Nullable World world
+    ) {
+        if (world == null) {
+            return (task, rejected) -> task.run();
+        }
+        return (task, rejected) -> LeaseBoundWorldDispatcher.execute(
+                world, task, rejected
+        );
     }
 
     private void tryApplyIfScheduled(World world, UUID npcUuid, PendingRelocation pending, long dueAtMs) {
