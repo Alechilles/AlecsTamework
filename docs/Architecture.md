@@ -19,7 +19,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Command relocation/death snapshot pipeline (`CommandNpcRelocationService`, `CommandLinkedNpcDeathService`, on-load relocation system)
 - Linked companions panel + command radial UI (mode/sort/filter/group management + per-row actions)
 - Settings announcement UI (`TameworkSettingsAnnouncementService`) with first-run welcome copy and version-specific upgrade notices.
-- Managed coop runtime (`TwCoopConfig`)
+- Managed coop runtime (`TwCoopConfig`) with schema-v5 resident, lifecycle-operation, and import journals
 - Optional asset patch generation (`Server/Tamework/Patches`) for JSON-like server assets that should stay valid when Tamework is absent
 - Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
 - Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
@@ -29,6 +29,9 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Interaction flow is split across resolver/selector/effect helpers for maintainability.
 - `TwInteractionConfig` supports preset interactions (`Tame`, `Feed`, `Harvest`, `Mount`, `ModeCycle`, `Breed`) and custom requirement/effect combinations.
 - Shared progression state persists via happiness/needs/breeding/traits/life-stage/attachments components and is restored across capture/spawn + death/respawn flows.
+- Stable NPC `profile_id` is the durable identity; live entity UUIDs are replaceable aliases. Recovery and command records deduplicate by profile once canonical identity is available.
+- An enabled/configured managed coop is Tamework-authoritative for occupancy and lifecycle, while an unmanaged coop remains purely vanilla. The runtime intentionally does not synchronize a second Tamework representation beside vanilla residents.
+- Manual and passive breeding share one pending-aware birth-job and capacity-admission pipeline, including one-job-per-parent and one-spawn-claim invariants.
 - Command tools persist linked NPC metadata, active/inactive status, panel preferences, and group metadata directly on the item.
 - Linked panel supports both linked and nearby modes, plus sort/filter/group assignment and group manager flows.
 - Ownership/damage behavior resolves effective policy through `TwCompanionConfig` with `TwGlobalConfig` fallback.

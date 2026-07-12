@@ -14,6 +14,10 @@ Some Tamework-powered mods use framework systems beyond basic taming and command
 - A mod can register certain coop ids with Tamework so coop behavior is framework-managed.
 - That usually means residents can be captured, released, and restored with continuity across coop cycles.
 - Tamework can keep a resident ledger so the same creature state is preserved instead of being treated like a brand-new spawn every time.
+- Only explicitly enabled/configured coops are managed this way. Other coops keep ordinary vanilla behavior.
+- A companion keeps one stable profile even if its temporary entity UUID changes after release, so command links and progression still refer to the same creature.
+- When an established vanilla coop becomes managed, old residents are audited and imported without spawning replacement copies. If Tamework cannot prove an exact match, it pauses that import for review instead of guessing.
+- Capturing a breeding parent into a managed coop cancels that parent's pending litter.
 
 ## Feed trough support
 - Needs systems can consume trough resources rather than only hand-fed resources.
@@ -30,6 +34,7 @@ Some Tamework-powered mods use framework systems beyond basic taming and command
 - A creature may keep its identity and progression even when moved through another structure or system.
 - Feeding and hydration can come from world objects rather than direct interaction only.
 - Recovery behavior can look stricter or safer than a simple teleport because Tamework is trying to preserve continuity.
+- An unresolved coop import may temporarily refuse new intake or release. That is a safety stop designed to prevent duplicate residents.
 
 ## Related Pages
 - [Happiness, Needs, Breeding, and Traits](/mod/alecs-tamework/happiness-needs-breeding-and-traits)

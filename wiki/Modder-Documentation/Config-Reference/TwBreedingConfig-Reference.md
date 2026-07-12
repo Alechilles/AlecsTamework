@@ -92,6 +92,8 @@ Each `RoleMaxNearbySameType` entry supports:
 - `RoleId`
 - `MaxNearbySameType`
 
+`MaxNearbySameType` is a hard admission and execution limit, not only a partner-search hint. Manual and passive breeding share the same capacity service. Live nearby NPCs and children already admitted by pending litters both consume headroom, and the delayed spawn rechecks capacity before applying. A litter can therefore be partially admitted or rejected rather than exceeding the configured cap.
+
 ### `Cooldowns`
 - `BaseCooldownSeconds`: base breeding cooldown in seconds.
 - `BaseCooldownMinutes`: human-friendly alias for the same base cooldown. This is the preferred authored key when you want minute-scale tuning.
@@ -221,6 +223,19 @@ These legacy fields are still decoded for old packs, but they are hidden from `/
 - `BaseCooldownMinutes`, `DefaultTimeToFullGrownMinutes`, `TimeToFullGrownMinutes`, and family-level `TimeToFullGrownMinutes` are author-facing minute aliases for the same stored second-based values.
 - Passive breeding enablement, breeding happiness requirement, and the global breeding-gender gate are settings-owned runtime policy.
 - `InheritTraits` only matters if a compatible [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference) is also present.
+
+## Litter and Birth-Job Semantics
+- One fertility roll creates one immutable litter plan before the delayed sequence begins.
+- Expected offspring is the product of both resolved parent fertility multipliers, clamped to `0..4`.
+- The whole-number portion is guaranteed, and one fractional roll can add at most one child. The intentional result is zero through four offspring.
+- Similar-looking siblings created by the same admitted litter are expected; they are distinct planned children, not repeated callback output.
+- Manual and passive breeding use the same job registry. A parent can belong to only one active job in that world, and a delayed callback can claim the spawn transition only once.
+- Capturing either parent into a managed coop cancels the job. Execution also validates both parents again before any child spawns.
+- Pending children count against nearby, claim, and player capacity while the job is active.
+- Technical cancellation restores only the exact provisional parent state written by that job, preventing an old callback from erasing a newer cooldown or manual selection.
+
+## Signed-Time Contract
+Hytale world-time epoch values can be negative. `Timing` and `PassiveBreeding` scheduling preserve signed deadlines and compare by ordering; only `0` is the unset sentinel. Do not use positive-value checks when integrating with breeding cooldown or sweep state.
 
 ## Minimal Example
 ```json
@@ -360,6 +375,7 @@ This pattern allows two different adult roles to breed together, produce one sha
 - Keep `Timing.Basis` and `PassiveBreeding.Basis` intentional. They solve different timing problems.
 - New content should prefer minute-based keys where they exist, but old second-based keys remain valid.
 - Gender labels appear in linked companion panels and preserved spawner tooltips for companions covered by an enabled gender config.
+- A multi-child litter is not automatically a duplication bug. Check `/tw gethappiness` for the active job's planned, admitted, and outstanding counts before investigating repeated entities.
 
 ## Related Pages
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)

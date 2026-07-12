@@ -57,6 +57,7 @@ Overrides:
 
 Link metadata includes:
 - NPC uuid
+- stable profile id when the companion has entered canonical persistence
 - last-known position
 - optional home position
 - cached display/name key/role
@@ -64,6 +65,8 @@ Link metadata includes:
 - optional `groupId`
 
 Inactive linked rows stay visible in the panel, can still use per-row actions, and are excluded from bulk dispatch.
+
+Entity UUIDs are projection aliases, not the companion's durable identity. When a stable profile is known, command records and recovery flows resolve historical UUIDs through that profile and deduplicate by profile. Unresolved legacy records continue to fall back to UUID until they can be bound safely; ambiguous bindings fail closed instead of spawning a replacement.
 
 When a player tames a supported NPC, Tamework attempts to auto-link the new companion to a matching command item in that player's inventory. Players now receive explicit feedback for both outcomes:
 - linked: the notification names the animal and command item that was linked.
@@ -138,6 +141,10 @@ Lost flow:
 - If relocation retry windows are exhausted, a linked companion can transition to `LOST`; the shipped default wait budget is 10 seconds.
 - `Recall`/`Return Home` are blocked while `LOST`.
 - `Revive`/`Respawn` can perform strict recovery (replacement spawn + stale-original suppression mapping).
+
+Managed-coop flow:
+- A linked companion housed by an enabled/configured managed coop stays attached to the same stable profile even when a later released projection has a different entity UUID.
+- Command status reads use the trusted managed-coop resident/lifecycle indexes. While those indexes are rebuilding or an import conflict is unresolved, recovery does not guess that the companion is missing.
 
 Dead companions:
 - Death snapshots persist across relog/restart.

@@ -31,7 +31,9 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw getflockdebug`
 - `/tw npcclean <roleId>`
 - `/tw showhitboxes`
-- `/tw debugdb [checkpoint|vacuum]`
+- `/tw debugdb [integrity|checkpoint|vacuum]`
+- `/tw coop audit`
+- `/tw coop import-status`
 - `/tw debugreviveready`
 - `/tw debugcrashtelemetry [flush|simulate]`
 
@@ -67,6 +69,14 @@ Those events use descriptor-approved `details` fields so the telemetry portal ca
 resource, role, and bucketed need context without turning on local per-event log spam.
 This diagnostics channel is enabled by default for now, but it only records events when Tamework telemetry is
 enabled in `/tw settings`. Use `/tw debugneedstelemetry off` as the local kill switch.
+
+## Coop and breeding integrity
+- `/tw coop audit` reports active managed authorities, resident and lifecycle-operation states, whether the composite indexes are trusted, their revisions, and import attention counts.
+- `/tw coop import-status` focuses on active import sessions, pending legacy sources, sources awaiting exact absence proof, and unresolved conflicts.
+- `/tw debugdb integrity` runs SQLite and foreign-key checks plus canonical identity, managed-coop lifecycle, and import invariants.
+- `/tw gethappiness` includes an active breeding job's id, state, mode, partner, planned litter size, admitted count, and outstanding count.
+- Import conflicts intentionally fail closed. Preserve the database/save evidence and investigate the reported source rather than manually spawning or deleting residents.
+- Negative world timestamps are valid. Only `0` means unset for breeding cooldown and passive-sweep scheduling.
 
 ## Log patterns to watch
 - Missing builder ids

@@ -33,6 +33,14 @@
   - life-stage/adult gates
   - sleep/combat gates
   - cooldown state/alarm timing
+  - whether `/tw gethappiness` reports an active job, including its id, state, mode, partner, planned litter, admitted children, and outstanding children
+
+## Managed-coop and persistence integrity
+- `/tw coop audit` summarizes active managed authorities, resident and lifecycle-operation states, trusted index revisions, and import attention counts.
+- `/tw coop import-status` prints the concise legacy-resident import view: active sessions, pending sources, sources awaiting exact absence proof, and unresolved conflicts.
+- `/tw debugdb integrity` runs the SQLite/foreign-key checks plus canonical identity, managed-coop lifecycle, and import-journal invariants.
+- An import marked `attention required` is intentionally fail-closed. Preserve the database and save evidence; do not clear or respawn residents merely to make the count disappear.
+- A coop is Tamework-authoritative only when an enabled `TwCoopConfig` resolves for that exact coop id. Unmanaged coops remain vanilla and are not shadowed by a Tamework resident sidecar.
 
 ## Needs/resource seek troubleshooting
 - Confirm seek sensor/action components are in the role/template:
@@ -98,6 +106,8 @@ XP can be diagnosed with a reason such as not tamed or owned, disabled harvest X
 - `/tw gettamed`, `/tw settamed`
 - `/tw getalarm [AlarmName] [NpcUuid]`
 - `/tw getflockdebug`
+- `/tw coop audit`, `/tw coop import-status`
+- `/tw debugdb integrity`
 - `/tw reloadconfig` (item-feature assets only)
 
 ## Timestamp note

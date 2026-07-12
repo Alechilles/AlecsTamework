@@ -26,6 +26,10 @@ Many Tamework-powered mods share a cluster of long-term progression systems. The
 - Uses readiness rules, cooldowns, and partner matching
 - Can require adulthood, tame state, wakefulness, or other gates
 - Some mods expose breed toggles or breeding status in the linked panel
+- Fertility can intentionally produce a litter of zero through four offspring. Several similar-looking siblings from one pairing are not automatically duplicates.
+- Manual and passive pairing use the same population rules. Nearby creatures and already-pending offspring count toward `MaxNearbySameType`, so a litter can be reduced or refused when the area is full.
+- Each parent can participate in only one active birth job, and the delayed birth can execute only once.
+- Capturing either parent into a managed coop cancels the pending birth.
 
 ## Life stage
 - Offspring can start as babies or juveniles and later grow into adult forms

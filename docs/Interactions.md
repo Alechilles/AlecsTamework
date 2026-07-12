@@ -140,9 +140,14 @@ Behavior:
 - Manual breeding is independent from `TwBreedingConfig.PassiveBreeding.Enabled`, the `/tw settings` passive breeding toggle, and the per-NPC breeding enable toggle. Cooldowns and eligibility gates such as tame, adult, ownership, gender, and role compatibility still apply.
 - `MinHappiness` is ignored when the happiness system or breeding happiness requirement is disabled.
 - When a manually selected pair is found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
+- Manual and passive pairing enter the same birth-job pipeline. A parent can belong to only one active job, and delayed execution can claim that job's spawn transition only once.
+- Fertility intentionally resolves a litter of zero through four offspring. Tamework multiplies the two resolved parent fertility factors, clamps the expected litter to four, guarantees the whole-number portion, and uses one fractional roll for at most one additional child. Similar-looking siblings from one admitted litter are not duplicate callbacks.
+- `Pairing.MaxNearbySameType` is a hard execution-time limit shared by manual and passive breeding. Live nearby NPCs and already-pending admitted children both consume headroom, so a planned litter may be reduced or rejected rather than exceeding the cap.
+- Capturing either parent into a managed coop cancels the pending job. The delayed callback also revalidates both parents before spawning.
 - Pairing can require the same role, require different adult roles in one lifecycle family, allow any adult in one lifecycle family, or explicitly allow any role through `TwBreedingConfig.Pairing.RoleCompatibility`.
 - If `TwBreedingConfig.Gender.Enabled` and `RequireDifferentGender` are enabled, partner selection also requires one male and one female companion.
 - Offspring flow supports baby-role preference, persisted weighted adult-role selection, life-stage initialization, trait/attachment inheritance, and growth timing.
+- World-time deadlines are signed. Negative timestamps are valid; only `0` means unset.
 
 ## Custom interactions
 `Type: "Custom"` exposes full `Requires` + `Effects` control.

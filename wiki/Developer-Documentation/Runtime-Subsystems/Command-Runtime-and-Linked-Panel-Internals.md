@@ -29,10 +29,13 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 ## Persistence model
 Command tools persist linked NPC metadata, group metadata, panel preferences, and active or inactive state directly on the item, while deeper recovery flows use the shared persistence runtime.
 
+When canonical identity is known, a command record also carries the stable profile id. Entity UUIDs are replaceable aliases: historical UUIDs resolve back to the same profile before relocation, lost marking, recovery, or spawn decisions. The facade deduplicates by profile and consults only trusted managed-coop indexes; ambiguous legacy identity or rebuilding indexes fail closed.
+
 ## Important runtime seams
 - Nearby and linked modes are separate entry sources
 - `LOST` is not just a label; it is part of the recovery model
 - Dead companion flows depend on persisted snapshots and companion policy
+- Managed-coop housing is a profile state, not evidence that the companion vanished. Recovery must not spawn while any alias is live, housed, captured, dead, or already replaced.
 
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)

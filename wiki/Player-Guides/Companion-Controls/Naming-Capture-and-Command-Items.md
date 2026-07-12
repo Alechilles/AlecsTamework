@@ -27,6 +27,7 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - Store command selection and linked companion metadata on the item itself
 - Open the radial menu and linked panel for deeper management
 - Can limit how many linked companions stay active at once
+- Follow the companion's stable profile across capture, coop housing, release, recall, and recovery even when the live entity UUID changes
 
 ## Tooltips and icons
 - Some spawner items show captured `Name` and `Role` lines in the tooltip.
@@ -37,6 +38,7 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - If an item works on one creature but not another, that is usually a role filter from the mod's config.
 - If spawning or naming fails, it is usually because of ownership, tame, cooldown, or allowed-role rules.
 - If a command item looks empty, it may simply have no linked companions yet.
+- A companion shown as housed in a managed coop is not missing. Recovery waits for authoritative coop state instead of creating a replacement.
 
 ## Related Pages
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
