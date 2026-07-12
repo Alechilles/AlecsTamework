@@ -114,7 +114,7 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
                     "SQLite integrity audit FAILED: " + report.failureReason()));
         } else if (report.isClean()) {
             commandContext.sender().sendMessage(Message.raw(
-                    "SQLite integrity audit: clean (integrity_check, foreign keys, identity/lifecycle uniqueness)."));
+                    "SQLite integrity audit: clean (SQLite, foreign keys, identity, lifecycle, and import invariants)."));
         }
         for (PersistenceIntegrityService.IntegrityIssue issue : report.issues()) {
             commandContext.sender().sendMessage(Message.raw(

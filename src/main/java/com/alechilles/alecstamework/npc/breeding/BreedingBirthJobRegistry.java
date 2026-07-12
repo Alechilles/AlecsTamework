@@ -198,6 +198,20 @@ public final class BreedingBirthJobRegistry {
         }
     }
 
+    /** Reads the active job containing the current entity UUID, if one exists in this scope. */
+    @Nonnull
+    public Optional<BreedingBirthJob> findActiveByParentUuid(
+            @Nonnull Object storeScope,
+            @Nonnull UUID parentUuid) {
+        Objects.requireNonNull(storeScope, "storeScope");
+        Objects.requireNonNull(parentUuid, "parentUuid");
+        synchronized (lock) {
+            return closed
+                    ? Optional.empty()
+                    : statesByStore.get(storeScope).findActiveByParentUuid(parentUuid);
+        }
+    }
+
     /** Locates a current or terminal job globally using only stable immutable identity. */
     @Nonnull
     public Optional<LocatedJob> locate(@Nonnull UUID jobId) {

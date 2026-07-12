@@ -167,6 +167,21 @@ class BreedingBirthJobRegistryTest {
     }
 
     @Test
+    void exposesOnlyTheActiveJobForParentDiagnostics() {
+        BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
+        Object scope = new Object();
+        BreedingParentIdentity parentA = parent(1L, "profile-a");
+        BreedingBirthJob job = job(100L, parentA, parent(2L, "profile-b"));
+
+        registry.register(scope, job);
+
+        assertEquals(job, registry.findActiveByParentUuid(scope, parentA.entityUuid())
+                .orElseThrow());
+        registry.cancel(scope, job.jobId());
+        assertTrue(registry.findActiveByParentUuid(scope, parentA.entityUuid()).isEmpty());
+    }
+
+    @Test
     void failedOutcomeIsDistinctAndReleasesParents() {
         BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
         Object scope = new Object();

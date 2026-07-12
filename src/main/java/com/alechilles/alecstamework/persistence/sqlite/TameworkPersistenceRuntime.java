@@ -262,6 +262,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         return managedCoopServices;
     }
 
+    /** Creates a stateless read-only audit facade over the current v5 database and indexes. */
+    @Nonnull
+    public ManagedCoopDiagnosticsService getManagedCoopDiagnosticsService() {
+        return new ManagedCoopDiagnosticsService(connectionManager, managedCoopServices);
+    }
+
     @Nonnull
     public NpcIdentityRepository getNpcIdentityRepository() {
         return npcIdentityRepository;

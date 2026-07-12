@@ -184,6 +184,14 @@ final class BreedingBirthJobScopeState {
         return closed ? Optional.empty() : Optional.ofNullable(jobsById.get(jobId));
     }
 
+    Optional<BreedingBirthJob> findActiveByParentUuid(UUID parentUuid) {
+        if (closed) {
+            return Optional.empty();
+        }
+        UUID jobId = activeJobByParentUuid.get(parentUuid);
+        return jobId != null ? Optional.ofNullable(jobsById.get(jobId)) : Optional.empty();
+    }
+
     int activeJobCount() {
         return closed ? 0 : activeJobByPair.size();
     }

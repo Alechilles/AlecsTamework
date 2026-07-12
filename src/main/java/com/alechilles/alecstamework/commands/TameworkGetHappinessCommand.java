@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
+import com.alechilles.alecstamework.npc.breeding.BreedingBirthJob;
+import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -59,7 +61,12 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         }
 
         BreedingSnapshot breeding = resolveBreedingSnapshot(candidate.ref, store, snapshot.value());
-        commandContext.sender().sendMessage(Message.raw(buildMessage(candidate.npcUuid, snapshot, breeding)));
+        BreedingBirthJob activeJob = TameworkBreedingServices.shared()
+                .jobRegistry()
+                .findActiveByParentUuid(store, candidate.npcUuid)
+                .orElse(null);
+        commandContext.sender().sendMessage(Message.raw(
+                buildMessage(candidate.npcUuid, snapshot, breeding, activeJob)));
     }
 
     @Nullable
@@ -161,7 +168,8 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
 
     private static String buildMessage(@Nonnull UUID npcUuid,
                                        @Nonnull HappinessSnapshot happiness,
-                                       @Nonnull BreedingSnapshot breeding) {
+                                       @Nonnull BreedingSnapshot breeding,
+                                       @Nullable BreedingBirthJob activeJob) {
         StringBuilder message = new StringBuilder();
         message.append("Happiness for NPC ")
                 .append(npcUuid)
@@ -172,7 +180,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         if (happiness.configId() != null) {
             message.append(", config=").append(happiness.configId());
         }
-        if (happiness.lastUpdateMs() > 0L) {
+        if (happiness.lastUpdateMs() != 0L) {
             message.append(", lastUpdateMs=").append(happiness.lastUpdateMs());
         }
         message.append(", base=").append(formatDouble(happiness.baseSetpoint()));
@@ -185,7 +193,9 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         message.append(")");
 
         if (!breeding.hasComponent()) {
-            message.append(". Breeding component: none.");
+            message.append(". Breeding component: none");
+            appendActiveJob(message, npcUuid, activeJob);
+            message.append(".");
             return message.toString();
         }
 
@@ -216,8 +226,28 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         } else {
             message.append(", threshold=n/a, eligible=n/a");
         }
+        appendActiveJob(message, npcUuid, activeJob);
         message.append(".");
         return message.toString();
+    }
+
+    private static void appendActiveJob(StringBuilder message,
+                                        UUID npcUuid,
+                                        @Nullable BreedingBirthJob activeJob) {
+        if (activeJob == null) {
+            message.append(". Active breeding job: none");
+            return;
+        }
+        UUID partner = activeJob.firstParent().entityUuid().equals(npcUuid)
+                ? activeJob.secondParent().entityUuid()
+                : activeJob.firstParent().entityUuid();
+        message.append(". Active breeding job: id=").append(activeJob.jobId())
+                .append(", state=").append(activeJob.state())
+                .append(", mode=").append(activeJob.mode())
+                .append(", partner=").append(partner)
+                .append(", planned=").append(activeJob.plan().children().size())
+                .append(", admitted=").append(activeJob.initiallyAdmittedChildren().size())
+                .append(", outstanding=").append(activeJob.admittedChildren().size());
     }
 
     @Nonnull

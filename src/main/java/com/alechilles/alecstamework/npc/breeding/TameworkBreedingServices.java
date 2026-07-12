@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.breeding;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.DoubleSupplier;
 import javax.annotation.Nonnull;
 
@@ -42,7 +43,21 @@ public final class TameworkBreedingServices implements AutoCloseable {
     /** Returns the shared plugin-wide seam consumed by both breeding entrypoints. */
     @Nonnull
     public static TameworkBreedingServices shared() {
-        return SharedHolder.INSTANCE;
+        return SharedHolder.INSTANCE.get();
+    }
+
+    /**
+     * Closes the current plugin-owned bundle and atomically installs a fresh bundle for reload.
+     *
+     * <p>Delayed callbacks that still hold the retired bundle observe its permanently closed
+     * registry. Runtime entrypoints resolved after this call observe only the fresh bundle, so an
+     * in-process plugin reload cannot inherit jobs or the closed state from the prior lifecycle.</p>
+     */
+    public static void shutdownShared() {
+        TameworkBreedingServices retired = SharedHolder.INSTANCE.getAndSet(
+                new TameworkBreedingServices()
+        );
+        retired.close();
     }
 
     @Nonnull
@@ -72,7 +87,8 @@ public final class TameworkBreedingServices implements AutoCloseable {
     }
 
     private static final class SharedHolder {
-        private static final TameworkBreedingServices INSTANCE = new TameworkBreedingServices();
+        private static final AtomicReference<TameworkBreedingServices> INSTANCE =
+                new AtomicReference<>(new TameworkBreedingServices());
 
         private SharedHolder() {
         }

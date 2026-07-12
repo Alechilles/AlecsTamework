@@ -137,6 +137,75 @@ public final class PersistenceIntegrityService {
                           GROUP BY authority_id, resident_slot HAVING COUNT(*) > 1
                         )
                         """),
+                check("duplicate_active_managed_authority_location", "physical coop has multiple active authorities", """
+                        SELECT COUNT(*) FROM (
+                          SELECT world_name, x, y, z FROM managed_coop_authority WHERE active = 1
+                          GROUP BY world_name, x, y, z HAVING COUNT(*) > 1
+                        )
+                        """),
+                check("active_terminal_coop_operation", "terminal coop operation is still marked active", """
+                        SELECT COUNT(*) FROM coop_lifecycle_operations
+                        WHERE active = 1
+                          AND state IN ('FINALIZED', 'COMPLETE', 'FAILED', 'QUARANTINED')
+                        """),
+                check("inactive_nonterminal_coop_operation", "nonterminal coop operation is marked inactive", """
+                        SELECT COUNT(*) FROM coop_lifecycle_operations
+                        WHERE active = 0
+                          AND state IN ('PREPARED', 'SLOT_COMMITTED', 'SOURCE_RETIRE_REQUESTED',
+                                        'SPAWN_CLAIMED', 'PROJECTION_CREATED')
+                        """),
+                check("active_finalized_import_session", "finalized coop import session is still marked active", """
+                        SELECT COUNT(*) FROM managed_coop_import_sessions
+                        WHERE active = 1 AND state <> 'ACTIVE'
+                        """),
+                check("inactive_active_import_session", "active coop import session is marked inactive", """
+                        SELECT COUNT(*) FROM managed_coop_import_sessions
+                        WHERE active = 0 AND state = 'ACTIVE'
+                        """),
+                check("import_session_source_count_mismatch", "import audit source count differs from immutable source rows", """
+                        SELECT COUNT(*) FROM (
+                          SELECT s.session_id
+                          FROM managed_coop_import_sessions s
+                          LEFT JOIN managed_coop_import_sources r ON r.session_id = s.session_id
+                          GROUP BY s.session_id, s.source_count
+                          HAVING COUNT(r.source_id) <> s.source_count
+                        )
+                        """),
+                check("finalized_import_source_not_absent", "finalized import retained a matched/imported vanilla source without absence proof", """
+                        SELECT COUNT(*) FROM (
+                          SELECT s.session_id
+                          FROM managed_coop_import_sessions s
+                          JOIN managed_coop_import_sources r ON r.session_id = s.session_id
+                          WHERE s.active = 0
+                            AND s.state IN ('FINALIZED_MANAGED', 'FINALIZED_CONFLICT')
+                            AND r.disposition_kind IN ('MATCHED', 'IMPORTED')
+                            AND r.neutralization_state <> 'VERIFIED_ABSENT'
+                          GROUP BY s.session_id
+                        )
+                        """),
+                check("managed_authority_with_active_import", "active import session authority is not importing", """
+                        SELECT COUNT(*) FROM (
+                          SELECT a.authority_id
+                          FROM managed_coop_authority a
+                          JOIN managed_coop_import_sessions s ON s.authority_id = a.authority_id
+                          WHERE s.active = 1
+                            AND (a.active <> 1 OR a.authority_state <> 'IMPORTING_TO_TWORK')
+                          GROUP BY a.authority_id
+                        )
+                        """),
+                check("importing_authority_without_active_session", "importing authority has no active import session", """
+                        SELECT COUNT(*) FROM managed_coop_authority a
+                        WHERE a.active = 1 AND a.authority_state = 'IMPORTING_TO_TWORK'
+                          AND NOT EXISTS (
+                            SELECT 1 FROM managed_coop_import_sessions s
+                            WHERE s.authority_id = a.authority_id
+                              AND s.active = 1 AND s.state = 'ACTIVE'
+                          )
+                        """),
+                check("unresolved_coop_import_conflict", "coop import conflicts require explicit resolution", """
+                        SELECT COUNT(*) FROM coop_import_conflicts
+                        WHERE resolution_state = 'UNRESOLVED'
+                        """),
                 check("duplicate_active_recovery_profile", "profile has multiple active recovery operations", """
                         SELECT COUNT(*) FROM (
                           SELECT profile_id FROM npc_recovery_operations WHERE active = 1
