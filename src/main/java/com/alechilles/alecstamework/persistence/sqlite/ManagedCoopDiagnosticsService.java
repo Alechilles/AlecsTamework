@@ -1,18 +1,26 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.items.ManagedCoopLifecycleOperationIndex;
+import com.alechilles.alecstamework.items.ManagedCoopResidentIndex;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Builds one read-only, point-in-time audit of durable and indexed managed-coop state. */
 public final class ManagedCoopDiagnosticsService {
+    private static final int MAX_DETAIL_ROWS = 25;
+
     private final SqliteConnectionManager connections;
     private final ManagedCoopRuntimeServices runtimeServices;
 
@@ -56,9 +64,15 @@ public final class ManagedCoopDiagnosticsService {
                     SELECT COUNT(*) FROM coop_import_conflicts
                     WHERE resolution_state = 'UNRESOLVED'
                     """);
+            List<ResidentDetail> residentDetails = residentDetails(connection);
+            List<OperationDetail> operationDetails = operationDetails(connection);
             IndexEpoch after = indexEpoch();
             connection.rollback();
-            boolean coherentTrustedEpoch = before.equals(after) && after.trusted();
+            boolean coherentTrustedEpoch = before.equals(after)
+                    && after.trusted()
+                    && after.authorityCount() == total(authorities)
+                    && after.residentCount() == total(residents)
+                    && after.operationCount() == total(operations);
             return new AuditReport(
                     ReportStatus.COMPLETE,
                     authorities,
@@ -71,6 +85,8 @@ public final class ManagedCoopDiagnosticsService {
                     coherentTrustedEpoch,
                     after.residentRevision(),
                     after.operationRevision(),
+                    residentDetails,
+                    operationDetails,
                     null,
                     null
             );
@@ -82,6 +98,8 @@ public final class ManagedCoopDiagnosticsService {
                     false,
                     runtimeServices.residentIndex().snapshot().revision(),
                     runtimeServices.lifecycleIndex().snapshot().revision(),
+                    List.of(),
+                    List.of(),
                     failureDetail(exception),
                     exception
             );
@@ -90,10 +108,122 @@ public final class ManagedCoopDiagnosticsService {
 
     @Nonnull
     private IndexEpoch indexEpoch() {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            ManagedCoopResidentIndex.Snapshot residents =
+                    runtimeServices.residentIndex().snapshot();
+            ManagedCoopLifecycleOperationIndex.Snapshot operations =
+                    runtimeServices.lifecycleIndex().snapshot();
+            boolean trusted = runtimeServices.compositeIndexRefreshService().isTrusted();
+            if (residents == runtimeServices.residentIndex().snapshot()
+                    && operations == runtimeServices.lifecycleIndex().snapshot()) {
+                return new IndexEpoch(
+                        trusted,
+                        residents.revision(),
+                        operations.revision(),
+                        residents.authorities().size(),
+                        residents.allResidents().size(),
+                        operations.operations().size());
+            }
+        }
+        ManagedCoopResidentIndex.Snapshot residents =
+                runtimeServices.residentIndex().snapshot();
+        ManagedCoopLifecycleOperationIndex.Snapshot operations =
+                runtimeServices.lifecycleIndex().snapshot();
         return new IndexEpoch(
-                runtimeServices.compositeIndexRefreshService().isTrusted(),
-                runtimeServices.residentIndex().snapshot().revision(),
-                runtimeServices.lifecycleIndex().snapshot().revision());
+                false,
+                residents.revision(),
+                operations.revision(),
+                residents.authorities().size(),
+                residents.allResidents().size(),
+                operations.operations().size());
+    }
+
+    @Nonnull
+    private List<ResidentDetail> residentDetails(Connection connection) throws SQLException {
+        ArrayList<ResidentDetail> details = new ArrayList<>(MAX_DETAIL_ROWS);
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT world_name, coop_id, x, y, z, resident_slot, profile_id, state,
+                       resident_uuid, source_npc_uuid, deployed_npc_uuid, generation
+                FROM managed_coop_residents WHERE active = 1
+                ORDER BY lower(world_name), x, y, z, resident_slot, profile_id, resident_id
+                LIMIT ?
+                """)) {
+            statement.setInt(1, MAX_DETAIL_ROWS);
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    details.add(new ResidentDetail(
+                            authorityKey(rows),
+                            requiredText(rows.getString("coop_id"), "coop_id"),
+                            rows.getInt("resident_slot"),
+                            requiredText(rows.getString("profile_id"), "profile_id"),
+                            requiredText(rows.getString("state"), "state"),
+                            requiredUuid(rows.getString("resident_uuid"), "resident_uuid"),
+                            optionalUuid(rows.getString("source_npc_uuid")),
+                            optionalUuid(rows.getString("deployed_npc_uuid")),
+                            rows.getLong("generation")));
+                }
+            }
+        }
+        return List.copyOf(details);
+    }
+
+    @Nonnull
+    private List<OperationDetail> operationDetails(Connection connection) throws SQLException {
+        ArrayList<OperationDetail> details = new ArrayList<>(MAX_DETAIL_ROWS);
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT operation_id, operation_kind, profile_id, world_name, coop_id,
+                       x, y, z, resident_slot, source_npc_uuid, planned_target_uuid,
+                       actual_target_uuid, state, generation, retry_count, last_error
+                FROM coop_lifecycle_operations WHERE active = 1
+                ORDER BY lower(world_name), x, y, z, resident_slot, created_at_ms, operation_id
+                LIMIT ?
+                """)) {
+            statement.setInt(1, MAX_DETAIL_ROWS);
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    details.add(new OperationDetail(
+                            authorityKey(rows),
+                            requiredText(rows.getString("coop_id"), "coop_id"),
+                            rows.getInt("resident_slot"),
+                            requiredText(rows.getString("profile_id"), "profile_id"),
+                            requiredText(rows.getString("operation_id"), "operation_id"),
+                            requiredText(rows.getString("operation_kind"), "operation_kind"),
+                            requiredText(rows.getString("state"), "state"),
+                            optionalUuid(rows.getString("source_npc_uuid")),
+                            optionalUuid(rows.getString("planned_target_uuid")),
+                            optionalUuid(rows.getString("actual_target_uuid")),
+                            rows.getLong("generation"),
+                            rows.getInt("retry_count"),
+                            rows.getString("last_error")));
+                }
+            }
+        }
+        return List.copyOf(details);
+    }
+
+    private ManagedCoopAuthorityKey authorityKey(ResultSet rows) throws SQLException {
+        return new ManagedCoopAuthorityKey(
+                requiredText(rows.getString("world_name"), "world_name"),
+                rows.getInt("x"), rows.getInt("y"), rows.getInt("z"));
+    }
+
+    private String requiredText(String value, String field) throws SQLException {
+        if (value == null || value.isBlank()) {
+            throw new SQLException("managed_coop_diagnostic_missing_" + field);
+        }
+        return value.trim();
+    }
+
+    private UUID requiredUuid(String value, String field) throws SQLException {
+        if (value == null || value.isBlank()) {
+            throw new SQLException("managed_coop_diagnostic_missing_" + field);
+        }
+        return UUID.fromString(value.trim());
+    }
+
+    @Nullable
+    private UUID optionalUuid(@Nullable String value) {
+        return value == null || value.isBlank() ? null : UUID.fromString(value.trim());
     }
 
     @Nonnull
@@ -132,7 +262,40 @@ public final class ManagedCoopDiagnosticsService {
     }
 
     /** One coherent in-memory index epoch sampled around the SQLite read transaction. */
-    private record IndexEpoch(boolean trusted, long residentRevision, long operationRevision) {
+    private record IndexEpoch(boolean trusted,
+                              long residentRevision,
+                              long operationRevision,
+                              int authorityCount,
+                              int residentCount,
+                              int operationCount) {
+    }
+
+    /** Immutable resident identity and occupancy values safe to print outside the ECS thread. */
+    public record ResidentDetail(@Nonnull ManagedCoopAuthorityKey authorityKey,
+                                 @Nonnull String coopId,
+                                 int residentSlot,
+                                 @Nonnull String profileId,
+                                 @Nonnull String state,
+                                 @Nonnull UUID residentUuid,
+                                 @Nullable UUID sourceNpcUuid,
+                                 @Nullable UUID deployedNpcUuid,
+                                 long generation) {
+    }
+
+    /** Immutable active-operation values, including projection and retry state. */
+    public record OperationDetail(@Nonnull ManagedCoopAuthorityKey authorityKey,
+                                  @Nonnull String coopId,
+                                  int residentSlot,
+                                  @Nonnull String profileId,
+                                  @Nonnull String operationId,
+                                  @Nonnull String kind,
+                                  @Nonnull String state,
+                                  @Nullable UUID sourceNpcUuid,
+                                  @Nullable UUID plannedTargetUuid,
+                                  @Nullable UUID actualTargetUuid,
+                                  long generation,
+                                  int retryCount,
+                                  @Nullable String lastError) {
     }
 
     /** Immutable values safe to format after the SQLite connection closes. */
@@ -148,6 +311,8 @@ public final class ManagedCoopDiagnosticsService {
             boolean compositeIndexTrusted,
             long residentIndexRevision,
             long operationIndexRevision,
+            @Nonnull List<ResidentDetail> residentDetails,
+            @Nonnull List<OperationDetail> operationDetails,
             @Nullable String failureReason,
             @Nullable Throwable failure) {
         public AuditReport {
@@ -155,6 +320,8 @@ public final class ManagedCoopDiagnosticsService {
             activeAuthoritiesByState = orderedCopy(activeAuthoritiesByState);
             activeResidentsByState = orderedCopy(activeResidentsByState);
             activeOperationsByKindAndState = orderedCopy(activeOperationsByKindAndState);
+            residentDetails = List.copyOf(residentDetails);
+            operationDetails = List.copyOf(operationDetails);
         }
 
         public long activeAuthorities() {
@@ -189,5 +356,13 @@ public final class ManagedCoopDiagnosticsService {
         private static Map<String, Long> orderedCopy(Map<String, Long> source) {
             return Collections.unmodifiableMap(new LinkedHashMap<>(source));
         }
+    }
+
+    private static long total(Map<String, Long> counts) {
+        long result = 0L;
+        for (long count : counts.values()) {
+            result += count;
+        }
+        return result;
     }
 }

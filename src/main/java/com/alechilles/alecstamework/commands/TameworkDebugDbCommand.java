@@ -73,6 +73,8 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
 
         TameworkPersistenceRuntime.PersistenceDiagnostics diagnostics = runtime.collectDiagnostics();
         PersistenceWriteQueue.QueueMetrics queueMetrics = diagnostics.queueMetrics();
+        PersistenceWriteQueue.QueueLifecycleMetrics lifecycleMetrics =
+                runtime.getWriteQueueLifecycleMetrics();
 
         String healthReason = diagnostics.healthState().reason();
         String failureTime = formatTimestamp(diagnostics.healthState().lastFailureAtMs());
@@ -103,6 +105,13 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
                         + (queueMetrics.lastFailureReason() == null
                         ? "<none>"
                         : queueMetrics.lastFailureReason())
+        ));
+        commandContext.sender().sendMessage(Message.raw(
+                "Write queue lifecycle: state=" + lifecycleMetrics.state()
+                        + ", pending=" + lifecycleMetrics.pendingTaskCount()
+                        + ", activeBatch=" + lifecycleMetrics.activeBatchSize()
+                        + ", failedAccepted=" + lifecycleMetrics.failedAcceptedTasks()
+                        + ", drainTimedOut=" + lifecycleMetrics.drainTimedOut()
         ));
     }
 
