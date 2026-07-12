@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import java.util.Objects;
 import java.util.UUID;
@@ -44,6 +45,31 @@ public record CompanionPopulationObservation(
                 || lifecycleState == CompanionLifecycleState.UNLOADED) && !completeLocation) {
             throw new IllegalArgumentException("Physical lifecycle observations require a chunk location.");
         }
+    }
+
+    /** Builds the durable observation shape shared by physical and dormant runtime callbacks. */
+    @Nonnull
+    static CompanionPopulationObservation fromRuntime(
+            @Nonnull String profileId,
+            @Nonnull UUID npcUuid,
+            @Nullable UUID ownerUuid,
+            @Nullable String ownershipWorldName,
+            @Nonnull CompanionLifecycleState lifecycleState,
+            @Nullable ClaimChunkCoordinate physicalChunk,
+            long revision,
+            @Nonnull String source) {
+        return new CompanionPopulationObservation(
+                profileId,
+                npcUuid,
+                ownerUuid,
+                ownershipWorldName,
+                lifecycleState,
+                physicalChunk == null ? null : physicalChunk.worldName(),
+                physicalChunk == null ? null : physicalChunk.chunkX(),
+                physicalChunk == null ? null : physicalChunk.chunkZ(),
+                revision,
+                source
+        );
     }
 
     @Nonnull

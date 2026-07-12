@@ -268,7 +268,7 @@ public final class CompanionPopulationRuntimeReconciler
                 physicalChunk,
                 revision
         );
-        CompanionPopulationObservation observation = observation(
+        CompanionPopulationObservation observation = CompanionPopulationObservation.fromRuntime(
                 profileId, npcUuid, ownerUuid, effectiveWorld, lifecycleState,
                 physicalChunk, revision, source
         );
@@ -310,31 +310,6 @@ public final class CompanionPopulationRuntimeReconciler
                 currentOwner == null ? ObservationOutcome.ADOPTED : ObservationOutcome.UPDATED,
                 observation,
                 warning
-        );
-    }
-
-    @Nonnull
-    private static CompanionPopulationObservation observation(
-            @Nonnull String profileId,
-            @Nonnull UUID npcUuid,
-            @Nullable UUID ownerUuid,
-            @Nullable String ownershipWorldName,
-            @Nonnull CompanionLifecycleState lifecycleState,
-            @Nullable ClaimChunkCoordinate physicalChunk,
-            long revision,
-            @Nonnull String source
-    ) {
-        return new CompanionPopulationObservation(
-                profileId,
-                npcUuid,
-                ownerUuid,
-                ownershipWorldName,
-                lifecycleState,
-                physicalChunk == null ? null : physicalChunk.worldName(),
-                physicalChunk == null ? null : physicalChunk.chunkX(),
-                physicalChunk == null ? null : physicalChunk.chunkZ(),
-                revision,
-                source
         );
     }
 
