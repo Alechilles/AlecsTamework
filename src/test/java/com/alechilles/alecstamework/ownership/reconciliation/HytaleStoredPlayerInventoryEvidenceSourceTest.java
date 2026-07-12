@@ -29,8 +29,8 @@ class HytaleStoredPlayerInventoryEvidenceSourceTest {
                 "durable-epoch"
         );
 
-        assertEquals(original.descriptor().generation(), restarted.descriptor().generation());
-        assertNotEquals(original.descriptor().generation(), changed.descriptor().generation());
+        assertEquals(original.descriptor().scanGeneration(), restarted.descriptor().scanGeneration());
+        assertNotEquals(original.descriptor().scanGeneration(), changed.descriptor().scanGeneration());
     }
 
     @Test

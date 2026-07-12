@@ -26,8 +26,8 @@ class HytaleSavedWorldEvidenceSourceTest {
         HytaleSavedWorldEvidenceSource restarted = source(new long[]{first}, "durable-epoch");
         HytaleSavedWorldEvidenceSource changed = source(new long[]{first, second}, "durable-epoch");
 
-        assertEquals(original.descriptor().generation(), restarted.descriptor().generation());
-        assertNotEquals(original.descriptor().generation(), changed.descriptor().generation());
+        assertEquals(original.descriptor().scanGeneration(), restarted.descriptor().scanGeneration());
+        assertNotEquals(original.descriptor().scanGeneration(), changed.descriptor().scanGeneration());
     }
 
     @Test
