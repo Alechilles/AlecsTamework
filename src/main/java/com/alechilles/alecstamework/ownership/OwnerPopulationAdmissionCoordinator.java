@@ -27,6 +27,7 @@ public final class OwnerPopulationAdmissionCoordinator {
     private final CompanionPopulationRepository repository;
     private final PersistenceHealthService persistenceHealth;
     private final OwnerPopulationJournalTerminality terminality;
+    private final OwnerPopulationJournalCloseCoordinator journalCloseCoordinator;
     private final OwnerPopulationCompensationCoordinator compensationCoordinator;
 
     public OwnerPopulationAdmissionCoordinator(@Nonnull OwnerPopulationIndex index,
@@ -36,6 +37,9 @@ public final class OwnerPopulationAdmissionCoordinator {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
         this.terminality = new OwnerPopulationJournalTerminality(index, persistenceHealth);
+        this.journalCloseCoordinator = new OwnerPopulationJournalCloseCoordinator(
+                index, repository, terminality
+        );
         this.compensationCoordinator = new OwnerPopulationCompensationCoordinator(
                 index, repository, terminality
         );
@@ -182,7 +186,7 @@ public final class OwnerPopulationAdmissionCoordinator {
         if (!index.commit(prepared.reservation())) {
             prepared.setState(PreparedOwnerPopulationAdmission.State.CANCELED);
             terminality.degrade("owner_population_index_commit_failed");
-            terminality.observeJournalClose(closeApplyingJournal(
+            terminality.observeJournalClose(journalCloseCoordinator.closeApplyingJournal(
                     prepared.operationId(), "owner-population-index-commit-failed"
             ), "owner_population_index_failure_journal_close_failed");
             return CompletableFuture.completedFuture(new OwnerPopulationCommitResult(
@@ -221,42 +225,7 @@ public final class OwnerPopulationAdmissionCoordinator {
     public CompletableFuture<Boolean> completeSourceFinalizationAsync(
             @Nonnull PreparedOwnerPopulationAdmission prepared
     ) {
-        Objects.requireNonNull(prepared, "prepared");
-        final CompletableFuture<Boolean> completion;
-        synchronized (prepared) {
-            CompletableFuture<Boolean> existing = prepared.sourceFinalizationCompletion();
-            if (existing != null) {
-                return existing;
-            }
-            if (prepared.state() == PreparedOwnerPopulationAdmission.State.COMMITTED) {
-                return CompletableFuture.completedFuture(true);
-            }
-            if (!prepared.transition(
-                    PreparedOwnerPopulationAdmission.State.SOURCE_FINALIZATION_PENDING,
-                    PreparedOwnerPopulationAdmission.State.SOURCE_FINALIZING
-            )) {
-                return CompletableFuture.completedFuture(false);
-            }
-            completion = new CompletableFuture<>();
-            prepared.sourceFinalizationCompletion(completion);
-        }
-        try {
-            PersistenceWriteQueue.WriteSubmission<Boolean> submission =
-                    repository.completeSourceFinalizationAsync(prepared.operationId().toString());
-            if (submission == null || submission.completion() == null) {
-                finishSourceFinalization(prepared, completion, false);
-            } else {
-                submission.completion().whenComplete((outcome, failure) -> finishSourceFinalization(
-                        prepared,
-                        completion,
-                        failure == null && outcome != null && outcome.isCommitted()
-                                && Boolean.TRUE.equals(outcome.value())
-                ));
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            finishSourceFinalization(prepared, completion, false);
-        }
-        return completion;
+        return journalCloseCoordinator.completeSourceFinalizationAsync(prepared);
     }
 
     /**
@@ -265,46 +234,7 @@ public final class OwnerPopulationAdmissionCoordinator {
     @Nonnull
     public CompletableFuture<Boolean> cancelAsync(@Nonnull PreparedOwnerPopulationAdmission prepared,
                                                    @Nonnull String reason) {
-        Objects.requireNonNull(prepared, "prepared");
-        String normalizedReason = reason == null || reason.isBlank()
-                ? "owner-population-canceled"
-                : reason.trim();
-        CompletableFuture<Boolean> completion;
-        synchronized (prepared) {
-            CompletableFuture<Boolean> existing = prepared.cancellationCompletion();
-            if (existing != null) {
-                return existing;
-            }
-            PreparedOwnerPopulationAdmission.State current = prepared.state();
-            if (current == PreparedOwnerPopulationAdmission.State.CANCELED) {
-                return CompletableFuture.completedFuture(true);
-            }
-            if ((current != PreparedOwnerPopulationAdmission.State.PREPARED
-                    && current != PreparedOwnerPopulationAdmission.State.APPLYING)
-                    || !prepared.transition(current, PreparedOwnerPopulationAdmission.State.CANCELED)) {
-                return CompletableFuture.completedFuture(false);
-            }
-            completion = new CompletableFuture<>();
-            prepared.cancellationCompletion(completion);
-        }
-        final boolean indexCanceled;
-        final CompletableFuture<Boolean> close;
-        try {
-            indexCanceled = index.cancel(prepared.reservation());
-            close = closeApplyingJournal(prepared.operationId(), normalizedReason);
-        } catch (RuntimeException | LinkageError failure) {
-            terminality.degrade("owner_population_cancel_start_failed");
-            completion.complete(false);
-            return completion;
-        }
-        close.whenComplete((closed, failure) -> {
-            boolean success = indexCanceled && failure == null && Boolean.TRUE.equals(closed);
-            if (!success) {
-                terminality.degrade("owner_population_cancel_journal_close_failed");
-            }
-            completion.complete(success);
-        });
-        return completion;
+        return journalCloseCoordinator.cancelAsync(prepared, reason);
     }
 
     /** Durably records compensation intent before any live rollback is allowed to run. */
@@ -434,44 +364,6 @@ public final class OwnerPopulationAdmissionCoordinator {
                 "owner-population-final-durability-failed",
                 result
         );
-    }
-
-    private void finishSourceFinalization(
-            @Nonnull PreparedOwnerPopulationAdmission prepared,
-            @Nonnull CompletableFuture<Boolean> completion,
-            boolean succeeded
-    ) {
-        if (succeeded) {
-            prepared.setState(PreparedOwnerPopulationAdmission.State.COMMITTED);
-        } else {
-            prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
-            terminality.degrade("owner_population_source_finalization_commit_failed");
-        }
-        completion.complete(succeeded);
-    }
-
-    @Nonnull
-    private CompletableFuture<Boolean> closeApplyingJournal(@Nonnull UUID operationId,
-                                                            @Nonnull String reason) {
-        try {
-            PersistenceWriteQueue.WriteSubmission<Boolean> close = repository.advanceOperationAsync(
-                    operationId.toString(),
-                    CompanionPopulationOperationRecord.State.APPLYING,
-                    CompanionPopulationOperationRecord.State.FAILED,
-                    reason
-            );
-            if (close == null || close.completion() == null) {
-                return CompletableFuture.completedFuture(false);
-            }
-            return close.completion().handle((outcome, failure) ->
-                    failure == null
-                            && outcome != null
-                            && outcome.isCommitted()
-                            && Boolean.TRUE.equals(outcome.value())
-            );
-        } catch (RuntimeException | LinkageError failure) {
-            return CompletableFuture.completedFuture(false);
-        }
     }
 
     @Nonnull
