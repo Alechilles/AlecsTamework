@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -45,10 +46,21 @@ public final class TameworkApiTestPrepareCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw("Unable to resolve the player for fixture setup."));
             return;
         }
-        ApiSelfTestFixtureManager.FixtureOperationResult result = manager.prepare(player, store, ref, world);
-        commandContext.sender().sendMessage(Message.raw(result.summary()));
-        if (result.fixtureSet() != null) {
-            TameworkApiSelfTestCommandSupport.sendFixtureStatus(commandContext, result.fixtureSet());
-        }
+        manager.prepareAsync(player, store, ref, world).whenComplete((result, failure) -> {
+            LeaseBoundWorldDispatcher.execute(world, () -> {
+                if (failure != null || result == null) {
+                    commandContext.sender().sendMessage(Message.raw(
+                            "Failed to prepare API self-test fixtures safely."
+                    ));
+                    return;
+                }
+                commandContext.sender().sendMessage(Message.raw(result.summary()));
+                if (result.fixtureSet() != null) {
+                    TameworkApiSelfTestCommandSupport.sendFixtureStatus(
+                            commandContext, result.fixtureSet()
+                    );
+                }
+            });
+        });
     }
 }

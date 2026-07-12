@@ -79,6 +79,8 @@ import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInterac
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionService;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderLifecycleInvalidator;
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -201,6 +203,7 @@ import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.plugin.event.PluginSetupEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
@@ -928,11 +931,29 @@ public class Tamework extends JavaPlugin {
                 damagePolicy,
                 ownerPopulationRuntime.populationPolicyAuthority()
         );
+        ClaimProviderLifecycleInvalidator claimProviderLifecycleInvalidator =
+                new ClaimProviderLifecycleInvalidator(provider -> {
+                    OwnerPopulationRuntime runtime = ownerPopulationRuntime;
+                    if (runtime != null) {
+                        runtime.claimProviderRegistry().onPluginLifecycleChanged(provider);
+                    }
+                    if (provider == ClaimIntegrationProvider.SIMPLE_CLAIMS) {
+                        damagePolicy.onRuntimeSettingsChanged();
+                    }
+                });
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                PluginSetupEvent.class,
+                claimProviderLifecycleInvalidator::onPluginSetup,
+                "claim provider lifecycle invalidation"
+        );
         companionXpEventDebugLogService = new CompanionXpEventDebugLogService(
                 () -> api,
                 message -> getLogger().at(Level.INFO).log(message)
         );
-        apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(persistenceRuntime);
+        apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(
+                persistenceRuntime, ownerPopulationRuntime
+        );
         apiSelfTestRunner = new ApiSelfTestRunner();
         TameworkPopulationRuntimeLifecycle.LinkedServices populationServices =
                 TameworkPopulationRuntimeLifecycle.createLinkedServices(

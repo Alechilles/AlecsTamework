@@ -25,13 +25,6 @@ class OwnerComponentWriteSafetyGuardTest {
             "com/alechilles/alecstamework/npc/components/TameworkOwnerComponent.java";
     private static final String MUTATION_SERVICE_PATH =
             "com/alechilles/alecstamework/ownership/OwnerComponentMutationService.java";
-    private static final String SELF_TEST_FIXTURE_PATH =
-            "com/alechilles/alecstamework/selftest/ApiSelfTestFixtureManager.java";
-
-    private static final String SELF_TEST_FIXTURE_WRITE = normalize(
-            "store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerUuid, ownerName))"
-    );
-
     private static final Pattern COMPONENT_TYPE_VARIABLE = Pattern.compile(
             "ComponentType\\s*<\\s*EntityStore\\s*,\\s*([A-Za-z_$.][A-Za-z0-9_$.]*)\\s*>\\s+"
                     + "([A-Za-z_$][A-Za-z0-9_$]*)"
@@ -65,8 +58,8 @@ class OwnerComponentWriteSafetyGuardTest {
                 violations.isEmpty(),
                 () -> "Raw TameworkOwnerComponent writes are forbidden outside "
                         + "OwnerComponentMutationService. Route ownership changes through prepared admission so "
-                        + "the durable population index and ECS state cannot diverge. The component codec and the "
-                        + "exact API self-test fixture write are the only exceptions.\nViolations:\n"
+                        + "the durable population index and ECS state cannot diverge. The component codec is the "
+                        + "only exception.\nViolations:\n"
                         + String.join("\n", violations)
         );
     }
@@ -84,9 +77,6 @@ class OwnerComponentWriteSafetyGuardTest {
             }
             String invocation = source.substring(matcher.start(), closeParenthesis + 1);
             if (!referencesOwnerComponent(invocation, matcher.start(), componentTypeBindings)) {
-                continue;
-            }
-            if (isAllowedSelfTestFixtureWrite(relativePath, invocation)) {
                 continue;
             }
             violations.add(formatViolation(relativePath, source, matcher.start(), invocation));
@@ -142,11 +132,6 @@ class OwnerComponentWriteSafetyGuardTest {
             }
         }
         return nearest != null && nearest.ownerComponent();
-    }
-
-    private static boolean isAllowedSelfTestFixtureWrite(String relativePath, String invocation) {
-        return SELF_TEST_FIXTURE_PATH.equals(relativePath)
-                && SELF_TEST_FIXTURE_WRITE.equals(normalize(invocation));
     }
 
     private static Set<String> captureVariables(String source, Pattern pattern) {
@@ -214,10 +199,6 @@ class OwnerComponentWriteSafetyGuardTest {
         long lineNumber = source.substring(0, offset).chars().filter(value -> value == '\n').count() + 1;
         String compactInvocation = invocation.replaceAll("\\s+", " ").trim();
         return relativePath + ":" + lineNumber + " -> " + compactInvocation;
-    }
-
-    private static String normalize(String value) {
-        return value.replaceAll("\\s+", "").replace(";", "");
     }
 
     private static List<Path> listJavaFiles() throws IOException {
