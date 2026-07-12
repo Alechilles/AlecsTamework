@@ -16,21 +16,10 @@ import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
-import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
-import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
-import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.util.ChunkUtil;
-import org.joml.Vector3i;
-import com.hypixel.hytale.server.core.entity.UUIDComponent;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
-import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -43,74 +32,8 @@ import javax.annotation.Nullable;
  */
 public final class CoopResidentStateSnapshotService {
     private final ConcurrentHashMap<UUID, CoopResidentStateSnapshot> snapshotsByNpc = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, CoopResidentStateSnapshot> recentRemovedByRole = new ConcurrentHashMap<>();
     private final CoopResidentStateSnapshotCodec snapshotCodec = new CoopResidentStateSnapshotCodec();
     private final CoopResidentStateRestorer stateRestorer = new CoopResidentStateRestorer(snapshotCodec);
-
-    @Nullable
-    public RemovedCoopResidentCapture onNpcRemoved(@Nullable Ref<EntityStore> reference,
-                                                   @Nullable RemoveReason reason,
-                                                   @Nullable Store<EntityStore> store) {
-        if (reason == RemoveReason.UNLOAD) {
-            return null;
-        }
-        if (reference == null || !reference.isValid() || store == null) {
-            return null;
-        }
-        CoopResidentComponent coopResident = store.getComponent(reference, CoopResidentComponent.getComponentType());
-        if (coopResident == null) {
-            return null;
-        }
-        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
-        UUID npcUuid = npc != null ? npc.getUuid() : resolveUuidFromComponent(reference, store);
-        if (npcUuid == null) {
-            return null;
-        }
-        CoopContext coopContext = resolveCoopContext(store, coopResident);
-        Vector3i coopLocation = coopResident.getCoopLocation();
-        if (coopContext == null || coopContext.coopId() == null || coopLocation == null) {
-            return null;
-        }
-        int residentSlot = coopContext.coopBlock() != null
-                ? CoopResidentSlotResolver.resolveResidentSlotByUuid(coopContext.coopBlock(), npcUuid)
-                : -1;
-        String roleId = resolveRoleId(npc);
-        CoopResidentStateSnapshot snapshot = createSnapshot(
-                reference,
-                store,
-                npcUuid,
-                coopContext != null ? coopContext.coopId() : null,
-                residentSlot,
-                roleId
-        );
-        if (snapshot == null) {
-            return null;
-        }
-        if (residentSlot >= 0) {
-            snapshotsByNpc.put(npcUuid, snapshot);
-            debugCoop(
-                    "state snapshot capture npc=" + npcUuid
-                            + " coop=" + coopContext.coopId()
-                            + " slot=" + residentSlot
-                            + " role=" + roleId
-                            + " reason=" + reason
-                            + " attachments=" + attachmentCount(snapshot.attachments())
-            );
-        }
-        registerRecentRemovedSnapshot(snapshot);
-        String worldName = store.getExternalData() != null && store.getExternalData().getWorld() != null
-                ? store.getExternalData().getWorld().getName()
-                : null;
-        return new RemovedCoopResidentCapture(
-                npcUuid,
-                normalizeIdentifier(worldName),
-                snapshot.coopId(),
-                coopLocation != null ? new Vector3i(coopLocation.x, coopLocation.y, coopLocation.z) : null,
-                residentSlot,
-                snapshot.roleId(),
-                snapshot
-        );
-    }
 
     public void captureSnapshot(@Nullable Ref<EntityStore> reference,
                                 @Nullable Store<EntityStore> store,
@@ -162,45 +85,6 @@ public final class CoopResidentStateSnapshotService {
             int residentSlot,
             @Nullable String roleId) {
         return createSnapshot(reference, store, npcUuid, coopId, residentSlot, roleId);
-    }
-
-    @Nullable
-    public CoopResidentStateSnapshot consumeRecentRemovedSnapshot(@Nullable String roleId, long maxAgeMs) {
-        return consumeRecentRemovedSnapshot(roleId, null, -1, maxAgeMs);
-    }
-
-    @Nullable
-    public CoopResidentStateSnapshot consumeRecentRemovedSnapshot(@Nullable String roleId,
-                                                                  @Nullable String coopId,
-                                                                  int residentSlot,
-                                                                  long maxAgeMs) {
-        String normalizedRoleId = normalizeIdentifier(roleId);
-        if (normalizedRoleId == null || maxAgeMs <= 0L) {
-            return null;
-        }
-        CoopResidentStateSnapshot snapshot = recentRemovedByRole.get(normalizedRoleId);
-        if (snapshot == null) {
-            return null;
-        }
-        String normalizedCoopId = normalizeIdentifier(coopId);
-        if (!isCoopIdMatchForRecent(snapshot.coopId(), normalizedCoopId)
-                || !isResidentSlotMatchForRecent(snapshot.residentSlot(), residentSlot)) {
-            return null;
-        }
-        long ageMs = Math.max(0L, System.currentTimeMillis() - snapshot.capturedAtMs());
-        if (ageMs > maxAgeMs) {
-            recentRemovedByRole.remove(normalizedRoleId, snapshot);
-            return null;
-        }
-        recentRemovedByRole.remove(normalizedRoleId, snapshot);
-        debugCoop(
-                "state snapshot consume recent role=" + normalizedRoleId
-                        + " npc=" + snapshot.npcUuid()
-                        + " coop=" + coopId
-                        + " slot=" + residentSlot
-                        + " ageMs=" + ageMs
-        );
-        return snapshot;
     }
 
     @Nullable
@@ -396,51 +280,6 @@ public final class CoopResidentStateSnapshotService {
         NpcDisplayNameComponentService.putPersistentAndRuntimeName(commandBuffer, reference, displayName);
     }
 
-    @Nullable
-    private UUID resolveUuidFromComponent(@Nonnull Ref<EntityStore> reference, @Nonnull Store<EntityStore> store) {
-        UUIDComponent uuidComponent = store.getComponent(reference, UUIDComponent.getComponentType());
-        return uuidComponent != null ? uuidComponent.getUuid() : null;
-    }
-
-    @Nullable
-    private String resolveRoleId(@Nullable NPCEntity npc) {
-        if (npc == null || npc.getRoleName() == null || npc.getRoleName().isBlank()) {
-            return null;
-        }
-        return npc.getRoleName().trim();
-    }
-
-    @Nullable
-    private CoopContext resolveCoopContext(@Nonnull Store<EntityStore> store,
-                                           @Nonnull CoopResidentComponent coopResident) {
-        Vector3i coopLocation = coopResident.getCoopLocation();
-        if (coopLocation == null) {
-            return null;
-        }
-        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
-        if (world == null || world.getChunkStore() == null) {
-            return null;
-        }
-        WorldChunk worldChunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(coopLocation.x, coopLocation.z));
-        if (worldChunk == null) {
-            return null;
-        }
-        Ref<ChunkStore> blockRef = worldChunk.getBlockComponentEntity(coopLocation.x, coopLocation.y, coopLocation.z);
-        if (blockRef == null || !blockRef.isValid()) {
-            return null;
-        }
-        Store<ChunkStore> chunkStore = world.getChunkStore().getStore();
-        if (chunkStore == null) {
-            return null;
-        }
-        CoopBlock coopBlock = chunkStore.getComponent(blockRef, CoopBlock.getComponentType());
-        if (coopBlock == null) {
-            return null;
-        }
-        FarmingCoopAsset coopAsset = coopBlock.getCoopAsset();
-        return new CoopContext(coopAsset != null ? coopAsset.getId() : null, coopBlock);
-    }
-
     private boolean isCoopIdMatch(@Nullable String left, @Nullable String right) {
         if (left == null || right == null) {
             return false;
@@ -479,60 +318,6 @@ public final class CoopResidentStateSnapshotService {
             return 0;
         }
         return attachments.getAttachmentIds().size();
-    }
-
-    private void registerRecentRemovedSnapshot(@Nonnull CoopResidentStateSnapshot snapshot) {
-        if (!isEligibleForRecentSnapshot(snapshot)) {
-            return;
-        }
-        String normalizedRoleId = normalizeIdentifier(snapshot.roleId());
-        if (normalizedRoleId == null) {
-            return;
-        }
-        recentRemovedByRole.put(normalizedRoleId, snapshot);
-        debugCoop(
-                "state snapshot recent register role=" + normalizedRoleId
-                        + " npc=" + snapshot.npcUuid()
-                        + " coop=" + snapshot.coopId()
-                        + " slot=" + snapshot.residentSlot()
-        );
-    }
-
-    private boolean isEligibleForRecentSnapshot(@Nonnull CoopResidentStateSnapshot snapshot) {
-        String normalizedRoleId = normalizeIdentifier(snapshot.roleId());
-        if (normalizedRoleId == null) {
-            return false;
-        }
-        TameworkTamedComponent tamed = snapshot.tamed();
-        boolean explicitlyTamed = tamed != null && tamed.isTamed();
-        TameworkOwnerComponent owner = snapshot.owner();
-        boolean hasOwner = owner != null && owner.getOwnerId() != null;
-        TameworkCommandLinksComponent commandLinks = snapshot.commandLinks();
-        boolean hasLinks = commandLinks != null
-                && commandLinks.getToolIds() != null
-                && commandLinks.getToolIds().length > 0;
-        boolean roleLooksTamed = normalizedRoleId.startsWith("tamed_");
-        return explicitlyTamed || hasOwner || hasLinks || roleLooksTamed;
-    }
-
-    private boolean isCoopIdMatchForRecent(@Nullable String snapshotCoopId, @Nullable String expectedCoopId) {
-        if (expectedCoopId == null) {
-            return true;
-        }
-        if (snapshotCoopId == null) {
-            return true;
-        }
-        return snapshotCoopId.equals(expectedCoopId);
-    }
-
-    private boolean isResidentSlotMatchForRecent(int snapshotResidentSlot, int expectedResidentSlot) {
-        if (expectedResidentSlot < 0) {
-            return true;
-        }
-        if (snapshotResidentSlot < 0) {
-            return true;
-        }
-        return snapshotResidentSlot == expectedResidentSlot;
     }
 
     @Nullable
@@ -612,9 +397,6 @@ public final class CoopResidentStateSnapshotService {
         return new TameworkAttachmentsComponent(configId, modelAttachments);
     }
 
-    private record CoopContext(@Nullable String coopId, @Nonnull CoopBlock coopBlock) {
-    }
-
     public record CoopResidentStateSnapshot(UUID npcUuid,
                                             @Nullable String coopId,
                                             int residentSlot,
@@ -635,12 +417,4 @@ public final class CoopResidentStateSnapshotService {
                                             long capturedAtMs) {
     }
 
-    public record RemovedCoopResidentCapture(@Nonnull UUID npcUuid,
-                                             @Nullable String worldName,
-                                             @Nullable String coopId,
-                                             @Nullable Vector3i coopLocation,
-                                             int residentSlot,
-                                             @Nullable String roleId,
-                                             @Nonnull CoopResidentStateSnapshot snapshot) {
-    }
 }
