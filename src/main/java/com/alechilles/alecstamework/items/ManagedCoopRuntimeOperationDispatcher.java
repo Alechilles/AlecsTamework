@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.items.ManagedCoopCaptureCoordinator.CaptureOutcome;
 import com.alechilles.alecstamework.items.ManagedCoopCaptureCoordinator.OutcomeStatus;
 import com.alechilles.alecstamework.items.ManagedCoopCaptureCoordinator.RetirementReady;
@@ -7,10 +8,14 @@ import com.alechilles.alecstamework.items.ManagedCoopCaptureSourceRetirementServ
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.ReleaseAttempt;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.ReleaseOutcome;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityRecord;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -27,6 +32,11 @@ import javax.annotation.Nullable;
  * this boundary.</p>
  */
 public final class ManagedCoopRuntimeOperationDispatcher {
+    public enum ReleaseSitePolicy {
+        EXACT_MANAGED_COOP,
+        EXACT_MANAGED_OR_DISABLED_REMOVAL
+    }
+
     public enum DispatchStatus {
         CAPTURED,
         CAPTURE_DEDUPLICATED,
@@ -46,21 +56,29 @@ public final class ManagedCoopRuntimeOperationDispatcher {
 
     /** Immutable physical release inputs copied before any persistence continuation. */
     public record ReleaseSite(@Nonnull String worldName,
+                              @Nonnull String expectedCoopId,
                               int blockX,
                               int blockY,
                               int blockZ,
                               int blockRotationIndex,
                               double offsetX,
                               double offsetY,
-                              double offsetZ) {
+                              double offsetZ,
+                              @Nonnull ReleaseSitePolicy policy) {
         public ReleaseSite {
             if (worldName == null || worldName.isBlank()) {
                 throw new IllegalArgumentException("worldName must not be blank");
             }
+            worldName = worldName.trim().toLowerCase(Locale.ROOT);
+            if (expectedCoopId == null || expectedCoopId.isBlank()) {
+                throw new IllegalArgumentException("expectedCoopId must not be blank");
+            }
+            expectedCoopId = expectedCoopId.trim().toLowerCase(Locale.ROOT);
             if (!Double.isFinite(offsetX) || !Double.isFinite(offsetY)
                     || !Double.isFinite(offsetZ)) {
                 throw new IllegalArgumentException("release offsets must be finite");
             }
+            Objects.requireNonNull(policy, "policy");
         }
 
         @Nonnull
@@ -68,11 +86,48 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             var offset = context.config().getLifecycleRules().getResidentSpawnOffset();
             return new ReleaseSite(
                     context.worldName(),
+                    context.coopId(),
                     context.authorityKey().x(),
                     context.authorityKey().y(),
                     context.authorityKey().z(),
                     context.blockRotationIndex(),
-                    offset.getX(), offset.getY(), offset.getZ());
+                    offset.getX(), offset.getY(), offset.getZ(),
+                    ReleaseSitePolicy.EXACT_MANAGED_COOP);
+        }
+
+        /** Reconstructs the immutable site for an authority durably disabled after block removal. */
+        @Nonnull
+        static ReleaseSite copyOfDisabled(@Nonnull AuthorityRecord authority) {
+            Objects.requireNonNull(authority, "authority");
+            if (!authority.active() || authority.state() != AuthorityState.DISABLED
+                    || !authority.authorityId().equals(authority.authorityKey().authorityId())) {
+                throw new IllegalArgumentException("authority is not a durable disabled marker");
+            }
+            TwCoopConfig config = null;
+            try {
+                config = TwCoopConfig.resolveForCoop(authority.coopId());
+            } catch (RuntimeException ignored) {
+                // The durable removal path remains recoverable if config assets are unavailable.
+            }
+            double offsetX = 0.0;
+            double offsetY = 0.0;
+            double offsetZ = 3.0;
+            if (config != null) {
+                var offset = config.getLifecycleRules().getResidentSpawnOffset();
+                offsetX = offset.getX();
+                offsetY = offset.getY();
+                offsetZ = offset.getZ();
+            }
+            ManagedCoopAuthorityKey key = authority.authorityKey();
+            return new ReleaseSite(
+                    key.worldName(), authority.coopId(), key.x(), key.y(), key.z(), 0,
+                    offsetX, offsetY, offsetZ,
+                    ReleaseSitePolicy.EXACT_MANAGED_OR_DISABLED_REMOVAL);
+        }
+
+        @Nonnull
+        ManagedCoopAuthorityKey authorityKey() {
+            return new ManagedCoopAuthorityKey(worldName, blockX, blockY, blockZ);
         }
     }
 
@@ -84,6 +139,19 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             Objects.requireNonNull(claim, "claim");
             Objects.requireNonNull(resident, "resident");
             Objects.requireNonNull(site, "site");
+            if (!resident.authorityKey().equals(site.authorityKey())
+                    || !resident.coopId().equalsIgnoreCase(site.expectedCoopId())) {
+                throw new IllegalArgumentException(
+                        "release resident does not match immutable physical site");
+            }
+            if (!claim.authorityKey().equals(site.authorityKey())
+                    || !claim.coopId().equalsIgnoreCase(site.expectedCoopId())
+                    || !claim.residentId().equals(resident.residentId())
+                    || claim.residentSlot() != resident.residentSlot()
+                    || !claim.profileId().equals(resident.profileId())) {
+                throw new IllegalArgumentException(
+                        "release claim does not match immutable resident site");
+            }
         }
     }
 
@@ -103,6 +171,23 @@ public final class ManagedCoopRuntimeOperationDispatcher {
                 retirementService::retire,
                 releaseCoordinator::coordinate,
                 new HytaleManagedCoopReleaseProjectionGateway(releaseAdapter),
+                UUID::randomUUID);
+    }
+
+    /** Uses paired v5 authority evidence so disabled removed-coop sites can be revalidated. */
+    public ManagedCoopRuntimeOperationDispatcher(
+            @Nonnull ManagedCoopCaptureRuntimeAdapter captureAdapter,
+            @Nonnull ManagedCoopCaptureSourceRetirementService retirementService,
+            @Nonnull ManagedCoopReleaseCoordinator releaseCoordinator,
+            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
+            @Nonnull ManagedCoopResidentIndex residentIndex,
+            @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes) {
+        this(
+                captureAdapter::capture,
+                retirementService::retire,
+                releaseCoordinator::coordinate,
+                new HytaleManagedCoopReleaseProjectionGateway(
+                        releaseAdapter, residentIndex, compositeIndexes),
                 UUID::randomUUID);
     }
 
@@ -155,12 +240,31 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             @Nonnull ResidentRecord resident,
             long requestedAtMs) {
         Objects.requireNonNull(context, "context");
-        Objects.requireNonNull(resident, "resident");
         final ReleaseSite site;
+        try {
+            site = ReleaseSite.copyOf(context);
+        } catch (RuntimeException exception) {
+            return completed(DispatchStatus.RELEASE_FAILED, null,
+                    failureDetail("managed_coop_release_site", exception));
+        }
+        return release(site, resident, requestedAtMs);
+    }
+
+    /** Starts a durable release from a copied site, including confirmed removed-coop recovery. */
+    @Nonnull
+    public CompletableFuture<DispatchOutcome> release(
+            @Nonnull ReleaseSite site,
+            @Nonnull ResidentRecord resident,
+            long requestedAtMs) {
+        Objects.requireNonNull(site, "site");
+        Objects.requireNonNull(resident, "resident");
         final UUID plannedUuid;
         final CompletableFuture<ReleaseOutcome> release;
         try {
-            site = ReleaseSite.copyOf(context);
+            if (!resident.authorityKey().equals(site.authorityKey())
+                    || !resident.coopId().equalsIgnoreCase(site.expectedCoopId())) {
+                throw new IllegalArgumentException("release resident does not match release site");
+            }
             plannedUuid = Objects.requireNonNull(plannedUuidSource.get(), "planned release UUID");
             release = releases.coordinate(new ReleaseAttempt(resident, plannedUuid, requestedAtMs));
         } catch (RuntimeException exception) {

@@ -286,9 +286,12 @@ final class CoopLifecycleOperationTransactions {
     @Nullable
     private String capturePrecondition(Connection connection, CaptureRequest request) throws SQLException {
         String common = commonPrecondition(connection, request.operationId(), request.profileId(),
-                request.authorityKey(), request.coopId(), request.residentSlot());
+                request.authorityKey(), request.residentSlot());
         if (common != null) {
             return common;
+        }
+        if (!store.authorityIsManaged(connection, request.authorityKey(), request.coopId())) {
+            return "managed_authority_not_found";
         }
         ResidentRecord byId = residents.loadByIdInTransaction(connection, request.residentId());
         ResidentRecord byProfile = residents.loadActiveByProfileInTransaction(connection, request.profileId());
@@ -361,9 +364,13 @@ final class CoopLifecycleOperationTransactions {
     @Nullable
     private String releasePrecondition(Connection connection, ReleaseRequest request) throws SQLException {
         String common = commonPrecondition(connection, request.operationId(), request.profileId(),
-                request.authorityKey(), request.coopId(), request.residentSlot());
+                request.authorityKey(), request.residentSlot());
         if (common != null) {
             return common;
+        }
+        if (!store.authorityAllowsRelease(
+                connection, request.authorityKey(), request.coopId())) {
+            return "release_authority_not_found";
         }
         ResidentRecord resident = residents.loadByIdInTransaction(connection, request.residentId());
         if (!housedReleaseMatches(request, resident)
@@ -391,13 +398,9 @@ final class CoopLifecycleOperationTransactions {
                                       String operationId,
                                       String profileId,
                                       ManagedCoopAuthorityKey key,
-                                      String coopId,
                                       int residentSlot) throws SQLException {
         if (!store.profileExists(connection, profileId)) {
             return "profile_not_found";
-        }
-        if (!store.authorityIsManaged(connection, key, coopId)) {
-            return "managed_authority_not_found";
         }
         return store.findActiveConflict(connection, operationId, profileId, key, residentSlot) == null
                 ? null

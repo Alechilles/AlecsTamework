@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRep
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityRecord;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import java.util.List;
@@ -102,8 +104,7 @@ final class ManagedCoopLifecycleRecoveryEvidence {
     private Decision fromAction(RecoveryAction action, SnapshotPair pair) {
         return switch (action.kind()) {
             case NONE -> new Decision(DecisionStatus.NONE, null, null);
-            case WAIT_FOR_COOP_CONTEXT ->
-                    new Decision(DecisionStatus.WAITING, null, action.detail());
+            case WAIT_FOR_COOP_CONTEXT -> release(action, pair);
             case BLOCKED_UNSAFE_STATE -> blocked(action.detail());
             case RESERVED_FOR_IMPORT ->
                     new Decision(DecisionStatus.RESERVED_IMPORT, null, action.detail());
@@ -142,12 +143,24 @@ final class ManagedCoopLifecycleRecoveryEvidence {
 
     @Nonnull
     private Decision release(RecoveryAction action, SnapshotPair pair) {
-        if (action.operation() == null || action.context() == null) {
-            return blocked("release_recovery_context_or_operation_missing");
+        if (action.operation() == null) {
+            return blocked("release_recovery_operation_missing");
         }
         final ReleaseSite site;
         try {
-            site = ReleaseSite.copyOf(action.context());
+            if (action.context() != null) {
+                site = ReleaseSite.copyOf(action.context());
+            } else {
+                AuthorityRecord authority = pair.residents().authority(
+                        action.operation().authorityKey(), action.operation().coopId());
+                if (authority == null || !authority.active()
+                        || authority.state() != AuthorityState.DISABLED) {
+                    return new Decision(DecisionStatus.WAITING, null,
+                            action.detail() != null ? action.detail()
+                                    : "release_recovery_waiting_for_loaded_coop");
+                }
+                site = ReleaseSite.copyOfDisabled(authority);
+            }
         } catch (RuntimeException exception) {
             return blocked(detail("release_recovery_site", exception));
         }
@@ -155,7 +168,7 @@ final class ManagedCoopLifecycleRecoveryEvidence {
             return blocked("managed_coop_index_epoch_changed");
         }
         return ready(new RecoveryCommand(
-                action.kind(), action.operation(), null, null, site,
+                ActionKind.RESUME_RELEASE, action.operation(), null, null, site,
                 pair.residents().revision(), pair.operations().revision()));
     }
 

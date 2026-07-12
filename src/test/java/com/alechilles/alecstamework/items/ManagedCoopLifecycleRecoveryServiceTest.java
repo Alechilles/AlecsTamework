@@ -193,6 +193,46 @@ class ManagedCoopLifecycleRecoveryServiceTest {
     }
 
     @Test
+    void disabledRemovedAuthorityRecoversReleaseWithoutPhysicalContext() {
+        Fixture fixture = releaseFixture(AuthorityState.DISABLED);
+        AtomicInteger recoveryCalls = new AtomicInteger();
+        AtomicReference<ReleaseProjectionCommand> projected = new AtomicReference<>();
+        ManagedCoopReleaseCoordinator.SpawnReady claim = releaseClaim(
+                fixture, fixture.operation.operationId());
+        ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
+                fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
+                ready -> CompletableFuture.completedFuture(null),
+                (ready, resident) -> CompletableFuture.completedFuture(null),
+                operation -> {
+                    recoveryCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            new ManagedCoopReleaseRecoveryService.RecoveryOutcome(
+                                    ManagedCoopReleaseRecoveryService.Status.READY,
+                                    claim, fixture.resident, null));
+                },
+                command -> {
+                    projected.set(command);
+                    return CompletableFuture.completedFuture(
+                            new ManagedCoopReleaseSpawnOrchestrator.Outcome(
+                                    ManagedCoopReleaseSpawnOrchestrator.Status.FINALIZED,
+                                    PLANNED, false, true, null));
+                },
+                () -> -50L);
+
+        ManagedCoopLifecycleRecoveryService.Outcome outcome =
+                service.recover("world", List.of()).join();
+
+        assertEquals(ManagedCoopLifecycleRecoveryService.RecoveryStatus.RELEASE_COMPLETED,
+                outcome.status());
+        assertEquals(1, recoveryCalls.get());
+        assertNotNull(projected.get());
+        assertEquals(
+                ManagedCoopRuntimeOperationDispatcher.ReleaseSitePolicy
+                        .EXACT_MANAGED_OR_DISABLED_REMOVAL,
+                projected.get().site().policy());
+    }
+
+    @Test
     void releaseRecoveryResultMustMatchSelectedOperationBeforeProjection() throws Exception {
         Fixture fixture = releaseFixture();
         AtomicInteger projections = new AtomicInteger();
@@ -286,13 +326,17 @@ class ManagedCoopLifecycleRecoveryServiceTest {
     }
 
     private static Fixture releaseFixture() {
+        return releaseFixture(AuthorityState.TWORK_MANAGED);
+    }
+
+    private static Fixture releaseFixture(AuthorityState authorityState) {
         String json = snapshotJson(false);
         String hash = ManagedCoopCaptureClaimValidator.snapshotSha256(json);
         ResidentRecord resident = resident(ResidentState.RELEASING, json, hash);
         OperationRecord operation = operation(
                 "release-op", OperationKind.RELEASE, OperationState.SPAWN_CLAIMED,
                 1L, null, PLANNED, hash);
-        return new Fixture(resident, operation);
+        return new Fixture(resident, operation, authorityState);
     }
 
     private static ManagedCoopReleaseCoordinator.SpawnReady releaseClaim(
@@ -382,8 +426,16 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                 new ManagedCoopLifecycleOperationIndex();
         private ResidentRecord resident;
         private OperationRecord operation;
+        private AuthorityState authorityState;
 
         private Fixture(ResidentRecord resident, OperationRecord operation) {
+            this(resident, operation, AuthorityState.TWORK_MANAGED);
+        }
+
+        private Fixture(ResidentRecord resident,
+                        OperationRecord operation,
+                        AuthorityState authorityState) {
+            this.authorityState = authorityState;
             rebuild(resident, operation);
         }
 
@@ -392,7 +444,7 @@ class ManagedCoopLifecycleRecoveryServiceTest {
             operation = nextOperation;
             AuthorityRecord authority = new AuthorityRecord(
                     AUTHORITY.authorityId(), AUTHORITY, COOP,
-                    AuthorityState.TWORK_MANAGED, true, 1,
+                    authorityState, true, 1,
                     -100L, -90L, null);
             assertTrue(residents.rebuild(
                     ManagedCoopReadResult.loaded(List.of(authority)),

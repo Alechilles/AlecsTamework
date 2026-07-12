@@ -184,6 +184,29 @@ final class CoopLifecycleOperationStore {
         }
     }
 
+    /** Disabled authorities may finish durable ejection, but may never admit another capture. */
+    boolean authorityAllowsRelease(Connection connection,
+                                   ManagedCoopAuthorityKey key,
+                                   String coopId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT 1 FROM managed_coop_authority
+                WHERE authority_id = ? AND world_name = ? AND x = ? AND y = ? AND z = ?
+                  AND lower(coop_id) = ?
+                  AND authority_state IN ('TWORK_MANAGED', 'DISABLED') AND active = 1
+                LIMIT 1
+                """)) {
+            statement.setString(1, key.authorityId());
+            statement.setString(2, key.worldName());
+            statement.setInt(3, key.x());
+            statement.setInt(4, key.y());
+            statement.setInt(5, key.z());
+            statement.setString(6, normalizeCoopId(coopId));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        }
+    }
+
     boolean profileExists(Connection connection, String profileId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT 1 FROM npc_profiles WHERE profile_id = ? LIMIT 1")) {

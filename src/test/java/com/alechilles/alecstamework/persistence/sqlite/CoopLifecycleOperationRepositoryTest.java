@@ -21,6 +21,7 @@ import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOpera
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.ReleaseRequest;
 import static com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import static com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
+import static com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -132,6 +133,26 @@ class CoopLifecycleOperationRepositoryTest {
                 committed(operations.finalizeRelease("release-a", 2L, 240L)).status());
         assertEquals(-1, residents.findFirstAvailableSlot(COOP, 1));
         assertEquals(List.of("DEPLOYED", "SOURCE"), activeClaimKinds("resident-a"));
+    }
+
+    @Test
+    void disabledAuthorityAllowsEjectionReleaseButRejectsNewCapture() throws Exception {
+        houseResidentA();
+        var disabled = committed(residents.transitionAuthority(
+                COOP, AuthorityState.TWORK_MANAGED, AuthorityState.DISABLED,
+                "confirmed_removed", 190L));
+        assertTrue(disabled.succeeded());
+
+        MutationResult release = committed(operations.prepareRelease(
+                release("release-disabled", TARGET_A, 0L, 200L)));
+        assertOperation(release, MutationStatus.APPLIED, OperationState.PREPARED, true, 0L);
+
+        CaptureRequest capture = capture(
+                "capture-disabled", "resident-b", "profile-b", SOURCE_B, 1, 0L, 210L);
+        MutationResult rejected = committed(operations.prepareCapture(capture));
+        assertEquals(MutationStatus.CONFLICT, rejected.status());
+        assertEquals("managed_authority_not_found", rejected.detail());
+        assertNull(operations.load("capture-disabled"));
     }
 
     @Test

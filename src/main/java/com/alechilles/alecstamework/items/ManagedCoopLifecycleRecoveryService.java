@@ -83,7 +83,8 @@ public final class ManagedCoopLifecycleRecoveryService {
                 entityRetirements::retire,
                 itemRetirements::recover,
                 releaseRecovery::resume,
-                new HytaleManagedCoopReleaseProjectionGateway(releaseAdapter)::project,
+                new HytaleManagedCoopReleaseProjectionGateway(
+                        releaseAdapter, residentIndex, compositeIndexes)::project,
                 System::currentTimeMillis
         );
     }
