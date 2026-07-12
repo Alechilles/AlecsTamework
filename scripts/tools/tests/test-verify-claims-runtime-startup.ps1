@@ -413,14 +413,37 @@ $probe = New-ClaimsRuntimeSqliteReadinessProbe -JavaExecutable $Java `
 
     $postEvidence = [pscustomobject]@{
         integrityCheck = "ok"; journalMode = "wal"; synchronous = 2
-        migrationV6Count = 1; coverageTotal = 7; coverageReady = 7
+        migrationV6Count = 1; coverageTotal = 7; coverageReady = 7; coverageErrorCount = 0
         coverageDistinctDimensions = 7
         coverageDimensions = "BASE_CONTAINER_BLOCKS,CUSTOM_CONTAINERS,GLOBAL_OWNER,PER_WORLD_OWNER,PLAYER_SAVES,PROFILE_STATE,WORLD_ENTITIES"
+        coverageRows = "BASE_CONTAINER_BLOCKS:catalog:base-containers:READY,CUSTOM_CONTAINERS:catalog:custom-containers:READY,GLOBAL_OWNER:owner-population:global:READY,PER_WORLD_OWNER:owner-population:per-world:READY,PLAYER_SAVES:catalog:player-saves:READY,PROFILE_STATE:catalog:profile-state:READY,WORLD_ENTITIES:catalog:world-entities:READY"
+        perWorldOwnerError = ""
         scanSessionState = "READY"; nonterminalOperations = 0
         canonicalRows = 78; profileRows = 78; missingCanonicalRows = 0; orphanCanonicalRows = 0
     }
     $preservation = Test-ClaimsRuntimeSqliteEvidence -Evidence $postEvidence -ExpectedCanonicalRows 77
     Assert-ClaimsTest $preservation.passed "upgrade preservation accepts growth while enforcing a 77-row floor"
+    $unknownWorldEvidence = $postEvidence.PSObject.Copy()
+    $unknownWorldEvidence.coverageReady = 6
+    $unknownWorldEvidence.coverageErrorCount = 1
+    $unknownWorldEvidence.coverageRows = $postEvidence.coverageRows.Replace(
+        "PER_WORLD_OWNER:owner-population:per-world:READY",
+        "PER_WORLD_OWNER:owner-population:per-world:RECONCILING"
+    )
+    $unknownWorldEvidence.perWorldOwnerError = "owned-profiles-have-unknown-world"
+    $unknownWorldEvidence.scanSessionState = "ACTIVE"
+    $globalSafe = Test-ClaimsRuntimeSqliteEvidence -Evidence $unknownWorldEvidence `
+        -ExpectedCanonicalRows 77 -AllowGlobalScopeUnknownWorld
+    Assert-ClaimsTest ($globalSafe.passed -and
+        $globalSafe.readinessMode -ceq "global-ready-per-world-unknown-scope") `
+        "GLOBAL scope accepts only the explicit unknown-world per-world sentinel"
+    Assert-ClaimsTest (-not (Test-ClaimsRuntimeSqliteEvidence `
+        -Evidence $unknownWorldEvidence -ExpectedCanonicalRows 77).passed) `
+        "unknown per-world scope is not accepted without an explicit GLOBAL-scope contract"
+    $unknownWorldEvidence.perWorldOwnerError = "different-reason"
+    Assert-ClaimsTest (-not (Test-ClaimsRuntimeSqliteEvidence -Evidence $unknownWorldEvidence `
+        -ExpectedCanonicalRows 77 -AllowGlobalScopeUnknownWorld).passed) `
+        "a different partial-readiness reason remains a hard failure"
     $postEvidence.coverageDimensions = "A,B,C,D,E,F,G"
     Assert-ClaimsTest (-not (Test-ClaimsRuntimeSqliteEvidence -Evidence $postEvidence).passed) `
         "seven arbitrary coverage dimension names cannot satisfy readiness"

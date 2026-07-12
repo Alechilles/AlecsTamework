@@ -261,7 +261,8 @@ function Invoke-ClaimsRuntimeVerification {
         providerContractEvidence = $validateContracts
         sqliteChecksPlanned = @(
             "integrity_check=ok", "journal_mode=wal", "synchronous=FULL", "schema-v6",
-            "all-seven-coverage-dimensions-ready", "scan-session-ready", "zero-nonterminal-operations",
+            "seven-coverage-dimensions-present", "configured-owner-scope-ready",
+            "unknown-per-world-scope-explicitly-fail-closed", "zero-nonterminal-operations",
             "canonical-profile-row-consistency"
         )
         manifests = $manifests
@@ -346,7 +347,7 @@ function Invoke-ClaimsRuntimeVerification {
             $readinessProbe = New-ClaimsRuntimeSqliteReadinessProbe `
                 -JavaExecutable $inputs.javaExecutable -BuiltArtifact $inputs.builtArtifact `
                 -ProbeSource $probeSource -DatabasePath $context.databasePath `
-                -ExpectedCanonicalRows $expectedUpgradeRows
+                -ExpectedCanonicalRows $expectedUpgradeRows -AllowGlobalScopeUnknownWorld
         }
         try {
             $processResult = Invoke-ClaimsRuntimeServerProcess -Context $context -Inputs $inputs `
@@ -384,7 +385,8 @@ function Invoke-ClaimsRuntimeVerification {
                 -DatabasePath $context.databasePath
             $baseline = if ($scenario.copiedUpgrade) { $expectedUpgradeRows } else { -1 }
             $sqliteValidation = Test-ClaimsRuntimeSqliteEvidence `
-                -Evidence $sqliteEvidence -ExpectedCanonicalRows $baseline
+                -Evidence $sqliteEvidence -ExpectedCanonicalRows $baseline `
+                -AllowGlobalScopeUnknownWorld:$scenario.copiedUpgrade
             Write-ClaimsRuntimeJson -Path (Join-Path $context.evidence "sqlite-evidence.json") `
                 -Value ([pscustomobject][ordered]@{ evidence = $sqliteEvidence; validation = $sqliteValidation })
             if ($scenario.copiedUpgrade) {

@@ -18,7 +18,8 @@ function New-ClaimsRuntimeSqliteReadinessProbe {
         [Parameter(Mandatory = $true)][string] $BuiltArtifact,
         [Parameter(Mandatory = $true)][string] $ProbeSource,
         [Parameter(Mandatory = $true)][string] $DatabasePath,
-        [Parameter(Mandatory = $true)][long] $ExpectedCanonicalRows
+        [Parameter(Mandatory = $true)][long] $ExpectedCanonicalRows,
+        [switch] $AllowGlobalScopeUnknownWorld
     )
 
     # GetNewClosure creates a dynamic module that does not inherit this module's private imports.
@@ -35,7 +36,8 @@ function New-ClaimsRuntimeSqliteReadinessProbe {
             $sampleEvidence = & $invokeSqliteProbe -JavaExecutable $JavaExecutable `
                 -BuiltArtifact $BuiltArtifact -ProbeSource $ProbeSource -DatabasePath $DatabasePath
             $sampleValidation = & $testSqliteEvidence -Evidence $sampleEvidence `
-                -ExpectedCanonicalRows $ExpectedCanonicalRows
+                -ExpectedCanonicalRows $ExpectedCanonicalRows `
+                -AllowGlobalScopeUnknownWorld:$AllowGlobalScopeUnknownWorld
             [pscustomobject][ordered]@{
                 ready = $sampleValidation.passed
                 sampledAtUtc = [DateTime]::UtcNow.ToString("o")
@@ -45,6 +47,7 @@ function New-ClaimsRuntimeSqliteReadinessProbe {
                 nonterminalOperations = $sampleEvidence.nonterminalOperations
                 canonicalRows = $sampleEvidence.canonicalRows
                 profileRows = $sampleEvidence.profileRows
+                readinessMode = $sampleValidation.readinessMode
                 failedChecks = @($sampleValidation.checks | Where-Object { -not $_.passed } | ForEach-Object name)
             }
         } catch {

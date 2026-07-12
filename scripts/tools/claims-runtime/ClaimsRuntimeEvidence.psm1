@@ -294,12 +294,16 @@ public final class ClaimsRuntimeSqliteProbe {
                 "SELECT COUNT(*) FROM companion_population_reconciliation"));
             emit("coverage_ready", tableScalar(connection, "companion_population_reconciliation",
                 "SELECT COUNT(*) FROM companion_population_reconciliation WHERE state = 'READY'"));
+            emit("coverage_error_count", tableScalar(connection, "companion_population_reconciliation",
+                "SELECT COUNT(*) FROM companion_population_reconciliation WHERE last_error IS NOT NULL AND TRIM(last_error) <> ''"));
             emit("coverage_distinct_dimensions", tableScalar(connection, "companion_population_reconciliation",
                 "SELECT COUNT(DISTINCT coverage_dimension) FROM companion_population_reconciliation"));
             emit("coverage_dimensions", tableScalar(connection, "companion_population_reconciliation",
                 "SELECT group_concat(coverage_dimension, ',') FROM (SELECT DISTINCT coverage_dimension FROM companion_population_reconciliation ORDER BY coverage_dimension)"));
             emit("coverage_rows", tableScalar(connection, "companion_population_reconciliation",
                 "SELECT group_concat(coverage_dimension || ':' || coverage_key || ':' || state, ',') FROM (SELECT coverage_dimension, coverage_key, state FROM companion_population_reconciliation ORDER BY coverage_dimension, coverage_key)"));
+            emit("per_world_owner_error", tableScalar(connection, "companion_population_reconciliation",
+                "SELECT COALESCE(last_error, '') FROM companion_population_reconciliation WHERE coverage_key = 'owner-population:per-world'"));
             emit("scan_session_state", tableScalar(connection, "companion_population_scan_session",
                 "SELECT state FROM companion_population_scan_session WHERE singleton_id = 1"));
             emit("nonterminal_operations", tableScalar(connection, "companion_population_operations",
@@ -380,8 +384,9 @@ function Invoke-ClaimsRuntimeSqliteProbe {
     }
     $required = @(
         "database_path", "integrity_check", "journal_mode", "synchronous",
-        "migration_v6_count", "migration_versions", "coverage_total", "coverage_ready",
-        "coverage_distinct_dimensions", "coverage_dimensions", "coverage_rows", "scan_session_state",
+        "migration_v6_count", "migration_versions", "coverage_total", "coverage_ready", "coverage_error_count",
+        "coverage_distinct_dimensions", "coverage_dimensions", "coverage_rows", "per_world_owner_error",
+        "scan_session_state",
         "nonterminal_operations", "canonical_rows", "profile_rows", "missing_canonical_rows",
         "orphan_canonical_rows", "owned_canonical_rows", "physical_canonical_rows", "lifecycle_rows"
     )
@@ -399,9 +404,11 @@ function Invoke-ClaimsRuntimeSqliteProbe {
         migrationVersions = $values.migration_versions
         coverageTotal = [long]$values.coverage_total
         coverageReady = [long]$values.coverage_ready
+        coverageErrorCount = [long]$values.coverage_error_count
         coverageDistinctDimensions = [long]$values.coverage_distinct_dimensions
         coverageDimensions = $values.coverage_dimensions
         coverageRows = $values.coverage_rows
+        perWorldOwnerError = $values.per_world_owner_error
         scanSessionState = $values.scan_session_state
         nonterminalOperations = [long]$values.nonterminal_operations
         canonicalRows = [long]$values.canonical_rows
@@ -419,7 +426,8 @@ function Test-ClaimsRuntimeSqliteEvidence {
     param(
         [Parameter(Mandatory = $true)]
         [psobject] $Evidence,
-        [long] $ExpectedCanonicalRows = -1
+        [long] $ExpectedCanonicalRows = -1,
+        [switch] $AllowGlobalScopeUnknownWorld
     )
 
     $checks = [System.Collections.Generic.List[object]]::new()
@@ -430,13 +438,28 @@ function Test-ClaimsRuntimeSqliteEvidence {
     Add-Check "journal-mode" ($Evidence.journalMode -ieq "wal") $Evidence.journalMode "wal"
     Add-Check "synchronous" ($Evidence.synchronous -eq 2) $Evidence.synchronous "2 (FULL)"
     Add-Check "schema-v6" ($Evidence.migrationV6Count -eq 1) $Evidence.migrationV6Count 1
+    $fullyReady = $Evidence.coverageReady -eq $Evidence.coverageTotal `
+        -and $Evidence.coverageErrorCount -eq 0 `
+        -and $Evidence.scanSessionState -ceq "READY"
+    $notReadyRows = @(([string]$Evidence.coverageRows -split ',') |
+        Where-Object { $_ -notmatch ':READY$' })
+    $unknownPerWorld = $AllowGlobalScopeUnknownWorld `
+        -and $Evidence.coverageReady -eq ($Evidence.coverageTotal - 1) `
+        -and $Evidence.coverageErrorCount -eq 1 `
+        -and $Evidence.scanSessionState -ceq "ACTIVE" `
+        -and $Evidence.perWorldOwnerError -ceq "owned-profiles-have-unknown-world" `
+        -and $notReadyRows.Count -eq 1 `
+        -and $notReadyRows[0] -ceq "PER_WORLD_OWNER:owner-population:per-world:RECONCILING"
+    $readinessAccepted = $fullyReady -or $unknownPerWorld
     Add-Check "coverage-row-count" ($Evidence.coverageTotal -ge 7) $Evidence.coverageTotal ">= 7"
-    Add-Check "coverage-ready" ($Evidence.coverageReady -eq $Evidence.coverageTotal) $Evidence.coverageReady $Evidence.coverageTotal
+    Add-Check "coverage-ready" $readinessAccepted $Evidence.coverageReady `
+        "all rows READY or exact GLOBAL-scope unknown-world sentinel"
     Add-Check "coverage-dimensions" ($Evidence.coverageDistinctDimensions -eq 7) $Evidence.coverageDistinctDimensions 7
     $expectedDimensions = "BASE_CONTAINER_BLOCKS,CUSTOM_CONTAINERS,GLOBAL_OWNER,PER_WORLD_OWNER,PLAYER_SAVES,PROFILE_STATE,WORLD_ENTITIES"
     Add-Check "coverage-dimension-set" ($Evidence.coverageDimensions -ceq $expectedDimensions) `
         $Evidence.coverageDimensions $expectedDimensions
-    Add-Check "scan-session" ($Evidence.scanSessionState -ceq "READY") $Evidence.scanSessionState "READY"
+    Add-Check "scan-session" $readinessAccepted $Evidence.scanSessionState `
+        "READY or ACTIVE only for exact GLOBAL-scope unknown-world sentinel"
     Add-Check "nonterminal-operations" ($Evidence.nonterminalOperations -eq 0) $Evidence.nonterminalOperations 0
     Add-Check "canonical-profile-count" ($Evidence.canonicalRows -eq $Evidence.profileRows) $Evidence.canonicalRows $Evidence.profileRows
     Add-Check "missing-canonical-rows" ($Evidence.missingCanonicalRows -eq 0) $Evidence.missingCanonicalRows 0
@@ -447,6 +470,9 @@ function Test-ClaimsRuntimeSqliteEvidence {
     }
     return [pscustomobject][ordered]@{
         passed = -not ($checks | Where-Object { -not $_.passed })
+        readinessMode = if ($fullyReady) { "all-dimensions-ready" } elseif ($unknownPerWorld) {
+            "global-ready-per-world-unknown-scope"
+        } else { "not-ready" }
         checks = @($checks)
     }
 }
