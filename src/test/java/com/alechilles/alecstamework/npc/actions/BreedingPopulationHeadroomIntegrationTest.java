@@ -42,6 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.ResourceLock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,6 +118,61 @@ class BreedingPopulationHeadroomIntegrationTest {
                 nearby.releaseFrom(nearbyReservation, 0);
                 registry.cancel(pair);
             }
+        }
+    }
+
+    /** A prepared child must not survive a provider reload/generation change before live spawn. */
+    @Test
+    void providerGenerationChangeBetweenPreparationAndSpawnClosesAdmission() throws Exception {
+        try (GlobalConfigScope ignored = GlobalConfigScope.install(10, 10, true);
+             Harness harness = Harness.open(tempDir.resolve("provider-switch"), 0, 0)) {
+            BreedingBirthPlan plan = birthPlan("provider-switch", OWNER);
+            BreedingNearbyReservationService nearby = new BreedingNearbyReservationService(
+                    new BreedingPopulationTypeService()
+            );
+            BreedingNearbyReservationService.Reservation nearbyReservation = nearby.reserveEvaluated(
+                    WORLD, CENTER, 12.0, 1, populationTypes(), Map.of()
+            );
+            BreedingPairAdmissionRegistry registry = BreedingPairAdmissionRegistry.shared();
+            BreedingPairAdmissionRegistry.Token pair = reservePair(registry, "provider-switch");
+            PreparedBreedingPopulationBatch prepared = null;
+            try {
+                BreedingPopulationPreparationResult result = harness.runtime()
+                        .breedingAdmissionService()
+                        .prepareAsync(request(plan, nearbyReservation, pair))
+                        .get(5, TimeUnit.SECONDS);
+                assertTrue(result.allowed());
+                assertEquals(1, result.admittedCount());
+                prepared = assertPrepared(result);
+                assertEquals(1L, harness.runtime().index().counts(OWNER, WORLD).globalPending());
+                assertEquals(1L, harness.runtime().claimAdmissionService().pendingForClaim(CLAIM_KEY));
+
+                installSimpleClaimsProbe(
+                        harness.runtime().claimProviderRegistry(), harness.bridge(), 2L
+                );
+
+                assertFalse(harness.runtime().breedingAdmissionService().claimForSpawn(prepared, 0));
+                awaitNoPending(harness);
+                assertEquals(0L, harness.runtime().index().counts(OWNER, WORLD).globalPending());
+                assertEquals(0L, harness.runtime().claimAdmissionService().pendingForClaim(CLAIM_KEY));
+                assertEquals(0, harness.runtime().claimAdmissionService().pendingReservationCount());
+            } finally {
+                if (prepared != null) {
+                    harness.runtime().breedingAdmissionService()
+                            .cancelRemainingAsync(prepared, "test-finally-cleanup")
+                            .get(5, TimeUnit.SECONDS);
+                }
+                nearby.releaseFrom(nearbyReservation, 0);
+                registry.cancel(pair);
+            }
+        }
+    }
+
+    private static void awaitNoPending(Harness harness) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (harness.runtime().index().counts(OWNER, WORLD).globalPending() != 0L
+                && System.nanoTime() < deadline) {
+            Thread.sleep(10L);
         }
     }
 
@@ -311,6 +367,14 @@ class BreedingPopulationHeadroomIntegrationTest {
             ClaimProviderRegistry registry,
             FixedClaimBridge bridge
     ) throws Exception {
+        installSimpleClaimsProbe(registry, bridge, 1L);
+    }
+
+    private static void installSimpleClaimsProbe(
+            ClaimProviderRegistry registry,
+            FixedClaimBridge bridge,
+            long generationEpoch
+    ) throws Exception {
         Field field = ClaimProviderRegistry.class.getDeclaredField("simpleClaimsProbe");
         field.setAccessible(true);
         @SuppressWarnings("unchecked")
@@ -320,7 +384,7 @@ class BreedingPopulationHeadroomIntegrationTest {
                 ClaimIntegrationProvider.SIMPLE_CLAIMS,
                 bridge.providerId(),
                 "test",
-                new ClaimProviderGeneration("breeding-headroom", "test-loader", 1L),
+                new ClaimProviderGeneration("breeding-headroom", "test-loader", generationEpoch),
                 Set.of(
                         ClaimProviderCapability.STABLE_CLAIM_IDENTITY,
                         ClaimProviderCapability.WORLD_SCOPED_EXTENT
