@@ -8,9 +8,10 @@ path against the two canonical quantities:
 - **claim delta**: change to the number of physical companions occupying a claim scope.
 
 The canonical row is `companion_population_state`. Admission is allowed only from a
-fully reconciled index, and a prepared transition must reach exactly one terminal
-state: committed, canceled, or compensating/recovered. In-memory counters are views
-of that durable authority, not an independent source of truth.
+fully reconciled index. A transition moves through durable `PREPARED`, `APPLYING`, and,
+when rollback is required, `COMPENSATING` phases before reaching one terminal
+`COMMITTED` or `FAILED` state. In-memory counters are views of that durable authority,
+not an independent source of truth.
 
 ## Mutation path matrix
 
@@ -23,17 +24,18 @@ zero durable delta. Source finalization must never happen before the population 
 | Standalone set-owner action/command (`ActionTameworkSetOwner`, `TameworkSetOwnerCommand`) | `OwnerMutationAdmissionPlanFactory` -> `OwnerMutationScheduler` | Set new owner `+1`; transfer old `-1`, new `+1`; clear `-1`; same owner `0` | Only a physical unowned-to-owned transition adds `+1`; transfer is `0`; clearing physical ownership removes `-1` | Component/profile writes run from the admitted continuation; denial leaves both unchanged | `ActionTameworkSetOwnerMutationPlanTest`, `TameworkSetOwnerCommandMutationPlanTest`, `OwnerMutationContinuationArchitectureTest` |
 | Legacy tame adoption (`LegacyTamedOwnershipBridge`) | `OwnerDerivedAuthorityMutationService` | `+1` for first authoritative adoption | `+1` when the adopted NPC is physical | Link/adoption effects follow the durable mutation | `LegacyTamedOwnershipBridgeResultTest` |
 | Spawn-tamed/admin batch (`TameworkNpcSpawnTamedCommand`) | `NpcOwnedBatchSpawnService` -> `CompanionPreparedSpawnService` | `+1` per successfully committed NPC | `+1` per physical spawned NPC | A prepared entity holder is added only inside the commit protocol; partial batches cancel unused units | `CompanionPreparedSpawnServiceOrderTest`, `PreparedSpawnCrashBoundaryArchitectureTest` |
-| Filled spawner restore/adoption (`SpawnerFeatureHandler`) | `SpawnerPreparedSpawnService` -> `CompanionPreparedSpawnService` | Existing owner `0`; explicit adoption `+1` | Dormant item to physical NPC `+1` | `CompanionSpawnSourceFinalizationContext.Kind.SPAWNER_ITEM` consumes the item only after commit | `SpawnerFeatureHandlerTest`, `CompanionSpawnSourceFinalizationContextTest`, `CompanionSpawnCommitContinuationTest` |
+| Filled spawner restore/adoption (`SpawnerFeatureHandler`) | `SpawnerPreparedSpawnService` -> `CompanionPreparedSpawnService` | Retained stored owner `0`; cleared-to-unowned `0`; null-to-spawning-owner `+1` | Retained/new owner to physical NPC `+1`; unowned restore `0` | `CompanionSpawnSourceFinalizationContext.Kind.SPAWNER_ITEM` consumes the item only after commit; denied/canceled legacy adoption releases its provisional identity exactly once | `SpawnerFeatureHandlerTest`, `CompanionSpawnLegacyAdmissionIntegrationTest`, `CompanionSpawnCommitContinuationTest` |
 | Managed coop capture (`CommandCoopManagedWildCaptureSystem`) | `CoopPopulationMutationService` / `CoopCaptureLedgerTransaction` | Normally `0`; capture-with-owner-clear uses the explicit `-1` owner plan | Physical to coop-dormant `-1` | Coop ledger, snapshot, and canonical population transition share the transaction; entity removal follows success | `CoopCaptureLedgerTransactionTest`, `CompanionPopulationRepositoryTest` |
 | Managed coop release | `CoopPreparedReleaseSpawnService` -> `CoopPopulationReleaseAdmissionService` | `0` for retained owner | Coop-dormant to physical `+1` | Ledger source becomes released only after spawn/population commit | `CoopPopulationReleaseAdmissionServiceTest`, `CoopReleaseSpawnCompletionTest`, `CoopPreparedReleaseSpawnArchitectureTest` |
-| Revivable death (`CommandLinkedNpcDeathService`) | `CommandLinkedNpcDeathProfileWriter` plus removal classifier | `0` | Physical to death snapshot `-1` | Durable death/profile snapshot is written before physical removal; the source remains available for revive | `CompanionRemovalLifecycleClassifierTest`, `CommandRespawnServiceTest` |
+| Revivable death (`CompanionRevivableDeathPopulationSystem`, `CommandLinkedNpcDeathService`) | immediate runtime dormant projection plus durable death/profile snapshot | `0` | Physical to `DEAD_REVIVABLE` `-1` as soon as death is observed | The owner slot remains; durable death/profile evidence stays available for revive | `CompanionDeathPopulationProjectorTest`, `CompanionRemovalLifecycleClassifierTest`, `CommandRespawnServiceTest` |
 | Revive (`CommandRespawnService`) | prepared restore spawn -> `CompanionPreparedSpawnService` | `0` | Death snapshot to physical `+1` | Death source is finalized only after commit; ambiguous outcomes retain recoverable state | `CommandRespawnServiceTest`, `CompanionRevivePolicyTest`, `CompanionSpawnCommitContinuationTest` |
 | Lost relocation fallback (`CommandLinkedNpcLostService`) | lost snapshot; recovery through `CommandLostFallbackSpawnService` | `0` | Drop/lost `-1`; fallback recovery `+1` | Lost source remains pending until the replacement spawn commits | `CommandRelocationTimeoutDecisionTest`, `CommandRelocationRestoreArchitectureTest`, `CompanionSpawnCommitContinuationTest` |
-| Recall, teleport, or rehome (`CommandNpcRelocationService`) | `CommandRelocationAdmissionGate` -> `CompanionRelocationAdmissionService` | Global `0`; per-world source `-1`, destination `+1` | Source claim `-1`, destination claim `+1` | Pending relocation is retained on denial/timeout; the old physical record is not discarded before destination commit | `CompanionRelocationAdmissionServiceTest`, `CommandNpcRelocationServiceTest`, `PendingRelocationAdmissionStateTest` |
+| Recall, teleport, or rehome (`CommandNpcRelocationService`) | `CommandRelocationAdmissionGate` -> `CompanionRelocationAdmissionService` | Global `0`; per-world source `-1`, destination `+1` | Source claim `-1`, destination claim `+1` | Pending relocation is retained on denial/timeout; an unavoidable observed over-cap move preserves the companion, emits a throttled warning, and increments `unavoidablePerWorldOverCapRelocations` | `CompanionRelocationAdmissionServiceTest`, `CommandNpcRelocationServiceTest`, `CompanionPopulationRuntimeReconcilerTest` |
 | Manual or passive breeding | `BreedingPopulationAdmissionService` -> prepared child batch | `+N` grouped by each resolved child owner | `+N` for successfully materialized children | Stable birth plan and replay journal own the handoff; every unused or failed child unit is canceled/recovered | `BreedingPopulationHeadroomIntegrationTest`, `BreedingPopulationReplayServiceTest`, `BreedingPreparedHandoffTerminalityTest`, `BreedingPopulationBatchAdmissionCoordinatorTest` |
 | Owner release/cull | `CommandOwnerReleaseService` / `CommandOwnerCullService` -> owner mutation authority | `-1` per released owned profile | `-1` when that profile is physical | Permanent release/cull durability precedes destructive entity removal | `CommandOwnerCullContinuationTest`, `PermanentDeletionPopulationArchitectureTest` |
 | Permanent non-revivable death | `CompanionPermanentDeathCoordinator` and retention systems | `-1` | `-1` | `CompanionPermanentDeathHold` retains the corpse until the release transition is durable; rejected world callbacks clear only safe pre-apply barriers or recognize an already durable release | `CompanionPermanentDeathCoordinatorTest`, `OwnerMutationWorldDispatcherTest`, `PermanentDeletionPopulationArchitectureTest` |
 | Public population API | `RuntimePopulationPolicyAuthority` | Request-defined | Request-defined | Caller must commit or cancel the returned prepared admission; operation keys provide idempotency | `RuntimePopulationPolicyAuthorityTest`, `PopulationPolicyApiV2Test` |
+| Bundled API self-test fixtures (`/tw api test prepare`, `reset`) | `ApiSelfTestPopulationAuthority` -> `OwnerMutationScheduler` | Fixture assignment `+1`; reset release `-1` | Physical fixture assignment/release `+1/-1` | Uses journaled `ADMIN_FORCE` assignment and durable permanent release through lease-bound world dispatch; no direct owner/profile bypass | `ApiSelfTestPopulationArchitectureTest` |
 | Natural load/unload/movement | runtime reconciliation observations | `0`; a known world move updates per-world scope `-1/+1` | Physical claim movement `-1/+1`; unload alone is not permanent removal | Coalesced observations update location; startup reconciliation remains the recovery authority | `CompanionPopulationRuntimeReconcilerTest`, `CoalescedCompanionPopulationWriterTest` |
 | `/tw npcclean` | `NpcCleanOwnershipGuard` | `0`; it may remove only NPCs proven unowned | Removal affects only proven-unowned occupancy | Cleanup is denied while indexes are not ready or ownership is unresolved | `NpcCleanOwnershipGuardTest`, `ClaimsOwnerPopulationStructuralPolicyTest` |
 
@@ -47,17 +49,42 @@ zero durable delta. Source finalization must never happen before the population 
 4. Immediately before apply, refresh provider topology and committed occupancy outside
    the reservation lock, then atomically validate the snapshot revision and recompute
    owner/claim headroom while excluding only this reservation's own pending slots.
-5. Apply the world/entity side effect on the world thread.
-6. Commit canonical state. Publish the resulting in-memory owner and claim views.
-7. Finalize a consumed source (spawner item, death/lost/coop record) only after commit.
-8. On definite pre-apply failure, cancel. On ambiguous post-apply failure, preserve
-   evidence and enter recovery; never guess that the side effect did or did not occur.
+5. Persist `APPLYING` while the owner and claim reservations remain held, then apply
+   the world/entity side effect on the world thread.
+6. On success, commit canonical state, publish the resulting in-memory owner and claim
+   views, then finalize a consumed source (spawner item, death/lost/coop record).
+7. If an applied mutation must roll back, persist `COMPENSATING` before reversing live
+   state or releasing capacity. Restore derived/source state first and the canonical
+   owner last; only then close the journal as `FAILED` and release both reservations.
+8. On definite pre-apply failure, cancel. On ambiguous post-apply or partial-compensation
+   failure, preserve evidence and enter recovery; never guess which side effects ran.
+9. Every lease-bearing world handoff has one accepted-never-started rejection path.
+   Its watchdog performs terminal cleanup exactly once; a late queued wrapper is a no-op.
 
-QuestLinesClaims and Simple Claims are generation-bound providers. A provider reload,
-disable, or replacement invalidates the lookup/admission session. Missing or ambiguous
-provider capability fails closed for positive claim admissions. Damage-policy lookup is
-separate: it follows its documented fail-open behavior so an integration outage does
-not make companions globally invulnerable.
+Spawner restore ownership is an explicit four-case policy. A non-null stored owner is
+always authoritative when `CaptureClearsOwner=false`, so its restore is owner-zero-delta
+and claim `+1`. If that stored owner is null, `SpawnSetsOwner=false` keeps the NPC
+unowned, while `SpawnSetsOwner=true` assigns the spawning player through a cap-checked
+null-to-owner transition (`+1` owner and `+1` claim). `CaptureClearsOwner=true` produces
+the same two unowned/assigned outcomes because no stored owner remains. A canonical
+unowned restore is therefore not treated as a same-owner zero-delta. Legacy items may
+hold one provisional identity lease; commit promotes it, while denial/cancellation
+releases it exactly once even if callbacks retry.
+
+QuestLinesClaims and Simple Claims are generation-bound providers. Provider probes
+re-read live PluginManager state for each operation and retain reflected positive
+contracts only through weak references keyed to plugin, classloader, and reflection
+generation. Setup/reload, disable, replacement, or settings changes invalidate the
+lookup/admission session, and there is no generation-blind bridge fallback. Missing or
+ambiguous provider capability fails closed for positive claim admissions. Damage-policy
+lookup is separate: it follows its documented fail-open behavior so an integration
+outage does not make companions globally invulnerable.
+
+QuestLines Claims `1.3.1` extent authority comes only from a complete, non-empty
+`getChunks()` result. Supported collection, map, and array shapes are snapshotted before
+mapping; every chunk must supply X, Z, and the requested world. Positive and negative
+claim/coordinate accessor discovery is cached for that bridge generation. Missing or
+malformed chunk data fails closed instead of falling back to scalar extent fields.
 
 ## Reconciliation evidence coverage
 
@@ -69,11 +96,13 @@ Startup reconciliation seals these independent catalogs before reporting ready:
 - base block item containers;
 - explicitly registered and sealed custom persisted-container providers.
 
-The saved-world directory catalog is captured independently of the live `World`
-objects. If an immediate world directory is omitted, unreadable, changes during the
-scan, or cannot be mapped to a live world's save path, world-entity and base-container
-coverage remain unsealed. A failed world load therefore cannot disappear from the
-reconciliation input and produce false `READY` state.
+Before building the catalog, startup asks Hytale to load every persisted world directory
+that is not already represented by a live save path. The saved-world directory catalog
+is still captured independently of live `World` objects. If an immediate world
+directory is omitted, unreadable, changes during the scan, fails to load, or cannot be
+mapped to a live world's save path, world-entity and base-container coverage remain
+unsealed. A failed world load therefore cannot disappear from the reconciliation input
+and produce false `READY` state.
 
 A saved entity carrying `DeathComponent` is corpse evidence, not live or unloaded
 claim occupancy. Reconciliation records it as `DEAD_REVIVABLE`; its saved chunk may be
@@ -83,14 +112,18 @@ the new active target. A simultaneous live representation and corpse for one UUI
 two physical representations of aliases for one profile, quarantines reconciliation
 instead of selecting a representation and risking a duplicate revive.
 
-Each mutable Hytale catalog is snapshotted in deterministic order and checked again at
-completion. A changed player UUID set or saved-chunk index set invalidates that scan;
-it cannot be promoted to ready. Direct contract coverage lives in
+Each startup pass acquires a persisted scan epoch. An interrupted `ACTIVE` epoch and its
+per-source cursors are resumed after restart; the epoch rotates only after the exact pass
+is durably marked `READY`. Each mutable Hytale catalog is snapshotted in deterministic
+order and checked again at completion. A changed player UUID set or saved-chunk index
+set invalidates that scan and cannot be promoted to ready. Direct contract coverage lives in
 `HytaleStoredPlayerInventoryEvidenceSourceTest`,
 `HytaleSavedWorldEvidenceSourceTest`,
-`CompanionPopulationReconciliationCatalogTest`, and
-`CompanionPopulationStartupReconcilerTest`. Persistent world-directory coverage is
-locked by `PersistentWorldDirectoryCatalogTest`.
+`CompanionPopulationReconciliationCatalogTest`,
+`CompanionPopulationStartupReconcilerTest`, and
+`CompanionPopulationScanSessionRepositoryTest`. Persistent world-directory coverage is
+locked by `PersistentWorldDirectoryCatalogTest` and
+`PersistedWorldCoverageLoaderTest`.
 
 A direct owner-component clear is not proof of release. Unless it matches an in-flight
 prepared transition or an explicit durable `RELEASED` operation, runtime reconciliation

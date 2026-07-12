@@ -93,7 +93,9 @@ Claim-aware population limits use an optional, provider-neutral bridge. The veri
 These gates accept build metadata (for example, `1.3.1+vendor.2`) but reject prerelease
 versions until that prerelease's reflected contract has been verified.
 
-The provider is resolved once per top-level operation, not retained permanently by tame, spawn, or breeding services. A `/tw settings` change or claim-plugin lifecycle change therefore affects the next operation while an already-prepared operation keeps its original settings revision and provider generation.
+The provider is resolved once per top-level operation, not retained permanently by tame, spawn, or breeding services. Provider probes read live PluginManager state on each operation, cache reflected ready contracts only through weak references bound to the plugin/classloader/reflection generation, and invalidate the matching provider on plugin setup. A `/tw settings` or lifecycle change therefore affects the next operation while an already-prepared operation keeps its original settings revision and provider generation. There is no generation-blind bridge fallback after a reload or replacement.
+
+QuestLines Claims extent lookup accepts only a complete, non-empty `getChunks()` result from the verified `1.3.1` contract. Supported collection, map, and array results are snapshotted, and every element must expose X, Z, and the requested world. Claim and coordinate accessor discovery caches both found and missing methods for the current bridge generation; malformed or incomplete extents fail closed without falling back to scalar extent fields.
 
 Before a prepared mutation is applied, Tamework performs a targeted provider/topology and
 occupancy refresh. The short apply lock validates the refreshed snapshot revision and recomputes
