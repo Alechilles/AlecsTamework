@@ -27,6 +27,16 @@ class ClaimsOwnerPopulationStructuralPolicyTest {
     }
 
     @Test
+    void providerAndBreedingAdmissionCollaboratorsRemainFocused() throws IOException {
+        assertLineLimit("integration/questlinesclaims/QuestLinesClaimsBridge.java", 500);
+        assertLineLimit("integration/questlinesclaims/QuestLinesReflectionAccess.java", 500);
+        assertLineLimit("ownership/BreedingPopulationAdmissionService.java", 500);
+        assertLineLimit("ownership/BreedingPopulationAdmissionUnitFactory.java", 500);
+        assertLineLimit("ownership/OwnerPopulationIndex.java", 500);
+        assertLineLimit("ownership/OwnerPopulationReservationBook.java", 500);
+    }
+
+    @Test
     void runtimeReconcilerDelegatesObservationPolicyAndIndexReplay() throws IOException {
         assertLineLimit(
                 "ownership/reconciliation/CompanionPopulationRuntimeReconciler.java", 500
