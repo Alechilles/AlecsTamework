@@ -111,6 +111,20 @@ class CompanionSpawnPopulationAdmissionServiceTest {
     }
 
     @Test
+    void canonicalUnownedRestoreMayAcquireAnOwnerThroughNormalAdmission() {
+        OwnerPopulationEntry unowned = new OwnerPopulationEntry(
+                "profile", null, null, CompanionLifecycleState.CAPTURED, 7L
+        );
+
+        assertNull(CompanionSpawnPopulationAdmissionService.validateRequestedOwner(
+                unowned, OWNER, OwnerPopulationOperation.RESTORE, false
+        ));
+        assertNull(CompanionSpawnPopulationAdmissionService.validateRequestedOwner(
+                unowned, null, OwnerPopulationOperation.RESTORE, false
+        ));
+    }
+
+    @Test
     void asymmetricClaimFailureStillMarksTheOwnerCommittedIdentityDurable() {
         OwnerPopulationCommitResult ownerCommit = new OwnerPopulationCommitResult(
                 OwnerPopulationCommitResult.Status.COMMITTED, "owner-committed", null

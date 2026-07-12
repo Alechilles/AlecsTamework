@@ -98,6 +98,38 @@ class SpawnerFeatureHandlerTest {
         assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(owner, true));
     }
 
+    @Test
+    void captureClearAndSpawnAssignmentMatrixProducesTheExactOwnerTransition() {
+        UUID currentOwner = UUID.randomUUID();
+        UUID spawningPlayer = UUID.randomUUID();
+
+        for (boolean captureClearsOwner : new boolean[]{false, true}) {
+            for (boolean spawnAssignsOwner : new boolean[]{false, true}) {
+                ItemFeatureConfig config = ItemFeatureConfig.builder()
+                        .spawnerEnabled(true)
+                        .captureClearsOwner(captureClearsOwner)
+                        .spawnAssignsOwner(spawnAssignsOwner)
+                        .build();
+                UUID itemOwner = SpawnerFeatureHandler.resolveCapturedOwnerMetadata(
+                        currentOwner, captureClearsOwner
+                );
+                UUID resolvedOwner = SpawnerOwnershipPolicyService.resolveSpawnOwner(
+                        itemOwner, spawningPlayer, config
+                );
+                UUID expectedOwner = captureClearsOwner
+                        ? (spawnAssignsOwner ? spawningPlayer : null)
+                        : currentOwner;
+
+                assertEquals(
+                        expectedOwner,
+                        resolvedOwner,
+                        "captureClearsOwner=" + captureClearsOwner
+                                + ", spawnAssignsOwner=" + spawnAssignsOwner
+                );
+            }
+        }
+    }
+
     private static ItemFeatureConfig buildSpawnerConfigForInteraction(ItemFeatureConfig baseConfig,
                                                                       Boolean spawnAssignsOwnerOverride)
             throws Exception {

@@ -40,6 +40,19 @@ final class SpawnerOwnershipPolicyService {
         return captureSourceOwnerUuid;
     }
 
+    /** Resolves the exact owner written to a released NPC after access checks succeed. */
+    @Nullable
+    static UUID resolveSpawnOwner(@Nullable UUID itemOwnerUuid,
+                                  @Nullable UUID spawningPlayerUuid,
+                                  @Nullable ItemFeatureConfig config) {
+        if (itemOwnerUuid != null) {
+            return itemOwnerUuid;
+        }
+        return config != null && config.isSpawnAssignsOwner()
+                ? spawningPlayerUuid
+                : null;
+    }
+
     private boolean resolveCaptureRequireOwner(@Nonnull ItemFeatureConfig config) {
         return config.getCaptureRequireOwnerOverride() != null
                 ? config.getCaptureRequireOwnerOverride()

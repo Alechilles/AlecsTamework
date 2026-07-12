@@ -342,8 +342,9 @@ final class SpawnerPreparedSpawnService {
         if (!ownershipPolicyService.isSpawnAllowed(player.getUuid(), policyOwner, config)) {
             return null;
         }
-        UUID ownerId = itemOwner == null && config.isSpawnAssignsOwner()
-                ? player.getUuid() : itemOwner;
+        UUID ownerId = SpawnerOwnershipPolicyService.resolveSpawnOwner(
+                itemOwner, player.getUuid(), config
+        );
         NPCPlugin npcPlugin = NPCPlugin.get();
         int roleIndex = npcPlugin == null ? -1 : npcPlugin.getIndex(roleId);
         if (npcPlugin == null || roleIndex < 0) {
