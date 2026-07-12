@@ -100,7 +100,7 @@ Owned `ACTIVE` and durably `UNLOADED` companions occupy claims. `CAPTURED`, `COO
 - Owner-specific Tamework protections run first.
 - A live tamed target is eligible even if it is a legacy/unowned tame.
 - An owned but not tamed NPC skips claim damage policy.
-- Public `evaluateDamage` requires the live target for this eligibility decision; dormant profiles return `UNAVAILABLE`/`live-target-required` instead of guessing from saved state.
+- Public `evaluateDamage` applies persisted owner-specific protection first for a dormant profile. If owner protection does not decide the result, live target state is required for claim eligibility and the claim result is `UNAVAILABLE`/`live-target-required` instead of guessing from saved state.
 - Optional-integration errors fail open so a broken claim bridge cannot make companions invulnerable.
 
 `SimpleClaims.Damage.AllowDamagePermissionKey` is a Hytale server permission checked before native SimpleClaims policy. For one compatibility release, Tamework also recognizes the previous raw SimpleClaims claim-party permission lookup (attacker player UUID + configured key), logs a throttled deprecation warning when it grants access, and will remove that compatibility path in the next major release. SimpleClaims' own native tamed-damage permission remains separate.
