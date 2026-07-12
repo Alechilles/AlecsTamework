@@ -32,7 +32,7 @@ zero durable delta. Source finalization must never happen before the population 
 | Recall, teleport, or rehome (`CommandNpcRelocationService`) | `CommandRelocationAdmissionGate` -> `CompanionRelocationAdmissionService` | Global `0`; per-world source `-1`, destination `+1` | Source claim `-1`, destination claim `+1` | Pending relocation is retained on denial/timeout; the old physical record is not discarded before destination commit | `CompanionRelocationAdmissionServiceTest`, `CommandNpcRelocationServiceTest`, `PendingRelocationAdmissionStateTest` |
 | Manual or passive breeding | `BreedingPopulationAdmissionService` -> prepared child batch | `+N` grouped by each resolved child owner | `+N` for successfully materialized children | Stable birth plan and replay journal own the handoff; every unused or failed child unit is canceled/recovered | `BreedingPopulationHeadroomIntegrationTest`, `BreedingPopulationReplayServiceTest`, `BreedingPreparedHandoffTerminalityTest`, `BreedingPopulationBatchAdmissionCoordinatorTest` |
 | Owner release/cull | `CommandOwnerReleaseService` / `CommandOwnerCullService` -> owner mutation authority | `-1` per released owned profile | `-1` when that profile is physical | Permanent release/cull durability precedes destructive entity removal | `CommandOwnerCullContinuationTest`, `PermanentDeletionPopulationArchitectureTest` |
-| Permanent non-revivable death | `CompanionPermanentDeathCoordinator` and retention systems | `-1` | `-1` | `CompanionPermanentDeathHold` retains the corpse until the release transition is durable | `CompanionPermanentDeathHoldTest`, `PermanentDeletionPopulationArchitectureTest` |
+| Permanent non-revivable death | `CompanionPermanentDeathCoordinator` and retention systems | `-1` | `-1` | `CompanionPermanentDeathHold` retains the corpse until the release transition is durable; rejected world callbacks clear only safe pre-apply barriers or recognize an already durable release | `CompanionPermanentDeathCoordinatorTest`, `OwnerMutationWorldDispatcherTest`, `PermanentDeletionPopulationArchitectureTest` |
 | Public population API | `RuntimePopulationPolicyAuthority` | Request-defined | Request-defined | Caller must commit or cancel the returned prepared admission; operation keys provide idempotency | `RuntimePopulationPolicyAuthorityTest`, `PopulationPolicyApiV2Test` |
 | Natural load/unload/movement | runtime reconciliation observations | `0`; a known world move updates per-world scope `-1/+1` | Physical claim movement `-1/+1`; unload alone is not permanent removal | Coalesced observations update location; startup reconciliation remains the recovery authority | `CompanionPopulationRuntimeReconcilerTest`, `CoalescedCompanionPopulationWriterTest` |
 | `/tw npcclean` | `NpcCleanOwnershipGuard` | `0`; it may remove only NPCs proven unowned | Removal affects only proven-unowned occupancy | Cleanup is denied while indexes are not ready or ownership is unresolved | `NpcCleanOwnershipGuardTest`, `ClaimsOwnerPopulationStructuralPolicyTest` |
@@ -44,10 +44,13 @@ zero durable delta. Source finalization must never happen before the population 
    positive scoped owner deltas, and claim readiness for positive claim deltas.
 3. Prepare with a stable operation key. A retry must return the existing operation,
    not reserve capacity twice.
-4. Apply the world/entity side effect on the world thread.
-5. Commit canonical state. Publish the resulting in-memory owner and claim views.
-6. Finalize a consumed source (spawner item, death/lost/coop record) only after commit.
-7. On definite pre-apply failure, cancel. On ambiguous post-apply failure, preserve
+4. Immediately before apply, refresh provider topology and committed occupancy outside
+   the reservation lock, then atomically validate the snapshot revision and recompute
+   owner/claim headroom while excluding only this reservation's own pending slots.
+5. Apply the world/entity side effect on the world thread.
+6. Commit canonical state. Publish the resulting in-memory owner and claim views.
+7. Finalize a consumed source (spawner item, death/lost/coop record) only after commit.
+8. On definite pre-apply failure, cancel. On ambiguous post-apply failure, preserve
    evidence and enter recovery; never guess that the side effect did or did not occur.
 
 QuestLinesClaims and Simple Claims are generation-bound providers. A provider reload,
@@ -66,13 +69,33 @@ Startup reconciliation seals these independent catalogs before reporting ready:
 - base block item containers;
 - explicitly registered and sealed custom persisted-container providers.
 
+The saved-world directory catalog is captured independently of the live `World`
+objects. If an immediate world directory is omitted, unreadable, changes during the
+scan, or cannot be mapped to a live world's save path, world-entity and base-container
+coverage remain unsealed. A failed world load therefore cannot disappear from the
+reconciliation input and produce false `READY` state.
+
+A saved entity carrying `DeathComponent` is corpse evidence, not live or unloaded
+claim occupancy. Reconciliation records it as `DEAD_REVIVABLE`; its saved chunk may be
+retained only as recovery context, while the lifecycle keeps it out of claim counts.
+For an interrupted revive, the surviving corpse proves the old dead state rather than
+the new active target. A simultaneous live representation and corpse for one UUID, or
+two physical representations of aliases for one profile, quarantines reconciliation
+instead of selecting a representation and risking a duplicate revive.
+
 Each mutable Hytale catalog is snapshotted in deterministic order and checked again at
 completion. A changed player UUID set or saved-chunk index set invalidates that scan;
 it cannot be promoted to ready. Direct contract coverage lives in
 `HytaleStoredPlayerInventoryEvidenceSourceTest`,
 `HytaleSavedWorldEvidenceSourceTest`,
 `CompanionPopulationReconciliationCatalogTest`, and
-`CompanionPopulationStartupReconcilerTest`.
+`CompanionPopulationStartupReconcilerTest`. Persistent world-directory coverage is
+locked by `PersistentWorldDirectoryCatalogTest`.
+
+A direct owner-component clear is not proof of release. Unless it matches an in-flight
+prepared transition or an explicit durable `RELEASED` operation, runtime reconciliation
+keeps the canonical slot and queues a component repair through the ownership mutation
+facade. This avoids turning an external component mutation into unjournaled capacity.
 
 ## Hytale 0.5.6 API inventory used by this design
 

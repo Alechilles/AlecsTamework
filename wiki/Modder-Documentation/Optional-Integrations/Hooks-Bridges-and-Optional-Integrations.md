@@ -66,6 +66,9 @@ What it enables:
 - QuestLines Claims `1.3.1`: claim-aware owner assignment, placement, restore, relocation, and breeding admissions
 - SimpleClaims `>=1.0.38 <1.1.0`: the same population admissions plus SimpleClaims-native tamed-target damage policy
 
+Build metadata is accepted within those release gates. Prerelease versions are rejected until
+their reflected provider contracts have been explicitly verified.
+
 Provider selection:
 
 - `Off` disables claim population checks.
@@ -73,6 +76,7 @@ Provider selection:
 - `Auto` probes QuestLines Claims first and probes SimpleClaims only when QuestLines Claims is absent or disabled.
 - An installed but not-ready, incompatible, or broken QuestLines Claims is not treated as absent. Active population admissions fail closed instead of falling through to SimpleClaims.
 - Provider and settings changes are picked up by the next operation. A reservation already in flight keeps the provider generation and settings revision with which it was prepared.
+- Apply-time validation refreshes provider topology and committed occupancy, then recomputes headroom while excluding only the reservation's own pending slots. Capacity consumed after preparation therefore invalidates the stale reservation unless the operation is explicitly forced.
 
 Activation and failure behavior:
 

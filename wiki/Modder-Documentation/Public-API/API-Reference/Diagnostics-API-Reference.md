@@ -94,7 +94,14 @@ Owner invalidation is currently reported as zero; claim reservations can be inva
 - `totalSnapshotNanos`
 - `lastSnapshotNanos`
 - `lastProviderCallNanos`
+- `targetedRefreshCount`
+- `totalTargetedRefreshNanos`
+- `lastTargetedRefreshNanos`
 - `provider`
+
+Snapshot timing covers population snapshot construction. Targeted-refresh timing is separate and
+covers apply-time provider/topology refreshes used to validate a prepared reservation immediately
+before mutation.
 
 The `provider` context reflects the current operation policy even before the first lookup. It exposes:
 
@@ -106,6 +113,19 @@ The `provider` context reflects the current operation policy even before the fir
 - `settingsRevision`
 
 This makes `Auto` behavior and installed-but-broken providers visible. Treat `generationToken` as opaque diagnostic text.
+
+### `activeRules`
+
+- `operation`
+- `ownerLimit` / `ownerScope`
+- `claimLimitPerChunk` / `claimLimitTotal`
+- `requireClaim`
+
+These are the effective rule values for the operation represented by the snapshot (currently
+`BREEDING`), after master-switch and operation activation logic has been applied. Inactive claim
+rules therefore appear as zero/false instead of echoing dormant configured values. Older callers
+can continue using the original `PopulationDiagnosticsView` and `LookupMetricsView` constructors;
+the added values default to unknown/zero for those constructors.
 
 ### `reconciliation`
 

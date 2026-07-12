@@ -90,7 +90,15 @@ Claim-aware population limits use an optional, provider-neutral bridge. The veri
 - QuestLines Claims exactly `1.3.1` (`net.evilcraft:QuestLinesClaims`).
 - SimpleClaims `>=1.0.38 <1.1.0` (`Buuz135:SimpleClaims`).
 
+These gates accept build metadata (for example, `1.3.1+vendor.2`) but reject prerelease
+versions until that prerelease's reflected contract has been verified.
+
 The provider is resolved once per top-level operation, not retained permanently by tame, spawn, or breeding services. A `/tw settings` change or claim-plugin lifecycle change therefore affects the next operation while an already-prepared operation keeps its original settings revision and provider generation.
+
+Before a prepared mutation is applied, Tamework performs a targeted provider/topology and
+occupancy refresh. The short apply lock validates the refreshed snapshot revision and recomputes
+headroom while excluding only the operation's own pending slots, so movement or another admission
+that consumes capacity after preparation cannot be overwritten by a stale decision.
 
 Provider selection is strict:
 

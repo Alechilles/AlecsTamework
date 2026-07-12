@@ -82,6 +82,8 @@ The startup catalog is bounded, resumable, and source-generation aware. It cover
 
 Every player inventory section is scanned, including storage, armor, hotbar, utility, `Tool`, and backpack. Captured items inside nested item containers are scanned recursively with depth, container-count, stack-count, and identity-cycle bounds. Base container blocks and registered custom containers participate in separate coverage dimensions; an unsealed custom-container catalog prevents false `READY` status.
 
+Saved-world directories are cataloged separately from successfully constructed live `World` objects. If an immediate saved-world directory is missing from the live catalog, unreadable, changes during the scan, or cannot be mapped back to its live save path, both saved-entity and base-container coverage remain unsealed. A failed world load therefore cannot be mistaken for an empty authoritative world.
+
 Evidence is reconciled by canonical profile/UUID alias. Duplicate observations do not create another owner slot. Conflicting or incomplete evidence degrades readiness rather than discarding a stored companion.
 
 ## Crash-recoverable admissions
@@ -90,6 +92,7 @@ Owner/claim admissions follow durable `PREPARED -> APPLYING -> terminal` journal
 
 - Capacity and the intended old/new state are prepared before a live spawn, owner change, restore, or relocation.
 - `APPLYING` is recorded before the mutation is attempted.
+- Immediately before the live mutation, provider topology and committed occupancy are refreshed outside locks; snapshot revision and cap headroom are then validated atomically while excluding only that operation's own pending slots.
 - Commit writes the confirmed canonical owner/lifecycle/location state and closes the journal.
 - Cancellation or compensation restores the prior state and closes unused capacity.
 
@@ -103,13 +106,15 @@ Breeding retries use deterministic identities rather than generating a new child
 
 Lifecycle release is equally explicit. `DEAD_REVIVABLE` remains owned; permanent cull/release and deaths without a configured/supported revive path commit `RELEASED` with no owner. A generic entity removal or temporary owner-component absence is not proof that capacity may be reopened.
 
+An owner component removed without an in-flight prepared transition or an explicit durable `RELEASED` operation is treated as an unjournaled mutation. Runtime reconciliation retains the canonical owner slot and queues restoration through the owner mutation facade instead of interpreting the component clear as a release.
+
 ## Permanent-death corpse retention and recovery evidence
 
 Hytale `0.5.6` dispatches every matching `DeathSystems.OnDeathSystem` observer for a newly added `DeathComponent` before consuming those observers' command buffers. Removing and re-adding `DeathComponent` in one observer therefore cannot prevent later death observers from running and can duplicate downstream death work.
 
-For a direct death with no supported revive path, Tamework leaves `DeathComponent` in place. Its fallback observer runs after the NPC death observer and queues a marked `DeferredCorpseRemoval` hold after the role-authored corpse timer. A retention system runs before both vanilla corpse-removal systems, keeps an owned permanent-death corpse held while durable release is pending, and retries release preparation at a throttled interval. The hold is a distinct marker that survives component cloning; Tamework never treats an ordinary vanilla corpse timer as its hold or shortens that timer. The retention pass releases a marked or missing timer only after the canonical population index confirms an ownerless `RELEASED` profile, allowing normal corpse removal to resume.
+For a direct death with no supported revive path, Tamework leaves `DeathComponent` in place. Its fallback observer runs after the NPC death observer and queues a marked `DeferredCorpseRemoval` hold after the role-authored corpse timer. A retention system runs before both vanilla corpse-removal systems, keeps an owned permanent-death corpse held while durable release is pending, and retries release preparation at a throttled interval. The hold is a distinct marker that survives component cloning; Tamework never treats an ordinary vanilla corpse timer as its hold or shortens that timer. If world shutdown rejects a deferred callback, state-independent cleanup re-enables a safe pre-apply retry or recognizes an already durable release; ambiguous post-apply state remains held. The retention pass checks canonical ownerless `RELEASED` state before a stale process-local pending marker, allowing normal corpse removal to resume after an in-process world reload.
 
-Saved-world reconciliation records a physical entity with `DeathComponent` as dead physical evidence, separately from a live physical entity. During recovery of an `APPLYING` permanent-death journal, an ownerless dead physical observation can prove that both the owner clear and death occurred. An ownerless live physical observation remains ambiguous and does not reopen capacity. Conflicting live/dead observations or duplicate physical locations degrade reconciliation instead of choosing whichever source was scanned last.
+Saved-world reconciliation records a physical entity with `DeathComponent` as dead physical evidence, separately from a live physical entity. A revivable corpse repairs to `DEAD_REVIVABLE`, never `UNLOADED`; its saved chunk is recovery context and does not consume claim occupancy. During recovery of an interrupted revive, the surviving corpse proves the old dead state rather than an active replacement. During recovery of an `APPLYING` permanent-death journal, an ownerless dead physical observation can prove that both the owner clear and death occurred. An ownerless live physical observation remains ambiguous and does not reopen capacity. Conflicting live/dead observations, duplicate physical locations, or simultaneous corpse/live aliases for one profile degrade reconciliation instead of choosing whichever source was scanned last.
 
 ## Upgrade and rollback guidance
 
