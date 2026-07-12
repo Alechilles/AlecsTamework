@@ -100,7 +100,10 @@ class HytaleStoredPlayerInventoryEvidenceSourceTest {
         );
     }
 
-    private static HytaleStoredPlayerInventoryEvidenceSource source(Set<UUID> players, String epoch) {
+    private static HytaleStoredPlayerInventoryEvidenceSource source(
+            Set<UUID> players,
+            String epoch
+    ) throws Exception {
         return new HytaleStoredPlayerInventoryEvidenceSource(
                 () -> players,
                 ignored -> CompletableFuture.completedFuture(List.of()),
