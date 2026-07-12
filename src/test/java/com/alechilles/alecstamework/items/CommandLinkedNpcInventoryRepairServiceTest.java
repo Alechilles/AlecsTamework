@@ -158,6 +158,120 @@ class CommandLinkedNpcInventoryRepairServiceTest {
         assertEquals(0, inventory.writeCount);
     }
 
+    @Test
+    void rejectedRepairWriteDoesNotClaimAnAppliedDeduplication() {
+        UUID historical = uuid(1);
+        UUID current = uuid(2);
+        FakeContainer inventory = new FakeContainer(List.of(new FakeStack(
+                "enabled",
+                "tool-a",
+                List.of(
+                        record(historical, "profile-a", "Historical"),
+                        record(current, "profile-a", "Current")
+                ),
+                false,
+                true
+        )));
+        inventory.rejectSlot = 0;
+
+        CommandLinkedNpcInventoryRepairService.RepairResult result = service.repair(
+                inventory,
+                stackAdapter,
+                ignored -> true,
+                request("profile-a", current, Set.of(historical, current))
+        );
+
+        assertEquals(1, result.matchedStacks());
+        assertEquals(0, result.updatedStacks());
+        assertEquals(0, result.deduplicatedRecords());
+        assertEquals(1, result.invalidStacks());
+        assertEquals(0, inventory.writeCount);
+    }
+
+    @Test
+    void canonicalizesLegacyAndDuplicateRecordsAcrossEveryCombinedCompartment() {
+        UUID historical = uuid(1);
+        UUID current = uuid(2);
+        LinkedNpcRecord legacy = record(historical, null, "Legacy");
+        LinkedNpcRecord canonical = record(current, "profile-a", "Canonical");
+        FakeContainer inventory = new FakeContainer(List.of(
+                new FakeStack("enabled", "tool-hotbar", List.of(legacy, canonical), false, true),
+                stack("enabled", "tool-storage", legacy),
+                FakeStack.empty(),
+                stack("enabled", "tool-backpack", legacy),
+                stack("disabled", "tool-disabled", legacy)
+        ));
+
+        CommandLinkedNpcInventoryRepairService.CanonicalizationResult result = service.canonicalize(
+                inventory,
+                stackAdapter,
+                "enabled"::equals,
+                records -> new CommandLinkedNpcInventoryRepairService.CanonicalStackRecords(
+                        List.of(record(current, "profile-a", "Canonical")), true, true)
+        );
+
+        assertEquals(5, result.scannedSlots());
+        assertEquals(3, result.enabledCommandStacks());
+        assertEquals(3, result.updatedStacks());
+        assertEquals(1, result.deduplicatedRecords());
+        assertEquals(0, result.unsafeStacks());
+        assertEquals(0, result.invalidStacks());
+        assertEquals(List.of("tool-backpack", "tool-hotbar", "tool-storage"), result.affectedToolIds());
+        assertEquals(3, inventory.writeCount);
+        assertRepaired(inventory.get(0).records.getFirst(), current);
+        assertRepaired(inventory.get(1).records.getFirst(), current);
+        assertRepaired(inventory.get(3).records.getFirst(), current);
+        assertEquals(historical, inventory.get(4).records.getFirst().npcUuid);
+    }
+
+    @Test
+    void canonicalizationFailsClosedForUnsafeInvalidAndRejectedWrites() {
+        FakeContainer inventory = new FakeContainer(List.of(
+                stack("enabled", "tool-unsafe", record(uuid(1), null, "Unsafe")),
+                new FakeStack("enabled", "tool-invalid", List.of(), false, false),
+                stack("enabled", "tool-write-fails", record(uuid(3), null, "Write"))
+        ));
+        inventory.rejectSlot = 2;
+
+        CommandLinkedNpcInventoryRepairService.CanonicalizationResult result = service.canonicalize(
+                inventory,
+                stackAdapter,
+                ignored -> true,
+                records -> {
+                    boolean unsafe = records.getFirst().npcUuid.equals(uuid(1));
+                    return new CommandLinkedNpcInventoryRepairService.CanonicalStackRecords(
+                            records, !unsafe, !unsafe);
+                }
+        );
+
+        assertEquals(3, result.enabledCommandStacks());
+        assertEquals(0, result.updatedStacks());
+        assertEquals(1, result.unsafeStacks());
+        assertEquals(2, result.invalidStacks());
+        assertEquals(0, inventory.writeCount);
+        assertTrue(result.affectedToolIds().isEmpty());
+    }
+
+    @Test
+    void canonicalizationAvoidsRedundantWritesWhenIdentityIsAlreadyCanonical() {
+        LinkedNpcRecord existing = record(uuid(4), "profile-a", "Current");
+        FakeStack original = new FakeStack("enabled", "tool-a", List.of(existing), false, true);
+        FakeContainer inventory = new FakeContainer(List.of(original));
+
+        CommandLinkedNpcInventoryRepairService.CanonicalizationResult result = service.canonicalize(
+                inventory,
+                stackAdapter,
+                ignored -> true,
+                records -> new CommandLinkedNpcInventoryRepairService.CanonicalStackRecords(
+                        records, true, false)
+        );
+
+        assertEquals(1, result.enabledCommandStacks());
+        assertEquals(0, result.updatedStacks());
+        assertEquals(0, inventory.writeCount);
+        assertSame(original, inventory.get(0));
+    }
+
     private CommandLinkedNpcInventoryRepairService.RepairRequest request(String profileId,
                                                                          UUID current,
                                                                          Set<UUID> aliases) {
@@ -209,6 +323,7 @@ class CommandLinkedNpcInventoryRepairServiceTest {
             implements CommandLinkedNpcInventoryRepairService.ContainerAdapter<FakeStack> {
         private final ArrayList<FakeStack> slots;
         private int writeCount;
+        private int rejectSlot = -1;
 
         private FakeContainer(List<FakeStack> slots) {
             this.slots = new ArrayList<>(slots);
@@ -225,9 +340,13 @@ class CommandLinkedNpcInventoryRepairServiceTest {
         }
 
         @Override
-        public void set(int slot, FakeStack stack) {
+        public boolean set(int slot, FakeStack stack) {
+            if (slot == rejectSlot) {
+                return false;
+            }
             slots.set(slot, stack);
             writeCount++;
+            return true;
         }
     }
 

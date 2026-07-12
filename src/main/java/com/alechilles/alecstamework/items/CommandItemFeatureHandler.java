@@ -122,6 +122,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkMutationService linkMutationService;
     private final CommandNpcExistenceService npcExistenceService;
     private final CommandCanonicalRecordCommitGate canonicalRecordCommitGate;
+    private final CommandLinkedNpcInventoryRepairService inventoryRepairService;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
     private final CommandRelocationDispatchService relocationDispatchService;
@@ -222,6 +223,8 @@ public final class CommandItemFeatureHandler {
         this.profileActionResolver = npcIdentityService != null
                 ? new CommandNpcProfileActionResolver(npcIdentityService)
                 : null;
+        this.inventoryRepairService =
+                new CommandLinkedNpcInventoryRepairService(registry, profileActionResolver);
         this.recipientService = new CommandRecipientService(
                 linkPolicyService,
                 linkedNpcRecordStore,
@@ -251,7 +254,7 @@ public final class CommandItemFeatureHandler {
                     persistenceRuntime.getLostRepository(),
                     persistenceRuntime.getNpcRecoveryOperationRepository(),
                     persistenceRuntime.getNpcLiveAliasRepairRepository(),
-                    new CommandLinkedNpcInventoryRepairService(registry),
+                    inventoryRepairService,
                     companionPlacementService,
                     new PlannedNpcProjectionSpawner(),
                     new PlannedNpcProjectionPostAddService(),
@@ -304,9 +307,10 @@ public final class CommandItemFeatureHandler {
     }
 
     public void onAddPlayerToWorld(AddPlayerToWorldEvent event) {
-        if (event == null || event.getWorld() == null || event.getHolder() == null || relocationService == null) {
+        if (event == null || event.getWorld() == null || event.getHolder() == null) {
             return;
         }
+        inventoryRepairService.canonicalize(event.getHolder());
         PlayerRef playerRef = event.getHolder().getComponent(PlayerRef.getComponentType());
         if (playerRef == null) {
             return;
@@ -324,7 +328,10 @@ public final class CommandItemFeatureHandler {
     }
 
     public void queueWorldChangeTravelRelocationsForPlayerUuid(World destinationWorld, UUID playerUuid) {
-        if (destinationWorld == null || playerUuid == null || relocationService == null) {
+        if (destinationWorld == null || playerUuid == null) {
+            return;
+        }
+        if (relocationService == null) {
             return;
         }
         dismountPlayerAfterWorldJoin(destinationWorld, playerUuid);
@@ -342,6 +349,29 @@ public final class CommandItemFeatureHandler {
             return;
         }
         queueWorldChangeTravelRelocations(player, destinationWorld);
+    }
+
+    /**
+     * Resolves the live player on their current world thread and lazily repairs every command-item
+     * copy in hotbar, storage, and backpack. Callers must queue this method through that world.
+     */
+    public void canonicalizePlayerCommandInventory(@Nullable World world, @Nullable UUID playerUuid) {
+        if (world == null || playerUuid == null) {
+            return;
+        }
+        Store<EntityStore> store =
+                world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+        if (store == null) {
+            return;
+        }
+        Ref<EntityStore> playerRef = world.getEntityRef(playerUuid);
+        if (playerRef == null || !playerRef.isValid()) {
+            return;
+        }
+        Player player = store.getComponent(playerRef, Player.getComponentType());
+        if (player != null && player.getWorld() == world) {
+            inventoryRepairService.canonicalize(player);
+        }
     }
 
     private void dismountPlayerAfterWorldJoin(World world, UUID playerUuid) {

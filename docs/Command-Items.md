@@ -68,6 +68,8 @@ Inactive linked rows stay visible in the panel, can still use per-row actions, a
 
 Entity UUIDs are projection aliases, not the companion's durable identity. When a stable profile is known, command records and recovery flows resolve historical UUIDs through that profile and deduplicate by profile. Unresolved legacy records continue to fall back to UUID until they can be bound safely; ambiguous bindings fail closed instead of spawning a replacement.
 
+For online players, command-item copies in the hotbar, storage, and backpack are lazily canonicalized when the player enters a world and whenever a linked command item moves through those inventory compartments. Offline inventories are not rewritten directly; their records remain safe through profile-first resolution and are normalized on the next load or use.
+
 When a player tames a supported NPC, Tamework attempts to auto-link the new companion to a matching command item in that player's inventory. Players now receive explicit feedback for both outcomes:
 - linked: the notification names the animal and command item that was linked.
 - not linked: the notification names the animal, applicable command item, and crafting bench type.

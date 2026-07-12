@@ -2,11 +2,16 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.component.Holder;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Production Hytale inventory adapters for profile-first command-record repair. */
 final class CommandLinkedNpcInventoryAdapters {
@@ -16,6 +21,28 @@ final class CommandLinkedNpcInventoryAdapters {
     static CommandLinkedNpcInventoryRepairService.ContainerAdapter<ItemStack> combined(
             @Nonnull CombinedItemContainer container) {
         return new CombinedAdapter(container);
+    }
+
+    @Nullable
+    static CommandLinkedNpcInventoryRepairService.ContainerAdapter<ItemStack> playerInventory(
+            @Nullable Holder<EntityStore> holder) {
+        if (holder == null) {
+            return null;
+        }
+        ArrayList<ItemContainer> containers = new ArrayList<>(3);
+        add(containers, holder.getComponent(InventoryComponent.Hotbar.getComponentType()));
+        add(containers, holder.getComponent(InventoryComponent.Storage.getComponentType()));
+        add(containers, holder.getComponent(InventoryComponent.Backpack.getComponentType()));
+        return containers.isEmpty()
+                ? null
+                : combined(new CombinedItemContainer(containers.toArray(ItemContainer[]::new)));
+    }
+
+    private static void add(@Nonnull List<ItemContainer> containers,
+                            @Nullable InventoryComponent component) {
+        if (component != null && component.getInventory() != null) {
+            containers.add(component.getInventory());
+        }
     }
 
     static CommandLinkedNpcInventoryRepairService.StackAdapter<ItemStack> itemStacks() {
@@ -41,8 +68,9 @@ final class CommandLinkedNpcInventoryAdapters {
         }
 
         @Override
-        public void set(int slot, @Nonnull ItemStack stack) {
-            container.setItemStackForSlot((short) slot, stack);
+        public boolean set(int slot, @Nonnull ItemStack stack) {
+            var transaction = container.setItemStackForSlot((short) slot, stack);
+            return transaction != null && transaction.succeeded();
         }
     }
 

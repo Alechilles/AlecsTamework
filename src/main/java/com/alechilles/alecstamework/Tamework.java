@@ -83,6 +83,7 @@ import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionSer
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.ManagedCoopRuntimeComposition;
@@ -928,6 +929,9 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler)
         );
         CommandTargetHudActivationTracker commandTargetHudActivationTracker = new CommandTargetHudActivationTracker();
         getEntityStoreRegistry().registerSystem(

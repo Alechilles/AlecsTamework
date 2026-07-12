@@ -2,10 +2,12 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,9 +31,27 @@ import org.joml.Vector3d;
 public final class CommandLinkedNpcInventoryRepairService {
     private final CommandItemRegistry registry;
     private final StackAdapter<ItemStack> itemStackAdapter = CommandLinkedNpcInventoryAdapters.itemStacks();
+    @Nullable
+    private final StackCanonicalizer stackCanonicalizer;
 
     public CommandLinkedNpcInventoryRepairService(@Nullable CommandItemRegistry registry) {
+        this(registry, (StackCanonicalizer) null);
+    }
+
+    CommandLinkedNpcInventoryRepairService(@Nullable CommandItemRegistry registry,
+                                           @Nullable CommandNpcProfileActionResolver resolver) {
+        this(registry, resolver == null ? null : records -> {
+            CommandNpcProfileActionResolver.CanonicalRecords canonical =
+                    resolver.canonicalizeRecords(records);
+            return new CanonicalStackRecords(
+                    canonical.records(), canonical.safeToPersist(), canonical.identityChanged());
+        });
+    }
+
+    private CommandLinkedNpcInventoryRepairService(@Nullable CommandItemRegistry registry,
+                                                    @Nullable StackCanonicalizer stackCanonicalizer) {
         this.registry = registry;
+        this.stackCanonicalizer = stackCanonicalizer;
     }
 
     /**
@@ -89,7 +109,6 @@ public final class CommandLinkedNpcInventoryRepairService {
             }
             matchedStacks++;
             matchedRecords += plan.matchedRecords();
-            deduplicatedRecords += Math.max(0, plan.matchedRecords() - 1);
             if (!plan.changed()) {
                 continue;
             }
@@ -98,8 +117,12 @@ public final class CommandLinkedNpcInventoryRepairService {
                 invalidStacks++;
                 continue;
             }
-            container.set(slot, updated);
+            if (!container.set(slot, updated)) {
+                invalidStacks++;
+                continue;
+            }
             updatedStacks++;
+            deduplicatedRecords += Math.max(0, plan.matchedRecords() - 1);
             String toolId = normalize(stacks.toolId(updated));
             if (toolId != null) {
                 affectedToolIds.add(toolId);
@@ -112,6 +135,104 @@ public final class CommandLinkedNpcInventoryRepairService {
                 updatedStacks,
                 matchedRecords,
                 deduplicatedRecords,
+                invalidStacks,
+                List.copyOf(affectedToolIds)
+        );
+    }
+
+    /**
+     * Canonicalizes every enabled command-item stack in hotbar, storage, and backpack order.
+     * Callers must invoke this method at a command/event boundary on the player's world thread.
+     */
+    @Nonnull
+    public CanonicalizationResult canonicalize(@Nullable Player player) {
+        if (player == null || player.getInventory() == null || stackCanonicalizer == null) {
+            return CanonicalizationResult.empty();
+        }
+        CombinedItemContainer combined =
+                player.getInventory().getCombinedBackpackStorageHotbarFirst();
+        if (combined == null) {
+            return CanonicalizationResult.empty();
+        }
+        return canonicalize(
+                CommandLinkedNpcInventoryAdapters.combined(combined),
+                itemStackAdapter,
+                this::isEnabledCommandItem,
+                stackCanonicalizer
+        );
+    }
+
+    /** Canonicalizes a loaded player holder before it is inserted into the destination world. */
+    @Nonnull
+    public CanonicalizationResult canonicalize(@Nullable Holder<EntityStore> holder) {
+        if (stackCanonicalizer == null) {
+            return CanonicalizationResult.empty();
+        }
+        ContainerAdapter<ItemStack> inventory =
+                CommandLinkedNpcInventoryAdapters.playerInventory(holder);
+        if (inventory == null) {
+            return CanonicalizationResult.empty();
+        }
+        return canonicalize(
+                inventory,
+                itemStackAdapter,
+                this::isEnabledCommandItem,
+                stackCanonicalizer
+        );
+    }
+
+    /** Pure adapter boundary used by focused inventory-compartment tests. */
+    @Nonnull
+    <S> CanonicalizationResult canonicalize(@Nonnull ContainerAdapter<S> container,
+                                            @Nonnull StackAdapter<S> stacks,
+                                            @Nonnull Predicate<String> enabledItem,
+                                            @Nonnull StackCanonicalizer canonicalizer) {
+        int scannedSlots = 0;
+        int enabledStacks = 0;
+        int updatedStacks = 0;
+        int deduplicatedRecords = 0;
+        int unsafeStacks = 0;
+        int invalidStacks = 0;
+        TreeSet<String> affectedToolIds = new TreeSet<>();
+
+        for (int slot = 0; slot < container.capacity(); slot++) {
+            scannedSlots++;
+            S stack = container.get(slot);
+            if (stack == null || stacks.isEmpty(stack) || !enabledItem.test(stacks.itemId(stack))) {
+                continue;
+            }
+            enabledStacks++;
+            StackRecords decoded = stacks.readRecords(stack);
+            if (decoded == null || !decoded.valid()) {
+                invalidStacks++;
+                continue;
+            }
+            CanonicalStackRecords canonical = canonicalizer.canonicalize(decoded.records());
+            if (canonical == null || !canonical.safeToPersist()) {
+                unsafeStacks++;
+                continue;
+            }
+            if (!canonical.changed()) {
+                continue;
+            }
+            S updated = stacks.writeRecords(stack, canonical.records());
+            if (updated == null || !container.set(slot, updated)) {
+                invalidStacks++;
+                continue;
+            }
+            updatedStacks++;
+            deduplicatedRecords += Math.max(0, decoded.records().size() - canonical.records().size());
+            String toolId = normalize(stacks.toolId(updated));
+            if (toolId != null) {
+                affectedToolIds.add(toolId);
+            }
+        }
+        return new CanonicalizationResult(
+                scannedSlots,
+                enabledStacks,
+                updatedStacks,
+                deduplicatedRecords,
+                unsafeStacks,
                 invalidStacks,
                 List.copyOf(affectedToolIds)
         );
@@ -268,7 +389,7 @@ public final class CommandLinkedNpcInventoryRepairService {
         @Nullable
         S get(int slot);
 
-        void set(int slot, @Nonnull S stack);
+        boolean set(int slot, @Nonnull S stack);
     }
 
     interface StackAdapter<S> {
@@ -298,6 +419,37 @@ public final class CommandLinkedNpcInventoryRepairService {
 
         static StackRecords invalid() {
             return new StackRecords(false, List.of());
+        }
+    }
+
+    @FunctionalInterface
+    interface StackCanonicalizer {
+        @Nonnull
+        CanonicalStackRecords canonicalize(@Nonnull List<LinkedNpcRecord> records);
+    }
+
+    record CanonicalStackRecords(@Nonnull List<LinkedNpcRecord> records,
+                                 boolean safeToPersist,
+                                 boolean changed) {
+        CanonicalStackRecords {
+            records = List.copyOf(records);
+        }
+    }
+
+    /** Deterministic totals for one whole-inventory canonicalization pass. */
+    public record CanonicalizationResult(int scannedSlots,
+                                         int enabledCommandStacks,
+                                         int updatedStacks,
+                                         int deduplicatedRecords,
+                                         int unsafeStacks,
+                                         int invalidStacks,
+                                         @Nonnull List<String> affectedToolIds) {
+        public CanonicalizationResult {
+            affectedToolIds = List.copyOf(affectedToolIds);
+        }
+
+        static CanonicalizationResult empty() {
+            return new CanonicalizationResult(0, 0, 0, 0, 0, 0, List.of());
         }
     }
 
