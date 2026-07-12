@@ -83,9 +83,9 @@ import com.alechilles.alecstamework.npc.actions.HeldItemAttachmentInteractionSer
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
-import com.alechilles.alecstamework.items.CommandCoopManagedWildCaptureSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
+import com.alechilles.alecstamework.items.ManagedCoopRuntimeComposition;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
@@ -147,6 +147,7 @@ import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
 import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
+import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnDiagnosticsSystem;
@@ -252,6 +253,7 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private LoadedNpcIdentityBootstrapService loadedNpcIdentityBootstrapService;
     private CoopResidentStateSnapshotService coopResidentStateSnapshotService;
+    private ManagedCoopRuntimeComposition managedCoopRuntime;
     private Path runtimeDataDirectory;
     private TameworkPersistenceRuntime persistenceRuntime;
     private TameworkApi api;
@@ -810,7 +812,10 @@ public class Tamework extends JavaPlugin {
         commandLinkedNpcCoopService = new CommandLinkedNpcCoopService(
                 persistenceRuntime.getCoopLedgerRepository(),
                 persistenceRuntime.getHealthService(),
-                persistenceRuntime.getNpcProfileRepository()
+                persistenceRuntime.getNpcProfileRepository(),
+                persistenceRuntime.getManagedCoopServices().residentIndex(),
+                persistenceRuntime.getManagedCoopServices()
+                        .compositeIndexRefreshService()::isTrusted
         );
         commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
                 commandLinkedNpcStateSnapshotService,
@@ -829,26 +834,24 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex()
         );
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
+        managedCoopRuntime = new ManagedCoopRuntimeComposition(
+                persistenceRuntime,
+                coopResidentStateSnapshotService,
+                commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex(),
+                projectionIdentityComponentType
+        );
         commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
+        getEntityStoreRegistry().registerSystem(managedCoopRuntime.staleEntitySuppressionSystem());
+        getEntityStoreRegistry().registerSystem(managedCoopRuntime.sourceRetirementSystem());
         getEntityStoreRegistry().registerSystem(
                 new CommandNpcRelocationOnLoadSystem(
                         commandNpcRelocationService,
                         commandLinkedNpcDeathService,
                         commandLinkedNpcLostService,
-                        commandLinkedNpcStateSnapshotService,
-                        coopResidentStateSnapshotService,
-                        null
+                        commandLinkedNpcStateSnapshotService
                 )
         );
-        getChunkStoreRegistry().registerSystem(
-                new CommandCoopManagedWildCaptureSystem(
-                        commandLinkedNpcCoopService,
-                        commandLinkedNpcCaptureService,
-                        commandNpcRelocationService,
-                        commandLinkedNpcLostService,
-                        coopResidentStateSnapshotService
-                )
-        );
+        getChunkStoreRegistry().registerSystem(managedCoopRuntime.runtimeSystem());
         getChunkStoreRegistry().registerSystem(new FeedTroughFoodStateSyncSystem());
 
         // Damage event is needed for owner damage filtering; avoid double-registration.
@@ -1168,6 +1171,11 @@ public class Tamework extends JavaPlugin {
         }
         overrideInitializedScopeKeys.clear();
         api = null;
+        if (managedCoopRuntime != null) {
+            managedCoopRuntime.close();
+            managedCoopRuntime = null;
+        }
+        TameworkBreedingServices.shutdownShared();
         if (persistenceRuntime != null) {
             persistenceRuntime.getNpcProfileRepository().setChangeObserver(null);
         }
@@ -1225,6 +1233,12 @@ public class Tamework extends JavaPlugin {
 
     private void onWorldRemovedForProgressionTiming(@Nonnull RemoveWorldEvent event) {
         if (event != null) {
+            World world = event.getWorld();
+            if (world != null && world.getEntityStore() != null
+                    && world.getEntityStore().getStore() != null) {
+                TameworkBreedingServices.shared().clearScope(
+                        world.getEntityStore().getStore());
+            }
             TameworkProgressionTimeScales.clearWorldScale(event.getWorld());
         }
     }

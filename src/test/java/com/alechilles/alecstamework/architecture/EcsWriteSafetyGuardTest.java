@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
@@ -25,13 +24,6 @@ class EcsWriteSafetyGuardTest {
             "store.addComponent("
     );
 
-    private static final String LEGACY_CAPTURE_SYSTEM =
-            "com/alechilles/alecstamework/items/CommandCoopManagedWildCaptureSystem.java";
-    private static final Set<String> LEGACY_CAPTURE_ALLOWED_LINES = Set.of(
-            "store.putComponent(reference, type, componentCopy);",
-            "deferredStore.putComponent(reference, type, deferredCopy);"
-    );
-
     @Test
     void systemClassesDoNotMutateStoreDirectly() throws IOException {
         List<String> violations = new ArrayList<>();
@@ -41,9 +33,6 @@ class EcsWriteSafetyGuardTest {
             for (int i = 0; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
                 if (!containsForbiddenWrite(line)) {
-                    continue;
-                }
-                if (isAllowedLegacyException(relativePath, line)) {
                     continue;
                 }
                 violations.add(relativePath + ":" + (i + 1) + " -> " + line);
@@ -65,13 +54,6 @@ class EcsWriteSafetyGuardTest {
             }
         }
         return false;
-    }
-
-    private static boolean isAllowedLegacyException(String relativePath, String line) {
-        if (!LEGACY_CAPTURE_SYSTEM.equals(relativePath)) {
-            return false;
-        }
-        return LEGACY_CAPTURE_ALLOWED_LINES.contains(line);
     }
 
     private static List<Path> listSystemFiles() throws IOException {

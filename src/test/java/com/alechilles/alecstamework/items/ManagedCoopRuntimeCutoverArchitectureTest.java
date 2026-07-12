@@ -21,6 +21,7 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
             "ManagedCoopRuntimeOperationDispatcher.java",
             "HytaleManagedCoopReleaseProjectionGateway.java",
             "ManagedCoopRuntimeSweepOrchestrator.java",
+            "ManagedCoopRuntimeComposition.java",
             "ManagedCoopRuntimeSystem.java");
 
     @Test
@@ -56,12 +57,50 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
     void restartRecoveryRunsBeforeNormalCaptureAndReleasePlanning() throws Exception {
         String source = Files.readString(MAIN.resolve(
                 "ManagedCoopRuntimeSweepOrchestrator.java"));
+        String importing = "ImportFilter imported = filterImports";
         String recovery = "boolean recoveryAttempted = startLifecycleRecovery";
         String planning = "boolean captureDemand = planner.needsCaptureCandidates";
 
+        assertTrue(source.contains("interface ImportBehavior"));
         assertTrue(source.contains("interface LifecycleRecoveryBehavior"));
         assertTrue(source.contains("lifecycleRecovery.recover(worldName, contexts)"));
+        assertTrue(source.indexOf(importing) >= 0);
         assertTrue(source.indexOf(recovery) >= 0);
+        assertTrue(source.indexOf(importing) < source.indexOf(recovery));
         assertTrue(source.indexOf(recovery) < source.indexOf(planning));
+    }
+
+    @Test
+    void pluginRegistersOnlyTheV5CompositionAndOwnsStaticIntakeLifecycle() throws Exception {
+        String plugin = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/Tamework.java"));
+        String composition = Files.readString(MAIN.resolve(
+                "ManagedCoopRuntimeComposition.java"));
+
+        assertTrue(plugin.contains("new ManagedCoopRuntimeComposition("));
+        assertTrue(plugin.contains("managedCoopRuntime.runtimeSystem()"));
+        assertTrue(plugin.contains("managedCoopRuntime.staleEntitySuppressionSystem()"));
+        assertTrue(plugin.contains("managedCoopRuntime.sourceRetirementSystem()"));
+        assertTrue(plugin.contains("managedCoopRuntime.close()"));
+        assertFalse(plugin.contains("CommandCoopManagedWildCaptureSystem"));
+        assertFalse(Files.exists(MAIN.resolve("CommandCoopManagedWildCaptureSystem.java")));
+        assertTrue(composition.contains("ManagedCoopItemIntakeRuntime.install("));
+        assertTrue(composition.contains("ManagedCoopItemIntakeRuntime.clear(itemIntakeHandler)"));
+        assertTrue(composition.contains("ManagedCoopVanillaImportBehavior"));
+        assertTrue(composition.contains("ManagedCoopRemovedCoopReconciler"));
+        assertTrue(composition.contains("new ManagedCoopStaleEntitySuppressionSystem("));
+    }
+
+    @Test
+    void relocationLifecycleNoLongerObservesVanillaCoopResidents() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/systems/"
+                        + "CommandNpcRelocationOnLoadSystem.java"));
+
+        assertFalse(source.contains("CoopResidentComponent"));
+        assertFalse(source.contains("CoopBlock"));
+        assertFalse(source.contains("CommandLinkedNpcCoopService"));
+        assertFalse(source.contains("CoopResidentStateSnapshotService"));
+        assertFalse(source.contains("COOP_RESIDENTS_FIELD"));
     }
 }

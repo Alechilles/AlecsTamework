@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import javax.annotation.Nonnull;
@@ -38,6 +39,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                                int captureCandidates,
                                int captureDispatches,
                                int releaseDispatches,
+                               int importBlockedCoops,
                                boolean lifecycleRecoveryAttempted,
                                boolean removedCheckDispatched,
                                @Nonnull List<CompletableFuture<DispatchOutcome>> operations,
@@ -52,6 +54,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
     private final ManagedCoopRuntimeCandidateScanner candidateScanner;
     private final ManagedCoopRuntimeSweepPlanner planner;
     private final ManagedCoopRuntimeOperationDispatcher operations;
+    private final ImportBehavior imports;
     private final LifecycleRecoveryBehavior lifecycleRecovery;
     private final AncillaryBehavior ancillary;
     private final RemovedCoopReconciler removedCoops;
@@ -61,6 +64,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
             @Nonnull ManagedCoopRuntimeCandidateScanner candidateScanner,
             @Nonnull ManagedCoopRuntimeSweepPlanner planner,
             @Nonnull ManagedCoopRuntimeOperationDispatcher operations,
+            @Nonnull ImportBehavior imports,
             @Nonnull LifecycleRecoveryBehavior lifecycleRecovery,
             @Nonnull AncillaryBehavior ancillary,
             @Nonnull RemovedCoopReconciler removedCoops) {
@@ -68,6 +72,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
         this.candidateScanner = Objects.requireNonNull(candidateScanner, "candidateScanner");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.operations = Objects.requireNonNull(operations, "operations");
+        this.imports = Objects.requireNonNull(imports, "imports");
         this.lifecycleRecovery = Objects.requireNonNull(
                 lifecycleRecovery, "lifecycleRecovery");
         this.ancillary = Objects.requireNonNull(ancillary, "ancillary");
@@ -85,20 +90,25 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
         Objects.requireNonNull(world, "world");
         Store<EntityStore> entityStore = entityStore(world);
         if (entityStore == null) {
-            return outcome(SweepStatus.WORLD_UNAVAILABLE, 0, 0, 0, 0, false, false,
+            return outcome(SweepStatus.WORLD_UNAVAILABLE, 0, 0, 0, 0, 0, false, false,
                     List.of(), "managed_coop_world_or_entity_store_unavailable");
         }
         entityStore.assertThread();
         ScanResult contexts = contextScanner.scan(chunkStore, world);
         if (!contexts.reliable()) {
-            return outcome(SweepStatus.CONTEXT_SCAN_UNAVAILABLE, 0, 0, 0, 0, false, false,
+            return outcome(SweepStatus.CONTEXT_SCAN_UNAVAILABLE, 0, 0, 0, 0, 0, false, false,
                     List.of(), contexts.detail());
         }
 
+        Set<String> physicalCoopKeys = activeCoopKeys(contexts.contexts());
+        ImportFilter imported = filterImports(
+                chunkStore, world, contexts.contexts(), nowMs);
+        // Import runs first, but pre-existing capture/release operations must still recover or an
+        // import gate waiting for those operations would deadlock the authority indefinitely.
         boolean recoveryAttempted = startLifecycleRecovery(world, contexts.contexts());
 
         boolean captureDemand = planner.needsCaptureCandidates(
-                contexts.contexts(), gameHour, nowMs);
+                imported.ready(), gameHour, nowMs);
         ManagedCoopRuntimeCandidateScanner.ScanResult candidates = captureDemand
                 ? candidateScanner.scan(entityStore)
                 : new ManagedCoopRuntimeCandidateScanner.ScanResult(
@@ -108,7 +118,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                 candidates.status() == ManagedCoopRuntimeCandidateScanner.ScanStatus.COMPLETE
                         ? candidates.candidates() : List.of();
         SweepPlan plan = planner.plan(
-                contexts.contexts(), candidateValues, gameHour, nowMs, true);
+                imported.ready(), candidateValues, gameHour, nowMs, true);
         ArrayList<CompletableFuture<DispatchOutcome>> dispatched = new ArrayList<>();
         int captures = 0;
         int releases = 0;
@@ -136,19 +146,20 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                 ancillary.syncInteractionState(ancillaryRequest);
             }
         }
-        ancillary.retainActiveCoops(plan.activeCoopKeys());
+        ancillary.retainActiveCoops(physicalCoopKeys);
         if (plan.checkRemovedCoops()) {
-            removedCoops.reconcile(chunkStore, world, plan.activeCoopKeys(), nowMs);
+            removedCoops.reconcile(chunkStore, world, physicalCoopKeys, nowMs);
         }
         String candidateDetail = candidates.status()
                 == ManagedCoopRuntimeCandidateScanner.ScanStatus.COMPLETE
                 ? null : candidates.detail();
         return outcome(
                 SweepStatus.COMPLETED,
-                plan.coops().size(),
+                contexts.contexts().size(),
                 candidateValues.size(),
                 captures,
                 releases,
+                imported.blocked(),
                 recoveryAttempted,
                 plan.checkRemovedCoops(),
                 dispatched,
@@ -165,13 +176,52 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                                  int candidates,
                                  int captures,
                                  int releases,
+                                 int importBlocked,
                                  boolean recoveryAttempted,
                                  boolean removed,
                                  List<CompletableFuture<DispatchOutcome>> operations,
                                  @Nullable String detail) {
         return new SweepOutcome(
-                status, coops, candidates, captures, releases,
+                status, coops, candidates, captures, releases, importBlocked,
                 recoveryAttempted, removed, operations, detail);
+    }
+
+    private ImportFilter filterImports(Store<ChunkStore> chunkStore,
+                                       World world,
+                                       List<ManagedCoopContext> contexts,
+                                       long nowMs) {
+        ArrayList<ManagedCoopContext> ready = new ArrayList<>();
+        int blocked = 0;
+        for (ManagedCoopContext context : contexts) {
+            if (context == null || importBlocks(chunkStore, world, context, nowMs)) {
+                blocked++;
+            } else {
+                ready.add(context);
+            }
+        }
+        return new ImportFilter(List.copyOf(ready), blocked);
+    }
+
+    private boolean importBlocks(Store<ChunkStore> chunkStore,
+                                 World world,
+                                 ManagedCoopContext context,
+                                 long nowMs) {
+        try {
+            ImportDecision decision = imports.inspect(chunkStore, world, context, nowMs);
+            return decision == null || decision.blocksManagedRuntime();
+        } catch (RuntimeException ignored) {
+            return true;
+        }
+    }
+
+    private Set<String> activeCoopKeys(List<ManagedCoopContext> contexts) {
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        for (ManagedCoopContext context : contexts) {
+            if (context != null) {
+                keys.add(context.coopKey());
+            }
+        }
+        return Set.copyOf(keys);
     }
 
     private boolean startLifecycleRecovery(World world, List<ManagedCoopContext> contexts) {
@@ -199,6 +249,22 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                 @Nonnull List<ManagedCoopContext> contexts);
     }
 
+    /** Synchronous import gate that must run before every other operation for the context. */
+    @FunctionalInterface
+    public interface ImportBehavior {
+        @Nullable
+        ImportDecision inspect(
+                @Nonnull Store<ChunkStore> chunkStore,
+                @Nonnull World world,
+                @Nonnull ManagedCoopContext context,
+                long nowMs);
+    }
+
+    /** Immutable import result; absent or exceptional evidence is treated as blocking. */
+    public record ImportDecision(boolean blocksManagedRuntime,
+                                 @Nullable String detail) {
+    }
+
     /** Immutable ancillary seam; implementations re-resolve live block state by world name. */
     public interface AncillaryBehavior {
         void produceAfter(
@@ -220,5 +286,8 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                        @Nonnull World world,
                        @Nonnull Set<String> activeCoopKeys,
                        long nowMs);
+    }
+
+    private record ImportFilter(@Nonnull List<ManagedCoopContext> ready, int blocked) {
     }
 }
