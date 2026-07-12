@@ -80,6 +80,11 @@ public final class CompanionPermanentDeathCoordinator {
         return npcUuid != null && pendingByNpc.containsKey(npcUuid);
     }
 
+    /** Clears a stale process-local barrier after the canonical index proves durable release. */
+    public boolean observeDurablyReleased(@Nullable UUID npcUuid) {
+        return npcUuid != null && pendingByNpc.remove(npcUuid) != null;
+    }
+
     private void prepare(@Nonnull Ref<EntityStore> npcRef,
                          @Nonnull Store<EntityStore> store,
                          @Nonnull PendingDeath pending) {
@@ -122,13 +127,28 @@ public final class CompanionPermanentDeathCoordinator {
 
             @Override
             public void onPopulationCommitted(@Nonnull CompanionPopulationCommitResult result) {
-                OwnerPopulationCommitResult ownerCommit = result.ownerCommit();
-                if (!result.committed() || ownerCommit == null || !ownerCommit.committed()) {
+                if (!isDurableRelease(result)) {
                     warn("Permanent companion death stayed held after a non-durable commit: npc="
                             + pending.npcUuid() + ", reason=" + result.reason());
                     return;
                 }
                 pendingByNpc.remove(pending.npcUuid(), pending);
+            }
+
+            @Override
+            public void onWorldDispatchRejected(@Nonnull String reason,
+                                                boolean mutationApplied,
+                                                @Nullable CompanionPopulationCommitResult commit) {
+                if (!mutationApplied || isDurableRelease(commit)) {
+                    pendingByNpc.remove(pending.npcUuid(), pending);
+                    warn("Permanent companion death world callback was unavailable; "
+                            + (mutationApplied ? "durable release was recognized" : "retry was enabled")
+                            + ": npc=" + pending.npcUuid() + ", reason=" + reason);
+                    return;
+                }
+                warn("Permanent companion death stayed held after an unavailable post-apply "
+                        + "callback without durable release: npc=" + pending.npcUuid()
+                        + ", reason=" + reason);
             }
 
             @Override
@@ -265,6 +285,14 @@ public final class CompanionPermanentDeathCoordinator {
     private static boolean hasDeathComponent(@Nonnull OwnerMutationContext context) {
         ComponentTypeAccess.requireDeathType();
         return context.store().getArchetype(context.npcRef()).contains(DeathComponent.getComponentType());
+    }
+
+    private static boolean isDurableRelease(
+            @Nullable CompanionPopulationCommitResult result
+    ) {
+        OwnerPopulationCommitResult ownerCommit = result == null ? null : result.ownerCommit();
+        return result != null && result.committed()
+                && ownerCommit != null && ownerCommit.committed();
     }
 
     private void warn(@Nonnull String message) {

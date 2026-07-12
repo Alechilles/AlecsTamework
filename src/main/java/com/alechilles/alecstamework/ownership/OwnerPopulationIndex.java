@@ -358,6 +358,28 @@ public final class OwnerPopulationIndex {
         return reconciliation.hasPending(profileId);
     }
 
+    /**
+     * Returns whether the exact profile is currently applying an owner clear from the observed
+     * owner. A merely reserved transition cannot authorize an ECS component removal.
+     */
+    public boolean hasApplyingOwnerClearTransition(String profileId, UUID observedOwnerId) {
+        String normalized = OwnerPopulationEntry.normalizeProfileId(profileId);
+        lock.lock();
+        try {
+            UUID token = pendingTokenByProfile.get(normalized);
+            OwnerPopulationPendingTransition transition = token == null
+                    ? null
+                    : pendingByToken.get(token);
+            return transition != null
+                    && transition.reservation().state()
+                    == OwnerPopulationReservation.ReservationState.APPLYING
+                    && Objects.equals(transition.request().expectedOwnerId(), observedOwnerId)
+                    && transition.request().newOwnerId() == null;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     /** Advances only the durable revision of an otherwise unchanged externally reconciled entry. */
     public boolean advanceReconciledRevision(String profileId, long expectedRevision, long newRevision) {
         return reconciliation.advanceRevision(profileId, expectedRevision, newRevision);

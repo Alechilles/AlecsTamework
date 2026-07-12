@@ -33,7 +33,6 @@ public final class OwnerMutationScheduler {
         this(index, identityResolver, coordinator, mutationService, companionCoordinator,
                 claimOccupancyIndex, claimProviderRegistry, new ClaimLookupMetrics());
     }
-
     OwnerMutationScheduler(@Nonnull OwnerPopulationIndex index,
                            @Nonnull CompanionIdentityResolver identityResolver,
                            @Nonnull OwnerPopulationAdmissionCoordinator coordinator,
@@ -288,7 +287,7 @@ public final class OwnerMutationScheduler {
                         reason,
                         preparation == null ? null : preparation.ownerDecision()
                 );
-            });
+            }, () -> callbacks.onWorldDispatchRejected(reason, false, null));
             return;
         }
         PreparedCompanionPopulationAdmission prepared = preparation.preparedAdmission();
@@ -314,9 +313,10 @@ public final class OwnerMutationScheduler {
                 newOwnerName,
                 callbacks,
                 prepared
-        ), () -> cancelPrepared(
-                prepared, "owner-mutation-world-unavailable"
-        ));
+        ), () -> {
+            cancelPrepared(prepared, "owner-mutation-world-unavailable");
+            callbacks.onWorldDispatchRejected("owner-mutation-world-unavailable", false, null);
+        });
     }
 
     private void applyPrepared(@Nonnull OwnerMutationSnapshotResolver.Snapshot snapshot,
@@ -469,7 +469,9 @@ public final class OwnerMutationScheduler {
                             }
                         }
                     }
-                });
+                }, () -> callbacks.onWorldDispatchRejected(
+                        "owner-mutation-world-unavailable", true, commit
+                ));
         });
     }
 

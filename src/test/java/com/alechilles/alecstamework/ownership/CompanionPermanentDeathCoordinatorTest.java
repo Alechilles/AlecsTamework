@@ -68,6 +68,76 @@ class CompanionPermanentDeathCoordinatorTest {
         assertFalse(harness.coordinator().isPending(harness.npcUuid()));
     }
 
+    @Test
+    void rejectedPreApplyWorldDispatchClearsBarrierAndEnablesRetry() {
+        Harness harness = schedulePermanentDeath();
+
+        harness.callbacks().onWorldDispatchRejected(
+                "owner-mutation-world-unavailable", false, null
+        );
+
+        assertFalse(harness.coordinator().isPending(harness.npcUuid()));
+        assertTrue(harness.coordinator().interceptLethalDamage(
+                null,
+                null,
+                harness.npcUuid(),
+                UUID.randomUUID(),
+                new Damage(Damage.NULL_SOURCE, 0, 10.0f),
+                10.0f
+        ));
+        assertTrue(harness.coordinator().isPending(harness.npcUuid()));
+    }
+
+    @Test
+    void rejectedPostApplyDispatchOnlyClearsAfterDurableRelease() {
+        Harness harness = schedulePermanentDeath();
+
+        harness.callbacks().onWorldDispatchRejected(
+                "owner-mutation-world-unavailable", true, failedCommit()
+        );
+        assertTrue(harness.coordinator().isPending(harness.npcUuid()));
+
+        harness.callbacks().onWorldDispatchRejected(
+                "owner-mutation-world-unavailable", true, committedRelease()
+        );
+        assertFalse(harness.coordinator().isPending(harness.npcUuid()));
+    }
+
+    @Test
+    void canonicalReleaseObservationClearsStaleBarrierIdempotently() {
+        Harness harness = schedulePermanentDeath();
+
+        assertTrue(harness.coordinator().observeDurablyReleased(harness.npcUuid()));
+        assertFalse(harness.coordinator().observeDurablyReleased(harness.npcUuid()));
+        assertFalse(harness.coordinator().isPending(harness.npcUuid()));
+    }
+
+    private static CompanionPopulationCommitResult failedCommit() {
+        return new CompanionPopulationCommitResult(
+                false,
+                "owner-population-commit-failed",
+                true,
+                new OwnerPopulationCommitResult(
+                        OwnerPopulationCommitResult.Status.PERSISTENCE_DEGRADED,
+                        "owner-population-commit-failed",
+                        null
+                )
+        );
+    }
+
+    private static CompanionPopulationCommitResult committedRelease() {
+        return new CompanionPopulationCommitResult(
+                true,
+                "companion-population-committed",
+                true,
+                new OwnerPopulationCommitResult(
+                        OwnerPopulationCommitResult.Status.COMMITTED,
+                        "owner-population-committed",
+                        null
+                )
+        );
+    }
+
     private static Harness schedulePermanentDeath() {
         AtomicReference<OwnerMutationScheduler.MutationCallbacks> captured =
                 new AtomicReference<>();

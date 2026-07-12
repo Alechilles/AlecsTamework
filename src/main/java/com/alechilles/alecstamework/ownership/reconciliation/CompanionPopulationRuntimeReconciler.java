@@ -211,7 +211,11 @@ public final class CompanionPopulationRuntimeReconciler
                 profileId, npcUuid, ownerUuid, effectiveWorld, lifecycleState,
                 physicalChunk, revision, source
         );
-        if (ownerIndex.hasPendingTransition(profileId)) {
+        if (ownerComponentRemoval
+                && ownerIndex.hasApplyingOwnerClearTransition(profileId, ownerUuid)) {
+            return ObservationResult.only(ObservationOutcome.SUPPRESSED_IN_FLIGHT);
+        }
+        if (!ownerComponentRemoval && ownerIndex.hasPendingTransition(profileId)) {
             if (!deferInFlight) {
                 return ObservationResult.only(ObservationOutcome.SUPPRESSED_IN_FLIGHT);
             }

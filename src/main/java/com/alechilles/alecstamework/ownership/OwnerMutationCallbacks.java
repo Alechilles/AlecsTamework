@@ -47,6 +47,16 @@ public interface OwnerMutationCallbacks {
     default void onPopulationCommitted(@Nonnull CompanionPopulationCommitResult result) {
     }
 
+    /**
+     * Performs thread-safe, state-independent terminal cleanup when a world no longer accepts a
+     * deferred callback. Implementations must not access live ECS or player state from this hook.
+     * A non-null commit is the persistence result observed after the live mutation was applied.
+     */
+    default void onWorldDispatchRejected(@Nonnull String reason,
+                                         boolean mutationApplied,
+                                         @Nullable CompanionPopulationCommitResult commit) {
+    }
+
     default void onDurabilityDegraded(@Nonnull String reason) {
     }
 }

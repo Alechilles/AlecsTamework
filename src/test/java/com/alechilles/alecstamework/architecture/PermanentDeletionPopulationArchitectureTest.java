@@ -104,13 +104,15 @@ class PermanentDeletionPopulationArchitectureTest {
         assertTrue(retention.contains("Order.AFTER, NPCSystems.OnDeathSystem.class"));
         assertTrue(retention.contains("Order.BEFORE, DeathSystems.TickCorpseRemoval.class"));
         assertTrue(retention.contains("Order.BEFORE, DeathSystems.CorpseRemoval.class"));
-        assertTrue(retention.contains("isDurablyReleased(npcUuid)"));
+        assertTrue(retention.contains("isDurablyReleased(canonical)"));
         assertTrue(retention.contains("CompanionPermanentDeathHold.isHold(current)"));
         assertTrue(retention.contains("coordinator.interceptExistingDeath("));
         int pendingBarrier = retention.indexOf("coordinator.isPending(npcUuid)");
-        int durableRelease = retention.indexOf("isDurablyReleased(npcUuid)");
-        assertTrue(pendingBarrier >= 0 && durableRelease > pendingBarrier);
-        assertTrue(retention.contains("else if (hasCanonicalCompanion(npcUuid))"));
+        int durableRelease = retention.indexOf("isDurablyReleased(canonical)");
+        int staleBarrierCleanup = retention.indexOf("coordinator.observeDurablyReleased(npcUuid)");
+        assertTrue(durableRelease >= 0 && staleBarrierCleanup > durableRelease);
+        assertTrue(pendingBarrier > staleBarrierCleanup);
+        assertTrue(retention.contains("if (canonical != null)"));
         assertTrue(retention.contains("retainDurabilityHold(ref, store, commandBuffer)"));
         assertTrue(retention.contains("npc.getRole().getDeathAnimationTime()"));
 

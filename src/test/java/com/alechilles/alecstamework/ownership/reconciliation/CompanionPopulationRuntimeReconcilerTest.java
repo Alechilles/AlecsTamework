@@ -126,6 +126,76 @@ class CompanionPopulationRuntimeReconcilerTest {
     }
 
     @Test
+    void reservedOwnerClearDoesNotAuthorizeAnEarlyComponentRemoval() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(npcUuid, ownerUuid)) {
+            OwnerPopulationEntry before = harness.ownerIndex.entry(harness.profileId).orElseThrow();
+            OwnerPopulationDecision decision = harness.ownerIndex.reserve(new OwnerPopulationTransitionRequest(
+                    harness.profileId,
+                    before.revision(),
+                    ownerUuid,
+                    "default",
+                    null,
+                    "default",
+                    CompanionLifecycleState.RELEASED,
+                    OwnerPopulationOperation.OWNER_CLEAR,
+                    OwnerPopulationLimitScope.GLOBAL,
+                    0,
+                    false
+            ));
+            assertTrue(decision.allowed());
+
+            CompanionPopulationRuntimeReconciler.ObservationOutcome result =
+                    harness.reconciler.observeOwnerComponentRemoval(
+                            npcUuid, ownerUuid, "default", 0, 0, "early-owner-component-removed"
+                    );
+
+            assertEquals(
+                    CompanionPopulationRuntimeReconciler.ObservationOutcome.REJECTED_UNJOURNALED_CLEAR,
+                    result
+            );
+            assertEquals(ownerUuid, harness.ownerIndex.entry(harness.profileId).orElseThrow().ownerId());
+            assertTrue(harness.ownerIndex.cancel(decision.reservation()));
+        }
+    }
+
+    @Test
+    void exactApplyingOwnerClearAuthorizesItsComponentRemoval() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(npcUuid, ownerUuid)) {
+            OwnerPopulationEntry before = harness.ownerIndex.entry(harness.profileId).orElseThrow();
+            OwnerPopulationDecision decision = harness.ownerIndex.reserve(new OwnerPopulationTransitionRequest(
+                    harness.profileId,
+                    before.revision(),
+                    ownerUuid,
+                    "default",
+                    null,
+                    "default",
+                    CompanionLifecycleState.RELEASED,
+                    OwnerPopulationOperation.OWNER_CLEAR,
+                    OwnerPopulationLimitScope.GLOBAL,
+                    0,
+                    false
+            ));
+            assertTrue(decision.allowed());
+            assertTrue(harness.ownerIndex.claimForApply(decision.reservation()));
+
+            CompanionPopulationRuntimeReconciler.ObservationOutcome result =
+                    harness.reconciler.observeOwnerComponentRemoval(
+                            npcUuid, ownerUuid, "default", 0, 0, "applying-owner-component-removed"
+                    );
+
+            assertEquals(
+                    CompanionPopulationRuntimeReconciler.ObservationOutcome.SUPPRESSED_IN_FLIGHT,
+                    result
+            );
+            assertTrue(harness.ownerIndex.cancel(decision.reservation()));
+        }
+    }
+
+    @Test
     void warningSinkFailureCannotSuppressDurableObservationQueueing() {
         UUID npcUuid = UUID.randomUUID();
         UUID oldOwner = UUID.randomUUID();
