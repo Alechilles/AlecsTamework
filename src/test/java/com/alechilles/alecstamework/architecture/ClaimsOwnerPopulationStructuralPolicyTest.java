@@ -27,6 +27,18 @@ class ClaimsOwnerPopulationStructuralPolicyTest {
     }
 
     @Test
+    void runtimeReconcilerDelegatesObservationPolicyAndIndexReplay() throws IOException {
+        assertLineLimit(
+                "ownership/reconciliation/CompanionPopulationRuntimeReconciler.java", 500
+        );
+        String source = Files.readString(JAVA_ROOT.resolve(
+                "ownership/reconciliation/CompanionPopulationRuntimeReconciler.java"
+        ));
+        assertTrue(source.contains("CompanionPopulationObservationPolicy observationPolicy"));
+        assertTrue(source.contains("CompanionPopulationIndexReplayService indexReplay"));
+    }
+
+    @Test
     void settingsPageStaysBelowExistingClassHardCeiling() throws IOException {
         assertLineLimit("ui/TameworkSettingsPage.java", 800);
         assertLineLimit("ui/TameworkSettingsFormParser.java", 500);

@@ -54,6 +54,75 @@ class CompanionPopulationRuntimeReconcilerTest {
     }
 
     @Test
+    void unavoidableCrossWorldOverCapRelocationIsPreservedWarnedAndMetered() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(npcUuid, ownerUuid, 1)) {
+            String existingProfile = "destination-resident";
+            assertTrue(harness.ownerIndex.tryReconcileCommittedEntry(new OwnerPopulationEntry(
+                    existingProfile,
+                    ownerUuid,
+                    "destination",
+                    CompanionLifecycleState.ACTIVE,
+                    1L
+            )));
+            List<String> warnings = new ArrayList<>();
+            harness.reconciler.setWarningSink(warnings::add);
+
+            CompanionPopulationRuntimeReconciler.ObservationOutcome result =
+                    harness.reconciler.observePhysical(
+                            npcUuid,
+                            ownerUuid,
+                            "destination",
+                            8,
+                            9,
+                            CompanionLifecycleState.ACTIVE,
+                            "unavoidable-world-relocation"
+                    );
+
+            assertEquals(CompanionPopulationRuntimeReconciler.ObservationOutcome.UPDATED, result);
+            assertEquals("destination", harness.ownerIndex.entry(harness.profileId)
+                    .orElseThrow().ownershipWorldName());
+            assertEquals(2L, harness.ownerIndex.counts(ownerUuid, "destination").worldCommitted());
+            assertEquals(1L, harness.ownerIndex.metrics(
+                    OwnerPopulationLimitScope.PER_WORLD, 1
+            ).overCapBuckets());
+            assertEquals(1L, harness.reconciler.unavoidablePerWorldOverCapRelocations());
+            assertEquals(1, warnings.size());
+            assertTrue(warnings.getFirst().contains("per-world owner over-cap"));
+            assertTrue(warnings.getFirst().contains("preserved the companion"));
+            OwnerPopulationDecision laterAdmission = harness.ownerIndex.reserve(
+                    new OwnerPopulationTransitionRequest(
+                            "later-positive-admission",
+                            OwnerPopulationTransitionRequest.NEW_PROFILE_REVISION,
+                            null,
+                            null,
+                            ownerUuid,
+                            "destination",
+                            CompanionLifecycleState.ACTIVE,
+                            OwnerPopulationOperation.NEW_OWNERSHIP,
+                            OwnerPopulationLimitScope.PER_WORLD,
+                            1,
+                            false
+                    )
+            );
+            assertFalse(laterAdmission.allowed());
+
+            harness.reconciler.observePhysical(
+                    npcUuid, ownerUuid, "default", 0, 0,
+                    CompanionLifecycleState.ACTIVE, "relocation-reset"
+            );
+            harness.reconciler.observePhysical(
+                    npcUuid, ownerUuid, "destination", 8, 9,
+                    CompanionLifecycleState.ACTIVE, "relocation-repeat"
+            );
+
+            assertEquals(2L, harness.reconciler.unavoidablePerWorldOverCapRelocations());
+            assertEquals(1, warnings.size(), "same owner/world warning bucket must be throttled");
+        }
+    }
+
+    @Test
     void unloadRetainsPhysicalOccupancyWhileDormancyClearsOnlyClaimOccupancy() {
         UUID npcUuid = UUID.randomUUID();
         UUID ownerUuid = UUID.randomUUID();
@@ -359,6 +428,10 @@ class CompanionPopulationRuntimeReconcilerTest {
     }
 
     private static Harness harness(UUID npcUuid, UUID ownerUuid) {
+        return harness(npcUuid, ownerUuid, 0);
+    }
+
+    private static Harness harness(UUID npcUuid, UUID ownerUuid, int perWorldLimit) {
         CompanionIdentityResolver identities = new CompanionIdentityResolver();
         String profileId = identities.resolveOrAllocate(npcUuid, "test-profile").profileId();
         OwnerPopulationIndex ownerIndex = new OwnerPopulationIndex();
@@ -390,12 +463,21 @@ class CompanionPopulationRuntimeReconcilerTest {
                 TimeUnit.MINUTES.toMillis(1),
                 TimeUnit.MINUTES.toMillis(1)
         );
+        CompanionPopulationObservationPolicy observationPolicy =
+                new CompanionPopulationObservationPolicy(
+                        ownerIndex,
+                        () -> new CompanionPopulationObservationPolicy.PerWorldLimit(
+                                true, perWorldLimit
+                        ),
+                        System::currentTimeMillis
+                );
         CompanionPopulationRuntimeReconciler reconciler = new CompanionPopulationRuntimeReconciler(
                 ownerIndex,
                 claimIndex,
                 identities,
                 writer,
-                new PersistenceHealthService()
+                new PersistenceHealthService(),
+                observationPolicy
         );
         writer.setListener(reconciler);
         return new Harness(profileId, ownerIndex, claimIndex, writer, reconciler);

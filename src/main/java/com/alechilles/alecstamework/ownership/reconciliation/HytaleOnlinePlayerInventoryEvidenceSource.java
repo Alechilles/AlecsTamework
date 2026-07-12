@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -12,7 +13,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
 /**
@@ -99,7 +99,9 @@ public final class HytaleOnlinePlayerInventoryEvidenceSource implements Companio
             ));
             return result;
         }
-        executeOrFail(world::execute, () -> {
+        executeOrFail((task, rejected) -> LeaseBoundWorldDispatcher.execute(
+                world, task, rejected
+        ), () -> {
                 try {
                     Ref<EntityStore> playerRef = world.getEntityRef(target.playerUuid());
                     if (playerRef == null || !playerRef.isValid()) {
@@ -121,11 +123,15 @@ public final class HytaleOnlinePlayerInventoryEvidenceSource implements Companio
         return result;
     }
 
-    static void executeOrFail(@Nonnull Consumer<Runnable> dispatcher,
+    static void executeOrFail(@Nonnull WorldDispatch dispatcher,
                               @Nonnull Runnable task,
                               @Nonnull CompletableFuture<?> result) {
         try {
-            dispatcher.accept(task);
+            dispatcher.dispatch(task, () -> result.completeExceptionally(
+                    new IllegalStateException(
+                            "Online player world dispatch did not start before its lease expired."
+                    )
+            ));
         } catch (RuntimeException | LinkageError failure) {
             result.completeExceptionally(failure);
         }
@@ -165,5 +171,10 @@ public final class HytaleOnlinePlayerInventoryEvidenceSource implements Companio
     }
 
     private record Target(@Nonnull UUID playerUuid, @Nonnull UUID worldUuid) {
+    }
+
+    @FunctionalInterface
+    interface WorldDispatch {
+        void dispatch(@Nonnull Runnable task, @Nonnull Runnable rejected);
     }
 }

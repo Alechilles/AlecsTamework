@@ -118,6 +118,17 @@ class LeaseBoundTerminalDispatchArchitectureTest {
         assertTrue(system.contains("May run from a lease watchdog"));
     }
 
+    @Test
+    void onlinePlayerEvidenceCannotWaitForeverForAcceptedWorldWork() throws IOException {
+        String source = read(MAIN.resolve(
+                "ownership/reconciliation/HytaleOnlinePlayerInventoryEvidenceSource.java"
+        ));
+
+        assertTrue(source.contains("LeaseBoundWorldDispatcher.execute("));
+        assertTrue(source.contains("Online player world dispatch did not start"));
+        assertFalse(source.contains("executeOrFail(world::execute"));
+    }
+
     private static String read(Path path) throws IOException {
         return Files.readString(path, StandardCharsets.UTF_8);
     }

@@ -14,7 +14,6 @@ import java.util.Objects;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -23,19 +22,17 @@ import javax.annotation.Nullable;
  */
 public final class CompanionPopulationRuntimeReconciler
         implements CoalescedCompanionPopulationWriter.Listener {
-    private static final long WARNING_INTERVAL_MS = 60_000L;
-
     private final OwnerPopulationIndex ownerIndex;
     private final ClaimOccupancyIndex claimIndex;
     private final CompanionIdentityResolver identityResolver;
     private final CoalescedCompanionPopulationWriter writer;
     private final PersistenceHealthService persistenceHealth;
-    private final ConcurrentHashMap<String, Long> lastWarningByProfile = new ConcurrentHashMap<>();
+    private final CompanionPopulationObservationPolicy observationPolicy;
+    private final CompanionPopulationIndexReplayService indexReplay;
     private final Object reloadLock = new Object();
     private final Map<String, CompanionPopulationObservation> observationsDuringReload = new HashMap<>();
     private final Map<String, CompanionPopulationObservation> deferredObservations = new HashMap<>();
     private boolean canonicalReloadInProgress;
-    private volatile WarningSink warningSink = message -> { };
 
     public CompanionPopulationRuntimeReconciler(
             @Nonnull OwnerPopulationIndex ownerIndex,
@@ -44,15 +41,34 @@ public final class CompanionPopulationRuntimeReconciler
             @Nonnull CoalescedCompanionPopulationWriter writer,
             @Nonnull PersistenceHealthService persistenceHealth
     ) {
+        this(ownerIndex, claimIndex, identityResolver, writer, persistenceHealth,
+                new CompanionPopulationObservationPolicy(ownerIndex));
+    }
+
+    CompanionPopulationRuntimeReconciler(
+            @Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull CoalescedCompanionPopulationWriter writer,
+            @Nonnull PersistenceHealthService persistenceHealth,
+            @Nonnull CompanionPopulationObservationPolicy observationPolicy
+    ) {
         this.ownerIndex = Objects.requireNonNull(ownerIndex, "ownerIndex");
         this.claimIndex = Objects.requireNonNull(claimIndex, "claimIndex");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
         this.writer = Objects.requireNonNull(writer, "writer");
         this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
+        this.observationPolicy = Objects.requireNonNull(observationPolicy, "observationPolicy");
+        this.indexReplay = new CompanionPopulationIndexReplayService(ownerIndex, claimIndex);
     }
 
     public void setWarningSink(@Nullable WarningSink warningSink) {
-        this.warningSink = warningSink == null ? message -> { } : warningSink;
+        observationPolicy.setWarningSink(warningSink == null ? null : warningSink::warn);
+    }
+
+    /** Number of preserved cross-world moves observed after they made a per-world bucket over-cap. */
+    public long unavoidablePerWorldOverCapRelocations() {
+        return observationPolicy.unavoidablePerWorldOverCapRelocations();
     }
 
     @Nonnull
@@ -162,11 +178,7 @@ public final class CompanionPopulationRuntimeReconciler
             queueObservation(result.observation());
         }
         if (result.warning() != null) {
-            try {
-                warnUnexpectedOwner(result.warning().current(), result.warning().observedOwner());
-            } catch (RuntimeException | LinkageError ignored) {
-                // Warning delivery cannot prevent durable observation scheduling.
-            }
+            observationPolicy.warn(result.warning());
         }
         return result.outcome();
     }
@@ -193,6 +205,23 @@ public final class CompanionPopulationRuntimeReconciler
         if (effectiveWorld == null && currentOwner != null) {
             effectiveWorld = currentOwner.ownershipWorldName();
         }
+        if (ownerComponentRemoval) {
+            CompanionPopulationObservationPolicy.RemovalDisposition disposition =
+                    observationPolicy.authorizeRemoval(profileId, ownerUuid, currentOwner);
+            if (disposition == CompanionPopulationObservationPolicy.RemovalDisposition.SUPPRESSED_IN_FLIGHT) {
+                return ObservationResult.only(ObservationOutcome.SUPPRESSED_IN_FLIGHT);
+            }
+            if (disposition == CompanionPopulationObservationPolicy.RemovalDisposition.AUTHORIZED_RELEASE) {
+                return ObservationResult.only(ObservationOutcome.AUTHORIZED_RELEASE);
+            }
+            if (disposition == CompanionPopulationObservationPolicy.RemovalDisposition.REJECTED_UNJOURNALED_CLEAR) {
+                return new ObservationResult(
+                        ObservationOutcome.REJECTED_UNJOURNALED_CLEAR,
+                        null,
+                        observationPolicy.rejectedRemoval(currentOwner, effectiveWorld)
+                );
+            }
+        }
         OwnerPopulationEntry observedOwner = new OwnerPopulationEntry(
                 profileId,
                 ownerUuid,
@@ -211,10 +240,6 @@ public final class CompanionPopulationRuntimeReconciler
                 profileId, npcUuid, ownerUuid, effectiveWorld, lifecycleState,
                 physicalChunk, revision, source
         );
-        if (ownerComponentRemoval
-                && ownerIndex.hasApplyingOwnerClearTransition(profileId, ownerUuid)) {
-            return ObservationResult.only(ObservationOutcome.SUPPRESSED_IN_FLIGHT);
-        }
         if (!ownerComponentRemoval && ownerIndex.hasPendingTransition(profileId)) {
             if (!deferInFlight) {
                 return ObservationResult.only(ObservationOutcome.SUPPRESSED_IN_FLIGHT);
@@ -226,20 +251,6 @@ public final class CompanionPopulationRuntimeReconciler
                     null
             );
         }
-        if (ownerComponentRemoval && currentOwner != null) {
-            if (currentOwner.ownerId() == null
-                    && currentOwner.lifecycleState() == CompanionLifecycleState.RELEASED) {
-                return ObservationResult.only(ObservationOutcome.AUTHORIZED_RELEASE);
-            }
-            if (currentOwner.ownerId() != null) {
-                return new ObservationResult(
-                        ObservationOutcome.REJECTED_UNJOURNALED_CLEAR,
-                        null,
-                        new OwnerWarning(currentOwner, null)
-                );
-            }
-        }
-
         ClaimOccupancyEntry currentClaim = claimIndex.entry(profileId).orElse(null);
         if (Objects.equals(currentOwner, observedOwner) && Objects.equals(currentClaim, observedClaim)) {
             CompanionPopulationObservation deferred = deferredObservations.remove(profileId);
@@ -247,9 +258,8 @@ public final class CompanionPopulationRuntimeReconciler
                     ? ObservationResult.only(ObservationOutcome.NO_CHANGE)
                     : new ObservationResult(ObservationOutcome.NO_CHANGE, observation, null);
         }
-        OwnerWarning warning = currentOwner != null
-                && !Objects.equals(currentOwner.ownerId(), ownerUuid)
-                ? new OwnerWarning(currentOwner, ownerUuid) : null;
+        CompanionPopulationObservationPolicy.WarningEvent warning =
+                observationPolicy.changedEntry(currentOwner, ownerUuid, effectiveWorld);
 
         if (!ownerIndex.tryReconcileCommittedEntry(observedOwner)) {
             deferObservation(observation);
@@ -336,42 +346,13 @@ public final class CompanionPopulationRuntimeReconciler
             }
             try {
                 for (CompanionPopulationObservation observation : observationsDuringReload.values()) {
-                    replayAfterReload(observation);
+                    indexReplay.replay(observation);
                 }
             } finally {
                 observationsDuringReload.clear();
                 canonicalReloadInProgress = false;
             }
         }
-    }
-
-    private void replayAfterReload(@Nonnull CompanionPopulationObservation observation) {
-        OwnerPopulationEntry current = ownerIndex.entry(observation.profileId()).orElse(null);
-        long revision = current == null ? 0L : current.revision();
-        OwnerPopulationEntry owner = new OwnerPopulationEntry(
-                observation.profileId(),
-                observation.ownerUuid(),
-                observation.ownershipWorldName(),
-                observation.lifecycleState(),
-                revision
-        );
-        if (!ownerIndex.tryReconcileCommittedEntry(owner)) {
-            return;
-        }
-        ClaimChunkCoordinate physical = observation.physicalWorldName() == null
-                ? null
-                : new ClaimChunkCoordinate(
-                        observation.physicalWorldName(),
-                        observation.physicalChunkX(),
-                        observation.physicalChunkZ()
-                );
-        claimIndex.observeMovement(new ClaimOccupancyEntry(
-                observation.profileId(),
-                observation.ownerUuid(),
-                observation.lifecycleState(),
-                physical,
-                revision
-        ));
     }
 
     @Override
@@ -397,7 +378,9 @@ public final class CompanionPopulationRuntimeReconciler
                     result.revision()
             );
             if (ownerAdvanced) {
-                advanceClaimRevision(observation.profileId(), observation.expectedRevision(), result.revision());
+                indexReplay.advanceClaimRevision(
+                        observation.profileId(), observation.expectedRevision(), result.revision()
+                );
             }
             return;
         }
@@ -471,36 +454,6 @@ public final class CompanionPopulationRuntimeReconciler
                 && Objects.equals(first.physicalChunkZ(), second.physicalChunkZ());
     }
 
-    private void advanceClaimRevision(@Nonnull String profileId,
-                                      long expectedRevision,
-                                      long newRevision) {
-        ClaimOccupancyEntry current = claimIndex.entry(profileId).orElse(null);
-        if (current == null || current.revision() != expectedRevision) {
-            return;
-        }
-        claimIndex.observeMovement(new ClaimOccupancyEntry(
-                current.profileId(),
-                current.ownerId(),
-                current.lifecycleState(),
-                current.physicalChunk(),
-                newRevision
-        ));
-    }
-
-    private void warnUnexpectedOwner(@Nonnull OwnerPopulationEntry current, @Nullable UUID observedOwner) {
-        long now = System.currentTimeMillis();
-        Long previous = lastWarningByProfile.put(current.profileId(), now);
-        if (previous != null && now - previous < WARNING_INTERVAL_MS) {
-            return;
-        }
-        warningSink.warn(
-                "Observed direct owner-component mutation for profile=" + current.profileId()
-                        + " oldOwner=" + current.ownerId()
-                        + " newOwner=" + observedOwner
-                        + "; adopted conservatively without deleting or moving the companion."
-        );
-    }
-
     @Nullable
     private static String normalizeWorld(@Nullable String value) {
         return value == null || value.isBlank() ? null : value.trim();
@@ -517,15 +470,11 @@ public final class CompanionPopulationRuntimeReconciler
 
     private record ObservationResult(@Nonnull ObservationOutcome outcome,
                                      @Nullable CompanionPopulationObservation observation,
-                                     @Nullable OwnerWarning warning) {
+                                     @Nullable CompanionPopulationObservationPolicy.WarningEvent warning) {
         @Nonnull
         private static ObservationResult only(@Nonnull ObservationOutcome outcome) {
             return new ObservationResult(outcome, null, null);
         }
-    }
-
-    private record OwnerWarning(@Nonnull OwnerPopulationEntry current,
-                                @Nullable UUID observedOwner) {
     }
 
     @FunctionalInterface
