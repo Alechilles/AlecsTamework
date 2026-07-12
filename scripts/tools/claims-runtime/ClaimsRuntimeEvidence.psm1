@@ -308,6 +308,10 @@ public final class ClaimsRuntimeSqliteProbe {
                 "SELECT state FROM companion_population_scan_session WHERE singleton_id = 1"));
             emit("nonterminal_operations", tableScalar(connection, "companion_population_operations",
                 "SELECT COUNT(*) FROM companion_population_operations WHERE state IN ('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING')"));
+            emit("retryable_breeding_operations", tableScalar(connection, "companion_population_operations",
+                "SELECT COUNT(*) FROM companion_population_operations WHERE operation_type = 'BREEDING' AND state = 'RETRYABLE'"));
+            emit("retryable_operations", tableScalar(connection, "companion_population_operations",
+                "SELECT COUNT(*) FROM companion_population_operations WHERE state = 'RETRYABLE'"));
             emit("canonical_rows", tableScalar(connection, "companion_population_state",
                 "SELECT COUNT(*) FROM companion_population_state"));
             emit("profile_rows", tableScalar(connection, "npc_profiles", "SELECT COUNT(*) FROM npc_profiles"));
@@ -387,7 +391,7 @@ function Invoke-ClaimsRuntimeSqliteProbe {
         "migration_v6_count", "migration_versions", "coverage_total", "coverage_ready", "coverage_error_count",
         "coverage_distinct_dimensions", "coverage_dimensions", "coverage_rows", "per_world_owner_error",
         "scan_session_state",
-        "nonterminal_operations", "canonical_rows", "profile_rows", "missing_canonical_rows",
+        "nonterminal_operations", "retryable_operations", "retryable_breeding_operations", "canonical_rows", "profile_rows", "missing_canonical_rows",
         "orphan_canonical_rows", "owned_canonical_rows", "physical_canonical_rows", "lifecycle_rows"
     )
     foreach ($key in $required) {
@@ -411,6 +415,8 @@ function Invoke-ClaimsRuntimeSqliteProbe {
         perWorldOwnerError = $values.per_world_owner_error
         scanSessionState = $values.scan_session_state
         nonterminalOperations = [long]$values.nonterminal_operations
+        retryableOperations = [long]$values.retryable_operations
+        retryableBreedingOperations = [long]$values.retryable_breeding_operations
         canonicalRows = [long]$values.canonical_rows
         profileRows = [long]$values.profile_rows
         missingCanonicalRows = [long]$values.missing_canonical_rows
@@ -461,6 +467,9 @@ function Test-ClaimsRuntimeSqliteEvidence {
     Add-Check "scan-session" $readinessAccepted $Evidence.scanSessionState `
         "READY or ACTIVE only for exact GLOBAL-scope unknown-world sentinel"
     Add-Check "nonterminal-operations" ($Evidence.nonterminalOperations -eq 0) $Evidence.nonterminalOperations 0
+    Add-Check "retryable-operation-kind" `
+        ($Evidence.retryableOperations -eq $Evidence.retryableBreedingOperations) `
+        $Evidence.retryableOperations "all retryable operations are BREEDING"
     Add-Check "canonical-profile-count" ($Evidence.canonicalRows -eq $Evidence.profileRows) $Evidence.canonicalRows $Evidence.profileRows
     Add-Check "missing-canonical-rows" ($Evidence.missingCanonicalRows -eq 0) $Evidence.missingCanonicalRows 0
     Add-Check "orphan-canonical-rows" ($Evidence.orphanCanonicalRows -eq 0) $Evidence.orphanCanonicalRows 0

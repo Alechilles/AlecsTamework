@@ -106,7 +106,8 @@ for QuestLines Claims 1.3.1. Wrong lanes, hashes, counts, text, stack traces, le
 other severe diagnostic remain fatal.
 
 SQLite is queried read-only for `integrity_check=ok`, WAL, FULL synchronous mode, schema v6, all seven
-coverage dimensions, configured owner-scope readiness, zero nonterminal operations, and
+coverage dimensions, configured owner-scope readiness, zero nonterminal operations, breeding/total
+`RETRYABLE` counts (which must match so no unsupported operation kind can escape readiness), and
 canonical/profile row consistency. A fully authoritative save must report every row and the scan session
 `READY` with zero coverage errors. Because these fixtures configure the owner cap as `GLOBAL`, the copied
 upgrade may instead report exactly one non-ready row:

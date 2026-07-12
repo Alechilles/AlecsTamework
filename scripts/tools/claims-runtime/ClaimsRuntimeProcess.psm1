@@ -474,6 +474,7 @@ function Write-ClaimsRuntimeScenarioSummary {
         $lines.Add("- SQLite integrity / WAL / synchronous: $($Result.sqliteEvidence.integrityCheck) / $($Result.sqliteEvidence.journalMode) / $($Result.sqliteEvidence.synchronous)")
         $lines.Add("- Coverage READY: $($Result.sqliteEvidence.coverageReady)/$($Result.sqliteEvidence.coverageTotal)")
         $lines.Add("- Nonterminal operations: $($Result.sqliteEvidence.nonterminalOperations)")
+        $lines.Add("- Retryable breeding/total operations: $($Result.sqliteEvidence.retryableBreedingOperations)/$($Result.sqliteEvidence.retryableOperations)")
         $lines.Add("- Canonical/profile rows: $($Result.sqliteEvidence.canonicalRows)/$($Result.sqliteEvidence.profileRows)")
     }
     if (-not [string]::IsNullOrWhiteSpace([string]$Result.error)) {

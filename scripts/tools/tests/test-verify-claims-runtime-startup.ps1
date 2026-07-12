@@ -419,6 +419,7 @@ $probe = New-ClaimsRuntimeSqliteReadinessProbe -JavaExecutable $Java `
         coverageRows = "BASE_CONTAINER_BLOCKS:catalog:base-containers:READY,CUSTOM_CONTAINERS:catalog:custom-containers:READY,GLOBAL_OWNER:owner-population:global:READY,PER_WORLD_OWNER:owner-population:per-world:READY,PLAYER_SAVES:catalog:player-saves:READY,PROFILE_STATE:catalog:profile-state:READY,WORLD_ENTITIES:catalog:world-entities:READY"
         perWorldOwnerError = ""
         scanSessionState = "READY"; nonterminalOperations = 0
+        retryableOperations = 0; retryableBreedingOperations = 0
         canonicalRows = 78; profileRows = 78; missingCanonicalRows = 0; orphanCanonicalRows = 0
     }
     $preservation = Test-ClaimsRuntimeSqliteEvidence -Evidence $postEvidence -ExpectedCanonicalRows 77
@@ -444,6 +445,11 @@ $probe = New-ClaimsRuntimeSqliteReadinessProbe -JavaExecutable $Java `
     Assert-ClaimsTest (-not (Test-ClaimsRuntimeSqliteEvidence -Evidence $unknownWorldEvidence `
         -ExpectedCanonicalRows 77 -AllowGlobalScopeUnknownWorld).passed) `
         "a different partial-readiness reason remains a hard failure"
+    $invalidRetryableEvidence = $postEvidence.PSObject.Copy()
+    $invalidRetryableEvidence.retryableOperations = 1
+    Assert-ClaimsTest (-not (Test-ClaimsRuntimeSqliteEvidence `
+        -Evidence $invalidRetryableEvidence).passed) `
+        "a non-breeding retryable operation cannot escape the readiness evidence gate"
     $postEvidence.coverageDimensions = "A,B,C,D,E,F,G"
     Assert-ClaimsTest (-not (Test-ClaimsRuntimeSqliteEvidence -Evidence $postEvidence).passed) `
         "seven arbitrary coverage dimension names cannot satisfy readiness"
