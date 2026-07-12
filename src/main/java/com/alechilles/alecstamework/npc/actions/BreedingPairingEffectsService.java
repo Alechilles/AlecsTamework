@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
@@ -110,20 +111,20 @@ final class BreedingPairingEffectsService {
             fail(pairing);
             return;
         }
-        try {
-            pairing.world().execute(() -> {
-                if (pairing.state().get() != PairingState.OPEN) {
-                    return;
-                }
-                try {
-                    action.run();
-                } catch (RuntimeException | LinkageError exception) {
-                    fail(pairing);
-                }
-            });
-        } catch (RuntimeException | LinkageError exception) {
-            fail(pairing);
-        }
+        LeaseBoundWorldDispatcher.execute(
+                pairing.world(),
+                () -> {
+                    if (pairing.state().get() != PairingState.OPEN) {
+                        return;
+                    }
+                    try {
+                        action.run();
+                    } catch (RuntimeException | LinkageError exception) {
+                        fail(pairing);
+                    }
+                },
+                () -> fail(pairing)
+        );
     }
 
     private static void complete(@Nonnull ScheduledPairing pairing) {

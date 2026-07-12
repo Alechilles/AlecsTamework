@@ -24,7 +24,8 @@ class LeaseBoundTerminalDispatchArchitectureTest {
                 MAIN.resolve("items/SpawnerPreparedSpawnService.java"),
                 MAIN.resolve("items/CoopPreparedReleaseSpawnService.java"),
                 MAIN.resolve("items/CompanionPreparedSpawnService.java"),
-                MAIN.resolve("npc/actions/BreedingPreparedPairingHandoffService.java")
+                MAIN.resolve("npc/actions/BreedingPreparedPairingHandoffService.java"),
+                MAIN.resolve("npc/actions/BreedingPairingEffectsService.java")
         );
 
         for (Path path : prepared) {
@@ -33,10 +34,16 @@ class LeaseBoundTerminalDispatchArchitectureTest {
             assertFalse(source.contains("world.execute("), path.toString());
         }
 
-        String breeding = read(prepared.get(prepared.size() - 1));
+        String breeding = read(MAIN.resolve(
+                "npc/actions/BreedingPreparedPairingHandoffService.java"
+        ));
         assertTrue(breeding.contains(
                 "() -> terminality.cancel(\"breeding-world-unavailable\")"
         ));
+        String effects = read(MAIN.resolve(
+                "npc/actions/BreedingPairingEffectsService.java"
+        ));
+        assertTrue(effects.contains("() -> fail(pairing)"));
     }
 
     @Test
