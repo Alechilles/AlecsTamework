@@ -103,15 +103,6 @@ class CompanionPermanentDeathCoordinatorTest {
         assertFalse(harness.coordinator().isPending(harness.npcUuid()));
     }
 
-    @Test
-    void canonicalReleaseObservationClearsStaleBarrierIdempotently() {
-        Harness harness = schedulePermanentDeath();
-
-        assertTrue(harness.coordinator().observeDurablyReleased(harness.npcUuid()));
-        assertFalse(harness.coordinator().observeDurablyReleased(harness.npcUuid()));
-        assertFalse(harness.coordinator().isPending(harness.npcUuid()));
-    }
-
     private static CompanionPopulationCommitResult failedCommit() {
         return new CompanionPopulationCommitResult(
                 false,

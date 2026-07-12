@@ -50,6 +50,24 @@ class OwnerMutationDispatchRejectionArchitectureTest {
         ));
     }
 
+    @Test
+    void dispatchStartWatchdogUsesReservationLeaseAndAtomicTerminalStates() throws IOException {
+        Path dispatcher = SCHEDULER.resolveSibling("OwnerMutationWorldDispatcher.java");
+        String source = Files.readString(dispatcher, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains(
+                "OwnerPopulationTransitionRequest.DEFAULT_LEASE_DURATION.toNanos()"
+        ));
+        assertTrue(source.contains("AtomicReference<DispatchState>"));
+        assertTrue(source.contains(
+                "compareAndSet(DispatchState.PENDING, DispatchState.STARTED)"
+        ));
+        assertTrue(source.contains(
+                "compareAndSet(DispatchState.PENDING, DispatchState.REJECTED)"
+        ));
+        assertTrue(source.contains("dispatcher.accept(() -> runStarted(state, task))"));
+    }
+
     private static int occurrences(String value, String needle) {
         int count = 0;
         int offset = 0;

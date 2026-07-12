@@ -48,9 +48,10 @@ public interface OwnerMutationCallbacks {
     }
 
     /**
-     * Performs thread-safe, state-independent terminal cleanup when a world no longer accepts a
-     * deferred callback. Implementations must not access live ECS or player state from this hook.
-     * A non-null commit is the persistence result observed after the live mutation was applied.
+     * Performs thread-safe, state-independent terminal cleanup when a world rejects a deferred
+     * callback or accepts it without starting it before the dispatch lease expires. Implementations
+     * must not access live ECS or player state from this hook. A non-null commit is the persistence
+     * result observed after the live mutation was applied.
      */
     default void onWorldDispatchRejected(@Nonnull String reason,
                                          boolean mutationApplied,

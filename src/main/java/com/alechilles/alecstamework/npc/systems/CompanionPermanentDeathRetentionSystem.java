@@ -89,24 +89,19 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
         }
         Ref<EntityStore> ref = chunk.getReferenceTo(index);
         UUID npcUuid = identity.getUuid();
-        TameworkOwnerComponent owner = store.getComponent(ref, ownerType);
-        OwnerPopulationEntry canonical = canonicalEntry(npcUuid);
-        if ((owner == null || owner.getOwnerId() == null) && isDurablyReleased(canonical)) {
-            coordinator.observeDurablyReleased(npcUuid);
-            retryAfterByNpc.remove(npcUuid);
-            resumeCorpseRemoval(ref, store, commandBuffer);
-            return;
-        }
         if (coordinator.isPending(npcUuid)) {
             retainDurabilityHold(ref, store, commandBuffer);
             return;
         }
+        TameworkOwnerComponent owner = store.getComponent(ref, ownerType);
         if (owner != null && owner.getOwnerId() != null) {
             retainOwnedPermanentDeath(ref, store, commandBuffer, npcUuid, owner.getOwnerId(), death);
             return;
         }
         retryAfterByNpc.remove(npcUuid);
-        if (canonical != null) {
+        if (isDurablyReleased(npcUuid)) {
+            resumeCorpseRemoval(ref, store, commandBuffer);
+        } else if (hasCanonicalCompanion(npcUuid)) {
             retainDurabilityHold(ref, store, commandBuffer);
         }
     }
@@ -144,10 +139,15 @@ public final class CompanionPermanentDeathRetentionSystem extends EntityTickingS
         );
     }
 
-    private static boolean isDurablyReleased(@Nullable OwnerPopulationEntry entry) {
+    private boolean isDurablyReleased(@Nonnull UUID npcUuid) {
+        OwnerPopulationEntry entry = canonicalEntry(npcUuid);
         return entry != null
                 && entry.ownerId() == null
                 && entry.lifecycleState() == CompanionLifecycleState.RELEASED;
+    }
+
+    private boolean hasCanonicalCompanion(@Nonnull UUID npcUuid) {
+        return canonicalEntry(npcUuid) != null;
     }
 
     @Nullable

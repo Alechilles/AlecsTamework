@@ -80,11 +80,6 @@ public final class CompanionPermanentDeathCoordinator {
         return npcUuid != null && pendingByNpc.containsKey(npcUuid);
     }
 
-    /** Clears a stale process-local barrier after the canonical index proves durable release. */
-    public boolean observeDurablyReleased(@Nullable UUID npcUuid) {
-        return npcUuid != null && pendingByNpc.remove(npcUuid) != null;
-    }
-
     private void prepare(@Nonnull Ref<EntityStore> npcRef,
                          @Nonnull Store<EntityStore> store,
                          @Nonnull PendingDeath pending) {
