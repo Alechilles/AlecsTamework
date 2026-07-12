@@ -33,7 +33,8 @@ public final class HytaleCompanionPopulationCatalogFactory {
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository,
-            @Nonnull CustomContainerReconciliationRegistry customContainers
+            @Nonnull CustomContainerReconciliationRegistry customContainers,
+            @Nonnull String scanSessionEpoch
     ) {
         return create(
                 universe,
@@ -41,6 +42,7 @@ public final class HytaleCompanionPopulationCatalogFactory {
                 itemFeatures,
                 legacyEvidenceRepository,
                 customContainers,
+                scanSessionEpoch,
                 PersistentWorldDirectoryCatalog.filesystem()
         );
     }
@@ -52,9 +54,11 @@ public final class HytaleCompanionPopulationCatalogFactory {
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository,
             @Nonnull CustomContainerReconciliationRegistry customContainers,
+            @Nonnull String scanSessionEpoch,
             @Nonnull PersistentWorldDirectoryCatalog persistentWorldDirectories
     ) {
         Objects.requireNonNull(universe, "universe");
+        Objects.requireNonNull(scanSessionEpoch, "scanSessionEpoch");
         Objects.requireNonNull(persistentWorldDirectories, "persistentWorldDirectories");
         LegacyCapturedItemEvidenceReader itemReader = new LegacyCapturedItemEvidenceReader(itemFeatures);
         RecursiveItemContainerEvidenceScanner itemContainers =
@@ -63,7 +67,6 @@ public final class HytaleCompanionPopulationCatalogFactory {
                 new HytalePlayerInventoryEvidenceScanner(itemContainers);
         List<CompanionPopulationEvidenceSource> sources = new ArrayList<>();
         List<String> incompleteReasons = new ArrayList<>();
-        String mutableSourceEpoch = UUID.randomUUID().toString();
 
         boolean profileSealed = addProfileSource(sources, legacyEvidenceRepository, incompleteReasons);
         KnownIdentities knownIdentities = knownIdentities(
@@ -74,14 +77,14 @@ public final class HytaleCompanionPopulationCatalogFactory {
                 ownerType,
                 itemContainers,
                 knownIdentities.npcUuids(),
-                mutableSourceEpoch,
+                scanSessionEpoch,
                 sources,
                 incompleteReasons,
                 persistentWorldDirectories
         );
         worlds = new WorldResult(worlds.sealed() && knownIdentities.complete());
         boolean playersSealed = addPlayerSources(
-                universe, inventories, mutableSourceEpoch, sources, incompleteReasons
+                universe, inventories, scanSessionEpoch, sources, incompleteReasons
         );
         CustomContainerReconciliationRegistry.Snapshot customSnapshot = customSnapshot(
                 customContainers, incompleteReasons

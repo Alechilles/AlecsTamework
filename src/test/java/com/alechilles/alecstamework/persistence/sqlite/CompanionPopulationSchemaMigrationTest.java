@@ -40,7 +40,8 @@ class CompanionPopulationSchemaMigrationTest {
                             "companion_population_state",
                             "companion_population_operations",
                             "companion_population_reconciliation",
-                            "companion_population_reconciliation_evidence"
+                            "companion_population_reconciliation_evidence",
+                            "companion_population_scan_session"
                     ),
                     existingTables(connection)
             );
@@ -56,19 +57,22 @@ class CompanionPopulationSchemaMigrationTest {
     }
 
     @Test
-    void repeatV6MigrationRepairsDatabasesThatPredateDurableEvidenceStaging() throws Exception {
+    void repeatV6MigrationRepairsDurableEvidenceAndScanSessionTables() throws Exception {
         SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve("v6-evidence-repair.sqlite"));
         SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
         try (Connection connection = connections.openConnection(); Statement statement = connection.createStatement()) {
             migrator.migrate(connection);
             statement.execute("DROP TABLE companion_population_reconciliation_evidence");
+            statement.execute("DROP TABLE companion_population_scan_session");
 
             assertFalse(tableExists(connection, "companion_population_reconciliation_evidence"));
+            assertFalse(tableExists(connection, "companion_population_scan_session"));
             assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V6));
 
             migrator.migrate(connection);
 
             assertTrue(tableExists(connection, "companion_population_reconciliation_evidence"));
+            assertTrue(tableExists(connection, "companion_population_scan_session"));
             assertTrue(existingIndexes(connection).contains("idx_companion_population_evidence_identity"));
         }
     }
@@ -243,7 +247,8 @@ class CompanionPopulationSchemaMigrationTest {
                 "companion_population_state",
                 "companion_population_operations",
                 "companion_population_reconciliation",
-                "companion_population_reconciliation_evidence"
+                "companion_population_reconciliation_evidence",
+                "companion_population_scan_session"
         );
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT name FROM sqlite_master WHERE type = 'table'"

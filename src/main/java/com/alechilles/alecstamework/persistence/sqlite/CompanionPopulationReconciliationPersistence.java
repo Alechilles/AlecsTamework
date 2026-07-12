@@ -9,6 +9,7 @@ public final class CompanionPopulationReconciliationPersistence {
     private final CompanionPopulationRepairRepository repairRepository;
     private final CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository;
     private final CompanionPopulationObservationRepository observationRepository;
+    private final CompanionPopulationScanSessionRepository scanSessionRepository;
 
     public CompanionPopulationReconciliationPersistence(
             @Nonnull SqliteConnectionManager connectionManager,
@@ -21,6 +22,7 @@ public final class CompanionPopulationReconciliationPersistence {
         this.repairRepository = new CompanionPopulationRepairRepository(writeQueue);
         this.legacyEvidenceRepository = new CompanionPopulationLegacyEvidenceRepository(connectionManager);
         this.observationRepository = new CompanionPopulationObservationRepository(writeQueue);
+        this.scanSessionRepository = new CompanionPopulationScanSessionRepository(connectionManager, writeQueue);
     }
 
     @Nonnull
@@ -41,5 +43,10 @@ public final class CompanionPopulationReconciliationPersistence {
     @Nonnull
     public CompanionPopulationObservationRepository observationRepository() {
         return observationRepository;
+    }
+
+    @Nonnull
+    public CompanionPopulationScanSessionRepository scanSessionRepository() {
+        return scanSessionRepository;
     }
 }

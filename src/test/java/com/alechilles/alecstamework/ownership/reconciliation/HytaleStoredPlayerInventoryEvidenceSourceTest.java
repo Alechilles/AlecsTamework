@@ -12,12 +12,26 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HytaleStoredPlayerInventoryEvidenceSourceTest {
     private static final UUID FIRST = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID SECOND = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+    @Test
+    void durableEpochResumesStableCatalogButStructuralChangeInvalidatesGeneration() {
+        HytaleStoredPlayerInventoryEvidenceSource original = source(Set.of(FIRST), "durable-epoch");
+        HytaleStoredPlayerInventoryEvidenceSource restarted = source(Set.of(FIRST), "durable-epoch");
+        HytaleStoredPlayerInventoryEvidenceSource changed = source(
+                Set.of(FIRST, SECOND),
+                "durable-epoch"
+        );
+
+        assertEquals(original.descriptor().generation(), restarted.descriptor().generation());
+        assertNotEquals(original.descriptor().generation(), changed.descriptor().generation());
+    }
 
     @Test
     void scansTheSnapshottedPlayerCatalogInStableUuidOrder() throws Exception {
@@ -83,6 +97,14 @@ class HytaleStoredPlayerInventoryEvidenceSourceTest {
                 null,
                 null,
                 "player-saves:stored"
+        );
+    }
+
+    private static HytaleStoredPlayerInventoryEvidenceSource source(Set<UUID> players, String epoch) {
+        return new HytaleStoredPlayerInventoryEvidenceSource(
+                () -> players,
+                ignored -> CompletableFuture.completedFuture(List.of()),
+                epoch
         );
     }
 }

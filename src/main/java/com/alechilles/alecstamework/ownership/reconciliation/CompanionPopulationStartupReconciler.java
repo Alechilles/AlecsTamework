@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
 import com.alechilles.alecstamework.ownership.OwnerPopulationReadiness;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationScanSessionRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -108,14 +110,19 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         long startedAt = System.currentTimeMillis();
         progress.set(running("waiting-for-universe-ready", 0L, 0L, startedAt));
         CompletableFuture<CompanionPopulationReconciliationProgress> future = universe.getUniverseReady()
-                .thenApplyAsync(ignored -> HytaleCompanionPopulationCatalogFactory.create(
-                        universe,
-                        ownerType,
-                        itemFeatures,
-                        persistence.getCompanionPopulationLegacyEvidenceRepository(),
-                        customContainers
+                .thenComposeAsync(ignored -> acquireScanSession(), executor)
+                .thenApplyAsync(session -> new StartupCatalog(
+                        HytaleCompanionPopulationCatalogFactory.create(
+                                universe,
+                                ownerType,
+                                itemFeatures,
+                                persistence.getCompanionPopulationLegacyEvidenceRepository(),
+                                customContainers,
+                                session.epoch()
+                        ),
+                        session.epoch()
                 ), executor)
-                .thenCompose(build -> reconcile(build, startedAt))
+                .thenCompose(startup -> reconcile(startup, startedAt))
                 .exceptionally(exception -> fail(exception, startedAt));
         completion = future;
         return future;
@@ -127,13 +134,30 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     }
 
     @Nonnull
+    private CompletableFuture<CompanionPopulationScanSessionRepository.Session> acquireScanSession() {
+        PersistenceWriteQueue.WriteSubmission<CompanionPopulationScanSessionRepository.Session> submission =
+                persistence.getCompanionPopulationScanSessionRepository().acquireOrResumeAsync();
+        return submission.completion().thenCompose(outcome -> {
+            CompanionPopulationScanSessionRepository.Session session = outcome.value();
+            if (outcome.isCommitted() && session != null) {
+                return CompletableFuture.completedFuture(session);
+            }
+            String reason = outcome.failureReason() == null
+                    ? "population-scan-session-acquire-failed"
+                    : outcome.failureReason();
+            return CompletableFuture.failedFuture(new IllegalStateException(reason, outcome.failure()));
+        });
+    }
+
+    @Nonnull
     private CompletableFuture<CompanionPopulationReconciliationProgress> reconcile(
-            @Nonnull HytaleCompanionPopulationCatalogFactory.BuildResult build,
+            @Nonnull StartupCatalog startup,
             long startedAt
     ) {
         if (closed.get()) {
             return CompletableFuture.completedFuture(progress.get());
         }
+        HytaleCompanionPopulationCatalogFactory.BuildResult build = startup.build();
         ProgressTracker tracker = new ProgressTracker(build.catalog(), build.reason(), startedAt);
         progress.set(tracker.snapshot());
         CompanionPopulationReconciliationService service = new CompanionPopulationReconciliationService(
@@ -141,6 +165,8 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 persistence.getCompanionPopulationReconciliationRepository(),
                 persistence.getCompanionPopulationRepository(),
                 persistence.getCompanionPopulationRepairRepository(),
+                persistence.getCompanionPopulationScanSessionRepository(),
+                startup.scanSessionEpoch(),
                 (descriptor, offset) -> progress.set(tracker.update(descriptor, offset))
         );
         return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE)
@@ -308,6 +334,12 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 System.currentTimeMillis()
         ));
         executor.shutdownNow();
+    }
+
+    private record StartupCatalog(
+            @Nonnull HytaleCompanionPopulationCatalogFactory.BuildResult build,
+            @Nonnull String scanSessionEpoch
+    ) {
     }
 
     private final class ProgressTracker {

@@ -304,6 +304,7 @@ public final class SqliteSchemaMigrator {
                     CREATE INDEX IF NOT EXISTS idx_companion_population_reconciliation_state
                     ON companion_population_reconciliation(coverage_dimension, state, updated_at_ms)
                     """);
+            createCompanionPopulationScanSessionTable(statement);
             createCompanionPopulationEvidenceTable(statement);
             statement.execute("""
                     INSERT OR IGNORE INTO companion_population_state (
@@ -334,6 +335,7 @@ public final class SqliteSchemaMigrator {
 
     private void reconcileSchemaV6Data(@Nonnull Connection connection) throws Exception {
         try (Statement statement = connection.createStatement()) {
+            createCompanionPopulationScanSessionTable(statement);
             createCompanionPopulationEvidenceTable(statement);
             statement.execute("""
                     INSERT OR IGNORE INTO companion_population_state (
@@ -360,6 +362,19 @@ public final class SqliteSchemaMigrator {
                     LEFT JOIN profile_states s ON s.profile_id = p.profile_id
                     """);
         }
+    }
+
+    private void createCompanionPopulationScanSessionTable(@Nonnull Statement statement) throws Exception {
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS companion_population_scan_session (
+                    singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+                    epoch TEXT NOT NULL CHECK (length(epoch) > 0),
+                    state TEXT NOT NULL CHECK (state IN ('ACTIVE', 'READY')),
+                    started_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    completed_at_ms INTEGER NOT NULL DEFAULT 0
+                )
+                """);
     }
 
     private void createCompanionPopulationEvidenceTable(@Nonnull Statement statement) throws Exception {

@@ -13,10 +13,23 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HytaleSavedWorldEvidenceSourceTest {
+    @Test
+    void durableEpochResumesStableCatalogButStructuralChangeInvalidatesGeneration() {
+        long first = ChunkUtil.indexChunk(1, 1);
+        long second = ChunkUtil.indexChunk(2, 2);
+        HytaleSavedWorldEvidenceSource original = source(new long[]{first}, "durable-epoch");
+        HytaleSavedWorldEvidenceSource restarted = source(new long[]{first}, "durable-epoch");
+        HytaleSavedWorldEvidenceSource changed = source(new long[]{first, second}, "durable-epoch");
+
+        assertEquals(original.descriptor().generation(), restarted.descriptor().generation());
+        assertNotEquals(original.descriptor().generation(), changed.descriptor().generation());
+    }
+
     @Test
     void classifiesSavedDeathComponentsAsDeadPhysicalEvidence() {
         assertEquals(
@@ -105,6 +118,16 @@ class HytaleSavedWorldEvidenceSourceTest {
                 chunkX,
                 chunkZ,
                 "world-entities:alpha"
+        );
+    }
+
+    private static HytaleSavedWorldEvidenceSource source(long[] indexes, String epoch) {
+        return new HytaleSavedWorldEvidenceSource(
+                "alpha",
+                HytaleSavedWorldEvidenceSource.Mode.WORLD_ENTITIES,
+                () -> indexes.clone(),
+                (chunkX, chunkZ) -> CompletableFuture.completedFuture(List.of()),
+                epoch
         );
     }
 }

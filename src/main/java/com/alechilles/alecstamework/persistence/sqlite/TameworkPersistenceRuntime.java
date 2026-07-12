@@ -257,6 +257,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     @Nonnull
+    public CompanionPopulationScanSessionRepository getCompanionPopulationScanSessionRepository() {
+        return populationReconciliationPersistence.scanSessionRepository();
+    }
+
+    @Nonnull
     public PersistenceWriteQueue.QueueMetrics getWriteQueueMetrics() {
         return writeQueue.getMetrics();
     }

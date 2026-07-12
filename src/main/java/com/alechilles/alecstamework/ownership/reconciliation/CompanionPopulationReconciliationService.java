@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperat
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationReconciliationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepairRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationScanSessionRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -32,6 +33,8 @@ public final class CompanionPopulationReconciliationService {
     private final CompanionPopulationRepository populationRepository;
     private final CompanionPopulationOperationRecoveryService operationRecovery;
     private final CompanionPopulationRepairRepository repairRepository;
+    private final CompanionPopulationScanSessionRepository scanSessionRepository;
+    private final String scanSessionEpoch;
     private final BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver;
 
     public CompanionPopulationReconciliationService(
@@ -39,6 +42,8 @@ public final class CompanionPopulationReconciliationService {
             @Nonnull CompanionPopulationReconciliationRepository reconciliationRepository,
             @Nonnull CompanionPopulationRepository populationRepository,
             @Nonnull CompanionPopulationRepairRepository repairRepository,
+            @Nonnull CompanionPopulationScanSessionRepository scanSessionRepository,
+            @Nonnull String scanSessionEpoch,
             @Nonnull BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver
     ) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
@@ -49,6 +54,8 @@ public final class CompanionPopulationReconciliationService {
         this.populationRepository = Objects.requireNonNull(populationRepository, "populationRepository");
         this.operationRecovery = new CompanionPopulationOperationRecoveryService(populationRepository);
         this.repairRepository = Objects.requireNonNull(repairRepository, "repairRepository");
+        this.scanSessionRepository = Objects.requireNonNull(scanSessionRepository, "scanSessionRepository");
+        this.scanSessionEpoch = Objects.requireNonNull(scanSessionEpoch, "scanSessionEpoch");
         this.progressObserver = Objects.requireNonNull(progressObserver, "progressObserver");
     }
 
@@ -81,6 +88,24 @@ public final class CompanionPopulationReconciliationService {
                     return finalizePopulation();
                 });
             });
+        }).thenCompose(this::completeScanSessionIfReady);
+    }
+
+    @Nonnull
+    private CompletableFuture<Result> completeScanSessionIfReady(@Nonnull Result result) {
+        if (result.status() != Status.READY) {
+            return CompletableFuture.completedFuture(result);
+        }
+        return scanSessionRepository.markReadyAsync(scanSessionEpoch).completion().thenCompose(outcome -> {
+            if (outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())) {
+                return CompletableFuture.completedFuture(result);
+            }
+            return publishOwnerState(
+                    CompanionPopulationCoverageRecord.State.DEGRADED,
+                    "reconciliation-session-complete-failed",
+                    result.profileCount(),
+                    1
+            ).thenApply(ignored -> Result.degraded("reconciliation-session-complete-failed"));
         });
     }
 
