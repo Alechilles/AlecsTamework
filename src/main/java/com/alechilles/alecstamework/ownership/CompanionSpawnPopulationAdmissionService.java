@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderRegistry;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -89,8 +90,20 @@ public final class CompanionSpawnPopulationAdmissionService {
         ClaimLookupSession session = new ClaimLookupSession(
                 policy.claimContext(), policy.claimLimitPerChunk() > 0, lookupMetrics
         );
-        return batchCoordinator.prepareAsync(planned.units(), session, mode)
-                .thenApply(result -> mapResult(safeRequests.size(), planned.spawns(), result));
+        final CompletableFuture<CompanionPopulationBatchPreparationResult> preparation;
+        try {
+            preparation = batchCoordinator.prepareAsync(planned.units(), session, mode);
+        } catch (RuntimeException | LinkageError failure) {
+            planner.releaseUnadmitted(planned.spawns(), 0);
+            throw failure;
+        }
+        return preparation.whenComplete((result, failure) -> {
+            int admitted = failure == null && result != null && result.allowed()
+                    && result.preparedBatch() != null
+                    ? result.admittedCount()
+                    : 0;
+            planner.releaseUnadmitted(planned.spawns(), admitted);
+        }).thenApply(result -> mapResult(safeRequests.size(), planned.spawns(), result));
     }
 
     /** Revalidates current settings, provider generation, and destination topology. */
@@ -102,9 +115,13 @@ public final class CompanionSpawnPopulationAdmissionService {
         ClaimLookupSession refreshed = new ClaimLookupSession(
                 current.claimContext(), current.claimLimitPerChunk() > 0, lookupMetrics
         );
-        return batchCoordinator.claimForApply(
+        boolean claimed = batchCoordinator.claimForApply(
                 batch.populationBatch(), unitIndex, current.settingsRevision(), refreshed
         );
+        if (!claimed) {
+            releaseAfterCancellation(batch, unitIndex, "spawn-population-claim-invalid");
+        }
+        return claimed;
     }
 
     /** Writes the fixed UUID and owner into NPCPlugin's pre-add holder. */
@@ -160,6 +177,7 @@ public final class CompanionSpawnPopulationAdmissionService {
                 return degraded("spawn-identity-remap-failed", result);
             }
             if (shouldMarkIdentityDurable(result)) {
+                spawn.claimIdentityTerminal();
                 try {
                     identityResolver.markDurable(spawn.profileId(), spawn.plannedNpcUuid());
                 } catch (RuntimeException | LinkageError identityFailure) {
@@ -198,7 +216,15 @@ public final class CompanionSpawnPopulationAdmissionService {
             int unitIndex,
             @Nonnull String reason
     ) {
-        return batchCoordinator.cancelAsync(batch.populationBatch(), unitIndex, reason);
+        return batchCoordinator.cancelAsync(batch.populationBatch(), unitIndex, reason)
+                .thenApply(canceled -> {
+                    if (Boolean.TRUE.equals(canceled)
+                            && !planner.releaseProvisional(batch.spawn(unitIndex))) {
+                        markDegraded("spawn_provisional_identity_release_failed");
+                        return false;
+                    }
+                    return canceled;
+                });
     }
 
     @Nonnull
@@ -206,7 +232,20 @@ public final class CompanionSpawnPopulationAdmissionService {
             @Nonnull PreparedCompanionSpawnBatch batch,
             @Nonnull String reason
     ) {
-        return batchCoordinator.cancelRemainingAsync(batch.populationBatch(), reason);
+        List<CompletableFuture<Boolean>> cancellations = new ArrayList<>();
+        for (int index = 0; index < batch.populationBatch().admittedCount(); index++) {
+            cancellations.add(cancelAsync(batch, index, reason));
+        }
+        return CompletableFuture.allOf(cancellations.toArray(CompletableFuture[]::new))
+                .thenApply(ignored -> {
+                    int canceled = 0;
+                    for (CompletableFuture<Boolean> cancellation : cancellations) {
+                        if (Boolean.TRUE.equals(cancellation.getNow(false))) {
+                            canceled++;
+                        }
+                    }
+                    return canceled;
+                });
     }
 
     /** Quarantines both authorities when a live spawn terminal action cannot be started. */
@@ -243,6 +282,30 @@ public final class CompanionSpawnPopulationAdmissionService {
             return true;
         } catch (RuntimeException | LinkageError failure) {
             return false;
+        }
+    }
+
+    private void releaseAfterCancellation(
+            @Nonnull PreparedCompanionSpawnBatch batch,
+            int unitIndex,
+            @Nonnull String reason
+    ) {
+        try {
+            CompletableFuture<Boolean> cancellation = batchCoordinator.cancelAsync(
+                    batch.populationBatch(), unitIndex, reason
+            );
+            if (cancellation == null) {
+                markDegraded("spawn_provisional_identity_cancel_stage_missing");
+                return;
+            }
+            cancellation.whenComplete((canceled, failure) -> {
+                if (failure != null || !Boolean.TRUE.equals(canceled)
+                        || !planner.releaseProvisional(batch.spawn(unitIndex))) {
+                    markDegraded("spawn_provisional_identity_release_failed");
+                }
+            });
+        } catch (RuntimeException | LinkageError failure) {
+            markDegraded("spawn_provisional_identity_release_failed");
         }
     }
 

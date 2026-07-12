@@ -37,8 +37,15 @@ final class CompanionSpawnAdmissionPlanner {
         List<CompanionPopulationAdmissionUnit> units = new ArrayList<>(requests.size());
         List<PreparedCompanionSpawnBatch.ReservedSpawn> spawns = new ArrayList<>(requests.size());
         for (CompanionSpawnAdmissionRequest request : requests) {
-            PlanResult result = plan(request, policy);
+            final PlanResult result;
+            try {
+                result = plan(request, policy);
+            } catch (RuntimeException | LinkageError failure) {
+                releaseUnadmitted(spawns, 0);
+                throw failure;
+            }
             if (!result.allowed()) {
+                releaseUnadmitted(spawns, 0);
                 return PlannedBatch.denied(result.reason());
             }
             units.add(result.unit());
@@ -63,20 +70,26 @@ final class CompanionSpawnAdmissionPlanner {
         OwnerPopulationOperation effectiveOperation = source.legacyAdoption()
                 ? OwnerPopulationOperation.LEGACY_ADOPTION
                 : request.operation();
-        CompanionPopulationAdmissionUnit unit = CompanionSpawnAdmissionPlanFactory.create(
-                request,
-                profileId,
-                plannedNpcUuid,
-                effectiveOperation,
-                source.owner(),
-                source.claim(),
-                policy
-        );
         PreparedCompanionSpawnBatch.ReservedSpawn spawn =
                 new PreparedCompanionSpawnBatch.ReservedSpawn(
                         request, profileId, plannedNpcUuid, request.previousNpcUuid(),
                         effectiveOperation, source.legacyAdoption()
                 );
+        final CompanionPopulationAdmissionUnit unit;
+        try {
+            unit = CompanionSpawnAdmissionPlanFactory.create(
+                    request,
+                    profileId,
+                    plannedNpcUuid,
+                    effectiveOperation,
+                    source.owner(),
+                    source.claim(),
+                    policy
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            releaseProvisional(spawn);
+            throw failure;
+        }
         return PlanResult.allowed(unit, spawn);
     }
 
@@ -98,6 +111,9 @@ final class CompanionSpawnAdmissionPlanner {
                 ? null : claimIndex.entry(profileId).orElse(null);
         boolean legacy = false;
         if (owner == null && claim == null && request.allowLegacyAdoption()) {
+            if (request.canonicalProfileId() != null) {
+                return Source.denied("spawn-source-population-profile-unavailable");
+            }
             CompanionIdentityResolver.Resolution resolution = identityResolver.resolveOrAllocate(
                     previousUuid, request.idempotencyKey() + ":legacy-adoption"
             );
@@ -126,6 +142,33 @@ final class CompanionSpawnAdmissionPlanner {
         return invalid == null
                 ? Source.allowed(profileId, owner, claim, legacy)
                 : Source.denied(invalid);
+    }
+
+    /** Releases only planned identities that did not become caller-owned capabilities. */
+    void releaseUnadmitted(
+            @Nonnull List<PreparedCompanionSpawnBatch.ReservedSpawn> spawns,
+            int admittedCount
+    ) {
+        int retained = Math.max(0, Math.min(admittedCount, spawns.size()));
+        for (int index = retained; index < spawns.size(); index++) {
+            releaseProvisional(spawns.get(index));
+        }
+    }
+
+    boolean releaseProvisional(@Nonnull PreparedCompanionSpawnBatch.ReservedSpawn spawn) {
+        Objects.requireNonNull(spawn, "spawn");
+        if (!spawn.legacyAdoption() || !spawn.claimIdentityTerminal()) {
+            return true;
+        }
+        UUID previousNpcUuid = spawn.previousNpcUuid();
+        if (previousNpcUuid == null) {
+            return false;
+        }
+        try {
+            return identityResolver.releaseProvisional(spawn.profileId(), previousNpcUuid);
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
     }
 
     @Nullable
