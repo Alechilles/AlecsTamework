@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HytaleSavedWorldEvidenceSourceTest {
     @Test
-    void durableEpochResumesStableCatalogButStructuralChangeInvalidatesGeneration() {
+    void durableEpochResumesStableCatalogButStructuralChangeInvalidatesGeneration() throws Exception {
         long first = ChunkUtil.indexChunk(1, 1);
         long second = ChunkUtil.indexChunk(2, 2);
         HytaleSavedWorldEvidenceSource original = source(new long[]{first}, "durable-epoch");
