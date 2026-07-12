@@ -78,8 +78,11 @@ class ClaimsOwnerPopulationStructuralPolicyTest {
 
         assertTrue(runtime.contains("TamedDamageOwnerPolicyResolver.resolve("));
         assertTrue(api.contains("TamedDamageOwnerPolicyResolver.resolveLive("));
-        assertTrue(resolver.indexOf("owner.getOwnerId()") < resolver.indexOf("links.getOwnerId()"));
-        assertTrue(resolver.indexOf("links.getOwnerId()") < resolver.indexOf("npcName.getOwnerId()"));
+        int ownerComponent = resolver.indexOf("owner.getOwnerId()");
+        int commandLinks = resolver.indexOf("links.getOwnerId()");
+        int npcName = resolver.indexOf("npcName.getOwnerId()");
+        assertTrue(ownerComponent >= 0 && commandLinks > ownerComponent);
+        assertTrue(npcName > commandLinks);
     }
 
     @Test
