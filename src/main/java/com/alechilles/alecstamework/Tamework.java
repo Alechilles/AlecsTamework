@@ -1199,7 +1199,7 @@ public class Tamework extends JavaPlugin {
         if (ownerPopulationRuntime != null && itemFeatureRegistry != null) {
             TameworkPopulationRuntimeLifecycle.start(ownerPopulationRuntime, Universe.get(),
                     ownerComponentType, itemFeatureRegistry,
-                    loadedNpcIdentityBootstrapService.awaitCurrentBootstrap());
+                    loadedNpcIdentityBootstrapService::awaitCurrentBootstrap);
         }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (hStatsIntegration != null) {

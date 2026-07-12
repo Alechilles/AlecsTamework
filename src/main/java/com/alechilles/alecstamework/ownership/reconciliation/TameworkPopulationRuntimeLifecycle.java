@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
@@ -115,7 +116,8 @@ public final class TameworkPopulationRuntimeLifecycle {
                              @Nonnull Universe universe,
                              @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
                              @Nonnull ItemFeatureRegistry itemFeatures,
-                             @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady) {
+                             @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>>
+                                     loadedIdentitiesReady) {
         runtime.customContainerReconciliationRegistry().seal(
                 "tamework-builtins:no-additional-custom-persisted-item-containers:v1"
         );

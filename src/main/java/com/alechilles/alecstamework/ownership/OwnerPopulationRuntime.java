@@ -21,6 +21,7 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
@@ -350,7 +351,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
             @Nonnull Universe universe,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
             @Nonnull ItemFeatureRegistry itemFeatures,
-            @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady
+            @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>> loadedIdentitiesReady
     ) {
         breedingReplayJournal.markUnavailable();
         return reconciliationRuntime.start(

@@ -433,6 +433,10 @@ class LoadedNpcIdentityBootstrapServiceTest {
         int startWorldRegistration = pluginSource.indexOf("StartWorldEvent.class");
         int initialBootstrap = pluginSource.indexOf("loadedNpcIdentityBootstrapService.bootstrapUniverse()");
         assertTrue(startWorldRegistration >= 0 && initialBootstrap > startWorldRegistration);
+        assertTrue(pluginSource.contains(
+                "loadedNpcIdentityBootstrapService::awaitCurrentBootstrap"));
+        assertFalse(pluginSource.contains(
+                "loadedNpcIdentityBootstrapService.awaitCurrentBootstrap()"));
     }
 
     private static LoadedNpcIdentityBootstrapService service(

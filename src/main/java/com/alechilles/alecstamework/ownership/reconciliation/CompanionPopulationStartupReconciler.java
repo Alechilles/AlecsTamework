@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
@@ -41,6 +42,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
     private final CompanionLiveEvidenceRevision liveEvidenceRevision;
     private final ScheduledExecutorService executor;
+    private final LoadedNpcIdentityStartupGate loadedIdentityStartupGate;
     private final AtomicReference<CompanionPopulationReconciliationProgress> progress =
             new AtomicReference<>(CompanionPopulationReconciliationProgress.idle());
     private final AtomicBoolean started = new AtomicBoolean();
@@ -96,6 +98,9 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 liveEvidenceRevision, "liveEvidenceRevision"
         );
         this.executor = Objects.requireNonNull(executor, "executor");
+        this.loadedIdentityStartupGate = new LoadedNpcIdentityStartupGate(
+                loadedNpcIdentityIndex, executor, closed::get
+        );
     }
     /**
      * Starts at most one reconciliation pass. Every expensive scan and final reload runs away from
@@ -107,7 +112,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull CustomContainerReconciliationRegistry customContainers,
-            @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady
+            @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>> loadedIdentitiesReady
     ) {
         Objects.requireNonNull(universe, "universe");
         Objects.requireNonNull(ownerType, "ownerType");
@@ -124,9 +129,8 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
 
         long startedAt = System.currentTimeMillis();
         progress.set(running("waiting-for-universe-ready", 0L, 0L, startedAt));
-        CompletableFuture<CompanionPopulationReconciliationProgress> future = universe.getUniverseReady()
-                .thenComposeAsync(ignored -> loadedIdentitiesReady, executor)
-                .thenApplyAsync(this::requireCompleteLoadedIdentities, executor)
+        CompletableFuture<CompanionPopulationReconciliationProgress> future = loadedIdentityStartupGate
+                .awaitAfter(universe.getUniverseReady(), loadedIdentitiesReady)
                 .thenComposeAsync(ignored -> acquireScanSession(), executor)
                 .thenComposeAsync(session -> new PersistedWorldCoverageLoader()
                         .ensureLoaded(universe)
@@ -188,17 +192,6 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 })
         );
     }
-    @Nonnull
-    private LoadedNpcIdentitySnapshot requireCompleteLoadedIdentities(
-            @Nonnull LoadedNpcIdentitySnapshot snapshot
-    ) {
-        LoadedNpcIdentitySnapshot current = loadedNpcIdentityIndex.snapshot();
-        if (!snapshot.initializationComplete() || !current.initializationComplete()) {
-            throw new IllegalStateException("Loaded NPC identity bootstrap is incomplete.");
-        }
-        return current;
-    }
-
     @Nonnull
     public CompanionPopulationReconciliationProgress progress() {
         return progress.get();

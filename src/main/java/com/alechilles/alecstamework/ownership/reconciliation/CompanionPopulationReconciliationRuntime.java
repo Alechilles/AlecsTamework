@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /** Owns startup recovery, live observation reconciliation, and custom-container declarations. */
@@ -105,7 +106,7 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
             @Nonnull Universe universe,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
             @Nonnull ItemFeatureRegistry itemFeatures,
-            @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady
+            @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>> loadedIdentitiesReady
     ) {
         return startupReconciler.start(
                 universe, ownerType, itemFeatures, customContainers, loadedIdentitiesReady
