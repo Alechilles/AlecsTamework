@@ -118,6 +118,21 @@ class PermanentDeletionPopulationArchitectureTest {
         assertTrue(registration.contains("new CompanionPermanentDeathDamageGateSystem("));
         assertTrue(registration.contains("new CompanionPermanentDeathFallbackSystem("));
         assertTrue(registration.contains("new CompanionPermanentDeathRetentionSystem("));
+        assertTrue(registration.contains("new CompanionRevivableDeathPopulationSystem("));
+
+        String revivable = read(
+                "ownership", "reconciliation", "CompanionRevivableDeathPopulationSystem.java"
+        );
+        assertTrue(revivable.contains("extends DeathSystems.OnDeathSystem"));
+        assertTrue(revivable.contains("Order.AFTER, NPCSystems.OnDeathSystem.class"));
+        assertTrue(revivable.contains("CompanionRevivePolicy.supportsRevive(roleId, links)"));
+        assertTrue(revivable.contains("projector.observeRevivableDeath("));
+
+        String projector = read(
+                "ownership", "reconciliation", "CompanionDeathPopulationProjector.java"
+        );
+        assertTrue(projector.contains("CompanionLifecycleState.DEAD_REVIVABLE"));
+        assertTrue(projector.contains("observation.ownerUuid()"));
     }
 
     private static String read(String... segments) throws IOException {

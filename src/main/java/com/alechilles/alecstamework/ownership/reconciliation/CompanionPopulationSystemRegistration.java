@@ -63,6 +63,12 @@ public final class CompanionPopulationSystemRegistration {
                 UUIDComponent.getComponentType(),
                 TransformComponent.getComponentType()
         ));
+        registry.registerSystem(new CompanionRevivableDeathPopulationSystem(
+                runtime.runtimeReconciler(),
+                ownerType,
+                UUIDComponent.getComponentType(),
+                TransformComponent.getComponentType()
+        ));
         registry.registerSystem(new CompanionPermanentDeathDamageGateSystem(
                 permanentDeath,
                 ownerType
