@@ -100,7 +100,7 @@ class ManagedCoopChunkScannerTest {
                     public TwCoopConfig forCoop(String coopId) {
                         return configs.get(coopId);
                     }
-                });
+                }, ignored -> false);
         return new ManagedCoopChunkScanner(
                 resolver,
                 (store, world) -> ManagedCoopChunkScanner.EvidenceRead.reliable(List.of()),

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
+import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import java.util.Locale;
 import java.util.Objects;
@@ -12,13 +13,19 @@ import org.joml.Vector3i;
 /** Resolves exact managed-coop authority from Tamework config without invoking vanilla admission. */
 public final class ManagedCoopAuthorityResolver {
     private final ConfigLookup configLookup;
+    private final VanillaCoopLookup vanillaCoopLookup;
 
     public ManagedCoopAuthorityResolver() {
-        this(new AssetConfigLookup());
+        this(new AssetConfigLookup(), new AssetVanillaCoopLookup());
     }
 
-    ManagedCoopAuthorityResolver(@Nonnull ConfigLookup configLookup) {
+    ManagedCoopAuthorityResolver(
+            @Nonnull ConfigLookup configLookup,
+            @Nonnull VanillaCoopLookup vanillaCoopLookup
+    ) {
         this.configLookup = Objects.requireNonNull(configLookup, "configLookup");
+        this.vanillaCoopLookup = Objects.requireNonNull(
+                vanillaCoopLookup, "vanillaCoopLookup");
     }
 
     /**
@@ -41,7 +48,8 @@ public final class ManagedCoopAuthorityResolver {
             return null;
         }
         String coopId = normalizeIdentifier(config.getCoopId());
-        if (coopId == null) {
+        if (coopId == null || !Boolean.FALSE.equals(
+                vanillaCoopLookup.capturesWildNpcsAutomatically(coopId))) {
             return null;
         }
         return new ManagedCoopContext(
@@ -138,6 +146,12 @@ public final class ManagedCoopAuthorityResolver {
         TwCoopConfig forCoop(@Nonnull String coopId);
     }
 
+    /** Reports the vanilla automatic-intake flag, or null when the base asset is unavailable. */
+    interface VanillaCoopLookup {
+        @Nullable
+        Boolean capturesWildNpcsAutomatically(@Nonnull String coopId);
+    }
+
     private static final class AssetConfigLookup implements ConfigLookup {
         @Nullable
         @Override
@@ -149,6 +163,30 @@ public final class ManagedCoopAuthorityResolver {
         @Override
         public TwCoopConfig forCoop(@Nonnull String coopId) {
             return TwCoopConfig.resolveForCoop(coopId);
+        }
+    }
+
+    /** Fails closed unless the targeted base coop explicitly disables its own wild intake. */
+    private static final class AssetVanillaCoopLookup implements VanillaCoopLookup {
+        @Nullable
+        @Override
+        public Boolean capturesWildNpcsAutomatically(@Nonnull String coopId) {
+            try {
+                if (FarmingCoopAsset.getAssetMap() == null
+                        || FarmingCoopAsset.getAssetMap().getAssetMap() == null) {
+                    return null;
+                }
+                for (FarmingCoopAsset asset
+                        : FarmingCoopAsset.getAssetMap().getAssetMap().values()) {
+                    if (asset != null && asset.getId() != null
+                            && coopId.equalsIgnoreCase(asset.getId())) {
+                        return asset.getCaptureWildNPCsInRange();
+                    }
+                }
+            } catch (RuntimeException exception) {
+                return null;
+            }
+            return null;
         }
     }
 }

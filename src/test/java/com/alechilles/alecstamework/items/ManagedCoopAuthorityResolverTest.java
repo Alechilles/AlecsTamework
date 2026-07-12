@@ -67,8 +67,28 @@ class ManagedCoopAuthorityResolverTest {
         ));
     }
 
+    @Test
+    void rejectsManagedAuthorityUnlessVanillaWildIntakeIsExplicitlyDisabled()
+            throws Exception {
+        TwCoopConfig config = config("Managed", "Coop_Chicken", true, false);
+
+        assertNull(resolver(
+                Map.of(), Map.of("coop_chicken", config), ignored -> true
+        ).resolve("world", null, "coop_chicken", new Vector3i(), 0, null));
+        assertNull(resolver(
+                Map.of(), Map.of("coop_chicken", config), ignored -> null
+        ).resolve("world", null, "coop_chicken", new Vector3i(), 0, null));
+    }
+
     private static ManagedCoopAuthorityResolver resolver(Map<String, TwCoopConfig> blockConfigs,
                                                          Map<String, TwCoopConfig> coopConfigs) {
+        return resolver(blockConfigs, coopConfigs, ignored -> false);
+    }
+
+    private static ManagedCoopAuthorityResolver resolver(
+            Map<String, TwCoopConfig> blockConfigs,
+            Map<String, TwCoopConfig> coopConfigs,
+            ManagedCoopAuthorityResolver.VanillaCoopLookup vanillaCoops) {
         return new ManagedCoopAuthorityResolver(new ManagedCoopAuthorityResolver.ConfigLookup() {
             @Override
             public TwCoopConfig forBlockType(String blockTypeId) {
@@ -79,7 +99,7 @@ class ManagedCoopAuthorityResolverTest {
             public TwCoopConfig forCoop(String coopId) {
                 return coopConfigs.get(coopId);
             }
-        });
+        }, vanillaCoops);
     }
 
     private static TwCoopConfig config(String id,
