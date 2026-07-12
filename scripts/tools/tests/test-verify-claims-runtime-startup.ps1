@@ -255,6 +255,34 @@ Shutdown completed!
     Assert-ClaimsTest ($sourceProbe.missingCanonicalRows -eq -1 -and $sourceProbe.orphanCanonicalRows -eq -1) `
         "multi-table probes degrade safely before v6"
 
+    $isolatedCallbackScript = @'
+param($ModulePath, $Java, $Artifact, $ProbeSource, $Database)
+Import-Module $ModulePath -Force
+$probe = New-ClaimsRuntimeSqliteReadinessProbe -JavaExecutable $Java `
+    -BuiltArtifact $Artifact -ProbeSource $ProbeSource -DatabasePath $Database `
+    -ExpectedCanonicalRows 77
+& $probe | ConvertTo-Json -Depth 10 -Compress
+'@
+    $isolatedRunspace = [Management.Automation.PowerShell]::Create()
+    try {
+        $null = $isolatedRunspace.AddScript($isolatedCallbackScript)
+        foreach ($argument in @(
+            (Join-Path $moduleRoot "ClaimsRuntimeReadiness.psm1"),
+            $JavaExecutable, $BuiltArtifact, $probeSource, $sourceDatabase
+        )) { $null = $isolatedRunspace.AddArgument($argument) }
+        $isolatedOutput = @($isolatedRunspace.Invoke())
+        $isolatedErrors = @($isolatedRunspace.Streams.Error)
+        Assert-ClaimsTest ($isolatedErrors.Count -eq 0) `
+            "SQLite readiness callback loads its dependencies in an isolated runspace"
+        $isolatedSample = (($isolatedOutput | ForEach-Object ToString) -join "") | ConvertFrom-Json
+        Assert-ClaimsTest ($null -eq $isolatedSample.PSObject.Properties["error"]) `
+            "SQLite readiness callback resolves its probe and validator dependencies"
+        Assert-ClaimsTest ($null -ne $isolatedSample.PSObject.Properties["scanSessionState"] -and
+            -not $isolatedSample.ready) "pre-v6 readiness sample is structured but not ready"
+    } finally {
+        $isolatedRunspace.Dispose()
+    }
+
     $sourceMods = Join-Path $upgradeSource "mods"
     Write-ClaimsTestText -Path (Join-Path $sourceMods "SimpleClaims\data\sentinel.txt") -Text "keep"
     Write-ClaimsTestText -Path (Join-Path $sourceMods "inherited.jar") -Text "do-not-copy"

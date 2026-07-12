@@ -5,6 +5,7 @@ Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeEvidence.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeInputs.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeLogs.psm1") -Force
 Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeProcess.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeReadiness.psm1") -Force
 
 function Get-ClaimsRuntimeScenarioPlan {
     [CmdletBinding()]
@@ -342,35 +343,10 @@ function Invoke-ClaimsRuntimeVerification {
         $errorText = $null
         $readinessProbe = $null
         if ($scenario.copiedUpgrade) {
-            $readinessProbe = {
-                try {
-                    if (-not (Test-Path -LiteralPath $context.databasePath -PathType Leaf)) {
-                        throw "Scenario database does not exist yet."
-                    }
-                    $sampleEvidence = Invoke-ClaimsRuntimeSqliteProbe `
-                        -JavaExecutable $inputs.javaExecutable -BuiltArtifact $inputs.builtArtifact `
-                        -ProbeSource $probeSource -DatabasePath $context.databasePath
-                    $sampleValidation = Test-ClaimsRuntimeSqliteEvidence `
-                        -Evidence $sampleEvidence -ExpectedCanonicalRows $expectedUpgradeRows
-                    [pscustomobject][ordered]@{
-                        ready = $sampleValidation.passed
-                        sampledAtUtc = [DateTime]::UtcNow.ToString("o")
-                        scanSessionState = $sampleEvidence.scanSessionState
-                        coverageReady = $sampleEvidence.coverageReady
-                        coverageTotal = $sampleEvidence.coverageTotal
-                        nonterminalOperations = $sampleEvidence.nonterminalOperations
-                        canonicalRows = $sampleEvidence.canonicalRows
-                        profileRows = $sampleEvidence.profileRows
-                        failedChecks = @($sampleValidation.checks | Where-Object { -not $_.passed } | ForEach-Object name)
-                    }
-                } catch {
-                    [pscustomobject][ordered]@{
-                        ready = $false
-                        sampledAtUtc = [DateTime]::UtcNow.ToString("o")
-                        error = $_.Exception.ToString()
-                    }
-                }
-            }.GetNewClosure()
+            $readinessProbe = New-ClaimsRuntimeSqliteReadinessProbe `
+                -JavaExecutable $inputs.javaExecutable -BuiltArtifact $inputs.builtArtifact `
+                -ProbeSource $probeSource -DatabasePath $context.databasePath `
+                -ExpectedCanonicalRows $expectedUpgradeRows
         }
         try {
             $processResult = Invoke-ClaimsRuntimeServerProcess -Context $context -Inputs $inputs `

@@ -1,12 +1,60 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeEvidence.psm1") -Force
+
 function Wait-ClaimsRuntimeDuration {
     param([Diagnostics.Process] $Process, [int] $Seconds)
     $watch = [Diagnostics.Stopwatch]::StartNew()
     while (-not $Process.HasExited -and $watch.Elapsed.TotalSeconds -lt $Seconds) {
         Start-Sleep -Milliseconds 100
     }
+}
+
+function New-ClaimsRuntimeSqliteReadinessProbe {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string] $JavaExecutable,
+        [Parameter(Mandatory = $true)][string] $BuiltArtifact,
+        [Parameter(Mandatory = $true)][string] $ProbeSource,
+        [Parameter(Mandatory = $true)][string] $DatabasePath,
+        [Parameter(Mandatory = $true)][long] $ExpectedCanonicalRows
+    )
+
+    # GetNewClosure creates a dynamic module that does not inherit this module's private imports.
+    # Capture the exact imported function bodies so the callback remains self-contained there.
+    $invokeSqliteProbe = (Get-Command Invoke-ClaimsRuntimeSqliteProbe `
+        -CommandType Function -ErrorAction Stop).ScriptBlock
+    $testSqliteEvidence = (Get-Command Test-ClaimsRuntimeSqliteEvidence `
+        -CommandType Function -ErrorAction Stop).ScriptBlock
+    return {
+        try {
+            if (-not (Test-Path -LiteralPath $DatabasePath -PathType Leaf)) {
+                throw "Scenario database does not exist yet."
+            }
+            $sampleEvidence = & $invokeSqliteProbe -JavaExecutable $JavaExecutable `
+                -BuiltArtifact $BuiltArtifact -ProbeSource $ProbeSource -DatabasePath $DatabasePath
+            $sampleValidation = & $testSqliteEvidence -Evidence $sampleEvidence `
+                -ExpectedCanonicalRows $ExpectedCanonicalRows
+            [pscustomobject][ordered]@{
+                ready = $sampleValidation.passed
+                sampledAtUtc = [DateTime]::UtcNow.ToString("o")
+                scanSessionState = $sampleEvidence.scanSessionState
+                coverageReady = $sampleEvidence.coverageReady
+                coverageTotal = $sampleEvidence.coverageTotal
+                nonterminalOperations = $sampleEvidence.nonterminalOperations
+                canonicalRows = $sampleEvidence.canonicalRows
+                profileRows = $sampleEvidence.profileRows
+                failedChecks = @($sampleValidation.checks | Where-Object { -not $_.passed } | ForEach-Object name)
+            }
+        } catch {
+            [pscustomobject][ordered]@{
+                ready = $false
+                sampledAtUtc = [DateTime]::UtcNow.ToString("o")
+                error = $_.Exception.ToString()
+            }
+        }
+    }.GetNewClosure()
 }
 
 function Wait-ClaimsRuntimeReadiness {
@@ -69,4 +117,7 @@ function Wait-ClaimsRuntimeReadiness {
     }
 }
 
-Export-ModuleMember -Function "Wait-ClaimsRuntimeReadiness"
+Export-ModuleMember -Function @(
+    "New-ClaimsRuntimeSqliteReadinessProbe",
+    "Wait-ClaimsRuntimeReadiness"
+)
