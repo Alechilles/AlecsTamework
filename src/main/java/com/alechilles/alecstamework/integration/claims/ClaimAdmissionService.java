@@ -1,10 +1,7 @@
 package com.alechilles.alecstamework.integration.claims;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.alechilles.alecstamework.integration.claims.ClaimAdmissionReservationLedger.PendingAdmission;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
@@ -27,9 +24,8 @@ public final class ClaimAdmissionService {
     private final ClaimAdmissionEvaluator evaluator;
     private final ClaimApplyHeadroomValidator applyHeadroomValidator;
     private final LongSupplier monotonicClock;
-    private final Map<UUID, PendingAdmission> pendingByToken = new HashMap<>();
-    private final Map<String, UUID> pendingTokenByProfile = new HashMap<>();
-    private final Map<ClaimPopulationKey, Long> pendingByClaim = new HashMap<>();
+    private final ClaimAdmissionReservationLedger reservationLedger =
+            new ClaimAdmissionReservationLedger();
     private final ClaimAdmissionMetrics metrics = new ClaimAdmissionMetrics();
     private long lastObservedNanos = Long.MIN_VALUE;
 
@@ -154,7 +150,7 @@ public final class ClaimAdmissionService {
         ClaimAdmissionRules.TransitionDelta delta = ClaimAdmissionRules.analyzeTransitions(
                 request.transitions(), snapshot.profileIds()
         );
-        long pending = pendingByClaim.getOrDefault(target.key(), 0L);
+        long pending = reservationLedger.pendingForClaim(target.key());
         long adjustedCommitted = Math.max(0L, snapshot.population() - delta.departures());
         ClaimCapEvaluator.Evaluation cap = ClaimCapEvaluator.evaluate(
                 request.limitPerClaimChunk(),
@@ -218,7 +214,7 @@ public final class ClaimAdmissionService {
             }
             long allPending = reservation.targetClaimKey() == null
                     ? 0L
-                    : pendingByClaim.getOrDefault(reservation.targetClaimKey(), 0L);
+                    : reservationLedger.pendingForClaim(reservation.targetClaimKey());
             ClaimApplyHeadroomValidator.Result validation = applyHeadroomValidator.validate(
                     reservation, refreshed, allPending
             );
@@ -257,7 +253,7 @@ public final class ClaimAdmissionService {
                 closePending(pending, ClaimAdmissionReservation.State.INVALIDATED);
                 return false;
             }
-            removePendingIndexes(pending);
+            reservationLedger.remove(pending);
             reservation.setState(ClaimAdmissionReservation.State.COMMITTED);
             metrics.reservationCommitted();
             return true;
@@ -297,7 +293,7 @@ public final class ClaimAdmissionService {
         lock.lock();
         try {
             int invalidated = 0;
-            for (PendingAdmission pending : Set.copyOf(pendingByToken.values())) {
+            for (PendingAdmission pending : reservationLedger.pendingAdmissions()) {
                 if (pending.reservation().state() == ClaimAdmissionReservation.State.RESERVED
                         && !ClaimAdmissionRules.sameStoredPolicy(pending.reservation(), currentContext)) {
                     closePending(pending, ClaimAdmissionReservation.State.INVALIDATED);
@@ -322,7 +318,7 @@ public final class ClaimAdmissionService {
     public int pendingReservationCount() {
         lock.lock();
         try {
-            return pendingByToken.size();
+            return reservationLedger.pendingCount();
         } finally {
             lock.unlock();
         }
@@ -332,7 +328,7 @@ public final class ClaimAdmissionService {
     public long pendingForClaim(@Nonnull ClaimPopulationKey key) {
         lock.lock();
         try {
-            return pendingByClaim.getOrDefault(Objects.requireNonNull(key, "key"), 0L);
+            return reservationLedger.pendingForClaim(Objects.requireNonNull(key, "key"));
         } finally {
             lock.unlock();
         }
@@ -342,11 +338,11 @@ public final class ClaimAdmissionService {
     public ClaimAdmissionMetrics.Snapshot metrics() {
         lock.lock();
         try {
-            long pendingSlots = 0L;
-            for (PendingAdmission pending : pendingByToken.values()) {
-                pendingSlots += pending.reservation().reservedSlots();
-            }
-            return metrics.snapshot(occupancyIndex, pendingByToken.size(), pendingSlots);
+            return metrics.snapshot(
+                    occupancyIndex,
+                    reservationLedger.pendingCount(),
+                    reservationLedger.pendingSlots()
+            );
         } finally {
             lock.unlock();
         }
@@ -358,7 +354,7 @@ public final class ClaimAdmissionService {
             return denied(request, "claim-occupancy-state-mismatch", 0L, 0L, 0L, null);
         }
         for (ClaimOccupancyTransition transition : request.transitions()) {
-            if (pendingTokenByProfile.containsKey(transition.profileId())) {
+            if (reservationLedger.hasPendingProfile(transition.profileId())) {
                 return denied(request, "claim-profile-pending", 0L, 0L, 0L, null);
             }
         }
@@ -385,17 +381,7 @@ public final class ClaimAdmissionService {
                 slots,
                 expiresAtNanos
         );
-        PendingAdmission pendingAdmission = new PendingAdmission(
-                reservation,
-                expiresAtNanos
-        );
-        pendingByToken.put(reservation.tokenId(), pendingAdmission);
-        for (ClaimOccupancyTransition transition : request.transitions()) {
-            pendingTokenByProfile.put(transition.profileId(), reservation.tokenId());
-        }
-        if (reservation.targetClaimKey() != null && slots > 0L) {
-            pendingByClaim.merge(reservation.targetClaimKey(), slots, Long::sum);
-        }
+        reservationLedger.register(reservation, expiresAtNanos);
         metrics.reservationCreated();
         long before = cap.remainingHeadroom();
         long after = before == Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(0L, before - slots);
@@ -456,13 +442,12 @@ public final class ClaimAdmissionService {
         if (!reservation.belongsTo(reservationAuthority)) {
             return null;
         }
-        PendingAdmission pending = pendingByToken.get(reservation.tokenId());
-        return pending != null && pending.reservation() == reservation ? pending : null;
+        return reservationLedger.find(reservation);
     }
 
     private int expireReservationsLocked(long nowNanos) {
         int expired = 0;
-        for (PendingAdmission pending : Set.copyOf(pendingByToken.values())) {
+        for (PendingAdmission pending : reservationLedger.pendingAdmissions()) {
             if (pending.reservation().state() == ClaimAdmissionReservation.State.RESERVED
                     && nowNanos >= pending.expiresAtNanos()) {
                 closePending(pending, ClaimAdmissionReservation.State.EXPIRED);
@@ -473,29 +458,9 @@ public final class ClaimAdmissionService {
     }
 
     private void closePending(PendingAdmission pending, ClaimAdmissionReservation.State terminalState) {
-        removePendingIndexes(pending);
+        reservationLedger.remove(pending);
         pending.reservation().setState(terminalState);
         metrics.reservationClosed(terminalState);
-    }
-
-    private void removePendingIndexes(PendingAdmission pending) {
-        ClaimAdmissionReservation reservation = pending.reservation();
-        pendingByToken.remove(reservation.tokenId(), pending);
-        for (ClaimOccupancyTransition transition : reservation.transitions()) {
-            pendingTokenByProfile.remove(transition.profileId(), reservation.tokenId());
-        }
-        if (reservation.targetClaimKey() != null && reservation.reservedSlots() > 0L) {
-            long updated = pendingByClaim.getOrDefault(reservation.targetClaimKey(), 0L)
-                    - reservation.reservedSlots();
-            if (updated < 0L) {
-                throw new IllegalStateException("Claim pending population underflow.");
-            }
-            if (updated == 0L) {
-                pendingByClaim.remove(reservation.targetClaimKey());
-            } else {
-                pendingByClaim.put(reservation.targetClaimKey(), updated);
-            }
-        }
     }
 
     private long observeNow() {
@@ -513,9 +478,5 @@ public final class ClaimAdmissionService {
         } catch (ArithmeticException ignored) {
             return Long.MAX_VALUE;
         }
-    }
-
-    private record PendingAdmission(@Nonnull ClaimAdmissionReservation reservation,
-                                    long expiresAtNanos) {
     }
 }
