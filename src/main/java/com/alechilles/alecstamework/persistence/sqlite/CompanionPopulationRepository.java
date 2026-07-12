@@ -12,7 +12,6 @@ import javax.annotation.Nullable;
 
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.bindState;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.parseUuid;
-import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.readOperation;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.readState;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.setInteger;
 import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationSqlSupport.setText;
@@ -25,12 +24,14 @@ public final class CompanionPopulationRepository {
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
     private final CoopLedgerRepository coopLedgerRepository;
+    private final CompanionPopulationJournalStore journalStore;
 
     public CompanionPopulationRepository(@Nonnull SqliteConnectionManager connectionManager,
                                          @Nonnull PersistenceWriteQueue writeQueue) {
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
         this.coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue);
+        this.journalStore = new CompanionPopulationJournalStore(connectionManager);
     }
 
     @Nonnull
@@ -67,7 +68,7 @@ public final class CompanionPopulationRepository {
         }
         return writeQueue.submitTracked(
                 "companion_population_operation_advance",
-                connection -> advanceOperationInTransaction(connection, operationId, expected, next, error),
+                connection -> journalStore.advance(connection, operationId, expected, next, error),
                 null
         );
     }
@@ -79,7 +80,7 @@ public final class CompanionPopulationRepository {
     ) {
         return writeQueue.submitTracked(
                 "companion_population_source_finalize",
-                connection -> completeSourceFinalizationInTransaction(connection, operationId),
+                connection -> journalStore.completeSourceFinalization(connection, operationId),
                 null
         );
     }
@@ -109,47 +110,13 @@ public final class CompanionPopulationRepository {
 
     @Nonnull
     public List<CompanionPopulationOperationRecord> loadNonterminalOperations() throws Exception {
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     """
-                     SELECT operation_id, profile_id, operation_type, state, expected_revision,
-                            old_state_json, new_state_json, target_context_json,
-                            created_at_ms, updated_at_ms, completed_at_ms, last_error
-                     FROM companion_population_operations
-                     WHERE state IN ('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING')
-                     ORDER BY created_at_ms, operation_id
-                     """
-             );
-             ResultSet resultSet = statement.executeQuery()) {
-            List<CompanionPopulationOperationRecord> rows = new ArrayList<>();
-            while (resultSet.next()) {
-                rows.add(readOperation(resultSet));
-            }
-            return List.copyOf(rows);
-        }
+        return journalStore.loadNonterminalOperations();
     }
 
     /** Loads retained breeding rows, including COMMITTED rows used as restart birth evidence. */
     @Nonnull
     public List<CompanionPopulationOperationRecord> loadBreedingOperations() throws Exception {
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
-                     """
-                     SELECT operation_id, profile_id, operation_type, state, expected_revision,
-                            old_state_json, new_state_json, target_context_json,
-                            created_at_ms, updated_at_ms, completed_at_ms, last_error
-                     FROM companion_population_operations
-                     WHERE operation_type = 'BREEDING'
-                     ORDER BY created_at_ms, operation_id
-                     """
-             );
-             ResultSet resultSet = statement.executeQuery()) {
-            List<CompanionPopulationOperationRecord> rows = new ArrayList<>();
-            while (resultSet.next()) {
-                rows.add(readOperation(resultSet));
-            }
-            return List.copyOf(rows);
-        }
+        return journalStore.loadBreedingOperations();
     }
 
     @Nonnull
@@ -159,14 +126,15 @@ public final class CompanionPopulationRepository {
     ) throws Exception {
         CompanionPopulationOperationRecord operation = request.operation();
         CompanionPopulationStateRecord baseline = request.baselineState();
-        OperationIdentity existingOperation = findOperation(connection, operation.operationId());
+        CompanionPopulationJournalStore.OperationIdentity existingOperation =
+                journalStore.find(connection, operation.operationId());
         if (existingOperation != null) {
             if (existingOperation.profileId().equals(operation.profileId())) {
                 return result(PopulationPersistenceTransition.ResultStatus.IDEMPOTENT, baseline.revision(), "operation_exists");
             }
             return result(PopulationPersistenceTransition.ResultStatus.OPERATION_CONFLICT, -1L, "operation_id_in_use");
         }
-        if (hasNonterminalOperation(connection, operation.profileId())) {
+        if (journalStore.hasNonterminal(connection, operation.profileId())) {
             return result(PopulationPersistenceTransition.ResultStatus.OPERATION_CONFLICT, -1L, "profile_operation_in_flight");
         }
 
@@ -188,7 +156,7 @@ public final class CompanionPopulationRepository {
         if (existingRevision == null) {
             insertPopulationState(connection, baseline);
         }
-        insertOperation(connection, operation);
+        journalStore.insert(connection, operation);
         return result(PopulationPersistenceTransition.ResultStatus.PREPARED, baseline.revision(), null);
     }
 
@@ -197,7 +165,8 @@ public final class CompanionPopulationRepository {
             @Nonnull Connection connection,
             @Nonnull PopulationPersistenceTransition.Commit request
     ) throws Exception {
-        OperationIdentity operation = findOperation(connection, request.operationId());
+        CompanionPopulationJournalStore.OperationIdentity operation =
+                journalStore.find(connection, request.operationId());
         if (operation == null) {
             return result(PopulationPersistenceTransition.ResultStatus.NOT_FOUND, -1L, "operation_not_found");
         }
@@ -240,14 +209,14 @@ public final class CompanionPopulationRepository {
                 connection, coopLedgerRepository, operation.targetContextJson()
         );
         if (sourceFinalizationRequired) {
-            markOperationApplied(connection, request.operationId());
+            journalStore.markApplied(connection, request.operationId());
             return result(
                     PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING,
                     revision + 1L,
                     "source_finalization_pending"
             );
         }
-        finalizeOperation(connection, request.operationId());
+        journalStore.finalizeCommitted(connection, request.operationId());
         return result(PopulationPersistenceTransition.ResultStatus.COMMITTED, revision + 1L, null);
     }
 
@@ -286,33 +255,6 @@ public final class CompanionPopulationRepository {
                 """
         )) {
             bindState(statement, state);
-            statement.executeUpdate();
-        }
-    }
-
-    private void insertOperation(@Nonnull Connection connection,
-                                 @Nonnull CompanionPopulationOperationRecord operation) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement(
-                """
-                INSERT INTO companion_population_operations (
-                    operation_id, profile_id, operation_type, state, expected_revision,
-                    old_state_json, new_state_json, target_context_json,
-                    created_at_ms, updated_at_ms, completed_at_ms, last_error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
-        )) {
-            statement.setString(1, operation.operationId());
-            statement.setString(2, operation.profileId());
-            statement.setString(3, operation.operationType());
-            statement.setString(4, operation.state().name());
-            statement.setLong(5, operation.expectedRevision());
-            statement.setString(6, operation.oldStateJson());
-            statement.setString(7, operation.newStateJson());
-            setText(statement, 8, operation.targetContextJson());
-            statement.setLong(9, operation.createdAtMs());
-            statement.setLong(10, operation.updatedAtMs());
-            statement.setLong(11, operation.completedAtMs());
-            setText(statement, 12, operation.lastError());
             statement.executeUpdate();
         }
     }
@@ -376,83 +318,6 @@ public final class CompanionPopulationRepository {
             }
         }
     }
-    private void finalizeOperation(@Nonnull Connection connection, @Nonnull String operationId) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement(
-                """
-                UPDATE companion_population_operations
-                SET state = 'COMMITTED', updated_at_ms = ?, completed_at_ms = ?, last_error = NULL
-                WHERE operation_id = ? AND state IN ('APPLYING', 'APPLIED')
-                """
-        )) {
-            long now = System.currentTimeMillis();
-            statement.setLong(1, now);
-            statement.setLong(2, now);
-            statement.setString(3, operationId);
-            if (statement.executeUpdate() != 1) {
-                throw new IllegalStateException("Population operation changed during commit.");
-            }
-        }
-    }
-
-    private void markOperationApplied(@Nonnull Connection connection,
-                                      @Nonnull String operationId) throws Exception {
-        if (!advanceOperationInTransaction(
-                connection,
-                operationId,
-                CompanionPopulationOperationRecord.State.APPLYING,
-                CompanionPopulationOperationRecord.State.APPLIED,
-                "source_finalization_pending"
-        )) {
-            throw new IllegalStateException("Population operation changed before source finalization.");
-        }
-    }
-
-    private boolean completeSourceFinalizationInTransaction(
-            @Nonnull Connection connection,
-            @Nonnull String operationId
-    ) throws Exception {
-        OperationIdentity operation = findOperation(connection, operationId);
-        if (operation == null) {
-            return false;
-        }
-        if (operation.state() == CompanionPopulationOperationRecord.State.COMMITTED) {
-            return true;
-        }
-        if (operation.state() != CompanionPopulationOperationRecord.State.APPLIED
-                || !CompanionSpawnSourceFinalizationContext.required(
-                operation.targetContextJson()
-        )) {
-            return false;
-        }
-        finalizeOperation(connection, operationId);
-        return true;
-    }
-    private boolean advanceOperationInTransaction(@Nonnull Connection connection,
-                                                  @Nonnull String operationId,
-                                                  @Nonnull CompanionPopulationOperationRecord.State expected,
-                                                  @Nonnull CompanionPopulationOperationRecord.State next,
-                                                  @Nullable String error) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement(
-                """
-                UPDATE companion_population_operations
-                SET state = ?, updated_at_ms = ?,
-                    completed_at_ms = CASE WHEN ? IN ('COMMITTED', 'FAILED') THEN ? ELSE 0 END,
-                    last_error = ?
-                WHERE operation_id = ? AND state = ?
-                """
-        )) {
-            long now = System.currentTimeMillis();
-            statement.setString(1, next.name());
-            statement.setLong(2, now);
-            statement.setString(3, next.name());
-            statement.setLong(4, now);
-            setText(statement, 5, error);
-            statement.setString(6, operationId);
-            statement.setString(7, expected.name());
-            return statement.executeUpdate() == 1;
-        }
-    }
-
     @Nullable
     private ExistingProfile findProfile(@Nonnull Connection connection, @Nonnull String profileId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
@@ -473,41 +338,6 @@ public final class CompanionPopulationRepository {
             statement.setString(1, profileId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 return resultSet.next() ? resultSet.getLong(1) : null;
-            }
-        }
-    }
-
-    @Nullable
-    private OperationIdentity findOperation(@Nonnull Connection connection, @Nonnull String operationId) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT profile_id, state, expected_revision, target_context_json FROM companion_population_operations WHERE operation_id = ?"
-        )) {
-            statement.setString(1, operationId);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (!resultSet.next()) {
-                    return null;
-                }
-                return new OperationIdentity(
-                        resultSet.getString(1),
-                        CompanionPopulationOperationRecord.State.valueOf(resultSet.getString(2)),
-                        resultSet.getLong(3),
-                        resultSet.getString(4)
-                );
-            }
-        }
-    }
-
-    private boolean hasNonterminalOperation(@Nonnull Connection connection, @Nonnull String profileId) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement(
-                """
-                SELECT 1 FROM companion_population_operations
-                WHERE profile_id = ? AND state IN ('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING')
-                LIMIT 1
-                """
-        )) {
-            statement.setString(1, profileId);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next();
             }
         }
     }
@@ -588,9 +418,4 @@ public final class CompanionPopulationRepository {
     private record ExistingProfile(@Nullable UUID currentNpcUuid) {
     }
 
-    private record OperationIdentity(@Nonnull String profileId,
-                                     @Nonnull CompanionPopulationOperationRecord.State state,
-                                     long expectedRevision,
-                                     @Nullable String targetContextJson) {
-    }
 }

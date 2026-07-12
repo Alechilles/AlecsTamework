@@ -38,12 +38,18 @@ class PreparedSpawnCrashBoundaryArchitectureTest {
                 Path.of("src/main/java/com/alechilles/alecstamework/persistence/sqlite"),
                 "CompanionPopulationRepository.java"
         );
+        String journalStore = read(
+                Path.of("src/main/java/com/alechilles/alecstamework/persistence/sqlite"),
+                "CompanionPopulationJournalStore.java"
+        );
         String spawner = read(ITEMS, "SpawnerPreparedSpawnService.java");
         String death = read(ITEMS, "CommandRespawnService.java");
         String lost = read(ITEMS, "CommandLostFallbackSpawnService.java");
         String context = read(OWNERSHIP, "CompanionSpawnSourceFinalizationContext.java");
 
-        assertTrue(repository.contains("markOperationApplied(connection, request.operationId())"));
+        assertTrue(repository.contains("journalStore.markApplied(connection, request.operationId())"));
+        assertTrue(journalStore.contains("State.APPLYING"));
+        assertTrue(journalStore.contains("State.APPLIED"));
         assertTrue(repository.contains("completeSourceFinalizationAsync("));
         assertTrue(context.contains("expectedFingerprint"));
         assertTrue(context.contains("finalizationKey"));

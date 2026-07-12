@@ -21,6 +21,12 @@ class ClaimsOwnerPopulationStructuralPolicyTest {
     }
 
     @Test
+    void populationRepositoryDelegatesJournalSqlToFocusedStore() throws IOException {
+        assertLineLimit("persistence/sqlite/CompanionPopulationRepository.java", 500);
+        assertLineLimit("persistence/sqlite/CompanionPopulationJournalStore.java", 500);
+    }
+
+    @Test
     void settingsPageStaysBelowExistingClassHardCeiling() throws IOException {
         assertLineLimit("ui/TameworkSettingsPage.java", 800);
         assertLineLimit("ui/TameworkSettingsFormParser.java", 500);
