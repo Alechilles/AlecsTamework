@@ -14,7 +14,7 @@ This page collects repo-specific checks that should be run before trusting an an
 Before finalizing changes to runtime systems, tick paths, async callbacks, damage dispatch, or player access, run:
 
 ```powershell
-rg "PlayerRef\\.getComponent\\(Player|getComponent\\(Player\\.getComponentType\\(\\)\\)|Universe\\.get\\(\\).*getPlayers" -n src/main/java
+rg "PlayerRef\.getComponent\(Player|getComponent\(Player\.getComponentType\(\)\)|Universe\.get\(\).*getPlayers" -n src/main/java
 .\mvnw.cmd -Dtest=EcsWriteSafetyGuardTest,AsyncThreadSafetyGuardTest test
 ```
 
