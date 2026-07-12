@@ -25,6 +25,22 @@ An enabled config hands the matching coop's occupancy and resident lifecycle to 
 
 Coops without an enabled matching config remain purely vanilla. Tamework does not maintain a shadow ledger for them. This is the post-overhaul boundary: it deliberately does **not** revive the older v2.5 hybrid where vanilla residents were observed and mirrored into a second Tamework representation. That hybrid required repeated slot inference and UUID remapping and was vulnerable to state drift.
 
+## Vanilla field parity
+
+Hytale `0.5.6` exposes seven lifecycle fields on `FarmingCoopAsset`. A managed coop deliberately reads the parallel `TwCoopConfig` values instead of calling vanilla resident mutation. Keep both assets aligned when the same coop must also behave sensibly without Tamework.
+
+| Vanilla `FarmingCoopAsset` field | Managed Tamework field | Managed-coop treatment |
+| --- | --- | --- |
+| `MaxResidents` | `LifecycleRules.MaxResidents` | Tamework's managed-slot ledger is the sole capacity authority. Existing over-capacity imports remain visible as overflow, but new intake is blocked. |
+| `ProduceDrops` | `ProduceRules.DropsByRole` | Tamework generates managed produce by resident role. It does not call vanilla coop production for a managed block. |
+| `ResidentSpawnOffset` | `LifecycleRules.ResidentSpawnOffset` | Tamework uses the offset in its durable release operation and placement search; vanilla deployment is not invoked. |
+| `ResidentRoamTime` | `ResidentRoamStartHour` and `ResidentRoamEndHour` | Tamework owns the roaming/housing schedule, including ranges that cross midnight. |
+| `CaptureWildNPCsInRange` | `LifecycleRules.CaptureWildNPCsInRange` | Tamework's candidate scanner and durable capture pipeline own wild intake. |
+| `WildCaptureRadius` | `LifecycleRules.WildCaptureRadius` | Tamework applies the radius before occupancy and identity admission. |
+| `AcceptedNpcGroups` | `LifecycleRules.AcceptedRoleIds` | This is an intentional replacement, not a direct copy. Tamework uses explicit normalized role ids, then applies tame/owner policy; vanilla NPC-group admission is not consulted. |
+
+Tamework adds `ProduceRules.IntervalGameHours`, `ProduceRules.ItemsPerTick`, `CapturePolicy`, and `IdentityRules`; vanilla `FarmingCoopAsset` has no equivalent identity or full-state snapshot contract. Vanilla `CoopBlock.Residents` is inspected only during explicit legacy import. After creating the durable managed binding and marker, Tamework neutralizes vanilla ownership, verifies absence in the current boot, and only then finalizes the import.
+
 ## Inheritance and Reload
 - Parent fallback is supported.
 - Omitted top-level object sections inherit from the parent.
@@ -94,12 +110,13 @@ Stable `profile_id`, rather than entity UUID, is the identity contract. A releas
 When an existing vanilla coop first becomes managed, Tamework performs an import-only audit:
 
 - immutable source fingerprints are journaled before mutation;
+- the cached report remains non-mutating until an operator confirms its exact fingerprint with `/tw coop reconcile <x> <y> <z> confirm <fingerprint>`;
 - exact, uniquely bound residents are imported into managed slots without spawning replacements;
 - the vanilla source is neutralized only after the managed binding is durable;
-- exact absence proof is required before the source is considered retired;
+- exact absence proof from the current server process is required before the source is considered retired; a restart rechecks and refreshes older proof;
 - unsupported layouts, duplicate matches, capacity conflicts, or changing evidence are quarantined and reported instead of guessed.
 
-Use `/tw coop import-status` to see pending or quarantined import work. A conflict intentionally keeps the affected authority fail-closed until evidence can be reconciled.
+Use `/tw coop import-status` to see pending or quarantined import work, and use `/tw coop reconcile <x> <y> <z>` to inspect source disposition and overflow at one loaded coop. Approval is process-local and bound to the complete deterministic plan, so changed resident, slot, profile, disposition, conflict, or overflow evidence requires a new confirmation. A conflict intentionally keeps the affected authority fail-closed until evidence can be reconciled.
 
 ## Defaults and Cross-System Notes
 - The shipped example asset is `src/main/resources/Server/Tamework/Items/Coops/TwCoopConfig_Example_Coop_Chicken.json`.

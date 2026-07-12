@@ -34,6 +34,8 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw debugdb [integrity|checkpoint|vacuum]`
 - `/tw coop audit`
 - `/tw coop import-status`
+- `/tw coop reconcile <x> <y> <z> [confirm <auditFingerprint>|cancel]`
+- `/tw coop rollback-preflight`
 - `/tw debugreviveready`
 - `/tw debugcrashtelemetry [flush|simulate]`
 
@@ -71,10 +73,12 @@ This diagnostics channel is enabled by default for now, but it only records even
 enabled in `/tw settings`. Use `/tw debugneedstelemetry off` as the local kill switch.
 
 ## Coop and breeding integrity
-- `/tw coop audit` reports active managed authorities, resident and lifecycle-operation states, whether the composite indexes are trusted, their revisions, and import attention counts.
+- `/tw coop audit` reports active managed authorities plus bounded resident/operation identity details: profile, slot, source/projection UUIDs, operation state, generation, retries, index revisions, and persistence queue lifecycle.
 - `/tw coop import-status` focuses on active import sessions, pending legacy sources, sources awaiting exact absence proof, and unresolved conflicts.
+- `/tw coop reconcile <x> <y> <z>` is report-only by default. Destructive progress requires the exact current audit fingerprint, the reconcile permission, and `confirm <fingerprint>`. Restart, cancellation, or any evidence/plan change revokes the process-local approval.
+- `/tw coop rollback-preflight` reports rollback blockers and available pre-v5 SQLite backup evidence without changing state. Live v5-to-v4 downgrade is unsupported; restore the matching complete pre-v5 save or roll forward.
 - `/tw debugdb integrity` runs SQLite and foreign-key checks plus canonical identity, managed-coop lifecycle, and import invariants.
-- `/tw gethappiness` includes an active breeding job's id, state, mode, partner, planned litter size, admitted count, and outstanding count.
+- `/tw gethappiness` includes the active/latest breeding job's id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result.
 - Import conflicts intentionally fail closed. Preserve the database/save evidence and investigate the reported source rather than manually spawning or deleting residents.
 - Negative world timestamps are valid. Only `0` means unset for breeding cooldown and passive-sweep scheduling.
 

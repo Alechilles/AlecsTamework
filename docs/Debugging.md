@@ -33,11 +33,13 @@
   - life-stage/adult gates
   - sleep/combat gates
   - cooldown state/alarm timing
-  - whether `/tw gethappiness` reports an active job, including its id, state, mode, partner, planned litter, admitted children, and outstanding children
+  - whether `/tw gethappiness` reports an active/latest job, including its id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result
 
 ## Managed-coop and persistence integrity
-- `/tw coop audit` summarizes active managed authorities, resident and lifecycle-operation states, trusted index revisions, and import attention counts.
+- `/tw coop audit` summarizes active managed authorities and prints bounded per-resident/per-operation identity details: profile, slot, source/projection UUIDs, operation state, generation, retries, and queue lifecycle state.
 - `/tw coop import-status` prints the concise legacy-resident import view: active sessions, pending sources, sources awaiting exact absence proof, and unresolved conflicts.
+- `/tw coop reconcile <x> <y> <z>` prints the cached report for that exact coop. It is report-only until an authorized operator repeats the exact fingerprint with `confirm <fingerprint>`; `cancel` revokes process-local approval. A changed report or restart requires a new confirmation.
+- `/tw coop rollback-preflight` is read-only. It reports queue, integrity, active lifecycle/import work, and pre-v5 SQLite backup evidence, while explicitly rejecting live v5-to-v4 downgrade claims. The supported rollback is a clean restore of the matching complete pre-v5 save; otherwise roll forward.
 - `/tw debugdb integrity` runs the SQLite/foreign-key checks plus canonical identity, managed-coop lifecycle, and import-journal invariants.
 - An import marked `attention required` is intentionally fail-closed. Preserve the database and save evidence; do not clear or respawn residents merely to make the count disappear.
 - A coop is Tamework-authoritative only when an enabled `TwCoopConfig` resolves for that exact coop id. Unmanaged coops remain vanilla and are not shadowed by a Tamework resident sidecar.
@@ -106,7 +108,7 @@ XP can be diagnosed with a reason such as not tamed or owned, disabled harvest X
 - `/tw gettamed`, `/tw settamed`
 - `/tw getalarm [AlarmName] [NpcUuid]`
 - `/tw getflockdebug`
-- `/tw coop audit`, `/tw coop import-status`
+- `/tw coop audit`, `/tw coop import-status`, `/tw coop reconcile`, `/tw coop rollback-preflight`
 - `/tw debugdb integrity`
 - `/tw reloadconfig` (item-feature assets only)
 

@@ -4,7 +4,8 @@
 
 ### Added
 - Added read-only managed-coop integrity commands: `/tw coop audit`, `/tw coop import-status`, and an expanded `/tw debugdb integrity` covering SQLite, foreign keys, profile identity, lifecycle operations, and import conflicts.
-- `/tw gethappiness` now reports an NPC's active breeding job id, state, mode, partner, planned litter size, admitted count, and outstanding count.
+- Added fingerprint-bound `/tw coop reconcile` reports and confirmation for legacy residents, plus a read-only `/tw coop rollback-preflight` that reports blockers without claiming an unsafe live database downgrade.
+- `/tw gethappiness` now reports an NPC's active or latest breeding job id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result.
 - Added schema-v5 managed-coop lifecycle and import journals so interrupted capture, release, item intake, and legacy-resident import work can be resumed or quarantined instead of guessed.
 - Added reserved built-in interaction extensions for model-supported attachment gates and atomic held-item-to-attachment mappings, allowing asset packs to equip persisted NPC appearance attachments without per-item Java handlers.
 - Added a private server licensing template for negotiated custom plugins,
@@ -30,6 +31,7 @@
 
 ### Changed
 - Enabled `TwCoopConfig` assets now keep Tamework as the sole occupancy and lifecycle authority only for their configured managed coops; coops without an enabled config remain purely vanilla. This preserves the post-overhaul model and does not restore the older vanilla-resident/Tamework-observer hybrid.
+- Managed-coop audits now include bounded per-resident and per-operation identity, UUID, slot, generation, retry, and persistence-queue lifecycle details.
 - Managed companion identity now follows one stable profile across changing entity UUID aliases, allowing command items and recovery paths to resolve historical UUIDs without creating a second NPC.
 - Manual and passive breeding now share one immutable, pending-aware birth-job pipeline. `MaxNearbySameType` is enforced as a hard limit against live NPCs and pending litters, while fertility still intentionally allows zero through four offspring when capacity permits.
 - Updated Alec's Tamework from GPL-3.0 to a source-available license that allows unmodified dependency use and example/template reuse while reserving forks, modified copies, and Tamework system reuse for separate written permission.
@@ -45,6 +47,7 @@
 ### Fixed
 - Fixed managed-coop duplication paths by transacting canonical profile state, resident slots, and lifecycle operations together; capture sources and stale aliases remain suppressed until retirement is confirmed, and release callbacks revalidate their exact coop condition before spawning.
 - Fixed old vanilla residents discovered on newly managed coops being silently mirrored or discarded. Exact matches are journaled and imported without spawning replacements, while ambiguous evidence is retained and quarantined for operator review.
+- Fixed imported vanilla-resident absence proof being trusted across a restart without rechecking the live coop, and preserved deterministic overflow residents while blocking only new intake.
 - Fixed accepted persistence work being dropped during shutdown by draining completion-aware writes and reporting failures instead of clearing queued state silently.
 - Fixed delayed breeding callbacks being able to execute the same litter twice or survive capture of either parent. Each parent can belong to only one active job, spawn is claimed once, and coop capture cancels the pending job.
 - Fixed breeding sweep and cooldown paths treating negative Hytale world timestamps as missing; `0` is the only unset sentinel.

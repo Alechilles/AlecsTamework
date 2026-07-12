@@ -54,7 +54,9 @@ Parent: [Data and Persistence](/mod/alecs-tamework/data-and-persistence) | [Deve
 - Treat `profile_id` as canonical NPC identity and entity UUIDs as aliases. Recovery must resolve all known aliases before it can conclude that a profile has no live or housed representation.
 - Keep profile state, managed slot state, and lifecycle operation changes in one transaction when they represent one capture or release.
 - Import ambiguity is a health condition, not permission to choose a resident. Retain evidence and fail closed until the exact binding or absence proof is available.
+- Treat imported-source absence proof as process-scoped live evidence. Persist it for audit, but recheck and refresh it after restart before finalizing a restored vanilla block list.
 - Use `/tw debugdb integrity` for SQLite, foreign-key, identity, lifecycle, and import invariants; use `/tw coop audit` for the runtime-facing managed-coop summary.
+- `/tw coop rollback-preflight` is read-only. It can identify queue/operation/conflict/integrity blockers and pre-v5 SQLite snapshots, but a supported downgrade still requires the matching complete pre-v5 save; SQLite alone is not a complete-save backup.
 
 ## Related Pages
 - [Command Runtime and Linked Panel Internals](/mod/alecs-tamework/command-runtime-and-linked-panel-internals)

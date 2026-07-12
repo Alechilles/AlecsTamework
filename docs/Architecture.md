@@ -31,6 +31,8 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Shared progression state persists via happiness/needs/breeding/traits/life-stage/attachments components and is restored across capture/spawn + death/respawn flows.
 - Stable NPC `profile_id` is the durable identity; live entity UUIDs are replaceable aliases. Recovery and command records deduplicate by profile once canonical identity is available.
 - An enabled/configured managed coop is Tamework-authoritative for occupancy and lifecycle, while an unmanaged coop remains purely vanilla. The runtime intentionally does not synchronize a second Tamework representation beside vanilla residents.
+- Legacy vanilla residents cross that boundary only through fingerprint-approved import. Exact deployed residents are adopted in place after a durable binding/marker; current-boot absence proof retires vanilla ownership without spawning a replacement.
+- Stale managed aliases are suppressible only while a current exact coop/config scan authorizes their site and an exact retained projection marker independently validates. Cross-world aliases use two owning-thread proof hops and otherwise remain fail-closed.
 - Manual and passive breeding share one pending-aware birth-job and capacity-admission pipeline, including one-job-per-parent and one-spawn-claim invariants.
 - Command tools persist linked NPC metadata, active/inactive status, panel preferences, and group metadata directly on the item.
 - Linked panel supports both linked and nearby modes, plus sort/filter/group assignment and group manager flows.

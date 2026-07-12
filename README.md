@@ -44,6 +44,8 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Spawner, naming, and command items**: capture and respawn NPCs with metadata, name companions with custom items, and build command tools with radial and linked-panel support.
 - **Linked companion runtime**: manage loaded, unloaded, dead, and lost companions through a linked panel with recall, home, revive, and related flows.
 - **Progression systems**: add happiness, needs, breeding, life stage, and trait-driven variation through config-driven systems.
+- **Managed coop integrity**: configured coops use one Tamework-owned resident lifecycle with stable profile identity, durable capture/release operations, and explicit legacy-resident reconciliation; unmanaged coops remain vanilla.
+- **Capacity-safe breeding**: manual and passive pairing share idempotent birth jobs, pending-litter population reservations, execution-time cap checks, and parent-capture cancellation while preserving intentional zero-to-four litters.
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
 
 ## What Integration Looks Like
