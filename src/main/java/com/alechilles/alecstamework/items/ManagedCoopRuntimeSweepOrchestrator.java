@@ -38,6 +38,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                                int captureCandidates,
                                int captureDispatches,
                                int releaseDispatches,
+                               boolean lifecycleRecoveryAttempted,
                                boolean removedCheckDispatched,
                                @Nonnull List<CompletableFuture<DispatchOutcome>> operations,
                                @Nullable String detail) {
@@ -51,6 +52,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
     private final ManagedCoopRuntimeCandidateScanner candidateScanner;
     private final ManagedCoopRuntimeSweepPlanner planner;
     private final ManagedCoopRuntimeOperationDispatcher operations;
+    private final LifecycleRecoveryBehavior lifecycleRecovery;
     private final AncillaryBehavior ancillary;
     private final RemovedCoopReconciler removedCoops;
 
@@ -59,12 +61,15 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
             @Nonnull ManagedCoopRuntimeCandidateScanner candidateScanner,
             @Nonnull ManagedCoopRuntimeSweepPlanner planner,
             @Nonnull ManagedCoopRuntimeOperationDispatcher operations,
+            @Nonnull LifecycleRecoveryBehavior lifecycleRecovery,
             @Nonnull AncillaryBehavior ancillary,
             @Nonnull RemovedCoopReconciler removedCoops) {
         this.contextScanner = Objects.requireNonNull(contextScanner, "contextScanner");
         this.candidateScanner = Objects.requireNonNull(candidateScanner, "candidateScanner");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.operations = Objects.requireNonNull(operations, "operations");
+        this.lifecycleRecovery = Objects.requireNonNull(
+                lifecycleRecovery, "lifecycleRecovery");
         this.ancillary = Objects.requireNonNull(ancillary, "ancillary");
         this.removedCoops = Objects.requireNonNull(removedCoops, "removedCoops");
     }
@@ -80,15 +85,17 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
         Objects.requireNonNull(world, "world");
         Store<EntityStore> entityStore = entityStore(world);
         if (entityStore == null) {
-            return outcome(SweepStatus.WORLD_UNAVAILABLE, 0, 0, 0, 0, false,
+            return outcome(SweepStatus.WORLD_UNAVAILABLE, 0, 0, 0, 0, false, false,
                     List.of(), "managed_coop_world_or_entity_store_unavailable");
         }
         entityStore.assertThread();
         ScanResult contexts = contextScanner.scan(chunkStore, world);
         if (!contexts.reliable()) {
-            return outcome(SweepStatus.CONTEXT_SCAN_UNAVAILABLE, 0, 0, 0, 0, false,
+            return outcome(SweepStatus.CONTEXT_SCAN_UNAVAILABLE, 0, 0, 0, 0, false, false,
                     List.of(), contexts.detail());
         }
+
+        boolean recoveryAttempted = startLifecycleRecovery(world, contexts.contexts());
 
         boolean captureDemand = planner.needsCaptureCandidates(
                 contexts.contexts(), gameHour, nowMs);
@@ -142,6 +149,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                 candidateValues.size(),
                 captures,
                 releases,
+                recoveryAttempted,
                 plan.checkRemovedCoops(),
                 dispatched,
                 candidateDetail);
@@ -157,11 +165,38 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
                                  int candidates,
                                  int captures,
                                  int releases,
+                                 boolean recoveryAttempted,
                                  boolean removed,
                                  List<CompletableFuture<DispatchOutcome>> operations,
                                  @Nullable String detail) {
         return new SweepOutcome(
-                status, coops, candidates, captures, releases, removed, operations, detail);
+                status, coops, candidates, captures, releases,
+                recoveryAttempted, removed, operations, detail);
+    }
+
+    private boolean startLifecycleRecovery(World world, List<ManagedCoopContext> contexts) {
+        String worldName = world.getName();
+        if (worldName == null || worldName.isBlank()) {
+            return false;
+        }
+        try {
+            CompletionStage<?> stage = lifecycleRecovery.recover(worldName, contexts);
+            return stage != null;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * Restart-recovery seam. Implementations must consume contexts synchronously and retain only
+     * immutable operation/site values after returning their completion stage.
+     */
+    @FunctionalInterface
+    public interface LifecycleRecoveryBehavior {
+        @Nullable
+        CompletionStage<?> recover(
+                @Nonnull String worldName,
+                @Nonnull List<ManagedCoopContext> contexts);
     }
 
     /** Immutable ancillary seam; implementations re-resolve live block state by world name. */

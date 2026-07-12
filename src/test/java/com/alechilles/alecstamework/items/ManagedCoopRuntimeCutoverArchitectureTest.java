@@ -51,4 +51,17 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
         assertFalse(source.contains("thenCompose(outcome -> operations.capture"));
         assertFalse(source.contains("thenCompose(outcome -> releases.release"));
     }
+
+    @Test
+    void restartRecoveryRunsBeforeNormalCaptureAndReleasePlanning() throws Exception {
+        String source = Files.readString(MAIN.resolve(
+                "ManagedCoopRuntimeSweepOrchestrator.java"));
+        String recovery = "boolean recoveryAttempted = startLifecycleRecovery";
+        String planning = "boolean captureDemand = planner.needsCaptureCandidates";
+
+        assertTrue(source.contains("interface LifecycleRecoveryBehavior"));
+        assertTrue(source.contains("lifecycleRecovery.recover(worldName, contexts)"));
+        assertTrue(source.indexOf(recovery) >= 0);
+        assertTrue(source.indexOf(recovery) < source.indexOf(planning));
+    }
 }
