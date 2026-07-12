@@ -48,7 +48,7 @@
 - Fixed permanent culls/releases and deaths without a supported revive path to release their owner slot durably, while dead companions that can be revived keep their slot.
 - Fixed `/tw npcclean` to wait for authoritative owner and claim reconciliation and protect unresolved or transitioning companion identities from bulk removal.
 - Fixed custom `SetOwner` effects so a missing or malformed UUID is rejected; an owner name alone can no longer clear or overwrite ownership.
-- Fixed runtime and Public API damage decisions to use the same live owner precedence and role-resolved protection settings.
+- Fixed runtime and Public API damage decisions to use the same live owner precedence (owner component, command-link owner, then persisted NPC-name owner) and role-resolved protection settings.
 - Closed population-limit bypasses across tame/set-owner, ownership transfer, legacy adoption, captured-spawner release, coop release, recall/teleport, revive, lost recovery, and manual/passive breeding by reserving owner and destination-claim capacity before mutation and committing or canceling it with the result.
 - Fixed claim population checks to fail closed while their active policy or durable index is unavailable, without changing SimpleClaims damage errors' fail-open behavior.
 - Fixed QuestLines Claims discovery and multi-chunk extent handling against the verified `1.3.1` contract, and constrained SimpleClaims compatibility to `>=1.0.38 <1.1.0`.

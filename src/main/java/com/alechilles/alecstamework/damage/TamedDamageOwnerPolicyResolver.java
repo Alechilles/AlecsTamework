@@ -33,10 +33,16 @@ public final class TamedDamageOwnerPolicyResolver {
 
     @Nonnull
     public static Resolution resolve(@Nullable TameworkOwnerComponent owner,
-                                      @Nullable TameworkCommandLinksComponent ignoredLinks,
-                                      @Nullable TameworkNpcNameComponent ignoredNpcName,
+                                      @Nullable TameworkCommandLinksComponent links,
+                                      @Nullable TameworkNpcNameComponent npcName,
                                       @Nullable String roleId) {
         UUID ownerId = owner == null ? null : owner.getOwnerId();
+        if (ownerId == null && links != null) {
+            ownerId = links.getOwnerId();
+        }
+        if (ownerId == null && npcName != null) {
+            ownerId = npcName.getOwnerId();
+        }
         if (ownerId == null) {
             return new Resolution(TamedDamageOwnerPolicy.unowned(), roleId);
         }

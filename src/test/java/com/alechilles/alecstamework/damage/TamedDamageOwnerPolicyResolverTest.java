@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/** Ensures every damage adapter uses canonical live ownership only. */
+/** Locks the shared live damage-owner fallback order used by runtime and the public API. */
 class TamedDamageOwnerPolicyResolverTest {
     @Test
     void canonicalOwnerComponentWinsOverDerivedMetadata() {
@@ -26,21 +26,34 @@ class TamedDamageOwnerPolicyResolverTest {
     }
 
     @Test
-    void commandLinksAndNameCannotSupplyOwnerWithoutCanonicalComponent() {
+    void commandLinkOwnerWinsOverNpcNameWhenCanonicalOwnerIsMissing() {
         UUID linkedOwner = UUID.randomUUID();
         TameworkCommandLinksComponent links = new TameworkCommandLinksComponent();
         links.setOwnerId(linkedOwner);
-        assertNull(TamedDamageOwnerPolicyResolver.resolve(
-                null, links, null, null
-        ).policy().ownerUuid());
-
         UUID namingOwner = UUID.randomUUID();
         TameworkNpcNameComponent name = new TameworkNpcNameComponent(
                 "Companion", namingOwner, 1L, TameworkNpcNameComponent.NameSource.Player
         );
-        assertNull(TamedDamageOwnerPolicyResolver.resolve(
-                null, null, name, null
+
+        assertEquals(linkedOwner, TamedDamageOwnerPolicyResolver.resolve(
+                new TameworkOwnerComponent(), links, name, null
         ).policy().ownerUuid());
+    }
+
+    @Test
+    void npcNameOwnerIsLastLiveFallback() {
+        UUID namingOwner = UUID.randomUUID();
+        TameworkNpcNameComponent name = new TameworkNpcNameComponent(
+                "Companion", namingOwner, 1L, TameworkNpcNameComponent.NameSource.Player
+        );
+
+        assertEquals(namingOwner, TamedDamageOwnerPolicyResolver.resolve(
+                null, new TameworkCommandLinksComponent(), name, null
+        ).policy().ownerUuid());
+    }
+
+    @Test
+    void missingLiveOwnerMetadataRemainsUnowned() {
         assertNull(TamedDamageOwnerPolicyResolver.resolve(
                 null, null, null, null
         ).policy().ownerUuid());

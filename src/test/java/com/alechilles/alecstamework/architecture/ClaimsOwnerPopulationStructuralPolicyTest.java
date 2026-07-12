@@ -69,6 +69,20 @@ class ClaimsOwnerPopulationStructuralPolicyTest {
     }
 
     @Test
+    void runtimeAndPublicApiShareLiveDamageOwnerPrecedence() throws IOException {
+        String runtime = Files.readString(JAVA_ROOT.resolve("damage/OwnerDamageFilterSystem.java"));
+        String api = Files.readString(JAVA_ROOT.resolve("api/internal/TameworkApiImpl.java"));
+        String resolver = Files.readString(JAVA_ROOT.resolve(
+                "damage/TamedDamageOwnerPolicyResolver.java"
+        ));
+
+        assertTrue(runtime.contains("TamedDamageOwnerPolicyResolver.resolve("));
+        assertTrue(api.contains("TamedDamageOwnerPolicyResolver.resolveLive("));
+        assertTrue(resolver.indexOf("owner.getOwnerId()") < resolver.indexOf("links.getOwnerId()"));
+        assertTrue(resolver.indexOf("links.getOwnerId()") < resolver.indexOf("npcName.getOwnerId()"));
+    }
+
+    @Test
     void directOwnerComponentRemovalCannotBecomeAnUnjournaledRelease() throws IOException {
         String source = Files.readString(JAVA_ROOT.resolve(
                 "ownership/reconciliation/CompanionOwnerComponentReconciliationSystem.java"
