@@ -95,7 +95,12 @@ public final class SimpleClaimsDamageAdapterMatrix {
     @Nonnull
     public static List<Scenario> scenarios() {
         return List.of(
-                scenario("owner-component-precedes-link-and-name", Mode.OUTSIDER_ALLOWED, SourceKind.DIRECT,
+                scenario("live-owner-component-precedes-link-and-name", Mode.OUTSIDER_ALLOWED, SourceKind.DIRECT,
+                        true, true, true, true, false, true,
+                        true, 0.0f, DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
+                        "block-owner-damage", 0, ParityExpectation.MATCH),
+                scenario("dormant-persisted-owner-protection-precedes-live-target-required",
+                        Mode.OUTSIDER_ALLOWED, SourceKind.DIRECT,
                         true, true, true, true, false, false,
                         true, 0.0f, DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
                         "block-owner-damage", 0, ParityExpectation.MATCH),

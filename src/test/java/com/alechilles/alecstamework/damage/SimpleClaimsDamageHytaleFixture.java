@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageAdapterMatrix.Scenario;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -48,18 +49,27 @@ public final class SimpleClaimsDamageHytaleFixture {
     /** Installs only the core component identities read by the production adapters. */
     public static final class HytaleModuleScope implements AutoCloseable {
         private final Object oldEntityModule;
+        private final Object oldTamework;
         private final ComponentType<EntityStore, NPCEntity> npcType = new ComponentType<>();
         private final ComponentType<EntityStore, Player> playerType = new ComponentType<>();
         private final ComponentType<EntityStore, TransformComponent> transformType = new ComponentType<>();
+        private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType = new ComponentType<>();
+        private final ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = new ComponentType<>();
+        private final ComponentType<EntityStore, TameworkNpcNameComponent> nameType = new ComponentType<>();
 
-        private HytaleModuleScope(Object oldEntityModule) {
+        private HytaleModuleScope(Object oldEntityModule, Object oldTamework) {
             this.oldEntityModule = oldEntityModule;
+            this.oldTamework = oldTamework;
         }
 
         @Nonnull
         public static HytaleModuleScope install() throws Exception {
             Field instanceField = staticField(EntityModule.class, "instance");
-            HytaleModuleScope scope = new HytaleModuleScope(instanceField.get(null));
+            Field tameworkInstanceField = staticField(Tamework.class, "instance");
+            HytaleModuleScope scope = new HytaleModuleScope(
+                    instanceField.get(null),
+                    tameworkInstanceField.get(null)
+            );
             EntityModule module = (EntityModule) unsafe().allocateInstance(EntityModule.class);
             Map<Class<?>, ComponentType<EntityStore, ?>> types = new HashMap<>();
             types.put(NPCEntity.class, scope.npcType);
@@ -67,12 +77,19 @@ public final class SimpleClaimsDamageHytaleFixture {
             setObjectField(module, EntityModule.class, "playerComponentType", scope.playerType);
             setObjectField(module, EntityModule.class, "transformComponentType", scope.transformType);
             instanceField.set(null, module);
+
+            Tamework tamework = (Tamework) unsafe().allocateInstance(Tamework.class);
+            setObjectField(tamework, Tamework.class, "ownerComponentType", scope.ownerType);
+            setObjectField(tamework, Tamework.class, "commandLinksComponentType", scope.linksType);
+            setObjectField(tamework, Tamework.class, "npcNameComponentType", scope.nameType);
+            tameworkInstanceField.set(null, tamework);
             return scope;
         }
 
         @Override
         public void close() throws Exception {
             staticField(EntityModule.class, "instance").set(null, oldEntityModule);
+            staticField(Tamework.class, "instance").set(null, oldTamework);
         }
     }
 
@@ -87,9 +104,12 @@ public final class SimpleClaimsDamageHytaleFixture {
         private final Ref<EntityStore> attackerRef;
         private final Ref<EntityStore> projectileRef;
         private final TransformComponent targetTransform;
-        private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType = new ComponentType<>();
-        private final ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = new ComponentType<>();
-        private final ComponentType<EntityStore, TameworkNpcNameComponent> nameType = new ComponentType<>();
+        private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        private final ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
+                TameworkCommandLinksComponent.getComponentType();
+        private final ComponentType<EntityStore, TameworkNpcNameComponent> nameType =
+                TameworkNpcNameComponent.getComponentType();
 
         private WorldFixture(@Nonnull Scenario scenario) throws Exception {
             this.scenario = scenario;
@@ -113,6 +133,18 @@ public final class SimpleClaimsDamageHytaleFixture {
             store.put(targetRef, NPCEntity.getComponentType(), npc);
             store.put(targetRef, TransformComponent.getComponentType(), targetTransform);
             store.put(attackerRef, Player.getComponentType(), attacker);
+            TameworkOwnerComponent owner = ownerComponent();
+            if (owner != null) {
+                store.put(targetRef, ownerType, owner);
+            }
+            TameworkCommandLinksComponent links = linksComponent();
+            if (links != null) {
+                store.put(targetRef, linksType, links);
+            }
+            TameworkNpcNameComponent name = nameComponent();
+            if (name != null) {
+                store.put(targetRef, nameType, name);
+            }
         }
 
         @Nonnull

@@ -30,10 +30,10 @@ public final class TameworkRuntimeSettings {
             if (Tamework.getInstance() == null) {
                 return null;
             }
+            return current();
         } catch (Throwable ignored) {
             return null;
         }
-        return current();
     }
 
     @Nonnull
