@@ -53,7 +53,8 @@ read-only inputs and a brand-new evidence root:
   -OutputRoot "C:\claims-evidence\run-2026-07-11" `
   -DwellSeconds 15 `
   -StartupTimeoutSeconds 180 `
-  -ShutdownTimeoutSeconds 60
+  -ShutdownTimeoutSeconds 60 `
+  -UpgradeReadinessTimeoutSeconds 300
 ```
 
 `OutputRoot` must not already exist. The harness refuses an output root under the live
@@ -66,8 +67,10 @@ The copied-upgrade fixture preserves active `universe`, root configuration/permi
 directories. It filters inherited archives, unpacked plugin manifests/classes, and native executable
 payloads from `mods`, then stages only the explicit Tamework/provider jars. It also omits inactive or
 generated root trees such as `backup`, `assetEditor`, logs, caches, and temporary homes. Each scenario
-runs with an isolated working directory, default
-`home\mods`, universe, environment home, app-data directories, and loopback ephemeral bind.
+runs with an isolated working directory, default `home\mods`, universe, environment home, app-data
+directories, and loopback ephemeral bind. For the copied lane, its copied `config.json` is rewritten so
+Tamework and exactly the staged scenario providers are enabled and scheduled server backups are disabled.
+The supplied source config remains unchanged.
 
 The five scenarios are:
 
@@ -79,8 +82,8 @@ The five scenarios are:
 
 All fixtures configure and read back a global per-owner tame limit of 3, claim limits of 2 per chunk and
 6 total, claim-required breeding, and non-member damage protection. Startup evidence proves that each
-expected plugin is enabled exactly once and that forbidden provider jars are absent. Provider artifact identity
-and public binary contracts are verified before startup. Actual claim-provider selection occurs when a
+expected plugin is enabled exactly once and that forbidden provider jars are absent. Provider artifact
+identity and public binary contracts are verified before startup. Actual claim-provider selection occurs when a
 claim operation is resolved; startup alone cannot prove that operation-scoped selection, so it remains
 an interactive/operation test gate. The same limitation applies to proving the staged settings were
 consumed by a gameplay operation: this harness proves their packaged configuration and readback.
@@ -88,17 +91,39 @@ consumed by a gameplay operation: this harness proves their packaged configurati
 For each scenario, the evidence root records the command line, PID/timestamps, artifact manifests and
 SHA-256 hashes, stdout/stderr, combined server logs, graceful-stop/exit state, JSON results, and a
 Markdown summary. Unexpected `SEVERE`, `ERROR`, exceptions, JVM linkage failures, plugin-load failures,
-or provider-contract failures fail the run. SQLite is queried read-only for `integrity_check=ok`, WAL,
+or provider-contract failures fail the run. Diagnostic classification uses one canonical server log so
+console/file mirrors cannot inflate exact counts; raw process stderr is checked separately for pre-logger
+JVM fatal/linkage/exception signatures. The exact numeric Hytale `[SERR] Reallocate: <n> to <n>` line is
+recorded as an ignored base-engine baseline. Any changed Reallocate text remains fatal.
+
+Two provider-origin SLF4J clusters are recorded and ignored only in their exact lanes with the audited
+provider identities and SHA-256 values: the three-line SLF4J 2.x no-provider cluster for QuestLines-only,
+and the five-line provider-instantiation/type-collision cluster when both providers are staged. The
+audited hashes are `664C6F5681695238FD898E851B044A90812AA13282D2A97A0770802182B7683B` for
+SimpleClaims 1.0.38 and `9AA23C0CCD0FD8BB70F305D952AA1B9A0BBF1AEC46D9D8D6DAD37E04B3F2F592`
+for QuestLines Claims 1.3.1. Wrong lanes, hashes, counts, text, stack traces, legacy
+`StaticLoggerBinder` warnings, and every
+other severe diagnostic remain fatal.
+
+SQLite is queried read-only for `integrity_check=ok`, WAL,
 FULL synchronous mode, schema v6, seven READY coverage dimensions, READY scan state, zero nonterminal
 operations, and canonical/profile row consistency. The copied upgrade must retain at least its pre-run
 profile/canonical row floor and must create a new, non-empty, `tamework_pre_v6_*.sqlite.bak` whose
 read-only integrity check passes and whose pre-v6 migration set and profile count match the source
 baseline. A copied/preexisting or unrelated valid SQLite file cannot satisfy that proof.
 
+After the normal dwell, the copied-upgrade lane polls those SQLite invariants while the server remains
+running. It stops only after terminal readiness or after `UpgradeReadinessTimeoutSeconds`; the default is
+300 seconds. `ACTIVE`, partial coverage, nonterminal operations, or a timeout remain failures. Fresh lanes
+use the fixed dwell because their empty databases already reached READY in the packaged startup runs.
+The `Companion population ledger loaded: ... RECONCILING` log is an initial bootstrap observation, not a
+terminal readiness anchor; the persisted scan session and coverage rows are authoritative here.
+
 The harness snapshots SHA-256, length, and modification time before and after the run for the built
 artifact, server jar, Java executable, both provider jars, the upgrade-source database, and file-form
 assets. SQLite `-wal`/`-shm` sidecars are included when present, and the isolated copy records matching
-hashes for the complete database snapshot before boot. Any input mutation fails the overall summary.
+hashes for the complete database snapshot before boot. The copied source `config.json` is tracked too.
+Any input mutation fails the overall summary.
 
 ### Safe validation without a Hytale boot
 
@@ -122,8 +147,8 @@ Run the focused PowerShell self-test with the same explicit artifacts:
 
 The self-test builds only disposable SQLite and fake-process fixtures; it never starts Hytale. It covers
 pre-v6 probing, copied-save layout, archive filtering, new-backup discrimination, immutability checks,
-log classification, graceful console stop, forced timeout cleanup, input refusal, and validate-only
-wiring.
+copied config overrides, exact diagnostic allow/fail matrices, readiness success/timeout polling,
+graceful console stop, forced timeout cleanup, input refusal, and validate-only wiring.
 
 The process contract is grounded in Hytale 0.5.6 server code: `Options` supplies the explicit assets,
 universe, bind, offline-auth, Sentry, and file-watcher flags; the working directory supplies the default

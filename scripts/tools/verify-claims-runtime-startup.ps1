@@ -44,6 +44,9 @@ param(
     [ValidateRange(1, 600)]
     [int] $ShutdownTimeoutSeconds,
 
+    [ValidateRange(1, 3600)]
+    [int] $UpgradeReadinessTimeoutSeconds = 300,
+
     [switch] $ValidateOnly
 )
 

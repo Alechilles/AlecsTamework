@@ -107,6 +107,15 @@ function New-ClaimsFakeProcessContext {
     return [pscustomobject]@{ home = $scenarioHome; evidence = $evidence }
 }
 
+function New-ClaimsTestDiagnosticPolicy {
+    param([string] $ScenarioId, [string] $Kind, [object[]] $Artifacts)
+    return [pscustomobject]@{
+        scenarioId = $ScenarioId
+        expectedKind = $Kind
+        providerArtifacts = $Artifacts
+    }
+}
+
 $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $testRoot = Join-Path $tempBase ("tamework-claims-runtime-tests-" + ([Guid]::NewGuid()).ToString("N"))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
@@ -165,6 +174,73 @@ Shutdown completed!
         -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider")
     Assert-ClaimsTest (-not $badAnalysis.passed -and $badAnalysis.findings.Count -gt 0) `
         "severe/provider/exception findings fail"
+    $rawFatal = Get-ClaimsRuntimeLogAnalysis -Text $goodLog `
+        -RawProcessStderr "Exception in thread main FixtureException" `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider")
+    Assert-ClaimsTest (-not $rawFatal.passed) "raw pre-logger exception stderr remains fatal"
+    $reallocateLine = "[2026/07/12 03:07:10 SEVERE] [SERR] Reallocate: 131072 to 1179648"
+    $reallocateAnalysis = Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $reallocateLine) `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider")
+    Assert-ClaimsTest ($reallocateAnalysis.passed -and
+        $reallocateAnalysis.ignoredFindings.Count -eq 1) "exact numeric Reallocate baseline is recorded/ignored"
+    $changedReallocate = Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $reallocateLine + " extra") `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider")
+    Assert-ClaimsTest (-not $changedReallocate.passed) "changed Reallocate text remains fatal"
+
+    $questArtifact = [pscustomobject]@{
+        pluginId = "net.evilcraft:QuestLinesClaims"; version = "1.3.1"
+        sha256 = "9AA23C0CCD0FD8BB70F305D952AA1B9A0BBF1AEC46D9D8D6DAD37E04B3F2F592"
+    }
+    $simpleArtifact = [pscustomobject]@{
+        pluginId = "Buuz135:SimpleClaims"; version = "1.0.38"
+        sha256 = "664C6F5681695238FD898E851B044A90812AA13282D2A97A0770802182B7683B"
+    }
+    $questPolicy = New-ClaimsTestDiagnosticPolicy "questlines-claims-1.3.1" `
+        "questlines-no-provider" @($questArtifact)
+    $questCluster = @"
+[2026/07/12 03:06:32 SEVERE] [SERR] SLF4J: No SLF4J providers were found.
+[2026/07/12 03:06:32 SEVERE] [SERR] SLF4J: Defaulting to no-operation (NOP) logger implementation
+[2026/07/12 03:06:32 SEVERE] [SERR] SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+"@
+    $questKnown = Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $questCluster) `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider") `
+        -KnownProviderDiagnosticPolicy $questPolicy
+    Assert-ClaimsTest ($questKnown.passed -and $questKnown.knownProviderDiagnostics.clusterMatches -eq 1) `
+        "exact QL-only provider diagnostic is hash/scenario scoped"
+    $wrongLane = New-ClaimsTestDiagnosticPolicy "simpleclaims-1.0.38" "none" @($simpleArtifact)
+    Assert-ClaimsTest (-not (Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $questCluster) `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider") `
+        -KnownProviderDiagnosticPolicy $wrongLane).passed) "provider diagnostic in the wrong lane is fatal"
+    Assert-ClaimsTest (-not (Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $questCluster + "`n" + $questCluster) `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider") `
+        -KnownProviderDiagnosticPolicy $questPolicy).passed) "duplicate provider cluster is fatal"
+    $wrongHashArtifact = $questArtifact.PSObject.Copy()
+    $wrongHashArtifact.sha256 = "0" * 64
+    $wrongHash = New-ClaimsTestDiagnosticPolicy "questlines-claims-1.3.1" `
+        "questlines-no-provider" @($wrongHashArtifact)
+    Assert-ClaimsTest (-not (Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $questCluster) `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider") `
+        -KnownProviderDiagnosticPolicy $wrongHash).passed) "changed provider hash revokes the waiver"
+    Assert-ClaimsTest (-not (Get-ClaimsRuntimeLogAnalysis `
+        -Text ($goodLog + "`n" + ($questCluster -replace 'further details\.', 'details changed.')) `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider") `
+        -KnownProviderDiagnosticPolicy $questPolicy).passed) "changed provider diagnostic text is fatal"
+    Assert-ClaimsTest (-not (Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $questCluster + "SEVERE unrelated`n") `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider") `
+        -KnownProviderDiagnosticPolicy $questPolicy).passed) "unrelated SEVERE remains fatal"
+
+    $bothPolicy = New-ClaimsTestDiagnosticPolicy "both-providers-auto" `
+        "mixed-provider-collision" @($simpleArtifact, $questArtifact)
+    $bothCluster = @"
+[2026/07/12 03:07:06 SEVERE] [SERR] SLF4J: A SLF4J service provider failed to instantiate:
+[2026/07/12 03:07:06 SEVERE] [SERR] org.slf4j.spi.SLF4JServiceProvider: org.slf4j.simple.SimpleServiceProvider not a subtype
+[2026/07/12 03:07:06 SEVERE] [SERR] SLF4J: No SLF4J providers were found.
+[2026/07/12 03:07:06 SEVERE] [SERR] SLF4J: Defaulting to no-operation (NOP) logger implementation
+[2026/07/12 03:07:06 SEVERE] [SERR] SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+"@
+    Assert-ClaimsTest (Get-ClaimsRuntimeLogAnalysis -Text ($goodLog + "`n" + $bothCluster) `
+        -ExpectedPluginIds @("Fixture:Tamework", "Fixture:Provider") `
+        -KnownProviderDiagnosticPolicy $bothPolicy).passed "exact both-provider collision cluster is recorded"
 
     $upgradeSource = Join-Path $testRoot "upgrade-source"
     $sourceDatabase = New-ClaimsPreV6Fixture -Root $upgradeSource `
@@ -188,6 +264,17 @@ Shutdown completed!
     Write-ClaimsTestText -Path (Join-Path $sourceMods "UnpackedPlugin\Plugin.class") -Text "do-not-copy"
     Write-ClaimsTestText -Path (Join-Path $upgradeSource "backup\old-world.txt") -Text "skip"
     Write-ClaimsTestText -Path (Join-Path $upgradeSource "assetEditor\cache.txt") -Text "skip"
+    $sourceConfigPath = Join-Path $upgradeSource "config.json"
+    Write-ClaimsTestText -Path $sourceConfigPath -Text (([ordered]@{
+        Version = 4
+        Backup = [ordered]@{ Enabled = $true }
+        Mods = [ordered]@{
+            "Alechilles:Alec's Tamework!" = [ordered]@{ Enabled = $false }
+            "Buuz135:SimpleClaims" = [ordered]@{ Enabled = $false }
+            "net.evilcraft:QuestLinesClaims" = [ordered]@{ Enabled = $false }
+        }
+    } | ConvertTo-Json -Depth 10) + [Environment]::NewLine)
+    $sourceConfigHash = (Get-FileHash -LiteralPath $sourceConfigPath -Algorithm SHA256).Hash
     $preexistingBackup = Join-Path (Split-Path $sourceDatabase -Parent) `
         "tamework_pre_v6_existing.sqlite.bak"
     Copy-Item -LiteralPath $sourceDatabase -Destination $preexistingBackup
@@ -250,6 +337,17 @@ Shutdown completed!
     Assert-ClaimsTest ($context.upgradeCopyEvidence.snapshotFiles.Count -eq $expectedSnapshotFiles) `
         "copied SQLite snapshot records the main file and every present WAL/SHM sidecar"
     Assert-ClaimsTest $context.settingsConfiguredActive "staged settings read back with every rule active"
+    Assert-ClaimsTest ($context.serverConfigEvidence.passed -and
+        $context.serverConfigEvidence.backupDisabled) "isolated copied config disables automatic backup"
+    Assert-ClaimsTest (-not ($context.serverConfigEvidence.pluginChecks | Where-Object {
+        -not $_.actualEnabled
+    })) "copied config enables Tamework and both scenario providers"
+    Assert-ClaimsTest ((Get-FileHash -LiteralPath $sourceConfigPath -Algorithm SHA256).Hash -ceq
+        $sourceConfigHash) "source config remains byte-for-byte unchanged"
+    $sourceConfigReadBack = Get-Content -LiteralPath $sourceConfigPath -Raw | ConvertFrom-Json
+    Assert-ClaimsTest (-not $sourceConfigReadBack.Mods."Buuz135:SimpleClaims".Enabled -and
+        -not $sourceConfigReadBack.Mods."net.evilcraft:QuestLinesClaims".Enabled) `
+        "source provider disable flags remain untouched"
     $copyProbe = Invoke-ClaimsRuntimeSqliteProbe -JavaExecutable $JavaExecutable `
         -BuiltArtifact $BuiltArtifact -ProbeSource $probeSource -DatabasePath $context.databasePath
     Assert-ClaimsTest ($copyProbe.profileRows -eq 77) "copied pre-v6 DB still has 77 profiles"
@@ -333,8 +431,14 @@ exit /b 0
 '@)
     $fakeInputs = [pscustomobject]@{ javaExecutable = "unused"; hytaleServerJar = "unused"; hytaleAssets = "unused" }
     $gracefulContext = New-ClaimsFakeProcessContext -Root $testRoot -Name "fake-graceful-home"
+    $readinessState = [pscustomobject]@{ count = 0 }
+    $readinessProbe = {
+        $readinessState.count++
+        [pscustomobject]@{ ready = $readinessState.count -ge 3; sample = $readinessState.count }
+    }.GetNewClosure()
     $graceful = Invoke-ClaimsRuntimeServerProcess -Context $gracefulContext -Inputs $fakeInputs `
         -DwellSeconds 0 -StartupTimeoutSeconds 3 -ShutdownTimeoutSeconds 3 `
+        -ReadinessProbe $readinessProbe -ReadinessTimeoutSeconds 5 `
         -ExecutableOverride $cmd -ArgumentOverride @("/d", "/c", $gracefulBatch)
     Assert-ClaimsTest ($null -ne $graceful.bootedAtUtc -and $null -ne $graceful.stopSentAtUtc) `
         "fake server reaches boot and receives graceful stop"
@@ -342,6 +446,15 @@ exit /b 0
         "fake graceful process exits cleanly"
     Assert-ClaimsTest ([string]::IsNullOrWhiteSpace([string]$graceful.lifecycleError)) `
         "fake graceful process has no lifecycle error"
+    Assert-ClaimsTest ($graceful.readiness.satisfied -and $graceful.readiness.samples.Count -eq 3) `
+        "readiness polling holds the server until a terminal-ready sample"
+    $notReadyContext = New-ClaimsFakeProcessContext -Root $testRoot -Name "fake-not-ready-home"
+    $notReady = Invoke-ClaimsRuntimeServerProcess -Context $notReadyContext -Inputs $fakeInputs `
+        -DwellSeconds 0 -StartupTimeoutSeconds 3 -ShutdownTimeoutSeconds 3 `
+        -ReadinessProbe { [pscustomobject]@{ ready = $false } } -ReadinessTimeoutSeconds 1 `
+        -ExecutableOverride $cmd -ArgumentOverride @("/d", "/c", $gracefulBatch)
+    Assert-ClaimsTest (-not $notReady.readiness.satisfied -and $notReady.exitCode -eq 0) `
+        "readiness timeout remains a failing evidence state even after graceful shutdown"
 
     $earlyExitBatch = Join-Path $testRoot "fake-early-exit.cmd"
     Write-ClaimsTestText -Path $earlyExitBatch -Text (@'
@@ -389,6 +502,8 @@ powershell.exe -NoProfile -Command "Start-Sleep -Seconds 20"
     Assert-ClaimsTest ($validation.upgradeSourceSqlite.profileRows -eq 77 -and
         $validation.expectedPostUpgradeCanonicalRows -eq 77) "validate-only probes the pre-v6 baseline"
     Assert-ClaimsTest $validation.inputImmutability.passed "validate-only leaves all explicit inputs unchanged"
+    Assert-ClaimsTest ($validation.upgradeReadinessTimeoutSeconds -eq 300) `
+        "validate-only reports the safe five-minute upgrade-readiness default"
     Assert-ClaimsTest (-not (Test-Path -LiteralPath $validateOutput)) `
         "validate-only creates no output root and launches no Hytale server"
 

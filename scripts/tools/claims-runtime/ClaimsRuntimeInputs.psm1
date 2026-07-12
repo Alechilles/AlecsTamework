@@ -204,6 +204,13 @@ function Get-ClaimsRuntimeTrackedInputState {
     if (Test-Path -LiteralPath $Inputs.hytaleAssets -PathType Leaf) {
         $paths.hytaleAssets = $Inputs.hytaleAssets
     }
+    $upgradeRootProperty = $Inputs.PSObject.Properties["upgradeSaveSource"]
+    if ($null -ne $upgradeRootProperty) {
+        $upgradeConfig = Join-Path $upgradeRootProperty.Value "config.json"
+        if (Test-Path -LiteralPath $upgradeConfig -PathType Leaf) {
+            $paths.upgradeSourceConfig = $upgradeConfig
+        }
+    }
     foreach ($sidecar in @(
             @{ name = "upgradeSourceDatabaseWal"; suffix = "-wal" },
             @{ name = "upgradeSourceDatabaseShm"; suffix = "-shm" }

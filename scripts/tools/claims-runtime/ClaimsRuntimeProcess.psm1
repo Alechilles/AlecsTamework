@@ -1,6 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeConfig.psm1") -Force
+Import-Module (Join-Path $PSScriptRoot "ClaimsRuntimeReadiness.psm1") -Force
+
 function Write-ClaimsRuntimeJson {
     param([string] $Path, [object] $Value)
     $parent = Split-Path -Path $Path -Parent
@@ -104,6 +107,10 @@ function Initialize-ClaimsRuntimeScenario {
     if ($Scenario.copiedUpgrade) {
         Copy-ClaimsRuntimeSaveRoot -Source $Inputs.upgradeSaveSource -Destination $scenarioHome
     }
+    $serverConfigEvidence = if ($Scenario.copiedUpgrade) {
+        Set-ClaimsRuntimeIsolatedServerConfig -Home $scenarioHome `
+            -Scenario $Scenario -Manifests $Manifests
+    } else { $null }
 
     $mods = Join-Path $scenarioHome "mods"
     $universe = Join-Path $scenarioHome "universe"
@@ -224,6 +231,7 @@ function Initialize-ClaimsRuntimeScenario {
         settingsSha256 = (Get-FileHash -LiteralPath $settingsPath -Algorithm SHA256).Hash
         settingsConfiguredActive = $settingsConfiguredActive
         settingsAssertionScope = "configured-and-read-back; runtime application remains an operation gate"
+        serverConfigEvidence = $serverConfigEvidence
         databasePath = $databasePath
         upgradeCopyEvidence = $upgradeCopyEvidence
         preexistingPreV6Backups = $preexistingPreV6Backups
@@ -259,6 +267,8 @@ function Invoke-ClaimsRuntimeServerProcess {
         [Parameter(Mandatory = $true)][int] $DwellSeconds,
         [Parameter(Mandatory = $true)][int] $StartupTimeoutSeconds,
         [Parameter(Mandatory = $true)][int] $ShutdownTimeoutSeconds,
+        [scriptblock] $ReadinessProbe,
+        [ValidateRange(1, 3600)][int] $ReadinessTimeoutSeconds = 300,
         [string] $ExecutableOverride,
         [string[]] $ArgumentOverride
     )
@@ -330,6 +340,13 @@ function Invoke-ClaimsRuntimeServerProcess {
     $exitedAt = $null
     $startFailure = $null
     $lifecycleFailure = $null
+    $readiness = [pscustomobject][ordered]@{
+        required = $null -ne $ReadinessProbe
+        satisfied = $null -eq $ReadinessProbe
+        mode = "not-started"
+        timeoutSeconds = if ($null -eq $ReadinessProbe) { $null } else { $ReadinessTimeoutSeconds }
+        samples = @()
+    }
     try {
         if (-not $process.Start()) { throw "Server process did not start." }
         $processStarted = $true
@@ -346,10 +363,9 @@ function Invoke-ClaimsRuntimeServerProcess {
             Start-Sleep -Milliseconds 100
         }
         if ($null -ne $bootedAt) {
-            $dwellWatch = [Diagnostics.Stopwatch]::StartNew()
-            while (-not $process.HasExited -and $dwellWatch.Elapsed.TotalSeconds -lt $DwellSeconds) {
-                Start-Sleep -Milliseconds 100
-            }
+            $readiness = Wait-ClaimsRuntimeReadiness -Process $process -DwellSeconds $DwellSeconds `
+                -ReadinessProbe $ReadinessProbe `
+                -ReadinessTimeoutSeconds $ReadinessTimeoutSeconds
         }
         if (-not $process.HasExited) {
             $stopSentAt = [DateTime]::UtcNow
@@ -398,6 +414,7 @@ function Invoke-ClaimsRuntimeServerProcess {
         exitCode = $exitCode
         forcedTermination = $forced
         lifecycleError = if ($null -eq $lifecycleFailure) { $null } else { $lifecycleFailure.ToString() }
+        readiness = $readiness
         stdout = $stdout
         stderr = $stderr
     }
@@ -451,6 +468,7 @@ function Write-ClaimsRuntimeScenarioSummary {
         $lines.Add("- PID: $($Result.process.pid)")
         $lines.Add("- Exit code: $($Result.process.exitCode)")
         $lines.Add("- Forced termination: $($Result.process.forcedTermination)")
+        if ($Result.process.readiness.required) { $lines.Add("- Upgrade readiness: $($Result.process.readiness.satisfied) ($($Result.process.readiness.samples.Count) samples)") }
     }
     if ($null -ne $Result.sqliteEvidence) {
         $lines.Add("- SQLite integrity / WAL / synchronous: $($Result.sqliteEvidence.integrityCheck) / $($Result.sqliteEvidence.journalMode) / $($Result.sqliteEvidence.synchronous)")

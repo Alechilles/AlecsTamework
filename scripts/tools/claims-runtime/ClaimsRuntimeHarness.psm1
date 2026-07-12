@@ -104,6 +104,36 @@ function Invoke-ClaimsRuntimeProviderContracts {
     }
 }
 
+function New-ClaimsRuntimeKnownProviderDiagnosticPolicy {
+    param([psobject] $Scenario, [psobject] $Inputs, [psobject] $Manifests)
+    $kind = switch ($Scenario.id) {
+        "questlines-claims-1.3.1" { "questlines-no-provider" }
+        "both-providers-auto" { "mixed-provider-collision" }
+        "copied-upgrade-save" { "mixed-provider-collision" }
+        default { "none" }
+    }
+    $artifacts = [System.Collections.Generic.List[object]]::new()
+    if ($Scenario.providerKinds -contains "simpleclaims") {
+        $artifacts.Add([pscustomobject][ordered]@{
+            pluginId = $Manifests.simpleClaims.pluginId
+            version = $Manifests.simpleClaims.version
+            sha256 = (Get-FileHash -LiteralPath $Inputs.simpleClaimsJar -Algorithm SHA256).Hash
+        })
+    }
+    if ($Scenario.providerKinds -contains "questlines") {
+        $artifacts.Add([pscustomobject][ordered]@{
+            pluginId = $Manifests.questLinesClaims.pluginId
+            version = $Manifests.questLinesClaims.version
+            sha256 = (Get-FileHash -LiteralPath $Inputs.questLinesClaimsJar -Algorithm SHA256).Hash
+        })
+    }
+    return [pscustomobject][ordered]@{
+        scenarioId = $Scenario.id
+        expectedKind = $kind
+        providerArtifacts = @($artifacts)
+    }
+}
+
 function Get-ClaimsRuntimePreV6ProfileBaseline {
     param([psobject] $Evidence)
     if ($Evidence.integrityCheck -cne "ok" -or $Evidence.profileRows -lt 0 -or
@@ -179,6 +209,7 @@ function Invoke-ClaimsRuntimeVerification {
         [Parameter(Mandatory = $true)][ValidateRange(1, 3600)][int] $DwellSeconds,
         [Parameter(Mandatory = $true)][ValidateRange(1, 3600)][int] $StartupTimeoutSeconds,
         [Parameter(Mandatory = $true)][ValidateRange(1, 600)][int] $ShutdownTimeoutSeconds,
+        [ValidateRange(1, 3600)][int] $UpgradeReadinessTimeoutSeconds = 300,
         [switch] $ValidateOnly
     )
 
@@ -240,6 +271,7 @@ function Invoke-ClaimsRuntimeVerification {
             [pscustomobject][ordered]@{ plan = $_; activeSettings = New-ClaimsRuntimeSettings $_.providerSetting }
         })
         providerSelectionScope = "Provider load and binary contracts are startup-observable; actual provider selection is operation-scoped and is not asserted by startup alone."
+        upgradeReadinessTimeoutSeconds = $UpgradeReadinessTimeoutSeconds
     }
     if ($ValidateOnly) {
         $validation | Add-Member -NotePropertyName inputImmutability -NotePropertyValue `
@@ -297,6 +329,9 @@ function Invoke-ClaimsRuntimeVerification {
         $settings = New-ClaimsRuntimeSettings -ProviderSetting $scenario.providerSetting
         $context = Initialize-ClaimsRuntimeScenario -Scenario $scenario -Inputs $inputs `
             -Manifests $manifests -Settings $settings
+        $context | Add-Member -NotePropertyName knownProviderDiagnosticPolicy `
+            -NotePropertyValue (New-ClaimsRuntimeKnownProviderDiagnosticPolicy `
+                -Scenario $scenario -Inputs $inputs -Manifests $manifests)
         Write-ClaimsRuntimeJson -Path (Join-Path $context.evidence "scenario-plan.json") -Value $context
         $processResult = $null
         $processForJson = $null
@@ -305,10 +340,44 @@ function Invoke-ClaimsRuntimeVerification {
         $sqliteValidation = $null
         $backupEvidence = $null
         $errorText = $null
+        $readinessProbe = $null
+        if ($scenario.copiedUpgrade) {
+            $readinessProbe = {
+                try {
+                    if (-not (Test-Path -LiteralPath $context.databasePath -PathType Leaf)) {
+                        throw "Scenario database does not exist yet."
+                    }
+                    $sampleEvidence = Invoke-ClaimsRuntimeSqliteProbe `
+                        -JavaExecutable $inputs.javaExecutable -BuiltArtifact $inputs.builtArtifact `
+                        -ProbeSource $probeSource -DatabasePath $context.databasePath
+                    $sampleValidation = Test-ClaimsRuntimeSqliteEvidence `
+                        -Evidence $sampleEvidence -ExpectedCanonicalRows $expectedUpgradeRows
+                    [pscustomobject][ordered]@{
+                        ready = $sampleValidation.passed
+                        sampledAtUtc = [DateTime]::UtcNow.ToString("o")
+                        scanSessionState = $sampleEvidence.scanSessionState
+                        coverageReady = $sampleEvidence.coverageReady
+                        coverageTotal = $sampleEvidence.coverageTotal
+                        nonterminalOperations = $sampleEvidence.nonterminalOperations
+                        canonicalRows = $sampleEvidence.canonicalRows
+                        profileRows = $sampleEvidence.profileRows
+                        failedChecks = @($sampleValidation.checks | Where-Object { -not $_.passed } | ForEach-Object name)
+                    }
+                } catch {
+                    [pscustomobject][ordered]@{
+                        ready = $false
+                        sampledAtUtc = [DateTime]::UtcNow.ToString("o")
+                        error = $_.Exception.ToString()
+                    }
+                }
+            }.GetNewClosure()
+        }
         try {
             $processResult = Invoke-ClaimsRuntimeServerProcess -Context $context -Inputs $inputs `
                 -DwellSeconds $DwellSeconds -StartupTimeoutSeconds $StartupTimeoutSeconds `
-                -ShutdownTimeoutSeconds $ShutdownTimeoutSeconds
+                -ShutdownTimeoutSeconds $ShutdownTimeoutSeconds `
+                -ReadinessProbe $readinessProbe `
+                -ReadinessTimeoutSeconds $UpgradeReadinessTimeoutSeconds
             Write-ClaimsRuntimeText -Path (Join-Path $context.evidence "stdout.log") -Value $processResult.stdout
             Write-ClaimsRuntimeText -Path (Join-Path $context.evidence "stderr.log") -Value $processResult.stderr
             $processForJson = $processResult.PSObject.Copy()
@@ -323,8 +392,10 @@ function Invoke-ClaimsRuntimeVerification {
             if ([string]::IsNullOrWhiteSpace($canonicalLog)) { $canonicalLog = $processResult.stdout }
             Write-ClaimsRuntimeText -Path (Join-Path $context.evidence "canonical-server.log") `
                 -Value $canonicalLog
-            $logAnalysis = Get-ClaimsRuntimeLogAnalysis -Text $combinedLogs `
+            $logAnalysis = Get-ClaimsRuntimeLogAnalysis -Text $canonicalLog `
                 -PluginEnablementText $canonicalLog `
+                -RawProcessStderr $processResult.stderr `
+                -KnownProviderDiagnosticPolicy $context.knownProviderDiagnosticPolicy `
                 -ExpectedPluginIds $context.expectedPluginIds `
                 -ForbiddenPluginIds $context.forbiddenProviderIds
             Write-ClaimsRuntimeJson -Path (Join-Path $context.evidence "log-analysis.json") -Value $logAnalysis
@@ -354,10 +425,13 @@ function Invoke-ClaimsRuntimeVerification {
             $errorText = $_.Exception.ToString()
         }
 
+        $readinessPassed = (-not $scenario.copiedUpgrade) -or `
+            ($null -ne $processResult -and $processResult.readiness.satisfied)
         $processPassed = $null -ne $processResult -and $null -ne $processResult.bootedAtUtc `
             -and $null -ne $processResult.stopSentAtUtc -and -not $processResult.forcedTermination `
             -and $processResult.exitCode -eq 0 `
-            -and [string]::IsNullOrWhiteSpace([string]$processResult.lifecycleError)
+            -and [string]::IsNullOrWhiteSpace([string]$processResult.lifecycleError) `
+            -and $readinessPassed
         $backupPassed = (-not $scenario.copiedUpgrade) -or `
             ($null -ne $backupEvidence -and $backupEvidence.passed)
         $passed = $processPassed -and $null -ne $logAnalysis -and $logAnalysis.passed `
@@ -369,6 +443,7 @@ function Invoke-ClaimsRuntimeVerification {
             description = $scenario.description
             passed = $passed
             processPassed = $processPassed
+            readinessPassed = $readinessPassed
             process = if ($null -eq $processResult) { $null } else { $processForJson }
             logAnalysis = $logAnalysis
             sqliteEvidence = $sqliteEvidence
@@ -418,6 +493,7 @@ function Invoke-ClaimsRuntimeVerification {
 Export-ModuleMember -Function @(
     "Get-ClaimsRuntimeScenarioPlan",
     "New-ClaimsRuntimeSettings",
+    "New-ClaimsRuntimeKnownProviderDiagnosticPolicy",
     "Get-ClaimsRuntimeUpgradeBackupEvidence",
     "Get-ClaimsRuntimeLogAnalysis",
     "Invoke-ClaimsRuntimeVerification"
