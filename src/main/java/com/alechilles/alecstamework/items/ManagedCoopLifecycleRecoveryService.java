@@ -71,7 +71,8 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ManagedCoopCaptureSourceRetirementService entityRetirements,
             @Nonnull ManagedCoopItemCaptureRecoveryService itemRetirements,
             @Nonnull ManagedCoopReleaseRecoveryService releaseRecovery,
-            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter) {
+            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
+            @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations) {
         this(
                 new ManagedCoopLifecycleRecoveryEvidence(
                         new ManagedCoopLifecycleRecoveryPlanner(),
@@ -84,7 +85,8 @@ public final class ManagedCoopLifecycleRecoveryService {
                 itemRetirements::recover,
                 releaseRecovery::resume,
                 new HytaleManagedCoopReleaseProjectionGateway(
-                        releaseAdapter, residentIndex, compositeIndexes)::project,
+                        releaseAdapter, residentIndex, compositeIndexes,
+                        releasePopulations)::project,
                 System::currentTimeMillis
         );
     }

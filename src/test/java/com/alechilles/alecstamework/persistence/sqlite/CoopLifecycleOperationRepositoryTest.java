@@ -136,6 +136,31 @@ class CoopLifecycleOperationRepositoryTest {
     }
 
     @Test
+    void definitivePreProjectionFailureRestoresHousedResidentAndDropsPlannedClaim() throws Exception {
+        houseResidentA();
+        ReleaseRequest request = release("release-failed", TARGET_A, 0L, 200L);
+        MutationResult prepared = committed(operations.prepareRelease(request));
+        MutationResult spawnClaimed = committed(operations.claimReleaseSpawn(
+                request.operationId(), prepared.operation().generation(), 210L
+        ));
+
+        MutationResult failed = committed(operations.failReleaseBeforeProjection(
+                request.operationId(), spawnClaimed.operation().generation(),
+                "population_admission_denied", 220L
+        ));
+
+        assertOperation(failed, MutationStatus.APPLIED, OperationState.FAILED, false, 2L);
+        ResidentRecord restored = residents.loadById("resident-a");
+        assertResident(restored, ResidentState.HOUSED, true, 2L, SOURCE_A);
+        assertEquals(List.of("SOURCE"), activeClaimKinds("resident-a"));
+        assertEquals(MutationStatus.IDEMPOTENT, committed(
+                operations.failReleaseBeforeProjection(
+                        request.operationId(), spawnClaimed.operation().generation(),
+                        "population_admission_denied", 230L
+                )).status());
+    }
+
+    @Test
     void disabledAuthorityAllowsEjectionReleaseButRejectsNewCapture() throws Exception {
         houseResidentA();
         var disabled = committed(residents.transitionAuthority(

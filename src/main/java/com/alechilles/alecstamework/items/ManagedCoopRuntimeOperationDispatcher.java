@@ -165,12 +165,13 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             @Nonnull ManagedCoopCaptureRuntimeAdapter captureAdapter,
             @Nonnull ManagedCoopCaptureSourceRetirementService retirementService,
             @Nonnull ManagedCoopReleaseCoordinator releaseCoordinator,
-            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter) {
+            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
+            @Nonnull ManagedCoopReleasePopulationCoordinator populations) {
         this(
                 captureAdapter::capture,
                 retirementService::retire,
                 releaseCoordinator::coordinate,
-                new HytaleManagedCoopReleaseProjectionGateway(releaseAdapter),
+                new HytaleManagedCoopReleaseProjectionGateway(releaseAdapter, populations),
                 UUID::randomUUID);
     }
 
@@ -181,13 +182,14 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             @Nonnull ManagedCoopReleaseCoordinator releaseCoordinator,
             @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
             @Nonnull ManagedCoopResidentIndex residentIndex,
-            @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes) {
+            @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
+            @Nonnull ManagedCoopReleasePopulationCoordinator populations) {
         this(
                 captureAdapter::capture,
                 retirementService::retire,
                 releaseCoordinator::coordinate,
                 new HytaleManagedCoopReleaseProjectionGateway(
-                        releaseAdapter, residentIndex, compositeIndexes),
+                        releaseAdapter, residentIndex, compositeIndexes, populations),
                 UUID::randomUUID);
     }
 

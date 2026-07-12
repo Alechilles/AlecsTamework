@@ -43,19 +43,23 @@ public final class ManagedCoopCaptureProfileRepository {
         return writeQueue.submitTracked(
                 "managed_coop_capture_profile_ensure",
                 connection -> {
-                    profiles.upsertProfileInTransaction(connection, new NpcProfileRepository.ProfileUpdate(
-                            seed.sourceNpcUuid(),
-                            seed.ownerUuid(),
-                            null,
-                            seed.roleId(),
-                            seed.displayName(),
-                            null,
-                            null,
-                            null,
-                            null,
-                            null,
-                            seed.toolIds()
-                    ));
+                    profiles.upsertProfileInTransaction(
+                            connection,
+                            new NpcProfileRepository.ProfileUpdate(
+                                    seed.sourceNpcUuid(),
+                                    seed.ownerUuid(),
+                                    null,
+                                    seed.roleId(),
+                                    seed.displayName(),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    seed.toolIds()
+                            ),
+                            ProfileOwnerMutation.unchanged()
+                    );
                     String profileId = profiles.resolveProfileIdInTransaction(connection, seed.sourceNpcUuid());
                     if (profileId == null || profileId.isBlank()) {
                         throw new IllegalStateException("managed_coop_capture_profile_missing_after_upsert");

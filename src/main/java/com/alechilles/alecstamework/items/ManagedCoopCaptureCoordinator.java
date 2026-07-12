@@ -12,6 +12,10 @@ import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureProfile
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureProfileRepository.ProfileIdentity;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureProfileRepository.ProfileSeed;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
+import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
+import com.alechilles.alecstamework.ownership.CoopPopulationCaptureAdmissionService;
+import com.alechilles.alecstamework.ownership.CoopPopulationCaptureAdmissionService.SourceKind;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -45,6 +49,9 @@ public final class ManagedCoopCaptureCoordinator {
                                  @Nullable UUID ownerUuid,
                                  @Nullable String displayName,
                                  @Nonnull String[] toolIds,
+                                 @Nonnull SourceKind sourceKind,
+                                 @Nullable ClaimChunkCoordinate sourceChunk,
+                                 boolean newlyEnsuredUnownedProfile,
                                  @Nonnull String snapshotJson,
                                  @Nonnull String snapshotHash,
                                  int snapshotVersion,
@@ -57,8 +64,20 @@ public final class ManagedCoopCaptureCoordinator {
             roleId = requireText(roleId, "roleId").toLowerCase(Locale.ROOT);
             snapshotJson = requireTextPreserving(snapshotJson, "snapshotJson");
             snapshotHash = requireText(snapshotHash, "snapshotHash");
+            Objects.requireNonNull(sourceKind, "sourceKind");
             if (residentSlot < 0 || snapshotVersion < 1 || expectedResidentGeneration < 0L) {
                 throw new IllegalArgumentException("slot, snapshot version, and generation must be valid");
+            }
+            if (sourceKind == SourceKind.LIVE_ENTITY && sourceChunk == null) {
+                throw new IllegalArgumentException("live capture source chunk is required");
+            }
+            if (sourceKind == SourceKind.CAPTURED_ITEM && sourceChunk != null) {
+                throw new IllegalArgumentException("captured-item intake cannot have a live source chunk");
+            }
+            if (newlyEnsuredUnownedProfile
+                    && (ownerUuid != null || sourceKind != SourceKind.LIVE_ENTITY)) {
+                throw new IllegalArgumentException(
+                        "only an unowned live source can establish a new population profile");
             }
             toolIds = toolIds == null ? new String[0] : toolIds.clone();
         }
@@ -93,6 +112,7 @@ public final class ManagedCoopCaptureCoordinator {
     }
 
     private final ProfileGateway profiles;
+    private final CaptureCommitGateway captureCommits;
     private final OperationGateway operations;
     private final IndexRefreshGateway indexRefresh;
     private final LongSupplier clock;
@@ -102,10 +122,17 @@ public final class ManagedCoopCaptureCoordinator {
     public ManagedCoopCaptureCoordinator(
             @Nonnull ManagedCoopCaptureProfileRepository profiles,
             @Nonnull CoopLifecycleOperationRepository operations,
-            @Nonnull ManagedCoopResidentIndexRefreshService indexRefresh) {
+            @Nonnull ManagedCoopResidentIndexRefreshService indexRefresh,
+            @Nonnull CoopPopulationCaptureAdmissionService populationAdmissions,
+            @Nonnull CompanionIdentityResolver identities) {
         this(
                 Objects.requireNonNull(profiles, "profiles")::ensureProfile,
-                new RepositoryOperationGateway(Objects.requireNonNull(operations, "operations")),
+                new ManagedCoopPopulationCaptureCommitter(
+                        populationAdmissions,
+                        identities,
+                        Objects.requireNonNull(operations, "operations")
+                )::commit,
+                new RepositoryOperationGateway(operations),
                 Objects.requireNonNull(indexRefresh, "indexRefresh")::refresh,
                 System::currentTimeMillis
         );
@@ -114,20 +141,29 @@ public final class ManagedCoopCaptureCoordinator {
     public ManagedCoopCaptureCoordinator(
             @Nonnull ManagedCoopCaptureProfileRepository profiles,
             @Nonnull CoopLifecycleOperationRepository operations,
-            @Nonnull ManagedCoopCompositeIndexRefreshService indexRefresh) {
+            @Nonnull ManagedCoopCompositeIndexRefreshService indexRefresh,
+            @Nonnull CoopPopulationCaptureAdmissionService populationAdmissions,
+            @Nonnull CompanionIdentityResolver identities) {
         this(
                 Objects.requireNonNull(profiles, "profiles")::ensureProfile,
-                new RepositoryOperationGateway(Objects.requireNonNull(operations, "operations")),
+                new ManagedCoopPopulationCaptureCommitter(
+                        populationAdmissions,
+                        identities,
+                        Objects.requireNonNull(operations, "operations")
+                )::commit,
+                new RepositoryOperationGateway(operations),
                 Objects.requireNonNull(indexRefresh, "indexRefresh")::refreshForLifecycleMutation,
                 System::currentTimeMillis
         );
     }
 
     ManagedCoopCaptureCoordinator(@Nonnull ProfileGateway profiles,
+                                  @Nonnull CaptureCommitGateway captureCommits,
                                   @Nonnull OperationGateway operations,
                                   @Nonnull IndexRefreshGateway indexRefresh,
                                   @Nonnull LongSupplier clock) {
         this.profiles = Objects.requireNonNull(profiles, "profiles");
+        this.captureCommits = Objects.requireNonNull(captureCommits, "captureCommits");
         this.operations = Objects.requireNonNull(operations, "operations");
         this.indexRefresh = Objects.requireNonNull(indexRefresh, "indexRefresh");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -190,7 +226,7 @@ public final class ManagedCoopCaptureCoordinator {
         } catch (RuntimeException exception) {
             return CompletableFuture.completedFuture(failed(detail("capture_request", exception)));
         }
-        return committed(operations.claimCapture(request), "capture_claim")
+        return captureCommits.commit(attempt, request)
                 .thenCompose(result -> afterClaim(attempt, request, result));
     }
 
@@ -423,13 +459,17 @@ public final class ManagedCoopCaptureCoordinator {
 
     interface OperationGateway {
         @Nonnull
-        PersistenceWriteQueue.WriteSubmission<MutationResult> claimCapture(@Nonnull CaptureRequest request);
-
-        @Nonnull
         PersistenceWriteQueue.WriteSubmission<MutationResult> requestSourceRetirement(
                 @Nonnull String operationId,
                 long expectedGeneration,
                 long nowMs);
+    }
+
+    interface CaptureCommitGateway {
+        @Nonnull
+        CompletionStage<MutationResult> commit(
+                @Nonnull CaptureAttempt attempt,
+                @Nonnull CaptureRequest request);
     }
 
     interface IndexRefreshGateway {
@@ -442,13 +482,6 @@ public final class ManagedCoopCaptureCoordinator {
 
         private RepositoryOperationGateway(CoopLifecycleOperationRepository repository) {
             this.repository = repository;
-        }
-
-        @Nonnull
-        @Override
-        public PersistenceWriteQueue.WriteSubmission<MutationResult> claimCapture(
-                @Nonnull CaptureRequest request) {
-            return repository.claimCapture(request);
         }
 
         @Nonnull

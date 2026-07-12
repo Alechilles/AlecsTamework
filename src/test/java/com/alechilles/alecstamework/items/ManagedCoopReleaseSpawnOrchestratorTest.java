@@ -1,9 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
-import com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.FinalizedProjection;
-import com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.ProjectionOutcome;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Admission;
+import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Finalization;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Outcome;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.SpawnAttempt;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
@@ -16,11 +15,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
-import static com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.OutcomeStatus.DEDUPLICATED;
-import static com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.OutcomeStatus.FAILED;
-import static com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.OutcomeStatus.FINALIZED;
 import static com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Status.BLOCKED;
 import static com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Status.PERSISTENCE_FAILED;
+import static com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Status.SPAWN_AMBIGUOUS;
 import static com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Status.SPAWN_FAILED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,7 +30,7 @@ class ManagedCoopReleaseSpawnOrchestratorTest {
     @Test
     void spawnsBeforePersistenceAndDispatchesPresentationOnlyAfterFinalized() throws Exception {
         List<String> events = new ArrayList<>();
-        CompletableFuture<ProjectionOutcome> persistence = new CompletableFuture<>();
+        CompletableFuture<Finalization> persistence = new CompletableFuture<>();
         ManagedCoopReleaseSpawnOrchestrator orchestrator =
                 new ManagedCoopReleaseSpawnOrchestrator(
                         (claim, actual, recordedAt) -> {
@@ -93,6 +90,39 @@ class ManagedCoopReleaseSpawnOrchestratorTest {
     }
 
     @Test
+    void ambiguousSpawnRetainsReceiptAndNeverRespawnsOrFinalizesBlindly() throws Exception {
+        AtomicInteger spawns = new AtomicInteger();
+        AtomicInteger finalizations = new AtomicInteger();
+        ManagedCoopReleaseSpawnOrchestrator orchestrator =
+                new ManagedCoopReleaseSpawnOrchestrator(
+                        (claim, actual, recordedAt) -> {
+                            finalizations.incrementAndGet();
+                            return CompletableFuture.completedFuture(finalized(claim));
+                        },
+                        command -> { }
+                );
+
+        Outcome ambiguous = orchestrator.coordinate(
+                claim(), Admission.clearToSpawn(),
+                () -> {
+                    spawns.incrementAndGet();
+                    return SpawnAttempt.ambiguous("spawn_result_uncertain");
+                }, 100L).get(3, TimeUnit.SECONDS);
+        Outcome replay = orchestrator.coordinate(
+                claim(), Admission.clearToSpawn(),
+                () -> {
+                    spawns.incrementAndGet();
+                    return SpawnAttempt.spawned(PLANNED);
+                }, 101L).get(3, TimeUnit.SECONDS);
+
+        assertEquals(SPAWN_AMBIGUOUS, ambiguous.status());
+        assertEquals(ManagedCoopReleaseSpawnOrchestrator.Status.DEDUPLICATED,
+                replay.status());
+        assertEquals(1, spawns.get());
+        assertEquals(0, finalizations.get());
+    }
+
+    @Test
     void mismatchedSpawnIdentityClosesGateInsteadOfPermittingAnotherSpawn() throws Exception {
         AtomicInteger spawns = new AtomicInteger();
         AtomicInteger finalizations = new AtomicInteger();
@@ -120,7 +150,7 @@ class ManagedCoopReleaseSpawnOrchestratorTest {
                 }, 101L
         ).get(3, TimeUnit.SECONDS);
 
-        assertEquals(SPAWN_FAILED, first.status());
+        assertEquals(SPAWN_AMBIGUOUS, first.status());
         assertEquals(BLOCKED, replay.status());
         assertEquals(1, spawns.get());
         assertEquals(0, finalizations.get());
@@ -137,7 +167,7 @@ class ManagedCoopReleaseSpawnOrchestratorTest {
                         (ignored, actual, recordedAt) -> {
                             int call = finalizations.incrementAndGet();
                             return CompletableFuture.completedFuture(call == 1
-                                    ? new ProjectionOutcome(FAILED, null, "write_failed")
+                                    ? Finalization.failed("write_failed")
                                     : finalized(claim));
                         },
                         command -> presentations.incrementAndGet()
@@ -238,8 +268,8 @@ class ManagedCoopReleaseSpawnOrchestratorTest {
                 new ManagedCoopReleaseSpawnOrchestrator(
                         (ignored, actual, recordedAt) -> CompletableFuture.completedFuture(
                                 call.incrementAndGet() == 1
-                                        ? new ProjectionOutcome(DEDUPLICATED, null, "in_flight")
-                                        : mismatchedFinalized(claim)),
+                                        ? Finalization.deduplicated("in_flight")
+                                        : Finalization.failed("mismatched_finalization")),
                         command -> presentations.incrementAndGet()
                 );
 
@@ -277,22 +307,8 @@ class ManagedCoopReleaseSpawnOrchestratorTest {
         );
     }
 
-    private static ProjectionOutcome finalized(SpawnReady claim) {
-        return new ProjectionOutcome(FINALIZED, projection(claim, claim.profileId()), null);
-    }
-
-    private static ProjectionOutcome mismatchedFinalized(SpawnReady claim) {
-        return new ProjectionOutcome(FINALIZED, projection(claim, "other-profile"), null);
-    }
-
-    private static FinalizedProjection projection(SpawnReady claim, String profileId) {
-        return new FinalizedProjection(
-                claim.operationId(), profileId, claim.residentId(), claim.authorityKey(),
-                claim.coopId(), claim.residentSlot(), claim.sourceNpcUuid(),
-                claim.plannedTargetUuid(), PLANNED, claim.snapshotHash(),
-                claim.expectedResidentGeneration(), claim.expectedResidentGeneration() + 2L,
-                claim.operationGeneration() + 2L, 9L, 10L
-        );
+    private static Finalization finalized(SpawnReady claim) {
+        return Finalization.finalized(null);
     }
 
     private static UUID uuid(long value) {

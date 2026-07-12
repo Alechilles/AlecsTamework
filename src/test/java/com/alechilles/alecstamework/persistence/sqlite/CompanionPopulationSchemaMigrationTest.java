@@ -20,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPopulationSchemaMigrationTest {
-    private static final int RESERVED_SCHEMA_VERSION_V5 = 5;
 
     @TempDir
     Path tempDir;
@@ -174,7 +173,12 @@ class CompanionPopulationSchemaMigrationTest {
 
     @Test
     void everySupportedPriorSchemaUpgradesThroughV6WithoutLosingProfiles() throws Exception {
-        for (int priorVersion : new int[]{2, 3, 4, RESERVED_SCHEMA_VERSION_V5}) {
+        for (int priorVersion : new int[]{
+                SqliteSchemaMigrator.SCHEMA_VERSION_V2,
+                SqliteSchemaMigrator.SCHEMA_VERSION_V3,
+                SqliteSchemaMigrator.SCHEMA_VERSION_V4,
+                SqliteSchemaMigrator.SCHEMA_VERSION_V5
+        }) {
             SqliteConnectionManager connections = new SqliteConnectionManager(
                     tempDir.resolve("upgrade-v" + priorVersion + ".sqlite")
             );
@@ -185,7 +189,7 @@ class CompanionPopulationSchemaMigrationTest {
                 String ownerUuid = UUID.randomUUID().toString();
                 String worldName = "world-v" + priorVersion;
                 setProfileOwnership(connection, profileId, ownerUuid, worldName);
-                if (priorVersion == RESERVED_SCHEMA_VERSION_V5) {
+                if (priorVersion == SqliteSchemaMigrator.SCHEMA_VERSION_V5) {
                     installReservedV5Fixture(connection, migrator);
                 }
 
@@ -195,15 +199,14 @@ class CompanionPopulationSchemaMigrationTest {
                 assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V3));
                 assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V4));
                 assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V6));
-                assertEquals(
-                        priorVersion == RESERVED_SCHEMA_VERSION_V5,
-                        migrator.isVersionApplied(connection, RESERVED_SCHEMA_VERSION_V5)
-                );
+                assertTrue(migrator.isVersionApplied(
+                        connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
+                ));
                 assertBackfilledProfile(connection, profileId, worldName);
                 assertEquals(ownerUuid, profileOwner(connection, profileId));
-                if (priorVersion == RESERVED_SCHEMA_VERSION_V5) {
+                if (priorVersion == SqliteSchemaMigrator.SCHEMA_VERSION_V5) {
                     assertEquals("schema_v5_external_fixture", migrationName(
-                            connection, RESERVED_SCHEMA_VERSION_V5
+                            connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
                     ));
                     assertEquals(1, scalarInt(connection, "SELECT fixture_value FROM coop_v5_integrity_marker"));
                 }
@@ -227,14 +230,13 @@ class CompanionPopulationSchemaMigrationTest {
                 migrator.migrate(connection);
 
                 assertTrue(migrator.isVersionApplied(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V6));
-                assertEquals(
-                        v5Present,
-                        migrator.isVersionApplied(connection, RESERVED_SCHEMA_VERSION_V5)
-                );
+                assertTrue(migrator.isVersionApplied(
+                        connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
+                ));
                 assertEquals(v5Present, tableExists(connection, "coop_v5_integrity_marker"));
                 if (v5Present) {
                     assertEquals("schema_v5_external_fixture", migrationName(
-                            connection, RESERVED_SCHEMA_VERSION_V5
+                            connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
                     ));
                     assertEquals(1, scalarInt(connection, "SELECT fixture_value FROM coop_v5_integrity_marker"));
                 }
@@ -275,7 +277,7 @@ class CompanionPopulationSchemaMigrationTest {
         }
         migrator.recordMigration(
                 connection,
-                RESERVED_SCHEMA_VERSION_V5,
+                SqliteSchemaMigrator.SCHEMA_VERSION_V5,
                 "schema_v5_external_fixture"
         );
     }

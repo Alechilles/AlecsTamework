@@ -29,6 +29,7 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
         FINALIZED_PRESENTATION_FAILED,
         DEDUPLICATED,
         SPAWN_FAILED,
+        SPAWN_AMBIGUOUS,
         PERSISTENCE_FAILED,
         BLOCKED
     }
@@ -72,9 +73,13 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
     }
     /** Immutable result returned by the adapter's one synchronous spawn call. */
     public record SpawnAttempt(boolean spawned,
+                               boolean ambiguous,
                                @Nullable UUID observedTargetUuid,
                                @Nullable String detail) {
         public SpawnAttempt {
+            if (spawned && ambiguous) {
+                throw new IllegalArgumentException("spawn cannot be both successful and ambiguous");
+            }
             if (spawned && observedTargetUuid == null) {
                 throw new IllegalArgumentException("spawned projection UUID is required");
             }
@@ -87,13 +92,18 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
         public static SpawnAttempt spawned(@Nonnull UUID observedTargetUuid) {
             return new SpawnAttempt(
                     true,
+                    false,
                     Objects.requireNonNull(observedTargetUuid, "observedTargetUuid"),
                     null
             );
         }
         @Nonnull
         public static SpawnAttempt failed(@Nonnull String detail) {
-            return new SpawnAttempt(false, null, requireText(detail, "detail"));
+            return new SpawnAttempt(false, false, null, requireText(detail, "detail"));
+        }
+        @Nonnull
+        public static SpawnAttempt ambiguous(@Nonnull String detail) {
+            return new SpawnAttempt(false, true, null, requireText(detail, "detail"));
         }
     }
     /** Immutable IDs queued for post-finalization world-thread re-resolution. */
@@ -126,11 +136,37 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
         @Nonnull
         SpawnAttempt spawn();
     }
+    /** Generic durable completion result for either legacy or atomic population finalization. */
+    public enum FinalizationStatus {
+        FINALIZED,
+        DEDUPLICATED,
+        FAILED
+    }
+    /** Immutable result returned by the durable release finalizer. */
+    public record Finalization(@Nonnull FinalizationStatus status,
+                               @Nullable String detail) {
+        public Finalization {
+            Objects.requireNonNull(status, "status");
+        }
+        @Nonnull
+        public static Finalization finalized(@Nullable String detail) {
+            return new Finalization(FinalizationStatus.FINALIZED, detail);
+        }
+        @Nonnull
+        public static Finalization deduplicated(@Nullable String detail) {
+            return new Finalization(FinalizationStatus.DEDUPLICATED, detail);
+        }
+        @Nonnull
+        public static Finalization failed(@Nonnull String detail) {
+            return new Finalization(FinalizationStatus.FAILED,
+                    requireText(detail, "detail"));
+        }
+    }
     /** Stable-ID persistence boundary; implementations must not retain live runtime objects. */
     @FunctionalInterface
-    public interface ProjectionFinalizer {
+    public interface DurableFinalizer {
         @Nonnull
-        CompletableFuture<ProjectionOutcome> finalizeProjection(
+        CompletableFuture<Finalization> finalizeRelease(
                 @Nonnull SpawnReady claim,
                 @Nonnull UUID actualTargetUuid,
                 long projectionRecordedAtMs);
@@ -140,7 +176,7 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
     public interface PresentationDispatcher {
         void dispatch(@Nonnull PresentationCommand command);
     }
-    private final ProjectionFinalizer finalizer;
+    private final DurableFinalizer finalizer;
     private final PresentationDispatcher presentationDispatcher;
     private final ConcurrentMap<String, SpawnReceipt> receipts = new ConcurrentHashMap<>();
     private final Set<String> presentationDispatched = ConcurrentHashMap.newKeySet();
@@ -155,7 +191,7 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
     }
 
     ManagedCoopReleaseSpawnOrchestrator(
-            @Nonnull ProjectionFinalizer finalizer,
+            @Nonnull DurableFinalizer finalizer,
             @Nonnull PresentationDispatcher presentationDispatcher) {
         this.finalizer = Objects.requireNonNull(finalizer, "finalizer");
         this.presentationDispatcher = Objects.requireNonNull(
@@ -172,9 +208,24 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
             @Nonnull Admission admission,
             @Nonnull SpawnAction spawnAction,
             long projectionRecordedAtMs) {
+        return coordinate(claim, admission, spawnAction, finalizer, projectionRecordedAtMs);
+    }
+
+    /**
+     * Uses a caller-supplied atomic finalizer for one release. This is the managed population path;
+     * it prevents the legacy projection coordinator from becoming a second commit authority.
+     */
+    @Nonnull
+    public CompletableFuture<Outcome> coordinate(
+            @Nonnull SpawnReady claim,
+            @Nonnull Admission admission,
+            @Nonnull SpawnAction spawnAction,
+            @Nonnull DurableFinalizer durableFinalizer,
+            long projectionRecordedAtMs) {
         Objects.requireNonNull(claim, "claim");
         Objects.requireNonNull(admission, "admission");
         Objects.requireNonNull(spawnAction, "spawnAction");
+        Objects.requireNonNull(durableFinalizer, "durableFinalizer");
         ClaimFingerprint fingerprint;
         try {
             fingerprint = validateClaim(claim);
@@ -198,9 +249,9 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
                 selection.actualTargetUuid(),
                 selection.spawnedThisAttempt()
         );
-        final CompletableFuture<ProjectionOutcome> completion;
+        final CompletableFuture<Finalization> completion;
         try {
-            completion = finalizer.finalizeProjection(
+            completion = durableFinalizer.finalizeRelease(
                     claim, context.actualTargetUuid(), projectionRecordedAtMs);
         } catch (RuntimeException exception) {
             return completed(Status.PERSISTENCE_FAILED, context.actualTargetUuid(),
@@ -218,6 +269,10 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
     @Nonnull
     CompletableFuture<Outcome> rejected(@Nonnull String detail) {
         return completed(Status.BLOCKED, null, false, false, detail);
+    }
+    @Nonnull
+    CompletableFuture<Outcome> ambiguous(@Nonnull String detail) {
+        return completed(Status.SPAWN_AMBIGUOUS, null, false, false, detail);
     }
     @Nonnull
     private SpawnSelection selectProjection(SpawnReady claim,
@@ -289,6 +344,10 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
             receipts.remove(claim.operationId(), reservation);
             return SpawnSelection.spawnFailed(failureDetail("projection_spawn", exception));
         }
+        if (attempt != null && attempt.ambiguous()) {
+            return SpawnSelection.ambiguous(
+                    attempt.detail() != null ? attempt.detail() : "projection_spawn_ambiguous");
+        }
         if (attempt == null || !attempt.spawned() || attempt.observedTargetUuid() == null) {
             receipts.remove(claim.operationId(), reservation);
             String detail = attempt != null ? attempt.detail() : null;
@@ -301,7 +360,7 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
             if (!receipts.replace(claim.operationId(), reservation, mismatch)) {
                 return SpawnSelection.blocked("spawn_receipt_publish_conflict");
             }
-            return SpawnSelection.spawnFailed("spawned_projection_uuid_does_not_match_plan");
+            return SpawnSelection.ambiguous("spawned_projection_uuid_does_not_match_plan");
         }
         SpawnReceipt completed = new SpawnReceipt(
                 reservation.fingerprint(), attempt.observedTargetUuid());
@@ -312,7 +371,7 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
     }
     @Nonnull
     private Outcome completeProjection(CompletionContext context,
-                                       @Nullable ProjectionOutcome outcome,
+                                       @Nullable Finalization outcome,
                                        @Nullable Throwable failure) {
         if (failure != null) {
             return outcome(Status.PERSISTENCE_FAILED, context, false,
@@ -322,11 +381,10 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
             return outcome(Status.PERSISTENCE_FAILED, context, false,
                     "projection_finalization_outcome_missing");
         }
-        if (outcome.status() == OutcomeStatus.DEDUPLICATED) {
+        if (outcome.status() == FinalizationStatus.DEDUPLICATED) {
             return outcome(Status.DEDUPLICATED, context, false, outcome.detail());
         }
-        if (!outcome.finalized()
-                || !matchesFinalized(context, outcome.finalizedProjection())) {
+        if (outcome.status() != FinalizationStatus.FINALIZED) {
             String detail = outcome.detail() != null
                     ? outcome.detail() : "projection_finalization_rejected";
             return outcome(Status.PERSISTENCE_FAILED, context, false, detail);
@@ -364,9 +422,9 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
         }
     }
 
-    private boolean matchesFinalized(CompletionContext context,
-                                     @Nullable FinalizedProjection finalized) {
-        SpawnReady claim = context.claim();
+    private static boolean matchesFinalized(SpawnReady claim,
+                                            UUID actualTargetUuid,
+                                            @Nullable FinalizedProjection finalized) {
         return finalized != null
                 && claim.operationId().equals(finalized.operationId())
                 && claim.profileId().equals(finalized.profileId())
@@ -376,7 +434,7 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
                 && claim.residentSlot() == finalized.residentSlot()
                 && claim.sourceNpcUuid().equals(finalized.sourceNpcUuid())
                 && claim.plannedTargetUuid().equals(finalized.plannedTargetUuid())
-                && context.actualTargetUuid().equals(finalized.actualTargetUuid())
+                && actualTargetUuid.equals(finalized.actualTargetUuid())
                 && claim.snapshotHash().equals(finalized.snapshotHash())
                 && claim.expectedResidentGeneration() == finalized.expectedResidentGeneration();
     }
@@ -454,11 +512,31 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
     }
 
     @Nonnull
-    private static ProjectionFinalizer coordinatorFinalizer(
+    private static DurableFinalizer coordinatorFinalizer(
             @Nonnull ManagedCoopReleaseProjectionCoordinator coordinator) {
         Objects.requireNonNull(coordinator, "coordinator");
         return (claim, actualTargetUuid, recordedAtMs) -> coordinator.coordinate(
-                new ProjectionAttempt(claim, actualTargetUuid, recordedAtMs));
+                new ProjectionAttempt(claim, actualTargetUuid, recordedAtMs))
+                .thenApply(outcome -> legacyFinalization(claim, actualTargetUuid, outcome));
+    }
+
+    @Nonnull
+    private static Finalization legacyFinalization(
+            @Nonnull SpawnReady claim,
+            @Nonnull UUID actualTargetUuid,
+            @Nullable ProjectionOutcome outcome) {
+        if (outcome == null) {
+            return Finalization.failed("projection_finalization_outcome_missing");
+        }
+        if (outcome.status() == OutcomeStatus.DEDUPLICATED) {
+            return Finalization.deduplicated(outcome.detail());
+        }
+        if (outcome.status() == OutcomeStatus.FINALIZED
+                && matchesFinalized(claim, actualTargetUuid, outcome.finalizedProjection())) {
+            return Finalization.finalized(outcome.detail());
+        }
+        return Finalization.failed(outcome.detail() != null
+                ? outcome.detail() : "projection_finalization_rejected");
     }
 
     private record ClaimFingerprint(String profileId,
@@ -503,6 +581,10 @@ public final class ManagedCoopReleaseSpawnOrchestrator {
 
         static SpawnSelection spawnFailed(String detail) {
             return new SpawnSelection(Status.SPAWN_FAILED, null, false, detail);
+        }
+
+        static SpawnSelection ambiguous(String detail) {
+            return new SpawnSelection(Status.SPAWN_AMBIGUOUS, null, false, detail);
         }
     }
 }

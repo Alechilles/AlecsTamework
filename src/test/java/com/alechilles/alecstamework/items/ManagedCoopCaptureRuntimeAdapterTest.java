@@ -48,7 +48,8 @@ class ManagedCoopCaptureRuntimeAdapterTest {
         ManagedCoopContext context = context();
         ManagedCoopCaptureRuntimeAdapter.Candidate candidate =
                 new ManagedCoopCaptureRuntimeAdapter.Candidate(
-                        SOURCE, "Mob_Chicken", null, "Chicken", new String[]{"tool-a"}, "profile-a");
+                        SOURCE, "Mob_Chicken", 1.0, 1.0,
+                        null, "Chicken", new String[]{"tool-a"}, "profile-a");
         CoopResidentStateSnapshot snapshot = snapshot("coop_chicken", 0, "mob_chicken");
         ManagedCoopCaptureRuntimeAdapter adapter = adapter();
 
@@ -73,7 +74,7 @@ class ManagedCoopCaptureRuntimeAdapterTest {
         String[] tools = {"tool-a"};
         ManagedCoopCaptureRuntimeAdapter.Candidate candidate =
                 new ManagedCoopCaptureRuntimeAdapter.Candidate(
-                        SOURCE, "mob_chicken", null, null, tools, null);
+                        SOURCE, "mob_chicken", 1.0, 1.0, null, null, tools, null);
         tools[0] = "mutated";
         CaptureAttempt attempt = adapter().buildAttempt(
                 context(), placement(0, 0L), candidate, snapshot("coop_chicken", 0, "mob_chicken"));
@@ -88,7 +89,8 @@ class ManagedCoopCaptureRuntimeAdapterTest {
     void recaptureAttemptCarriesCommittedResidentGeneration() throws Exception {
         ManagedCoopCaptureRuntimeAdapter.Candidate candidate =
                 new ManagedCoopCaptureRuntimeAdapter.Candidate(
-                        SOURCE, "mob_chicken", null, null, new String[0], "profile-a");
+                        SOURCE, "mob_chicken", 1.0, 1.0,
+                        null, null, new String[0], "profile-a");
 
         CaptureAttempt attempt = adapter().buildAttempt(
                 context(),
@@ -105,7 +107,8 @@ class ManagedCoopCaptureRuntimeAdapterTest {
         ManagedCoopCaptureRuntimeAdapter adapter = adapter();
         ManagedCoopCaptureRuntimeAdapter.Candidate candidate =
                 new ManagedCoopCaptureRuntimeAdapter.Candidate(
-                        SOURCE, "mob_chicken", null, null, new String[0], null);
+                        SOURCE, "mob_chicken", 1.0, 1.0,
+                        null, null, new String[0], null);
 
         assertThrows(IllegalArgumentException.class, () -> adapter.buildAttempt(
                 context(), placement(0, 0L), candidate,

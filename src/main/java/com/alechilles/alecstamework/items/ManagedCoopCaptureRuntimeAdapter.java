@@ -10,8 +10,11 @@ import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationServi
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus;
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.SnapshotHandoff;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
+import com.alechilles.alecstamework.ownership.CoopPopulationCaptureAdmissionService.SourceKind;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 import java.util.Objects;
@@ -31,6 +34,8 @@ public final class ManagedCoopCaptureRuntimeAdapter {
     /** Immutable live identity copied before the persistence boundary. */
     public record Candidate(@Nonnull UUID sourceNpcUuid,
                             @Nonnull String roleId,
+                            double sourceX,
+                            double sourceZ,
                             @Nullable UUID ownerUuid,
                             @Nullable String displayName,
                             @Nonnull String[] toolIds,
@@ -38,6 +43,9 @@ public final class ManagedCoopCaptureRuntimeAdapter {
         public Candidate {
             Objects.requireNonNull(sourceNpcUuid, "sourceNpcUuid");
             roleId = requireText(roleId, "roleId");
+            if (!Double.isFinite(sourceX) || !Double.isFinite(sourceZ)) {
+                throw new IllegalArgumentException("source coordinates must be finite");
+            }
             toolIds = toolIds == null ? new String[0] : toolIds.clone();
             stableProfileId = normalizeOptional(stableProfileId);
         }
@@ -161,6 +169,13 @@ public final class ManagedCoopCaptureRuntimeAdapter {
                 candidate.ownerUuid(),
                 candidate.displayName(),
                 candidate.toolIds(),
+                SourceKind.LIVE_ENTITY,
+                new ClaimChunkCoordinate(
+                        context.worldName(),
+                        ChunkUtil.chunkCoordinate((int) Math.floor(candidate.sourceX())),
+                        ChunkUtil.chunkCoordinate((int) Math.floor(candidate.sourceZ()))
+                ),
+                candidate.ownerUuid() == null && candidate.stableProfileId() == null,
                 snapshotJson,
                 snapshotHash,
                 Integer.parseInt(CoopResidentStateSnapshotCodec.CURRENT_VERSION),

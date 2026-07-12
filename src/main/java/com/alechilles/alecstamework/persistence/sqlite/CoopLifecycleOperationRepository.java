@@ -93,6 +93,22 @@ public final class CoopLifecycleOperationRepository {
                                  long nowMs) {
     }
 
+    /** Exact release evidence required by the canonical population commit boundary. */
+    public record PopulationReleaseCommitRequest(
+            @Nonnull String operationId,
+            @Nonnull String residentId,
+            @Nonnull ManagedCoopAuthorityKey authorityKey,
+            @Nonnull String coopId,
+            int residentSlot,
+            @Nonnull String profileId,
+            @Nonnull UUID plannedTargetUuid,
+            @Nonnull UUID actualTargetUuid,
+            @Nullable String snapshotHash,
+            long expectedResidentGeneration,
+            long expectedOperationGeneration,
+            long nowMs) {
+    }
+
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
     private final CoopLifecycleOperationTransactions transactions;
@@ -123,6 +139,12 @@ public final class CoopLifecycleOperationRepository {
             @Nonnull CaptureRequest request) {
         ManagedCoopCaptureClaimValidator.validate(request);
         return submit("coop_capture_claim", connection -> transactions.claimCapture(connection, request));
+    }
+
+    MutationResult claimCaptureInTransaction(@Nonnull Connection connection,
+                                             @Nonnull CaptureRequest request) throws SQLException {
+        ManagedCoopCaptureClaimValidator.validate(request);
+        return transactions.claimCapture(connection, request);
     }
 
     @Nonnull
@@ -176,6 +198,20 @@ public final class CoopLifecycleOperationRepository {
                         expectedOperationGeneration, false, nowMs));
     }
 
+    /**
+     * Restores a resident and terminates its release after definitive proof no spawn occurred.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> failReleaseBeforeProjection(
+            @Nonnull String operationId,
+            long expectedOperationGeneration,
+            @Nonnull String error,
+            long nowMs) {
+        return submit("coop_release_fail_before_projection",
+                connection -> transactions.failReleaseBeforeProjection(
+                        connection, operationId, expectedOperationGeneration, error, nowMs));
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> markProjectionCreated(
             @Nonnull String operationId,
@@ -195,6 +231,12 @@ public final class CoopLifecycleOperationRepository {
         return submit("coop_release_finalize",
                 connection -> transactions.finalizeRelease(
                         connection, operationId, expectedOperationGeneration, nowMs));
+    }
+
+    MutationResult commitPopulationReleaseInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull PopulationReleaseCommitRequest request) throws SQLException {
+        return transactions.commitPopulationRelease(connection, request);
     }
 
     @Nullable

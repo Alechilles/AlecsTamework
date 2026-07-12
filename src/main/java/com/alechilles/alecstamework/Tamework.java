@@ -880,6 +880,7 @@ public class Tamework extends JavaPlugin {
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
         managedCoopRuntime = new ManagedCoopRuntimeComposition(
                 persistenceRuntime,
+                ownerPopulationRuntime,
                 coopResidentStateSnapshotService,
                 commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex(),
                 projectionIdentityComponentType

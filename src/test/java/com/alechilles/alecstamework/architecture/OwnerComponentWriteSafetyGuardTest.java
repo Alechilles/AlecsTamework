@@ -25,6 +25,10 @@ class OwnerComponentWriteSafetyGuardTest {
             "com/alechilles/alecstamework/npc/components/TameworkOwnerComponent.java";
     private static final String MUTATION_SERVICE_PATH =
             "com/alechilles/alecstamework/ownership/OwnerComponentMutationService.java";
+    // Serializer-only helper: its putComponent(payload, ...) method writes a detached JSON object,
+    // never an EntityStore/Holder/CommandBuffer, so the lexical mutation matcher must ignore it.
+    private static final String SNAPSHOT_CODEC_PATH =
+            "com/alechilles/alecstamework/items/CoopResidentStateSnapshotCodec.java";
     private static final Pattern COMPONENT_TYPE_VARIABLE = Pattern.compile(
             "ComponentType\\s*<\\s*EntityStore\\s*,\\s*([A-Za-z_$.][A-Za-z0-9_$.]*)\\s*>\\s+"
                     + "([A-Za-z_$][A-Za-z0-9_$]*)"
@@ -43,7 +47,9 @@ class OwnerComponentWriteSafetyGuardTest {
         List<String> violations = new ArrayList<>();
         for (Path sourceFile : listJavaFiles()) {
             String relativePath = toUnixRelativePath(sourceFile);
-            if (OWNER_COMPONENT_PATH.equals(relativePath) || MUTATION_SERVICE_PATH.equals(relativePath)) {
+            if (OWNER_COMPONENT_PATH.equals(relativePath)
+                    || MUTATION_SERVICE_PATH.equals(relativePath)
+                    || SNAPSHOT_CODEC_PATH.equals(relativePath)) {
                 continue;
             }
 

@@ -146,6 +146,40 @@ final class ManagedCoopResidentTransactions {
         return result(MutationStatus.APPLIED, loadById(connection, residentId), null);
     }
 
+    /** Restores a release only after the caller has definitive proof no projection was created. */
+    MutationResult cancelReleaseBeforeProjection(Connection connection,
+                                                  String residentId,
+                                                  long expectedGeneration,
+                                                  UUID plannedTargetUuid,
+                                                  long nowMs) throws SQLException {
+        ResidentRecord resident = loadById(connection, residentId);
+        if (resident == null || !resident.active()) {
+            return result(MutationStatus.NOT_FOUND, resident, "active_resident_not_found");
+        }
+        if (resident.state() == ResidentState.HOUSED
+                && resident.generation() == expectedGeneration + 2L
+                && !uuidClaims.hasActive(
+                        connection, residentId, plannedTargetUuid, "PLANNED")) {
+            return result(MutationStatus.IDEMPOTENT, resident, null);
+        }
+        if (resident.state() != ResidentState.RELEASING
+                || resident.generation() != expectedGeneration + 1L
+                || !uuidClaims.hasActive(
+                        connection, residentId, plannedTargetUuid, "PLANNED")) {
+            return result(MutationStatus.CONFLICT, resident, "release_cancel_precondition_conflict");
+        }
+        updateState(
+                connection,
+                residentId,
+                ResidentState.RELEASING,
+                expectedGeneration + 1L,
+                ResidentState.HOUSED,
+                nowMs
+        );
+        uuidClaims.deactivateKind(connection, residentId, "PLANNED", nowMs);
+        return result(MutationStatus.APPLIED, loadById(connection, residentId), null);
+    }
+
     MutationResult reserveProjectionUuid(Connection connection,
                                          String residentId,
                                          UUID targetUuid,

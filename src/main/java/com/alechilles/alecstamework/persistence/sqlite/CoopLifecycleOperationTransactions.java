@@ -16,6 +16,7 @@ import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOpera
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationKind;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationRecord;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
+import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationReleaseCommitRequest;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.ReleaseRequest;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRules.deployedCaptureMatches;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRules.deployedResidentMatches;
@@ -212,7 +213,8 @@ final class CoopLifecycleOperationTransactions {
             return conflict(operation, "operation_state_or_generation_conflict");
         }
         ResidentRecord resident = residentForOperation(connection, operation);
-        String conflict = projectionPrecondition(connection, operation, resident, actualTargetUuid);
+        String conflict = projectionPrecondition(
+                connection, operation, resident, actualTargetUuid, false);
         if (conflict != null) {
             return conflict(operation, conflict);
         }
@@ -227,6 +229,73 @@ final class CoopLifecycleOperationTransactions {
             throw new SQLException("projection_operation_generation_changed_after_uuid_reservation");
         }
         return applied(requireOperation(connection, operationId));
+    }
+
+    MutationResult failReleaseBeforeProjection(Connection connection,
+                                                String operationId,
+                                                long expectedOperationGeneration,
+                                                String error,
+                                                long nowMs) throws SQLException {
+        validateGeneration(expectedOperationGeneration);
+        String normalizedError = requireText(error, "error");
+        OperationRecord operation = store.load(
+                connection, requireText(operationId, "operationId")
+        );
+        if (operation == null) {
+            return notFound("release_operation_not_found");
+        }
+        ResidentRecord resident = residentForOperation(connection, operation);
+        if (operation.kind() == OperationKind.RELEASE
+                && operation.state() == OperationState.FAILED
+                && !operation.active()
+                && operation.generation() == expectedOperationGeneration + 1L
+                && operation.actualTargetUuid() == null
+                && resident != null
+                && resident.state() == ResidentState.HOUSED
+                && resident.generation() == operation.expectedResidentGeneration() + 2L) {
+            return idempotent(operation);
+        }
+        if (operation.kind() != OperationKind.RELEASE
+                || (operation.state() != OperationState.PREPARED
+                    && operation.state() != OperationState.SPAWN_CLAIMED)
+                || !operation.active()
+                || operation.generation() != expectedOperationGeneration
+                || operation.actualTargetUuid() != null
+                || operation.plannedTargetUuid() == null
+                || !releasingResidentMatches(operation, resident)) {
+            return conflict(operation, "release_cancel_operation_state_conflict");
+        }
+
+        Savepoint rollbackBoundary = connection.setSavepoint();
+        ManagedCoopResidentRepository.MutationResult restored =
+                residents.cancelReleaseBeforeProjectionInTransaction(
+                        connection,
+                        resident.residentId(),
+                        operation.expectedResidentGeneration(),
+                        operation.plannedTargetUuid(),
+                        nowMs
+                );
+        if (!restored.succeeded()) {
+            connection.rollback(rollbackBoundary);
+            connection.releaseSavepoint(rollbackBoundary);
+            return conflict(operation, restored.detail());
+        }
+        if (!store.failReleaseBeforeProjection(
+                connection,
+                operation.operationId(),
+                operation.state(),
+                expectedOperationGeneration,
+                normalizedError,
+                nowMs)) {
+            connection.rollback(rollbackBoundary);
+            connection.releaseSavepoint(rollbackBoundary);
+            return conflict(
+                    requireOperation(connection, operation.operationId()),
+                    "release_cancel_operation_cas_conflict"
+            );
+        }
+        connection.releaseSavepoint(rollbackBoundary);
+        return applied(requireOperation(connection, operation.operationId()));
     }
 
     MutationResult finalizeRelease(Connection connection,
@@ -269,6 +338,103 @@ final class CoopLifecycleOperationTransactions {
                 OperationState.PROJECTION_CREATED, OperationState.FINALIZED,
                 expectedOperationGeneration, true, nowMs)) {
             throw new SQLException("release_operation_generation_changed_after_resident_deployment");
+        }
+        return applied(requireOperation(connection, operationId));
+    }
+
+    /**
+     * Marks and finalizes one exact projection within the enclosing population transaction.
+     */
+    MutationResult commitPopulationRelease(Connection connection,
+                                           PopulationReleaseCommitRequest request) throws SQLException {
+        Objects.requireNonNull(request, "request");
+        validateGeneration(request.expectedResidentGeneration());
+        validateGeneration(request.expectedOperationGeneration());
+        if (request.expectedResidentGeneration() > Long.MAX_VALUE - 2L
+                || request.expectedOperationGeneration() > Long.MAX_VALUE - 2L) {
+            throw new IllegalArgumentException("release generations cannot advance safely");
+        }
+        Objects.requireNonNull(request.authorityKey(), "authorityKey");
+        Objects.requireNonNull(request.plannedTargetUuid(), "plannedTargetUuid");
+        Objects.requireNonNull(request.actualTargetUuid(), "actualTargetUuid");
+        if (!request.plannedTargetUuid().equals(request.actualTargetUuid())) {
+            return conflict(null, "release_projection_not_exact_planned_uuid");
+        }
+        OperationRecord existing = store.load(
+                connection, requireText(request.operationId(), "operationId")
+        );
+        String conflict = populationReleasePrecondition(connection, request, existing);
+        if (conflict != null) {
+            return conflict(existing, conflict);
+        }
+
+        Savepoint releaseBoundary = connection.setSavepoint();
+        MutationResult marked = markProjectionCreatedForPopulationCommit(
+                connection,
+                request.operationId(),
+                request.expectedOperationGeneration(),
+                request.actualTargetUuid(),
+                request.nowMs()
+        );
+        if (!marked.succeeded() || marked.operation() == null) {
+            connection.rollback(releaseBoundary);
+            connection.releaseSavepoint(releaseBoundary);
+            return marked;
+        }
+        MutationResult finalized = finalizeRelease(
+                connection,
+                request.operationId(),
+                marked.operation().generation(),
+                request.nowMs()
+        );
+        if (!finalized.succeeded()) {
+            connection.rollback(releaseBoundary);
+            connection.releaseSavepoint(releaseBoundary);
+            return new MutationResult(finalized.status(), null, finalized.detail());
+        }
+        connection.releaseSavepoint(releaseBoundary);
+        return finalized;
+    }
+
+    private MutationResult markProjectionCreatedForPopulationCommit(
+            Connection connection,
+            String operationId,
+            long expectedOperationGeneration,
+            UUID actualTargetUuid,
+            long nowMs) throws SQLException {
+        validateGeneration(expectedOperationGeneration);
+        OperationRecord operation = store.load(connection, requireText(operationId, "operationId"));
+        if (operation == null) {
+            return notFound("release_operation_not_found");
+        }
+        if (operation.kind() != OperationKind.RELEASE) {
+            return conflict(operation, "operation_kind_conflict");
+        }
+        if (operation.state() == OperationState.PROJECTION_CREATED
+                || operation.state() == OperationState.FINALIZED) {
+            return actualTargetUuid.equals(operation.actualTargetUuid())
+                    ? idempotent(operation)
+                    : conflict(operation, "projection_uuid_conflict");
+        }
+        if (!operation.active() || operation.state() != OperationState.SPAWN_CLAIMED
+                || operation.generation() != expectedOperationGeneration) {
+            return conflict(operation, "operation_state_or_generation_conflict");
+        }
+        ResidentRecord resident = residentForOperation(connection, operation);
+        String conflict = projectionPrecondition(
+                connection, operation, resident, actualTargetUuid, true);
+        if (conflict != null) {
+            return conflict(operation, conflict);
+        }
+        ManagedCoopResidentRepository.MutationResult reservation =
+                residents.reserveProjectionUuidInTransaction(
+                        connection, resident.residentId(), actualTargetUuid, nowMs);
+        if (!reservation.succeeded()) {
+            return conflict(operation, reservation.detail());
+        }
+        if (!store.markProjectionCreated(
+                connection, operationId, expectedOperationGeneration, actualTargetUuid, nowMs)) {
+            throw new SQLException("projection_operation_generation_changed_after_uuid_reservation");
         }
         return applied(requireOperation(connection, operationId));
     }
@@ -426,14 +592,18 @@ final class CoopLifecycleOperationTransactions {
     private String projectionPrecondition(Connection connection,
                                           OperationRecord operation,
                                           @Nullable ResidentRecord resident,
-                                          UUID actualTargetUuid) throws SQLException {
+                                          UUID actualTargetUuid,
+                                          boolean populationCommit) throws SQLException {
         if (!releasingResidentMatches(operation, resident)) {
             return "releasing_resident_state_conflict";
         }
         if (store.hasUuidClaimConflict(connection, resident.residentId(), actualTargetUuid)
                 || store.hasResidentUuidConflict(
                         connection, resident.residentId(), actualTargetUuid)
-                || store.uuidHasProfileMapping(connection, actualTargetUuid)
+                || (populationCommit
+                    ? !store.uuidMapsExclusivelyToProfile(
+                            connection, actualTargetUuid, operation.profileId())
+                    : store.uuidHasProfileMapping(connection, actualTargetUuid))
                 || store.findTargetConflict(connection, operation.operationId(), actualTargetUuid) != null
                 || store.hasRecoveryTargetConflict(connection, actualTargetUuid)) {
             return "projection_target_uuid_conflict";
@@ -447,6 +617,61 @@ final class CoopLifecycleOperationTransactions {
             return deployedResidentMatches(operation, resident);
         }
         return releasingResidentMatches(operation, resident);
+    }
+
+    @Nullable
+    private String populationReleasePrecondition(
+            Connection connection,
+            PopulationReleaseCommitRequest request,
+            @Nullable OperationRecord operation) throws SQLException {
+        if (operation == null) {
+            return "release_operation_not_found";
+        }
+        if (operation.kind() != OperationKind.RELEASE
+                || !operation.operationId().equals(request.operationId())
+                || !operation.profileId().equals(request.profileId())
+                || !operation.authorityKey().equals(request.authorityKey())
+                || !operation.coopId().equalsIgnoreCase(request.coopId())
+                || operation.residentSlot() != request.residentSlot()
+                || !Objects.equals(operation.plannedTargetUuid(), request.plannedTargetUuid())
+                || !Objects.equals(operation.snapshotHash(), request.snapshotHash())
+                || operation.expectedResidentGeneration() != request.expectedResidentGeneration()) {
+            return "release_operation_identity_conflict";
+        }
+        long requiredGeneration;
+        boolean requiredActive;
+        switch (operation.state()) {
+            case SPAWN_CLAIMED -> {
+                requiredGeneration = request.expectedOperationGeneration();
+                requiredActive = true;
+            }
+            case PROJECTION_CREATED -> {
+                requiredGeneration = request.expectedOperationGeneration() + 1L;
+                requiredActive = true;
+            }
+            case FINALIZED -> {
+                requiredGeneration = request.expectedOperationGeneration() + 2L;
+                requiredActive = false;
+            }
+            default -> {
+                return "release_operation_state_conflict";
+            }
+        }
+        if (operation.generation() != requiredGeneration || operation.active() != requiredActive) {
+            return "release_operation_generation_conflict";
+        }
+        if (operation.actualTargetUuid() != null
+                && !operation.actualTargetUuid().equals(request.actualTargetUuid())) {
+            return "projection_uuid_conflict";
+        }
+        ResidentRecord resident = residentForOperation(connection, operation);
+        if (resident == null || !resident.residentId().equals(request.residentId())) {
+            return "release_resident_identity_conflict";
+        }
+        boolean residentMatches = operation.state() == OperationState.FINALIZED
+                ? deployedResidentMatches(operation, resident)
+                : releasingResidentMatches(operation, resident);
+        return residentMatches ? null : "release_resident_state_conflict";
     }
 
     @Nullable

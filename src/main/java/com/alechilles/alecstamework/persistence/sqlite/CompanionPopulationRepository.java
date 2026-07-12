@@ -23,14 +23,29 @@ import static com.alechilles.alecstamework.persistence.sqlite.CompanionPopulatio
 public final class CompanionPopulationRepository {
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
-    private final CoopLedgerRepository coopLedgerRepository;
+    private final CoopLifecycleOperationRepository coopLifecycleRepository;
     private final CompanionPopulationJournalStore journalStore;
 
     public CompanionPopulationRepository(@Nonnull SqliteConnectionManager connectionManager,
                                          @Nonnull PersistenceWriteQueue writeQueue) {
+        this(
+                connectionManager,
+                writeQueue,
+                new CoopLifecycleOperationRepository(
+                        connectionManager,
+                        writeQueue,
+                        new ManagedCoopResidentRepository(connectionManager, writeQueue)
+                )
+        );
+    }
+
+    public CompanionPopulationRepository(
+            @Nonnull SqliteConnectionManager connectionManager,
+            @Nonnull PersistenceWriteQueue writeQueue,
+            @Nonnull CoopLifecycleOperationRepository coopLifecycleRepository) {
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
-        this.coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue);
+        this.coopLifecycleRepository = coopLifecycleRepository;
         this.journalStore = new CompanionPopulationJournalStore(connectionManager);
     }
 
@@ -205,8 +220,8 @@ public final class CompanionPopulationRepository {
 
         updateProfile(connection, request);
         updatePopulationState(connection, request);
-        CompanionPopulationCoopLedgerMutation.applyIfPresent(
-                connection, coopLedgerRepository, operation.targetContextJson()
+        CompanionPopulationManagedCoopMutation.applyIfPresent(
+                connection, coopLifecycleRepository, operation.targetContextJson()
         );
         if (sourceFinalizationRequired) {
             journalStore.markApplied(connection, request.operationId());

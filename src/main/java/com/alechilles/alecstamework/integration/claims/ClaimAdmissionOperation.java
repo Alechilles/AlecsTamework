@@ -9,6 +9,7 @@ public enum ClaimAdmissionOperation {
     BREED,
     SPAWNER_RELEASE,
     SPAWN_AND_ASSIGN_OWNER,
+    COOP_CAPTURE,
     COOP_RELEASE,
     RECALL,
     TELEPORT,

@@ -16,7 +16,6 @@ class ProfileOwnershipWriteSafetyGuardTest {
     void snapshotServicesUseOwnershipNeutralProfileUpserts() throws Exception {
         for (String file : List.of(
                 "CommandLinkedNpcCaptureService.java",
-                "CommandLinkedNpcCoopService.java",
                 "CommandLinkedNpcStateSnapshotService.java"
         )) {
             String source = Files.readString(MAIN.resolve("items").resolve(file));
@@ -32,6 +31,20 @@ class ProfileOwnershipWriteSafetyGuardTest {
         assertTrue(deathWriter.contains("profileRepository.upsertSnapshotAsync("));
         assertFalse(deathWriter.contains("profileRepository.upsertAsync("));
         assertTrue(deathService.contains("profileWriter.enqueue("));
+
+        String managedFacade = Files.readString(
+                MAIN.resolve("items").resolve("CommandLinkedNpcCoopService.java")
+        );
+        assertFalse(managedFacade.contains("upsertProfileInTransaction("));
+        assertFalse(managedFacade.contains("upsertSnapshotAsync("));
+        assertFalse(managedFacade.contains("upsertAsync("));
+
+        String managedCaptureProfile = Files.readString(
+                MAIN.resolve("persistence").resolve("sqlite")
+                        .resolve("ManagedCoopCaptureProfileRepository.java")
+        );
+        assertTrue(managedCaptureProfile.contains("ProfileOwnerMutation.unchanged()"));
+        assertFalse(managedCaptureProfile.contains("profiles.upsertAsync("));
     }
 
     @Test

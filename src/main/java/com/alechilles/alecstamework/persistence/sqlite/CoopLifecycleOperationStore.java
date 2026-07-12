@@ -163,6 +163,29 @@ final class CoopLifecycleOperationStore {
         }
     }
 
+    boolean uuidMapsExclusivelyToProfile(Connection connection,
+                                         UUID npcUuid,
+                                         String profileId) throws SQLException {
+        boolean found = false;
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT profile_id FROM npc_uuid_aliases WHERE npc_uuid = ?
+                UNION
+                SELECT profile_id FROM npc_profiles WHERE current_npc_uuid = ?
+                """)) {
+            statement.setString(1, npcUuid.toString());
+            statement.setString(2, npcUuid.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    found = true;
+                    if (!profileId.equals(resultSet.getString(1))) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return found;
+    }
+
     boolean authorityIsManaged(Connection connection,
                                ManagedCoopAuthorityKey key,
                                String coopId) throws SQLException {
@@ -274,6 +297,29 @@ final class CoopLifecycleOperationStore {
             statement.setLong(2, nowMs);
             statement.setString(3, operationId);
             statement.setLong(4, expectedGeneration);
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    boolean failReleaseBeforeProjection(Connection connection,
+                                        String operationId,
+                                        OperationState expectedState,
+                                        long expectedGeneration,
+                                        String error,
+                                        long nowMs) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE coop_lifecycle_operations
+                SET state = 'FAILED', generation = generation + 1, active = 0,
+                    updated_at_ms = ?, completed_at_ms = ?, last_error = ?
+                WHERE operation_id = ? AND operation_kind = 'RELEASE' AND state = ?
+                  AND actual_target_uuid IS NULL AND active = 1 AND generation = ?
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setLong(2, nowMs);
+            statement.setString(3, error);
+            statement.setString(4, operationId);
+            statement.setString(5, expectedState.name());
+            statement.setLong(6, expectedGeneration);
             return statement.executeUpdate() == 1;
         }
     }

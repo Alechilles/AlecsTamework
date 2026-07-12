@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureProfileRepository.ProfileIdentity;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
+import com.alechilles.alecstamework.ownership.CoopPopulationCaptureAdmissionService.SourceKind;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -77,7 +80,8 @@ class ManagedCoopCaptureCoordinatorTest {
             return refreshed(call == 1 ? 7L : 8L);
         };
         ManagedCoopCaptureCoordinator coordinator =
-                new ManagedCoopCaptureCoordinator(profiles, operations, refresh, () -> 900L);
+                new ManagedCoopCaptureCoordinator(
+                        profiles, operations, operations, refresh, () -> 900L);
 
         String[] toolIds = {"tool-a"};
         ManagedCoopCaptureCoordinator.CaptureAttempt attempt = attempt(SOURCE_A, toolIds);
@@ -131,6 +135,7 @@ class ManagedCoopCaptureCoordinatorTest {
         ManagedCoopCaptureCoordinator coordinator = new ManagedCoopCaptureCoordinator(
                 profiles,
                 operations,
+                operations,
                 () -> refreshed(1L),
                 () -> 200L
         );
@@ -166,6 +171,7 @@ class ManagedCoopCaptureCoordinatorTest {
         };
         ManagedCoopCaptureCoordinator coordinator = new ManagedCoopCaptureCoordinator(
                 profiles,
+                operations,
                 operations,
                 () -> refreshed(1L),
                 () -> 200L
@@ -232,6 +238,7 @@ class ManagedCoopCaptureCoordinatorTest {
         };
         ManagedCoopCaptureCoordinator rejectedProfile = new ManagedCoopCaptureCoordinator(
                 seed -> rejectedSubmission("profile_queue_closed"),
+                operations,
                 operations,
                 () -> {
                     refreshCalls.incrementAndGet();
@@ -362,6 +369,7 @@ class ManagedCoopCaptureCoordinatorTest {
         return new ManagedCoopCaptureCoordinator(
                 seed -> completedSubmission(new ProfileIdentity(profileId, sourceUuid)),
                 operations,
+                operations,
                 refresh,
                 () -> 200L
         );
@@ -392,6 +400,9 @@ class ManagedCoopCaptureCoordinatorTest {
                 null,
                 "Chicken",
                 toolIds,
+                SourceKind.LIVE_ENTITY,
+                new ClaimChunkCoordinate("world", 0, 0),
+                false,
                 snapshot,
                 ManagedCoopCaptureClaimValidator.snapshotSha256(snapshot),
                 1,
@@ -476,17 +487,30 @@ class ManagedCoopCaptureCoordinatorTest {
                 PersistenceWriteQueue.WriteStatus.COMMITTED, value, null, null);
     }
 
-    private static final class FakeOperations implements ManagedCoopCaptureCoordinator.OperationGateway {
+    private static final class FakeOperations implements
+            ManagedCoopCaptureCoordinator.CaptureCommitGateway,
+            ManagedCoopCaptureCoordinator.OperationGateway {
         private final AtomicInteger claimCalls = new AtomicInteger();
         private final AtomicReference<CaptureRequest> lastRequest = new AtomicReference<>();
         private Function<CaptureRequest, PersistenceWriteQueue.WriteSubmission<MutationResult>> claimBehavior;
         private RetirementBehavior retireBehavior;
 
         @Override
-        public PersistenceWriteQueue.WriteSubmission<MutationResult> claimCapture(CaptureRequest request) {
+        public CompletionStage<MutationResult> commit(
+                ManagedCoopCaptureCoordinator.CaptureAttempt attempt,
+                CaptureRequest request) {
             claimCalls.incrementAndGet();
             lastRequest.set(request);
-            return claimBehavior.apply(request);
+            PersistenceWriteQueue.WriteSubmission<MutationResult> submission =
+                    claimBehavior.apply(request);
+            return submission.completion().thenApply(outcome -> {
+                if (outcome == null
+                        || outcome.status() != PersistenceWriteQueue.WriteStatus.COMMITTED
+                        || outcome.value() == null) {
+                    throw new IllegalStateException("capture_claim_not_committed");
+                }
+                return outcome.value();
+            });
         }
 
         @Override

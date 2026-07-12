@@ -24,7 +24,9 @@ import javax.annotation.Nullable;
  *
  * <p>A {@code PROJECTION_CREATED} row is intentionally normalized to its original generation-one
  * spawn claim. The normal live guard must then find the exact marked planned UUID, causing the
- * spawn orchestrator to adopt and finalize that projection without invoking its spawn callback.</p>
+ * spawn orchestrator to adopt and finalize that projection without invoking its spawn callback.
+ * The shared projection gateway also reacquires population admission from this persisted planned
+ * UUID; recovery never allocates a replacement UUID of its own.</p>
  */
 public final class ManagedCoopReleaseRecoveryService {
     public enum Status {

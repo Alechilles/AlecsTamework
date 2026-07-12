@@ -37,7 +37,9 @@ class SqliteSchemaV5MigrationTest {
             insertCoopRow(connection, 2, "profile-b", null, housedUuid);
 
             connection.setAutoCommit(false);
-            new SqliteSchemaMigrator().migrate(connection);
+            new SqliteSchemaMigrator().migrateThrough(
+                    connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
+            );
             connection.commit();
 
             assertEquals(1, count(connection, "managed_coop_residents"));
@@ -50,7 +52,9 @@ class SqliteSchemaV5MigrationTest {
             assertEquals("0", scalar(connection,
                     "SELECT generation FROM npc_recovery_operations WHERE profile_id = 'profile-a'"));
 
-            new SqliteSchemaMigrator().migrate(connection);
+            new SqliteSchemaMigrator().migrateThrough(
+                    connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
+            );
             assertEquals(1, count(connection, "managed_coop_residents"));
             assertEquals(2, count(connection, "coop_import_conflicts"));
             assertEquals(1, count(connection, "npc_recovery_operations"));
@@ -64,7 +68,9 @@ class SqliteSchemaV5MigrationTest {
             createV4Fixture(connection);
             insertProfile(connection, "profile-a", UUID.randomUUID(), "Mob_Chicken");
             insertCoopRow(connection, 0, "profile-a", UUID.randomUUID(), null);
-            new SqliteSchemaMigrator().migrate(connection);
+            new SqliteSchemaMigrator().migrateThrough(
+                    connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
+            );
 
             String authorityId = "world|1|2|3";
             assertThrows(SQLException.class, () -> execute(connection, """
@@ -100,7 +106,9 @@ class SqliteSchemaV5MigrationTest {
             execute(connection, "CREATE TABLE npc_recovery_operations (operation_id TEXT PRIMARY KEY)");
 
             connection.setAutoCommit(false);
-            assertThrows(Exception.class, () -> new SqliteSchemaMigrator().migrate(connection));
+            assertThrows(Exception.class, () -> new SqliteSchemaMigrator().migrateThrough(
+                    connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5
+            ));
             connection.rollback();
             connection.setAutoCommit(true);
 

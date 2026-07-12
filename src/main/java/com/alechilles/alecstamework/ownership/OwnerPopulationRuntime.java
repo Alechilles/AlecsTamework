@@ -37,6 +37,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     private final CompanionPopulationBatchAdmissionCoordinator companionBatchAdmissionCoordinator;
     private final CompanionSpawnPopulationAdmissionService companionSpawnAdmissionService;
     private final BreedingPopulationAdmissionService breedingAdmissionService;
+    private final CoopPopulationCaptureAdmissionService coopCaptureAdmissionService;
     private final CoopPopulationReleaseAdmissionService coopReleaseAdmissionService;
     private final RuntimePopulationPolicyAuthority populationPolicyAuthority;
     private final PublicPopulationCapabilityMaintenance capabilityMaintenance;
@@ -59,6 +60,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
             @Nonnull CompanionPopulationBatchAdmissionCoordinator companionBatchAdmissionCoordinator,
             @Nonnull CompanionSpawnPopulationAdmissionService companionSpawnAdmissionService,
             @Nonnull BreedingPopulationAdmissionService breedingAdmissionService,
+            @Nonnull CoopPopulationCaptureAdmissionService coopCaptureAdmissionService,
             @Nonnull CoopPopulationReleaseAdmissionService coopReleaseAdmissionService,
             @Nonnull RuntimePopulationPolicyAuthority populationPolicyAuthority,
             @Nonnull PublicPopulationCapabilityMaintenance capabilityMaintenance,
@@ -80,6 +82,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         this.companionBatchAdmissionCoordinator = companionBatchAdmissionCoordinator;
         this.companionSpawnAdmissionService = companionSpawnAdmissionService;
         this.breedingAdmissionService = breedingAdmissionService;
+        this.coopCaptureAdmissionService = coopCaptureAdmissionService;
         this.coopReleaseAdmissionService = coopReleaseAdmissionService;
         this.populationPolicyAuthority = populationPolicyAuthority;
         this.capabilityMaintenance = capabilityMaintenance;
@@ -146,6 +149,15 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                         claimLookupMetrics,
                         breedingReplayJournal.replayService()
                 );
+        CoopPopulationCaptureAdmissionService coopCaptureAdmissionService =
+                new CoopPopulationCaptureAdmissionService(
+                        index,
+                        identityResolver,
+                        claimOccupancyIndex,
+                        claimProviderRegistry,
+                        companionCoordinator,
+                        claimLookupMetrics
+                );
         CoopPopulationReleaseAdmissionService coopReleaseAdmissionService =
                 new CoopPopulationReleaseAdmissionService(
                         index,
@@ -208,6 +220,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                 companionBatchCoordinator,
                 companionSpawnAdmissionService,
                 breedingAdmissionService,
+                coopCaptureAdmissionService,
                 coopReleaseAdmissionService,
                 populationPolicyAuthority,
                 capabilityMaintenance,
@@ -281,6 +294,11 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     @Nonnull
     public BreedingPopulationAdmissionService breedingAdmissionService() {
         return breedingAdmissionService;
+    }
+
+    @Nonnull
+    public CoopPopulationCaptureAdmissionService coopCaptureAdmissionService() {
+        return coopCaptureAdmissionService;
     }
 
     @Nonnull

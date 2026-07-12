@@ -2,20 +2,24 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.items.CoopResidentStateRestorer.ComponentSlot;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
-import com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.FinalizedProjection;
-import com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.ProjectionOutcome;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityDecision;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityRequest;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.SpawnPlacement;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Outcome;
+import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Finalization;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
+import com.alechilles.alecstamework.ownership.CoopPopulationReleaseAdmissionService.ReleaseRequest;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationResult;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationStatus;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentRegistry;
+import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -29,12 +33,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.OutcomeStatus.FAILED;
-import static com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionCoordinator.OutcomeStatus.FINALIZED;
 import static com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Status.BLOCKED;
 import static com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Status.PERSISTENCE_FAILED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -71,7 +74,7 @@ class ManagedCoopReleaseRuntimeAdapterTest {
             throws Exception {
         Bundle bundle = bundle("coop-a");
         RecordingGateway gateway = new RecordingGateway();
-        CompletableFuture<ProjectionOutcome> persistence = new CompletableFuture<>();
+        CompletableFuture<Finalization> persistence = new CompletableFuture<>();
         List<String> events = new ArrayList<>();
         AtomicReference<LiveIdentityRequest> inspected = new AtomicReference<>();
         AtomicReference<UUID> finalizedActual = new AtomicReference<>();
@@ -244,6 +247,27 @@ class ManagedCoopReleaseRuntimeAdapterTest {
     }
 
     @Test
+    void populationOnlyConstructionRejectsLegacyGatewayBeforeLiveWork() throws Exception {
+        Bundle bundle = bundle("coop-a");
+        AtomicInteger guards = new AtomicInteger();
+        ManagedCoopReleaseRuntimeAdapter adapter = new ManagedCoopReleaseRuntimeAdapter(
+                (request, owningStore) -> {
+                    guards.incrementAndGet();
+                    return LiveIdentityDecision.clearToSpawn();
+                },
+                owningStore -> true,
+                command -> { });
+
+        Outcome outcome = adapter.release(
+                bundle.claim(), bundle.resident(), placement(), store
+        ).get(3, TimeUnit.SECONDS);
+
+        assertEquals(BLOCKED, outcome.status());
+        assertTrue(outcome.detail().contains("population_release_gateway_required"));
+        assertEquals(0, guards.get());
+    }
+
+    @Test
     void finalizationFailureReplaysSameMarkedUuidWithoutSecondSpawnerCall()
             throws Exception {
         Bundle bundle = bundle("coop-a");
@@ -255,7 +279,7 @@ class ManagedCoopReleaseRuntimeAdapterTest {
                 new ManagedCoopReleaseSpawnOrchestrator(
                         (claim, actual, recordedAt) -> CompletableFuture.completedFuture(
                                 finalizations.incrementAndGet() == 1
-                                        ? new ProjectionOutcome(FAILED, null, "write_failed")
+                                        ? Finalization.failed("write_failed")
                                         : finalized(claim)),
                         command -> presentations.incrementAndGet()
                 );
@@ -329,6 +353,60 @@ class ManagedCoopReleaseRuntimeAdapterTest {
         assertEquals(1, presentations.get());
     }
 
+    @Test
+    void populationPathAdoptsExactPostSpawnMarkerAndUsesOnlyAtomicFinalizer()
+            throws Exception {
+        Bundle bundle = bundle("coop-a");
+        PopulationBackend backend = new PopulationBackend();
+        ManagedCoopReleasePopulationCoordinator populations =
+                new ManagedCoopReleasePopulationCoordinator(
+                        new CoopResidentStateSnapshotCodec(), backend,
+                        (operationId, generation, reason, nowMs) ->
+                                CompletableFuture.completedFuture(
+                                        new MutationResult(
+                                                MutationStatus.APPLIED, null, null)),
+                        () -> 400L);
+        var prepared = populations.prepareAsync(
+                bundle.claim(), bundle.resident(), "world", 0, 0).join().prepared();
+        AtomicInteger guardCalls = new AtomicInteger();
+        AtomicInteger presentations = new AtomicInteger();
+        ManagedCoopReleaseSpawnOrchestrator orchestrator =
+                new ManagedCoopReleaseSpawnOrchestrator(
+                        (claim, actual, recordedAt) -> {
+                            throw new AssertionError(
+                                    "legacy projection finalizer must not run");
+                        },
+                        command -> presentations.incrementAndGet());
+        ManagedCoopReleaseProjectionSpawner populationSpawner =
+                new ManagedCoopReleaseProjectionSpawner(
+                        new CoopResidentStateRestorer(),
+                        (request, installer) ->
+                                ManagedCoopReleaseProjectionSpawner.GatewayResult.failed(
+                                        ManagedCoopReleaseProjectionSpawner.Status.SPAWN_FAILED,
+                                        "spawn_return_ambiguous"));
+        ManagedCoopReleaseRuntimeAdapter adapter = new ManagedCoopReleaseRuntimeAdapter(
+                new CoopResidentStateSnapshotCodec(),
+                new PlannedNpcProjectionSpawner(),
+                populationSpawner,
+                orchestrator,
+                (request, owningStore) -> guardCalls.incrementAndGet() == 1
+                        ? LiveIdentityDecision.clearToSpawn()
+                        : LiveIdentityDecision.matching(PLANNED),
+                owningStore -> true,
+                () -> 500L);
+
+        Outcome outcome = adapter.release(
+                bundle.claim(), bundle.resident(), placement(), store,
+                prepared, populations).get(3, TimeUnit.SECONDS);
+
+        assertEquals(ManagedCoopReleaseSpawnOrchestrator.Status.FINALIZED, outcome.status());
+        assertTrue(outcome.spawnedThisAttempt());
+        assertEquals(2, guardCalls.get());
+        assertEquals(1, backend.claims.get());
+        assertEquals(1, backend.commits.get());
+        assertEquals(1, presentations.get());
+    }
+
     private ManagedCoopReleaseRuntimeAdapter adapter(
             RecordingGateway gateway,
             ManagedCoopReleaseSpawnOrchestrator orchestrator,
@@ -394,18 +472,8 @@ class ManagedCoopReleaseRuntimeAdapterTest {
         );
     }
 
-    private ProjectionOutcome finalized(SpawnReady claim) {
-        return new ProjectionOutcome(
-                FINALIZED,
-                new FinalizedProjection(
-                        claim.operationId(), claim.profileId(), claim.residentId(),
-                        claim.authorityKey(), claim.coopId(), claim.residentSlot(),
-                        claim.sourceNpcUuid(), claim.plannedTargetUuid(), PLANNED,
-                        claim.snapshotHash(), claim.expectedResidentGeneration(), 2L,
-                        3L, 9L, 10L
-                ),
-                null
-        );
+    private Finalization finalized(SpawnReady claim) {
+        return Finalization.finalized(null);
     }
 
     private SpawnPlacement placement() {
@@ -487,6 +555,50 @@ class ManagedCoopReleaseRuntimeAdapterTest {
                 TameworkProjectionIdentityComponent projectionMarker) {
             steps.add("snapshot");
             return restorer.restore(components::put, snapshot, projectionMarker);
+        }
+    }
+
+    private static final class PopulationBackend
+            implements ManagedCoopReleasePopulationCoordinator.AdmissionBackend {
+        private final Object handle = new Object();
+        private final AtomicInteger claims = new AtomicInteger();
+        private final AtomicInteger commits = new AtomicInteger();
+
+        @Override
+        public CompletableFuture<ManagedCoopReleasePopulationCoordinator.BackendPreparation>
+                prepare(ReleaseRequest request,
+                        Function<UUID, String> durableContextFactory) {
+            durableContextFactory.apply(request.plannedNpcUuid());
+            return CompletableFuture.completedFuture(
+                    new ManagedCoopReleasePopulationCoordinator.BackendPreparation(
+                            true, "profile-a", request.plannedNpcUuid(), handle, "prepared"));
+        }
+
+        @Override
+        public boolean claim(Object handle) {
+            claims.incrementAndGet();
+            return this.handle == handle;
+        }
+
+        @Override
+        public boolean writeSpawnHolder(Object handle, Holder<EntityStore> holder) {
+            return this.handle == handle;
+        }
+
+        @Override
+        public CompletableFuture<CompanionPopulationCommitResult> commit(Object handle) {
+            commits.incrementAndGet();
+            return CompletableFuture.completedFuture(new CompanionPopulationCommitResult(
+                    true, "committed", true, null));
+        }
+
+        @Override
+        public CompletableFuture<Boolean> cancel(Object handle, String reason) {
+            return CompletableFuture.completedFuture(true);
+        }
+
+        @Override
+        public void markReadinessDegraded(String reason) {
         }
     }
 }

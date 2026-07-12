@@ -39,7 +39,7 @@ public record ManagedCoopCaptureCandidate(@Nonnull UUID npcUuid,
     @Nonnull
     public ManagedCoopCaptureRuntimeAdapter.Candidate runtimeCandidate() {
         return new ManagedCoopCaptureRuntimeAdapter.Candidate(
-                npcUuid, roleId, ownerUuid, displayName, toolIds, stableProfileId);
+                npcUuid, roleId, x, z, ownerUuid, displayName, toolIds, stableProfileId);
     }
 
     @Nullable

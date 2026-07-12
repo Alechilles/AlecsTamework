@@ -1,11 +1,15 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Regression coverage for canonical dormant-source validation before coop replacement spawn. */
 class CoopPopulationReleaseAdmissionServiceTest {
@@ -15,6 +19,67 @@ class CoopPopulationReleaseAdmissionServiceTest {
     private static final UUID HOUSED = UUID.fromString(
             "00000000-0000-0000-0000-000000000201"
     );
+    private static final UUID PLANNED = UUID.fromString(
+            "00000000-0000-0000-0000-000000000202"
+    );
+
+    @Test
+    void classifiesReleaseAsCoopPlacementAdmission() {
+        assertEquals(
+                com.alechilles.alecstamework.integration.claims.ClaimAdmissionOperation.COOP_RELEASE,
+                CoopPopulationReleaseAdmissionService.CLAIM_OPERATION
+        );
+    }
+
+    @Test
+    void releaseRequestPreservesExactCallerPlannedUuid() {
+        CoopPopulationReleaseAdmissionService.ReleaseRequest request = request(PLANNED);
+
+        assertEquals(HOUSED, request.previousNpcUuid());
+        assertEquals(PLANNED, request.plannedNpcUuid());
+        assertEquals("world", request.worldName());
+        assertEquals("managed-release", request.idempotencyKey());
+    }
+
+    @Test
+    void releaseRequestRejectsReusingTheHousedSourceUuid() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> request(HOUSED)
+        );
+    }
+
+    @Test
+    void durableContextFactoryReceivesAndPersistsTheCallerPlannedUuid() {
+        CoopPopulationReleaseAdmissionService.ReleaseRequest request = request(PLANNED);
+        AtomicReference<UUID> factoryUuid = new AtomicReference<>();
+
+        String context = CoopPopulationReleaseAdmissionService.contextJson(
+                request,
+                planned -> {
+                    factoryUuid.set(planned);
+                    return "{\"managedCoopOperationId\":\"release-operation\"}";
+                }
+        );
+        JsonObject json = JsonParser.parseString(context).getAsJsonObject();
+
+        assertEquals(PLANNED, factoryUuid.get());
+        assertEquals(PLANNED.toString(), json.get("plannedNpcUuid").getAsString());
+        assertEquals("release-operation", json.get("managedCoopOperationId").getAsString());
+    }
+
+    @Test
+    void durableContextCannotReplaceTheCallerPlannedUuid() {
+        CoopPopulationReleaseAdmissionService.ReleaseRequest request = request(PLANNED);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> CoopPopulationReleaseAdmissionService.contextJson(
+                        request,
+                        ignored -> "{\"plannedNpcUuid\":\"" + UUID.randomUUID() + "\"}"
+                )
+        );
+    }
 
     @Test
     void acceptsExactCoopedOwnerAndClaimProjection() {
@@ -62,6 +127,19 @@ class CoopPopulationReleaseAdmissionServiceTest {
         );
         return CoopPopulationReleaseAdmissionService.validateDormantSource(
                 HOUSED, currentNpcUuid, OWNER, owner, claim
+        );
+    }
+
+    private static CoopPopulationReleaseAdmissionService.ReleaseRequest request(UUID plannedUuid) {
+        return new CoopPopulationReleaseAdmissionService.ReleaseRequest(
+                HOUSED,
+                plannedUuid,
+                OWNER,
+                "Owner",
+                " world ",
+                4,
+                7,
+                " managed-release "
         );
     }
 }

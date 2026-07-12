@@ -179,7 +179,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new NpcLiveAliasRepairRepository(writeQueue);
         PersistenceIntegrityService integrityService = new PersistenceIntegrityService(connectionManager);
         CompanionPopulationRepository companionPopulationRepository =
-                new CompanionPopulationRepository(connectionManager, writeQueue);
+                new CompanionPopulationRepository(
+                        connectionManager,
+                        writeQueue,
+                        managedCoopServices.lifecycleRepository()
+                );
         CompanionPopulationCoverageRepository companionPopulationCoverageRepository =
                 new CompanionPopulationCoverageRepository(connectionManager, writeQueue);
         CompanionIdentityRepository companionIdentityRepository =

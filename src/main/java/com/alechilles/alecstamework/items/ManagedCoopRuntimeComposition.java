@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.systems.ManagedCoopCaptureSourceRetireme
 import com.alechilles.alecstamework.npc.systems.ManagedCoopStaleEntitySuppressionSystem;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopRuntimeServices;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
@@ -34,11 +35,13 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
 
     public ManagedCoopRuntimeComposition(
             @Nonnull TameworkPersistenceRuntime persistence,
+            @Nonnull OwnerPopulationRuntime population,
             @Nonnull CoopResidentStateSnapshotService snapshots,
             @Nonnull LoadedNpcIdentityIndex loadedIdentities,
             @Nonnull ComponentType<EntityStore, TameworkProjectionIdentityComponent>
                     projectionIdentityType) {
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(population, "population");
         Objects.requireNonNull(snapshots, "snapshots");
         Objects.requireNonNull(loadedIdentities, "loadedIdentities");
         Objects.requireNonNull(projectionIdentityType, "projectionIdentityType");
@@ -51,7 +54,9 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
         ManagedCoopCaptureCoordinator captureCoordinator = new ManagedCoopCaptureCoordinator(
                 services.captureProfileRepository(),
                 services.lifecycleRepository(),
-                services.compositeIndexRefreshService());
+                services.compositeIndexRefreshService(),
+                population.coopCaptureAdmissionService(),
+                population.identityResolver());
         ManagedCoopCaptureRuntimeAdapter captureAdapter = new ManagedCoopCaptureRuntimeAdapter(
                 services.occupancyService(), breedingCancellation, snapshots, captureCoordinator);
         ManagedCoopCaptureSourceRetirementService sourceRetirements =
@@ -70,6 +75,10 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         services.compositeIndexRefreshService(),
                         services.residentIndex(),
                         services.lifecycleIndex());
+        ManagedCoopReleasePopulationCoordinator releasePopulations =
+                new ManagedCoopReleasePopulationCoordinator(
+                        population.coopReleaseAdmissionService(),
+                        services.lifecycleRepository());
         ManagedCoopReleaseRuntimeAdapter releaseAdapter = releaseAdapter(
                 services, loadedIdentities, presentation);
         ManagedCoopReleaseRecoveryService releaseRecovery =
@@ -87,9 +96,11 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         sourceRetirements,
                         itemRecovery,
                         releaseRecovery,
-                        releaseAdapter);
+                        releaseAdapter,
+                        releasePopulations);
         ManagedCoopRuntimeOperationDispatcher operations = operationDispatcher(
-                services, captureAdapter, sourceRetirements, releaseAdapter);
+                services, captureAdapter, sourceRetirements, releaseAdapter,
+                releasePopulations);
         ManagedCoopVanillaImportBehavior imports = importBehavior(
                 persistence,
                 services,
@@ -206,17 +217,12 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
             ManagedCoopRuntimeServices services,
             LoadedNpcIdentityIndex loadedIdentities,
             ManagedCoopReleasePresentationDispatcher presentation) {
-        ManagedCoopReleaseProjectionCoordinator projectionCoordinator =
-                new ManagedCoopReleaseProjectionCoordinator(
-                        services.lifecycleRepository(),
-                        services.compositeIndexRefreshService());
         ManagedCoopReleaseLiveIdentityGuard liveIdentity =
                 new ManagedCoopReleaseLiveIdentityGuard(
                         loadedIdentities,
                         services.residentIndex(),
                         services.compositeIndexRefreshService()::isTrusted);
         return new ManagedCoopReleaseRuntimeAdapter(
-                projectionCoordinator,
                 liveIdentity,
                 ManagedCoopRuntimeComposition::isOwningThread,
                 presentation);
@@ -227,7 +233,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
             ManagedCoopRuntimeServices services,
             ManagedCoopCaptureRuntimeAdapter captureAdapter,
             ManagedCoopCaptureSourceRetirementService sourceRetirements,
-            ManagedCoopReleaseRuntimeAdapter releaseAdapter) {
+            ManagedCoopReleaseRuntimeAdapter releaseAdapter,
+            ManagedCoopReleasePopulationCoordinator releasePopulations) {
         ManagedCoopReleaseCoordinator releaseCoordinator = new ManagedCoopReleaseCoordinator(
                 services.lifecycleRepository(), services.compositeIndexRefreshService());
         return new ManagedCoopRuntimeOperationDispatcher(
@@ -236,7 +243,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                 releaseCoordinator,
                 releaseAdapter,
                 services.residentIndex(),
-                services.compositeIndexRefreshService());
+                services.compositeIndexRefreshService(),
+                releasePopulations);
     }
 
     @Nonnull

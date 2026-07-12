@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 
 /** Prepares a dormant coop profile before any replacement NPC is physically spawned. */
 public final class CoopPopulationReleaseAdmissionService {
+    static final ClaimAdmissionOperation CLAIM_OPERATION = ClaimAdmissionOperation.COOP_RELEASE;
+
     private final OwnerPopulationIndex ownerIndex;
     private final CompanionIdentityResolver identityResolver;
     private final ClaimOccupancyIndex claimIndex;
@@ -84,7 +86,7 @@ public final class CoopPopulationReleaseAdmissionService {
                         ? PreparationResult.prepared(new PreparedRelease(
                         request,
                         planned.profileId(),
-                        planned.plannedNpcUuid(),
+                        request.plannedNpcUuid(),
                         result.preparedAdmission()
                 ))
                         : PreparationResult.denied(result.reason()));
@@ -265,7 +267,7 @@ public final class CoopPopulationReleaseAdmissionService {
                 OwnerPopulationOperation.RESTORE,
                 true
         );
-        UUID plannedNpcUuid = UUID.randomUUID();
+        UUID plannedNpcUuid = request.plannedNpcUuid();
         ClaimChunkCoordinate destination = new ClaimChunkCoordinate(
                 request.worldName(), request.chunkX(), request.chunkZ()
         );
@@ -295,7 +297,7 @@ public final class CoopPopulationReleaseAdmissionService {
         );
         final String targetContext;
         try {
-            targetContext = contextJson(request, plannedNpcUuid, durableContextFactory);
+            targetContext = contextJson(request, durableContextFactory);
         } catch (RuntimeException | LinkageError invalidContext) {
             return PlanResult.denied("coop-release-durable-context-invalid");
         }
@@ -314,7 +316,7 @@ public final class CoopPopulationReleaseAdmissionService {
                 policy.claimContext().providerGeneration()
         );
         ClaimAdmissionRequest claimRequest = new ClaimAdmissionRequest(
-                ClaimAdmissionOperation.SPAWNER_RELEASE,
+                CLAIM_OPERATION,
                 List.of(claimTransition),
                 proposed.occupiesClaim() ? destination : null,
                 policy.claimContext(),
@@ -393,11 +395,11 @@ public final class CoopPopulationReleaseAdmissionService {
     }
 
     @Nonnull
-    private static String contextJson(
+    static String contextJson(
             @Nonnull ReleaseRequest request,
-            @Nonnull UUID plannedUuid,
             @Nullable Function<UUID, String> durableContextFactory
     ) {
+        UUID plannedUuid = request.plannedNpcUuid();
         JsonObject json = new JsonObject();
         json.addProperty("operation", "coop_release");
         json.addProperty("idempotencyKey", request.idempotencyKey());
@@ -425,6 +427,7 @@ public final class CoopPopulationReleaseAdmissionService {
     }
 
     public record ReleaseRequest(@Nonnull UUID previousNpcUuid,
+                                 @Nonnull UUID plannedNpcUuid,
                                  @Nullable UUID ownerId,
                                  @Nullable String ownerName,
                                  @Nonnull String worldName,
@@ -433,6 +436,12 @@ public final class CoopPopulationReleaseAdmissionService {
                                  @Nonnull String idempotencyKey) {
         public ReleaseRequest {
             Objects.requireNonNull(previousNpcUuid, "previousNpcUuid");
+            Objects.requireNonNull(plannedNpcUuid, "plannedNpcUuid");
+            if (previousNpcUuid.equals(plannedNpcUuid)) {
+                throw new IllegalArgumentException(
+                        "plannedNpcUuid must differ from previousNpcUuid."
+                );
+            }
             worldName = Objects.requireNonNull(worldName, "worldName").trim();
             idempotencyKey = Objects.requireNonNull(idempotencyKey, "idempotencyKey").trim();
             if (worldName.isEmpty() || idempotencyKey.isEmpty()) {
@@ -445,6 +454,17 @@ public final class CoopPopulationReleaseAdmissionService {
                                   @Nonnull String profileId,
                                   @Nonnull UUID plannedNpcUuid,
                                   @Nonnull PreparedCompanionPopulationAdmission admission) {
+        public PreparedRelease {
+            Objects.requireNonNull(request, "request");
+            profileId = OwnerPopulationEntry.normalizeProfileId(profileId);
+            Objects.requireNonNull(plannedNpcUuid, "plannedNpcUuid");
+            Objects.requireNonNull(admission, "admission");
+            if (!request.plannedNpcUuid().equals(plannedNpcUuid)) {
+                throw new IllegalArgumentException(
+                        "Prepared release UUID must match the caller-planned UUID."
+                );
+            }
+        }
     }
 
     public record PreparationResult(boolean allowed,

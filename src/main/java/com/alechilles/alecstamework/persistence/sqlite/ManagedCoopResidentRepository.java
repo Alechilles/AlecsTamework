@@ -299,6 +299,17 @@ public final class ManagedCoopResidentRepository {
                 connection, residentId, expectedGeneration, plannedTargetUuid, nowMs);
     }
 
+    MutationResult cancelReleaseBeforeProjectionInTransaction(
+            Connection connection,
+            String residentId,
+            long expectedGeneration,
+            UUID plannedTargetUuid,
+            long nowMs) throws SQLException {
+        return transactions.cancelReleaseBeforeProjection(
+                connection, residentId, expectedGeneration, plannedTargetUuid, nowMs
+        );
+    }
+
     MutationResult reserveProjectionUuidInTransaction(Connection connection,
                                                       String residentId,
                                                       UUID targetUuid,

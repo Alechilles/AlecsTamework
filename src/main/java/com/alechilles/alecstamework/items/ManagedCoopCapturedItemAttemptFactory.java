@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.items.ManagedCoopCaptureSourceEvidence.Captu
 import com.alechilles.alecstamework.items.ManagedCoopItemIntakeHandler.IntakeRequest;
 import com.alechilles.alecstamework.items.ManagedCoopOccupancyService.CapturePlacement;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
+import com.alechilles.alecstamework.ownership.CoopPopulationCaptureAdmissionService.SourceKind;
 import javax.annotation.Nonnull;
 
 /** Remaps one verified portable item snapshot into an exact, item-source-tagged capture attempt. */
@@ -58,6 +59,9 @@ final class ManagedCoopCapturedItemAttemptFactory {
                 envelope.ownerUuid(),
                 envelope.displayName(),
                 envelope.toolIds(),
+                SourceKind.CAPTURED_ITEM,
+                null,
+                false,
                 snapshotJson,
                 snapshotHash,
                 envelope.snapshotVersion(),

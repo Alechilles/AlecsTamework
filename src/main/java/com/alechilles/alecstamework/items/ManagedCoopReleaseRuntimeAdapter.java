@@ -127,10 +127,12 @@ public final class ManagedCoopReleaseRuntimeAdapter {
 
     private final CoopResidentStateSnapshotCodec snapshotCodec;
     private final PlannedNpcProjectionSpawner projectionSpawner;
+    private final ManagedCoopReleaseProjectionSpawner populationProjectionSpawner;
     private final ManagedCoopReleaseSpawnOrchestrator orchestrator;
     private final LiveIdentityGuard liveIdentityGuard;
     private final OwningWorldThreadGuard worldThreadGuard;
     private final LongSupplier clock;
+    private final boolean legacyProjectionEnabled;
 
     public ManagedCoopReleaseRuntimeAdapter(
             @Nonnull ManagedCoopReleaseProjectionCoordinator projectionCoordinator,
@@ -141,13 +143,40 @@ public final class ManagedCoopReleaseRuntimeAdapter {
         this(
                 new CoopResidentStateSnapshotCodec(),
                 new PlannedNpcProjectionSpawner(),
+                new ManagedCoopReleaseProjectionSpawner(),
                 new ManagedCoopReleaseSpawnOrchestrator(
                         Objects.requireNonNull(projectionCoordinator, "projectionCoordinator"),
                         presentationDispatcher),
                 liveIdentityGuard,
                 worldThreadGuard,
-                System::currentTimeMillis
+                System::currentTimeMillis,
+                true
         );
+    }
+
+    /**
+     * Population-only construction. A legacy gateway is rejected before spawn so the atomic
+     * population commit cannot accidentally be bypassed by composition drift.
+     */
+    public ManagedCoopReleaseRuntimeAdapter(
+            @Nonnull LiveIdentityGuard liveIdentityGuard,
+            @Nonnull OwningWorldThreadGuard worldThreadGuard,
+            @Nonnull ManagedCoopReleaseSpawnOrchestrator.PresentationDispatcher
+                    presentationDispatcher) {
+        this(
+                new CoopResidentStateSnapshotCodec(),
+                new PlannedNpcProjectionSpawner(),
+                new ManagedCoopReleaseProjectionSpawner(),
+                new ManagedCoopReleaseSpawnOrchestrator(
+                        (claim, actualTargetUuid, recordedAtMs) ->
+                                CompletableFuture.completedFuture(
+                                        ManagedCoopReleaseSpawnOrchestrator.Finalization.failed(
+                                                "managed_coop_population_finalizer_required")),
+                        presentationDispatcher),
+                liveIdentityGuard,
+                worldThreadGuard,
+                System::currentTimeMillis,
+                false);
     }
 
     ManagedCoopReleaseRuntimeAdapter(
@@ -157,12 +186,40 @@ public final class ManagedCoopReleaseRuntimeAdapter {
             @Nonnull LiveIdentityGuard liveIdentityGuard,
             @Nonnull OwningWorldThreadGuard worldThreadGuard,
             @Nonnull LongSupplier clock) {
+        this(snapshotCodec, projectionSpawner, new ManagedCoopReleaseProjectionSpawner(),
+                orchestrator, liveIdentityGuard, worldThreadGuard, clock, true);
+    }
+
+    ManagedCoopReleaseRuntimeAdapter(
+            @Nonnull CoopResidentStateSnapshotCodec snapshotCodec,
+            @Nonnull PlannedNpcProjectionSpawner projectionSpawner,
+            @Nonnull ManagedCoopReleaseProjectionSpawner populationProjectionSpawner,
+            @Nonnull ManagedCoopReleaseSpawnOrchestrator orchestrator,
+            @Nonnull LiveIdentityGuard liveIdentityGuard,
+            @Nonnull OwningWorldThreadGuard worldThreadGuard,
+            @Nonnull LongSupplier clock) {
+        this(snapshotCodec, projectionSpawner, populationProjectionSpawner, orchestrator,
+                liveIdentityGuard, worldThreadGuard, clock, true);
+    }
+
+    private ManagedCoopReleaseRuntimeAdapter(
+            @Nonnull CoopResidentStateSnapshotCodec snapshotCodec,
+            @Nonnull PlannedNpcProjectionSpawner projectionSpawner,
+            @Nonnull ManagedCoopReleaseProjectionSpawner populationProjectionSpawner,
+            @Nonnull ManagedCoopReleaseSpawnOrchestrator orchestrator,
+            @Nonnull LiveIdentityGuard liveIdentityGuard,
+            @Nonnull OwningWorldThreadGuard worldThreadGuard,
+            @Nonnull LongSupplier clock,
+            boolean legacyProjectionEnabled) {
         this.snapshotCodec = Objects.requireNonNull(snapshotCodec, "snapshotCodec");
         this.projectionSpawner = Objects.requireNonNull(projectionSpawner, "projectionSpawner");
+        this.populationProjectionSpawner = Objects.requireNonNull(
+                populationProjectionSpawner, "populationProjectionSpawner");
         this.orchestrator = Objects.requireNonNull(orchestrator, "orchestrator");
         this.liveIdentityGuard = Objects.requireNonNull(liveIdentityGuard, "liveIdentityGuard");
         this.worldThreadGuard = Objects.requireNonNull(worldThreadGuard, "worldThreadGuard");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.legacyProjectionEnabled = legacyProjectionEnabled;
     }
 
     /**
@@ -179,6 +236,10 @@ public final class ManagedCoopReleaseRuntimeAdapter {
         Objects.requireNonNull(resident, "resident");
         Objects.requireNonNull(placement, "placement");
         Objects.requireNonNull(owningStore, "owningStore");
+        if (!legacyProjectionEnabled) {
+            return orchestrator.rejected(
+                    "managed_coop_population_release_gateway_required");
+        }
         try {
             owningStore.assertThread();
             if (!worldThreadGuard.isOwningWorldThread(owningStore)) {
@@ -203,6 +264,76 @@ public final class ManagedCoopReleaseRuntimeAdapter {
             );
         } catch (RuntimeException exception) {
             return orchestrator.rejected(failureDetail("managed_coop_release_runtime", exception));
+        }
+    }
+
+    /**
+     * Population-integrated release path. The prepared capability is claimed immediately before
+     * adoption/spawn, written into a new holder, and committed as the sole durable finalizer.
+     */
+    @Nonnull
+    public CompletableFuture<Outcome> release(
+            @Nonnull SpawnReady claim,
+            @Nonnull ResidentRecord resident,
+            @Nonnull SpawnPlacement placement,
+            @Nonnull Store<EntityStore> owningStore,
+            @Nonnull ManagedCoopReleasePopulationCoordinator.PreparedRelease prepared,
+            @Nonnull ManagedCoopReleasePopulationCoordinator populations) {
+        Objects.requireNonNull(claim, "claim");
+        Objects.requireNonNull(resident, "resident");
+        Objects.requireNonNull(placement, "placement");
+        Objects.requireNonNull(owningStore, "owningStore");
+        Objects.requireNonNull(prepared, "prepared");
+        Objects.requireNonNull(populations, "populations");
+        try {
+            owningStore.assertThread();
+            if (!worldThreadGuard.isOwningWorldThread(owningStore)) {
+                return orchestrator.rejected("managed_coop_release_wrong_world_thread");
+            }
+            VerifiedSnapshot verified = verifySnapshot(claim, resident);
+            TameworkProjectionIdentityComponent marker = projectionMarker(claim);
+            LiveIdentityDecision decision = requireDecision(liveIdentityGuard.inspect(
+                    liveIdentityRequest(claim), owningStore));
+            if (decision.status() == LiveIdentityStatus.LOOKUP_FAILED) {
+                populations.markReadinessDegraded(
+                        "managed_coop_release_pre_spawn_identity_ambiguous");
+                return orchestrator.ambiguous(decision.detail() != null
+                        ? decision.detail() : "live_identity_lookup_failed");
+            }
+            Admission admission = admission(claim, decision);
+            if (verified.projectionAlreadyCommitted()
+                    && decision.status() != LiveIdentityStatus.MATCHING_MARKED_PROJECTION) {
+                admission = Admission.blocked(
+                        "deployed_resident_requires_matching_live_projection");
+            }
+            if (admission.status()
+                    == ManagedCoopReleaseSpawnOrchestrator.AdmissionStatus.BLOCKED) {
+                return orchestrator.rejected(admission.detail() != null
+                        ? admission.detail() : "managed_coop_release_live_admission_blocked");
+            }
+            if (!populations.claimForSpawn(prepared, claim)) {
+                return orchestrator.rejected("managed_coop_population_spawn_claim_rejected");
+            }
+            long recordedAtMs = clock.getAsLong();
+            CompletableFuture<Outcome> completion = orchestrator.coordinate(
+                    claim,
+                    admission,
+                    () -> spawnWithPopulation(
+                            claim, verified.snapshot(), marker, placement, owningStore,
+                            prepared, populations),
+                    (finalClaim, actualTargetUuid, ignoredRecordedAt) ->
+                            populations.commitAsync(prepared, finalClaim, actualTargetUuid),
+                    recordedAtMs);
+            return completion.thenApply(outcome -> outcome != null
+                    && outcome.status() == ManagedCoopReleaseSpawnOrchestrator.Status.BLOCKED
+                    ? new Outcome(
+                            ManagedCoopReleaseSpawnOrchestrator.Status.SPAWN_AMBIGUOUS,
+                            outcome.actualTargetUuid(), outcome.spawnedThisAttempt(),
+                            outcome.presentationDispatched(), outcome.detail())
+                    : outcome);
+        } catch (RuntimeException exception) {
+            return orchestrator.rejected(failureDetail(
+                    "managed_coop_release_population_runtime", exception));
         }
     }
 
@@ -231,6 +362,62 @@ public final class ManagedCoopReleaseRuntimeAdapter {
         }
         // SPAWNED is returned only after the spawner verifies component and legacy UUIDs.
         return SpawnAttempt.spawned(claim.plannedTargetUuid());
+    }
+
+    @Nonnull
+    private SpawnAttempt spawnWithPopulation(
+            SpawnReady claim,
+            CoopResidentStateSnapshotService.CoopResidentStateSnapshot snapshot,
+            TameworkProjectionIdentityComponent marker,
+            SpawnPlacement placement,
+            Store<EntityStore> owningStore,
+            ManagedCoopReleasePopulationCoordinator.PreparedRelease prepared,
+            ManagedCoopReleasePopulationCoordinator populations) {
+        ManagedCoopReleaseProjectionSpawner.Result result =
+                populationProjectionSpawner.spawn(
+                        new ManagedCoopReleaseProjectionSpawner.Request(
+                                snapshot.roleId(),
+                                claim.plannedTargetUuid(),
+                                snapshot,
+                                marker,
+                                new Vector3d(placement.x(), placement.y(), placement.z()),
+                                new Rotation3f(
+                                        placement.pitch(), placement.yaw(), placement.roll()),
+                                owningStore,
+                                holder -> populations.writeSpawnHolder(prepared, holder)));
+        if (result != null && result.spawned()) {
+            return SpawnAttempt.spawned(claim.plannedTargetUuid());
+        }
+        LiveIdentityDecision probe;
+        try {
+            probe = requireDecision(liveIdentityGuard.inspect(
+                    liveIdentityRequest(claim), owningStore));
+        } catch (RuntimeException exception) {
+            populations.markReadinessDegraded(
+                    "managed_coop_release_post_spawn_probe_failed");
+            return SpawnAttempt.ambiguous(failureDetail(
+                    "managed_coop_release_post_spawn_probe", exception));
+        }
+        String status = result != null && result.status() != null
+                ? result.status().name().toLowerCase(Locale.ROOT) : "missing_result";
+        if (probe.status() == LiveIdentityStatus.MATCHING_MARKED_PROJECTION
+                && claim.plannedTargetUuid().equals(probe.observedTargetUuid())
+                && (result == null
+                    || result.status()
+                    != ManagedCoopReleaseProjectionSpawner.Status.HOLDER_WRITE_FAILED)) {
+            return SpawnAttempt.spawned(claim.plannedTargetUuid());
+        }
+        if (probe.status() == LiveIdentityStatus.CLEAR_TO_SPAWN
+                && result != null
+                && result.status()
+                != ManagedCoopReleaseProjectionSpawner.Status.IDENTITY_MISMATCH) {
+            return SpawnAttempt.failed("managed_population_projection_spawn_" + status);
+        }
+        populations.markReadinessDegraded(
+                "managed_coop_release_post_spawn_identity_ambiguous");
+        String detail = probe.detail() != null ? probe.detail()
+                : "managed_population_projection_spawn_" + status;
+        return SpawnAttempt.ambiguous(detail);
     }
 
     @Nonnull
