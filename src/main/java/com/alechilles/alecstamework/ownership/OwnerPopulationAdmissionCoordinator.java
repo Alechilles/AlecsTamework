@@ -27,6 +27,7 @@ public final class OwnerPopulationAdmissionCoordinator {
     private final CompanionPopulationRepository repository;
     private final PersistenceHealthService persistenceHealth;
     private final OwnerPopulationJournalTerminality terminality;
+    private final OwnerPopulationCompensationCoordinator compensationCoordinator;
 
     public OwnerPopulationAdmissionCoordinator(@Nonnull OwnerPopulationIndex index,
                                                @Nonnull CompanionPopulationRepository repository,
@@ -35,6 +36,9 @@ public final class OwnerPopulationAdmissionCoordinator {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
         this.terminality = new OwnerPopulationJournalTerminality(index, persistenceHealth);
+        this.compensationCoordinator = new OwnerPopulationCompensationCoordinator(
+                index, repository, terminality
+        );
     }
 
     @Nonnull
@@ -301,6 +305,24 @@ public final class OwnerPopulationAdmissionCoordinator {
             completion.complete(success);
         });
         return completion;
+    }
+
+    /** Durably records compensation intent before any live rollback is allowed to run. */
+    @Nonnull
+    public CompletableFuture<Boolean> beginCompensationAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull String reason
+    ) {
+        return compensationCoordinator.beginAsync(prepared, reason);
+    }
+
+    /** Closes a successfully restored mutation before releasing its conservative reservation. */
+    @Nonnull
+    public CompletableFuture<Boolean> completeCompensationAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull String reason
+    ) {
+        return compensationCoordinator.completeAsync(prepared, reason);
     }
 
     /** Fails positive owner admissions closed after a post-apply accounting failure. */

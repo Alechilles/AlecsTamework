@@ -22,6 +22,7 @@ public final class OwnerMutationScheduler {
     private final OwnerMutationIdentityLifecycle identityLifecycle;
     private final CompanionPopulationAdmissionCoordinator companionCoordinator;
     private final OwnerMutationTerminality terminality;
+    private final OwnerMutationCompensationService compensationService;
     private final CompanionAdmissionPolicyResolver policyResolver;
     private final ClaimLookupMetrics lookupMetrics;
     public OwnerMutationScheduler(@Nonnull OwnerPopulationIndex index,
@@ -49,6 +50,9 @@ public final class OwnerMutationScheduler {
         this.snapshotResolver = new OwnerMutationSnapshotResolver(identityResolver);
         this.companionCoordinator = Objects.requireNonNull(companionCoordinator, "companionCoordinator");
         this.terminality = new OwnerMutationTerminality(this.companionCoordinator);
+        this.compensationService = new OwnerMutationCompensationService(
+                this.companionCoordinator, this.mutationService, this.terminality
+        );
         this.identityLifecycle = new OwnerMutationIdentityLifecycle(
                 identityResolver, snapshotResolver, terminality
         );
@@ -402,18 +406,9 @@ public final class OwnerMutationScheduler {
             return;
         }
         if (!result.applied()) {
-            try {
-                callbacks.onApplyCompensated(profileId, result.reason(), mutationContext);
-            } catch (RuntimeException | LinkageError ignored) {
-                // Cancellation and accounting terminality take precedence over callback failure.
-            }
-            if (result.safeToCancel()) {
-                cancelPrepared(prepared, result.reason());
-                terminality.denied(callbacks, result.reason(), prepared.ownerAdmission().decision());
-            } else {
-                terminality.degrade("owner_mutation_live_write_ambiguous");
-                terminality.durabilityDegraded(callbacks, result.reason());
-            }
+            compensationService.handleFailedWrite(
+                    world, npcUuid, profileId, prepared, callbacks, mutationContext, result
+            );
             return;
         }
         boolean identityMapped = identityLifecycle.remapLive(

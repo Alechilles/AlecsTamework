@@ -14,6 +14,9 @@ public final class PreparedOwnerPopulationAdmission {
     enum State {
         PREPARED,
         APPLYING,
+        COMPENSATION_STARTING,
+        COMPENSATING,
+        COMPENSATION_CLOSING,
         COMMITTING,
         SOURCE_FINALIZATION_PENDING,
         SOURCE_FINALIZING,
@@ -30,6 +33,10 @@ public final class PreparedOwnerPopulationAdmission {
     private CompletableFuture<Boolean> cancellationCompletion;
     @Nullable
     private CompletableFuture<Boolean> sourceFinalizationCompletion;
+    @Nullable
+    private CompletableFuture<Boolean> compensationStartCompletion;
+    @Nullable
+    private CompletableFuture<Boolean> compensationCompletion;
 
     PreparedOwnerPopulationAdmission(@Nonnull UUID operationId,
                                      @Nonnull OwnerPopulationAdmissionPlan plan,
@@ -94,5 +101,23 @@ public final class PreparedOwnerPopulationAdmission {
 
     synchronized void sourceFinalizationCompletion(@Nonnull CompletableFuture<Boolean> completion) {
         sourceFinalizationCompletion = Objects.requireNonNull(completion, "completion");
+    }
+
+    @Nullable
+    synchronized CompletableFuture<Boolean> compensationStartCompletion() {
+        return compensationStartCompletion;
+    }
+
+    synchronized void compensationStartCompletion(@Nonnull CompletableFuture<Boolean> completion) {
+        compensationStartCompletion = Objects.requireNonNull(completion, "completion");
+    }
+
+    @Nullable
+    synchronized CompletableFuture<Boolean> compensationCompletion() {
+        return compensationCompletion;
+    }
+
+    synchronized void compensationCompletion(@Nonnull CompletableFuture<Boolean> completion) {
+        compensationCompletion = Objects.requireNonNull(completion, "completion");
     }
 }

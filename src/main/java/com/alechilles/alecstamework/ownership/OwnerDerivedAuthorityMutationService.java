@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
-import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -39,29 +38,6 @@ final class OwnerDerivedAuthorityMutationService {
             return;
         }
         writeImmediate(npcRef, store, project(before, expectedOwnerId, newOwnerId));
-    }
-
-    void applyBuffered(@Nonnull Ref<EntityStore> npcRef,
-                       @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                       @Nonnull Snapshot before,
-                       @Nullable UUID expectedOwnerId,
-                       @Nullable UUID newOwnerId) {
-        if (newOwnerId != null && Objects.equals(expectedOwnerId, newOwnerId)) {
-            return;
-        }
-        Snapshot projected = project(before, expectedOwnerId, newOwnerId);
-        writeBuffered(
-                npcRef,
-                commandBuffer,
-                TameworkCommandLinksComponent.getComponentType(),
-                projected.commandLinks()
-        );
-        writeBuffered(
-                npcRef,
-                commandBuffer,
-                TameworkNpcNameComponent.getComponentType(),
-                projected.npcName()
-        );
     }
 
     boolean restoreImmediate(@Nonnull Ref<EntityStore> npcRef,
@@ -133,22 +109,6 @@ final class OwnerDerivedAuthorityMutationService {
             store.tryRemoveComponent(npcRef, type);
         } else {
             store.putComponent(npcRef, type, cloneComponent(value));
-        }
-    }
-
-    private static <T extends Component<EntityStore>> void writeBuffered(
-            @Nonnull Ref<EntityStore> npcRef,
-            @Nonnull CommandBuffer<EntityStore> commandBuffer,
-            @Nullable ComponentType<EntityStore, T> type,
-            @Nullable T value
-    ) {
-        if (type == null) {
-            return;
-        }
-        if (value == null) {
-            commandBuffer.tryRemoveComponent(npcRef, type);
-        } else {
-            commandBuffer.putComponent(npcRef, type, cloneComponent(value));
         }
     }
 

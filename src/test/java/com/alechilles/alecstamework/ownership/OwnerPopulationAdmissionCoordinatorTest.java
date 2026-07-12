@@ -107,6 +107,51 @@ class OwnerPopulationAdmissionCoordinatorTest {
         }
     }
 
+    @Test
+    void compensationIsDurableBeforeReservationReleaseAndBothStagesAreIdempotent() throws Exception {
+        try (Harness harness = harness("compensating.sqlite")) {
+            UUID ownerUuid = UUID.randomUUID();
+            OwnerPopulationPreparationResult preparation = harness.coordinator.prepareAsync(
+                    newPlan(
+                            UUID.randomUUID().toString(),
+                            UUID.randomUUID(),
+                            ownerUuid,
+                            1,
+                            6L
+                    )
+            ).get(2, TimeUnit.SECONDS);
+            PreparedOwnerPopulationAdmission prepared = preparation.preparedAdmission();
+            assertTrue(harness.coordinator.claimForApply(
+                    prepared, 6L, ClaimProviderGeneration.NONE
+            ));
+
+            CompletableFuture<Boolean> firstStart = harness.coordinator.beginCompensationAsync(
+                    prepared, "live-write-failed"
+            );
+            CompletableFuture<Boolean> retryStart = harness.coordinator.beginCompensationAsync(
+                    prepared, "retry"
+            );
+
+            assertSame(firstStart, retryStart);
+            assertTrue(firstStart.get(2, TimeUnit.SECONDS));
+            assertEquals("COMPENSATING", operationState(harness.connections, prepared.operationId()));
+            assertEquals(1L, harness.index.counts(ownerUuid, "default").globalPending());
+
+            CompletableFuture<Boolean> firstClose = harness.coordinator.completeCompensationAsync(
+                    prepared, "live-state-restored"
+            );
+            CompletableFuture<Boolean> retryClose = harness.coordinator.completeCompensationAsync(
+                    prepared, "retry"
+            );
+
+            assertSame(firstClose, retryClose);
+            assertTrue(firstClose.get(2, TimeUnit.SECONDS));
+            assertEquals("FAILED", operationState(harness.connections, prepared.operationId()));
+            assertEquals(0L, harness.index.counts(ownerUuid, "default").globalPending());
+            assertEquals(0, harness.index.pendingReservationCount());
+        }
+    }
+
     /** Regression: repeated outer owner/claim cleanup must share one durable owner cancellation. */
     @Test
     void ownerCancellationIsIdempotentAndSharesOneJournalClose() throws Exception {

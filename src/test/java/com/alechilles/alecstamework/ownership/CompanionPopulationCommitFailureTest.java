@@ -21,6 +21,8 @@ import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteSchemaMigrator;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -96,6 +98,60 @@ class CompanionPopulationCommitFailureTest {
         }
     }
 
+    @Test
+    void combinedCompensationHoldsBothReservationsUntilJournalClose() throws Exception {
+        SqliteConnectionManager connections = new SqliteConnectionManager(
+                tempDir.resolve("combined-compensation.sqlite")
+        );
+        try (Connection connection = connections.openConnection()) {
+            new SqliteSchemaMigrator().migrate(connection);
+        }
+        PersistenceHealthService health = new PersistenceHealthService();
+        try (PersistenceWriteQueue queue = new PersistenceWriteQueue(connections, health, null)) {
+            OwnerPopulationIndex ownerIndex = new OwnerPopulationIndex();
+            ownerIndex.replaceCommittedEntries(List.of(), OwnerPopulationReadiness.READY);
+            ClaimOccupancyIndex claimIndex = new ClaimOccupancyIndex();
+            claimIndex.replaceCommittedEntries(List.of(), ClaimOccupancyReadiness.READY);
+            ClaimAdmissionService claimService = new ClaimAdmissionService(claimIndex);
+            CompanionPopulationRepository repository = new CompanionPopulationRepository(
+                    connections, queue
+            );
+            CompanionPopulationAdmissionCoordinator coordinator =
+                    new CompanionPopulationAdmissionCoordinator(
+                            new OwnerPopulationAdmissionCoordinator(ownerIndex, repository, health),
+                            claimService
+                    );
+            ClaimPolicyContext policy = offPolicy();
+            String profileId = UUID.randomUUID().toString();
+            UUID ownerId = UUID.randomUUID();
+            CompanionPopulationPreparationResult result = coordinator.prepareAsync(
+                    ownerPlan(profileId, UUID.randomUUID(), ownerId),
+                    claimRequest(profileId, ownerId, policy),
+                    new ClaimLookupSession(policy)
+            ).get(4, TimeUnit.SECONDS);
+            PreparedCompanionPopulationAdmission prepared = result.preparedAdmission();
+            assertTrue(coordinator.claimForApply(
+                    prepared, SETTINGS_REVISION, new ClaimLookupSession(policy)
+            ));
+
+            assertTrue(coordinator.beginCompensationAsync(
+                    prepared, "live-write-failed"
+            ).get(4, TimeUnit.SECONDS));
+
+            assertEquals("COMPENSATING", operationState(connections, prepared));
+            assertEquals(1, ownerIndex.pendingReservationCount());
+            assertEquals(1, claimService.pendingReservationCount());
+
+            assertTrue(coordinator.completeCompensationAsync(
+                    prepared, "live-state-restored"
+            ).get(4, TimeUnit.SECONDS));
+
+            assertEquals("FAILED", operationState(connections, prepared));
+            assertEquals(0, ownerIndex.pendingReservationCount());
+            assertEquals(0, claimService.pendingReservationCount());
+        }
+    }
+
     private static OwnerPopulationAdmissionPlan ownerPlan(String profileId,
                                                            UUID npcId,
                                                            UUID ownerId) {
@@ -164,5 +220,21 @@ class CompanionPopulationCommitFailureTest {
                 SETTINGS_REVISION,
                 null
         );
+    }
+
+    private static String operationState(
+            SqliteConnectionManager connections,
+            PreparedCompanionPopulationAdmission prepared
+    ) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT state FROM companion_population_operations WHERE operation_id = ?"
+             )) {
+            statement.setString(1, prepared.ownerAdmission().operationId().toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertTrue(resultSet.next());
+                return resultSet.getString(1);
+            }
+        }
     }
 }

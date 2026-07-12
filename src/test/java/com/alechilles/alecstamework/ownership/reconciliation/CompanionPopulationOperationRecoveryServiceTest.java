@@ -55,6 +55,58 @@ class CompanionPopulationOperationRecoveryServiceTest {
     }
 
     @Test
+    void compensatingCrashClosesOnlyAfterTheExactOldStateIsObserved() throws Exception {
+        try (Harness harness = harness("compensation-old-state.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID oldOwner = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, oldOwner, UUID.randomUUID(),
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.OWNER_TRANSFER,
+                    CompanionPopulationOperationRecord.State.COMPENSATING, false
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(List.of(
+                    physical(npcUuid, oldOwner, "default", 0, 0)
+            ));
+
+            assertTrue(result.complete());
+            assertEquals(0, result.committed());
+            assertEquals(1, result.canceled());
+            assertEquals(CompanionPopulationOperationRecord.State.FAILED, harness.operationState());
+        }
+    }
+
+    @Test
+    void compensatingCrashWithPartialLiveStateRemainsQuarantined() throws Exception {
+        try (Harness harness = harness("compensation-partial.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID oldOwner = UUID.randomUUID();
+            UUID newOwner = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, oldOwner, newOwner,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.OWNER_TRANSFER,
+                    CompanionPopulationOperationRecord.State.COMPENSATING, false
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(List.of(
+                    physical(npcUuid, newOwner, "default", 0, 0)
+            ));
+
+            assertFalse(result.complete());
+            assertEquals(
+                    "operation-recovery-compensation-incomplete",
+                    result.ambiguous().getFirst().reason()
+            );
+            assertEquals(
+                    CompanionPopulationOperationRecord.State.COMPENSATING,
+                    harness.operationState()
+            );
+        }
+    }
+
+    @Test
     void applyingNewOwnerTransferAndClearFollowActualPhysicalOwner() throws Exception {
         assertOwnerDeltaCommits(OwnerPopulationOperation.NEW_OWNERSHIP, null, UUID.randomUUID(), "new");
         assertOwnerDeltaCommits(

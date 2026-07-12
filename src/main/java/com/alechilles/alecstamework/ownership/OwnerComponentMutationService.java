@@ -130,6 +130,9 @@ public final class OwnerComponentMutationService {
                 newOwnerName
         );
         if (!write.applied()) {
+            if (write.compensationRequired()) {
+                beginRecoveryCompensation(prepared, write.reason());
+            }
             return MutationResult.notApplied(write.reason());
         }
         return MutationResult.applied(commitSafely(prepared));
@@ -183,15 +186,42 @@ public final class OwnerComponentMutationService {
             );
             return WriteResult.success();
         } catch (RuntimeException | LinkageError exception) {
-            if (restoreImmediate(store, npcRef, ownerType, previous)) {
-                if (derivedAuthority.restoreImmediate(npcRef, store, previousDerived)) {
-                    coordinator.cancelAsync(prepared, "owner-component-write-failed");
-                    return WriteResult.notApplied("owner-component-write-failed");
-                }
-            }
-            markReadinessDegradedSafely("owner_component_write_ambiguous");
-            return WriteResult.notApplied("owner-component-write-ambiguous");
+            return WriteResult.compensationRequired(
+                    "owner-component-write-failed",
+                    new CompensationPlan(previous, previousDerived)
+            );
         }
+    }
+
+    /** Restores derived authority first while the canonical owner still signals incomplete work. */
+    boolean compensateDerivedImmediate(
+            @Nonnull Ref<EntityStore> npcRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull CompensationPlan plan
+    ) {
+        Objects.requireNonNull(plan, "plan");
+        if (!npcRef.isValid()) {
+            return false;
+        }
+        return derivedAuthority.restoreImmediate(npcRef, store, plan.previousDerived);
+    }
+
+    /** Restores the canonical owner last so old-owner recovery evidence implies prior steps ran. */
+    boolean compensateOwnerImmediate(
+            @Nonnull Ref<EntityStore> npcRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull CompensationPlan plan
+    ) {
+        Objects.requireNonNull(plan, "plan");
+        if (!npcRef.isValid()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
+                TameworkOwnerComponent.getComponentType();
+        if (ownerType == null) {
+            return false;
+        }
+        return restoreImmediate(store, npcRef, ownerType, plan.previousOwner);
     }
 
     /**
@@ -238,87 +268,6 @@ public final class OwnerComponentMutationService {
         }
     }
 
-    /**
-     * Queues a system-safe component write. The journal reconciles ambiguity if buffer flush fails.
-     */
-    @Nonnull
-    public MutationResult applyBuffered(@Nonnull Ref<EntityStore> npcRef,
-                                        @Nonnull Store<EntityStore> store,
-                                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                        @Nonnull PreparedOwnerPopulationAdmission prepared,
-                                        @Nullable UUID newOwnerId,
-                                        @Nullable String newOwnerName,
-                                        long settingsRevision,
-                                        @Nonnull ClaimProviderGeneration providerGeneration) {
-        return applyBuffered(
-                npcRef,
-                store,
-                commandBuffer,
-                prepared,
-                prepared.plan().transition().expectedOwnerId(),
-                newOwnerId,
-                newOwnerName,
-                settingsRevision,
-                providerGeneration
-        );
-    }
-
-    /** Buffered counterpart for a replacement representation with an explicit live expectation. */
-    @Nonnull
-    public MutationResult applyBuffered(@Nonnull Ref<EntityStore> npcRef,
-                                        @Nonnull Store<EntityStore> store,
-                                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                        @Nonnull PreparedOwnerPopulationAdmission prepared,
-                                        @Nullable UUID expectedLiveOwnerId,
-                                        @Nullable UUID newOwnerId,
-                                        @Nullable String newOwnerName,
-                                        long settingsRevision,
-                                        @Nonnull ClaimProviderGeneration providerGeneration) {
-        if (!npcRef.isValid()) {
-            coordinator.cancelAsync(prepared, "owner-component-reference-invalid");
-            return MutationResult.notApplied("owner-component-reference-invalid");
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType =
-                TameworkOwnerComponent.getComponentType();
-        if (ownerType == null) {
-            coordinator.cancelAsync(prepared, "owner-component-type-unavailable");
-            return MutationResult.notApplied("owner-component-type-unavailable");
-        }
-        TameworkOwnerComponent previous = store.getComponent(npcRef, ownerType);
-        if (!matchesExpectedOwner(previous, expectedLiveOwnerId)) {
-            coordinator.cancelAsync(prepared, "owner-component-state-changed");
-            return MutationResult.notApplied("owner-component-state-changed");
-        }
-        OwnerDerivedAuthorityMutationService.Snapshot previousDerived;
-        try {
-            previousDerived = derivedAuthority.capture(npcRef, store);
-        } catch (RuntimeException | LinkageError exception) {
-            coordinator.cancelAsync(prepared, "owner-derived-authority-read-failed");
-            return MutationResult.notApplied("owner-derived-authority-read-failed");
-        }
-        if (!coordinator.claimForApply(prepared, settingsRevision, providerGeneration)) {
-            return MutationResult.notApplied("owner-component-reservation-invalid");
-        }
-        try {
-            if (newOwnerId == null) {
-                commandBuffer.tryRemoveComponent(npcRef, ownerType);
-            } else {
-                commandBuffer.putComponent(
-                        npcRef,
-                        ownerType,
-                        new TameworkOwnerComponent(newOwnerId, normalizeName(newOwnerName))
-                );
-            }
-            derivedAuthority.applyBuffered(
-                    npcRef, commandBuffer, previousDerived, expectedLiveOwnerId, newOwnerId
-            );
-        } catch (RuntimeException | LinkageError exception) {
-            markReadinessDegradedSafely("owner_component_buffer_write_ambiguous");
-            return MutationResult.notApplied("owner-component-buffer-write-ambiguous");
-        }
-        return MutationResult.applied(commitSafely(prepared));
-    }
-
     @Nonnull
     private CompletableFuture<OwnerPopulationCommitResult> commitSafely(
             @Nonnull PreparedOwnerPopulationAdmission prepared
@@ -338,6 +287,26 @@ public final class OwnerComponentMutationService {
                 "owner-component-commit-start-failed",
                 null
         ));
+    }
+
+    private void beginRecoveryCompensation(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull String reason
+    ) {
+        try {
+            CompletableFuture<Boolean> completion = coordinator.beginCompensationAsync(prepared, reason);
+            if (completion == null) {
+                markReadinessDegradedSafely("owner_component_compensation_stage_missing");
+                return;
+            }
+            completion.whenComplete((started, failure) -> {
+                if (failure != null || !Boolean.TRUE.equals(started)) {
+                    markReadinessDegradedSafely("owner_component_compensation_start_failed");
+                }
+            });
+        } catch (RuntimeException | LinkageError failure) {
+            markReadinessDegradedSafely("owner_component_compensation_start_failed");
+        }
     }
 
     private static boolean matchesExpectedOwner(@Nullable TameworkOwnerComponent component,
@@ -405,19 +374,50 @@ public final class OwnerComponentMutationService {
         }
     }
 
-    public record WriteResult(boolean applied, @Nonnull String reason) {
+    public record WriteResult(
+            boolean applied,
+            @Nonnull String reason,
+            @Nullable CompensationPlan compensationPlan
+    ) {
         public boolean safeToCancel() {
-            return !reason.endsWith("-ambiguous");
+            return compensationPlan == null && !reason.endsWith("-ambiguous");
+        }
+
+        public boolean compensationRequired() {
+            return compensationPlan != null;
         }
 
         @Nonnull
         static WriteResult notApplied(@Nonnull String reason) {
-            return new WriteResult(false, reason);
+            return new WriteResult(false, reason, null);
+        }
+
+        @Nonnull
+        static WriteResult compensationRequired(
+                @Nonnull String reason,
+                @Nonnull CompensationPlan compensationPlan
+        ) {
+            return new WriteResult(false, reason, compensationPlan);
         }
 
         @Nonnull
         static WriteResult success() {
-            return new WriteResult(true, "owner-component-applied");
+            return new WriteResult(true, "owner-component-applied", null);
+        }
+    }
+
+    /** Detached before-image used only after the durable compensation boundary commits. */
+    public static final class CompensationPlan {
+        @Nullable
+        private final TameworkOwnerComponent previousOwner;
+        private final OwnerDerivedAuthorityMutationService.Snapshot previousDerived;
+
+        private CompensationPlan(
+                @Nullable TameworkOwnerComponent previousOwner,
+                @Nonnull OwnerDerivedAuthorityMutationService.Snapshot previousDerived
+        ) {
+            this.previousOwner = previousOwner == null ? null : previousOwner.clone();
+            this.previousDerived = Objects.requireNonNull(previousDerived, "previousDerived").copy();
         }
     }
 }

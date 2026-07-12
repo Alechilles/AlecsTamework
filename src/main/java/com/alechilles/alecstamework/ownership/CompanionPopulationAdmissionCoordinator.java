@@ -304,6 +304,62 @@ public final class CompanionPopulationAdmissionCoordinator {
         }
     }
 
+    /** Persists COMPENSATING while both owner and claim reservations remain held. */
+    @Nonnull
+    public CompletableFuture<Boolean> beginCompensationAsync(
+            @Nonnull PreparedCompanionPopulationAdmission prepared,
+            @Nonnull String reason
+    ) {
+        Objects.requireNonNull(prepared, "prepared");
+        try {
+            CompletableFuture<Boolean> completion = ownerCoordinator.beginCompensationAsync(
+                    prepared.ownerAdmission(), reason
+            );
+            return completion == null ? CompletableFuture.completedFuture(false) : completion;
+        } catch (RuntimeException | LinkageError failure) {
+            markReadinessDegradedSafely("companion_population_compensation_start_failed");
+            return CompletableFuture.completedFuture(false);
+        }
+    }
+
+    /** Releases claim capacity only after the restored owner operation is durably FAILED. */
+    @Nonnull
+    public CompletableFuture<Boolean> completeCompensationAsync(
+            @Nonnull PreparedCompanionPopulationAdmission prepared,
+            @Nonnull String reason
+    ) {
+        Objects.requireNonNull(prepared, "prepared");
+        try {
+            CompletableFuture<Boolean> ownerCompletion = ownerCoordinator.completeCompensationAsync(
+                    prepared.ownerAdmission(), reason
+            );
+            if (ownerCompletion == null) {
+                markReadinessDegradedSafely("companion_population_compensation_close_failed");
+                return CompletableFuture.completedFuture(false);
+            }
+            return ownerCompletion.handle((ownerCanceled, failure) -> {
+                boolean claimCanceled = false;
+                if (failure == null && Boolean.TRUE.equals(ownerCanceled)) {
+                    try {
+                        claimCanceled = claimAdmissionService.cancel(prepared.claimReservation());
+                    } catch (RuntimeException | LinkageError ignored) {
+                        claimCanceled = false;
+                    }
+                }
+                boolean completed = failure == null
+                        && Boolean.TRUE.equals(ownerCanceled)
+                        && claimCanceled;
+                if (!completed) {
+                    markReadinessDegradedSafely("companion_population_compensation_close_failed");
+                }
+                return completed;
+            });
+        } catch (RuntimeException | LinkageError failure) {
+            markReadinessDegradedSafely("companion_population_compensation_close_failed");
+            return CompletableFuture.completedFuture(false);
+        }
+    }
+
     private void markBothReadinessDegraded(@Nonnull String reason) {
         claimAdmissionService.markReadinessDegraded();
         ownerCoordinator.markReadinessDegraded(reason);

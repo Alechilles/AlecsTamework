@@ -51,15 +51,22 @@ class OwnerMutationContinuationArchitectureTest {
     }
 
     @Test
-    void ambiguousLiveOwnerWritesCannotCancelCapacity() throws IOException {
+    void liveOwnerCompensationIsJournaledBeforeRollbackAndCapacityRelease() throws IOException {
         String mutation = read("ownership", "OwnerComponentMutationService.java");
         String scheduler = read("ownership", "OwnerMutationScheduler.java");
+        String compensation = read("ownership", "OwnerMutationCompensationService.java");
 
-        assertTrue(mutation.contains("if (restoreImmediate(store, npcRef, ownerType, previous))"));
-        assertTrue(mutation.contains("owner-component-write-ambiguous"));
-        assertTrue(mutation.contains("return !reason.endsWith(\"-ambiguous\")"));
-        assertTrue(scheduler.contains("if (result.safeToCancel())"));
-        assertTrue(scheduler.contains("owner_mutation_live_write_ambiguous"));
+        assertTrue(mutation.contains("return restoreImmediate(store, npcRef, ownerType,"));
+        assertTrue(mutation.contains("WriteResult.compensationRequired("));
+        assertFalse(mutation.contains("MutationResult applyBuffered("));
+        assertTrue(scheduler.contains("compensationService.handleFailedWrite("));
+        assertTrue(compensation.contains("if (result.safeToCancel())"));
+        int begin = compensation.indexOf("beginCompensationAsync(prepared, result.reason())");
+        int derived = compensation.indexOf("mutationService.compensateDerivedImmediate(", begin);
+        int source = compensation.indexOf("notifyCompensated(callbacks, profileId, reason", derived);
+        int owner = compensation.indexOf("mutationService.compensateOwnerImmediate(", source);
+        int close = compensation.indexOf("completeCompensationAsync(prepared, reason)", owner);
+        assertTrue(begin >= 0 && derived > begin && source > derived && owner > source && close > owner);
     }
 
     /** Regression: only pre-durable denial releases; allowed preparation promotes its DB alias. */
