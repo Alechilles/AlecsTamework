@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
@@ -23,8 +22,6 @@ import static com.alechilles.alecstamework.ownership.OwnerPopulationCountOps.rem
  */
 public final class OwnerPopulationIndex {
     private final ReentrantLock lock = new ReentrantLock();
-    private final Object reservationAuthority = new Object();
-    private final LongSupplier monotonicClock;
     private final Map<String, OwnerPopulationEntry> entriesByProfile = new HashMap<>();
     private final Map<OwnerPopulationScopeKey, Long> committedCounts = new HashMap<>();
     private final Map<OwnerPopulationScopeKey, Long> pendingCounts = new HashMap<>();
@@ -32,6 +29,7 @@ public final class OwnerPopulationIndex {
     private final Map<String, UUID> pendingTokenByProfile = new HashMap<>();
     private final OwnerPopulationReadinessState readiness = new OwnerPopulationReadinessState();
     private final OwnerPopulationMetrics metrics = new OwnerPopulationMetrics();
+    private final OwnerPopulationReservationBook reservations;
     private final OwnerPopulationQueryAccess queries = new OwnerPopulationQueryAccess(
             lock, entriesByProfile, committedCounts, pendingCounts, pendingByToken, readiness, metrics
     );
@@ -45,14 +43,18 @@ public final class OwnerPopulationIndex {
             new OwnerPopulationReconciliationAccess(
                     lock, entriesByProfile, committedCounts, pendingTokenByProfile
             );
-    private long lastObservedNanos = Long.MIN_VALUE;
-
     public OwnerPopulationIndex() {
         this(System::nanoTime);
     }
 
     public OwnerPopulationIndex(LongSupplier monotonicClock) {
-        this.monotonicClock = Objects.requireNonNull(monotonicClock, "monotonicClock");
+        this.reservations = new OwnerPopulationReservationBook(
+                Objects.requireNonNull(monotonicClock, "monotonicClock"),
+                pendingCounts,
+                pendingByToken,
+                pendingTokenByProfile,
+                metrics
+        );
     }
 
     /** Replaces startup state. Active reservations are rejected to avoid invalidating live leases. */
@@ -131,7 +133,7 @@ public final class OwnerPopulationIndex {
 
     private OwnerPopulationDecision reserveLocked(OwnerPopulationTransitionRequest request,
                                                   long nowNanos) {
-        expireReservationsLocked(nowNanos);
+        reservations.expireReserved(nowNanos);
         OwnerPopulationEntry current = entriesByProfile.get(request.profileId());
         if (canonicalReloadInProgress) {
             return denied(request, "owner-population-canonical-reload", current, 0L, 0L, false);
@@ -162,7 +164,7 @@ public final class OwnerPopulationIndex {
         if (mismatch != null) {
             return mismatch;
         }
-        if (pendingTokenByProfile.containsKey(request.profileId())) {
+        if (reservations.hasProfile(request.profileId())) {
             return denied(request, "owner-population-profile-pending", current, 0L, 0L, false);
         }
         if (current != null && current.revision() == Long.MAX_VALUE) {
@@ -196,8 +198,7 @@ public final class OwnerPopulationIndex {
                                                         long nowNanos,
                                                         long committed,
                                                         long pending) {
-        OwnerPopulationReservation reservation =
-                new OwnerPopulationReservation(UUID.randomUUID(), reservationAuthority);
+        OwnerPopulationReservation reservation = reservations.newReservation();
         OwnerPopulationPendingTransition transition = new OwnerPopulationPendingTransition(
                 reservation,
                 request,
@@ -206,12 +207,9 @@ public final class OwnerPopulationIndex {
                 draft.additions(),
                 draft.constrainedKey(),
                 draft.positiveDelta(),
-                addLease(nowNanos, request.leaseDurationNanos())
+                reservations.expiresAt(nowNanos, request.leaseDurationNanos())
         );
-        pendingByToken.put(reservation.tokenId(), transition);
-        pendingTokenByProfile.put(request.profileId(), reservation.tokenId());
-        addCounts(pendingCounts, draft.additions());
-        metrics.reservationCreated();
+        reservations.register(transition);
         return new OwnerPopulationDecision(
                 true,
                 OwnerPopulationTransitionDraft.reservationReason(request, draft.positiveDelta()),
@@ -228,18 +226,20 @@ public final class OwnerPopulationIndex {
 
     /** Claims a reserved lease exactly once and makes it non-expiring while its mutation applies. */
     public boolean claimForApply(OwnerPopulationReservation reservation) {
-        if (!Objects.requireNonNull(reservation, "reservation").belongsTo(reservationAuthority)) {
+        if (!reservations.owns(Objects.requireNonNull(reservation, "reservation"))) {
             return false;
         }
         lock.lock();
         try {
             long nowNanos = observeNow();
-            OwnerPopulationPendingTransition transition = findPending(reservation);
+            OwnerPopulationPendingTransition transition = reservations.find(reservation);
             if (transition == null || reservation.state() != OwnerPopulationReservation.ReservationState.RESERVED) {
                 return false;
             }
-            if (isExpired(transition, nowNanos)) {
-                expireTransition(transition);
+            if (reservations.isExpired(transition, nowNanos)) {
+                reservations.close(
+                        transition, OwnerPopulationReservation.ReservationState.EXPIRED
+                );
                 return false;
             }
             if (!hasApplyHeadroom(transition)) {
@@ -275,7 +275,7 @@ public final class OwnerPopulationIndex {
 
     /** Commits once; repeated commits of the same successfully committed capability are harmless. */
     public boolean commit(OwnerPopulationReservation reservation) {
-        if (!Objects.requireNonNull(reservation, "reservation").belongsTo(reservationAuthority)) {
+        if (!reservations.owns(Objects.requireNonNull(reservation, "reservation"))) {
             return false;
         }
         lock.lock();
@@ -290,24 +290,23 @@ public final class OwnerPopulationIndex {
             if (reservation.state() != OwnerPopulationReservation.ReservationState.APPLYING) {
                 return false;
             }
-            OwnerPopulationPendingTransition transition = findPending(reservation);
+            OwnerPopulationPendingTransition transition = reservations.find(reservation);
             if (transition == null) {
                 return false;
             }
             if (!matchesCapturedEntry(transition.current(), entriesByProfile.get(transition.request().profileId()))) {
-                closePending(transition, OwnerPopulationReservation.ReservationState.CANCELED);
+                reservations.close(
+                        transition, OwnerPopulationReservation.ReservationState.CANCELED
+                );
                 return false;
             }
 
-            removeCounts(pendingCounts, transition.additions());
             if (transition.current() != null) {
                 removeCounts(committedCounts, scopeKeys(transition.current()));
             }
             entriesByProfile.put(transition.proposed().profileId(), transition.proposed());
             addCounts(committedCounts, scopeKeys(transition.proposed()));
-            removePendingIndexes(transition);
-            reservation.setState(OwnerPopulationReservation.ReservationState.COMMITTED);
-            metrics.reservationCommitted();
+            reservations.commit(transition);
             return true;
         } finally {
             lock.unlock();
@@ -316,7 +315,7 @@ public final class OwnerPopulationIndex {
 
     /** Cancels a reserved or applying transition without changing its captured committed entry. */
     public boolean cancel(OwnerPopulationReservation reservation) {
-        if (!Objects.requireNonNull(reservation, "reservation").belongsTo(reservationAuthority)) {
+        if (!reservations.owns(Objects.requireNonNull(reservation, "reservation"))) {
             return false;
         }
         lock.lock();
@@ -328,11 +327,13 @@ public final class OwnerPopulationIndex {
             if (reservation.state() == OwnerPopulationReservation.ReservationState.COMMITTED) {
                 return false;
             }
-            OwnerPopulationPendingTransition transition = findPending(reservation);
+            OwnerPopulationPendingTransition transition = reservations.find(reservation);
             if (transition == null) {
                 return false;
             }
-            closePending(transition, OwnerPopulationReservation.ReservationState.CANCELED);
+            reservations.close(
+                    transition, OwnerPopulationReservation.ReservationState.CANCELED
+            );
             return true;
         } finally {
             lock.unlock();
@@ -343,7 +344,7 @@ public final class OwnerPopulationIndex {
     public int expireReservations() {
         lock.lock();
         try {
-            return expireReservationsLocked(observeNow());
+            return reservations.expireReserved(reservations.observeNow());
         } finally {
             lock.unlock();
         }
@@ -366,15 +367,7 @@ public final class OwnerPopulationIndex {
         String normalized = OwnerPopulationEntry.normalizeProfileId(profileId);
         lock.lock();
         try {
-            UUID token = pendingTokenByProfile.get(normalized);
-            OwnerPopulationPendingTransition transition = token == null
-                    ? null
-                    : pendingByToken.get(token);
-            return transition != null
-                    && transition.reservation().state()
-                    == OwnerPopulationReservation.ReservationState.APPLYING
-                    && Objects.equals(transition.request().expectedOwnerId(), observedOwnerId)
-                    && transition.request().newOwnerId() == null;
+            return reservations.hasApplyingOwnerClear(normalized, observedOwnerId);
         } finally {
             lock.unlock();
         }
@@ -398,7 +391,7 @@ public final class OwnerPopulationIndex {
     public boolean tryBeginCanonicalReload() {
         lock.lock();
         try {
-            if (canonicalReloadInProgress || !pendingByToken.isEmpty()) {
+            if (canonicalReloadInProgress || !reservations.isEmpty()) {
                 return false;
             }
             canonicalReloadInProgress = true;
@@ -465,68 +458,12 @@ public final class OwnerPopulationIndex {
         );
     }
 
-    private OwnerPopulationPendingTransition findPending(OwnerPopulationReservation reservation) {
-        OwnerPopulationPendingTransition transition = pendingByToken.get(reservation.tokenId());
-        return transition != null && transition.reservation() == reservation ? transition : null;
-    }
-
     private boolean matchesCapturedEntry(OwnerPopulationEntry expected, OwnerPopulationEntry actual) {
         return Objects.equals(expected, actual);
     }
 
-    private int expireReservationsLocked(long nowNanos) {
-        int expired = 0;
-        for (OwnerPopulationPendingTransition transition : Set.copyOf(pendingByToken.values())) {
-            if (transition.reservation().state() != OwnerPopulationReservation.ReservationState.RESERVED
-                    || !isExpired(transition, nowNanos)) {
-                continue;
-            }
-            expireTransition(transition);
-            expired++;
-        }
-        return expired;
-    }
-
-    private boolean isExpired(OwnerPopulationPendingTransition transition, long nowNanos) {
-        return nowNanos >= transition.expiresAtNanos();
-    }
-
-    private void expireTransition(OwnerPopulationPendingTransition transition) {
-        closePending(transition, OwnerPopulationReservation.ReservationState.EXPIRED);
-    }
-
-    private void closePending(OwnerPopulationPendingTransition transition,
-                              OwnerPopulationReservation.ReservationState terminalState) {
-        removeCounts(pendingCounts, transition.additions());
-        removePendingIndexes(transition);
-        transition.reservation().setState(terminalState);
-        if (terminalState == OwnerPopulationReservation.ReservationState.CANCELED) {
-            metrics.reservationCanceled();
-        } else if (terminalState == OwnerPopulationReservation.ReservationState.EXPIRED) {
-            metrics.reservationExpired();
-        }
-    }
-
-    private void removePendingIndexes(OwnerPopulationPendingTransition transition) {
-        pendingByToken.remove(transition.reservation().tokenId(), transition);
-        pendingTokenByProfile.remove(transition.request().profileId(), transition.reservation().tokenId());
-    }
-
     private long observeNow() {
-        long nowNanos = monotonicClock.getAsLong();
-        if (lastObservedNanos != Long.MIN_VALUE && nowNanos < lastObservedNanos) {
-            throw new IllegalStateException("Monotonic owner-population clock moved backwards.");
-        }
-        lastObservedNanos = nowNanos;
-        return nowNanos;
-    }
-
-    private long addLease(long nowNanos, long leaseDurationNanos) {
-        try {
-            return Math.addExact(nowNanos, leaseDurationNanos);
-        } catch (ArithmeticException ignored) {
-            return Long.MAX_VALUE;
-        }
+        return reservations.observeNow();
     }
 
     private long incrementRevision(long revision) {
