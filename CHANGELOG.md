@@ -43,6 +43,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed packaged servers printing a false `SEVERE` SLF4J binder warning when Tamework opened its SQLite data store.
 - Fixed coop capture and release crash windows so the coop resident record, companion population state, and recovery journal finish together; a failed source check rolls the whole transition back instead of leaving a ghost resident or reopening capacity.
 - Fixed post-apply owner mutation rollback to persist `COMPENSATING` before reversing live state, restore derived/source state before the canonical owner, and release owner/claim reservations only after the journal reaches terminal failure.
 - Fixed breeding retries after restart to reuse stable pair and child identities and close every admitted unit exactly once, preventing late callbacks or partial spawns from producing duplicate offspring or leaking reserved capacity.
