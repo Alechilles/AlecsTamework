@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.ownership.CompanionSpawnAdmissionRequest;
 import com.alechilles.alecstamework.ownership.CompanionSpawnPopulationAdmissionService;
 import com.alechilles.alecstamework.ownership.CompanionSpawnPreparationResult;
 import com.alechilles.alecstamework.ownership.PreparedCompanionSpawnBatch;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import org.joml.Vector3d;
@@ -115,11 +116,7 @@ final class CommandPreparedRestoreSpawnService {
     }
 
     private static void dispatch(World world, Runnable task, Runnable rejected) {
-        try {
-            if (world.isAlive()) world.execute(task); else rejected.run();
-        } catch (RuntimeException | LinkageError failure) {
-            rejected.run();
-        }
+        LeaseBoundWorldDispatcher.execute(world, task, rejected);
     }
 
     interface Callbacks {

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.ownership.CoopPopulationReleaseAdmissionService;
 import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
 import com.alechilles.alecstamework.ownership.PlannedCompanionSpawnProbe;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -398,21 +399,8 @@ final class CoopPreparedReleaseSpawnService {
                 + context.y() + ":" + context.z() + ":" + context.residentSlot();
     }
 
-    private static void dispatch(World world, Runnable applied) {
-        dispatch(world, applied, () -> {
-        });
-    }
-
     private static void dispatch(World world, Runnable applied, Runnable rejected) {
-        try {
-            if (!world.isAlive()) {
-                rejected.run();
-            } else {
-                world.execute(applied);
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            rejected.run();
-        }
+        LeaseBoundWorldDispatcher.execute(world, applied, rejected);
     }
 
     private static void deny(Callbacks callbacks, String reason) {

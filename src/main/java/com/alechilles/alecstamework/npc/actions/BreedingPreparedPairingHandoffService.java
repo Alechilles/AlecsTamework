@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionService;
 import com.alechilles.alecstamework.ownership.BreedingPopulationPreparationResult;
 import com.alechilles.alecstamework.ownership.PreparedBreedingPopulationBatch;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -55,17 +56,17 @@ final class BreedingPreparedPairingHandoffService {
         BreedingPreparedHandoffTerminality terminality = terminality(
                 populationService, batch, nearbyReservation, pairToken, abortCompletion
         );
-        try {
-            world.execute(() -> {
-                try {
-                    finalizer.finalize(batch, terminality);
-                } catch (RuntimeException | LinkageError exception) {
-                    terminality.cancel("breeding-world-finalization-failed");
-                }
-            });
-        } catch (RuntimeException | LinkageError exception) {
-            terminality.cancel("breeding-world-unavailable");
-        }
+        LeaseBoundWorldDispatcher.execute(
+                world,
+                () -> {
+                    try {
+                        finalizer.finalize(batch, terminality);
+                    } catch (RuntimeException | LinkageError exception) {
+                        terminality.cancel("breeding-world-finalization-failed");
+                    }
+                },
+                () -> terminality.cancel("breeding-world-unavailable")
+        );
     }
 
     void releaseUnprepared(

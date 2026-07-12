@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationCommitResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -148,11 +149,67 @@ class CompanionSpawnCommitContinuationTest {
         ), events);
     }
 
+    @Test
+    void rejectedCommitContinuationRetainsSourceAndRunsTerminalCleanup() {
+        List<String> events = new ArrayList<>();
+
+        continuation.finish(
+                CompletableFuture.completedFuture(fullCommit()),
+                () -> "planned-live-target",
+                ignored -> events.add("source"),
+                ignored -> events.add("live"),
+                () -> CompletableFuture.completedFuture(true),
+                reason -> events.add("degraded:" + reason),
+                () -> events.add("terminal"),
+                rejected()
+        );
+
+        assertFalse(events.contains("live"));
+        assertFalse(events.contains("source"));
+        assertEquals(List.of(
+                "degraded:spawn-commit-continuation-world-unavailable", "terminal"
+        ), events);
+    }
+
+    @Test
+    void rejectedSourceJournalContinuationStillRunsTerminalCleanup() {
+        CompletableFuture<Boolean> sourceDurability = new CompletableFuture<>();
+        AtomicInteger dispatches = new AtomicInteger();
+        List<String> events = new ArrayList<>();
+
+        continuation.finish(
+                CompletableFuture.completedFuture(fullCommit()),
+                () -> "planned-live-target",
+                ignored -> events.add("source"),
+                ignored -> events.add("live"),
+                () -> sourceDurability,
+                reason -> events.add("degraded:" + reason),
+                () -> events.add("terminal"),
+                (task, rejected) -> {
+                    if (dispatches.incrementAndGet() == 1) {
+                        task.run();
+                    } else {
+                        rejected.run();
+                    }
+                }
+        );
+
+        assertEquals(List.of("live", "source"), events);
+        sourceDurability.complete(true);
+        assertEquals(List.of(
+                "live", "source",
+                "degraded:spawn-source-finalization-world-unavailable", "terminal"
+        ), events);
+    }
+
     private static CompanionSpawnCommitContinuation.Dispatcher immediate() {
-        return task -> {
+        return (task, rejected) -> {
             task.run();
-            return true;
         };
+    }
+
+    private static CompanionSpawnCommitContinuation.Dispatcher rejected() {
+        return (task, rejected) -> rejected.run();
     }
 
     private static CompanionPopulationCommitResult fullCommit() {

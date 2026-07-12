@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.ownership.PopulationDenialFeedback;
 import com.alechilles.alecstamework.ownership.PreparedCompanionSpawnBatch;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -427,15 +428,7 @@ final class SpawnerPreparedSpawnService {
     }
 
     private static void dispatch(World world, Runnable task, Runnable rejected) {
-        try {
-            if (world.isAlive()) {
-                world.execute(task);
-            } else {
-                rejected.run();
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            rejected.run();
-        }
+        LeaseBoundWorldDispatcher.execute(world, task, rejected);
     }
 
     private record ValidatedSpawn(

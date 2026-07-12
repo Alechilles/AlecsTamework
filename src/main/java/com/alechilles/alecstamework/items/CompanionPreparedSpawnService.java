@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.ownership.CompanionSpawnPopulationAdmissionS
 import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
 import com.alechilles.alecstamework.ownership.PlannedCompanionSpawnProbe;
 import com.alechilles.alecstamework.ownership.PreparedCompanionSpawnBatch;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -160,7 +161,9 @@ final class CompanionPreparedSpawnService {
                     notifyDegraded(callbacks, reason);
                 },
                 () -> terminal(callbacks),
-                task -> dispatch(world, task)
+                (task, rejected) -> LeaseBoundWorldDispatcher.execute(
+                        world, task, rejected
+                )
         );
     }
 
@@ -322,18 +325,6 @@ final class CompanionPreparedSpawnService {
             callbacks.onTerminal();
         } catch (RuntimeException | LinkageError ignored) {
             // No admission remains for the callback to strand.
-        }
-    }
-
-    private static boolean dispatch(@Nonnull World world, @Nonnull Runnable task) {
-        try {
-            if (!world.isAlive()) {
-                return false;
-            }
-            world.execute(task);
-            return true;
-        } catch (RuntimeException | LinkageError failure) {
-            return false;
         }
     }
 

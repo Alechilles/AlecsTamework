@@ -50,10 +50,10 @@ final class CompanionSpawnCommitContinuation {
                 result, failure, liveResolver, sourceFinalization, liveContinuation,
                 sourceDurability, degraded, terminal, dispatcher
         );
-        if (!dispatch(dispatcher, worldTask)) {
+        dispatch(dispatcher, worldTask, () -> {
             notify(degraded, "spawn-commit-continuation-world-unavailable");
             runTerminal(terminal);
-        }
+        });
     }
 
     private <T> void finishOnWorld(
@@ -128,10 +128,10 @@ final class CompanionSpawnCommitContinuation {
                 }
                 runTerminal(terminal);
             };
-            if (!dispatch(dispatcher, worldTask)) {
+            dispatch(dispatcher, worldTask, () -> {
                 notify(degraded, "spawn-source-finalization-world-unavailable");
                 runTerminal(terminal);
-            }
+            });
         });
     }
 
@@ -176,11 +176,11 @@ final class CompanionSpawnCommitContinuation {
         }
     }
 
-    private static boolean dispatch(Dispatcher dispatcher, Runnable task) {
+    private static void dispatch(Dispatcher dispatcher, Runnable task, Runnable rejected) {
         try {
-            return dispatcher.dispatch(task);
+            dispatcher.dispatch(task, rejected);
         } catch (RuntimeException | LinkageError failure) {
-            return false;
+            runTerminal(rejected);
         }
     }
 
@@ -207,6 +207,6 @@ final class CompanionSpawnCommitContinuation {
 
     @FunctionalInterface
     interface Dispatcher {
-        boolean dispatch(@Nonnull Runnable task);
+        void dispatch(@Nonnull Runnable task, @Nonnull Runnable rejected);
     }
 }
