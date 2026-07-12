@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderProbe;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbeResult;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
+import java.lang.ref.WeakReference;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
@@ -19,13 +20,11 @@ import javax.annotation.Nonnull;
 /** Lifecycle-aware SimpleClaims 1.0.38-compatible capability probe. */
 public final class SimpleClaimsProviderProbe implements ClaimProviderProbe {
     private static final String PROVIDER_ID = "simpleclaims";
-    private static final String PLUGIN_IDENTIFIER = "Buuz135:SimpleClaims";
-
     private final ClaimPluginLocator locator;
     private final Function<Object, SimpleClaimsBreedingBridge> bridgeFactory;
     private final AtomicLong observationSequence = new AtomicLong();
     private ClaimProviderGeneration cachedLocationGeneration = ClaimProviderGeneration.NONE;
-    private ClaimProviderProbeResult cachedReady;
+    private WeakReference<ClaimProviderProbeResult> cachedReady;
     private long reflectedGeneration;
     private long cacheEpoch;
     private long latestPublishedObservation;
@@ -33,7 +32,10 @@ public final class SimpleClaimsProviderProbe implements ClaimProviderProbe {
 
     public SimpleClaimsProviderProbe() {
         this(
-                new HytaleClaimPluginLocator(PROVIDER_ID, PLUGIN_IDENTIFIER),
+                new HytaleClaimPluginLocator(
+                        PROVIDER_ID,
+                        HytaleClaimPluginLocator.SIMPLE_CLAIMS_PLUGIN_IDENTIFIER
+                ),
                 plugin -> SimpleClaimsBreedingBridge.forClassLoader(plugin.getClass().getClassLoader())
         );
     }
@@ -125,6 +127,9 @@ public final class SimpleClaimsProviderProbe implements ClaimProviderProbe {
     }
 
     private void clearCachedContract() {
+        if (cachedReady != null) {
+            cachedReady.clear();
+        }
         cachedReady = null;
         cachedLocationGeneration = ClaimProviderGeneration.NONE;
     }
@@ -151,9 +156,13 @@ public final class SimpleClaimsProviderProbe implements ClaimProviderProbe {
         if (closed) {
             return new Snapshot(cacheEpoch, null);
         }
-        if (cachedReady != null && cachedLocationGeneration.equals(locationGeneration)) {
+        ClaimProviderProbeResult ready = cachedReady == null ? null : cachedReady.get();
+        if (ready != null && cachedLocationGeneration.equals(locationGeneration)) {
             latestPublishedObservation = Math.max(latestPublishedObservation, observation);
-            return new Snapshot(cacheEpoch, cachedReady);
+            return new Snapshot(cacheEpoch, ready);
+        }
+        if (ready == null && cachedReady != null) {
+            clearCachedContract();
         }
         return new Snapshot(cacheEpoch, null);
     }
@@ -179,9 +188,8 @@ public final class SimpleClaimsProviderProbe implements ClaimProviderProbe {
                 && cacheEpoch == observedEpoch
                 && observation >= latestPublishedObservation) {
             cachedLocationGeneration = location.generation();
-            cachedReady = candidate;
+            cachedReady = new WeakReference<>(candidate);
             latestPublishedObservation = observation;
-            return cachedReady;
         }
         return candidate;
     }

@@ -6,6 +6,5 @@ package com.alechilles.alecstamework.integration.claims;
 public enum ClaimProviderCapability {
     STABLE_CLAIM_IDENTITY,
     WORLD_SCOPED_EXTENT,
-    MEMBERSHIP_ACCESS,
     DAMAGE_ACCESS
 }

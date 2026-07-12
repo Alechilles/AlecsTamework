@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderProbe;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbeResult;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
+import java.lang.ref.WeakReference;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,7 +22,7 @@ public final class QuestLinesClaimsProviderProbe implements ClaimProviderProbe {
     private final ClaimPluginLocator locator;
     private final AtomicLong observationSequence = new AtomicLong();
     private ClaimProviderGeneration cachedLocationGeneration = ClaimProviderGeneration.NONE;
-    private ClaimProviderProbeResult cachedReady;
+    private WeakReference<ClaimProviderProbeResult> cachedReady;
     private long reflectedGeneration;
     private long cacheEpoch;
     private long latestPublishedObservation;
@@ -103,6 +104,9 @@ public final class QuestLinesClaimsProviderProbe implements ClaimProviderProbe {
     }
 
     private void clearCachedContract() {
+        if (cachedReady != null) {
+            cachedReady.clear();
+        }
         cachedReady = null;
         cachedLocationGeneration = ClaimProviderGeneration.NONE;
     }
@@ -129,9 +133,13 @@ public final class QuestLinesClaimsProviderProbe implements ClaimProviderProbe {
         if (closed) {
             return new Snapshot(cacheEpoch, null);
         }
-        if (cachedReady != null && cachedLocationGeneration.equals(locationGeneration)) {
+        ClaimProviderProbeResult ready = cachedReady == null ? null : cachedReady.get();
+        if (ready != null && cachedLocationGeneration.equals(locationGeneration)) {
             latestPublishedObservation = Math.max(latestPublishedObservation, observation);
-            return new Snapshot(cacheEpoch, cachedReady);
+            return new Snapshot(cacheEpoch, ready);
+        }
+        if (ready == null && cachedReady != null) {
+            clearCachedContract();
         }
         return new Snapshot(cacheEpoch, null);
     }
@@ -149,9 +157,8 @@ public final class QuestLinesClaimsProviderProbe implements ClaimProviderProbe {
                 && cacheEpoch == observedEpoch
                 && observation >= latestPublishedObservation) {
             cachedLocationGeneration = location.generation();
-            cachedReady = candidate;
+            cachedReady = new WeakReference<>(candidate);
             latestPublishedObservation = observation;
-            return cachedReady;
         }
         return candidate;
     }

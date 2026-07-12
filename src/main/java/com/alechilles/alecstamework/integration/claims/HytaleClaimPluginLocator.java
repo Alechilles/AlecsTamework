@@ -16,6 +16,7 @@ import javax.annotation.Nullable;
  */
 public final class HytaleClaimPluginLocator implements ClaimPluginLocator {
     public static final String QUESTLINES_PLUGIN_IDENTIFIER = "net.evilcraft:QuestLinesClaims";
+    public static final String SIMPLE_CLAIMS_PLUGIN_IDENTIFIER = "Buuz135:SimpleClaims";
 
     private final String providerId;
     private final PluginIdentifier pluginIdentifier;

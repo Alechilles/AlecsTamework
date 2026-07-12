@@ -20,9 +20,6 @@ import org.joml.Vector3d;
 public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge {
     private static final String PROVIDER_ID = "simpleclaims";
 
-    @Nullable
-    private static volatile SimpleClaimsBreedingBridge cachedBridge;
-
     public enum LookupStatus {
         CLAIM_FOUND,
         NO_CLAIM,
@@ -71,21 +68,10 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
         this.damagePolicy = new SimpleClaimsNativeTamedDamagePolicy(damageAccess);
     }
 
+    /** Resolves the current classloader generation without retaining a process-wide bridge. */
     @Nonnull
     public static SimpleClaimsBreedingBridge initialize() {
-        SimpleClaimsBreedingBridge bridge = cachedBridge;
-        if (bridge != null) {
-            return bridge;
-        }
-        SimpleClaimsBreedingBridge candidate = createBridge();
-        synchronized (SimpleClaimsBreedingBridge.class) {
-            bridge = cachedBridge;
-            if (bridge == null) {
-                bridge = candidate;
-                cachedBridge = bridge;
-            }
-            return bridge;
-        }
+        return createBridge();
     }
 
     @Nonnull
@@ -326,9 +312,4 @@ public final class SimpleClaimsBreedingBridge implements ClaimIntegrationBridge 
         return message == null || message.isBlank() ? "unknown error" : message;
     }
 
-    static void clearCachedBridgeForTests() {
-        synchronized (SimpleClaimsBreedingBridge.class) {
-            cachedBridge = null;
-        }
-    }
 }

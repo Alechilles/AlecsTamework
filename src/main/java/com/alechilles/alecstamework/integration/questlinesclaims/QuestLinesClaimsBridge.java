@@ -35,9 +35,6 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
     private static final String PROVIDER_ID = "questlines-claims";
     private static final String FOOTPRINT_ID_PREFIX = "footprint:";
 
-    @Nullable
-    private static volatile QuestLinesClaimsBridge cachedBridge;
-
     private final boolean available;
     @Nullable
     private final String unavailableReason;
@@ -56,21 +53,10 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
         this.getClaimAtBlock = getClaimAtBlock;
     }
 
+    /** Resolves the current plugin generation without retaining a process-wide bridge. */
     @Nonnull
     public static QuestLinesClaimsBridge initialize() {
-        QuestLinesClaimsBridge bridge = cachedBridge;
-        if (bridge != null) {
-            return bridge;
-        }
-        QuestLinesClaimsBridge candidate = createBridge();
-        synchronized (QuestLinesClaimsBridge.class) {
-            bridge = cachedBridge;
-            if (bridge == null) {
-                bridge = candidate;
-                cachedBridge = bridge;
-            }
-            return bridge;
-        }
+        return createBridge();
     }
 
     @Nonnull
@@ -369,12 +355,6 @@ public final class QuestLinesClaimsBridge implements ClaimIntegrationBridge {
     @Nonnull
     private static QuestLinesClaimsBridge unavailable(@Nullable String reason) {
         return new QuestLinesClaimsBridge(false, reason, null, null);
-    }
-
-    static void clearCachedBridgeForTests() {
-        synchronized (QuestLinesClaimsBridge.class) {
-            cachedBridge = null;
-        }
     }
 
     private record FootprintRead(@Nullable ClaimFootprint footprint,

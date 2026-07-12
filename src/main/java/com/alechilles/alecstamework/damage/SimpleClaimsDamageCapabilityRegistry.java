@@ -6,13 +6,14 @@ import com.alechilles.alecstamework.integration.claims.ClaimPluginVersionCompati
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
 import com.alechilles.alecstamework.integration.claims.HytaleClaimPluginLocator;
+import java.lang.ref.WeakReference;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 
 /**
- * Positive-generation cache for SimpleClaims damage and identity access.
+ * Weak positive-generation cache for SimpleClaims damage and identity access.
  *
  * <p>Every resolve observes PluginManager first. Absent, disabled, failed, and incompatible states
  * are never sticky. Locator and reflection work occur outside the registry monitor, and an older
@@ -21,13 +22,11 @@ import javax.annotation.Nonnull;
 final class SimpleClaimsDamageCapabilityRegistry
         implements SimpleClaimsDamageCapabilityResolver, AutoCloseable {
     private static final String PROVIDER_ID = "simpleclaims-damage";
-    private static final String PLUGIN_IDENTIFIER = "Buuz135:SimpleClaims";
-
     private final ClaimPluginLocator locator;
     private final Function<Object, SimpleClaimsDamageGeneration> generationFactory;
     private final AtomicLong observationSequence = new AtomicLong();
     private ClaimProviderGeneration cachedLocationGeneration = ClaimProviderGeneration.NONE;
-    private Resolution cachedReady;
+    private WeakReference<Resolution> cachedReady;
     private long reflectedGeneration;
     private long cacheEpoch;
     private long latestPublishedObservation;
@@ -35,7 +34,10 @@ final class SimpleClaimsDamageCapabilityRegistry
 
     SimpleClaimsDamageCapabilityRegistry() {
         this(
-                new HytaleClaimPluginLocator(PROVIDER_ID, PLUGIN_IDENTIFIER),
+                new HytaleClaimPluginLocator(
+                        PROVIDER_ID,
+                        HytaleClaimPluginLocator.SIMPLE_CLAIMS_PLUGIN_IDENTIFIER
+                ),
                 SimpleClaimsDamageGeneration::reflect
         );
     }
@@ -152,9 +154,13 @@ final class SimpleClaimsDamageCapabilityRegistry
         if (closed) {
             return new Snapshot(cacheEpoch, null);
         }
-        if (cachedReady != null && cachedLocationGeneration.equals(locationGeneration)) {
+        Resolution ready = cachedReady == null ? null : cachedReady.get();
+        if (ready != null && cachedLocationGeneration.equals(locationGeneration)) {
             latestPublishedObservation = Math.max(latestPublishedObservation, observation);
-            return new Snapshot(cacheEpoch, cachedReady);
+            return new Snapshot(cacheEpoch, ready);
+        }
+        if (ready == null && cachedReady != null) {
+            clearCached();
         }
         return new Snapshot(cacheEpoch, null);
     }
@@ -175,7 +181,7 @@ final class SimpleClaimsDamageCapabilityRegistry
                 && cacheEpoch == observedEpoch
                 && observation >= latestPublishedObservation) {
             cachedLocationGeneration = location.generation();
-            cachedReady = candidate;
+            cachedReady = new WeakReference<>(candidate);
             latestPublishedObservation = observation;
         }
         return candidate;
@@ -190,6 +196,9 @@ final class SimpleClaimsDamageCapabilityRegistry
 
     private void clearCached() {
         cachedLocationGeneration = ClaimProviderGeneration.NONE;
+        if (cachedReady != null) {
+            cachedReady.clear();
+        }
         cachedReady = null;
     }
 

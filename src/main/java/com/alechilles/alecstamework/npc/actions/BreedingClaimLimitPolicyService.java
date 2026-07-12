@@ -7,8 +7,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProviderSelector;
 import com.alechilles.alecstamework.integration.claims.ClaimPopulationKey;
 import com.alechilles.alecstamework.integration.claims.ClaimPolicyContext;
-import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesClaimsBridge;
-import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.hypixel.hytale.component.Store;
@@ -47,12 +46,13 @@ final class BreedingClaimLimitPolicyService {
             config = TwGlobalConfig.defaultConfig();
         }
         TameworkRuntimeSettings runtimeSettings = TameworkRuntimeSettings.currentOrNull();
+        ClaimProviderRequest providerRequest = runtimeSettings == null
+                ? config.getSimpleClaimsProviderRequest()
+                : runtimeSettings.simpleClaimsProviderRequest();
         OwnerPopulationRuntime populationRuntime = resolvePopulationRuntime();
         if (populationRuntime != null) {
             ClaimPolicyContext context = populationRuntime.claimProviderRegistry().resolveRequest(
-                    runtimeSettings == null
-                            ? config.getSimpleClaimsProviderRequest()
-                            : runtimeSettings.simpleClaimsProviderRequest(),
+                    providerRequest,
                     runtimeSettings == null ? 0L : runtimeSettings.revision()
             );
             return context.bridge() != null
@@ -61,13 +61,39 @@ final class BreedingClaimLimitPolicyService {
                             context.providerId(), context.reason()
                     );
         }
-        ClaimIntegrationProvider provider = TameworkRuntimeSettings.simpleClaimsProvider(
-                config.getSimpleClaimsProvider()
-        );
-        return ClaimIntegrationProviderSelector.select(
-                provider,
-                QuestLinesClaimsBridge.initialize(),
-                SimpleClaimsBreedingBridge.initialize()
+        return unavailableWithoutPopulationRuntime(providerRequest);
+    }
+
+    /** Never performs permissive provider probing outside the lifecycle-aware owner runtime. */
+    @Nonnull
+    static ClaimIntegrationBridge unavailableWithoutPopulationRuntime(@Nullable ClaimProviderRequest request) {
+        if (request == null) {
+            return ClaimIntegrationProviderSelector.unavailable(
+                    "invalid",
+                    "Owner population runtime is unavailable and no claim provider request was supplied."
+            );
+        }
+        if (!request.valid()) {
+            return ClaimIntegrationProviderSelector.unavailable(
+                    "invalid",
+                    request.invalidDiagnostic("SimpleClaims.Provider")
+            );
+        }
+        ClaimIntegrationProvider provider = request.provider();
+        if (provider == ClaimIntegrationProvider.OFF) {
+            return ClaimIntegrationProviderSelector.unavailable("off", "Claim integration is off.");
+        }
+        String providerId = switch (provider) {
+            case AUTO -> "auto";
+            case SIMPLE_CLAIMS -> "simpleclaims";
+            case QUESTLINES_CLAIMS -> "questlines-claims";
+            case OFF -> "off";
+        };
+        return ClaimIntegrationProviderSelector.unavailable(
+                providerId,
+                "Owner population runtime is unavailable; claim provider '"
+                        + request.displayValue()
+                        + "' cannot be resolved safely."
         );
     }
 
