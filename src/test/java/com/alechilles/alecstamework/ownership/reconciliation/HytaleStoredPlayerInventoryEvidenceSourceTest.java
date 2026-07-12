@@ -21,7 +21,7 @@ class HytaleStoredPlayerInventoryEvidenceSourceTest {
     private static final UUID SECOND = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Test
-    void durableEpochResumesStableCatalogButStructuralChangeInvalidatesGeneration() {
+    void durableEpochResumesStableCatalogButStructuralChangeInvalidatesGeneration() throws Exception {
         HytaleStoredPlayerInventoryEvidenceSource original = source(Set.of(FIRST), "durable-epoch");
         HytaleStoredPlayerInventoryEvidenceSource restarted = source(Set.of(FIRST), "durable-epoch");
         HytaleStoredPlayerInventoryEvidenceSource changed = source(
