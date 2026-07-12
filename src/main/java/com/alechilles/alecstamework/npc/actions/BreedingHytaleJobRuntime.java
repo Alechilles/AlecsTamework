@@ -47,6 +47,8 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
     private final BreedingParticleOffsetResolver particleOffsetResolver = new BreedingParticleOffsetResolver();
     private final BreedingParentCooldownResolver cooldownResolver = new BreedingParentCooldownResolver();
     private final BreedingCooldownRollbackService rollbackService = new BreedingCooldownRollbackService();
+    private final BreedingSpawnCompletionGuard spawnCompletionGuard =
+            new BreedingSpawnCompletionGuard();
 
     @Override
     @Nonnull
@@ -138,6 +140,16 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
         }
         Ref<EntityStore> childRef = spawned.first();
         NPCEntity childNpc = spawned.second();
+        return spawnCompletionGuard.complete(
+                () -> initializeSpawnedChild(job, child, childRef, childNpc, context),
+                exception -> logSpawnFollowUpFailure(job, childNpc, exception));
+    }
+
+    private void initializeSpawnedChild(BreedingBirthJob job,
+                                        PlannedChild child,
+                                        Ref<EntityStore> childRef,
+                                        NPCEntity childNpc,
+                                        Context context) {
         String physicsReset = CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
                 childRef,
                 childNpc,
@@ -174,7 +186,6 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
         spawnHearts(childRef, childNpc, context.store());
         logInfo("Breeding spawn success: child=" + childNpc.getUuid()
                 + " role=" + child.roleId() + " physicsReset={" + physicsReset + "}.");
-        return true;
     }
 
     @Override
@@ -326,6 +337,19 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
         if (plugin != null && plugin.getLogger() != null && plugin.isDebugBreedingEnabled()) {
             plugin.getLogger().at(Level.INFO).log(message);
         }
+    }
+
+    private void logSpawnFollowUpFailure(BreedingBirthJob job,
+                                         NPCEntity childNpc,
+                                         RuntimeException failure) {
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || plugin.getLogger() == null) {
+            return;
+        }
+        plugin.getLogger().at(Level.WARNING).withCause(failure).log(
+                "Breeding child was created but follow-up initialization failed: job="
+                        + job.jobId() + " child=" + childNpc.getUuid()
+                        + ". Birth remains committed to prevent a duplicate litter.");
     }
 
     record Context(
