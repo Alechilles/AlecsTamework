@@ -1,5 +1,6 @@
-package com.alechilles.alecstamework.ownership;
+package com.alechilles.alecstamework.runtime.dispatch;
 
+import com.alechilles.alecstamework.ownership.OwnerPopulationTransitionRequest;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -11,34 +12,39 @@ import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
 /**
- * Dispatches deferred owner-mutation work without letting world shutdown strand cleanup.
- * A lease-aligned start watchdog rejects accepted work that never begins; its wrapper then no-ops.
+ * Dispatches lease-bound world work without allowing shutdown to strand terminal cleanup.
+ * A lease-aligned start watchdog rejects accepted work that never begins; its queued wrapper then
+ * becomes a no-op so the task and rejection callback remain mutually exclusive.
  */
-final class OwnerMutationWorldDispatcher {
+public final class LeaseBoundWorldDispatcher {
     private static final Executor START_TIMEOUT_EXECUTOR = CompletableFuture.delayedExecutor(
             OwnerPopulationTransitionRequest.DEFAULT_LEASE_DURATION.toNanos(),
             TimeUnit.NANOSECONDS
     );
 
-    private OwnerMutationWorldDispatcher() {
+    private LeaseBoundWorldDispatcher() {
     }
 
-    static void execute(@Nonnull World world, @Nonnull Runnable task) {
+    public static void execute(@Nonnull World world, @Nonnull Runnable task) {
         execute(world, task, () -> {
         });
     }
 
-    static void execute(@Nonnull World world,
-                        @Nonnull Runnable task,
-                        @Nonnull Runnable rejected) {
+    public static void execute(@Nonnull World world,
+                               @Nonnull Runnable task,
+                               @Nonnull Runnable rejected) {
         Objects.requireNonNull(world, "world");
         execute(world::isAlive, world::execute, task, rejected);
     }
 
-    static void execute(@Nonnull BooleanSupplier alive,
-                        @Nonnull Consumer<Runnable> dispatcher,
-                        @Nonnull Runnable task,
-                        @Nonnull Runnable rejected) {
+    /**
+     * Dispatches through an arbitrary world-like executor while retaining the production lease
+     * watchdog. This overload also supplies a deterministic seam for executor adapters.
+     */
+    public static void execute(@Nonnull BooleanSupplier alive,
+                               @Nonnull Consumer<Runnable> dispatcher,
+                               @Nonnull Runnable task,
+                               @Nonnull Runnable rejected) {
         execute(alive, dispatcher, task, rejected, START_TIMEOUT_EXECUTOR);
     }
 

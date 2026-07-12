@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.alechilles.alecstamework.integration.claims.ClaimLookupMetrics;
 import com.alechilles.alecstamework.integration.claims.ClaimLookupSession;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
@@ -275,7 +276,7 @@ public final class OwnerMutationScheduler {
             } else {
                 terminality.degrade("owner_mutation_prepare_completion_ambiguous");
             }
-            OwnerMutationWorldDispatcher.execute(snapshot.world(), () -> {
+            LeaseBoundWorldDispatcher.execute(snapshot.world(), () -> {
                 if (preparation != null) {
                     try {
                         callbacks.onPopulationDenied(preparation);
@@ -307,7 +308,7 @@ public final class OwnerMutationScheduler {
             );
             return;
         }
-        OwnerMutationWorldDispatcher.execute(snapshot.world(), () -> applyPrepared(
+        LeaseBoundWorldDispatcher.execute(snapshot.world(), () -> applyPrepared(
                 snapshot,
                 newOwnerId,
                 newOwnerName,
@@ -444,7 +445,7 @@ public final class OwnerMutationScheduler {
             boolean identityDurable = identityLifecycle.markLiveDurableIfCommitted(
                     identityMapped, commit, profileId, npcUuid
             );
-            OwnerMutationWorldDispatcher.execute(world, () -> {
+            LeaseBoundWorldDispatcher.execute(world, () -> {
                     if (failure != null || commit == null || !commit.committed() || !identityDurable) {
                         terminality.durabilityDegraded(callbacks,
                                 !identityMapped

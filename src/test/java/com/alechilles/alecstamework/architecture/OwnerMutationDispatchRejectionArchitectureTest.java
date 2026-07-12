@@ -52,7 +52,10 @@ class OwnerMutationDispatchRejectionArchitectureTest {
 
     @Test
     void dispatchStartWatchdogUsesReservationLeaseAndAtomicTerminalStates() throws IOException {
-        Path dispatcher = SCHEDULER.resolveSibling("OwnerMutationWorldDispatcher.java");
+        Path dispatcher = Paths.get(
+                "src", "main", "java", "com", "alechilles", "alecstamework",
+                "runtime", "dispatch", "LeaseBoundWorldDispatcher.java"
+        );
         String source = Files.readString(dispatcher, StandardCharsets.UTF_8);
 
         assertTrue(source.contains(

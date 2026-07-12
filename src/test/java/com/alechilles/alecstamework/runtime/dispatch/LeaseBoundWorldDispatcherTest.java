@@ -1,4 +1,4 @@
-package com.alechilles.alecstamework.ownership;
+package com.alechilles.alecstamework.runtime.dispatch;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -8,13 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class OwnerMutationWorldDispatcherTest {
+/** Regression coverage for shutdown between world dispatch acceptance and task start. */
+class LeaseBoundWorldDispatcherTest {
     @Test
     void deadWorldRunsRejectedCallbackExactlyOnceEvenWhenItThrows() {
         AtomicInteger rejected = new AtomicInteger();
         ManualExecutor timeout = new ManualExecutor();
 
-        OwnerMutationWorldDispatcher.execute(
+        LeaseBoundWorldDispatcher.execute(
                 () -> false,
                 task -> {
                     throw new AssertionError("dead worlds must not dispatch");
@@ -38,7 +39,7 @@ class OwnerMutationWorldDispatcherTest {
         AtomicInteger rejected = new AtomicInteger();
         ManualExecutor timeout = new ManualExecutor();
 
-        OwnerMutationWorldDispatcher.execute(
+        LeaseBoundWorldDispatcher.execute(
                 () -> true,
                 task -> {
                     throw new IllegalStateException("world shutting down");
@@ -60,7 +61,7 @@ class OwnerMutationWorldDispatcherTest {
         AtomicInteger rejected = new AtomicInteger();
         ManualExecutor timeout = new ManualExecutor();
 
-        OwnerMutationWorldDispatcher.execute(
+        LeaseBoundWorldDispatcher.execute(
                 () -> true,
                 Runnable::run,
                 tasks::incrementAndGet,
@@ -79,7 +80,7 @@ class OwnerMutationWorldDispatcherTest {
         AtomicInteger rejected = new AtomicInteger();
         ManualExecutor timeout = new ManualExecutor();
 
-        OwnerMutationWorldDispatcher.execute(
+        LeaseBoundWorldDispatcher.execute(
                 () -> true,
                 Runnable::run,
                 () -> {
@@ -102,7 +103,7 @@ class OwnerMutationWorldDispatcherTest {
         AtomicInteger rejected = new AtomicInteger();
         ManualExecutor timeout = new ManualExecutor();
 
-        OwnerMutationWorldDispatcher.execute(
+        LeaseBoundWorldDispatcher.execute(
                 () -> true,
                 queued::set,
                 tasks::incrementAndGet,
@@ -124,7 +125,7 @@ class OwnerMutationWorldDispatcherTest {
         AtomicInteger rejected = new AtomicInteger();
         ManualExecutor timeout = new ManualExecutor();
 
-        OwnerMutationWorldDispatcher.execute(
+        LeaseBoundWorldDispatcher.execute(
                 () -> true,
                 queued::set,
                 tasks::incrementAndGet,
