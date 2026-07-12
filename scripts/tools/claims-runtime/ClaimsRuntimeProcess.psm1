@@ -488,7 +488,6 @@ function Write-ClaimsRuntimeScenarioSummary {
     Write-ClaimsRuntimeText -Path $Path `
         -Value (($lines -join [Environment]::NewLine) + [Environment]::NewLine)
 }
-
 Export-ModuleMember -Function @(
     "Write-ClaimsRuntimeJson",
     "Write-ClaimsRuntimeText",
