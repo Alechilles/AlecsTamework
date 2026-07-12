@@ -149,7 +149,11 @@ $primaryDocCandidates = @(
     "docs/agents/runtime-vs-source-checklist.md",
     "docs/agents/lessons-index.md"
 )
-$primaryDocs = $primaryDocCandidates | Where-Object { Test-Path (Join-Path $script:RepoRoot $_) }
+# AGENTS.md is required policy but may be supplied outside Git in isolated worktrees.
+# Keep the generated index stable whether that external file is currently present or not.
+$primaryDocs = $primaryDocCandidates | Where-Object {
+    $_ -eq "AGENTS.md" -or (Test-Path (Join-Path $script:RepoRoot $_))
+}
 foreach ($doc in $primaryDocs) {
     $lines.Add(('- `{0}`' -f $doc))
 }
