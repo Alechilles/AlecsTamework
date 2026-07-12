@@ -43,6 +43,7 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
     private final PublicPopulationExpiredAdmissionCleaner expiredCleaner;
     private final PublicPopulationRetentionCleaner retentionCleaner;
     private final PublicPopulationCapabilityLifecycle capabilityLifecycle;
+    private final PublicPopulationCommitCoordinator commitCoordinator;
     private final Map<UUID, PublicPopulationAdmissionRecord> admissions = new ConcurrentHashMap<>();
     private final Map<String, SinglePreparation> idempotentSingles = new ConcurrentHashMap<>();
     private final Map<String, BatchPreparation> idempotentBatches = new ConcurrentHashMap<>();
@@ -110,6 +111,9 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
         );
         this.capabilityLifecycle = new PublicPopulationCapabilityLifecycle(
                 coordinator, policyResolver, decisions, lookupMetrics
+        );
+        this.commitCoordinator = new PublicPopulationCommitCoordinator(
+                identityResolver, coordinator, decisions
         );
         this.batchPreparer = new PublicPopulationBatchPreparer(
                 planner,
@@ -246,43 +250,7 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
         if (record == null) {
             return CompletableFuture.completedFuture(PopulationAdmissionDecision.unavailable(INVALID_TOKEN));
         }
-        CompletableFuture<PopulationAdmissionDecision> future;
-        synchronized (record) {
-            if (record.state() == PublicPopulationAdmissionRecord.State.COMMITTING) {
-                return record.completion();
-            }
-            if (record.state() != PublicPopulationAdmissionRecord.State.APPLYING) {
-                return CompletableFuture.completedFuture(record.state()
-                        == PublicPopulationAdmissionRecord.State.COMMITTED
-                        || record.state() == PublicPopulationAdmissionRecord.State.DEGRADED
-                        || record.state() == PublicPopulationAdmissionRecord.State.CANCELED
-                        ? record.decision()
-                        : decisions.denied(record.request(), "population-admission-not-applying"));
-            }
-            record.transition(
-                    PublicPopulationAdmissionRecord.State.APPLYING,
-                    PublicPopulationAdmissionRecord.State.COMMITTING
-            );
-            future = new CompletableFuture<>();
-            record.completion(future);
-        }
-        try {
-            CompletionStage<CompanionPopulationCommitResult> commit = coordinator.commitAsync(
-                    record.prepared()
-            );
-            if (commit == null) {
-                finishCommitSafely(record, future, null, new IllegalStateException(
-                        "Population commit returned no completion stage."
-                ));
-            } else {
-                commit.whenComplete((result, failure) ->
-                        finishCommitSafely(record, future, result, failure)
-                );
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            finishCommitSafely(record, future, null, failure);
-        }
-        return future;
+        return commitCoordinator.commit(record);
     }
 
     @Nonnull
@@ -373,82 +341,6 @@ public final class RuntimePopulationPolicyAuthority implements PopulationPolicyA
             future.complete(PopulationBatchAdmissionDecision.unavailable(
                     request.units().size(), "population-admission-batch-prepare-failed"
             ));
-        }
-    }
-
-    private void finishCommit(PublicPopulationAdmissionRecord record,
-                              CompletableFuture<PopulationAdmissionDecision> future,
-                              @Nullable CompanionPopulationCommitResult result,
-                              @Nullable Throwable failure) {
-        PopulationAdmissionDecision decision;
-        PublicPopulationAdmissionRecord.State state;
-        boolean ownerCommitted = result != null && result.ownerCommit() != null
-                && result.ownerCommit().committed();
-        if (failure == null && result != null && (result.committed() || ownerCommitted)) {
-            try {
-                identityResolver.markDurable(record.profileId(), record.currentNpcUuid());
-                if (result.committed()) {
-                    decision = decisions.accepted(
-                            PopulationAdmissionDecision.Status.COMMITTED,
-                            result.reason(),
-                            record.token(),
-                            record.prepared().ownerAdmission().decision()
-                    );
-                    state = PublicPopulationAdmissionRecord.State.COMMITTED;
-                } else {
-                    decision = decisions.closed(
-                            PopulationAdmissionDecision.Status.DEGRADED,
-                            result.reason()
-                    );
-                    state = PublicPopulationAdmissionRecord.State.DEGRADED;
-                }
-            } catch (RuntimeException | LinkageError exception) {
-                decision = decisions.closed(
-                        PopulationAdmissionDecision.Status.DEGRADED,
-                        "population-admission-identity-cache-degraded"
-                );
-                state = PublicPopulationAdmissionRecord.State.DEGRADED;
-            }
-        } else {
-            markCommitReadinessDegraded("public_population_commit_failed");
-            decision = decisions.closed(
-                    PopulationAdmissionDecision.Status.DEGRADED,
-                    result == null ? "population-admission-commit-failed" : result.reason()
-            );
-            state = PublicPopulationAdmissionRecord.State.DEGRADED;
-        }
-        synchronized (record) {
-            record.update(state, decision);
-        }
-        future.complete(decision);
-    }
-
-    private void finishCommitSafely(
-            @Nonnull PublicPopulationAdmissionRecord record,
-            @Nonnull CompletableFuture<PopulationAdmissionDecision> future,
-            @Nullable CompanionPopulationCommitResult result,
-            @Nullable Throwable failure
-    ) {
-        try {
-            finishCommit(record, future, result, failure);
-        } catch (RuntimeException | LinkageError completionFailure) {
-            markCommitReadinessDegraded("public_population_commit_callback_failed");
-            PopulationAdmissionDecision degraded = decisions.closed(
-                    PopulationAdmissionDecision.Status.DEGRADED,
-                    "population-admission-commit-callback-failed"
-            );
-            synchronized (record) {
-                record.update(PublicPopulationAdmissionRecord.State.DEGRADED, degraded);
-            }
-            future.complete(degraded);
-        }
-    }
-
-    private void markCommitReadinessDegraded(@Nonnull String reason) {
-        try {
-            coordinator.markReadinessDegraded(reason);
-        } catch (RuntimeException | LinkageError ignored) {
-            // Preserve terminal completion if readiness diagnostics also fail.
         }
     }
 
