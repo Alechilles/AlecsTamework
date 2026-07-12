@@ -30,6 +30,10 @@ public final class LeaseBoundWorldDispatcher {
         });
     }
 
+    /**
+     * Dispatches lease-bound work to a world. The rejection callback may run outside the world
+     * thread and therefore must only close thread-safe state, never live ECS or player state.
+     */
     public static void execute(@Nonnull World world,
                                @Nonnull Runnable task,
                                @Nonnull Runnable rejected) {
@@ -40,6 +44,9 @@ public final class LeaseBoundWorldDispatcher {
     /**
      * Dispatches through an arbitrary world-like executor while retaining the production lease
      * watchdog. This overload also supplies a deterministic seam for executor adapters.
+     *
+     * <p>The rejection callback can run on the calling thread or the watchdog executor. It must
+     * only close thread-safe state and must never access live ECS or player state.</p>
      */
     public static void execute(@Nonnull BooleanSupplier alive,
                                @Nonnull Consumer<Runnable> dispatcher,
@@ -59,38 +66,50 @@ public final class LeaseBoundWorldDispatcher {
         Objects.requireNonNull(rejected, "rejected");
         Objects.requireNonNull(timeoutExecutor, "timeoutExecutor");
         AtomicReference<DispatchState> state = new AtomicReference<>(DispatchState.PENDING);
+        AtomicReference<Runnable> pendingTask = new AtomicReference<>(task);
+        AtomicReference<Runnable> pendingRejection = new AtomicReference<>(rejected);
         try {
             if (!alive.getAsBoolean()) {
-                rejectPending(state, rejected);
+                rejectPending(state, pendingTask, pendingRejection);
                 return;
             }
-            timeoutExecutor.execute(() -> rejectPending(state, rejected));
+            timeoutExecutor.execute(() -> rejectPending(state, pendingTask, pendingRejection));
         } catch (RuntimeException | LinkageError failure) {
-            rejectPending(state, rejected);
+            rejectPending(state, pendingTask, pendingRejection);
             return;
         }
         try {
             if (!alive.getAsBoolean() || state.get() != DispatchState.PENDING) {
-                rejectPending(state, rejected);
+                rejectPending(state, pendingTask, pendingRejection);
                 return;
             }
-            dispatcher.accept(() -> runStarted(state, task));
+            dispatcher.accept(() -> runStarted(state, pendingTask, pendingRejection));
         } catch (RuntimeException | LinkageError failure) {
-            rejectPending(state, rejected);
+            rejectPending(state, pendingTask, pendingRejection);
         }
     }
 
     private static void runStarted(@Nonnull AtomicReference<DispatchState> state,
-                                   @Nonnull Runnable task) {
+                                   @Nonnull AtomicReference<Runnable> pendingTask,
+                                   @Nonnull AtomicReference<Runnable> pendingRejection) {
         if (state.compareAndSet(DispatchState.PENDING, DispatchState.STARTED)) {
-            task.run();
+            Runnable task = pendingTask.getAndSet(null);
+            pendingRejection.set(null);
+            if (task != null) {
+                task.run();
+            }
         }
     }
 
     private static void rejectPending(@Nonnull AtomicReference<DispatchState> state,
-                                      @Nonnull Runnable rejected) {
+                                      @Nonnull AtomicReference<Runnable> pendingTask,
+                                      @Nonnull AtomicReference<Runnable> pendingRejection) {
         if (state.compareAndSet(DispatchState.PENDING, DispatchState.REJECTED)) {
-            runRejected(rejected);
+            pendingTask.set(null);
+            Runnable rejected = pendingRejection.getAndSet(null);
+            if (rejected != null) {
+                runRejected(rejected);
+            }
         }
     }
 

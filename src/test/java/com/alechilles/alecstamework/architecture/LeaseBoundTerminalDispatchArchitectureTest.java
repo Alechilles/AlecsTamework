@@ -51,11 +51,27 @@ class LeaseBoundTerminalDispatchArchitectureTest {
         String continuation = read(MAIN.resolve(
                 "items/CompanionSpawnCommitContinuation.java"
         ));
+        String preparedSpawn = read(MAIN.resolve(
+                "items/CompanionPreparedSpawnService.java"
+        ));
+        String batchSpawn = read(MAIN.resolve("items/NpcOwnedBatchSpawnService.java"));
+        String restoreSpawn = read(MAIN.resolve(
+                "items/CommandPreparedRestoreSpawnService.java"
+        ));
 
         assertTrue(continuation.contains("dispatcher.dispatch(task, rejected)"));
         assertTrue(continuation.contains("spawn-commit-continuation-world-unavailable"));
         assertTrue(continuation.contains("spawn-source-finalization-world-unavailable"));
         assertTrue(continuation.contains("void dispatch(@Nonnull Runnable task, @Nonnull Runnable rejected)"));
+        assertTrue(continuation.contains("Consumer<String> dispatchRejected"));
+        assertTrue(preparedSpawn.contains("callbacks.onWorldDispatchRejected(reason)"));
+        assertTrue(preparedSpawn.contains("must not access live ECS or player state"));
+        assertTrue(batchSpawn.contains("tracker.abandonWithoutCompletion("));
+
+        int restoreCancel = restoreSpawn.indexOf("private static void cancelPrepared(");
+        int restoreDispatch = restoreSpawn.indexOf("private static void dispatch(", restoreCancel);
+        String restoreRejection = restoreSpawn.substring(restoreCancel, restoreDispatch);
+        assertFalse(restoreRejection.contains("callbacks.onDenied("));
     }
 
     @Test
@@ -76,6 +92,30 @@ class LeaseBoundTerminalDispatchArchitectureTest {
                 "worldAccess.execute(destinationWorld", sourceRemove
         );
         assertTrue(sourceRemove >= 0 && destinationDispatch > sourceRemove);
+        String postRemove = service.substring(sourceRemove, service.indexOf(
+                "private void restoreSourceEntityAndApplyFailure", destinationDispatch
+        ));
+        assertTrue(postRemove.contains("terminalizeDrainedTransferAsLost("));
+        assertFalse(postRemove.contains("restoreSourceEntityAndTerminalize("));
+
+        int lostHandler = service.indexOf("private void terminalizeDrainedTransferAsLost(");
+        int nextMethod = service.indexOf("private void handleSourceRemoveFailure(", lostHandler);
+        String handler = service.substring(lostHandler, nextMethod);
+        assertTrue(handler.contains("commitUnconfirmedRelocationAsLost("));
+        assertTrue(handler.contains("null, npcUuid, pending"));
+        assertFalse(handler.contains("worldAccess.isEntityPresent("));
+        assertFalse(handler.contains("worldAccess.restoreSourceEntity("));
+    }
+
+    @Test
+    void coopWatchdogCleanupUsesCapturedThreadSafeFlightKey() throws IOException {
+        String system = read(MAIN.resolve(
+                "items/CommandCoopManagedWildCaptureSystem.java"
+        ));
+
+        assertTrue(system.contains("String terminalFlightKey = releaseFlightKey(world, slotContext)"));
+        assertTrue(system.contains("completeReleaseFlight(terminalFlightKey)"));
+        assertTrue(system.contains("May run from a lease watchdog"));
     }
 
     private static String read(Path path) throws IOException {

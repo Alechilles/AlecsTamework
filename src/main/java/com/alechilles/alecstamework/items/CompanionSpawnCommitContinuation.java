@@ -20,18 +20,19 @@ final class CompanionSpawnCommitContinuation {
             @Nonnull Consumer<T> liveContinuation,
             @Nonnull Supplier<CompletableFuture<Boolean>> sourceDurability,
             @Nonnull Consumer<String> degraded,
+            @Nonnull Consumer<String> dispatchRejected,
             @Nonnull Runnable terminal,
             @Nonnull Dispatcher dispatcher
     ) {
         if (commit == null) {
             complete(null, new IllegalStateException("commit unavailable"), liveResolver,
                     sourceFinalization, liveContinuation, sourceDurability,
-                    degraded, terminal, dispatcher);
+                    degraded, dispatchRejected, terminal, dispatcher);
             return;
         }
         commit.whenComplete((result, failure) -> complete(
                 result, failure, liveResolver, sourceFinalization, liveContinuation,
-                sourceDurability, degraded, terminal, dispatcher
+                sourceDurability, degraded, dispatchRejected, terminal, dispatcher
         ));
     }
 
@@ -43,17 +44,17 @@ final class CompanionSpawnCommitContinuation {
             Consumer<T> liveContinuation,
             Supplier<CompletableFuture<Boolean>> sourceDurability,
             Consumer<String> degraded,
+            Consumer<String> dispatchRejected,
             Runnable terminal,
             Dispatcher dispatcher
     ) {
         Runnable worldTask = () -> finishOnWorld(
                 result, failure, liveResolver, sourceFinalization, liveContinuation,
-                sourceDurability, degraded, terminal, dispatcher
+                sourceDurability, degraded, dispatchRejected, terminal, dispatcher
         );
-        dispatch(dispatcher, worldTask, () -> {
-            notify(degraded, "spawn-commit-continuation-world-unavailable");
-            runTerminal(terminal);
-        });
+        dispatch(dispatcher, worldTask, () -> notify(
+                dispatchRejected, "spawn-commit-continuation-world-unavailable"
+        ));
     }
 
     private <T> void finishOnWorld(
@@ -64,6 +65,7 @@ final class CompanionSpawnCommitContinuation {
             Consumer<T> liveContinuation,
             Supplier<CompletableFuture<Boolean>> sourceDurability,
             Consumer<String> degraded,
+            Consumer<String> dispatchRejected,
             Runnable terminal,
             Dispatcher dispatcher
     ) {
@@ -88,7 +90,9 @@ final class CompanionSpawnCommitContinuation {
                 return;
             }
             notifyCommitFailure(result, failure, degraded);
-            finishSourceDurability(sourceDurability, degraded, terminal, dispatcher);
+            finishSourceDurability(
+                    sourceDurability, degraded, dispatchRejected, terminal, dispatcher
+            );
             return;
         }
         if (sourceFinalization != null) {
@@ -105,6 +109,7 @@ final class CompanionSpawnCommitContinuation {
     private static void finishSourceDurability(
             Supplier<CompletableFuture<Boolean>> sourceDurability,
             Consumer<String> degraded,
+            Consumer<String> dispatchRejected,
             Runnable terminal,
             Dispatcher dispatcher
     ) {
@@ -128,10 +133,9 @@ final class CompanionSpawnCommitContinuation {
                 }
                 runTerminal(terminal);
             };
-            dispatch(dispatcher, worldTask, () -> {
-                notify(degraded, "spawn-source-finalization-world-unavailable");
-                runTerminal(terminal);
-            });
+            dispatch(dispatcher, worldTask, () -> notify(
+                    dispatchRejected, "spawn-source-finalization-world-unavailable"
+            ));
         });
     }
 

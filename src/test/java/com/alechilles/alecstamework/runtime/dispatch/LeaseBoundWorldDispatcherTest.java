@@ -139,6 +139,30 @@ class LeaseBoundWorldDispatcherTest {
         assertEquals(0, tasks.get());
     }
 
+    @Test
+    void timeoutRejectionRunsOnWatchdogThread() throws InterruptedException {
+        AtomicReference<Runnable> queued = new AtomicReference<>();
+        AtomicReference<String> rejectionThread = new AtomicReference<>();
+        ManualExecutor timeout = new ManualExecutor();
+
+        LeaseBoundWorldDispatcher.execute(
+                () -> true,
+                queued::set,
+                () -> {
+                    throw new AssertionError("timed-out task must not run");
+                },
+                () -> rejectionThread.set(Thread.currentThread().getName()),
+                timeout
+        );
+
+        Thread watchdog = new Thread(timeout::runNext, "lease-watchdog-test");
+        watchdog.start();
+        watchdog.join();
+
+        assertEquals("lease-watchdog-test", rejectionThread.get());
+        queued.get().run();
+    }
+
     private static final class ManualExecutor implements java.util.concurrent.Executor {
         private final AtomicReference<Runnable> task = new AtomicReference<>();
 

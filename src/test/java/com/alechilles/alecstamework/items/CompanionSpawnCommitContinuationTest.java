@@ -29,6 +29,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );
@@ -49,6 +50,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );
@@ -70,6 +72,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );
@@ -94,6 +97,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );
@@ -116,6 +120,7 @@ class CompanionSpawnCommitContinuationTest {
                 },
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );
@@ -140,6 +145,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );
@@ -150,7 +156,7 @@ class CompanionSpawnCommitContinuationTest {
     }
 
     @Test
-    void rejectedCommitContinuationRetainsSourceAndRunsTerminalCleanup() {
+    void rejectedCommitContinuationRetainsSourceAndRunsThreadSafeCleanup() {
         List<String> events = new ArrayList<>();
 
         continuation.finish(
@@ -160,6 +166,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 rejected()
         );
@@ -167,7 +174,7 @@ class CompanionSpawnCommitContinuationTest {
         assertFalse(events.contains("live"));
         assertFalse(events.contains("source"));
         assertEquals(List.of(
-                "degraded:spawn-commit-continuation-world-unavailable", "terminal"
+                "dispatch-rejected:spawn-commit-continuation-world-unavailable"
         ), events);
     }
 
@@ -184,6 +191,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> sourceDurability,
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 (task, rejected) -> {
                     if (dispatches.incrementAndGet() == 1) {
@@ -198,7 +206,7 @@ class CompanionSpawnCommitContinuationTest {
         sourceDurability.complete(true);
         assertEquals(List.of(
                 "live", "source",
-                "degraded:spawn-source-finalization-world-unavailable", "terminal"
+                "dispatch-rejected:spawn-source-finalization-world-unavailable"
         ), events);
     }
 
@@ -242,6 +250,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(true),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );
@@ -265,6 +274,7 @@ class CompanionSpawnCommitContinuationTest {
                 ignored -> events.add("live"),
                 () -> CompletableFuture.completedFuture(false),
                 reason -> events.add("degraded:" + reason),
+                reason -> events.add("dispatch-rejected:" + reason),
                 () -> events.add("terminal"),
                 immediate()
         );

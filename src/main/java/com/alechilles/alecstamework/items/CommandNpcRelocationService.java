@@ -731,9 +731,9 @@ public final class CommandNpcRelocationService {
                         () -> worldAccess.restoreSourceEntity(
                                 sourceWorld, sourceStore, drainedHolder, npcUuid
                         ),
-                        () -> logTravelDiagnostic(
-                                Level.WARNING,
-                                "Cross-world source restore dispatch failed for npc=" + npcUuid
+                        () -> terminalizeDrainedTransferAsLost(
+                                npcUuid, pending,
+                                "relocation-replaced-source-restore-dispatch-rejected"
                         )
                 );
                 return;
@@ -847,9 +847,8 @@ public final class CommandNpcRelocationService {
                             + destinationWorld.getName()
             );
             scheduleTryApply(destinationWorld, npcUuid, INITIAL_APPLY_DELAY_MS);
-        }, () -> restoreSourceEntityAndTerminalize(
-                sourceWorld, sourceStore, drainedHolder, destinationWorld, npcUuid, pending,
-                "relocation-destination-dispatch-failed"
+        }, () -> terminalizeDrainedTransferAsLost(
+                npcUuid, pending, "relocation-destination-dispatch-rejected"
         ));
     }
 
@@ -881,43 +880,29 @@ public final class CommandNpcRelocationService {
                     () -> applyTransferFailurePolicy(destinationWorld, npcUuid, pending),
                     () -> terminalizeRelocation(pending, "relocation-failure-dispatch-rejected")
             );
-        }, () -> commitUnconfirmedRelocationAsLost(
-                destinationWorld, npcUuid, pending, System.currentTimeMillis()
+        }, () -> terminalizeDrainedTransferAsLost(
+                npcUuid, pending, "relocation-source-restore-dispatch-rejected"
         ));
     }
 
-    private void restoreSourceEntityAndTerminalize(World sourceWorld,
-                                                    Store<EntityStore> sourceStore,
-                                                    Holder<EntityStore> drainedHolder,
-                                                    World destinationWorld,
-                                                    UUID npcUuid,
-                                                    PendingRelocation pending,
-                                                    String reason) {
-        boolean destinationPresent;
-        try {
-            destinationPresent = worldAccess.isEntityPresent(destinationWorld, npcUuid);
-        } catch (RuntimeException | LinkageError exception) {
-            commitUnconfirmedRelocationAsLost(destinationWorld, npcUuid, pending, System.currentTimeMillis());
-            return;
-        }
-        if (destinationPresent) {
-            pending.markCrossWorldTransferFinished();
-            knownWorldByNpc.put(npcUuid, destinationWorld);
-            scheduleTryApply(destinationWorld, npcUuid, RELOCATION_CONFIRMATION_DELAY_MS);
-            return;
-        }
-        worldAccess.execute(sourceWorld, () -> {
-            if (worldAccess.restoreSourceEntity(sourceWorld, sourceStore, drainedHolder, npcUuid)) {
-                pending.markPhysicalMutationCompensated();
-                terminalizeRelocation(pending, reason);
-            } else {
-                commitUnconfirmedRelocationAsLost(
-                        sourceWorld, npcUuid, pending, System.currentTimeMillis()
-                );
-            }
-        }, () -> commitUnconfirmedRelocationAsLost(
-                sourceWorld, npcUuid, pending, System.currentTimeMillis()
-        ));
+    /**
+     * Closes an already-drained transfer without touching either world's ECS. This method can run
+     * from the lease watchdog, so the population admission is conservatively committed as lost.
+     */
+    private void terminalizeDrainedTransferAsLost(
+            UUID npcUuid,
+            PendingRelocation pending,
+            String reason
+    ) {
+        pending.markCrossWorldTransferFinished();
+        logTravelDiagnostic(
+                Level.WARNING,
+                "Cross-world transfer became unobservable after source removal for npc="
+                        + npcUuid + ", reason=" + reason
+        );
+        commitUnconfirmedRelocationAsLost(
+                null, npcUuid, pending, System.currentTimeMillis()
+        );
     }
 
     private void handleSourceRemoveFailure(World sourceWorld,

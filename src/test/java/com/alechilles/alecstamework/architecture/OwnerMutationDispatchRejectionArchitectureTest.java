@@ -68,7 +68,11 @@ class OwnerMutationDispatchRejectionArchitectureTest {
         assertTrue(source.contains(
                 "compareAndSet(DispatchState.PENDING, DispatchState.REJECTED)"
         ));
-        assertTrue(source.contains("dispatcher.accept(() -> runStarted(state, task))"));
+        assertTrue(source.contains(
+                "dispatcher.accept(() -> runStarted(state, pendingTask, pendingRejection))"
+        ));
+        assertTrue(source.contains("pendingTask.set(null)"));
+        assertTrue(source.contains("pendingRejection.getAndSet(null)"));
     }
 
     private static int occurrences(String value, String needle) {

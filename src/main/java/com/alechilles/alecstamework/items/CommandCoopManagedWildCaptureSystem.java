@@ -912,6 +912,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                             + " spawn=" + formatVector(spawnPosition)
             );
         }
+        String terminalFlightKey = releaseFlightKey(world, slotContext);
         return preparedReleaseSpawnService.schedule(
                 world,
                 entityStore,
@@ -967,7 +968,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
                     @Override
                     public void onTerminal() {
-                        completeReleaseFlight(world, slotContext);
+                        completeReleaseFlight(terminalFlightKey);
                     }
                 }
         );
@@ -1058,16 +1059,31 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             @Nonnull World world,
             @Nonnull CommandLinkedNpcCoopService.CoopSlotContext slotContext
     ) {
+        completeReleaseFlight(releaseFlightKey(world, slotContext));
+    }
+
+    @Nullable
+    private String releaseFlightKey(
+            @Nonnull World world,
+            @Nonnull CommandLinkedNpcCoopService.CoopSlotContext slotContext
+    ) {
         String coopId = normalizeIdentifier(slotContext.coopId());
         if (coopId == null) {
-            return;
+            return null;
         }
         String coopKey = buildCoopKey(
                 world.getName(),
                 new Vector3i(slotContext.x(), slotContext.y(), slotContext.z()),
                 coopId
         );
-        inFlightSlots.remove(coopKey + "|slot=" + slotContext.residentSlot());
+        return coopKey + "|slot=" + slotContext.residentSlot();
+    }
+
+    /** May run from a lease watchdog; the key is captured while still on the world thread. */
+    private void completeReleaseFlight(@Nullable String flightKey) {
+        if (flightKey != null) {
+            inFlightSlots.remove(flightKey);
+        }
     }
 
     private void playCoopEffectsAtEntity(@Nonnull World world,

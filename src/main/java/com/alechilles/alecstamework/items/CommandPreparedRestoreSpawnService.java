@@ -38,7 +38,7 @@ final class CommandPreparedRestoreSpawnService {
                 world,
                 () -> apply(world, store, npcPlugin, roleIndex, position, rotation,
                         admission, preparation, failure, callbacks),
-                () -> cancelPrepared(admission, preparation, callbacks)
+                () -> cancelPrepared(admission, preparation)
         ));
         return true;
     }
@@ -106,13 +106,11 @@ final class CommandPreparedRestoreSpawnService {
 
     private static void cancelPrepared(
             CompanionSpawnPopulationAdmissionService admission,
-            @Nullable CompanionSpawnPreparationResult preparation,
-            Callbacks callbacks
+            @Nullable CompanionSpawnPreparationResult preparation
     ) {
         if (preparation != null && preparation.preparedBatch() != null) {
             admission.cancelRemainingAsync(preparation.preparedBatch(), "command-restore-world-unavailable");
         }
-        callbacks.onDenied("command-restore-world-unavailable");
     }
 
     private static void dispatch(World world, Runnable task, Runnable rejected) {

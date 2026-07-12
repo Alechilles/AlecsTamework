@@ -160,6 +160,10 @@ final class CompanionPreparedSpawnService {
                     degradeAuthority("spawn_continuation_" + reason.replace('-', '_'));
                     notifyDegraded(callbacks, reason);
                 },
+                reason -> {
+                    degradeAuthority("spawn_continuation_" + reason.replace('-', '_'));
+                    notifyWorldDispatchRejected(callbacks, reason);
+                },
                 () -> terminal(callbacks),
                 (task, rejected) -> LeaseBoundWorldDispatcher.execute(
                         world, task, rejected
@@ -320,6 +324,17 @@ final class CompanionPreparedSpawnService {
         }
     }
 
+    private static void notifyWorldDispatchRejected(
+            @Nonnull Callbacks callbacks,
+            @Nonnull String reason
+    ) {
+        try {
+            callbacks.onWorldDispatchRejected(reason);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Durable accounting is already terminal or conservatively retained.
+        }
+    }
+
     private static void terminal(@Nonnull Callbacks callbacks) {
         try {
             callbacks.onTerminal();
@@ -372,6 +387,13 @@ final class CompanionPreparedSpawnService {
         }
 
         default void onDurabilityDegraded(@Nonnull String reason) {
+        }
+
+        /**
+         * Runs outside the world thread when deferred work cannot start. Implementations may only
+         * close thread-safe state and must not access live ECS or player state.
+         */
+        default void onWorldDispatchRejected(@Nonnull String reason) {
         }
 
         default void onTerminal() {

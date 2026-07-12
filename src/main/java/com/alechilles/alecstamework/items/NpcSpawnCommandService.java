@@ -344,6 +344,17 @@ public final class NpcSpawnCommandService {
             }
         }
 
+        /** Closes an abandoned world callback without invoking player-facing completion off-thread. */
+        synchronized void abandonWithoutCompletion(@Nonnull String reason) {
+            if (completed) {
+                return;
+            }
+            stop(reason);
+            pendingCount = 0;
+            sealed = true;
+            completed = true;
+        }
+
         synchronized void seal() {
             sealed = true;
             finishIfReady();

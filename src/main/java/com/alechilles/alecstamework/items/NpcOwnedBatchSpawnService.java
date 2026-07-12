@@ -199,6 +199,14 @@ final class NpcOwnedBatchSpawnService {
             }
 
             @Override
+            public void onWorldDispatchRejected(String reason) {
+                completed = true;
+                tracker.abandonWithoutCompletion(
+                        "Post-spawn world callback was unavailable: " + reason + "."
+                );
+            }
+
+            @Override
             public void onTerminal() {
                 if (!completed) {
                     completed = true;
@@ -292,8 +300,7 @@ final class NpcOwnedBatchSpawnService {
         if (preparation != null && preparation.preparedBatch() != null) {
             admission.cancelRemainingAsync(preparation.preparedBatch(), "command-spawn-world-unavailable");
         }
-        tracker.stop("World became unavailable before spawn.");
-        tracker.seal();
+        tracker.abandonWithoutCompletion("World became unavailable before spawn.");
     }
 
     private static void dispatch(World world, Runnable task, Runnable rejected) {
