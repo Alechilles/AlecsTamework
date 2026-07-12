@@ -111,6 +111,9 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         progress.set(running("waiting-for-universe-ready", 0L, 0L, startedAt));
         CompletableFuture<CompanionPopulationReconciliationProgress> future = universe.getUniverseReady()
                 .thenComposeAsync(ignored -> acquireScanSession(), executor)
+                .thenComposeAsync(session -> new PersistedWorldCoverageLoader()
+                        .ensureLoaded(universe)
+                        .thenApply(ignored -> session), executor)
                 .thenApplyAsync(session -> new StartupCatalog(
                         HytaleCompanionPopulationCatalogFactory.create(
                                 universe,
