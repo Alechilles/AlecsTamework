@@ -76,15 +76,21 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
             return;
         }
 
-        NpcSpawnCommandService.SpawnBatchResult result = new NpcSpawnCommandService(plugin).spawnTamedOwnedBatch(
+        new NpcSpawnCommandService(plugin).spawnTamedOwnedBatch(
                 player,
                 store,
                 ref,
                 world,
                 roleId,
                 quantity,
-                parsedAttachments.attachments
+                parsedAttachments.attachments,
+                result -> sendSpawnResult(commandContext, roleId, result)
         );
+    }
+
+    private static void sendSpawnResult(@Nonnull CommandContext commandContext,
+                                        @Nonnull String roleId,
+                                        @Nonnull NpcSpawnCommandService.SpawnBatchResult result) {
         if (result.getFailureMessage() != null) {
             commandContext.sender().sendMessage(Message.raw(result.getFailureMessage()));
             return;

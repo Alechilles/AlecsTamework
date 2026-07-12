@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,10 +30,10 @@ public final class TameworkRuntimeSettings {
             if (Tamework.getInstance() == null) {
                 return null;
             }
+            return current();
         } catch (Throwable ignored) {
             return null;
         }
-        return current();
     }
 
     @Nonnull
@@ -43,6 +44,19 @@ public final class TameworkRuntimeSettings {
     @Nonnull
     public ResolvedTameworkSettings values() {
         return values;
+    }
+
+    /**
+     * Stable non-negative fingerprint used to keep one admission on one immutable settings view.
+     */
+    public long revision() {
+        long hash = 0xcbf29ce484222325L;
+        String serialized = values.toString();
+        for (int index = 0; index < serialized.length(); index++) {
+            hash ^= serialized.charAt(index);
+            hash *= 0x100000001b3L;
+        }
+        return hash & Long.MAX_VALUE;
     }
 
     public int populationLimitPerPlayerOwnedTotal() {
@@ -56,7 +70,14 @@ public final class TameworkRuntimeSettings {
 
     @Nonnull
     public ClaimIntegrationProvider simpleClaimsProvider() {
-        return ClaimIntegrationProvider.fromConfigValue(values.simpleClaimsProvider());
+        ClaimProviderRequest request = simpleClaimsProviderRequest();
+        return request.valid() ? request.provider() : ClaimIntegrationProvider.OFF;
+    }
+
+    /** Returns the provider request with any invalid legacy value intact for fail-closed policy resolution. */
+    @Nonnull
+    public ClaimProviderRequest simpleClaimsProviderRequest() {
+        return values.simpleClaimsProviderRequest();
     }
 
     public boolean simpleClaimsEnabled() {

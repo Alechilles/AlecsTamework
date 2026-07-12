@@ -466,36 +466,12 @@
             },
             "Actions": [
               {
-                "Type": "Inventory",
-                "UseTarget": true,
-                "Operation": "RemoveHeldItem",
-                "Count": 1
-              },
-              {
-                "Type": "TameworkSetOwner"
-              },
-              {
-                "Type": "TameworkSetTamed",
-                "Value": true
-              },
-              {
-                "Type": "State",
-                "State": "Idle.Default"
-              },
-              {
-                "Type": "SpawnParticles",
-                "Offset": [
-                  0,
-                  0.8,
-                  0
-                ],
-                "ParticleSystem": "Pet_Heal"
-              },
-              {
-                "Type": "PlaySound",
-                "SoundEventId": {
-                  "Compute": "InteractSoundFeed"
-                }
+                "Type": "TameworkSetOwner",
+                "TameOnApplied": true,
+                "ConsumeHeldItemOnApplied": true,
+                "StateOnApplied": "Idle.Default",
+                "ParticleSystemOnApplied": "Pet_Heal",
+                "SoundEventParamOnApplied": "InteractSoundFeed"
               }
             ]
           },

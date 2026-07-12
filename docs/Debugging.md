@@ -68,6 +68,13 @@
 - Spawner failures: check role filters, tame/owner policy, range/cooldown, and captured metadata.
 - Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).
 
+## Population and claim troubleshooting
+- Positive owner or claim admissions stay fail-closed until the required reconciliation dimensions are `READY`. Startup resumes the same persisted `ACTIVE` scan epoch and source cursors after a restart, and it asks Hytale to load saved worlds before catalog construction. A failed world load or changed mutable source keeps coverage unsealed instead of publishing false readiness.
+- Claim providers are re-probed from live plugin state per operation. Reflected ready contracts are weak and generation-bound; plugin setup/reload, replacement, disable, or `/tw settings` changes invalidate stale sessions. An incompatible or incomplete QuestLines `getChunks()` contract is an admission error, not a SimpleClaims fallback condition.
+- `Unavoidable companion relocation created a per-world owner over-cap condition` means a cross-world move was preserved even though the destination now exceeds its per-world owner cap. The warning is throttled, `unavoidablePerWorldOverCapRelocations` increments, and later positive admissions remain blocked until the count falls.
+- Population-bearing world work uses a lease-aligned start watchdog. If an accepted callback never starts during shutdown, its rejection cleanup runs exactly once and any late queued wrapper is inert. Repeated warnings here usually indicate world shutdown or executor backlog, not a second mutation.
+- `/tw api test prepare` and `/tw api test reset` use production journaled `ADMIN_FORCE` assignment and permanent-release authority. A readiness, admission, or durability failure from these commands is therefore meaningful and should not be bypassed with direct owner/profile edits.
+
 ## Debug toggles
 - `/tw debughook [on|off]`
 - `/tw debugprompt [on|off]`
@@ -110,6 +117,7 @@ XP can be diagnosed with a reason such as not tamed or owned, disabled harvest X
 - `/tw getflockdebug`
 - `/tw coop audit`, `/tw coop import-status`, `/tw coop reconcile`, `/tw coop rollback-preflight`
 - `/tw debugdb integrity`
+- `/tw npcclean <roleId>` removes only matching NPCs proven unowned. It is unavailable until both owner-population and claim-occupancy reconciliation are `READY`, and it skips canonical identities with an owner or pending transition.
 - `/tw reloadconfig` (item-feature assets only)
 
 ## Timestamp note

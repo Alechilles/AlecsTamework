@@ -1,0 +1,338 @@
+package com.alechilles.alecstamework.ownership;
+
+import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.integration.claims.ClaimAdmissionService;
+import com.alechilles.alecstamework.integration.claims.ClaimLookupMetrics;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRegistry;
+import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesClaimsProviderProbe;
+import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsProviderProbe;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationProgress;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationRuntime;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRuntimeReconciler;
+import com.alechilles.alecstamework.ownership.reconciliation.CustomContainerReconciliationRegistry;
+import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nonnull;
+
+/**
+ * Groups the owner population index, identity cache, durable coordinator, and bootstrap result.
+ */
+public final class OwnerPopulationRuntime implements AutoCloseable {
+    private final OwnerPopulationIndex index;
+    private final CompanionIdentityResolver identityResolver;
+    private final OwnerPopulationAdmissionCoordinator admissionCoordinator;
+    private final OwnerComponentMutationService mutationService;
+    private final OwnerMutationScheduler mutationScheduler;
+    private final ClaimOccupancyIndex claimOccupancyIndex;
+    private final ClaimAdmissionService claimAdmissionService;
+    private final ClaimProviderRegistry claimProviderRegistry;
+    private final ClaimLookupMetrics claimLookupMetrics;
+    private final CompanionPopulationAdmissionCoordinator companionAdmissionCoordinator;
+    private final CompanionPopulationBatchAdmissionCoordinator companionBatchAdmissionCoordinator;
+    private final CompanionSpawnPopulationAdmissionService companionSpawnAdmissionService;
+    private final BreedingPopulationAdmissionService breedingAdmissionService;
+    private final CoopPopulationReleaseAdmissionService coopReleaseAdmissionService;
+    private final RuntimePopulationPolicyAuthority populationPolicyAuthority;
+    private final PublicPopulationCapabilityMaintenance capabilityMaintenance;
+    private final CompanionRelocationAdmissionService relocationAdmissionService;
+    private final CompanionPopulationReconciliationRuntime reconciliationRuntime;
+    private final BreedingReplayJournalLoader breedingReplayJournal;
+    private final CompanionPopulationBootstrapService.BootstrapResult bootstrapResult;
+
+    private OwnerPopulationRuntime(
+            @Nonnull OwnerPopulationIndex index,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull OwnerPopulationAdmissionCoordinator admissionCoordinator,
+            @Nonnull OwnerComponentMutationService mutationService,
+            @Nonnull OwnerMutationScheduler mutationScheduler,
+            @Nonnull ClaimOccupancyIndex claimOccupancyIndex,
+            @Nonnull ClaimAdmissionService claimAdmissionService,
+            @Nonnull ClaimProviderRegistry claimProviderRegistry,
+            @Nonnull ClaimLookupMetrics claimLookupMetrics,
+            @Nonnull CompanionPopulationAdmissionCoordinator companionAdmissionCoordinator,
+            @Nonnull CompanionPopulationBatchAdmissionCoordinator companionBatchAdmissionCoordinator,
+            @Nonnull CompanionSpawnPopulationAdmissionService companionSpawnAdmissionService,
+            @Nonnull BreedingPopulationAdmissionService breedingAdmissionService,
+            @Nonnull CoopPopulationReleaseAdmissionService coopReleaseAdmissionService,
+            @Nonnull RuntimePopulationPolicyAuthority populationPolicyAuthority,
+            @Nonnull PublicPopulationCapabilityMaintenance capabilityMaintenance,
+            @Nonnull CompanionRelocationAdmissionService relocationAdmissionService,
+            @Nonnull CompanionPopulationReconciliationRuntime reconciliationRuntime,
+            @Nonnull BreedingReplayJournalLoader breedingReplayJournal,
+            @Nonnull CompanionPopulationBootstrapService.BootstrapResult bootstrapResult
+    ) {
+        this.index = index;
+        this.identityResolver = identityResolver;
+        this.admissionCoordinator = admissionCoordinator;
+        this.mutationService = mutationService;
+        this.mutationScheduler = mutationScheduler;
+        this.claimOccupancyIndex = claimOccupancyIndex;
+        this.claimAdmissionService = claimAdmissionService;
+        this.claimProviderRegistry = claimProviderRegistry;
+        this.claimLookupMetrics = claimLookupMetrics;
+        this.companionAdmissionCoordinator = companionAdmissionCoordinator;
+        this.companionBatchAdmissionCoordinator = companionBatchAdmissionCoordinator;
+        this.companionSpawnAdmissionService = companionSpawnAdmissionService;
+        this.breedingAdmissionService = breedingAdmissionService;
+        this.coopReleaseAdmissionService = coopReleaseAdmissionService;
+        this.populationPolicyAuthority = populationPolicyAuthority;
+        this.capabilityMaintenance = capabilityMaintenance;
+        this.relocationAdmissionService = relocationAdmissionService;
+        this.reconciliationRuntime = reconciliationRuntime;
+        this.breedingReplayJournal = breedingReplayJournal;
+        this.bootstrapResult = bootstrapResult;
+    }
+
+    @Nonnull
+    public static OwnerPopulationRuntime initialize(@Nonnull TameworkPersistenceRuntime persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        OwnerPopulationIndex index = new OwnerPopulationIndex();
+        CompanionIdentityResolver identityResolver = new CompanionIdentityResolver();
+        ClaimOccupancyIndex claimOccupancyIndex = new ClaimOccupancyIndex();
+        CompanionPopulationBootstrapService bootstrapService = new CompanionPopulationBootstrapService(
+                persistence.getCompanionPopulationRepository(),
+                persistence.getCompanionPopulationCoverageRepository(),
+                persistence.getCompanionIdentityRepository(),
+                persistence.getHealthService(),
+                index,
+                identityResolver,
+                claimOccupancyIndex
+        );
+        CompanionPopulationBootstrapService.BootstrapResult bootstrap = bootstrapService.load();
+        OwnerPopulationAdmissionCoordinator coordinator = new OwnerPopulationAdmissionCoordinator(
+                index,
+                persistence.getCompanionPopulationRepository(),
+                persistence.getHealthService()
+        );
+        ClaimAdmissionService claimAdmissionService = new ClaimAdmissionService(claimOccupancyIndex);
+        ClaimProviderRegistry claimProviderRegistry = new ClaimProviderRegistry(
+                new QuestLinesClaimsProviderProbe(),
+                new SimpleClaimsProviderProbe()
+        );
+        ClaimLookupMetrics claimLookupMetrics = new ClaimLookupMetrics();
+        OwnerComponentMutationService mutationService = new OwnerComponentMutationService(coordinator);
+        CompanionPopulationAdmissionCoordinator companionCoordinator =
+                new CompanionPopulationAdmissionCoordinator(coordinator, claimAdmissionService);
+        CompanionPopulationBatchAdmissionCoordinator companionBatchCoordinator =
+                new CompanionPopulationBatchAdmissionCoordinator(companionCoordinator);
+        CompanionSpawnPopulationAdmissionService companionSpawnAdmissionService =
+                new CompanionSpawnPopulationAdmissionService(
+                        index,
+                        identityResolver,
+                        claimOccupancyIndex,
+                        claimProviderRegistry,
+                        companionCoordinator,
+                        companionBatchCoordinator,
+                        mutationService,
+                        claimLookupMetrics
+                );
+        BreedingReplayJournalLoader breedingReplayJournal = new BreedingReplayJournalLoader(
+                persistence.getCompanionPopulationRepository(), persistence.getHealthService()
+        );
+        breedingReplayJournal.refresh();
+        BreedingPopulationAdmissionService breedingAdmissionService =
+                new BreedingPopulationAdmissionService(
+                        companionBatchCoordinator,
+                        claimOccupancyIndex,
+                        claimProviderRegistry,
+                        mutationService,
+                        identityResolver,
+                        claimLookupMetrics,
+                        breedingReplayJournal.replayService()
+                );
+        CoopPopulationReleaseAdmissionService coopReleaseAdmissionService =
+                new CoopPopulationReleaseAdmissionService(
+                        index,
+                        identityResolver,
+                        claimOccupancyIndex,
+                        claimProviderRegistry,
+                        companionCoordinator,
+                        mutationService,
+                        claimLookupMetrics
+                );
+        OwnerMutationScheduler mutationScheduler = new OwnerMutationScheduler(
+                index,
+                identityResolver,
+                coordinator,
+                mutationService,
+                companionCoordinator,
+                claimOccupancyIndex,
+                claimProviderRegistry,
+                claimLookupMetrics
+        );
+        CompanionPopulationReconciliationRuntime reconciliationRuntime =
+                new CompanionPopulationReconciliationRuntime(
+                        persistence,
+                        bootstrapService,
+                        index,
+                        identityResolver,
+                        claimOccupancyIndex
+                );
+        RuntimePopulationPolicyAuthority populationPolicyAuthority = new RuntimePopulationPolicyAuthority(
+                index,
+                identityResolver,
+                companionCoordinator,
+                companionBatchCoordinator,
+                claimOccupancyIndex,
+                claimAdmissionService,
+                claimProviderRegistry,
+                System::nanoTime,
+                claimLookupMetrics
+        );
+        PublicPopulationCapabilityMaintenance capabilityMaintenance =
+                PublicPopulationCapabilityMaintenance.start(populationPolicyAuthority);
+        CompanionRelocationAdmissionService relocationAdmissionService =
+                new CompanionRelocationAdmissionService(
+                        index, identityResolver, claimOccupancyIndex, populationPolicyAuthority
+                );
+        populationPolicyAuthority.setReconciliationDiagnostics(() ->
+                PopulationReconciliationDiagnosticsMapper.map(reconciliationRuntime.progress())
+        );
+        return new OwnerPopulationRuntime(
+                index,
+                identityResolver,
+                coordinator,
+                mutationService,
+                mutationScheduler,
+                claimOccupancyIndex,
+                claimAdmissionService,
+                claimProviderRegistry,
+                claimLookupMetrics,
+                companionCoordinator,
+                companionBatchCoordinator,
+                companionSpawnAdmissionService,
+                breedingAdmissionService,
+                coopReleaseAdmissionService,
+                populationPolicyAuthority,
+                capabilityMaintenance,
+                relocationAdmissionService,
+                reconciliationRuntime,
+                breedingReplayJournal,
+                bootstrap
+        );
+    }
+
+    @Nonnull
+    public OwnerPopulationIndex index() {
+        return index;
+    }
+
+    @Nonnull
+    public CompanionIdentityResolver identityResolver() {
+        return identityResolver;
+    }
+
+    @Nonnull
+    public OwnerPopulationAdmissionCoordinator admissionCoordinator() {
+        return admissionCoordinator;
+    }
+
+    @Nonnull
+    public OwnerComponentMutationService mutationService() {
+        return mutationService;
+    }
+
+    @Nonnull
+    public OwnerMutationScheduler mutationScheduler() {
+        return mutationScheduler;
+    }
+
+    @Nonnull
+    public ClaimOccupancyIndex claimOccupancyIndex() {
+        return claimOccupancyIndex;
+    }
+
+    @Nonnull
+    public ClaimAdmissionService claimAdmissionService() {
+        return claimAdmissionService;
+    }
+
+    @Nonnull
+    public ClaimProviderRegistry claimProviderRegistry() {
+        return claimProviderRegistry;
+    }
+
+    @Nonnull
+    ClaimLookupMetrics claimLookupMetrics() {
+        return claimLookupMetrics;
+    }
+
+    @Nonnull
+    public CompanionPopulationAdmissionCoordinator companionAdmissionCoordinator() {
+        return companionAdmissionCoordinator;
+    }
+
+    @Nonnull
+    public CompanionPopulationBatchAdmissionCoordinator companionBatchAdmissionCoordinator() {
+        return companionBatchAdmissionCoordinator;
+    }
+
+    @Nonnull
+    public CompanionSpawnPopulationAdmissionService companionSpawnAdmissionService() {
+        return companionSpawnAdmissionService;
+    }
+
+    @Nonnull
+    public BreedingPopulationAdmissionService breedingAdmissionService() {
+        return breedingAdmissionService;
+    }
+
+    @Nonnull
+    public CoopPopulationReleaseAdmissionService coopReleaseAdmissionService() {
+        return coopReleaseAdmissionService;
+    }
+
+    @Nonnull
+    public RuntimePopulationPolicyAuthority populationPolicyAuthority() {
+        return populationPolicyAuthority;
+    }
+
+    @Nonnull
+    public CompanionRelocationAdmissionService relocationAdmissionService() {
+        return relocationAdmissionService;
+    }
+
+    @Nonnull
+    public CompanionPopulationRuntimeReconciler runtimeReconciler() {
+        return reconciliationRuntime.runtimeReconciler();
+    }
+
+    @Nonnull
+    public CustomContainerReconciliationRegistry customContainerReconciliationRegistry() {
+        return reconciliationRuntime.customContainers();
+    }
+
+    @Nonnull
+    public CompletableFuture<CompanionPopulationReconciliationProgress> startReconciliation(
+            @Nonnull Universe universe,
+            @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nonnull ItemFeatureRegistry itemFeatures
+    ) {
+        return reconciliationRuntime.start(universe, ownerType, itemFeatures)
+                .thenCompose(progress -> breedingReplayJournal.refreshAsync()
+                        .thenApply(ignored -> progress));
+    }
+
+    @Nonnull
+    public CompanionPopulationReconciliationProgress reconciliationProgress() {
+        return reconciliationRuntime.progress();
+    }
+
+    @Nonnull
+    public CompanionPopulationBootstrapService.BootstrapResult bootstrapResult() {
+        return bootstrapResult;
+    }
+
+    @Override
+    public void close() {
+        capabilityMaintenance.close();
+        reconciliationRuntime.close();
+        claimProviderRegistry.close();
+    }
+}

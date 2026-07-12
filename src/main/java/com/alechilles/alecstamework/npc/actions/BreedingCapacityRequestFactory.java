@@ -4,42 +4,34 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthAnchor;
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan;
 import com.alechilles.alecstamework.npc.breeding.BreedingCapacityHeadroom;
-import com.alechilles.alecstamework.npc.breeding.BreedingClaimCapacityScope;
 import com.alechilles.alecstamework.npc.breeding.BreedingPairingCoordinator;
-import com.alechilles.alecstamework.npc.breeding.BreedingPlayerCapacityScope;
 import com.alechilles.alecstamework.npc.breeding.BreedingPopulationAdmissionService;
 import com.alechilles.alecstamework.npc.breeding.BreedingReservationScope;
 import com.alechilles.alecstamework.npc.breeding.PlannedChild;
 import com.alechilles.alecstamework.npc.actions.BreedingOffspringProgressionService.OwnerSnapshot;
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
-/** Builds exact nearby, claim, and player capacity input for one immutable litter plan. */
+/** Builds exact nearby-capacity input for one immutable litter plan. */
 final class BreedingCapacityRequestFactory {
     private final BreedingPopulationTypeService populationTypeService;
-    private final BreedingClaimLimitPolicyService claimPolicyService;
 
     BreedingCapacityRequestFactory() {
-        this(new BreedingPopulationTypeService(), new BreedingClaimLimitPolicyService());
+        this(new BreedingPopulationTypeService());
     }
 
-    BreedingCapacityRequestFactory(BreedingPopulationTypeService populationTypeService,
-                                   BreedingClaimLimitPolicyService claimPolicyService) {
+    BreedingCapacityRequestFactory(BreedingPopulationTypeService populationTypeService) {
         this.populationTypeService = populationTypeService;
-        this.claimPolicyService = claimPolicyService;
     }
 
     @Nonnull
@@ -62,29 +54,11 @@ final class BreedingCapacityRequestFactory {
             return naturalZero(jobId, worldId, mode, plan, anchor, expectedScope);
         }
         Vector3d center = new Vector3d(anchor.x(), anchor.y(), anchor.z());
-        String inheritanceRoleId = plan.children().isEmpty()
-                ? parentRoleId
-                : plan.children().getFirst().roleId();
-        BreedingClaimLimitPolicyService.Decision claimDecision = claimPolicyService.evaluate(
-                store,
-                center,
-                config,
-                inheritanceRoleId,
-                parentAOwner.ownerId(),
-                parentBOwner.ownerId(),
-                null,
-                null
-        );
-        if (!claimDecision.allowed()) {
-            return BreedingPairingCoordinator.CapacityDecision.reject(claimDecision.reason());
-        }
         NearbyBoundary nearby = nearbyBoundary(config, parentRoleId);
-        BreedingClaimCapacityScope claimScope = claimScope(claimDecision.claimReservationKey());
-        List<BreedingPlayerCapacityScope> playerScopes = playerScopes(claimDecision.playerReservationKeys());
         BreedingReservationScope reservationScope = new BreedingReservationScope(
                 nearby.radius(),
-                claimScope,
-                playerScopes
+                null,
+                List.of()
         );
         if (expectedScope != null && !expectedScope.equals(reservationScope)) {
             return BreedingPairingCoordinator.CapacityDecision.reject("capacity-scope-changed");
@@ -96,7 +70,6 @@ final class BreedingCapacityRequestFactory {
                 nearby,
                 config
         );
-        BreedingCapacityHeadroom headroom = headroom(claimDecision, claimScope, playerScopes);
         return BreedingPairingCoordinator.CapacityDecision.allow(
                 new BreedingPopulationAdmissionService.AdmissionRequest(
                         jobId,
@@ -107,7 +80,7 @@ final class BreedingCapacityRequestFactory {
                         reservationScope,
                         nearby.maxNearby(),
                         liveNearby,
-                        headroom
+                        BreedingCapacityHeadroom.unlimited()
                 )
         );
     }
@@ -179,57 +152,12 @@ final class BreedingCapacityRequestFactory {
         return new NearbyBoundary(maxNearby, radius);
     }
 
-    private BreedingCapacityHeadroom headroom(
-            BreedingClaimLimitPolicyService.Decision decision,
-            @Nullable BreedingClaimCapacityScope claimScope,
-            List<BreedingPlayerCapacityScope> playerScopes) {
-        if (!decision.capEnforced()) {
-            return BreedingCapacityHeadroom.unlimited();
-        }
-        int remaining = Math.max(0, decision.remainingHeadroom());
-        OptionalInt claimHeadroom = claimScope != null ? OptionalInt.of(remaining) : OptionalInt.empty();
-        Map<BreedingPlayerCapacityScope, Integer> playerHeadroom = new LinkedHashMap<>();
-        for (BreedingPlayerCapacityScope playerScope : playerScopes) {
-            playerHeadroom.put(playerScope, remaining);
-        }
-        return new BreedingCapacityHeadroom(claimHeadroom, playerHeadroom);
-    }
-
-    @Nullable
-    private BreedingClaimCapacityScope claimScope(
-            @Nullable BreedingClaimLimitPolicyService.ClaimReservationKey key) {
-        if (key == null || key.providerId() == null || key.providerId().isBlank()
-                || key.worldName() == null || key.worldName().isBlank()) {
-            return null;
-        }
-        String claimId = firstNonBlank(key.claimId(), key.ownerType() + ":" + key.ownerId());
-        return new BreedingClaimCapacityScope(key.providerId(), key.worldName(), claimId);
-    }
-
-    private List<BreedingPlayerCapacityScope> playerScopes(
-            List<BreedingClaimLimitPolicyService.PlayerReservationKey> keys) {
-        ArrayList<BreedingPlayerCapacityScope> scopes = new ArrayList<>();
-        for (BreedingClaimLimitPolicyService.PlayerReservationKey key : keys) {
-            if (key == null || key.ownerId() == null) {
-                continue;
-            }
-            scopes.add(key.scope() == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
-                    ? BreedingPlayerCapacityScope.global(key.ownerId())
-                    : BreedingPlayerCapacityScope.perWorld(key.worldName(), key.ownerId()));
-        }
-        return List.copyOf(scopes);
-    }
-
     @Nullable
     private String resolveWorldId(Store<EntityStore> store) {
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         return world == null || world.getName() == null || world.getName().isBlank()
                 ? null
                 : world.getName();
-    }
-
-    private static String firstNonBlank(@Nullable String first, @Nonnull String fallback) {
-        return first != null && !first.isBlank() ? first : fallback;
     }
 
     private record NearbyBoundary(int maxNearby, double radius) {

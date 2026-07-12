@@ -1,27 +1,20 @@
 package com.alechilles.alecstamework.integration.simpleclaims;
 
 import com.alechilles.alecstamework.integration.claims.ClaimLookupResult;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
-/** Regression coverage for SimpleClaims bridge initialization caching. */
+/** Regression coverage for lifecycle-safe SimpleClaims bridge initialization. */
 class SimpleClaimsBreedingBridgeTest {
-    @AfterEach
-    void resetCache() {
-        SimpleClaimsBreedingBridge.clearCachedBridgeForTests();
-    }
-
     @Test
-    void initializeCachesResolvedBridgeInstance() {
-        SimpleClaimsBreedingBridge.clearCachedBridgeForTests();
-
+    void initializeDoesNotRetainGenerationBlindStaticBridge() {
         SimpleClaimsBreedingBridge first = SimpleClaimsBreedingBridge.initialize();
         SimpleClaimsBreedingBridge second = SimpleClaimsBreedingBridge.initialize();
 
-        assertSame(first, second);
+        assertNotSame(first, second);
+        assertEquals(first.providerId(), second.providerId());
     }
 
     @Test

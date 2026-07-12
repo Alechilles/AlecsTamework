@@ -10,7 +10,7 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 
 Use this page to bootstrap against `TameworkApi`, verify capabilities, and choose the correct family reference page.
 
-> **Experimental API Contract (`0.6.0`)**
+> **Experimental API Contract (`0.7.0`)**
 > The API is named **Public API** in docs and packages, but the contract is still experimental. Keep capability checks and plan for additive changes.
 
 ## Dependency and access pattern
@@ -18,7 +18,7 @@ Add Tamework as a dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.6.0"
+  "Alechilles:Alec's Tamework!": "2.16.1"
 }
 ```
 
@@ -70,6 +70,7 @@ Current capability set:
 - [Command Links API Reference](/mod/alecs-tamework/command-links-api-reference)
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
 - [Policies API Reference](/mod/alecs-tamework/policies-api-reference)
+- [Population Admission API Reference](/mod/alecs-tamework/population-admission-api-reference)
 - [Config Reads API Reference](/mod/alecs-tamework/config-reads-api-reference)
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
@@ -113,7 +114,7 @@ See:
 - Do not write directly to `tamework.sqlite`.
 - Do not depend on repository classes like `NpcProfileRepository` or `CaptureRepository`.
 - Do not mutate or cache internal `Tw*Config` instances.
-- Do not assume API version `0.6.0` will match the mod version.
+- Do not assume API version `0.7.0` will match the mod version.
 
 ## Related Pages
 - [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)

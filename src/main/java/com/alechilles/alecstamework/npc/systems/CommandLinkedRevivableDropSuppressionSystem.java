@@ -1,9 +1,8 @@
 package com.alechilles.alecstamework.npc.systems;
 
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.items.CompanionRevivePolicy;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -62,9 +61,7 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
         }
         TameworkCommandLinksComponent links = commandBuffer.getComponent(ref, linksType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
-        boolean deadRespawnEnabled = TameworkRuntimeSettings.reviveSystemEnabled(
-                TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled()
-        );
+        boolean deadRespawnEnabled = CompanionRevivePolicy.featureEnabled(roleId);
         if (!shouldSuppressDrops(links, deadRespawnEnabled)) {
             return;
         }

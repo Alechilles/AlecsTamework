@@ -131,7 +131,7 @@ class RespawnTraceDiagnosticsWiringTest {
                         && content.contains("RespawnTraceLogSupport.startTrace(traceBranch"),
                 "Replacement traces must be recorded even when debug log emission is disabled."
         );
-        int reset = content.indexOf("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics");
+        int reset = content.indexOf("resetSpawnedCompanionPhysics(");
         int recordReplacement = content.indexOf("RespawnTraceLogSupport.recordReplacement");
         int scheduleProbe = content.indexOf("RespawnTraceLogSupport.scheduleProbe");
 
@@ -183,6 +183,9 @@ class RespawnTraceDiagnosticsWiringTest {
         assertTrue(reset >= 0, "Breeding offspring must clear inherited fall and velocity state after spawn.");
         assertTrue(protection >= 0, "Breeding offspring must receive short fall-damage grace after spawn.");
         assertTrue(progression >= 0, "Breeding offspring progression state must still be applied.");
+        assertTrue(content.contains("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics"));
+        assertTrue(content.contains("RecentSpawnProtectionService.getInstance().record"));
+        assertTrue(content.contains("progressionService.applyOffspringState"));
         assertTrue(reset < protection, "Spawn physics reset should run before fall-damage grace is recorded.");
         assertTrue(protection < progression, "Spawn protection should be registered before further offspring setup.");
     }

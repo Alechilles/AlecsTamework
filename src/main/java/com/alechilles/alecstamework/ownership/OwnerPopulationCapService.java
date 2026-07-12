@@ -1,41 +1,35 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Evaluates and counts owner population caps used by breeding and tame-acquisition gates.
+ * Compatibility preflight facade over the authoritative owner population index.
+ *
+ * <p>This class never scans ECS stores, enumerates worlds, schedules foreign-world work, or waits
+ * on a future. Mutation callers must use {@link OwnerPopulationAdmissionCoordinator}; this facade
+ * remains informational for legacy callers while they migrate.
  */
 public final class OwnerPopulationCapService {
-
     private OwnerPopulationCapService() {
     }
 
     @Nonnull
-    public static Decision evaluateAcquisition(@Nullable Store<EntityStore> store, @Nullable UUID ownerId) {
+    public static Decision evaluateAcquisition(@Nullable Store<EntityStore> store,
+                                               @Nullable UUID ownerId) {
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        if (globalConfig == null) {
-            globalConfig = TwGlobalConfig.defaultConfig();
-        }
-        return evaluateAcquisition(globalConfig, store, ownerId);
+        return evaluateAcquisition(
+                globalConfig == null ? TwGlobalConfig.defaultConfig() : globalConfig,
+                store,
+                ownerId
+        );
     }
 
     @Nonnull
@@ -49,14 +43,42 @@ public final class OwnerPopulationCapService {
         int limit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
                 resolved.getPopulationLimitPerPlayerOwnedTotal()
         );
-        TwGlobalConfig.PerPlayerLimitScope scope = TameworkRuntimeSettings.populationPerPlayerLimitScope(
-                resolved.getPopulationPerPlayerLimitScope()
-        );
-        if (limit <= 0) {
-            return Decision.allowDisabled(scope);
+        TwGlobalConfig.PerPlayerLimitScope configuredScope =
+                TameworkRuntimeSettings.populationPerPlayerLimitScope(
+                        resolved.getPopulationPerPlayerLimitScope()
+                );
+        OwnerPopulationLimitScope scope = toIndexScope(configuredScope);
+        String worldName = resolveWorldName(store);
+        OwnerPopulationIndex index = resolveIndex();
+        if (index == null) {
+            return limit <= 0
+                    ? Decision.allowDisabled(configuredScope)
+                    : Decision.denyUnavailable(limit, configuredScope, "owner-population-index-unavailable");
         }
-        int currentCount = countOwnedPopulation(scope, store, ownerId);
-        return evaluateResolved(limit, currentCount, scope);
+
+        OwnerPopulationCounts counts = index.counts(ownerId, worldName);
+        long committed = scope == OwnerPopulationLimitScope.GLOBAL
+                ? counts.globalCommitted()
+                : counts.worldCommitted();
+        long pending = scope == OwnerPopulationLimitScope.GLOBAL
+                ? counts.globalPending()
+                : counts.worldPending();
+        int current = saturatingInt(committed + pending);
+        if (limit <= 0) {
+            return Decision.allowDisabled(configuredScope, current);
+        }
+        if (scope == OwnerPopulationLimitScope.PER_WORLD && worldName == null) {
+            return Decision.denyUnavailable(limit, configuredScope, "owner-cap-world-context-required");
+        }
+        OwnerPopulationReadiness readiness = index.readiness(scope);
+        if (!readiness.allowsPositiveCappedAdmissions()) {
+            return Decision.denyUnavailable(
+                    limit,
+                    configuredScope,
+                    "owner-population-" + readiness.name().toLowerCase(java.util.Locale.ROOT)
+            );
+        }
+        return evaluateResolved(limit, current, configuredScope);
     }
 
     @Nonnull
@@ -68,180 +90,72 @@ public final class OwnerPopulationCapService {
                 ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
                 : scope;
         if (safeLimit <= 0) {
-            return Decision.allowDisabled(safeScope);
+            return Decision.allowDisabled(safeScope, Math.max(0, currentCount));
         }
         int safeCurrent = Math.max(0, currentCount);
         int remaining = safeLimit - safeCurrent;
-        if (remaining <= 0) {
-            return Decision.denyAtCap(safeLimit, safeCurrent, safeScope);
-        }
-        return Decision.allowWithCap(safeLimit, safeCurrent, remaining, safeScope);
+        return remaining <= 0
+                ? Decision.denyAtCap(safeLimit, safeCurrent, safeScope)
+                : Decision.allowWithCap(safeLimit, safeCurrent, remaining, safeScope);
     }
 
+    /**
+     * Legacy count read backed only by the index. Unready state returns a conservative sentinel.
+     */
     public static int countOwnedPopulation(@Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
                                            @Nullable Store<EntityStore> store,
                                            @Nonnull UUID ownerId) {
-        if (scope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL) {
-            Universe universe = Universe.get();
-            Map<String, World> worldsByName = universe != null ? universe.getWorlds() : null;
-            if (worldsByName == null || worldsByName.isEmpty()) {
-                PopulationSource fallbackSource = buildPopulationSource(store, ownerId);
-                return fallbackSource == null
-                        ? 0
-                        : countOwnedPopulationAcrossSources(List.of(fallbackSource));
-            }
-            List<PopulationSource> populationSources = new ArrayList<>(worldsByName.size());
-            for (World world : worldsByName.values()) {
-                PopulationSource source = buildPopulationSource(world, ownerId);
-                if (source != null) {
-                    populationSources.add(source);
-                }
-            }
-            return countOwnedPopulationAcrossSources(populationSources);
-        }
-        PopulationSource localSource = buildPopulationSource(store, ownerId);
-        return localSource == null
-                ? 0
-                : countOwnedPopulationAcrossSources(List.of(localSource));
+        OwnerPopulationIndex index = resolveIndex();
+        OwnerPopulationLimitScope indexScope = toIndexScope(scope);
+        String worldName = resolveWorldName(store);
+        return countOwnedPopulation(index, indexScope, worldName, ownerId);
     }
 
-    static int countOwnedPopulationAcrossSources(@Nonnull Collection<PopulationSource> sources) {
-        if (sources == null || sources.isEmpty()) {
-            return 0;
+    static int countOwnedPopulation(@Nullable OwnerPopulationIndex index,
+                                    @Nonnull OwnerPopulationLimitScope scope,
+                                    @Nullable String worldName,
+                                    @Nonnull UUID ownerId) {
+        if (scope == OwnerPopulationLimitScope.PER_WORLD && worldName == null) {
+            return Integer.MAX_VALUE;
         }
-        int total = 0;
-        List<CompletableFuture<Integer>> deferredCounts = new ArrayList<>();
-        for (PopulationSource source : sources) {
-            if (source == null) {
-                continue;
-            }
-            if (source.isInCallingThread()) {
-                total += Math.max(0, source.countDirect());
-            } else {
-                deferredCounts.add(source.countDeferred());
-            }
+        if (index == null || !index.readiness(scope).allowsPositiveCappedAdmissions()) {
+            return Integer.MAX_VALUE;
         }
-        for (CompletableFuture<Integer> deferredCount : deferredCounts) {
-            if (deferredCount == null) {
-                continue;
-            }
-            total += Math.max(0, deferredCount.join());
-        }
-        return Math.max(0, total);
-    }
-
-    interface PopulationSource {
-        boolean isInCallingThread();
-
-        int countDirect();
-
-        @Nonnull
-        CompletableFuture<Integer> countDeferred();
+        OwnerPopulationCounts counts = index.counts(ownerId, worldName);
+        return saturatingInt(scope == OwnerPopulationLimitScope.GLOBAL
+                ? counts.globalCommitted() + counts.globalPending()
+                : counts.worldCommitted() + counts.worldPending());
     }
 
     @Nullable
-    private static PopulationSource buildPopulationSource(@Nullable Store<EntityStore> store, @Nonnull UUID ownerId) {
-        if (store == null) {
-            return null;
-        }
-        World world = resolveWorld(store);
-        if (world == null) {
-            return new PopulationSource() {
-                @Override
-                public boolean isInCallingThread() {
-                    return true;
-                }
+    private static OwnerPopulationIndex resolveIndex() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin == null ? null : plugin.getOwnerPopulationIndex();
+    }
 
-                @Override
-                public int countDirect() {
-                    return countOwnedPopulationInStore(store, ownerId);
-                }
-
-                @Nonnull
-                @Override
-                public CompletableFuture<Integer> countDeferred() {
-                    return CompletableFuture.completedFuture(countOwnedPopulationInStore(store, ownerId));
-                }
-            };
-        }
-        return buildPopulationSource(world, ownerId);
+    @Nonnull
+    private static OwnerPopulationLimitScope toIndexScope(
+            @Nullable TwGlobalConfig.PerPlayerLimitScope scope
+    ) {
+        return scope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
+                ? OwnerPopulationLimitScope.GLOBAL
+                : OwnerPopulationLimitScope.PER_WORLD;
     }
 
     @Nullable
-    private static PopulationSource buildPopulationSource(@Nullable World world, @Nonnull UUID ownerId) {
-        if (world == null || world.getEntityStore() == null) {
-            return null;
-        }
-        Store<EntityStore> worldStore = world.getEntityStore().getStore();
-        if (worldStore == null) {
-            return null;
-        }
-        return new PopulationSource() {
-            @Override
-            public boolean isInCallingThread() {
-                return worldStore.isInThread();
-            }
-
-            @Override
-            public int countDirect() {
-                return countOwnedPopulationInStore(worldStore, ownerId);
-            }
-
-            @Nonnull
-            @Override
-            public CompletableFuture<Integer> countDeferred() {
-                if (!world.isAlive() || !worldStore.isAliveInDifferentThread()) {
-                    return CompletableFuture.completedFuture(0);
-                }
-                CompletableFuture<Integer> deferred = new CompletableFuture<>();
-                try {
-                    world.execute(() -> {
-                        try {
-                            deferred.complete(countOwnedPopulationInStore(worldStore, ownerId));
-                        } catch (Throwable throwable) {
-                            deferred.completeExceptionally(throwable);
-                        }
-                    });
-                } catch (Throwable throwable) {
-                    deferred.completeExceptionally(throwable);
-                }
-                return deferred;
-            }
-        };
-    }
-
-    @Nullable
-    private static World resolveWorld(@Nullable Store<EntityStore> store) {
+    private static String resolveWorldName(@Nullable Store<EntityStore> store) {
         if (store == null || store.getExternalData() == null) {
             return null;
         }
-        EntityStore entityStore = store.getExternalData();
-        return entityStore != null ? entityStore.getWorld() : null;
+        World world = store.getExternalData().getWorld();
+        if (world == null || world.getName() == null || world.getName().isBlank()) {
+            return null;
+        }
+        return world.getName().trim();
     }
 
-    private static int countOwnedPopulationInStore(@Nullable Store<EntityStore> store, @Nonnull UUID ownerId) {
-        if (store == null) {
-            return 0;
-        }
-        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (npcType == null || ownerType == null) {
-            return 0;
-        }
-        int[] count = new int[] {0};
-        store.forEachChunk(
-                Query.and(npcType, ownerType),
-                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
-                    int size = chunk.size();
-                    for (int i = 0; i < size; i++) {
-                        TameworkOwnerComponent owner = chunk.getComponent(i, ownerType);
-                        if (owner != null && ownerId.equals(owner.getOwnerId())) {
-                            count[0]++;
-                        }
-                    }
-                }
-        );
-        return Math.max(0, count[0]);
+    private static int saturatingInt(long value) {
+        return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0L, value);
     }
 
     public record Decision(boolean allowed,
@@ -254,19 +168,23 @@ public final class OwnerPopulationCapService {
         @Nonnull
         static Decision allowNoOwner() {
             return new Decision(
-                    true,
-                    false,
-                    0,
-                    0,
-                    Integer.MAX_VALUE,
-                    TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
-                    "owner-cap-no-owner"
+                    true, false, 0, 0, Integer.MAX_VALUE,
+                    TwGlobalConfig.PerPlayerLimitScope.PER_WORLD, "owner-cap-no-owner"
             );
         }
 
         @Nonnull
         static Decision allowDisabled(@Nonnull TwGlobalConfig.PerPlayerLimitScope scope) {
-            return new Decision(true, false, 0, 0, Integer.MAX_VALUE, scope, "owner-cap-disabled");
+            return allowDisabled(scope, 0);
+        }
+
+        @Nonnull
+        static Decision allowDisabled(@Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
+                                      int currentCount) {
+            return new Decision(
+                    true, false, 0, Math.max(0, currentCount), Integer.MAX_VALUE,
+                    scope, "owner-cap-disabled"
+            );
         }
 
         @Nonnull
@@ -275,13 +193,8 @@ public final class OwnerPopulationCapService {
                                      int remainingHeadroom,
                                      @Nonnull TwGlobalConfig.PerPlayerLimitScope scope) {
             return new Decision(
-                    true,
-                    true,
-                    Math.max(0, limit),
-                    Math.max(0, currentCount),
-                    Math.max(0, remainingHeadroom),
-                    scope,
-                    "owner-cap-allow"
+                    true, true, Math.max(0, limit), Math.max(0, currentCount),
+                    Math.max(0, remainingHeadroom), scope, "owner-cap-allow"
             );
         }
 
@@ -290,13 +203,17 @@ public final class OwnerPopulationCapService {
                                   int currentCount,
                                   @Nonnull TwGlobalConfig.PerPlayerLimitScope scope) {
             return new Decision(
-                    false,
-                    true,
-                    Math.max(0, limit),
-                    Math.max(0, currentCount),
-                    0,
-                    scope,
-                    "owner-cap-reached"
+                    false, true, Math.max(0, limit), Math.max(0, currentCount),
+                    0, scope, "owner-cap-reached"
+            );
+        }
+
+        @Nonnull
+        static Decision denyUnavailable(int limit,
+                                        @Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
+                                        @Nonnull String reason) {
+            return new Decision(
+                    false, true, Math.max(0, limit), -1, 0, scope, reason
             );
         }
     }

@@ -10,7 +10,8 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
-import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -37,8 +38,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -49,37 +54,44 @@ public final class ApiSelfTestFixtureManager {
     public static final String FIXTURE_KEY_OWNED = "owned_linked_example";
     public static final String FIXTURE_KEY_STRANGER = "stranger_linked_example";
 
-    private static final long WRITE_QUEUE_WAIT_TIMEOUT_MS = 5000L;
     private static final String STRANGER_OWNER_NAME = "API Self-Test Stranger";
     private static final String DISPLAY_NAME_OWNED = "API Self-Test Owned Example";
     private static final String DISPLAY_NAME_STRANGER = "API Self-Test Stranger Example";
 
-    private final TameworkPersistenceRuntime persistenceRuntime;
+    private final ApiSelfTestPopulationAuthority populationAuthority;
     private final ApiSelfTestCommandToolFactory toolFactory;
 
-    public ApiSelfTestFixtureManager(@Nonnull TameworkPersistenceRuntime persistenceRuntime) {
-        this(persistenceRuntime, new ApiSelfTestCommandToolFactory());
+    public ApiSelfTestFixtureManager(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
+                                     @Nonnull OwnerPopulationRuntime populationRuntime) {
+        this(
+                new ApiSelfTestPopulationAuthority(persistenceRuntime, populationRuntime),
+                new ApiSelfTestCommandToolFactory()
+        );
     }
 
-    ApiSelfTestFixtureManager(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
+    ApiSelfTestFixtureManager(@Nonnull ApiSelfTestPopulationAuthority populationAuthority,
                               @Nonnull ApiSelfTestCommandToolFactory toolFactory) {
-        this.persistenceRuntime = persistenceRuntime;
-        this.toolFactory = toolFactory;
+        this.populationAuthority = Objects.requireNonNull(
+                populationAuthority, "populationAuthority"
+        );
+        this.toolFactory = Objects.requireNonNull(toolFactory, "toolFactory");
     }
 
     @Nonnull
-    public FixtureOperationResult prepare(@Nonnull Player player,
-                                          @Nonnull Store<EntityStore> store,
-                                          @Nonnull Ref<EntityStore> playerRef,
-                                          @Nonnull World world) {
+    public CompletableFuture<FixtureOperationResult> prepareAsync(
+            @Nonnull Player player,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> playerRef,
+            @Nonnull World world
+    ) {
         UUID ownerPlayerUuid = player.getUuid();
         String worldName = normalizeWorldName(world);
         if (ownerPlayerUuid == null) {
-            return FixtureOperationResult.failure("Unable to determine your player UUID.", null);
+            return completedFailure("Unable to determine your player UUID.", null);
         }
         ApiSelfTestFixtureSet existing = resolveFixtureSet(player, store, world).orElse(null);
         if (existing != null) {
-            return FixtureOperationResult.failure(
+            return completedFailure(
                     "An API self-test fixture set already exists. Run /tw api test reset first.",
                     existing
             );
@@ -87,7 +99,7 @@ public final class ApiSelfTestFixtureManager {
 
         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (playerTransform == null) {
-            return FixtureOperationResult.failure("Unable to read your position for fixture placement.", null);
+            return completedFailure("Unable to read your position for fixture placement.", null);
         }
         Vector3d playerPosition = new Vector3d(playerTransform.getPosition());
         Rotation3f playerRotation = new Rotation3f(playerTransform.getRotation());
@@ -96,7 +108,7 @@ public final class ApiSelfTestFixtureManager {
         String fixtureSetId = UUID.randomUUID().toString();
         String toolId = UUID.randomUUID().toString();
 
-        ArrayList<UUID> spawnedNpcUuids = new ArrayList<>();
+        ArrayList<SpawnedFixture> spawnedFixtures = new ArrayList<>();
         try {
             SpawnedFixture owned = spawnFixture(
                     store,
@@ -111,7 +123,7 @@ public final class ApiSelfTestFixtureManager {
                     DISPLAY_NAME_OWNED,
                     new Vector3d(playerPosition.x + 4.0, playerPosition.y, playerPosition.z + 4.0)
             );
-            spawnedNpcUuids.add(owned.fixture().npcUuid());
+            spawnedFixtures.add(owned);
 
             SpawnedFixture stranger = spawnFixture(
                     store,
@@ -126,101 +138,203 @@ public final class ApiSelfTestFixtureManager {
                     DISPLAY_NAME_STRANGER,
                     new Vector3d(playerPosition.x - 4.0, playerPosition.y, playerPosition.z + 4.0)
             );
-            spawnedNpcUuids.add(stranger.fixture().npcUuid());
+            spawnedFixtures.add(stranger);
 
-            if (!upsertProfile(owned.fixture(), fixtureSetId, ownerPlayerUuid, toolId)
-                    || !upsertProfile(stranger.fixture(), fixtureSetId, ownerPlayerUuid, toolId)
-                    || !persistenceRuntime.awaitWriteQueueIdle(WRITE_QUEUE_WAIT_TIMEOUT_MS)) {
-                cleanupSpawnedFixtures(world, spawnedNpcUuids);
-                cleanupProfiles(spawnedNpcUuids);
-                return FixtureOperationResult.failure(
-                        "Failed to persist the self-test fixture profiles.",
-                        null
-                );
-            }
-
-            ItemStack toolStack = toolFactory.createExampleCommandTool(
-                    fixtureSetId,
-                    ownerPlayerUuid,
-                    worldName,
-                    toolId,
-                    List.of(
-                            new LinkedNpcSpec(
-                                    owned.fixture().npcUuid(),
-                                    owned.fixture().lastKnownPosition(),
-                                    owned.fixture().homePosition(),
-                                    owned.fixture().displayName(),
-                                    null,
-                                    owned.fixture().roleId()
-                            ),
-                            new LinkedNpcSpec(
-                                    stranger.fixture().npcUuid(),
-                                    stranger.fixture().lastKnownPosition(),
-                                    stranger.fixture().homePosition(),
-                                    stranger.fixture().displayName(),
-                                    null,
-                                    stranger.fixture().roleId()
-                            )
+            CompletableFuture<Void> ownership = CompletableFuture.allOf(
+                    populationAuthority.assignOwnerAsync(
+                            store, owned.reference(), owned.fixture(), fixtureSetId
+                    ),
+                    populationAuthority.assignOwnerAsync(
+                            store, stranger.reference(), stranger.fixture(), fixtureSetId
                     )
             );
-            int toolSlot = placeToolInHotbar(player, toolStack);
-            if (toolSlot < 0) {
-                cleanupSpawnedFixtures(world, spawnedNpcUuids);
-                cleanupProfiles(spawnedNpcUuids);
-                return FixtureOperationResult.failure(
-                        "Failed to place the example command whistle in your hotbar.",
-                        null
-                );
-            }
-
-            LinkedHashMap<String, ApiSelfTestFixtureRecord> fixtures = new LinkedHashMap<>();
-            fixtures.put(owned.fixture().fixtureKey(), owned.fixture());
-            fixtures.put(stranger.fixture().fixtureKey(), stranger.fixture());
-            return FixtureOperationResult.success(
-                    "Prepared API self-test fixtures in hotbar slot " + toolSlot + ".",
-                    new ApiSelfTestFixtureSet(fixtureSetId, ownerPlayerUuid, worldName, toolId, fixtures)
-            );
+            return ownership
+                    .thenCompose(ignored -> populationAuthority.persistMetadataAsync(
+                            owned.fixture(), stranger.fixture(), fixtureSetId, ownerPlayerUuid, toolId
+                    ))
+                    .thenCompose(ignored -> onWorld(world, () -> finishPrepare(
+                            player, owned.fixture(), stranger.fixture(), fixtureSetId,
+                            ownerPlayerUuid, worldName, toolId
+                    )))
+                    .handle((result, failure) -> failure == null
+                            ? CompletableFuture.completedFuture(result)
+                            : cleanupFailedPrepareAsync(store, spawnedFixtures, failure))
+                    .thenCompose(future -> future);
         } catch (Exception ex) {
-            cleanupSpawnedFixtures(world, spawnedNpcUuids);
-            cleanupProfiles(spawnedNpcUuids);
-            return FixtureOperationResult.failure("Failed to prepare self-test fixtures: " + ex.getMessage(), null);
+            cleanupSpawnedFixtures(world, spawnedFixtures.stream()
+                    .map(fixture -> fixture.fixture().npcUuid()).toList());
+            return completedFailure("Failed to prepare self-test fixtures: " + rootMessage(ex), null);
         }
     }
 
     @Nonnull
-    public FixtureOperationResult reset(@Nonnull Player player,
-                                        @Nonnull Store<EntityStore> store,
-                                        @Nonnull World world) {
+    public CompletableFuture<FixtureOperationResult> resetAsync(
+            @Nonnull Player player,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull World world
+    ) {
         UUID ownerPlayerUuid = player.getUuid();
         if (ownerPlayerUuid == null) {
-            return FixtureOperationResult.failure("Unable to determine your player UUID.", null);
+            return completedFailure("Unable to determine your player UUID.", null);
         }
         String worldName = normalizeWorldName(world);
         List<ToolStackMatch> tools = findSelfTestTools(player, worldName);
         List<LiveFixtureMarkerMatch> liveFixtures = collectLiveFixtures(store, ownerPlayerUuid, null);
         if (tools.isEmpty() && liveFixtures.isEmpty()) {
-            return FixtureOperationResult.failure("No API self-test fixture set found for this player/world.", null);
+            return completedFailure("No API self-test fixture set found for this player/world.", null);
         }
+        LinkedHashSet<UUID> referencedNpcUuids = toolNpcUuids(tools);
+        LinkedHashSet<UUID> liveNpcUuids = new LinkedHashSet<>();
+        for (LiveFixtureMarkerMatch liveFixture : liveFixtures) {
+            liveNpcUuids.add(liveFixture.npcUuid());
+        }
+        referencedNpcUuids.removeAll(liveNpcUuids);
+        if (!referencedNpcUuids.isEmpty()) {
+            return completedFailure(
+                    "Cannot safely reset while " + referencedNpcUuids.size()
+                            + " fixture companion(s) are not loaded; their owner slots were preserved.",
+                    null
+            );
+        }
+        List<CompletableFuture<Void>> releases = new ArrayList<>();
+        for (LiveFixtureMarkerMatch liveFixture : liveFixtures) {
+            releases.add(populationAuthority.releaseLoadedAsync(
+                    store, liveFixture.reference(), liveFixture.npcUuid()
+            ));
+        }
+        return CompletableFuture.allOf(releases.toArray(CompletableFuture[]::new))
+                .thenCompose(ignored -> onWorld(world, () -> {
+                    for (ToolStackMatch tool : tools) {
+                        removeHotbarSlot(player, tool.slot());
+                    }
+                    return FixtureOperationResult.success(
+                            "Reset API self-test fixtures. Permanently released "
+                                    + liveNpcUuids.size() + " fixture profile(s).",
+                            null
+                    );
+                }))
+                .exceptionally(failure -> FixtureOperationResult.failure(
+                        "Failed to reset self-test fixtures safely: " + rootMessage(failure),
+                        null
+                ));
+    }
 
+    @Nonnull
+    private FixtureOperationResult finishPrepare(
+            @Nonnull Player player,
+            @Nonnull ApiSelfTestFixtureRecord owned,
+            @Nonnull ApiSelfTestFixtureRecord stranger,
+            @Nonnull String fixtureSetId,
+            @Nonnull UUID ownerPlayerUuid,
+            @Nonnull String worldName,
+            @Nonnull String toolId
+    ) {
+        ItemStack toolStack = toolFactory.createExampleCommandTool(
+                fixtureSetId,
+                ownerPlayerUuid,
+                worldName,
+                toolId,
+                List.of(linkedSpec(owned), linkedSpec(stranger))
+        );
+        int toolSlot = placeToolInHotbar(player, toolStack);
+        if (toolSlot < 0) {
+            throw new IllegalStateException("fixture-tool-placement-failed");
+        }
+        LinkedHashMap<String, ApiSelfTestFixtureRecord> fixtures = new LinkedHashMap<>();
+        fixtures.put(owned.fixtureKey(), owned);
+        fixtures.put(stranger.fixtureKey(), stranger);
+        return FixtureOperationResult.success(
+                "Prepared API self-test fixtures in hotbar slot " + toolSlot + ".",
+                new ApiSelfTestFixtureSet(
+                        fixtureSetId, ownerPlayerUuid, worldName, toolId, fixtures
+                )
+        );
+    }
+
+    @Nonnull
+    private static LinkedNpcSpec linkedSpec(@Nonnull ApiSelfTestFixtureRecord fixture) {
+        return new LinkedNpcSpec(
+                fixture.npcUuid(),
+                fixture.lastKnownPosition(),
+                fixture.homePosition(),
+                fixture.displayName(),
+                null,
+                fixture.roleId()
+        );
+    }
+
+    @Nonnull
+    private CompletableFuture<FixtureOperationResult> cleanupFailedPrepareAsync(
+            @Nonnull Store<EntityStore> store,
+            @Nonnull List<SpawnedFixture> spawnedFixtures,
+            @Nonnull Throwable failure
+    ) {
+        List<CompletableFuture<Void>> cleanup = new ArrayList<>();
+        for (SpawnedFixture spawned : spawnedFixtures) {
+            cleanup.add(populationAuthority.releaseOrDespawnUnownedAsync(
+                    store, spawned.reference(), spawned.fixture().npcUuid()
+            ));
+        }
+        return CompletableFuture.allOf(cleanup.toArray(CompletableFuture[]::new))
+                .handle((ignored, cleanupFailure) -> FixtureOperationResult.failure(
+                        "Failed to prepare self-test fixtures: " + rootMessage(failure)
+                                + (cleanupFailure == null
+                                ? ""
+                                : " (cleanup pending: " + rootMessage(cleanupFailure) + ")"),
+                        null
+                ));
+    }
+
+    @Nonnull
+    private static LinkedHashSet<UUID> toolNpcUuids(@Nonnull List<ToolStackMatch> tools) {
         LinkedHashSet<UUID> npcUuids = new LinkedHashSet<>();
         for (ToolStackMatch tool : tools) {
             for (LinkedNpcSpec spec : tool.linkedNpcSpecs()) {
                 npcUuids.add(spec.npcUuid());
             }
-            removeHotbarSlot(player, tool.slot());
         }
-        for (LiveFixtureMarkerMatch liveFixture : liveFixtures) {
-            npcUuids.add(liveFixture.npcUuid());
-            NPCEntity npc = store.getComponent(liveFixture.reference(), NPCEntity.getComponentType());
-            if (npc != null) {
-                npc.setToDespawn();
+        return npcUuids;
+    }
+
+    @Nonnull
+    private static <T> CompletableFuture<T> onWorld(
+            @Nonnull World world,
+            @Nonnull Supplier<T> action
+    ) {
+        CompletableFuture<T> completion = new CompletableFuture<>();
+        LeaseBoundWorldDispatcher.execute(world, () -> {
+            try {
+                completion.complete(action.get());
+            } catch (Throwable throwable) {
+                completion.completeExceptionally(throwable);
             }
-        }
-        cleanupProfiles(npcUuids);
-        return FixtureOperationResult.success(
-                "Reset API self-test fixtures. Cleaned " + npcUuids.size() + " fixture profile(s).",
-                null
+        }, () -> completion.completeExceptionally(
+                new IllegalStateException("fixture-world-dispatch-rejected")
+        ));
+        return completion;
+    }
+
+    @Nonnull
+    private static CompletableFuture<FixtureOperationResult> completedFailure(
+            @Nonnull String summary,
+            @Nullable ApiSelfTestFixtureSet fixtureSet
+    ) {
+        return CompletableFuture.completedFuture(
+                FixtureOperationResult.failure(summary, fixtureSet)
         );
+    }
+
+    @Nonnull
+    private static String rootMessage(@Nonnull Throwable throwable) {
+        Throwable current = throwable;
+        while ((current instanceof CompletionException || current.getCause() != null)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        String message = current.getMessage();
+        return message == null || message.isBlank()
+                ? current.getClass().getSimpleName()
+                : message;
     }
 
     @Nonnull
@@ -355,10 +469,6 @@ public final class ApiSelfTestFixtureManager {
         if (linksType != null) {
             store.putComponent(npcRef, linksType, new TameworkCommandLinksComponent(ownerUuid, new String[] { toolId }, homePosition));
         }
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (ownerType != null) {
-            store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerUuid, ownerName));
-        }
         ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
         if (tamedType != null) {
             store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
@@ -414,32 +524,6 @@ public final class ApiSelfTestFixtureManager {
         );
     }
 
-    private boolean upsertProfile(@Nonnull ApiSelfTestFixtureRecord fixture,
-                                  @Nonnull String fixtureSetId,
-                                  @Nonnull UUID ownerPlayerUuid,
-                                  @Nonnull String toolId) {
-        String profileJson = "{\"apiSelfTest\":true,\"fixtureSetId\":\""
-                + fixtureSetId
-                + "\",\"fixtureKey\":\""
-                + fixture.fixtureKey()
-                + "\",\"ownerPlayerUuid\":\""
-                + ownerPlayerUuid
-                + "\"}";
-        return persistenceRuntime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
-                fixture.npcUuid(),
-                fixture.ownerUuid(),
-                fixture.ownerName(),
-                fixture.roleId(),
-                fixture.displayName(),
-                fixture.displayName(),
-                true,
-                null,
-                null,
-                profileJson,
-                new String[] { toolId }
-        ));
-    }
-
     private void cleanupSpawnedFixtures(@Nonnull World world, @Nonnull Iterable<UUID> spawnedNpcUuids) {
         for (UUID npcUuid : spawnedNpcUuids) {
             if (npcUuid == null) {
@@ -458,17 +542,6 @@ public final class ApiSelfTestFixtureManager {
                 npc.setToDespawn();
             }
         }
-    }
-
-    private void cleanupProfiles(@Nonnull Iterable<UUID> npcUuids) {
-        NpcProfileRepository repository = persistenceRuntime.getNpcProfileRepository();
-        for (UUID npcUuid : npcUuids) {
-            if (npcUuid == null) {
-                continue;
-            }
-            repository.deleteProfileTreeAsync(npcUuid);
-        }
-        persistenceRuntime.awaitWriteQueueIdle(WRITE_QUEUE_WAIT_TIMEOUT_MS);
     }
 
     private int placeToolInHotbar(@Nonnull Player player, @Nonnull ItemStack stack) {

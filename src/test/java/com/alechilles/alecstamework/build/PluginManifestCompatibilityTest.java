@@ -74,6 +74,39 @@ class PluginManifestCompatibilityTest {
         assertEquals(256, image.getHeight(), "icon-256.png must be 256 pixels high.");
     }
 
+    /**
+     * Guards the third-party API versions whose public contracts were verified for claim integrations.
+     */
+    @Test
+    void claimIntegrationsUseVerifiedOptionalDependencyRanges() throws IOException {
+        JsonObject manifest = readManifest();
+        JsonObject dependencies = manifest.getAsJsonObject("Dependencies");
+        JsonObject optionalDependencies = manifest.getAsJsonObject("OptionalDependencies");
+
+        assertNotNull(dependencies, "The manifest must retain an explicit required-dependency object.");
+        assertNotNull(optionalDependencies, "Claim integrations must be declared as optional dependencies.");
+        assertTrue(optionalDependencies.has("Buuz135:SimpleClaims"), "SimpleClaims must remain declared.");
+        assertTrue(
+                optionalDependencies.has("net.evilcraft:QuestLinesClaims"),
+                "QuestLines Claims must be declared under its verified plugin identifier."
+        );
+        assertEquals(
+                ">=1.0.38 <1.1.0",
+                optionalDependencies.get("Buuz135:SimpleClaims").getAsString(),
+                "SimpleClaims must stay within the verified 1.0.38-compatible API line."
+        );
+        assertEquals(
+                "=1.3.1",
+                optionalDependencies.get("net.evilcraft:QuestLinesClaims").getAsString(),
+                "QuestLines Claims must remain pinned to its verified 1.3.1 API contract."
+        );
+        assertFalse(
+                dependencies.has("Buuz135:SimpleClaims")
+                        || dependencies.has("net.evilcraft:QuestLinesClaims"),
+                "Claims integrations must degrade gracefully when either external plugin is absent."
+        );
+    }
+
     private static JsonObject readManifest() throws IOException {
         Path path = Path.of("src", "main", "resources", "manifest.json");
         try (Reader reader = Files.newBufferedReader(path)) {

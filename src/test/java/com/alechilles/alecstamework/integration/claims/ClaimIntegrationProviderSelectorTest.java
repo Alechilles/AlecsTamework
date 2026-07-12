@@ -4,49 +4,28 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClaimIntegrationProviderSelectorTest {
     @Test
-    void autoPrefersQuestLinesWhenBothAreAvailable() {
-        FakeBridge questLines = new FakeBridge("questlines-claims", true);
-        FakeBridge simpleClaims = new FakeBridge("simpleclaims", true);
-
-        ClaimIntegrationBridge selected = ClaimIntegrationProviderSelector.select(
-                ClaimIntegrationProvider.AUTO,
-                questLines,
-                simpleClaims
+    void unavailableBridgePreservesOperationDiagnostic() {
+        ClaimIntegrationBridge bridge = ClaimIntegrationProviderSelector.unavailable(
+                "questlines-claims",
+                "owner runtime is unavailable"
         );
 
-        assertSame(questLines, selected);
+        assertFalse(bridge.isAvailable());
+        assertEquals("questlines-claims", bridge.providerId());
+        assertEquals("owner runtime is unavailable", bridge.getUnavailableReason());
+        assertEquals(ClaimLookupResult.Status.UNAVAILABLE, bridge.lookupClaim("world", 0, 0).status());
     }
 
     @Test
-    void autoFallsBackToSimpleClaimsWhenQuestLinesIsUnavailable() {
-        FakeBridge questLines = new FakeBridge("questlines-claims", false);
-        FakeBridge simpleClaims = new FakeBridge("simpleclaims", true);
+    void unavailableBridgeNormalizesBlankInputs() {
+        ClaimIntegrationBridge bridge = ClaimIntegrationProviderSelector.unavailable(" ", null);
 
-        ClaimIntegrationBridge selected = ClaimIntegrationProviderSelector.select(
-                ClaimIntegrationProvider.AUTO,
-                questLines,
-                simpleClaims
-        );
-
-        assertSame(simpleClaims, selected);
-    }
-
-    @Test
-    void explicitOffReturnsUnavailableBridge() {
-        ClaimIntegrationBridge selected = ClaimIntegrationProviderSelector.select(
-                ClaimIntegrationProvider.OFF,
-                new FakeBridge("questlines-claims", true),
-                new FakeBridge("simpleclaims", true)
-        );
-
-        assertFalse(selected.isAvailable());
-        assertEquals("off", selected.providerId());
-        assertEquals(ClaimLookupResult.Status.UNAVAILABLE, selected.lookupClaim("world", 0, 0).status());
+        assertEquals("unavailable", bridge.providerId());
+        assertEquals("Claim integration provider is unavailable.", bridge.getUnavailableReason());
     }
 
     @Test
@@ -57,24 +36,5 @@ class ClaimIntegrationProviderSelectorTest {
         assertEquals(ClaimIntegrationProvider.QUESTLINES_CLAIMS, ClaimIntegrationProvider.fromConfigValue("QuestLinesClaims"));
         assertEquals(ClaimIntegrationProvider.OFF, ClaimIntegrationProvider.fromConfigValue("disabled"));
         assertTrue(ClaimIntegrationProvider.AUTO.configValue().equals("Auto"));
-    }
-
-    private record FakeBridge(String providerId, boolean available) implements ClaimIntegrationBridge {
-        @Override
-        public boolean isAvailable() {
-            return available;
-        }
-
-        @Override
-        public String getUnavailableReason() {
-            return available ? null : "missing";
-        }
-
-        @Override
-        public ClaimLookupResult lookupClaim(String worldName, double blockX, double blockZ) {
-            return available
-                    ? ClaimLookupResult.noClaim()
-                    : ClaimLookupResult.unavailable("missing");
-        }
     }
 }

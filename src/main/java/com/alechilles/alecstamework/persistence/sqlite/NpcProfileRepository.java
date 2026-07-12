@@ -1,8 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -70,13 +68,27 @@ public final class NpcProfileRepository {
     }
 
     public boolean upsertAsync(@Nonnull ProfileUpdate update) {
+        ProfileOwnerMutation ownerMutation = update.ownerUuid() == null
+                ? ProfileOwnerMutation.unchanged()
+                : ProfileOwnerMutation.set(update.ownerUuid());
+        return upsertAsync(update, ownerMutation, "npc_profile_upsert");
+    }
+
+    /** Snapshot metadata may enrich a profile but cannot become an ownership authority. */
+    public boolean upsertSnapshotAsync(@Nonnull ProfileUpdate update) {
+        return upsertAsync(update, ProfileOwnerMutation.unchanged(), "npc_profile_snapshot_upsert");
+    }
+
+    private boolean upsertAsync(@Nonnull ProfileUpdate update,
+                                @Nonnull ProfileOwnerMutation ownerMutation,
+                                @Nonnull String operation) {
         AtomicReference<ProfileRecord> beforeRef = new AtomicReference<>();
         AtomicReference<ProfileRecord> afterRef = new AtomicReference<>();
         return writeQueue.submit(
-                "npc_profile_upsert",
+                operation,
                 connection -> {
                     beforeRef.set(loadProfileByNpcUuidInTransaction(connection, update.npcUuid()));
-                    upsertProfileInTransaction(connection, update);
+                    upsertProfileInTransaction(connection, update, ownerMutation);
                     String profileId = resolveProfileIdInTransaction(connection, update.npcUuid());
                     afterRef.set(profileId != null ? loadProfileByIdInTransaction(connection, profileId) : null);
                 },
@@ -250,14 +262,26 @@ public final class NpcProfileRepository {
     }
 
     void upsertProfileInTransaction(@Nonnull Connection connection, @Nonnull ProfileUpdate update) throws Exception {
+        ProfileOwnerMutation ownerMutation = update.ownerUuid() == null
+                ? ProfileOwnerMutation.unchanged()
+                : ProfileOwnerMutation.set(update.ownerUuid());
+        upsertProfileInTransaction(connection, update, ownerMutation);
+    }
+
+    void upsertProfileInTransaction(@Nonnull Connection connection,
+                                    @Nonnull ProfileUpdate update,
+                                    @Nonnull ProfileOwnerMutation ownerMutation) throws Exception {
+        Objects.requireNonNull(ownerMutation, "ownerMutation");
         String npcUuidString = update.npcUuid().toString();
         String profileId = resolveOrCreateProfileIdInTransaction(connection, update.npcUuid());
         long nowMs = System.currentTimeMillis();
         String currentNpcUuid = resolveEffectiveCurrentUuidForUpsert(connection, profileId, npcUuidString);
         ExistingProfileRow existingRow = loadExistingProfileRowInTransaction(connection, profileId);
-        String ownerUuid = update.ownerUuid() != null
-                ? update.ownerUuid().toString()
-                : existingRow != null ? existingRow.ownerUuid() : null;
+        String ownerUuid = switch (ownerMutation.kind()) {
+            case SET -> ownerMutation.ownerUuid().toString();
+            case CLEAR -> null;
+            case UNCHANGED -> existingRow == null ? null : existingRow.ownerUuid();
+        };
         String displayName = trimToNull(update.displayName());
         if (displayName == null && existingRow != null) {
             displayName = existingRow.displayName();
@@ -266,7 +290,17 @@ public final class NpcProfileRepository {
         if (roleId == null && existingRow != null) {
             roleId = existingRow.roleId();
         }
-        String stateJson = buildMergedStateJson(existingRow, update);
+        String stateJson = NpcProfileStateJsonCodec.merge(
+                existingRow == null ? null : existingRow.stateJson(),
+                update,
+                ownerMutation,
+                ownerMutation.kind() == ProfileOwnerMutation.Kind.UNCHANGED
+                        && existingRow != null
+                        && (existingRow.ownerUuid() == null
+                            ? update.ownerUuid() == null
+                            : update.ownerUuid() != null
+                                && update.ownerUuid().toString().equals(existingRow.ownerUuid()))
+        );
         String stateHash = stateJson != null ? Integer.toHexString(stateJson.hashCode()) : null;
         boolean profileUnchanged = existingRow != null
                 && Objects.equals(existingRow.currentNpcUuid(), currentNpcUuid)
@@ -726,21 +760,22 @@ public final class NpcProfileRepository {
                 if (!rs.next()) {
                     return null;
                 }
-                JsonObject state = parseJsonObject(trimToNull(rs.getString("state_json")));
+                JsonObject state = NpcProfileStateJsonCodec.parse(trimToNull(rs.getString("state_json")));
                 String[] toolIds = loadAllToolLinks(connection, profileId);
                 String[] activeSnapshotTypes = loadActiveSnapshotTypesInTransaction(connection, profileId)
                         .toArray(new String[0]);
+                UUID ownerUuid = SqliteValueCodec.parseUuid(rs.getString("owner_uuid"));
                 return new ProfileRecord(
                         profileId,
                         SqliteValueCodec.parseUuid(rs.getString("current_npc_uuid")),
-                        SqliteValueCodec.parseUuid(rs.getString("owner_uuid")),
-                        getJsonString(state, "owner_name"),
+                        ownerUuid,
+                        NpcProfileStateJsonCodec.string(state, "owner_name"),
                         trimToNull(rs.getString("role_id")),
                         trimToNull(rs.getString("display_name")),
-                        getJsonString(state, "custom_name"),
-                        getJsonBoolean(state, "tamed"),
-                        getJsonString(state, "coop_id"),
-                        getJsonInteger(state, "coop_slot"),
+                        NpcProfileStateJsonCodec.string(state, "custom_name"),
+                        NpcProfileStateJsonCodec.bool(state, "tamed"),
+                        NpcProfileStateJsonCodec.string(state, "coop_id"),
+                        NpcProfileStateJsonCodec.integer(state, "coop_slot"),
                         toolIds,
                         activeSnapshotTypes,
                         rs.getLong("updated_at_ms")
@@ -876,96 +911,6 @@ public final class NpcProfileRepository {
             statement.setInt(3, isCurrent ? 1 : 0);
             statement.setLong(4, mappedAtMs);
             statement.executeUpdate();
-        }
-    }
-
-    @Nonnull
-    private JsonObject buildStateJson(@Nonnull ProfileUpdate update) {
-        JsonObject state = new JsonObject();
-        putString(state, "owner_name", update.ownerName());
-        putString(state, "custom_name", update.customName());
-        putBoolean(state, "tamed", update.tamed());
-        putString(state, "coop_id", update.coopId());
-        if (update.coopSlot() != null) {
-            state.addProperty("coop_slot", update.coopSlot());
-        }
-        putString(state, "profile_json", update.profileJson());
-        return state;
-    }
-
-    @Nullable
-    private String buildMergedStateJson(@Nullable ExistingProfileRow existingRow,
-                                        @Nonnull ProfileUpdate update) {
-        JsonObject merged = existingRow != null ? parseJsonObject(trimToNull(existingRow.stateJson())) : null;
-        if (merged == null) {
-            merged = new JsonObject();
-        }
-        JsonObject updateState = buildStateJson(update);
-        for (String key : updateState.keySet()) {
-            JsonElement value = updateState.get(key);
-            merged.add(key, value);
-        }
-        return merged.size() > 0 ? merged.toString() : null;
-    }
-
-    private void putString(@Nonnull JsonObject object, @Nonnull String key, @Nullable String value) {
-        String normalized = trimToNull(value);
-        if (normalized != null) {
-            object.addProperty(key, normalized);
-        }
-    }
-
-    private void putBoolean(@Nonnull JsonObject object, @Nonnull String key, @Nullable Boolean value) {
-        if (value != null) {
-            object.addProperty(key, value);
-        }
-    }
-
-    @Nullable
-    private JsonObject parseJsonObject(@Nullable String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            return JsonParser.parseString(raw).getAsJsonObject();
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private String getJsonString(@Nullable JsonObject object, @Nonnull String key) {
-        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            return trimToNull(object.get(key).getAsString());
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private Boolean getJsonBoolean(@Nullable JsonObject object, @Nonnull String key) {
-        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            return object.get(key).getAsBoolean();
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private Integer getJsonInteger(@Nullable JsonObject object, @Nonnull String key) {
-        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
-            return null;
-        }
-        try {
-            return object.get(key).getAsInt();
-        } catch (Exception ignored) {
-            return null;
         }
     }
 

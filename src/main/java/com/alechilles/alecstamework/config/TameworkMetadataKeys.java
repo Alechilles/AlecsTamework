@@ -5,6 +5,8 @@ package com.alechilles.alecstamework.config;
  */
 public final class TameworkMetadataKeys {
     public static final String CAPTURED = "Tamework.Captured";
+    /** Canonical durable companion identity; legacy items may only carry {@link #TARGET_UUID}. */
+    public static final String COMPANION_PROFILE_ID = "Tamework.CompanionProfileId";
     public static final String TARGET_UUID = "Tamework.TargetUuid";
     public static final String TARGET_ENTITY_ID = "Tamework.TargetEntityId";
     public static final String CAPTURE_ROLE_ID = "Tamework.CaptureRoleId";

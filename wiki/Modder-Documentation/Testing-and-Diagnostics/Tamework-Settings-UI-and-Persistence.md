@@ -67,8 +67,8 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 
 | Area | Settings-owned values |
 | --- | --- |
-| Population | Owned NPC limits and per-player counting scope |
-| SimpleClaims | Enablement, claim limits, breeding-claim requirement, and tamed damage protection |
+| Population | Canonical owned-companion limits and per-player counting scope |
+| Claim integration | Master enablement, provider, claim admission limits, breeding-claim requirement, and SimpleClaims tamed-target damage policy |
 | Ownership | Owner damage protection, capture/spawn/interaction/linking owner requirements, capture owner clearing, and spawn owner assignment |
 | Needs | Master enable, resource seeking mode, owner-offline tick policy, damage model/rates/lethal |
 | Progression | Happiness master enable, passive breeding master enable, breeding happiness requirement, breeding gender master toggle, traits master enable, leveling master enable, and talent tree master enable |
@@ -79,12 +79,47 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 - `LimitPerPlayerOwnedTotal`
 - `PerPlayerLimitScope`
 
-### SimpleClaims
+The limit counts canonical profiles with a non-null owner, not only loaded NPCs. `ACTIVE`, `UNLOADED`, `CAPTURED`, `COOP`, `DEAD_REVIVABLE`, `LOST`, `RESTORING`, and conservatively classified dormant profiles all consume one owner slot. A zero limit disables denial but keeps tracking current so a later positive limit starts from the real population.
+
+- `Global` counts an owner across the universe.
+- `Per World` counts the profile's authoritative ownership world. Dormant companions retain their last ownership world.
+- Owner transfers reserve the destination before releasing the source. A denied transfer leaves the old owner unchanged.
+- Existing over-cap companions are preserved; later positive admissions are blocked until the owner is below the cap.
+- A companion whose authoritative ownership world is unknown still counts globally, while per-world positive admissions remain blocked until reconciliation establishes its scope.
+- Tamework currently has no automatic population-repair command. Diagnostics report the unresolved source; recovery requires complete save/SQLite backups and restoration of authoritative evidence or a supported release flow, not manual counter/row edits.
+
+### Claim Integration
+- `Provider` (`Auto`, `QuestLinesClaims`, `SimpleClaims`, or `Off`)
 - `SimpleClaimsEnabled`
 - `LimitPerClaimChunk`
 - `LimitPerClaimTotal`
 - `BreedingRequiresClaim`
 - `ProtectTamedFromNonMembers`
+
+The persisted names remain `SimpleClaims*` for compatibility, but population limits can use either supported provider:
+
+- QuestLines Claims exactly `1.3.1`.
+- SimpleClaims `>=1.0.38 <1.1.0`.
+
+`Auto` prefers QuestLines Claims and tries SimpleClaims only if QuestLines Claims is absent or disabled. It does not bypass an installed-but-not-ready, incompatible, or broken QuestLines Claims. Explicit providers never fall back. `/tw settings` rejects unknown provider text; an unknown legacy file value remains visible as invalid instead of silently becoming `Auto`.
+
+Applying settings invalidates provider caches without restarting the server. The next operation sees the new settings/provider generation, while a reservation already in flight keeps its original context.
+
+Claim policy activation is operation-specific:
+
+| Master enable | Population rule relevant to operation | Protect toggle | Behavior |
+| --- | --- | --- | --- |
+| Off | Any | Any | No population or damage provider work. Owner limits remain independent. |
+| On | Positive chunk/total cap | Any | Tame, owner assignment, restore, release, relocation, and breeding placements enforce claim admission. |
+| On | No positive cap, `BreedingRequiresClaim` on | Any | Breeding alone requires a claim; other admissions do not probe a provider. |
+| On | No relevant population rule | Off | No provider work. |
+| On | Any | On | Eligible live tamed targets use SimpleClaims native damage policy independently of population. |
+
+Active population rule errors fail closed. SimpleClaims damage lookup/invocation errors fail open so an optional integration failure cannot make companions invulnerable. QuestLines Claims is population-only.
+
+Claim limits count owned `ACTIVE` and durably `UNLOADED` physical companions. Captured, cooped, dead, and lost companions keep their owner slot but do not occupy a claim. Explicit placements are gated; natural movement is allowed and can create an over-cap claim that blocks later admissions.
+
+`ProtectTamedFromNonMembers` is a legacy name for the native SimpleClaims tamed-target policy, not a membership-only deny. It preserves full-world protection, administrator/member permissions, player and party allies, and the claim's outsider setting. Eligibility requires a live tamed target; owned-but-not-tamed targets skip this claim policy.
 
 ### Ownership and Interaction Defaults
 - `BlockOwnerDamage`
@@ -123,6 +158,8 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 - Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` values are imported only when the universe settings file does not already contain telemetry values.
 - `/tw settings` is intended for world-level operations and diagnostics, not per-mod content packs.
 - The login popup is shown at most once per player login session, so world changes do not reopen it repeatedly.
+- Positive owner/claim admissions fail closed while population state is `LOADING`, `RECONCILING`, or `DEGRADED`. This avoids treating incomplete upgrade coverage as zero companions.
+- Claim population and damage capabilities are independent. Enabling damage does not make breeding scan claims when no population rule is relevant.
 
 ## Relationship to `Tw*Config` Assets
 - `TwGlobalConfig`, `TwNeedsConfig`, and related assets remain the content-authoring path for role, item, timing, refill, command-distance, and integration details.
@@ -135,9 +172,13 @@ These values are owned by `/tw settings` at runtime. Legacy config keys may stil
 - Use `/tw settings` for server-specific tuning after deployment.
 - Keep the announcement copy focused on major setting changes and use `announcementId` changes sparingly so the popup stays meaningful.
 - Keep a backup of `universe/Tamework/Settings/` before major balancing experiments.
+- Before enabling a positive cap on an upgraded save, also back up the complete save and wait for `getPopulationDiagnostics()` readiness to report `READY` for the configured scope.
 
 ## Related Pages
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference)
 - [Integrations, Telemetry, and Build Workflow](/mod/alecs-tamework/integrations-telemetry-and-build-workflow)
+- [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+- [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
+- [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)

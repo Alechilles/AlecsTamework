@@ -99,8 +99,10 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             ctx = buildContextSnapshot(player, interactionTarget, role);
             config = resolveConfig(role, ctx);
             if (config != null && config.isEnabled()) {
-                claimLegacyOwnershipForPrompt(npcRef, store, player, ctx);
-                resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+                boolean adoptionPending = claimLegacyOwnershipForPrompt(npcRef, store, player);
+                if (!adoptionPending) {
+                    resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+                }
             }
             if (resolved != null && resolved.entry instanceof HarvestInteraction) {
                 HarvestInteraction harvest = (HarvestInteraction) resolved.entry;
@@ -145,19 +147,16 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         return true;
     }
 
-    private void claimLegacyOwnershipForPrompt(Ref<EntityStore> npcRef,
-                                               Store<EntityStore> store,
-                                               Player player,
-                                               InteractionContextSnapshot ctx) {
+    private boolean claimLegacyOwnershipForPrompt(Ref<EntityStore> npcRef,
+                                                  Store<EntityStore> store,
+                                                  Player player) {
         LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
                 LegacyTamedOwnershipBridge.claimForPlayerIfEligible(npcRef, store, player);
-        if (!ownerBridgeResult.isClaimed()) {
-            return;
+        if (ownerBridgeResult.isScheduled()) {
+            logDebug("TameworkPrompt: legacy tamed ownership scheduled.");
+            return true;
         }
-        ctx.cachedNpcTamed = null;
-        ctx.cachedNpcOwnerId = null;
-        ctx.cachedPlayerIsOwner = null;
-        logDebug("TameworkPrompt: claimed legacy tamed ownership for player prompt.");
+        return false;
     }
 
     private PromptSelectionFingerprint buildPromptSelectionFingerprint(Player player, Role role) {

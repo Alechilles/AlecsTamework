@@ -1,13 +1,11 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -17,12 +15,12 @@ import com.hypixel.hytale.component.SystemGroup;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.logger.HytaleLogger;
 import org.joml.Vector3d;
-import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -44,21 +42,30 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
     private final ComponentType<EntityStore, TameworkCommandLinksComponent> linksType;
     private final ComponentType<EntityStore, TameworkNpcNameComponent> npcNameType;
     private final ComponentType<EntityStore, TransformComponent> transformType;
+    private final ComponentType<EntityStore, NPCEntity> npcType;
     private final HytaleLogger logger;
-    private final SimpleClaimsTamedDamagePolicyService claimDamagePolicyService;
+    private final SimpleClaimsTamedDamagePolicy damagePolicy;
+    private final DamageAttackerAttributionResolver attackerAttributionResolver;
 
     public OwnerDamageFilterSystem(HytaleLogger logger) {
+        this(logger, new SimpleClaimsTamedDamagePolicy());
+    }
+
+    public OwnerDamageFilterSystem(HytaleLogger logger,
+                                   @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy) {
         this.ownerType = TameworkOwnerComponent.getComponentType();
         this.linksType = TameworkCommandLinksComponent.getComponentType();
         this.npcNameType = TameworkNpcNameComponent.getComponentType();
         this.transformType = TransformComponent.getComponentType();
+        this.npcType = NPCEntity.getComponentType();
         this.logger = logger;
-        this.claimDamagePolicyService = new SimpleClaimsTamedDamagePolicyService();
+        this.damagePolicy = damagePolicy;
+        this.attackerAttributionResolver = new DamageAttackerAttributionResolver();
     }
 
     @Override
     public Query<EntityStore> getQuery() {
-        return Query.any();
+        return Query.and(npcType);
     }
 
     @Override
@@ -70,7 +77,7 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         boolean debugLag = isLagDebugEnabled();
         long startedNs = debugLag ? System.nanoTime() : 0L;
         try {
-            if (damage == null || damage.isCancelled()) {
+            if (DamagePolicyEventGate.shouldSkip(damage)) {
                 return;
             }
             Ref<EntityStore> targetRef = chunk.getReferenceTo(index);
@@ -78,12 +85,7 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
                 return;
             }
 
-            UUID attackerPlayerUuid = resolveAttackerPlayerUuid(damage.getSource(), store);
-            if (shouldDenyOwnedDamage(index, chunk, store, targetRef, attackerPlayerUuid)) {
-                cancelDamage(damage);
-                return;
-            }
-
+            UUID attackerPlayerUuid = attackerAttributionResolver.resolve(damage.getSource(), store);
             TwGlobalConfig globalConfig = TwGlobalConfig.resolveSimpleClaimsSettingsConfig();
             if (globalConfig == null) {
                 globalConfig = TwGlobalConfig.resolveActive();
@@ -91,14 +93,16 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
             if (globalConfig == null) {
                 globalConfig = TwGlobalConfig.defaultConfig();
             }
-            SimpleClaimsTamedDamagePolicyService.Decision claimDecision = claimDamagePolicyService.evaluate(
+            TamedDamageDecision decision = damagePolicy.evaluate(
+                    resolveOwnerPolicy(index, chunk, store, targetRef),
                     targetRef,
                     store,
+                    resolveWorldName(store),
                     resolveTargetPosition(index, chunk, store, targetRef),
                     attackerPlayerUuid,
                     globalConfig
             );
-            if (!claimDecision.allowed()) {
+            if (!decision.allowed()) {
                 cancelDamage(damage);
             }
         } finally {
@@ -108,78 +112,16 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         }
     }
 
-    private boolean shouldDenyOwnedDamage(int index,
-                                          ArchetypeChunk<EntityStore> chunk,
-                                          Store<EntityStore> store,
-                                          Ref<EntityStore> targetRef,
-                                          @Nullable UUID attackerPlayerUuid) {
-        UUID ownerId = resolveOwnerId(index, chunk, store, targetRef);
-        if (ownerId == null) {
-            return false;
-        }
+    @Nonnull
+    private TamedDamageOwnerPolicy resolveOwnerPolicy(int index,
+                                                      ArchetypeChunk<EntityStore> chunk,
+                                                      Store<EntityStore> store,
+                                                      Ref<EntityStore> targetRef) {
+        TameworkOwnerComponent owner = ownerType == null ? null : chunk.getComponent(index, ownerType);
+        TameworkCommandLinksComponent links = linksType == null ? null : chunk.getComponent(index, linksType);
+        TameworkNpcNameComponent npcName = npcNameType == null ? null : chunk.getComponent(index, npcNameType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
-        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-        boolean blockOwnerDamage = TameworkRuntimeSettings.blockOwnerDamage(settings.isBlockOwnerDamage());
-        boolean blockAllPlayerDamageIfOwned =
-                TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(settings.isBlockAllPlayerDamageIfOwned());
-        boolean invulnerableIfOwned = TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned());
-        if (!blockOwnerDamage && !blockAllPlayerDamageIfOwned && !invulnerableIfOwned) {
-            return false;
-        }
-        if (invulnerableIfOwned) {
-            return true;
-        }
-        if (attackerPlayerUuid == null) {
-            return false;
-        }
-        if (blockAllPlayerDamageIfOwned) {
-            return true;
-        }
-        return blockOwnerDamage && ownerId.equals(attackerPlayerUuid);
-    }
-
-    @Nullable
-    private UUID resolveOwnerId(int index,
-                                @Nonnull ArchetypeChunk<EntityStore> chunk,
-                                @Nonnull Store<EntityStore> store,
-                                @Nonnull Ref<EntityStore> targetRef) {
-        ComponentType<EntityStore, TameworkOwnerComponent> resolvedOwnerType = ownerType != null
-                ? ownerType
-                : TameworkOwnerComponent.getComponentType();
-        if (resolvedOwnerType != null) {
-            TameworkOwnerComponent owner = chunk.getComponent(index, resolvedOwnerType);
-            if (owner == null) {
-                owner = store.getComponent(targetRef, resolvedOwnerType);
-            }
-            if (owner != null && owner.getOwnerId() != null) {
-                return owner.getOwnerId();
-            }
-        }
-
-        ComponentType<EntityStore, TameworkCommandLinksComponent> resolvedLinksType = linksType != null
-                ? linksType
-                : TameworkCommandLinksComponent.getComponentType();
-        if (resolvedLinksType != null) {
-            TameworkCommandLinksComponent links = chunk.getComponent(index, resolvedLinksType);
-            if (links == null) {
-                links = store.getComponent(targetRef, resolvedLinksType);
-            }
-            if (links != null && links.getOwnerId() != null) {
-                return links.getOwnerId();
-            }
-        }
-
-        ComponentType<EntityStore, TameworkNpcNameComponent> resolvedNpcNameType = npcNameType != null
-                ? npcNameType
-                : TameworkNpcNameComponent.getComponentType();
-        if (resolvedNpcNameType == null) {
-            return null;
-        }
-        TameworkNpcNameComponent npcName = chunk.getComponent(index, resolvedNpcNameType);
-        if (npcName == null) {
-            npcName = store.getComponent(targetRef, resolvedNpcNameType);
-        }
-        return npcName != null ? npcName.getOwnerId() : null;
+        return TamedDamageOwnerPolicyResolver.resolve(owner, links, npcName, roleId).policy();
     }
 
     @Nullable
@@ -202,32 +144,11 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
     }
 
     @Nullable
-    private UUID resolveAttackerPlayerUuid(@Nullable Damage.Source source,
-                                           @Nullable Store<EntityStore> store) {
-        if (source == null || store == null) {
+    private String resolveWorldName(@Nullable Store<EntityStore> store) {
+        if (store == null || store.getExternalData() == null || store.getExternalData().getWorld() == null) {
             return null;
         }
-        if (source instanceof Damage.ProjectileSource projectileSource) {
-            UUID sourcePlayerUuid = resolvePlayerUuidFromRef(projectileSource.getRef(), store);
-            if (sourcePlayerUuid != null) {
-                return sourcePlayerUuid;
-            }
-            return resolvePlayerUuidFromRef(projectileSource.getProjectile(), store);
-        }
-        if (source instanceof Damage.EntitySource entitySource) {
-            return resolvePlayerUuidFromRef(entitySource.getRef(), store);
-        }
-        return null;
-    }
-
-    @Nullable
-    private UUID resolvePlayerUuidFromRef(@Nullable Ref<EntityStore> sourceRef,
-                                          @Nonnull Store<EntityStore> store) {
-        if (sourceRef == null || !sourceRef.isValid()) {
-            return null;
-        }
-        Player player = store.getComponent(sourceRef, Player.getComponentType());
-        return player != null ? player.getUuid() : null;
+        return store.getExternalData().getWorld().getName();
     }
 
     private void cancelDamage(Damage damage) {

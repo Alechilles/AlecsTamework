@@ -13,9 +13,13 @@ import com.alechilles.alecstamework.api.NameItemConfigView;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
+import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
+import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.api.PolicyApi;
+import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
+import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
@@ -42,7 +46,11 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
-import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
+import com.alechilles.alecstamework.damage.SimpleClaimsTamedDamagePolicy;
+import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicyResolver;
+import com.alechilles.alecstamework.damage.SimpleClaimsRawAccessDecision;
+import com.alechilles.alecstamework.damage.TamedDamageDecision;
+import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicy;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
@@ -72,7 +80,6 @@ import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
-import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.persistence.sqlite.ApiProfileDataRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
@@ -106,8 +113,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public final class TameworkApiImpl
-        implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi {
-    static final String API_VERSION = "0.6.0";
+        implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi,
+        AutoCloseable {
+    static final String API_VERSION = "0.7.0";
     static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
@@ -120,7 +128,8 @@ public final class TameworkApiImpl
     private final TameworkEventBus eventBus;
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
-    private final SimpleClaimsBreedingBridge simpleClaimsBridge;
+    private final SimpleClaimsTamedDamagePolicy damagePolicy;
+    private final PopulationPolicyApiDelegate populationPolicy;
     private final InteractionExtensionApi interactionExtensionApi;
     private final TraitEffectApi traitEffectApi;
     private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
@@ -271,12 +280,47 @@ public final class TameworkApiImpl
                            @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                            @Nonnull InteractionExtensionApi interactionExtensionApi,
                            @Nonnull TraitEffectApi traitEffectApi) {
+        this(
+                persistenceRuntime,
+                eventBus,
+                stateSnapshotService,
+                interactionExtensionApi,
+                traitEffectApi,
+                new SimpleClaimsTamedDamagePolicy()
+        );
+    }
+
+    TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
+                    @Nonnull TameworkEventBus eventBus,
+                    @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                    @Nonnull InteractionExtensionApi interactionExtensionApi,
+                    @Nonnull TraitEffectApi traitEffectApi,
+                    @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy) {
+        this(
+                persistenceRuntime,
+                eventBus,
+                stateSnapshotService,
+                interactionExtensionApi,
+                traitEffectApi,
+                damagePolicy,
+                UnavailablePopulationPolicyAuthority.INSTANCE
+        );
+    }
+
+    public TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
+                           @Nonnull TameworkEventBus eventBus,
+                           @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                           @Nonnull InteractionExtensionApi interactionExtensionApi,
+                           @Nonnull TraitEffectApi traitEffectApi,
+                           @Nonnull SimpleClaimsTamedDamagePolicy damagePolicy,
+                           @Nonnull PopulationPolicyAuthority populationPolicyAuthority) {
         this.persistenceRuntime = Objects.requireNonNull(persistenceRuntime);
         this.profileRepository = Objects.requireNonNull(persistenceRuntime.getNpcProfileRepository());
         this.profileDataRepository = Objects.requireNonNull(persistenceRuntime.getApiProfileDataRepository());
         this.eventBus = Objects.requireNonNull(eventBus);
         this.stateSnapshotService = stateSnapshotService;
-        this.simpleClaimsBridge = SimpleClaimsBreedingBridge.initialize();
+        this.damagePolicy = Objects.requireNonNull(damagePolicy);
+        this.populationPolicy = new PopulationPolicyApiDelegate(populationPolicyAuthority);
         this.interactionExtensionApi = Objects.requireNonNull(interactionExtensionApi);
         this.traitEffectApi = Objects.requireNonNull(traitEffectApi);
     }
@@ -289,6 +333,17 @@ public final class TameworkApiImpl
     @Override
     public EnumSet<TameworkApiCapability> getCapabilities() {
         return capabilities.clone();
+    }
+
+    /** Drops reflected optional-claim contracts after a settings change. */
+    public void onRuntimeSettingsChanged() {
+        damagePolicy.onRuntimeSettingsChanged();
+    }
+
+    /** Releases optional-plugin references owned by this API instance. */
+    @Override
+    public void close() {
+        damagePolicy.close();
     }
 
     @Override
@@ -794,77 +849,14 @@ public final class TameworkApiImpl
                     null
             );
         }
-
         LiveNpcContext liveContext = readLiveNpcContext(profile.currentNpcUuid());
-        if (liveContext == null || isBlank(liveContext.worldName()) || liveContext.currentPosition() == null) {
-            return unavailableClaimDecision("live-claim-context-missing");
-        }
-        if (!simpleClaimsBridge.isAvailable()) {
-            return new ClaimAccessDecisionView(
-                    false,
-                    true,
-                    ClaimAccessDecisionView.Status.UNAVAILABLE,
-                    simpleClaimsBridge.getUnavailableReason(),
-                    null,
-                    null,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
-        }
-
-        SimpleClaimsBreedingBridge.LookupResult lookup = simpleClaimsBridge.lookupSimpleClaimsClaim(
-                liveContext.worldName(),
-                toVector(liveContext.currentPosition())
-        );
-        if (lookup.status() == SimpleClaimsBreedingBridge.LookupStatus.NO_CLAIM) {
-            return new ClaimAccessDecisionView(
-                    true,
-                    true,
-                    ClaimAccessDecisionView.Status.ALLOWED,
-                    "outside-claim",
-                    null,
-                    null,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
-        }
-        if (lookup.status() == SimpleClaimsBreedingBridge.LookupStatus.UNAVAILABLE) {
-            return new ClaimAccessDecisionView(
-                    false,
-                    true,
-                    ClaimAccessDecisionView.Status.UNAVAILABLE,
-                    lookup.message(),
-                    null,
-                    null,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
-        }
-        if (lookup.status() == SimpleClaimsBreedingBridge.LookupStatus.ERROR) {
-            return new ClaimAccessDecisionView(
-                    true,
-                    true,
-                    ClaimAccessDecisionView.Status.ALLOW_FAIL_OPEN,
-                    lookup.message(),
-                    null,
-                    null,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
-        }
-
-        SimpleClaimsBreedingBridge.ClaimInfo claimInfo = lookup.claimInfo();
-        SimpleClaimsBreedingBridge.DamageAccessResult accessResult = simpleClaimsBridge.evaluateDamageAccess(
-                liveContext.worldName(),
-                toVector(liveContext.currentPosition()),
+        SimpleClaimsRawAccessDecision decision = damagePolicy.evaluateRawClaimAccess(
+                liveContext != null ? liveContext.worldName() : null,
+                liveContext != null ? toVector(liveContext.currentPosition()) : null,
                 playerUuid,
-                globalConfig.getSimpleClaimsDamageAllowDamagePermissionKey()
+                globalConfig
         );
-        return mapClaimAccess(accessResult, claimInfo, liveContext);
+        return mapClaimAccess(decision, liveContext);
     }
 
     @Nonnull
@@ -872,134 +864,77 @@ public final class TameworkApiImpl
     public DamagePolicyDecisionView evaluateDamage(String profileId, @Nullable UUID attackerPlayerUuid) {
         Optional<OwnershipPolicyView> ownership = getOwnershipByProfileId(profileId);
         if (ownership.isEmpty()) {
-            OwnershipPolicyView missing = new OwnershipPolicyView(
-                    profileId == null ? "" : profileId,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    false,
-                    null,
-                    null,
-                    false,
-                    false,
-                    false
-            );
-            return new DamagePolicyDecisionView(
-                    profileId == null ? "" : profileId,
-                    attackerPlayerUuid,
-                    true,
-                    DamagePolicyDecisionView.Status.UNAVAILABLE,
-                    "profile-not-found",
-                    missing,
-                    null
-            );
+            return ApiDamagePolicyMapper.profileMissing(profileId, attackerPlayerUuid);
         }
 
-        OwnershipPolicyView policy = ownership.get();
-        if (policy.ownerUuid() != null && policy.invulnerableIfOwned()) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    false,
-                    DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
-                    "invulnerable-if-owned",
-                    policy,
-                    null
-            );
-        }
-        if (policy.ownerUuid() != null && attackerPlayerUuid != null) {
-            if (policy.blockAllPlayerDamageIfOwned()) {
-                return new DamagePolicyDecisionView(
-                        policy.profileId(),
-                        attackerPlayerUuid,
-                        false,
-                        DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
-                        "block-all-player-damage-if-owned",
-                        policy,
-                        null
+        OwnershipPolicyView policy = ownership.orElseThrow();
+        ResolvedLiveNpc liveNpc = resolveLiveNpc(policy.currentNpcUuid());
+        TamedDamageOwnerPolicyResolver.Resolution liveOwner = liveNpc == null
+                ? null
+                : TamedDamageOwnerPolicyResolver.resolveLive(
+                        liveNpc.reference(), liveNpc.store()
                 );
-            }
-            if (policy.blockOwnerDamage() && attackerPlayerUuid.equals(policy.ownerUuid())) {
-                return new DamagePolicyDecisionView(
-                        policy.profileId(),
-                        attackerPlayerUuid,
-                        false,
-                        DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
-                        "block-owner-damage",
-                        policy,
-                        null
-                );
-            }
-        }
-
-        ClaimAccessDecisionView claimAccess = evaluateClaimAccess(policy.profileId(), attackerPlayerUuid);
-        if (!claimAccess.allowed()) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    false,
-                    DamagePolicyDecisionView.Status.DENIED_CLAIM_PROTECTION,
-                    claimAccess.reason() != null ? claimAccess.reason() : "claim-protection-denied",
-                    policy,
-                    claimAccess
-            );
-        }
-        if (claimAccess.status() == ClaimAccessDecisionView.Status.ALLOW_FAIL_OPEN) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    true,
-                    DamagePolicyDecisionView.Status.ALLOWED_FAIL_OPEN,
-                    claimAccess.reason() != null ? claimAccess.reason() : "claim-lookup-failed-open",
-                    policy,
-                    claimAccess
-            );
-        }
-        if (claimAccess.status() == ClaimAccessDecisionView.Status.SKIPPED
-                || claimAccess.status() == ClaimAccessDecisionView.Status.UNAVAILABLE) {
-            return new DamagePolicyDecisionView(
-                    policy.profileId(),
-                    attackerPlayerUuid,
-                    true,
-                    DamagePolicyDecisionView.Status.ALLOWED_SKIPPED,
-                    claimAccess.reason() != null ? claimAccess.reason() : "claim-check-skipped",
-                    policy,
-                    claimAccess
-            );
-        }
-        return new DamagePolicyDecisionView(
-                policy.profileId(),
+        OwnershipPolicyView effectivePolicy = liveOwner == null
+                ? policy
+                : ApiDamagePolicyMapper.withLiveOwnerPolicy(policy, liveOwner);
+        Vector3d targetPosition = liveNpc != null
+                && liveNpc.transform() != null
+                && liveNpc.transform().getPosition() != null
+                ? new Vector3d(liveNpc.transform().getPosition())
+                : null;
+        String worldName = liveNpc != null ? liveNpc.world().getName() : null;
+        TamedDamageDecision decision = damagePolicy.evaluate(
+                new TamedDamageOwnerPolicy(
+                        effectivePolicy.ownerUuid(),
+                        effectivePolicy.blockOwnerDamage(),
+                        effectivePolicy.blockAllPlayerDamageIfOwned(),
+                        effectivePolicy.invulnerableIfOwned()
+                ),
+                liveNpc != null ? liveNpc.reference() : null,
+                liveNpc != null ? liveNpc.store() : null,
+                worldName,
+                targetPosition,
                 attackerPlayerUuid,
-                true,
-                DamagePolicyDecisionView.Status.ALLOWED,
-                "allowed",
-                policy,
-                claimAccess
+                resolveSimpleClaimsConfig()
+        );
+        return ApiDamagePolicyMapper.map(
+                effectivePolicy,
+                attackerPlayerUuid,
+                decision,
+                worldName,
+                ApiMapper.mapVector(targetPosition)
         );
     }
 
     @Nonnull
     @Override
+    @Deprecated(since = "0.7.0", forRemoval = false)
     public PopulationCapDecisionView evaluatePopulationCap(@Nullable UUID ownerUuid) {
-        OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(null, ownerUuid);
-        return new PopulationCapDecisionView(
-                ownerUuid,
-                decision.allowed(),
-                decision.capEnabled(),
-                decision.limit(),
-                decision.currentCount(),
-                decision.remainingHeadroom(),
-                decision.scope() != null ? decision.scope().name() : null,
-                decision.reason()
-        );
+        return populationPolicy.evaluateLegacy(ownerUuid);
+    }
+
+    @Nonnull
+    @Override
+    public OwnerPopulationCapDecisionViewV2 evaluatePopulationCap(@Nonnull OwnerPopulationCapRequestV2 request) {
+        return populationPolicy.evaluate(request);
+    }
+
+    @Nonnull
+    @Override
+    public PopulationAdmissionApi populationAdmissions() {
+        return populationPolicy.admissions();
     }
 
     @Nonnull
     @Override
     public PersistenceDiagnosticsView getPersistenceDiagnostics() {
         return ApiMapper.mapPersistenceDiagnostics(persistenceRuntime.collectDiagnostics());
+    }
+
+    @Nonnull
+    @Override
+    public PopulationDiagnosticsView getPopulationDiagnostics() {
+        return populationPolicy.diagnostics();
     }
 
     private ProgressionMutationResult withLoadedProgressionTargetByProfileId(
@@ -2061,57 +1996,26 @@ public final class TameworkApiImpl
     }
 
     @Nonnull
-    private ClaimAccessDecisionView mapClaimAccess(@Nonnull SimpleClaimsBreedingBridge.DamageAccessResult accessResult,
-                                                   @Nullable SimpleClaimsBreedingBridge.ClaimInfo claimInfo,
-                                                   @Nonnull LiveNpcContext liveContext) {
-        UUID claimPartyId = claimInfo != null ? claimInfo.partyId() : accessResult.claimPartyId();
-        Integer claimChunkCount = claimInfo != null ? claimInfo.claimChunkCount() : null;
-        return switch (accessResult.status()) {
-            case ALLOWED -> new ClaimAccessDecisionView(
-                    true,
-                    true,
-                    ClaimAccessDecisionView.Status.ALLOWED,
-                    accessResult.message(),
-                    claimPartyId,
-                    claimChunkCount,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
-            case DENIED -> new ClaimAccessDecisionView(
-                    true,
-                    false,
-                    ClaimAccessDecisionView.Status.DENIED,
-                    accessResult.message(),
-                    claimPartyId,
-                    claimChunkCount,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
-            case LOOKUP_ERROR -> new ClaimAccessDecisionView(
-                    true,
-                    true,
-                    ClaimAccessDecisionView.Status.ALLOW_FAIL_OPEN,
-                    accessResult.message(),
-                    claimPartyId,
-                    claimChunkCount,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
-            case UNAVAILABLE -> new ClaimAccessDecisionView(
-                    false,
-                    true,
-                    ClaimAccessDecisionView.Status.UNAVAILABLE,
-                    accessResult.message(),
-                    claimPartyId,
-                    claimChunkCount,
-                    liveContext.worldName(),
-                    liveContext.currentPosition(),
-                    "live"
-            );
+    private ClaimAccessDecisionView mapClaimAccess(@Nonnull SimpleClaimsRawAccessDecision decision,
+                                                   @Nullable LiveNpcContext liveContext) {
+        ClaimAccessDecisionView.Status status = switch (decision.status()) {
+            case ALLOWED -> ClaimAccessDecisionView.Status.ALLOWED;
+            case DENIED -> ClaimAccessDecisionView.Status.DENIED;
+            case ALLOW_FAIL_OPEN -> ClaimAccessDecisionView.Status.ALLOW_FAIL_OPEN;
+            case SKIPPED -> ClaimAccessDecisionView.Status.SKIPPED;
+            case UNAVAILABLE -> ClaimAccessDecisionView.Status.UNAVAILABLE;
         };
+        return new ClaimAccessDecisionView(
+                decision.available(),
+                decision.allowed(),
+                status,
+                decision.reason(),
+                decision.claimPartyId(),
+                null,
+                liveContext != null ? liveContext.worldName() : null,
+                liveContext != null ? liveContext.currentPosition() : null,
+                liveContext != null ? "live" : null
+        );
     }
 
     @Nonnull

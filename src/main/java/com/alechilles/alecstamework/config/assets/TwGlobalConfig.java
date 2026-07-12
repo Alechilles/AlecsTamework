@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.config.assets;
 
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -15,6 +16,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -24,6 +27,7 @@ import javax.annotation.Nullable;
  */
 public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwGlobalConfig>>,
         TwParentFallbackAsset<TwGlobalConfig> {
+    private static final Logger LOGGER = Logger.getLogger(TwGlobalConfig.class.getName());
     private static final int MILLIS_PER_MINUTE = 60_000;
     private static final String DEFAULT_SIMPLE_CLAIMS_DAMAGE_ALLOW_DAMAGE_PERMISSION_KEY =
             "tamework.damage_tamed_claim_npc";
@@ -576,6 +580,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private int populationLimitPerPlayerOwnedTotal;
     private PerPlayerLimitScope populationPerPlayerLimitScope = PerPlayerLimitScope.PER_WORLD;
     private ClaimIntegrationProvider simpleClaimsProvider = ClaimIntegrationProvider.AUTO;
+    @Nullable
+    private String invalidSimpleClaimsProviderValue;
     private boolean simpleClaimsEnabled;
     private int simpleClaimsBreedingLimitPerClaimChunk;
     private int simpleClaimsBreedingLimitPerClaimTotal;
@@ -1013,6 +1019,16 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return simpleClaimsProvider;
     }
 
+    /**
+     * Returns the provider request without discarding an invalid explicit legacy value.
+     */
+    @Nonnull
+    public ClaimProviderRequest getSimpleClaimsProviderRequest() {
+        return invalidSimpleClaimsProviderValue == null
+                ? ClaimProviderRequest.forProvider(getSimpleClaimsProvider())
+                : ClaimProviderRequest.fromConfigValue(invalidSimpleClaimsProviderValue);
+    }
+
     public int getSimpleClaimsBreedingLimitPerClaimChunk() {
         return Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
     }
@@ -1315,7 +1331,15 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         simpleClaimsSectionDefined = true;
         if (section.provider != null) {
-            simpleClaimsProvider = ClaimIntegrationProvider.fromConfigValue(section.provider);
+            ClaimProviderRequest request = ClaimProviderRequest.fromConfigValue(section.provider);
+            if (request.valid()) {
+                simpleClaimsProvider = request.provider();
+                invalidSimpleClaimsProviderValue = null;
+            } else {
+                invalidSimpleClaimsProviderValue = request.displayValue();
+                LOGGER.log(Level.WARNING, request.invalidDiagnostic("SimpleClaims.Provider")
+                        + " Population claim policy is INVALID.");
+            }
         }
         if (section.simpleClaimsEnabled != null) {
             simpleClaimsEnabled = section.simpleClaimsEnabled;
@@ -1345,7 +1369,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     private SimpleClaimsSection toSimpleClaimsSection() {
         SimpleClaimsSection section = new SimpleClaimsSection();
-        section.provider = getSimpleClaimsProvider().configValue();
+        section.provider = invalidSimpleClaimsProviderValue != null
+                ? invalidSimpleClaimsProviderValue
+                : getSimpleClaimsProvider().configValue();
         section.simpleClaimsEnabled = simpleClaimsEnabled;
         section.breeding = new SimpleClaimsBreedingSection();
         section.breeding.limitPerClaimChunk = simpleClaimsBreedingLimitPerClaimChunk;
@@ -1652,6 +1678,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                                             @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("SimpleClaims")) {
             simpleClaimsProvider = parent.simpleClaimsProvider;
+            invalidSimpleClaimsProviderValue = parent.invalidSimpleClaimsProviderValue;
             simpleClaimsEnabled = parent.simpleClaimsEnabled;
             simpleClaimsBreedingLimitPerClaimChunk = parent.simpleClaimsBreedingLimitPerClaimChunk;
             simpleClaimsBreedingLimitPerClaimTotal = parent.simpleClaimsBreedingLimitPerClaimTotal;
@@ -1669,6 +1696,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("Provider")) {
             simpleClaimsProvider = parent.simpleClaimsProvider;
+            invalidSimpleClaimsProviderValue = parent.invalidSimpleClaimsProviderValue;
         }
         if (!nestedExplicit.contains("SimpleClaimsEnabled")) {
             simpleClaimsEnabled = parent.simpleClaimsEnabled;

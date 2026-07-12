@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationBridge;
+import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
@@ -12,6 +15,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests population-cap policy behavior for claim and per-player breeding limits. */
 class BreedingClaimLimitPolicyServiceTest {
+
+    @Test
+    void missingPopulationRuntimeFailsClosedWithoutLegacyAutoFallback() {
+        ClaimIntegrationBridge bridge =
+                BreedingClaimLimitPolicyService.unavailableWithoutPopulationRuntime(
+                        ClaimProviderRequest.forProvider(ClaimIntegrationProvider.AUTO)
+                );
+
+        assertFalse(bridge.isAvailable());
+        assertEquals("auto", bridge.providerId());
+        assertTrue(bridge.getUnavailableReason().contains("cannot be resolved safely"));
+    }
+
+    @Test
+    void missingPopulationRuntimePreservesInvalidProviderDiagnostic() {
+        ClaimIntegrationBridge bridge =
+                BreedingClaimLimitPolicyService.unavailableWithoutPopulationRuntime(
+                        ClaimProviderRequest.fromConfigValue("surprise-provider")
+                );
+
+        assertFalse(bridge.isAvailable());
+        assertEquals("invalid", bridge.providerId());
+        assertTrue(bridge.getUnavailableReason().contains("surprise-provider"));
+    }
 
     @Test
     void noClaimAllowsBreedingWhenClaimIsNotRequired() throws Exception {
@@ -212,23 +239,20 @@ class BreedingClaimLimitPolicyServiceTest {
     }
 
     @Test
-    void ownerBasisForNoInheritanceUsesBothDistinctOwners() {
+    void ownerBasisForNoInheritanceLeavesChildUnowned() {
         UUID ownerA = UUID.randomUUID();
         UUID ownerB = UUID.randomUUID();
         List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, ownerA, ownerB);
 
-        assertEquals(2, targets.size());
-        assertEquals(ownerA, targets.get(0));
-        assertEquals(ownerB, targets.get(1));
+        assertTrue(targets.isEmpty());
     }
 
     @Test
-    void ownerBasisForNoInheritanceDeduplicatesSameOwner() {
+    void ownerBasisForNoInheritanceDoesNotReserveSharedOwner() {
         UUID owner = UUID.randomUUID();
         List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, owner, owner);
 
-        assertEquals(1, targets.size());
-        assertEquals(owner, targets.get(0));
+        assertTrue(targets.isEmpty());
     }
 
     private static BreedingClaimLimitPolicyService.ResolvedClaim claimFound(int chunkCount) {

@@ -4,40 +4,21 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Selects the active claims bridge from config/runtime provider settings.
+ * Builds immutable unavailable bridges for fail-closed claim-policy seams.
  */
 public final class ClaimIntegrationProviderSelector {
-    private static final ClaimIntegrationBridge OFF_BRIDGE = new StaticUnavailableBridge("off", "Claim integration is off.");
-    private static final ClaimIntegrationBridge MISSING_BRIDGE =
-            new StaticUnavailableBridge("missing", "No claim integration provider is available.");
-
     private ClaimIntegrationProviderSelector() {
     }
 
+    /** Builds an immutable unavailable bridge for one operation-scoped registry result. */
     @Nonnull
-    public static ClaimIntegrationBridge select(@Nullable ClaimIntegrationProvider provider,
-                                                @Nullable ClaimIntegrationBridge questLines,
-                                                @Nullable ClaimIntegrationBridge simpleClaims) {
-        ClaimIntegrationProvider resolved = provider == null ? ClaimIntegrationProvider.AUTO : provider;
-        return switch (resolved) {
-            case OFF -> OFF_BRIDGE;
-            case QUESTLINES_CLAIMS -> availableOrMissing(questLines);
-            case SIMPLE_CLAIMS -> availableOrMissing(simpleClaims);
-            case AUTO -> {
-                if (questLines != null && questLines.isAvailable()) {
-                    yield questLines;
-                }
-                if (simpleClaims != null && simpleClaims.isAvailable()) {
-                    yield simpleClaims;
-                }
-                yield MISSING_BRIDGE;
-            }
-        };
-    }
-
-    @Nonnull
-    private static ClaimIntegrationBridge availableOrMissing(@Nullable ClaimIntegrationBridge bridge) {
-        return bridge == null ? MISSING_BRIDGE : bridge;
+    public static ClaimIntegrationBridge unavailable(@Nullable String providerId,
+                                                     @Nullable String reason) {
+        String resolvedId = providerId == null || providerId.isBlank()
+                ? "unavailable" : providerId.trim();
+        String resolvedReason = reason == null || reason.isBlank()
+                ? "Claim integration provider is unavailable." : reason.trim();
+        return new StaticUnavailableBridge(resolvedId, resolvedReason);
     }
 
     private record StaticUnavailableBridge(@Nonnull String providerId,

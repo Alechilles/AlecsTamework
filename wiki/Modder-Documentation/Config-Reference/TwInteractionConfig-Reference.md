@@ -310,6 +310,8 @@ Accepted `Source` values:
 - `None`
 - `Custom`
 
+For `Source: Custom`, `Uuid` must contain a valid UUID. `Name` is optional display metadata and cannot identify an owner by itself. A blank or malformed `Uuid` rejects the effect; use `Source: None` for an intentional ownership clear.
+
 ### `ModifyStats`
 Fields:
 - `Stats`

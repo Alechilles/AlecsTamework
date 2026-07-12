@@ -1,13 +1,16 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierRefreshService;
+import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.NeedsResourceMode;
 import com.hypixel.hytale.codec.Codec;
@@ -28,6 +31,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -88,8 +92,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     private final Tamework plugin;
     private final World world;
+    private final TameworkSettingsFormParser formParser;
 
     private TameworkSettingsValues currentValues;
+    private ClaimProviderRequest currentClaimProviderRequest;
     private String statusLine = "";
     private String warningLine = "";
     private boolean applyInProgress;
@@ -100,7 +106,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.world = Objects.requireNonNull(world, "world");
-        this.currentValues = TameworkSettingsValues.fromRuntime();
+        this.formParser = new TameworkSettingsFormParser(playerRef, plugin.getLogger());
+        loadCurrentValues();
+        showInvalidProviderWarning();
     }
 
     @Override
@@ -135,9 +143,9 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         switch (action) {
             case ACTION_CLOSE -> close();
             case ACTION_REFRESH -> {
-                currentValues = TameworkSettingsValues.fromRuntime();
+                loadCurrentValues();
                 statusLine = resolveText("tamework.ui.settings.status.refreshed");
-                warningLine = "";
+                showInvalidProviderWarning();
                 refreshUi();
             }
             case ACTION_LOAD_PRESET -> onLoadPreset(data);
@@ -237,7 +245,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Entries", populationScopeEntries());
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Value", currentValues.populationPerPlayerLimitScope().configValue());
         commandBuilder.set("#TwSettingsClaimProviderDropdown.Entries", claimProviderEntries());
-        commandBuilder.set("#TwSettingsClaimProviderDropdown.Value", currentValues.simpleClaimsProvider().configValue());
+        commandBuilder.set("#TwSettingsClaimProviderDropdown.Value", currentClaimProviderRequest.displayValue());
         commandBuilder.set("#TwSettingsSimpleClaimsEnabledCheck.Value", currentValues.simpleClaimsEnabled());
         commandBuilder.set("#TwSettingsClaimLimitChunkInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimChunk()));
         commandBuilder.set("#TwSettingsClaimLimitTotalInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimTotal()));
@@ -286,7 +294,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             return;
         }
 
-        ParseResult parseResult = parseValues(payload);
+        TameworkSettingsFormParser.ParseResult parseResult = parseValues(payload);
         if (!parseResult.success()) {
             warningLine = parseResult.message();
             statusLine = "";
@@ -311,7 +319,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         refreshUi();
                         return;
                     }
-                    currentValues = TameworkSettingsValues.fromRuntime();
+                    loadCurrentValues();
                     if (outcome == null) {
                         statusLine = "";
                         warningLine = resolveText("tamework.ui.settings.warning.applyFailed");
@@ -339,7 +347,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             refreshUi();
             return;
         }
-        ParseResult parseResult = parseValues(payload);
+        TameworkSettingsFormParser.ParseResult parseResult = parseValues(payload);
         TameworkSettingsValues baseValues = parseResult.success() && parseResult.values() != null
                 ? parseResult.values()
                 : currentValues;
@@ -358,6 +366,13 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
             return ApplyOutcome.failure(resolveText("tamework.ui.settings.warning.saveFailed"));
         }
+        OwnerPopulationRuntime populationRuntime = plugin.getOwnerPopulationRuntime();
+        if (populationRuntime != null) {
+            populationRuntime.claimProviderRegistry().onSettingsChanged();
+        }
+        if (plugin.getApi() instanceof TameworkApiImpl implementation) {
+            implementation.onRuntimeSettingsChanged();
+        }
 
         return ApplyOutcome.success(resolveText("tamework.ui.settings.status.applied"));
     }
@@ -368,186 +383,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     }
 
     @Nonnull
-    private ParseResult parseValues(@Nonnull EventPayload payload) {
-        Integer populationLimit = parseNonNegativeInt(
-                payload.populationLimit,
-                resolveText("tamework.ui.settings.field.populationLimit")
-        );
-        if (populationLimit == null) {
-            return ParseResult.failure(formatText(
-                    "tamework.ui.settings.validation.nonNegativeInteger",
-                    resolveText("tamework.ui.settings.field.populationLimit")
-            ));
-        }
-        Integer claimLimitChunk = parseNonNegativeInt(
-                payload.claimLimitChunk,
-                resolveText("tamework.ui.settings.field.simpleClaimsClaimChunkLimit")
-        );
-        if (claimLimitChunk == null) {
-            return ParseResult.failure(formatText(
-                    "tamework.ui.settings.validation.nonNegativeInteger",
-                    resolveText("tamework.ui.settings.field.simpleClaimsClaimChunkLimit")
-            ));
-        }
-        Integer claimLimitTotal = parseNonNegativeInt(
-                payload.claimLimitTotal,
-                resolveText("tamework.ui.settings.field.simpleClaimsClaimTotalLimit")
-        );
-        if (claimLimitTotal == null) {
-            return ParseResult.failure(formatText(
-                    "tamework.ui.settings.validation.nonNegativeInteger",
-                    resolveText("tamework.ui.settings.field.simpleClaimsClaimTotalLimit")
-            ));
-        }
-        Double needsOwnerOfflineGraceHours = parseNonNegativeDouble(
-                payload.needsOwnerOfflineGraceHours,
-                resolveText("tamework.ui.settings.field.needsOwnerOfflineGraceHours")
-        );
-        if (needsOwnerOfflineGraceHours == null) {
-            return ParseResult.failure(formatText(
-                    "tamework.ui.settings.validation.nonNegativeNumber",
-                    resolveText("tamework.ui.settings.field.needsOwnerOfflineGraceHours")
-            ));
-        }
-        Double needsOwnerOfflineDecayMultiplier = parseNonNegativeDouble(
-                payload.needsOwnerOfflineDecayMultiplier,
-                resolveText("tamework.ui.settings.field.needsOwnerOfflineDecayMultiplier")
-        );
-        if (needsOwnerOfflineDecayMultiplier == null) {
-            return ParseResult.failure(formatText(
-                    "tamework.ui.settings.validation.nonNegativeNumber",
-                    resolveText("tamework.ui.settings.field.needsOwnerOfflineDecayMultiplier")
-            ));
-        }
-        Double needsStarvationDamagePerMinute = parseNonNegativeDouble(
-                payload.needsStarvationDamagePerMinute,
-                resolveText("tamework.ui.settings.field.needsStarvationDamagePerMinute")
-        );
-        if (needsStarvationDamagePerMinute == null) {
-            return ParseResult.failure(formatText(
-                    "tamework.ui.settings.validation.nonNegativeNumber",
-                    resolveText("tamework.ui.settings.field.needsStarvationDamagePerMinute")
-            ));
-        }
-        Double needsDehydrationDamagePerMinute = parseNonNegativeDouble(
-                payload.needsDehydrationDamagePerMinute,
-                resolveText("tamework.ui.settings.field.needsDehydrationDamagePerMinute")
-        );
-        if (needsDehydrationDamagePerMinute == null) {
-            return ParseResult.failure(formatText(
-                    "tamework.ui.settings.validation.nonNegativeNumber",
-                    resolveText("tamework.ui.settings.field.needsDehydrationDamagePerMinute")
-            ));
-        }
-
-        TwGlobalConfig.PerPlayerLimitScope scope = TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(payload.populationScope);
-        String providerValue = trim(payload.claimProvider);
-        if (providerValue.isBlank()) {
-            providerValue = currentValues.simpleClaimsProvider().configValue();
-        }
-        ClaimIntegrationProvider claimProvider = ClaimIntegrationProvider.fromConfigValue(providerValue);
-        String tickPolicyModeValue = trim(payload.needsTickPolicyMode);
-        if (tickPolicyModeValue.isBlank()) {
-            tickPolicyModeValue = currentValues.needsTickPolicyMode().toConfigValue();
-        }
-        TwNeedsConfig.TickPolicyMode tickPolicyMode = TwNeedsConfig.TickPolicyMode.fromConfigValue(tickPolicyModeValue);
-        String needsResourceModeValue = trim(payload.needsResourceMode);
-        if (needsResourceModeValue.isBlank()) {
-            needsResourceModeValue = currentValues.needsResourceMode();
-        }
-        String needsResourceMode = NeedsResourceMode.fromConfigValue(needsResourceModeValue).toConfigValue();
-        String damageModelValue = trim(payload.needsDamageModel);
-        if (damageModelValue.isBlank()) {
-            damageModelValue = currentValues.needsDamageModel().toConfigValue();
-        }
-        TwNeedsConfig.DamageModel damageModel = TwNeedsConfig.DamageModel.fromConfigValue(damageModelValue);
-        String damageDualNeedRuleValue = trim(payload.needsDamageDualNeedRule);
-        if (damageDualNeedRuleValue.isBlank()) {
-            damageDualNeedRuleValue = currentValues.needsDamageDualNeedRule().toConfigValue();
-        }
-        TwNeedsConfig.DualNeedRule damageDualNeedRule =
-                TwNeedsConfig.DualNeedRule.fromConfigValue(damageDualNeedRuleValue);
-
-        TameworkSettingsValues values = new TameworkSettingsValues(
-                populationLimit,
-                scope,
-                claimProvider,
-                boolOrDefault(payload.simpleClaimsEnabled, currentValues.simpleClaimsEnabled()),
-                claimLimitChunk,
-                claimLimitTotal,
-                boolOrDefault(payload.breedingRequiresClaim, currentValues.simpleClaimsBreedingRequiresClaim()),
-                boolOrDefault(payload.simpleClaimsProtect, currentValues.simpleClaimsProtectTamedFromNonMembers()),
-                boolOrDefault(payload.blockOwnerDamage, currentValues.blockOwnerDamage()),
-                boolOrDefault(payload.blockAllDamageIfOwned, currentValues.blockAllPlayerDamageIfOwned()),
-                boolOrDefault(payload.invulnerableIfOwned, currentValues.invulnerableIfOwned()),
-                boolOrDefault(payload.captureClearsOwner, currentValues.captureClearsOwner()),
-                boolOrDefault(payload.spawnSetsOwner, currentValues.spawnSetsOwner()),
-                boolOrDefault(payload.captureRequiresOwner, currentValues.captureRequiresOwner()),
-                boolOrDefault(payload.spawnRequiresOwner, currentValues.spawnRequiresOwner()),
-                boolOrDefault(payload.interactionRequiresOwner, currentValues.interactionRequiresOwner()),
-                boolOrDefault(payload.linkingRequiresOwner, currentValues.linkingRequiresOwner()),
-                boolOrDefault(payload.needsEnabled, currentValues.needsEnabled()),
-                needsResourceMode,
-                boolOrDefault(payload.needsDamageEnabled, currentValues.needsDamageEnabled()),
-                tickPolicyMode,
-                needsOwnerOfflineGraceHours,
-                needsOwnerOfflineDecayMultiplier,
-                damageModel,
-                damageDualNeedRule,
-                needsStarvationDamagePerMinute,
-                needsDehydrationDamagePerMinute,
-                boolOrDefault(payload.needsDamageLethal, currentValues.needsDamageLethal()),
-                boolOrDefault(payload.happinessEnabled, currentValues.happinessEnabled()),
-                boolOrDefault(payload.passiveBreedingEnabled, currentValues.passiveBreedingEnabled()),
-                boolOrDefault(payload.breedingRequiresHappiness, currentValues.breedingRequiresHappiness()),
-                boolOrDefault(payload.breedingGenderEnabled, currentValues.breedingGenderEnabled()),
-                boolOrDefault(payload.traitsEnabled, currentValues.traitsEnabled()),
-                boolOrDefault(payload.levelingEnabled, currentValues.levelingEnabled()),
-                boolOrDefault(payload.talentsEnabled, currentValues.talentsEnabled()),
-                boolOrDefault(payload.reviveSystemEnabled, currentValues.reviveSystemEnabled()),
-                boolOrDefault(payload.recallTeleportingEnabled, currentValues.recallTeleportingEnabled()),
-                currentValues.telemetryEnabled(),
-                currentValues.telemetryBreadcrumbsEnabled()
-        );
-        return ParseResult.success(values);
-    }
-
-    @Nullable
-    private Integer parseNonNegativeInt(@Nullable String raw, @Nonnull String label) {
-        String value = trim(raw);
-        if (value.isBlank()) {
-            return 0;
-        }
-        try {
-            int parsed = Integer.parseInt(value);
-            return Math.max(0, parsed);
-        } catch (NumberFormatException ignored) {
-            plugin.getLogger().at(Level.FINE).log("Invalid integer input for " + label + ": " + value);
-            return null;
-        }
-    }
-
-    @Nullable
-    private Double parseNonNegativeDouble(@Nullable String raw, @Nonnull String label) {
-        String value = trim(raw);
-        if (value.isBlank()) {
-            return 0.0;
-        }
-        try {
-            double parsed = Double.parseDouble(value);
-            if (!Double.isFinite(parsed)) {
-                plugin.getLogger().at(Level.FINE).log("Invalid decimal input for " + label + ": " + value);
-                return null;
-            }
-            return Math.max(0.0, parsed);
-        } catch (NumberFormatException ignored) {
-            plugin.getLogger().at(Level.FINE).log("Invalid decimal input for " + label + ": " + value);
-            return null;
-        }
-    }
-
-    private boolean boolOrDefault(@Nullable Boolean value, boolean fallback) {
-        return value != null ? value : fallback;
+    private TameworkSettingsFormParser.ParseResult parseValues(@Nonnull EventPayload payload) {
+        return formParser.parse(payload, currentValues, currentClaimProviderRequest);
     }
 
     private void refreshUi() {
@@ -572,7 +409,17 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     }
 
     private List<DropdownEntryInfo> claimProviderEntries() {
-        return List.of(
+        List<DropdownEntryInfo> entries = new ArrayList<>();
+        if (!currentClaimProviderRequest.valid()) {
+            entries.add(new DropdownEntryInfo(
+                    LocalizableString.fromString(formatText(
+                            "tamework.ui.settings.claimProvider.invalid",
+                            currentClaimProviderRequest.displayValue()
+                    )),
+                    currentClaimProviderRequest.displayValue()
+            ));
+        }
+        entries.addAll(List.of(
                 new DropdownEntryInfo(
                         LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.auto")),
                         ClaimIntegrationProvider.AUTO.configValue()
@@ -589,7 +436,23 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         LocalizableString.fromString(resolveText("tamework.ui.settings.claimProvider.off")),
                         ClaimIntegrationProvider.OFF.configValue()
                 )
-        );
+        ));
+        return List.copyOf(entries);
+    }
+
+    private void loadCurrentValues() {
+        TameworkSettingsValues.RuntimeState state = TameworkSettingsValues.fromRuntimeState();
+        currentValues = state.values();
+        currentClaimProviderRequest = state.claimProviderRequest();
+    }
+
+    private void showInvalidProviderWarning() {
+        warningLine = currentClaimProviderRequest.valid()
+                ? ""
+                : formatText(
+                        "tamework.ui.settings.warning.invalidClaimProvider",
+                        currentClaimProviderRequest.displayValue()
+                );
     }
 
     private List<DropdownEntryInfo> needsTickPolicyModeEntries() {
@@ -668,16 +531,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         return value == null ? "" : value.trim();
     }
 
-    private record ParseResult(boolean success, @Nonnull String message, @Nullable TameworkSettingsValues values) {
-        static ParseResult success(@Nonnull TameworkSettingsValues values) {
-            return new ParseResult(true, "", values);
-        }
-
-        static ParseResult failure(@Nonnull String message) {
-            return new ParseResult(false, message, null);
-        }
-    }
-
     private record ApplyOutcome(boolean success, boolean partial, @Nonnull String message, @Nonnull String warning) {
         static ApplyOutcome success(@Nonnull String message) {
             return new ApplyOutcome(true, false, message, "");
@@ -736,44 +589,44 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
                 .build();
 
-        private String action;
-        private String preset;
-        private String populationLimit;
-        private String populationScope;
-        private String claimProvider;
-        private Boolean simpleClaimsEnabled;
-        private String claimLimitChunk;
-        private String claimLimitTotal;
-        private Boolean breedingRequiresClaim;
-        private Boolean simpleClaimsProtect;
-        private Boolean blockOwnerDamage;
-        private Boolean blockAllDamageIfOwned;
-        private Boolean invulnerableIfOwned;
-        private Boolean captureClearsOwner;
-        private Boolean spawnSetsOwner;
-        private Boolean captureRequiresOwner;
-        private Boolean spawnRequiresOwner;
-        private Boolean interactionRequiresOwner;
-        private Boolean linkingRequiresOwner;
-        private Boolean needsEnabled;
-        private String needsResourceMode;
-        private Boolean needsDamageEnabled;
-        private String needsTickPolicyMode;
-        private String needsOwnerOfflineGraceHours;
-        private String needsOwnerOfflineDecayMultiplier;
-        private String needsDamageModel;
-        private String needsDamageDualNeedRule;
-        private String needsStarvationDamagePerMinute;
-        private String needsDehydrationDamagePerMinute;
-        private Boolean needsDamageLethal;
-        private Boolean happinessEnabled;
-        private Boolean passiveBreedingEnabled;
-        private Boolean breedingRequiresHappiness;
-        private Boolean breedingGenderEnabled;
-        private Boolean traitsEnabled;
-        private Boolean levelingEnabled;
-        private Boolean talentsEnabled;
-        private Boolean reviveSystemEnabled;
-        private Boolean recallTeleportingEnabled;
+        String action;
+        String preset;
+        String populationLimit;
+        String populationScope;
+        String claimProvider;
+        Boolean simpleClaimsEnabled;
+        String claimLimitChunk;
+        String claimLimitTotal;
+        Boolean breedingRequiresClaim;
+        Boolean simpleClaimsProtect;
+        Boolean blockOwnerDamage;
+        Boolean blockAllDamageIfOwned;
+        Boolean invulnerableIfOwned;
+        Boolean captureClearsOwner;
+        Boolean spawnSetsOwner;
+        Boolean captureRequiresOwner;
+        Boolean spawnRequiresOwner;
+        Boolean interactionRequiresOwner;
+        Boolean linkingRequiresOwner;
+        Boolean needsEnabled;
+        String needsResourceMode;
+        Boolean needsDamageEnabled;
+        String needsTickPolicyMode;
+        String needsOwnerOfflineGraceHours;
+        String needsOwnerOfflineDecayMultiplier;
+        String needsDamageModel;
+        String needsDamageDualNeedRule;
+        String needsStarvationDamagePerMinute;
+        String needsDehydrationDamagePerMinute;
+        Boolean needsDamageLethal;
+        Boolean happinessEnabled;
+        Boolean passiveBreedingEnabled;
+        Boolean breedingRequiresHappiness;
+        Boolean breedingGenderEnabled;
+        Boolean traitsEnabled;
+        Boolean levelingEnabled;
+        Boolean talentsEnabled;
+        Boolean reviveSystemEnabled;
+        Boolean recallTeleportingEnabled;
     }
 }

@@ -9,37 +9,30 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/**
- * Owns SQLite runtime dependencies for linked-NPC persistence domains.
- */
+/** Owns SQLite runtime dependencies for linked-NPC and population persistence domains. */
 public final class TameworkPersistenceRuntime implements AutoCloseable {
     public static final String SQLITE_FILENAME = "tamework.sqlite";
-    private static final String LEGACY_MIGRATION_MARKER_FILE = "tamework.sqlite.legacy-dat-import-v2.marker";
-    private static final long SNAPSHOT_PRUNE_INTERVAL_HOURS = 6L;
-    private static final long SNAPSHOT_PRUNE_RETENTION_MS = 30L * 24L * 60L * 60L * 1000L;
-    private static final int SNAPSHOT_PRUNE_MAX_INACTIVE_PER_TYPE = 20;
-    private static final long WAL_CHECKPOINT_INTERVAL_MINUTES = 30L;
-    private static final long VACUUM_INTERVAL_HOURS = 24L;
-    private static final long STARTUP_VACUUM_DELAY_MINUTES = 2L;
-    private static final long MAINTENANCE_SHUTDOWN_TIMEOUT_SECONDS = 2L;
+    private static final String LEGACY_MIGRATION_MARKER_FILE =
+            "tamework.sqlite.legacy-dat-import-v2.marker";
+    private static final DateTimeFormatter BACKUP_SUFFIX_FORMAT =
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
     private final Path runtimeDataDirectory;
     private final Path sqlitePath;
     private final PersistenceHealthService healthService;
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
-    private final ScheduledExecutorService maintenanceExecutor;
+    private final SqliteMaintenanceService maintenanceService;
     private final ApiProfileDataRepository apiProfileDataRepository;
     private final CaptureRepository captureRepository;
     private final CoopLedgerRepository coopLedgerRepository;
@@ -51,35 +44,41 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final NpcRecoveryOperationRepository npcRecoveryOperationRepository;
     private final NpcLiveAliasRepairRepository npcLiveAliasRepairRepository;
     private final PersistenceIntegrityService integrityService;
+    private final CompanionPopulationRepository companionPopulationRepository;
+    private final CompanionPopulationCoverageRepository companionPopulationCoverageRepository;
+    private final CompanionIdentityRepository companionIdentityRepository;
+    private final CompanionPopulationReconciliationPersistence populationReconciliationPersistence;
     private final SqliteSchemaMigrator schemaMigrator;
-    @Nullable
-    private final HytaleLogger logger;
 
-    private TameworkPersistenceRuntime(@Nonnull Path runtimeDataDirectory,
-                                       @Nonnull Path sqlitePath,
-                                       @Nonnull PersistenceHealthService healthService,
-                                       @Nonnull SqliteConnectionManager connectionManager,
-                                       @Nonnull PersistenceWriteQueue writeQueue,
-                                       @Nonnull ScheduledExecutorService maintenanceExecutor,
-                                       @Nonnull ApiProfileDataRepository apiProfileDataRepository,
-                                       @Nonnull CaptureRepository captureRepository,
-                                       @Nonnull CoopLedgerRepository coopLedgerRepository,
-                                       @Nonnull DeathRepository deathRepository,
-                                       @Nonnull LostRepository lostRepository,
-                                       @Nonnull ManagedCoopRuntimeServices managedCoopServices,
-                                       @Nonnull NpcIdentityRepository npcIdentityRepository,
-                                       @Nonnull NpcProfileRepository npcProfileRepository,
-                                       @Nonnull NpcRecoveryOperationRepository npcRecoveryOperationRepository,
-                                       @Nonnull NpcLiveAliasRepairRepository npcLiveAliasRepairRepository,
-                                       @Nonnull PersistenceIntegrityService integrityService,
-                                       @Nonnull SqliteSchemaMigrator schemaMigrator,
-                                       @Nullable HytaleLogger logger) {
+    private TameworkPersistenceRuntime(
+            @Nonnull Path runtimeDataDirectory,
+            @Nonnull Path sqlitePath,
+            @Nonnull PersistenceHealthService healthService,
+            @Nonnull SqliteConnectionManager connectionManager,
+            @Nonnull PersistenceWriteQueue writeQueue,
+            @Nonnull SqliteMaintenanceService maintenanceService,
+            @Nonnull ApiProfileDataRepository apiProfileDataRepository,
+            @Nonnull CaptureRepository captureRepository,
+            @Nonnull CoopLedgerRepository coopLedgerRepository,
+            @Nonnull DeathRepository deathRepository,
+            @Nonnull LostRepository lostRepository,
+            @Nonnull ManagedCoopRuntimeServices managedCoopServices,
+            @Nonnull NpcIdentityRepository npcIdentityRepository,
+            @Nonnull NpcProfileRepository npcProfileRepository,
+            @Nonnull NpcRecoveryOperationRepository npcRecoveryOperationRepository,
+            @Nonnull NpcLiveAliasRepairRepository npcLiveAliasRepairRepository,
+            @Nonnull PersistenceIntegrityService integrityService,
+            @Nonnull CompanionPopulationRepository companionPopulationRepository,
+            @Nonnull CompanionPopulationCoverageRepository companionPopulationCoverageRepository,
+            @Nonnull CompanionIdentityRepository companionIdentityRepository,
+            @Nonnull CompanionPopulationReconciliationPersistence populationReconciliationPersistence,
+            @Nonnull SqliteSchemaMigrator schemaMigrator) {
         this.runtimeDataDirectory = runtimeDataDirectory;
         this.sqlitePath = sqlitePath;
         this.healthService = healthService;
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
-        this.maintenanceExecutor = maintenanceExecutor;
+        this.maintenanceService = maintenanceService;
         this.apiProfileDataRepository = apiProfileDataRepository;
         this.captureRepository = captureRepository;
         this.coopLedgerRepository = coopLedgerRepository;
@@ -91,8 +90,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.npcRecoveryOperationRepository = npcRecoveryOperationRepository;
         this.npcLiveAliasRepairRepository = npcLiveAliasRepairRepository;
         this.integrityService = integrityService;
+        this.companionPopulationRepository = companionPopulationRepository;
+        this.companionPopulationCoverageRepository = companionPopulationCoverageRepository;
+        this.companionIdentityRepository = companionIdentityRepository;
+        this.populationReconciliationPersistence = populationReconciliationPersistence;
         this.schemaMigrator = schemaMigrator;
-        this.logger = logger;
     }
 
     @Nonnull
@@ -104,12 +106,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
         SqliteSchemaMigrator schemaMigrator = new SqliteSchemaMigrator();
         SqliteMigrationBackupService backupService = new SqliteMigrationBackupService();
-        ScheduledExecutorService maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "tamework-persistence-maintenance");
-            thread.setDaemon(true);
-            return thread;
-        });
-
         try {
             backupService.backupBeforeVersion(
                     sqlitePath,
@@ -117,26 +113,33 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                     schemaMigrator,
                     SqliteSchemaMigrator.SCHEMA_VERSION_V5
             );
+            backupService.backupBeforeVersion(
+                    sqlitePath,
+                    connectionManager,
+                    schemaMigrator,
+                    SqliteSchemaMigrator.SCHEMA_VERSION_V6
+            );
+            backupAndResetPreV2SqliteIfNeeded(sqlitePath, connectionManager, schemaMigrator);
             try (Connection connection = connectionManager.openConnection()) {
                 connection.setAutoCommit(false);
                 try {
                     schemaMigrator.migrate(connection);
                     connection.commit();
-                } catch (Exception ex) {
+                } catch (Exception exception) {
                     connection.rollback();
-                    throw ex;
+                    throw exception;
                 } finally {
                     connection.setAutoCommit(true);
                 }
             }
-        } catch (Exception ex) {
-            String healthReason = isSqliteDriverUnavailable(ex)
+        } catch (Exception exception) {
+            String healthReason = isSqliteDriverUnavailable(exception)
                     ? "sqlite_native_unavailable"
                     : "sqlite_schema_bootstrap_failed";
             health.markDegraded(healthReason);
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_schema_bootstrap_failed",
-                    ex,
+                    exception,
                     TameworkTelemetryContext.persistence(
                             "runtime",
                             "schema_bootstrap",
@@ -145,18 +148,24 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                     ).build()
             );
             if (logger != null) {
-                logger.at(Level.SEVERE).log("SQLite schema bootstrap failed: " + ex.getMessage());
+                logger.at(Level.SEVERE).log(
+                        "SQLite schema bootstrap failed: " + exception.getMessage()
+                );
             }
         }
 
         PersistenceWriteQueue writeQueue = new PersistenceWriteQueue(connectionManager, health, logger);
-
         NpcProfileRepository npcProfileRepository = new NpcProfileRepository(connectionManager, writeQueue);
-        ApiProfileDataRepository apiProfileDataRepository = new ApiProfileDataRepository(connectionManager, writeQueue);
-        CaptureRepository captureRepository = new CaptureRepository(connectionManager, writeQueue, npcProfileRepository);
-        CoopLedgerRepository coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue, npcProfileRepository);
-        DeathRepository deathRepository = new DeathRepository(connectionManager, writeQueue, npcProfileRepository);
-        LostRepository lostRepository = new LostRepository(connectionManager, writeQueue, npcProfileRepository);
+        ApiProfileDataRepository apiProfileDataRepository =
+                new ApiProfileDataRepository(connectionManager, writeQueue);
+        CaptureRepository captureRepository =
+                new CaptureRepository(connectionManager, writeQueue, npcProfileRepository);
+        CoopLedgerRepository coopLedgerRepository =
+                new CoopLedgerRepository(connectionManager, writeQueue, npcProfileRepository);
+        DeathRepository deathRepository =
+                new DeathRepository(connectionManager, writeQueue, npcProfileRepository);
+        LostRepository lostRepository =
+                new LostRepository(connectionManager, writeQueue, npcProfileRepository);
         ManagedCoopRuntimeServices managedCoopServices = new ManagedCoopRuntimeServices(
                 connectionManager,
                 writeQueue,
@@ -168,8 +177,17 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new NpcRecoveryOperationRepository(connectionManager, writeQueue);
         NpcLiveAliasRepairRepository npcLiveAliasRepairRepository =
                 new NpcLiveAliasRepairRepository(writeQueue);
-        PersistenceIntegrityService integrityService =
-                new PersistenceIntegrityService(connectionManager);
+        PersistenceIntegrityService integrityService = new PersistenceIntegrityService(connectionManager);
+        CompanionPopulationRepository companionPopulationRepository =
+                new CompanionPopulationRepository(connectionManager, writeQueue);
+        CompanionPopulationCoverageRepository companionPopulationCoverageRepository =
+                new CompanionPopulationCoverageRepository(connectionManager, writeQueue);
+        CompanionIdentityRepository companionIdentityRepository =
+                new CompanionIdentityRepository(connectionManager);
+        CompanionPopulationReconciliationPersistence populationReconciliationPersistence =
+                new CompanionPopulationReconciliationPersistence(connectionManager, writeQueue);
+        SqliteMaintenanceService maintenanceService =
+                new SqliteMaintenanceService(connectionManager, npcProfileRepository, logger);
 
         TameworkPersistenceRuntime runtime = new TameworkPersistenceRuntime(
                 normalizedDataDir,
@@ -177,7 +195,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 health,
                 connectionManager,
                 writeQueue,
-                maintenanceExecutor,
+                maintenanceService,
                 apiProfileDataRepository,
                 captureRepository,
                 coopLedgerRepository,
@@ -189,15 +207,17 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 npcRecoveryOperationRepository,
                 npcLiveAliasRepairRepository,
                 integrityService,
-                schemaMigrator,
-                logger
+                companionPopulationRepository,
+                companionPopulationCoverageRepository,
+                companionIdentityRepository,
+                populationReconciliationPersistence,
+                schemaMigrator
         );
 
         if (health.isHealthy()) {
             runtime.runLegacyDatImport(logger);
             managedCoopServices.compositeIndexRefreshService().refresh();
-            runtime.scheduleSnapshotPruning();
-            runtime.scheduleDatabaseMaintenance();
+            maintenanceService.start();
         }
         return runtime;
     }
@@ -262,7 +282,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         return managedCoopServices;
     }
 
-    /** Creates a stateless read-only audit facade over the current v5 database and indexes. */
+    /** Creates a stateless read-only audit facade over the current managed-coop database/indexes. */
     @Nonnull
     public ManagedCoopDiagnosticsService getManagedCoopDiagnosticsService() {
         return new ManagedCoopDiagnosticsService(connectionManager, managedCoopServices);
@@ -291,6 +311,48 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PersistenceIntegrityService getIntegrityService() {
         return integrityService;
+    }
+
+    @Nonnull
+    public CompanionPopulationRepository getCompanionPopulationRepository() {
+        return companionPopulationRepository;
+    }
+
+    @Nonnull
+    public CompanionPopulationCoverageRepository getCompanionPopulationCoverageRepository() {
+        return companionPopulationCoverageRepository;
+    }
+
+    @Nonnull
+    public CompanionIdentityRepository getCompanionIdentityRepository() {
+        return companionIdentityRepository;
+    }
+
+    @Nonnull
+    public CompanionPopulationReconciliationRepository
+    getCompanionPopulationReconciliationRepository() {
+        return populationReconciliationPersistence.reconciliationRepository();
+    }
+
+    @Nonnull
+    public CompanionPopulationRepairRepository getCompanionPopulationRepairRepository() {
+        return populationReconciliationPersistence.repairRepository();
+    }
+
+    @Nonnull
+    public CompanionPopulationLegacyEvidenceRepository
+    getCompanionPopulationLegacyEvidenceRepository() {
+        return populationReconciliationPersistence.legacyEvidenceRepository();
+    }
+
+    @Nonnull
+    public CompanionPopulationObservationRepository getCompanionPopulationObservationRepository() {
+        return populationReconciliationPersistence.observationRepository();
+    }
+
+    @Nonnull
+    public CompanionPopulationScanSessionRepository getCompanionPopulationScanSessionRepository() {
+        return populationReconciliationPersistence.scanSessionRepository();
     }
 
     @Nonnull
@@ -331,11 +393,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     public boolean requestWalCheckpoint() {
-        return scheduleMaintenanceTask(this::runWalCheckpoint, "wal_checkpoint_request_rejected");
+        return maintenanceService.requestWalCheckpoint();
     }
 
     public boolean requestVacuum() {
-        return scheduleMaintenanceTask(this::runVacuum, "vacuum_request_rejected");
+        return maintenanceService.requestVacuum();
     }
 
     private void runLegacyDatImport(@Nullable HytaleLogger logger) {
@@ -347,7 +409,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             return;
         }
         try {
-            LegacyDatImporter importer = new LegacyDatImporter(runtimeDataDirectory, connectionManager, schemaMigrator);
+            LegacyDatImporter importer =
+                    new LegacyDatImporter(runtimeDataDirectory, connectionManager, schemaMigrator);
             boolean imported = importer.importAll(
                     captureRepository,
                     coopLedgerRepository,
@@ -357,11 +420,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             if (imported) {
                 Files.writeString(markerPath, "ok");
             }
-        } catch (Exception ex) {
+        } catch (Exception exception) {
             healthService.markDegraded("legacy_dat_import_failed");
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_legacy_import_failed",
-                    ex,
+                    exception,
                     TameworkTelemetryContext.persistence(
                             "runtime",
                             "legacy_import",
@@ -370,102 +433,10 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                     ).build()
             );
             if (logger != null) {
-                logger.at(Level.SEVERE).log("Legacy .dat migration failed: " + ex.getMessage());
+                logger.at(Level.SEVERE).log(
+                        "Legacy .dat migration failed: " + exception.getMessage()
+                );
             }
-        }
-    }
-
-    private void scheduleSnapshotPruning() {
-        long now = System.currentTimeMillis();
-        long cutoff = now - SNAPSHOT_PRUNE_RETENTION_MS;
-        npcProfileRepository.pruneInactiveSnapshotHistoryAsync(cutoff, SNAPSHOT_PRUNE_MAX_INACTIVE_PER_TYPE);
-        maintenanceExecutor.scheduleAtFixedRate(
-                () -> {
-                    long currentCutoff = System.currentTimeMillis() - SNAPSHOT_PRUNE_RETENTION_MS;
-                    npcProfileRepository.pruneInactiveSnapshotHistoryAsync(
-                            currentCutoff,
-                            SNAPSHOT_PRUNE_MAX_INACTIVE_PER_TYPE
-                    );
-                },
-                SNAPSHOT_PRUNE_INTERVAL_HOURS,
-                SNAPSHOT_PRUNE_INTERVAL_HOURS,
-                TimeUnit.HOURS
-        );
-    }
-
-    private void scheduleDatabaseMaintenance() {
-        runWalCheckpoint();
-        maintenanceExecutor.scheduleAtFixedRate(
-                this::runWalCheckpoint,
-                WAL_CHECKPOINT_INTERVAL_MINUTES,
-                WAL_CHECKPOINT_INTERVAL_MINUTES,
-                TimeUnit.MINUTES
-        );
-        maintenanceExecutor.schedule(this::runVacuum, STARTUP_VACUUM_DELAY_MINUTES, TimeUnit.MINUTES);
-        maintenanceExecutor.scheduleAtFixedRate(
-                this::runVacuum,
-                VACUUM_INTERVAL_HOURS,
-                VACUUM_INTERVAL_HOURS,
-                TimeUnit.HOURS
-        );
-    }
-
-    private void runWalCheckpoint() {
-        try (Connection connection = connectionManager.openConnection();
-             Statement statement = connection.createStatement()) {
-            statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
-        } catch (Exception ex) {
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    "persistence_wal_checkpoint_failed",
-                    ex,
-                    TameworkTelemetryContext.persistence(
-                            "maintenance",
-                            "wal_checkpoint",
-                            "wal_checkpoint_failed",
-                            "SQLite WAL checkpoint failed."
-                    ).build()
-            );
-            logWarning("SQLite WAL checkpoint failed: " + ex.getMessage());
-        }
-    }
-
-    private void runVacuum() {
-        try (Connection connection = connectionManager.openConnection();
-             Statement statement = connection.createStatement()) {
-            connection.setAutoCommit(true);
-            statement.execute("VACUUM");
-        } catch (Exception ex) {
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    "persistence_vacuum_failed",
-                    ex,
-                    TameworkTelemetryContext.persistence(
-                            "maintenance",
-                            "vacuum",
-                            "vacuum_failed",
-                            "SQLite VACUUM failed."
-                    ).build()
-            );
-            logWarning("SQLite VACUUM failed: " + ex.getMessage());
-        }
-    }
-
-    private boolean scheduleMaintenanceTask(@Nonnull Runnable task, @Nonnull String rejectedReason) {
-        try {
-            maintenanceExecutor.execute(task);
-            return true;
-        } catch (RejectedExecutionException ex) {
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    "persistence_maintenance_rejected",
-                    ex,
-                    TameworkTelemetryContext.persistence(
-                            "maintenance",
-                            "schedule_task",
-                            rejectedReason,
-                            "SQLite maintenance task rejected."
-                    ).build()
-            );
-            logWarning("SQLite maintenance task rejected: " + rejectedReason);
-            return false;
         }
     }
 
@@ -477,30 +448,53 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         }
     }
 
-    private void logWarning(@Nonnull String message) {
-        if (logger != null) {
-            logger.at(Level.WARNING).log(message);
+    private static void backupAndResetPreV2SqliteIfNeeded(
+            @Nonnull Path sqlitePath,
+            @Nonnull SqliteConnectionManager connectionManager,
+            @Nonnull SqliteSchemaMigrator schemaMigrator) throws Exception {
+        if (!Files.exists(sqlitePath)) {
+            return;
         }
+        boolean alreadyV2;
+        try (Connection connection = connectionManager.openConnection()) {
+            alreadyV2 = schemaMigrator.isVersionApplied(
+                    connection,
+                    SqliteSchemaMigrator.SCHEMA_VERSION_V2
+            );
+        } catch (Exception exception) {
+            if (isSqliteDriverUnavailable(exception)) {
+                throw exception;
+            }
+            alreadyV2 = false;
+        }
+        if (alreadyV2) {
+            return;
+        }
+
+        String suffix = BACKUP_SUFFIX_FORMAT.format(Instant.now());
+        Path backupPath = sqlitePath.resolveSibling(
+                "tamework_pre_v2_" + suffix + ".sqlite.bak"
+        );
+        Files.copy(sqlitePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+        Files.deleteIfExists(sqlitePath);
+        Files.deleteIfExists(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-wal"));
+        Files.deleteIfExists(sqlitePath.resolveSibling(sqlitePath.getFileName() + "-shm"));
     }
 
     @Override
     public void close() {
-        maintenanceExecutor.shutdownNow();
-        try {
-            maintenanceExecutor.awaitTermination(MAINTENANCE_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-        }
+        maintenanceService.close();
         writeQueue.close();
     }
 
-    public record PersistenceDiagnostics(@Nonnull Path databasePath,
-                                         long sqliteBytes,
-                                         long walBytes,
-                                         long shmBytes,
-                                         long totalBytes,
-                                         @Nonnull PersistenceWriteQueue.QueueMetrics queueMetrics,
-                                         @Nonnull PersistenceHealthService.HealthState healthState) {
+    public record PersistenceDiagnostics(
+            @Nonnull Path databasePath,
+            long sqliteBytes,
+            long walBytes,
+            long shmBytes,
+            long totalBytes,
+            @Nonnull PersistenceWriteQueue.QueueMetrics queueMetrics,
+            @Nonnull PersistenceHealthService.HealthState healthState) {
     }
 
     static boolean isSqliteDriverUnavailable(@Nullable Throwable throwable) {

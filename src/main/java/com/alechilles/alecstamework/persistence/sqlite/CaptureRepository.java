@@ -128,7 +128,7 @@ public final class CaptureRepository {
                 null,
                 null,
                 snapshot.toolIds()
-        ));
+        ), ProfileOwnerMutation.unchanged());
         String profileId = profileRepository.resolveOrCreateProfileIdInTransaction(connection, snapshot.npcUuid());
         profileRepository.replaceToolLinksInTransaction(connection, profileId, LINK_TYPE, snapshot.toolIds());
         profileRepository.setActiveSnapshotInTransaction(

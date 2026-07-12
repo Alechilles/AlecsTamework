@@ -60,28 +60,40 @@ final class InteractionExecutor {
         }
         if (entry instanceof TameInteraction) {
             TameInteraction tame = (TameInteraction) entry;
-            boolean applied = effects.applyStartTaming(npcRef, store, player);
-            if (!applied) {
-                return false;
-            }
-            applied |= effects.applyTameRoleChange(tame, npcRef, role, store, ctx);
-            feedHelper.consumeHeldItem(player, 1);
-            applied |= effects.applyCustomEffects(
-                    interactionConfigId,
-                    interactionIndex,
-                    entry,
-                    entry.getEffects(),
+            return effects.applyStartTaming(
                     npcRef,
-                    role,
-                    infoProvider,
                     store,
                     player,
-                    ctx,
-                    harvestInteraction
+                    (liveNpcRef, liveStore, livePlayer) -> {
+                        Role liveRole = effects.resolveLiveRole(liveNpcRef, liveStore, role);
+                        InteractionContextSnapshot liveContext = effects.refreshContext(livePlayer, liveRole);
+                        effects.applyTameRoleChange(tame, liveNpcRef, liveRole, liveStore, liveContext);
+                        if (livePlayer != null) {
+                            feedHelper.consumeHeldItem(livePlayer, 1);
+                        }
+                        effects.applyCustomEffects(
+                                interactionConfigId,
+                                interactionIndex,
+                                entry,
+                                entry.getEffects(),
+                                liveNpcRef,
+                                liveRole,
+                                infoProvider,
+                                liveStore,
+                                livePlayer,
+                                liveContext,
+                                harvestInteraction
+                        );
+                        if (livePlayer != null) {
+                            CommandAutoLinkResult autoLink = CommandAutoLinkService.autoLinkNewlyTamedNpc(
+                                    livePlayer,
+                                    liveNpcRef,
+                                    liveStore
+                            );
+                            sendTameAutoLinkFeedback(livePlayer, autoLink);
+                        }
+                    }
             );
-            CommandAutoLinkResult autoLink = CommandAutoLinkService.autoLinkNewlyTamedNpc(player, npcRef, store);
-            sendTameAutoLinkFeedback(player, autoLink);
-            return applied;
         }
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;

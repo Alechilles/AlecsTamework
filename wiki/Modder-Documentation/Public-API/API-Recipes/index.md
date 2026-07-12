@@ -10,7 +10,7 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection provides task-focused examples for common Tamework API integration workflows.
 
-> **Experimental API Contract (`0.6.0`)**
+> **Experimental API Contract (`0.7.0`)**
 > Recipe behavior should always be gated behind runtime capability checks.
 
 ## Child Pages

@@ -212,7 +212,7 @@ public final class CommandLinkedNpcStateSnapshotService {
         if (profileRepository == null || snapshot.npcUuid() == null) {
             return;
         }
-        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+        profileRepository.upsertSnapshotAsync(new NpcProfileRepository.ProfileUpdate(
                 snapshot.npcUuid(),
                 snapshot.ownerId(),
                 snapshot.ownerName(),

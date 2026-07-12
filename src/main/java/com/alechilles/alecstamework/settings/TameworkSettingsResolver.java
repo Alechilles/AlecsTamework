@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.settings;
 
-import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -107,7 +107,8 @@ public final class TameworkSettingsResolver {
 
     @Nonnull
     private static String normalizeClaimProvider(@Nullable String provider) {
-        return ClaimIntegrationProvider.fromConfigValue(provider).configValue();
+        ClaimProviderRequest request = ClaimProviderRequest.fromConfigValue(provider);
+        return request.valid() ? request.provider().configValue() : request.displayValue();
     }
 
     @Nullable

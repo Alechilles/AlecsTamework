@@ -10,7 +10,11 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkCaptureWild`: Captures untamed NPCs.
 - `TameworkDenyCaptureUntamed`: Blocks capture when tame is required.
 - `TameworkDenyInteract`: Blocks player interaction (typically non-owner gating).
-- `TameworkSetOwner`: Assigns owner from interacting player.
+- `TameworkSetOwner`: Assigns owner from the interacting player. Vanilla action lists that also
+  tame or consume an item should configure `TameOnApplied`, `ConsumeHeldItemOnApplied`,
+  `StateOnApplied`, `ParticleSystemOnApplied`, and `SoundEventParamOnApplied` on this action. Those
+  effects then run only from the admitted owner-mutation continuation; do not add eager sibling
+  inventory/tame success actions to the same list.
 - `TameworkSetTamed`: Sets/clears tamed state.
 - `TameworkNeedsResourceConsume`: Consumes configured needs resource targets (food/water seek flows).
 - `TameworkNeedsResourceRejectTarget`: Temporarily suppresses a failed needs seek target so later scans can choose another reachable source.

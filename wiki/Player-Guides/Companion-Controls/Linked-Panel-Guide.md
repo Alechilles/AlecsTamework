@@ -46,7 +46,9 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 
 ## Special statuses
 - `Unloaded` means the companion is not currently loaded near you, but the tool still knows about it.
-- `Attempting recall` means the tool is still retrying an unloaded companion relocation. The timer shows how many seconds remain before it is treated as lost.
+- `Attempting recall` means the tool is still retrying an unloaded companion relocation. The timer
+  shows the remaining retry window. If the companion is confirmed still live at its same-world
+  source when that window expires, it stays linked there instead of being marked lost.
 - `Dead` means the tool has a persisted death snapshot and may allow revive after policy and cooldown checks.
 - `LOST` means the tool could not safely complete relocation or travel recovery. In that state, normal recall and return-home actions are usually blocked.
 

@@ -35,6 +35,14 @@ final class SpawnerItemStackMetadataService {
         return itemStack.withMetadata(key, Codec.LONG, until);
     }
 
+    boolean isCooldownActive(ItemStack itemStack, String key, int cooldownMs) {
+        if (itemStack == null || key == null || cooldownMs <= 0) {
+            return false;
+        }
+        Long until = itemStack.getFromMetadataOrNull(key, Codec.LONG);
+        return until != null && until > System.currentTimeMillis();
+    }
+
     boolean isAlreadyCaptured(ItemStack itemStack) {
         if (itemStack == null) {
             return false;
@@ -83,6 +91,7 @@ final class SpawnerItemStackMetadataService {
             return null;
         }
         ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.CAPTURED);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.COMPANION_PROFILE_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TARGET_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TARGET_ENTITY_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);

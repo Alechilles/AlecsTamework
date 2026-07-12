@@ -95,6 +95,14 @@ public final class OwnerMessageUtil {
         );
     }
 
+    public static void sendPopulationUnavailable(Player player, String reason) {
+        if (!canSend(player)) {
+            return;
+        }
+        String safeReason = reason == null || reason.isBlank() ? "policy unavailable" : reason.trim();
+        notifyWarning(player, "Companion admission is unavailable: " + safeReason + ".");
+    }
+
     private static boolean canSend(Player player) {
         if (player == null) {
             return false;

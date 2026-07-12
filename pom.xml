@@ -75,6 +75,11 @@
             <version>${slf4j.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>5.10.2</version>
@@ -171,6 +176,7 @@
                                     <include>curse.maven:creditor-1560961</include>
                                     <include>org.xerial:sqlite-jdbc</include>
                                     <include>org.slf4j:slf4j-api</include>
+                                    <include>org.slf4j:slf4j-nop</include>
                                 </includes>
                             </artifactSet>
                             <filters>

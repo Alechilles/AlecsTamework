@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -45,7 +46,13 @@ public final class TameworkApiTestResetCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw("Unable to resolve the player for fixture reset."));
             return;
         }
-        ApiSelfTestFixtureManager.FixtureOperationResult result = manager.reset(player, store, world);
-        commandContext.sender().sendMessage(Message.raw(result.summary()));
+        manager.resetAsync(player, store, world).whenComplete((result, failure) -> {
+            LeaseBoundWorldDispatcher.execute(world, () -> {
+                String summary = failure != null || result == null
+                        ? "Failed to reset API self-test fixtures safely."
+                        : result.summary();
+                commandContext.sender().sendMessage(Message.raw(summary));
+            });
+        });
     }
 }

@@ -28,9 +28,9 @@ class InteractionBehaviorTest {
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "npc", "actions", "InteractionExecutor.java"
     );
-    private static final Path TAMEWORK_INTERACT_EFFECTS = Paths.get(
+    private static final Path INTERACTION_HARVEST_EFFECTS = Paths.get(
             "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "TameworkInteractEffects.java"
+            "com", "alechilles", "alecstamework", "npc", "actions", "InteractionHarvestEffects.java"
     );
 
     @Test
@@ -253,34 +253,37 @@ class InteractionBehaviorTest {
 
     @Test
     void optimizedHarvestResolvesCooldownDurationFromInteractionContext() throws Exception {
-        String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
+        String content = Files.readString(INTERACTION_HARVEST_EFFECTS, StandardCharsets.UTF_8);
 
         int stringArrayLookup = content.indexOf(
-                "owner.getRoleStringArrayParam(role, ctx, HARVEST_TIMEOUT_PARAMETER)"
+                "owner.getRoleStringArrayParam(role, context, HARVEST_TIMEOUT_PARAMETER)"
         );
         int cooldownReadyCheck = content.indexOf(
                 "ActionTameworkHarvestAlarm.isHarvestCooldownReady(npcRef, role, store, baseSeconds)"
         );
         int cooldownEnsure = content.indexOf(
-                "ActionTameworkHarvestAlarm.ensureHarvestCooldownActive(npcRef, role, store, baseSeconds)"
+                "ActionTameworkHarvestAlarm.ensureHarvestCooldownActive("
         );
+        int cooldownEnsureArgs = content.indexOf("npcRef, role, store, baseSeconds", cooldownEnsure);
 
         assertTrue(stringArrayLookup >= 0, "Optimized harvest should resolve HarvestTimeout from interaction params.");
         assertTrue(cooldownReadyCheck >= 0, "Resolved HarvestTimeout should be passed into the readiness check.");
         assertTrue(cooldownEnsure >= 0, "Resolved HarvestTimeout should be passed into the post-state cooldown check.");
+        assertTrue(cooldownEnsureArgs > cooldownEnsure,
+                "Post-state cooldown confirmation should receive the resolved timeout.");
     }
 
     @Test
     void containerHarvestBonusModeUsesInteractionContextParams() throws Exception {
-        String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
+        String content = Files.readString(INTERACTION_HARVEST_EFFECTS, StandardCharsets.UTF_8);
 
-        int modeResolution = content.indexOf("String harvestBonusMode = owner.getRoleStringParam(");
+        int modeResolution = content.indexOf("String bonusMode = owner.getRoleStringParam(");
         int modeParam = content.indexOf(
                 "CompanionHarvestBonusService.HARVEST_BONUS_MODE_PARAM",
                 modeResolution
         );
         int preserveCheck = content.indexOf(
-                "CompanionHarvestBonusService.shouldPreserveCooldown(harvestBonusMode, npcRef, store)",
+                "CompanionHarvestBonusService.shouldPreserveCooldown(",
                 modeParam
         );
 
@@ -324,7 +327,7 @@ class InteractionBehaviorTest {
 
     @Test
     void optimizedHarvestLogsContainerAndCooldownDiagnostics() throws Exception {
-        String content = Files.readString(TAMEWORK_INTERACT_EFFECTS, StandardCharsets.UTF_8);
+        String content = Files.readString(INTERACTION_HARVEST_EFFECTS, StandardCharsets.UTF_8);
 
         assertTrue(content.contains("TameworkHarvestDebug: cooldown-ready-request"),
                 "Optimized harvest should log the resolved cooldown duration before applying it.");

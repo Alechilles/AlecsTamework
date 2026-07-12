@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimProviderRequest;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import javax.annotation.Nonnull;
@@ -151,7 +152,13 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
 
     @Nonnull
     static TameworkSettingsValues fromRuntime() {
-        return fromResolvedSettings(TameworkSettingsStore.loadRuntimeGlobalSettings());
+        return fromRuntimeState().values();
+    }
+
+    @Nonnull
+    static RuntimeState fromRuntimeState() {
+        ResolvedTameworkSettings settings = TameworkSettingsStore.loadRuntimeGlobalSettings();
+        return new RuntimeState(fromResolvedSettings(settings), settings.simpleClaimsProviderRequest());
     }
 
     @Nonnull
@@ -197,6 +204,10 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 settings.telemetryEnabled(),
                 settings.telemetryBreadcrumbsEnabled()
         );
+    }
+
+    record RuntimeState(@Nonnull TameworkSettingsValues values,
+                        @Nonnull ClaimProviderRequest claimProviderRequest) {
     }
 
 }

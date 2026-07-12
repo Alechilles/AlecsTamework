@@ -55,7 +55,22 @@ Captured Tamework NPC names are stored on the spawner item and restored on spawn
 Captured attachment IDs are stored on the spawner item and can be displayed with player-friendly labels from
 `TwAttachmentDisplayConfig`.
 
+Filled spawners also carry the canonical companion profile identity used by population accounting. Capture moves an owned companion to `CAPTURED`: it keeps consuming one owner slot unless capture clears ownership, but it stops occupying a physical claim. Spawn/release reserves destination owner and claim capacity before creating the NPC. The exact source stack is finalized only after a live NPC with the planned canonical identity exists; a denial or pre-spawn failure keeps the filled item intact, while a late durability failure is reported as degraded.
+
+Older filled items without a canonical profile ID are adopted through their stable legacy identity. Adoption is cap-checked and cannot create a second active representation of the same companion. Existing over-cap legacy companions are preserved during upgrade reconciliation, but a copied or newly restored item cannot bypass later admissions. A provisional legacy identity is promoted when its owner admission commits or released exactly once after denial/cancellation; retries and late callbacks cannot double-release it.
+
 `Capture.ClearsOwner` and `Spawn.AssignsOwner` are controlled by `/tw settings`. Older configs that still contain those fields continue to load, but new item configs should not author them.
+
+The spawn transition follows all four runtime-setting combinations:
+
+| `CaptureClearsOwner` | `SpawnSetsOwner` | Spawned owner | Spawn owner delta | Spawn claim delta |
+| --- | --- | --- | ---: | ---: |
+| `false` | `false` | Stored owner, or unowned if none was stored | Stored owner `0`; unowned `0` | Stored owner `+1`; unowned `0` |
+| `false` | `true` | Stored owner when non-null; otherwise spawning player | Stored owner `0`; null-to-owner `+1` | `+1` when owned |
+| `true` | `false` | Unowned | `0` | `0` |
+| `true` | `true` | Spawning player | `+1` | `+1` |
+
+The deltas assume the captured source itself occupies no physical claim. A canonical unowned profile restored to a non-null owner always uses normal cap-checked null-to-owner admission; it is never treated as an existing-owner zero delta. Conversely, a canonical non-null stored owner cannot be silently transferred or cleared by restore.
 
 ## Icon overrides
 Optional overrides for filled spawner icons based on attachments or role.

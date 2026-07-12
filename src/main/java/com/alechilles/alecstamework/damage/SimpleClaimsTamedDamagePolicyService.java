@@ -1,37 +1,29 @@
 package com.alechilles.alecstamework.damage;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
-import com.alechilles.alecstamework.npc.TamedStateResolver;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
-import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
-import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Evaluates optional claim-based damage restrictions for tamed NPC targets.
+ * Compatibility wrapper for callers that used the original claim-only policy service.
  */
 final class SimpleClaimsTamedDamagePolicyService {
-    private static final long WARNING_THROTTLE_MS = 60_000L;
-
-    private final SimpleClaimsBreedingBridge simpleClaimsBridge;
-    private long nextWarningAtMs;
+    private final SimpleClaimsTamedDamagePolicy policy;
 
     SimpleClaimsTamedDamagePolicyService() {
-        this(SimpleClaimsBreedingBridge.initialize());
+        this.policy = new SimpleClaimsTamedDamagePolicy();
     }
 
     SimpleClaimsTamedDamagePolicyService(@Nullable SimpleClaimsBreedingBridge simpleClaimsBridge) {
-        this.simpleClaimsBridge = simpleClaimsBridge == null
-                ? SimpleClaimsBreedingBridge.initialize()
-                : simpleClaimsBridge;
+        this.policy = simpleClaimsBridge == null
+                ? new SimpleClaimsTamedDamagePolicy()
+                : new SimpleClaimsTamedDamagePolicy(simpleClaimsBridge);
     }
 
     @Nonnull
@@ -40,47 +32,16 @@ final class SimpleClaimsTamedDamagePolicyService {
                       @Nullable Vector3d targetPosition,
                       @Nullable UUID attackerPlayerUuid,
                       @Nullable TwGlobalConfig globalConfig) {
-        if (globalConfig == null) {
-            return Decision.allowSkipped("damage-protection-disabled");
-        }
-        boolean simpleClaimsEnabled = TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled());
-        boolean protectTamedFromNonMembers = TameworkRuntimeSettings.simpleClaimsProtectTamedFromNonMembers(
-                globalConfig.isSimpleClaimsDamageProtectTamedFromNonMembers()
-        );
-        if (!simpleClaimsEnabled || !protectTamedFromNonMembers) {
-            return Decision.allowSkipped("damage-protection-disabled");
-        }
-        if (attackerPlayerUuid == null) {
-            return Decision.allowSkipped("attacker-unattributed");
-        }
-        if (targetRef == null || !targetRef.isValid() || store == null) {
-            return Decision.allowSkipped("target-context-missing");
-        }
-        if (!TamedStateResolver.isTamed(targetRef, store)) {
-            return Decision.allowSkipped("target-not-tamed");
-        }
-        String worldName = resolveWorldName(store);
-        if (worldName == null || worldName.isBlank() || targetPosition == null) {
-            warnFailOpen("SimpleClaims tamed damage check failed: target/world context was missing.");
-            return Decision.allowFailOpen("lookup-context-missing");
-        }
-        SimpleClaimsBreedingBridge.DamageAccessResult accessResult = simpleClaimsBridge.evaluateDamageAccess(
-                worldName,
+        TamedDamageDecision decision = policy.evaluate(
+                TamedDamageOwnerPolicy.unowned(),
+                targetRef,
+                store,
+                resolveWorldName(store),
                 targetPosition,
                 attackerPlayerUuid,
-                globalConfig.getSimpleClaimsDamageAllowDamagePermissionKey()
+                globalConfig
         );
-        Decision resolved = evaluateResolved(accessResult);
-        if (resolved.status() == DecisionStatus.ALLOW_FAIL_OPEN) {
-            warnFailOpen(
-                    "SimpleClaims tamed damage check failed-open: status="
-                            + (accessResult != null ? accessResult.status() : "<null>")
-                            + ", message="
-                            + (accessResult != null ? accessResult.message() : "missing-result")
-                            + "."
-            );
-        }
-        return resolved;
+        return mapDecision(decision);
     }
 
     @Nonnull
@@ -101,24 +62,17 @@ final class SimpleClaimsTamedDamagePolicyService {
         if (store == null || store.getExternalData() == null || store.getExternalData().getWorld() == null) {
             return null;
         }
-        World world = store.getExternalData().getWorld();
-        return world != null ? world.getName() : null;
+        return store.getExternalData().getWorld().getName();
     }
 
-    private void warnFailOpen(@Nullable String warning) {
-        if (warning == null || warning.isBlank()) {
-            return;
-        }
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getLogger() == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (now < nextWarningAtMs) {
-            return;
-        }
-        nextWarningAtMs = now + WARNING_THROTTLE_MS;
-        plugin.getLogger().at(Level.WARNING).log(warning);
+    @Nonnull
+    private static Decision mapDecision(@Nonnull TamedDamageDecision decision) {
+        return switch (decision.status()) {
+            case ALLOW_SKIPPED, UNAVAILABLE -> Decision.allowSkipped(decision.reason());
+            case ALLOW_ENFORCED -> Decision.allowEnforced(decision.reason());
+            case DENY_OWNER, DENY_CLAIM -> Decision.deny(decision.reason());
+            case ALLOW_FAIL_OPEN -> Decision.allowFailOpen(decision.reason());
+        };
     }
 
     enum DecisionStatus {

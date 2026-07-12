@@ -242,7 +242,7 @@ public final class LostRepository {
                 null,
                 null,
                 null
-        ));
+        ), ProfileOwnerMutation.unchanged());
         String profileId = profileRepository.resolveOrCreateProfileIdInTransaction(connection, snapshot.npcUuid());
         profileRepository.setActiveSnapshotInTransaction(
                 connection,

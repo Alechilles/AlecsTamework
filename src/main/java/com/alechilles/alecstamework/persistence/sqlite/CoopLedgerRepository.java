@@ -218,7 +218,7 @@ public final class CoopLedgerRepository {
                     row.residentSlot(),
                     null,
                     null
-            ));
+            ), ProfileOwnerMutation.unchanged());
         } else if (releasedNpcUuid != null) {
             if (existing != null && existing.housedNpcUuid != null && !existing.housedNpcUuid.equals(releasedNpcUuid)) {
                 profileRepository.remapCurrentUuidInTransaction(connection, existing.housedNpcUuid, releasedNpcUuid);
@@ -242,7 +242,7 @@ public final class CoopLedgerRepository {
                         row.residentSlot(),
                         null,
                         null
-                ));
+                ), ProfileOwnerMutation.unchanged());
             }
         }
 
@@ -289,10 +289,45 @@ public final class CoopLedgerRepository {
         }
     }
 
+    void upsertSlotIfSourceMatchesInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull CoopLedgerRow row,
+            boolean expectedPresent,
+            @Nullable UUID expectedHousedNpcUuid,
+            @Nullable UUID expectedLastReleasedNpcUuid
+    ) throws Exception {
+        String coopId = normalizeIdentifier(row.coopId());
+        if (coopId == null || row.residentSlot() < 0) {
+            throw new IllegalArgumentException("Invalid coop ledger row.");
+        }
+        ExistingSlot existing = findExistingSlot(
+                connection, normalizeWorld(row.worldName()), coopId,
+                row.x(), row.y(), row.z(), row.residentSlot()
+        );
+        if ((existing != null) != expectedPresent
+                || existing != null && (!java.util.Objects.equals(
+                        existing.housedNpcUuid, expectedHousedNpcUuid
+                ) || !java.util.Objects.equals(
+                        existing.lastReleasedNpcUuid, expectedLastReleasedNpcUuid
+                ))) {
+            throw new IllegalStateException("Coop capture source changed before population commit.");
+        }
+        upsertSlotInTransaction(connection, row);
+    }
+
     void releaseAndRemapInTransaction(@Nonnull Connection connection,
                                       @Nonnull CoopLedgerRow row,
                                       @Nullable UUID previousNpcUuid,
                                       @Nullable UUID currentNpcUuid) throws Exception {
+        String coopId = normalizeIdentifier(row.coopId());
+        ExistingSlot existing = coopId == null ? null : findExistingSlot(
+                connection, normalizeWorld(row.worldName()), coopId,
+                row.x(), row.y(), row.z(), row.residentSlot()
+        );
+        if (previousNpcUuid == null || existing == null
+                || !previousNpcUuid.equals(existing.housedNpcUuid)) {
+            throw new IllegalStateException("Coop release source changed before population commit.");
+        }
         if (previousNpcUuid != null && currentNpcUuid != null && !previousNpcUuid.equals(currentNpcUuid)) {
             profileRepository.remapCurrentUuidInTransaction(connection, previousNpcUuid, currentNpcUuid);
         }

@@ -14,34 +14,57 @@ public final class SqliteSchemaMigrator {
     public static final int SCHEMA_VERSION_V3 = 3;
     public static final int SCHEMA_VERSION_V4 = 4;
     public static final int SCHEMA_VERSION_V5 = 5;
+    public static final int SCHEMA_VERSION_V6 = 6;
     public static final int MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2 = 2001;
     public static final String MIGRATION_NAME_SCHEMA_V2 = "schema_v2";
     public static final String MIGRATION_NAME_SCHEMA_V3 = "schema_v3_api_profile_data";
     public static final String MIGRATION_NAME_SCHEMA_V4 = "schema_v4_coop_state_snapshot";
     public static final String MIGRATION_NAME_SCHEMA_V5 = "schema_v5_identity_and_lifecycle_operations";
+    public static final String MIGRATION_NAME_SCHEMA_V6 = "schema_v6_companion_population_integrity";
     public static final String MIGRATION_NAME_LEGACY_DAT_IMPORT_V2 = "legacy_dat_import_v2";
 
     private final SqliteSchemaV5Migration schemaV5Migration = new SqliteSchemaV5Migration();
 
     public void migrate(@Nonnull Connection connection) throws Exception {
+        migrateThrough(connection, SCHEMA_VERSION_V6);
+    }
+
+    /** Applies every Tamework-owned schema migration up to the requested version. */
+    void migrateThrough(@Nonnull Connection connection, int targetVersion) throws Exception {
+        if (targetVersion < SCHEMA_VERSION_V2 || targetVersion > SCHEMA_VERSION_V6) {
+            throw new IllegalArgumentException("Unsupported schema target: " + targetVersion);
+        }
         createMigrationsTable(connection);
-        if (!isVersionApplied(connection, SCHEMA_VERSION_V2)) {
+        if (targetVersion >= SCHEMA_VERSION_V2 && !isVersionApplied(connection, SCHEMA_VERSION_V2)) {
             applySchemaV2(connection);
             recordMigration(connection, SCHEMA_VERSION_V2, MIGRATION_NAME_SCHEMA_V2);
         }
-        if (!isVersionApplied(connection, SCHEMA_VERSION_V3)) {
+        if (targetVersion >= SCHEMA_VERSION_V3 && !isVersionApplied(connection, SCHEMA_VERSION_V3)) {
             applySchemaV3(connection);
             recordMigration(connection, SCHEMA_VERSION_V3, MIGRATION_NAME_SCHEMA_V3);
         }
-        if (!isVersionApplied(connection, SCHEMA_VERSION_V4)) {
+        if (targetVersion >= SCHEMA_VERSION_V4 && !isVersionApplied(connection, SCHEMA_VERSION_V4)) {
             applySchemaV4(connection);
             recordMigration(connection, SCHEMA_VERSION_V4, MIGRATION_NAME_SCHEMA_V4);
         }
-        if (!isVersionApplied(connection, SCHEMA_VERSION_V5)) {
-            schemaV5Migration.apply(connection);
-            recordMigration(connection, SCHEMA_VERSION_V5, MIGRATION_NAME_SCHEMA_V5);
+        if (targetVersion >= SCHEMA_VERSION_V5) {
+            if (!isVersionApplied(connection, SCHEMA_VERSION_V5)) {
+                schemaV5Migration.apply(connection);
+                recordMigration(connection, SCHEMA_VERSION_V5, MIGRATION_NAME_SCHEMA_V5);
+            } else {
+                // A pre-existing v5 marker may come from an earlier rollout order. Reapplying
+                // the idempotent DDL ensures every managed-coop table/index exists before v6.
+                schemaV5Migration.apply(connection);
+            }
+        }
+        if (targetVersion < SCHEMA_VERSION_V6) {
+            return;
+        }
+        if (!isVersionApplied(connection, SCHEMA_VERSION_V6)) {
+            applySchemaV6(connection);
+            recordMigration(connection, SCHEMA_VERSION_V6, MIGRATION_NAME_SCHEMA_V6);
         } else {
-            schemaV5Migration.reconcileLegacyData(connection);
+            reconcileSchemaV6Data(connection);
         }
     }
 
@@ -207,6 +230,184 @@ public final class SqliteSchemaMigrator {
         try (Statement statement = connection.createStatement()) {
             statement.execute("ALTER TABLE coop_slots ADD COLUMN state_snapshot_json TEXT");
         }
+    }
+
+    private void applySchemaV6(@Nonnull Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS companion_population_state (
+                        profile_id TEXT PRIMARY KEY,
+                        ownership_world_name TEXT,
+                        lifecycle_state TEXT NOT NULL,
+                        physical_world_name TEXT,
+                        physical_chunk_x INTEGER,
+                        physical_chunk_z INTEGER,
+                        revision INTEGER NOT NULL CHECK (revision >= 0),
+                        source TEXT,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE,
+                        CHECK ((physical_world_name IS NULL AND physical_chunk_x IS NULL AND physical_chunk_z IS NULL)
+                            OR (physical_world_name IS NOT NULL AND physical_chunk_x IS NOT NULL AND physical_chunk_z IS NOT NULL))
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_scope
+                    ON companion_population_state(ownership_world_name, lifecycle_state)
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_physical_chunk
+                    ON companion_population_state(physical_world_name, physical_chunk_x, physical_chunk_z, lifecycle_state)
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS companion_population_operations (
+                        operation_id TEXT PRIMARY KEY,
+                        profile_id TEXT NOT NULL,
+                        operation_type TEXT NOT NULL,
+                        state TEXT NOT NULL,
+                        expected_revision INTEGER NOT NULL CHECK (expected_revision >= 0),
+                        old_state_json TEXT NOT NULL,
+                        new_state_json TEXT NOT NULL,
+                        target_context_json TEXT,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        completed_at_ms INTEGER NOT NULL DEFAULT 0,
+                        last_error TEXT,
+                        FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_operations_state
+                    ON companion_population_operations(state, updated_at_ms)
+                    """);
+            statement.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_companion_population_nonterminal_profile
+                    ON companion_population_operations(profile_id)
+                    WHERE state IN ('PREPARED', 'APPLYING', 'APPLIED', 'COMPENSATING')
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS companion_population_reconciliation (
+                        coverage_key TEXT PRIMARY KEY,
+                        coverage_dimension TEXT NOT NULL,
+                        world_or_save_id TEXT,
+                        scan_generation TEXT NOT NULL,
+                        state TEXT NOT NULL,
+                        cursor_json TEXT,
+                        scanned_count INTEGER NOT NULL DEFAULT 0 CHECK (scanned_count >= 0),
+                        estimated_total INTEGER NOT NULL DEFAULT -1 CHECK (estimated_total >= -1),
+                        started_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        completed_at_ms INTEGER NOT NULL DEFAULT 0,
+                        last_error TEXT
+                    )
+                    """);
+            statement.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_companion_population_reconciliation_state
+                    ON companion_population_reconciliation(coverage_dimension, state, updated_at_ms)
+                    """);
+            createCompanionPopulationScanSessionTable(statement);
+            createCompanionPopulationEvidenceTable(statement);
+            statement.execute("""
+                    INSERT OR IGNORE INTO companion_population_state (
+                        profile_id, ownership_world_name, lifecycle_state,
+                        physical_world_name, physical_chunk_x, physical_chunk_z,
+                        revision, source, created_at_ms, updated_at_ms
+                    )
+                    SELECT
+                        p.profile_id,
+                        p.last_world_name,
+                        CASE
+                            WHEN COALESCE(s.capture_active, 0) = 1 THEN 'CAPTURED'
+                            WHEN COALESCE(s.death_active, 0) = 1 THEN 'DEAD_REVIVABLE'
+                            WHEN COALESCE(s.lost_active, 0) = 1 THEN 'LOST'
+                            WHEN COALESCE(s.in_coop, 0) = 1 THEN 'COOP'
+                            ELSE 'UNKNOWN_DORMANT'
+                        END,
+                        NULL, NULL, NULL,
+                        0,
+                        'schema_v6_legacy_backfill',
+                        p.created_at_ms,
+                        p.updated_at_ms
+                    FROM npc_profiles p
+                    LEFT JOIN profile_states s ON s.profile_id = p.profile_id
+                    """);
+        }
+    }
+
+    private void reconcileSchemaV6Data(@Nonnull Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            createCompanionPopulationScanSessionTable(statement);
+            createCompanionPopulationEvidenceTable(statement);
+            statement.execute("""
+                    INSERT OR IGNORE INTO companion_population_state (
+                        profile_id, ownership_world_name, lifecycle_state,
+                        physical_world_name, physical_chunk_x, physical_chunk_z,
+                        revision, source, created_at_ms, updated_at_ms
+                    )
+                    SELECT
+                        p.profile_id,
+                        p.last_world_name,
+                        CASE
+                            WHEN COALESCE(s.capture_active, 0) = 1 THEN 'CAPTURED'
+                            WHEN COALESCE(s.death_active, 0) = 1 THEN 'DEAD_REVIVABLE'
+                            WHEN COALESCE(s.lost_active, 0) = 1 THEN 'LOST'
+                            WHEN COALESCE(s.in_coop, 0) = 1 THEN 'COOP'
+                            ELSE 'UNKNOWN_DORMANT'
+                        END,
+                        NULL, NULL, NULL,
+                        0,
+                        'schema_v6_runtime_backfill',
+                        p.created_at_ms,
+                        p.updated_at_ms
+                    FROM npc_profiles p
+                    LEFT JOIN profile_states s ON s.profile_id = p.profile_id
+                    """);
+        }
+    }
+
+    private void createCompanionPopulationScanSessionTable(@Nonnull Statement statement) throws Exception {
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS companion_population_scan_session (
+                    singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+                    epoch TEXT NOT NULL CHECK (length(epoch) > 0),
+                    state TEXT NOT NULL CHECK (state IN ('ACTIVE', 'READY')),
+                    started_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    completed_at_ms INTEGER NOT NULL DEFAULT 0
+                )
+                """);
+    }
+
+    private void createCompanionPopulationEvidenceTable(@Nonnull Statement statement) throws Exception {
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS companion_population_reconciliation_evidence (
+                    coverage_key TEXT NOT NULL,
+                    scan_generation TEXT NOT NULL,
+                    evidence_key TEXT NOT NULL,
+                    npc_uuid TEXT NOT NULL,
+                    owner_uuid TEXT,
+                    evidence_kind TEXT NOT NULL,
+                    ownership_world_name TEXT,
+                    physical_world_name TEXT,
+                    physical_chunk_x INTEGER,
+                    physical_chunk_z INTEGER,
+                    source TEXT NOT NULL,
+                    observed_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (coverage_key, scan_generation, evidence_key),
+                    CHECK ((physical_world_name IS NULL AND physical_chunk_x IS NULL AND physical_chunk_z IS NULL)
+                        OR (physical_world_name IS NOT NULL AND physical_chunk_x IS NOT NULL AND physical_chunk_z IS NOT NULL))
+                )
+                """);
+        statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_companion_population_evidence_identity
+                ON companion_population_reconciliation_evidence(npc_uuid, scan_generation)
+                """);
+        statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_companion_population_evidence_source
+                ON companion_population_reconciliation_evidence(coverage_key, scan_generation)
+                """);
     }
 
     private boolean hasColumn(@Nonnull Connection connection,

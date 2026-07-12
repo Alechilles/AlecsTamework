@@ -185,7 +185,14 @@ final class CommandRelocationDispatchService {
         if (safePosition == null) {
             return;
         }
-        candidate.npc.moveTo(candidate.ref, safePosition.x, safePosition.y, safePosition.z, context.store);
+        World world = context.player == null ? null : context.player.getWorld();
+        UUID ownerUuid = context.player == null ? null : context.player.getUuid();
+        if (world != null && ownerUuid != null && candidate.npc.getUuid() != null) {
+            relocationService.queueRelocation(
+                    world, candidate.npc.getUuid(), safePosition, ownerUuid,
+                    true, true, null, null, 0L, new Vector3d(npcPos), null
+            );
+        }
     }
 
     private double resolvePositiveDouble(double configured, double fallback) {

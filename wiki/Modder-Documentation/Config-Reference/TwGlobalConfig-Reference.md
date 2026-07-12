@@ -20,7 +20,7 @@ Use `TwGlobalConfig` for:
 
 Do not use it for role-specific companion policy. That belongs in [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
 
-Population caps, ownership requirements/protection, revive enablement, SimpleClaims enablement/limits, and related high-impact server policy are owned by `/tw settings`. Legacy config keys are still decoded, but new examples and `/tw config` hide them.
+Population caps, ownership requirements/protection, revive enablement, claim-integration enablement/limits, and related high-impact server policy are owned by `/tw settings`. Legacy config keys are still decoded, but new examples and `/tw config` hide them.
 
 ## Asset Location and Resolution
 - Location: `<ModRoot>/Server/Tamework/Global/*.json`
@@ -95,9 +95,25 @@ These toggles opt bundled Tamework assets into the live game. Any loaded active 
 - `CarnivoreFeed`
 
 ### `SimpleClaims`
-SimpleClaims runtime policy is owned by `/tw settings`. `AllowDamagePermissionKey` remains config-owned so integrations can keep a stable permission contract.
+The namespace is retained for backward compatibility even when QuestLines Claims supplies population policy. Runtime master/provider/cap/protection policy is owned by `/tw settings`. `AllowDamagePermissionKey` remains config-owned so servers can keep a stable permission contract.
 
-- `Damage.AllowDamagePermissionKey`: SimpleClaims permission key that bypasses the damage restriction.
+- `Damage.AllowDamagePermissionKey`: Hytale server permission that bypasses SimpleClaims tamed-target damage restriction before native policy runs. The shipped default is `tamework.damage_tamed_claim_npc`.
+
+For the current compatibility release only, the same configured key is also checked through the old raw SimpleClaims claim-party permission route using the attacker's player UUID. A grant logs a throttled deprecation warning; migrate it to the Hytale server permission because the raw-party route is scheduled for removal in the next major release. This custom key is not SimpleClaims' native `simpleclaims.party.protection.tamed_damage` permission.
+
+### Settings-owned population and claim fields
+
+These legacy fields are still decoded but `/tw settings` is authoritative:
+
+- `Population.LimitPerPlayerOwnedTotal`: maximum canonical owned companion profiles per owner; `0` disables denial while tracking continues.
+- `Population.PerPlayerLimitScope`: `PerWorld` or `Global`. Dormant profiles retain their last authoritative ownership world.
+- `SimpleClaims.Provider`: `Auto`, `QuestLinesClaims`, `SimpleClaims`, or `Off`. Unknown nonblank values are invalid and do not silently become `Auto`.
+- `SimpleClaims.SimpleClaimsEnabled`: backward-compatible master claim-integration gate.
+- `SimpleClaims.Breeding.LimitPerClaimChunk` and `LimitPerClaimTotal`: claim placement-admission caps.
+- `SimpleClaims.Breeding.BreedingRequiresClaim`: applies only to breeding when no positive cap otherwise activates population policy.
+- `SimpleClaims.Damage.ProtectTamedFromNonMembers`: enables SimpleClaims native damage policy for eligible live tamed targets.
+
+`Auto` selects ready QuestLines Claims first. SimpleClaims is considered only if QuestLines Claims is absent or disabled; an installed but broken/incompatible QuestLines Claims causes active population admissions to fail closed. Explicit providers never fall back. Settings and plugin lifecycle changes affect the next operation without rewriting an in-flight reservation.
 
 ## Legacy Settings-Owned Fields Accepted
 Older packs may still contain ownership protection, ownership requirement, population, revive enablement, and SimpleClaims policy keys in `TwGlobalConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
@@ -158,6 +174,8 @@ Older packs may still contain ownership protection, ownership requirement, popul
 - `AssetSets` are global gates, not per-role toggles.
 - Explicit maps and arrays replace parent values. Do not expect append behavior.
 - Use `TwCompanionConfig` for role-scoped command distances and travel behavior. `TwGlobalConfig` is the shared infrastructure layer.
+- Claim caps gate explicit placement. They do not prevent natural companion movement across claim boundaries.
+- Population policy failures fail closed for positive admissions; SimpleClaims damage integration failures fail open.
 
 ## Related Pages
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
