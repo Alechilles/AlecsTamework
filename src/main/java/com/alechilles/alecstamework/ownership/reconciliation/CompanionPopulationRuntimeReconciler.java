@@ -29,6 +29,7 @@ public final class CompanionPopulationRuntimeReconciler
     private final PersistenceHealthService persistenceHealth;
     private final CompanionPopulationObservationPolicy observationPolicy;
     private final CompanionPopulationIndexReplayService indexReplay;
+    private final CompanionLiveEvidenceRevision liveEvidenceRevision;
     private final Object reloadLock = new Object();
     private final Map<String, CompanionPopulationObservation> observationsDuringReload = new HashMap<>();
     private final Map<String, CompanionPopulationObservation> deferredObservations = new HashMap<>();
@@ -42,7 +43,20 @@ public final class CompanionPopulationRuntimeReconciler
             @Nonnull PersistenceHealthService persistenceHealth
     ) {
         this(ownerIndex, claimIndex, identityResolver, writer, persistenceHealth,
-                new CompanionPopulationObservationPolicy(ownerIndex));
+                new CompanionPopulationObservationPolicy(ownerIndex),
+                new CompanionLiveEvidenceRevision());
+    }
+
+    public CompanionPopulationRuntimeReconciler(
+            @Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull CoalescedCompanionPopulationWriter writer,
+            @Nonnull PersistenceHealthService persistenceHealth,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision
+    ) {
+        this(ownerIndex, claimIndex, identityResolver, writer, persistenceHealth,
+                new CompanionPopulationObservationPolicy(ownerIndex), liveEvidenceRevision);
     }
 
     CompanionPopulationRuntimeReconciler(
@@ -53,12 +67,27 @@ public final class CompanionPopulationRuntimeReconciler
             @Nonnull PersistenceHealthService persistenceHealth,
             @Nonnull CompanionPopulationObservationPolicy observationPolicy
     ) {
+        this(ownerIndex, claimIndex, identityResolver, writer, persistenceHealth,
+                observationPolicy, new CompanionLiveEvidenceRevision());
+    }
+
+    CompanionPopulationRuntimeReconciler(
+            @Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull CoalescedCompanionPopulationWriter writer,
+            @Nonnull PersistenceHealthService persistenceHealth,
+            @Nonnull CompanionPopulationObservationPolicy observationPolicy,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision
+    ) {
         this.ownerIndex = Objects.requireNonNull(ownerIndex, "ownerIndex");
         this.claimIndex = Objects.requireNonNull(claimIndex, "claimIndex");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
         this.writer = Objects.requireNonNull(writer, "writer");
         this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
         this.observationPolicy = Objects.requireNonNull(observationPolicy, "observationPolicy");
+        this.liveEvidenceRevision = Objects.requireNonNull(
+                liveEvidenceRevision, "liveEvidenceRevision");
         this.indexReplay = new CompanionPopulationIndexReplayService(ownerIndex, claimIndex);
     }
 
@@ -173,6 +202,9 @@ public final class CompanionPopulationRuntimeReconciler
                     deferInFlight,
                     ownerComponentRemoval
             );
+        }
+        if (result.outcome() != ObservationOutcome.NO_CHANGE) {
+            liveEvidenceRevision.advance();
         }
         if (result.observation() != null) {
             queueObservation(result.observation());

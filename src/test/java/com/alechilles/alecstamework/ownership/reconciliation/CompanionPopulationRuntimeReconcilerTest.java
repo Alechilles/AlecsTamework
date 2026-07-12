@@ -29,6 +29,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPopulationRuntimeReconcilerTest {
     @Test
+    void semanticNpcChangesAdvanceLiveEvidenceButPeriodicUnchangedObservationsDoNot() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(npcUuid, ownerUuid)) {
+            long baseline = harness.liveEvidence.capture();
+
+            assertEquals(
+                    CompanionPopulationRuntimeReconciler.ObservationOutcome.NO_CHANGE,
+                    harness.reconciler.observePhysical(
+                            npcUuid, ownerUuid, "default", 0, 0,
+                            CompanionLifecycleState.ACTIVE, "periodic-unchanged"));
+            assertTrue(harness.liveEvidence.isCurrent(baseline));
+
+            assertEquals(
+                    CompanionPopulationRuntimeReconciler.ObservationOutcome.UPDATED,
+                    harness.reconciler.observePhysical(
+                            npcUuid, ownerUuid, "default", 1, 0,
+                            CompanionLifecycleState.ACTIVE, "semantic-move"));
+            assertFalse(harness.liveEvidence.isCurrent(baseline));
+        }
+    }
+
+    @Test
     void naturalMovementUpdatesClaimOccupancyImmediatelyEvenWhileReconciliationIsNotReady() {
         UUID npcUuid = UUID.randomUUID();
         UUID ownerUuid = UUID.randomUUID();
@@ -471,23 +494,26 @@ class CompanionPopulationRuntimeReconcilerTest {
                         ),
                         System::currentTimeMillis
                 );
+        CompanionLiveEvidenceRevision liveEvidence = new CompanionLiveEvidenceRevision();
         CompanionPopulationRuntimeReconciler reconciler = new CompanionPopulationRuntimeReconciler(
                 ownerIndex,
                 claimIndex,
                 identities,
                 writer,
                 new PersistenceHealthService(),
-                observationPolicy
+                observationPolicy,
+                liveEvidence
         );
         writer.setListener(reconciler);
-        return new Harness(profileId, ownerIndex, claimIndex, writer, reconciler);
+        return new Harness(profileId, ownerIndex, claimIndex, writer, reconciler, liveEvidence);
     }
 
     private record Harness(String profileId,
                            OwnerPopulationIndex ownerIndex,
                            ClaimOccupancyIndex claimIndex,
                            CoalescedCompanionPopulationWriter writer,
-                           CompanionPopulationRuntimeReconciler reconciler) implements AutoCloseable {
+                           CompanionPopulationRuntimeReconciler reconciler,
+                           CompanionLiveEvidenceRevision liveEvidence) implements AutoCloseable {
         @Override
         public void close() {
             writer.close();

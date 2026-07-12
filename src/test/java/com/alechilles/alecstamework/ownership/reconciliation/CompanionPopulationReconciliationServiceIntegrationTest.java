@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership.reconciliation;
 
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
+import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
@@ -66,6 +67,10 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
             assertEquals(4, result.profileCount());
             assertEquals(1, result.duplicateObservations());
             assertEquals(
+                    CompanionPersistedProjectionEvidenceRegistry.State.SEALED,
+                    harness.projections().snapshot().state()
+            );
+            assertEquals(
                     CompanionPopulationScanSessionRepository.State.READY,
                     harness.persistence().getCompanionPopulationScanSessionRepository()
                             .loadCurrent().state()
@@ -115,7 +120,22 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
         );
 
         try (Harness harness = Harness.open(tempDir.resolve("unknown-world"), catalog)) {
-            CompanionPopulationReconciliationService.Result reconciliation = harness.reconcile(2);
+            CompanionPopulationReconciliationService.Result staged =
+                    harness.reconcileBeforeFinalReload(2);
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.GLOBAL_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.RECONCILING
+            );
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.RECONCILING
+            );
+
+            CompanionPopulationReconciliationService.Result reconciliation = harness.service()
+                    .completePartialAfterCanonicalReloadAsync(staged)
+                    .get(10L, TimeUnit.SECONDS);
             assertEquals(
                     CompanionPopulationReconciliationService.Status.RECONCILING,
                     reconciliation.status()
@@ -130,6 +150,11 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                     harness,
                     CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
                     CompanionPopulationCoverageRecord.State.RECONCILING
+            );
+            assertEquals(
+                    CompanionPopulationScanSessionRepository.State.ACTIVE,
+                    harness.persistence().getCompanionPopulationScanSessionRepository()
+                            .loadCurrent().state()
             );
 
             Projection projection = harness.bootstrap();
@@ -176,6 +201,210 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
             assertTrue(release.allowed());
             assertFalse(release.positiveDelta());
             assertTrue(index.cancel(release.reservation()));
+        }
+    }
+
+    @Test
+    void fullReadinessRemainsStagedUntilTheFinalFence() throws Exception {
+        CompanionPopulationReconciliationCatalog catalog = sealedCatalog(
+                List.of(), List.of(), List.of(), List.of(), List.of()
+        );
+        try (Harness harness = Harness.open(tempDir.resolve("staged-ready"), catalog)) {
+            CompanionPopulationReconciliationService.Result staged =
+                    harness.reconcileBeforeFinalReload(1);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.READY, staged.status());
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.GLOBAL_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.RECONCILING
+            );
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.RECONCILING
+            );
+
+            CompanionPopulationReconciliationService.Result ready = harness.service()
+                    .completeAfterCanonicalReloadAsync(staged)
+                    .get(10L, TimeUnit.SECONDS);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.READY, ready.status());
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.GLOBAL_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.READY
+            );
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.READY
+            );
+        }
+    }
+
+    @Test
+    void loadedIdentityMovementDuringSavedScanCannotPublishAuthoritativeAbsence() throws Exception {
+        LoadedNpcIdentityIndex identities = new LoadedNpcIdentityIndex();
+        identities.markInitializationComplete();
+        CompanionPopulationEvidenceSource movingWorldSource = new CompanionPopulationEvidenceSource() {
+            private final Descriptor descriptor = new Descriptor(
+                    "moving-world",
+                    CompanionPopulationCoverageRecord.Dimension.WORLD_ENTITIES,
+                    "alpha",
+                    "generation-moving-world",
+                    1L
+            );
+
+            @Override
+            public Descriptor descriptor() {
+                return descriptor;
+            }
+
+            @Override
+            public CompletableFuture<Batch> scan(long offset, int maxUnits) {
+                identities.recordAdded(
+                        UUID.fromString("00000000-0000-0000-0000-000000000899"),
+                        new LoadedNpcIdentityIndex.Location("alpha", "store-alpha")
+                );
+                return CompletableFuture.completedFuture(new Batch(
+                        List.of(), 1L, 1L, true
+                ));
+            }
+        };
+        CompanionPopulationReconciliationCatalog catalog = new CompanionPopulationReconciliationCatalog(
+                List.of(
+                        source("profiles", CompanionPopulationCoverageRecord.Dimension.PROFILE_STATE,
+                                List.of()),
+                        movingWorldSource,
+                        source("players", CompanionPopulationCoverageRecord.Dimension.PLAYER_SAVES,
+                                List.of()),
+                        source("base", CompanionPopulationCoverageRecord.Dimension.BASE_CONTAINER_BLOCKS,
+                                List.of())
+                ),
+                true,
+                true,
+                true,
+                true,
+                new CustomContainerReconciliationRegistry.Snapshot(
+                        List.of(source(
+                                "custom",
+                                CompanionPopulationCoverageRecord.Dimension.CUSTOM_CONTAINERS,
+                                List.of()
+                        )),
+                        true,
+                        "all custom containers",
+                        "custom-generation"
+                )
+        );
+
+        try (Harness harness = Harness.open(
+                tempDir.resolve("loaded-movement"), catalog, identities
+        )) {
+            CompanionPopulationReconciliationService.Result result = harness.reconcile(1);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.DEGRADED, result.status());
+            assertEquals("reconciliation-loaded-identity-mutated-during-scan", result.reason());
+            assertEquals(
+                    CompanionPersistedProjectionEvidenceRegistry.State.DEGRADED,
+                    harness.projections().snapshot().state()
+            );
+            assertEquals(
+                    CompanionPopulationScanSessionRepository.State.ACTIVE,
+                    harness.persistence().getCompanionPopulationScanSessionRepository()
+                            .loadCurrent().state()
+            );
+        }
+    }
+
+    @Test
+    void finalReloadDegradationLeavesEvidenceAndSessionUnsealed() throws Exception {
+        CompanionPopulationReconciliationCatalog catalog = sealedCatalog(
+                List.of(), List.of(), List.of(), List.of(), List.of()
+        );
+        try (Harness harness = Harness.open(tempDir.resolve("final-reload-degraded"), catalog)) {
+            CompanionPopulationReconciliationService.Result staged =
+                    harness.reconcileBeforeFinalReload(1);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.READY, staged.status());
+            assertEquals(
+                    CompanionPersistedProjectionEvidenceRegistry.State.SCANNING,
+                    harness.projections().snapshot().state()
+            );
+            assertEquals(
+                    CompanionPopulationScanSessionRepository.State.ACTIVE,
+                    harness.persistence().getCompanionPopulationScanSessionRepository()
+                            .loadCurrent().state()
+            );
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.GLOBAL_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.RECONCILING
+            );
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.RECONCILING
+            );
+
+            CompanionPopulationReconciliationService.Result rejected =
+                    harness.service().rejectAfterCanonicalReloadAsync(
+                            staged,
+                            "reconciliation-final-index-degraded"
+                    ).get(10L, TimeUnit.SECONDS);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.DEGRADED, rejected.status());
+            assertEquals(
+                    CompanionPersistedProjectionEvidenceRegistry.State.DEGRADED,
+                    harness.projections().snapshot().state()
+            );
+            assertEquals(
+                    CompanionPopulationScanSessionRepository.State.ACTIVE,
+                    harness.persistence().getCompanionPopulationScanSessionRepository()
+                            .loadCurrent().state()
+            );
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.GLOBAL_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.DEGRADED
+            );
+            assertCoverage(
+                    harness,
+                    CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.DEGRADED
+            );
+        }
+    }
+
+    @Test
+    void liveEvidenceMutationBeforeFinalSealLeavesSessionActive() throws Exception {
+        CompanionPopulationReconciliationCatalog catalog = sealedCatalog(
+                List.of(), List.of(), List.of(), List.of(), List.of()
+        );
+        try (Harness harness = Harness.open(tempDir.resolve("final-live-mutation"), catalog)) {
+            CompanionPopulationReconciliationService.Result staged =
+                    harness.reconcileBeforeFinalReload(1);
+            assertEquals(CompanionPopulationReconciliationService.Status.READY, staged.status());
+
+            harness.liveEvidenceRevision().advance();
+            CompanionPopulationReconciliationService.Result rejected = harness.service()
+                    .completeAfterCanonicalReloadAsync(staged)
+                    .get(10L, TimeUnit.SECONDS);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.DEGRADED, rejected.status());
+            assertEquals(
+                    "reconciliation-live-evidence-mutated-during-final-reload",
+                    rejected.reason()
+            );
+            assertEquals(
+                    CompanionPersistedProjectionEvidenceRegistry.State.DEGRADED,
+                    harness.projections().snapshot().state()
+            );
+            assertEquals(
+                    CompanionPopulationScanSessionRepository.State.ACTIVE,
+                    harness.persistence().getCompanionPopulationScanSessionRepository()
+                            .loadCurrent().state()
+            );
         }
     }
 
@@ -350,11 +579,24 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
 
     private record Harness(
             TameworkPersistenceRuntime persistence,
-            CompanionPopulationReconciliationService service
+            CompanionPopulationReconciliationService service,
+            LoadedNpcIdentityIndex identities,
+            CompanionPersistedProjectionEvidenceRegistry projections,
+            CompanionLiveEvidenceRevision liveEvidenceRevision
     ) implements AutoCloseable {
         static Harness open(
                 Path path,
                 CompanionPopulationReconciliationCatalog catalog
+        ) throws Exception {
+            LoadedNpcIdentityIndex identities = new LoadedNpcIdentityIndex();
+            identities.markInitializationComplete();
+            return open(path, catalog, identities);
+        }
+
+        static Harness open(
+                Path path,
+                CompanionPopulationReconciliationCatalog catalog,
+                LoadedNpcIdentityIndex identities
         ) throws Exception {
             TameworkPersistenceRuntime persistence = TameworkPersistenceRuntime.initialize(path, null);
             CompanionPopulationScanSessionRepository sessions =
@@ -365,6 +607,13 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                 persistence.close();
                 throw new IllegalStateException("Unable to acquire reconciliation scan session.");
             }
+            CompanionPersistedProjectionEvidenceRegistry projections =
+                    new CompanionPersistedProjectionEvidenceRegistry();
+            projections.bindLoadedIdentityIndex(identities);
+            CompanionLiveEvidenceRevision liveEvidenceRevision =
+                    new CompanionLiveEvidenceRevision();
+            projections.bindLiveEvidenceRevision(liveEvidenceRevision);
+            projections.begin(acquired.value().epoch());
             CompanionPopulationReconciliationService service =
                     new CompanionPopulationReconciliationService(
                             catalog,
@@ -373,13 +622,29 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                             persistence.getCompanionPopulationRepairRepository(),
                             sessions,
                             acquired.value().epoch(),
+                            identities,
+                            projections,
+                            liveEvidenceRevision,
                             (descriptor, offset) -> {
                             }
                     );
-            return new Harness(persistence, service);
+            return new Harness(
+                    persistence, service, identities, projections, liveEvidenceRevision
+            );
         }
 
         CompanionPopulationReconciliationService.Result reconcile(int batchSize) throws Exception {
+            CompanionPopulationReconciliationService.Result staged =
+                    reconcileBeforeFinalReload(batchSize);
+            return staged.status() == CompanionPopulationReconciliationService.Status.READY
+                    ? service.completeAfterCanonicalReloadAsync(staged)
+                            .get(10L, TimeUnit.SECONDS)
+                    : staged;
+        }
+
+        CompanionPopulationReconciliationService.Result reconcileBeforeFinalReload(
+                int batchSize
+        ) throws Exception {
             return service.reconcileFullyAsync(batchSize).get(10L, TimeUnit.SECONDS);
         }
 

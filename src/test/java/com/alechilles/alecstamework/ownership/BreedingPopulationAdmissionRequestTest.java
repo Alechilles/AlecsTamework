@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimIntegrationProvider;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
 import com.alechilles.alecstamework.integration.claims.ClaimPolicyContext;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderGeneration;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderState;
@@ -10,6 +12,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,7 +47,7 @@ class BreedingPopulationAdmissionRequestTest {
                         request,
                         1,
                         new ClaimChunkCoordinate("world-a", 4, 7),
-                        policy()
+                        policy(), freshBaselineResolver(), false
                 );
 
         JsonObject target = JsonParser.parseString(
@@ -77,7 +80,7 @@ class BreedingPopulationAdmissionRequestTest {
                         request,
                         1,
                         new ClaimChunkCoordinate("world-a", 4, 7),
-                        policy()
+                        policy(), freshBaselineResolver(), false
                 );
         JsonObject target = JsonParser.parseString(
                 prepared.units().get(0).ownerPlan().targetContextJson()
@@ -86,6 +89,44 @@ class BreedingPopulationAdmissionRequestTest {
         assertFalse(request.hasCanonicalParentPair());
         assertFalse(target.has("parentProfileIds"));
         assertEquals("world-a", target.get("world").getAsString());
+    }
+
+    @Test
+    void exactReplayBuildsFromTheRetainedRevisionZeroBaseline() {
+        BreedingPopulationAdmissionRequest request = request(List.of("parent-a", "parent-z"));
+        ClaimChunkCoordinate destination = new ClaimChunkCoordinate("world-a", 4, 7);
+        String profileId = BreedingAdmissionIdentity.profileId(
+                request.idempotencyKey(), "child-0"
+        );
+        UUID plannedNpcUuid = BreedingAdmissionIdentity.npcUuid(
+                request.idempotencyKey(), "child-0"
+        );
+        OwnerPopulationEntry owner = new OwnerPopulationEntry(
+                profileId, null, "world-a", CompanionLifecycleState.ACTIVE, 0L
+        );
+        ClaimOccupancyEntry claim = new ClaimOccupancyEntry(
+                profileId, null, CompanionLifecycleState.ACTIVE, destination, 0L
+        );
+        OwnerPopulationIndex owners = new OwnerPopulationIndex();
+        ClaimOccupancyIndex claims = new ClaimOccupancyIndex();
+        CompanionIdentityResolver identities = new CompanionIdentityResolver();
+        owners.reconcileCommittedEntry(owner);
+        claims.reconcileCommittedEntry(claim);
+        identities.remap(profileId, null, plannedNpcUuid);
+
+        BreedingPopulationAdmissionUnitFactory.PreparedUnits prepared =
+                new BreedingPopulationAdmissionUnitFactory().build(
+                        request, 1, destination, policy(),
+                        new BreedingPopulationRetryBaselineResolver(owners, claims, identities),
+                        true
+                );
+
+        CompanionPopulationAdmissionUnit unit = prepared.units().get(0);
+        assertEquals(0L, unit.ownerPlan().transition().expectedRevision());
+        assertEquals(0L, unit.ownerPlan().baselineState().revision());
+        assertEquals("breeding_retry", unit.ownerPlan().source());
+        assertEquals(claim, unit.claimRequest().transitions().get(0).expected());
+        assertEquals(1L, unit.claimRequest().transitions().get(0).proposed().revision());
     }
 
     private static BreedingPopulationAdmissionRequest request(List<String> parentProfileIds) {
@@ -149,6 +190,14 @@ class BreedingPopulationAdmissionRequestTest {
                 0,
                 false,
                 claimContext
+        );
+    }
+
+    private static BreedingPopulationRetryBaselineResolver freshBaselineResolver() {
+        return new BreedingPopulationRetryBaselineResolver(
+                new OwnerPopulationIndex(),
+                new ClaimOccupancyIndex(),
+                new CompanionIdentityResolver()
         );
     }
 }

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.ownership.CompanionSpawnSourceFinalizationContext;
@@ -9,10 +10,7 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateR
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
 import com.alechilles.alecstamework.persistence.sqlite.ProfileOwnerMutation;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +21,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionOperationProjectionExpectationResolver.booleanValue;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionOperationProjectionExpectationResolver.firstNonBlank;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionOperationProjectionExpectationResolver.nullableString;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionOperationProjectionExpectationResolver.parseObject;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionOperationProjectionExpectationResolver.parseOwner;
 
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRecoveryDecisionService.Context;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRecoveryDecisionService.Decision;
@@ -35,23 +39,33 @@ import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulation
  */
 public final class CompanionPopulationOperationRecoveryService {
     private final CompanionPopulationRepository repository;
-
     public CompanionPopulationOperationRecoveryService(@Nonnull CompanionPopulationRepository repository) {
         this.repository = Objects.requireNonNull(repository, "repository");
     }
-
     @Nonnull
     public CompletableFuture<RecoveryResult> recoverAsync(
             @Nonnull List<CompanionPopulationOperationRecord> operations,
-            @Nonnull CompanionPopulationEvidenceSet evidenceSet
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet) {
+        return recoverAsync(operations, evidenceSet,
+                new LoadedNpcIdentitySnapshot(0L, true, List.of()));
+    }
+    /** Recovers against one complete loaded-identity snapshot from the saved-scan fence. */
+    @Nonnull
+    public CompletableFuture<RecoveryResult> recoverAsync(
+            @Nonnull List<CompanionPopulationOperationRecord> operations,
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet,
+            @Nonnull LoadedNpcIdentitySnapshot loadedIdentities
     ) {
         Objects.requireNonNull(operations, "operations");
         Objects.requireNonNull(evidenceSet, "evidenceSet");
+        Objects.requireNonNull(loadedIdentities, "loadedIdentities");
         return loadBaselines().thenCompose(baselines -> {
-            MutableResult result = new MutableResult();
+            CompanionPopulationRecoveryAccumulator result =
+                    new CompanionPopulationRecoveryAccumulator();
             return recoverNext(
                     List.copyOf(operations),
-                    evidenceSet.byNpcUuid(),
+                    evidenceSet,
+                    loadedIdentities,
                     baselines,
                     0,
                     result
@@ -77,27 +91,46 @@ public final class CompanionPopulationOperationRecoveryService {
     @Nonnull
     private CompletableFuture<Void> recoverNext(
             @Nonnull List<CompanionPopulationOperationRecord> operations,
-            @Nonnull Map<UUID, CompanionPopulationEvidenceSet.ResolvedEvidence> evidence,
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet,
+            @Nonnull LoadedNpcIdentitySnapshot loadedIdentities,
             @Nonnull Map<String, CompanionPopulationStateRecord> baselines,
             int index,
-            @Nonnull MutableResult result
+            @Nonnull CompanionPopulationRecoveryAccumulator result
     ) {
         if (index >= operations.size()) {
             return CompletableFuture.completedFuture(null);
         }
         CompanionPopulationOperationRecord operation = operations.get(index);
-        return recoverOne(operation, evidence, baselines.get(operation.profileId()), result)
-                .thenCompose(ignored -> recoverNext(operations, evidence, baselines, index + 1, result));
+        return recoverOne(operation, evidenceSet, loadedIdentities,
+                baselines.get(operation.profileId()), result).thenCompose(ignored -> recoverNext(
+                        operations, evidenceSet, loadedIdentities, baselines, index + 1, result));
     }
 
     @Nonnull
     private CompletableFuture<Void> recoverOne(
             @Nonnull CompanionPopulationOperationRecord operation,
-            @Nonnull Map<UUID, CompanionPopulationEvidenceSet.ResolvedEvidence> evidence,
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet,
+            @Nonnull LoadedNpcIdentitySnapshot loadedIdentities,
             @Nullable CompanionPopulationStateRecord baseline,
-            @Nonnull MutableResult result
+            @Nonnull CompanionPopulationRecoveryAccumulator result
     ) {
-        if (operation.state() == CompanionPopulationOperationRecord.State.PREPARED) {
+        CompanionOperationProjectionExpectationResolver.Resolution projection =
+                CompanionOperationProjectionExpectationResolver.resolve(
+                        operation, evidenceSet, loadedIdentities
+                );
+        if (projection.ambiguityReason() != null) {
+            result.ambiguous(operation, projection.ambiguityReason());
+            return CompletableFuture.completedFuture(null);
+        }
+        if (operation.state() == CompanionPopulationOperationRecord.State.PREPARED
+                && projection.exactEvidence() == null) {
+            if (OwnerPopulationOperation.BREEDING.name().equalsIgnoreCase(
+                    operation.operationType()
+            )) {
+                return retryOperation(
+                        operation, "startup-recovery-breeding-prepared-retryable", result
+                );
+            }
             return failOperation(operation, "startup-recovery-prepared-not-applied", result);
         }
         CompanionSpawnSourceFinalizationContext.Descriptor sourceFinalization;
@@ -126,17 +159,30 @@ public final class CompanionPopulationOperationRecoveryService {
             return CompletableFuture.completedFuture(null);
         }
 
-        ObservedState observed = observedState(evidence.get(parsed.npcUuid()));
+        Map<UUID, CompanionPopulationEvidenceSet.ResolvedEvidence> evidence = evidenceSet.byNpcUuid();
+        ObservedState observed = observedState(projection.exactEvidence() != null
+                ? projection.exactEvidence() : evidence.get(parsed.npcUuid()));
         ObservedState previousObserved = parsed.previousNpcUuid() == null
                 || parsed.previousNpcUuid().equals(parsed.npcUuid())
                 ? null
                 : observedState(evidence.get(parsed.previousNpcUuid()));
         Decision decision = CompanionPopulationRecoveryDecisionService.decide(
-                operation.state(), parsed.decisionContext(), observed, previousObserved
+                operation.state() == CompanionPopulationOperationRecord.State.PREPARED
+                        ? CompanionPopulationOperationRecord.State.APPLYING : operation.state(),
+                parsed.decisionContext(), observed, previousObserved
         );
+        if (projection.exactEvidence() != null
+                && decision.outcome() != CompanionPopulationRecoveryDecisionService.Outcome.COMMIT
+                && decision.outcome() != CompanionPopulationRecoveryDecisionService.Outcome.AMBIGUOUS) {
+            result.ambiguous(operation, "operation-recovery-projection-target-state-mismatch");
+            return CompletableFuture.completedFuture(null);
+        }
         return switch (decision.outcome()) {
-            case COMMIT -> commitOperation(operation, parsed, observed, result);
+            case COMMIT -> operation.state() == CompanionPopulationOperationRecord.State.PREPARED
+                    ? commitPreparedProjection(operation, parsed, observed, result)
+                    : commitOperation(operation, parsed, observed, result);
             case CLOSE -> failOperation(operation, decision.reason(), result);
+            case RETRY -> retryOperation(operation, decision.reason(), result);
             case AMBIGUOUS -> {
                 result.ambiguous(operation, decision.reason());
                 yield CompletableFuture.completedFuture(null);
@@ -145,11 +191,57 @@ public final class CompanionPopulationOperationRecoveryService {
     }
 
     @Nonnull
+    private CompletableFuture<Void> commitPreparedProjection(
+            @Nonnull CompanionPopulationOperationRecord operation,
+            @Nonnull ParsedOperation parsed,
+            @Nullable ObservedState observed,
+            @Nonnull CompanionPopulationRecoveryAccumulator result
+    ) {
+        PersistenceWriteQueue.WriteSubmission<Boolean> submission = repository.advanceOperationAsync(
+                operation.operationId(), CompanionPopulationOperationRecord.State.PREPARED,
+                CompanionPopulationOperationRecord.State.APPLYING,
+                "startup-recovery-projection-observed"
+        );
+        return submission.completion().thenCompose(outcome -> {
+            if (outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())) {
+                return commitOperation(operation, parsed, observed, result);
+            }
+            result.ambiguous(operation, "operation-recovery-projection-apply-transition-failed");
+            return CompletableFuture.completedFuture(null);
+        });
+    }
+    @Nonnull
+    private CompletableFuture<Void> retryOperation(
+            @Nonnull CompanionPopulationOperationRecord operation,
+            @Nonnull String reason,
+            @Nonnull CompanionPopulationRecoveryAccumulator result
+    ) {
+        if (!OwnerPopulationOperation.BREEDING.name().equalsIgnoreCase(
+                operation.operationType()
+        )) {
+            result.ambiguous(operation, "operation-recovery-retryable-kind-invalid");
+            return CompletableFuture.completedFuture(null);
+        }
+        PersistenceWriteQueue.WriteSubmission<Boolean> submission = repository.advanceOperationAsync(
+                operation.operationId(),
+                operation.state(),
+                CompanionPopulationOperationRecord.State.RETRYABLE,
+                reason
+        );
+        return submission.completion().thenAccept(outcome -> {
+            if (outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())) {
+                result.retryable();
+            } else {
+                result.ambiguous(operation, "operation-recovery-retryable-close-failed");
+            }
+        });
+    }
+    @Nonnull
     private CompletableFuture<Void> commitOperation(
             @Nonnull CompanionPopulationOperationRecord operation,
             @Nonnull ParsedOperation parsed,
             @Nullable ObservedState observed,
-            @Nonnull MutableResult result
+            @Nonnull CompanionPopulationRecoveryAccumulator result
     ) {
         boolean permanentRelease = parsed.permanentRelease();
         String ownershipWorld = parsed.newState().worldSpecified()
@@ -178,7 +270,7 @@ public final class CompanionPopulationOperationRecoveryService {
                     && value.status() == PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING) {
                 result.ambiguous(operation, "operation-recovery-source-finalization-pending");
             } else if (outcome.isCommitted() && value != null && value.isSuccess()) {
-                result.committed++;
+                result.committed();
             } else {
                 result.ambiguous(operation, "operation-recovery-commit-failed");
             }
@@ -189,7 +281,7 @@ public final class CompanionPopulationOperationRecoveryService {
     private CompletableFuture<Void> failOperation(
             @Nonnull CompanionPopulationOperationRecord operation,
             @Nonnull String reason,
-            @Nonnull MutableResult result
+            @Nonnull CompanionPopulationRecoveryAccumulator result
     ) {
         PersistenceWriteQueue.WriteSubmission<Boolean> submission = repository.advanceOperationAsync(
                 operation.operationId(),
@@ -199,7 +291,7 @@ public final class CompanionPopulationOperationRecoveryService {
         );
         return submission.completion().thenAccept(outcome -> {
             if (outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())) {
-                result.canceled++;
+                result.canceled();
             } else {
                 result.ambiguous(operation, "operation-recovery-close-failed");
             }
@@ -306,6 +398,9 @@ public final class CompanionPopulationOperationRecoveryService {
             case LOST_SNAPSHOT -> CompanionLifecycleState.LOST;
             case COOP_SNAPSHOT -> CompanionLifecycleState.COOP;
             case PROFILE_RECORD -> throw new IllegalStateException("Profile rows are not apply evidence.");
+            case PROJECTION_MARKER -> throw new IllegalStateException(
+                    "Projection markers are not apply evidence."
+            );
         };
         CompanionPopulationEvidenceSet.PhysicalLocation physical = evidence.physicalLocation();
         return new ObservedState(
@@ -318,27 +413,6 @@ public final class CompanionPopulationOperationRecoveryService {
                 physical == null ? null : physical.chunkX(),
                 physical == null ? null : physical.chunkZ()
         );
-    }
-
-    @Nullable
-    private static UUID parseOwner(@Nonnull JsonObject object) {
-        if (!object.has("ownerUuid") && !object.has("owner")) {
-            throw new IllegalArgumentException("Missing population operation owner state.");
-        }
-        JsonElement value = object.has("ownerUuid") ? object.get("ownerUuid") : object.get("owner");
-        if (value == null || value.isJsonNull()) {
-            return null;
-        }
-        String raw = value.getAsString();
-        return raw == null || raw.isBlank() ? null : UUID.fromString(raw);
-    }
-
-    @Nonnull
-    private static JsonObject parseObject(@Nullable String json) {
-        if (json == null || json.isBlank()) {
-            throw new IllegalArgumentException("Missing population operation JSON.");
-        }
-        return JsonParser.parseString(json).getAsJsonObject();
     }
 
     @Nullable
@@ -355,28 +429,6 @@ public final class CompanionPopulationOperationRecoveryService {
                 context.get("chunkX").getAsInt(),
                 context.get("chunkZ").getAsInt()
         );
-    }
-
-    @Nullable
-    private static String nullableString(@Nonnull JsonObject object, @Nonnull String field) {
-        JsonElement value = object.get(field);
-        if (value == null || value.isJsonNull()) {
-            return null;
-        }
-        String raw = value.getAsString();
-        return raw == null || raw.isBlank() ? null : raw.trim();
-    }
-
-    private static boolean booleanValue(@Nonnull JsonObject object, @Nonnull String field) {
-        JsonElement value = object.get(field);
-        if (value == null) {
-            return false;
-        }
-        if (value.isJsonNull() || !value.isJsonPrimitive()
-                || !value.getAsJsonPrimitive().isBoolean()) {
-            throw new IllegalArgumentException("Invalid operation context boolean: " + field);
-        }
-        return value.getAsBoolean();
     }
 
     private static void validatePermanentRelease(boolean permanentRelease,
@@ -407,15 +459,8 @@ public final class CompanionPopulationOperationRecoveryService {
         return newOwner == null ? ProfileOwnerMutation.clear() : ProfileOwnerMutation.set(newOwner);
     }
 
-    @Nullable
-    private static String firstNonBlank(@Nullable String first, @Nullable String second) {
-        if (first != null && !first.isBlank()) {
-            return first.trim();
-        }
-        return second == null || second.isBlank() ? null : second.trim();
-    }
-
     public record RecoveryResult(int committed,
+                                 int retryable,
                                  int canceled,
                                  @Nonnull List<AmbiguousOperation> ambiguous) {
         public boolean complete() {
@@ -452,19 +497,4 @@ public final class CompanionPopulationOperationRecoveryService {
         }
     }
 
-    private static final class MutableResult {
-        private final List<AmbiguousOperation> ambiguous = new ArrayList<>();
-        private int committed;
-        private int canceled;
-
-        private void ambiguous(@Nonnull CompanionPopulationOperationRecord operation,
-                               @Nonnull String reason) {
-            ambiguous.add(new AmbiguousOperation(operation.operationId(), operation.profileId(), reason));
-        }
-
-        @Nonnull
-        private RecoveryResult freeze() {
-            return new RecoveryResult(committed, canceled, List.copyOf(ambiguous));
-        }
-    }
 }

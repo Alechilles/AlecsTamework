@@ -407,6 +407,58 @@ class ManagedCoopReleaseRuntimeAdapterTest {
         assertEquals(1, presentations.get());
     }
 
+    @Test
+    void alternateMarkerEvidenceRemainsAmbiguousAcrossRestartAndNeverSpawns()
+            throws Exception {
+        Bundle bundle = bundle("coop-a");
+        PopulationBackend backend = new PopulationBackend();
+        ManagedCoopReleasePopulationCoordinator populations =
+                new ManagedCoopReleasePopulationCoordinator(
+                        new CoopResidentStateSnapshotCodec(), backend,
+                        (operationId, generation, reason, nowMs) ->
+                                CompletableFuture.completedFuture(
+                                        new MutationResult(
+                                                MutationStatus.APPLIED, null, null)),
+                        () -> 400L);
+        var prepared = populations.prepareAsync(
+                bundle.claim(), bundle.resident(), "world", 0, 0).join().prepared();
+        AtomicInteger spawnCalls = new AtomicInteger();
+        ManagedCoopReleaseProjectionSpawner populationSpawner =
+                new ManagedCoopReleaseProjectionSpawner(
+                        new CoopResidentStateRestorer(),
+                        (request, installer) -> {
+                            spawnCalls.incrementAndGet();
+                            return ManagedCoopReleaseProjectionSpawner.GatewayResult.failed(
+                                    ManagedCoopReleaseProjectionSpawner.Status.SPAWN_FAILED,
+                                    "must_not_spawn");
+                        });
+
+        for (int restart = 0; restart < 2; restart++) {
+            ManagedCoopReleaseRuntimeAdapter adapter =
+                    new ManagedCoopReleaseRuntimeAdapter(
+                            new CoopResidentStateSnapshotCodec(),
+                            new PlannedNpcProjectionSpawner(),
+                            populationSpawner,
+                            rejectingOrchestrator(),
+                            (request, owningStore) -> LiveIdentityDecision.lookupFailed(
+                                    "release_projection_marker_found_at_unexpected_identity"),
+                            owningStore -> true,
+                            () -> 500L);
+
+            Outcome outcome = adapter.release(
+                    bundle.claim(), bundle.resident(), placement(), store,
+                    prepared, populations).get(3, TimeUnit.SECONDS);
+
+            assertEquals(ManagedCoopReleaseSpawnOrchestrator.Status.SPAWN_AMBIGUOUS,
+                    outcome.status());
+            assertTrue(outcome.detail().contains("unexpected_identity"));
+        }
+        assertEquals(0, spawnCalls.get());
+        assertEquals(0, backend.claims.get());
+        assertEquals(0, backend.commits.get());
+        assertTrue(backend.degraded.get() >= 2);
+    }
+
     private ManagedCoopReleaseRuntimeAdapter adapter(
             RecordingGateway gateway,
             ManagedCoopReleaseSpawnOrchestrator orchestrator,
@@ -563,6 +615,7 @@ class ManagedCoopReleaseRuntimeAdapterTest {
         private final Object handle = new Object();
         private final AtomicInteger claims = new AtomicInteger();
         private final AtomicInteger commits = new AtomicInteger();
+        private final AtomicInteger degraded = new AtomicInteger();
 
         @Override
         public CompletableFuture<ManagedCoopReleasePopulationCoordinator.BackendPreparation>
@@ -571,7 +624,8 @@ class ManagedCoopReleaseRuntimeAdapterTest {
             durableContextFactory.apply(request.plannedNpcUuid());
             return CompletableFuture.completedFuture(
                     new ManagedCoopReleasePopulationCoordinator.BackendPreparation(
-                            true, "profile-a", request.plannedNpcUuid(), handle, "prepared"));
+                            ManagedCoopReleasePopulationCoordinator.PreparationStatus.PREPARED,
+                            "profile-a", request.plannedNpcUuid(), handle, "prepared"));
         }
 
         @Override
@@ -599,6 +653,7 @@ class ManagedCoopReleaseRuntimeAdapterTest {
 
         @Override
         public void markReadinessDegraded(String reason) {
+            degraded.incrementAndGet();
         }
     }
 }

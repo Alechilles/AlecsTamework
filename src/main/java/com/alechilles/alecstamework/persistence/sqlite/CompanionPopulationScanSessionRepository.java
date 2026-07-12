@@ -8,8 +8,12 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
- * Owns the singleton reconciliation scan session used to resume mutable evidence sources after a
- * restart and to rotate their epoch only after the previous scan reached READY.
+ * Owns the singleton reconciliation scan session used to give every server process a fresh epoch
+ * for mutable evidence sources.
+ *
+ * <p>Offsets are resumable only inside the process that owns the returned epoch. A restarted
+ * process must rescan mutable saved-world and inventory sources from zero because their contents
+ * can change while the process is down even when their structural catalogs are unchanged.</p>
  */
 public final class CompanionPopulationScanSessionRepository {
     private static final int SINGLETON_ID = 1;
@@ -25,7 +29,7 @@ public final class CompanionPopulationScanSessionRepository {
         this.writeQueue = Objects.requireNonNull(writeQueue, "writeQueue");
     }
 
-    /** Acquires the active session, resuming it after a crash or rotating a previously READY one. */
+    /** Acquires a fresh process session, superseding either an ACTIVE or READY prior epoch. */
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<Session> acquireOrResumeAsync() {
         String candidateEpoch = UUID.randomUUID().toString();
@@ -43,6 +47,24 @@ public final class CompanionPopulationScanSessionRepository {
         return writeQueue.submitTracked(
                 "companion_population_scan_session_ready",
                 connection -> markReadyInTransaction(connection, requiredEpoch),
+                null
+        );
+    }
+
+    /**
+     * Ensures the exact epoch is ACTIVE after a failed finalization fence.
+     *
+     * <p>The transition is idempotent: an already-ACTIVE matching epoch confirms the required
+     * fail-closed state, while a stale or missing epoch is rejected.</p>
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> invalidateReadyAsync(
+            @Nonnull String epoch
+    ) {
+        String requiredEpoch = requireEpoch(epoch);
+        return writeQueue.submitTracked(
+                "companion_population_scan_session_invalidate_ready",
+                connection -> invalidateReadyInTransaction(connection, requiredEpoch),
                 null
         );
     }
@@ -82,16 +104,13 @@ public final class CompanionPopulationScanSessionRepository {
             }
             return new Session(candidateEpoch, State.ACTIVE);
         }
-        if (current.state() == State.ACTIVE) {
-            return current;
-        }
         long now = System.currentTimeMillis();
         try (PreparedStatement statement = connection.prepareStatement(
                 """
-                UPDATE companion_population_scan_session
-                SET epoch = ?, state = 'ACTIVE', started_at_ms = ?, updated_at_ms = ?, completed_at_ms = 0
-                WHERE singleton_id = ? AND epoch = ? AND state = 'READY'
-                """
+                    UPDATE companion_population_scan_session
+                    SET epoch = ?, state = 'ACTIVE', started_at_ms = ?, updated_at_ms = ?, completed_at_ms = 0
+                    WHERE singleton_id = ? AND epoch = ?
+                    """
         )) {
             statement.setString(1, candidateEpoch);
             statement.setLong(2, now);
@@ -99,7 +118,7 @@ public final class CompanionPopulationScanSessionRepository {
             statement.setInt(4, SINGLETON_ID);
             statement.setString(5, current.epoch());
             if (statement.executeUpdate() != 1) {
-                throw new IllegalStateException("Population scan session changed during rotation.");
+                throw new IllegalStateException("Population scan session changed during acquisition.");
             }
         }
         return new Session(candidateEpoch, State.ACTIVE);
@@ -122,6 +141,39 @@ public final class CompanionPopulationScanSessionRepository {
             statement.setInt(3, SINGLETON_ID);
             statement.setString(4, epoch);
             return statement.executeUpdate() == 1;
+        }
+    }
+
+    private static boolean invalidateReadyInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String epoch
+    ) throws Exception {
+        long now = System.currentTimeMillis();
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                UPDATE companion_population_scan_session
+                SET state = 'ACTIVE', updated_at_ms = ?, completed_at_ms = 0
+                WHERE singleton_id = ? AND epoch = ? AND state = 'READY'
+                """
+        )) {
+            statement.setLong(1, now);
+            statement.setInt(2, SINGLETON_ID);
+            statement.setString(3, epoch);
+            if (statement.executeUpdate() == 1) {
+                return true;
+            }
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT 1 FROM companion_population_scan_session
+                WHERE singleton_id = ? AND epoch = ? AND state = 'ACTIVE'
+                """
+        )) {
+            statement.setInt(1, SINGLETON_ID);
+            statement.setString(2, epoch);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
         }
     }
 

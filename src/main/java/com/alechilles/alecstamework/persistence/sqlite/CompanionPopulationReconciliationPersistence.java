@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPersistedProjectionEvidenceRegistry;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 
@@ -10,6 +11,7 @@ public final class CompanionPopulationReconciliationPersistence {
     private final CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository;
     private final CompanionPopulationObservationRepository observationRepository;
     private final CompanionPopulationScanSessionRepository scanSessionRepository;
+    private final CompanionPersistedProjectionEvidenceRegistry projectionEvidenceRegistry;
 
     public CompanionPopulationReconciliationPersistence(
             @Nonnull SqliteConnectionManager connectionManager,
@@ -23,6 +25,7 @@ public final class CompanionPopulationReconciliationPersistence {
         this.legacyEvidenceRepository = new CompanionPopulationLegacyEvidenceRepository(connectionManager);
         this.observationRepository = new CompanionPopulationObservationRepository(writeQueue);
         this.scanSessionRepository = new CompanionPopulationScanSessionRepository(connectionManager, writeQueue);
+        this.projectionEvidenceRegistry = new CompanionPersistedProjectionEvidenceRegistry();
     }
 
     @Nonnull
@@ -48,5 +51,10 @@ public final class CompanionPopulationReconciliationPersistence {
     @Nonnull
     public CompanionPopulationScanSessionRepository scanSessionRepository() {
         return scanSessionRepository;
+    }
+
+    @Nonnull
+    public CompanionPersistedProjectionEvidenceRegistry projectionEvidenceRegistry() {
+        return projectionEvidenceRegistry;
     }
 }

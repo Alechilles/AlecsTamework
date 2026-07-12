@@ -30,6 +30,24 @@ final class BreedingPairingAttemptSelector {
     BreedingPairingAttempt select(
             @Nonnull BreedingPreparedParents parents,
             @Nonnull BreedingPopulationAdmissionService service) {
+        return select(parents, new ReplayLookup() {
+            @Override
+            public BreedingPopulationReplayState stateForPair(
+                    String worldId, List<String> parentProfiles) {
+                return service.replayStateForPair(worldId, parentProfiles);
+            }
+
+            @Override
+            public BreedingPopulationReplayState state(String attemptKey) {
+                return service.replayState(attemptKey);
+            }
+        });
+    }
+
+    @Nullable
+    BreedingPairingAttempt select(
+            @Nonnull BreedingPreparedParents parents,
+            @Nonnull ReplayLookup replayLookup) {
         if (parents.sourceIdentity().profileId().equals(
                 parents.partnerIdentity().profileId()
         )) {
@@ -39,7 +57,7 @@ final class BreedingPairingAttemptSelector {
                 parents.sourceIdentity().profileId(),
                 parents.partnerIdentity().profileId()
         );
-        BreedingPopulationReplayState pairReplay = service.replayStateForPair(
+        BreedingPopulationReplayState pairReplay = replayLookup.stateForPair(
                 parents.worldId(), parentProfiles
         );
         if (pairReplay.usable() && pairReplay.hasPendingChildren()) {
@@ -49,7 +67,7 @@ final class BreedingPairingAttemptSelector {
                     : new BreedingPairingAttempt(replayId, pairReplay, true);
         }
         if (!pairReplay.usable()) {
-            return null;
+            return selectLegacyExactReplay(parents, pairReplay, replayLookup);
         }
 
         UUID newJobId = BreedingAttemptIdentity.forAppliedCooldowns(
@@ -57,7 +75,7 @@ final class BreedingPairingAttemptSelector {
                 parents.partnerIdentity(), parents.partnerFingerprint(),
                 Objects.requireNonNull(admissionNonceSupplier.get(), "admission nonce")
         );
-        BreedingPopulationReplayState fresh = service.replayState(
+        BreedingPopulationReplayState fresh = replayLookup.state(
                 BreedingAttemptIdentity.attemptKey(newJobId)
         );
         if (!fresh.usable() || fresh.birthPlan() != null
@@ -65,6 +83,28 @@ final class BreedingPairingAttemptSelector {
             return null;
         }
         return new BreedingPairingAttempt(newJobId, fresh, false);
+    }
+
+    @Nullable
+    private static BreedingPairingAttempt selectLegacyExactReplay(
+            BreedingPreparedParents parents,
+            BreedingPopulationReplayState pairReplay,
+            ReplayLookup replayLookup) {
+        if (!"breeding-replay-pair-metadata-missing".equals(pairReplay.reason())) {
+            return null;
+        }
+        UUID legacyJobId = BreedingAttemptIdentity.forPersistedCooldowns(
+                parents.sourceIdentity(), parents.sourceSnapshot(),
+                parents.partnerIdentity(), parents.partnerSnapshot()
+        );
+        String attemptKey = BreedingAttemptIdentity.attemptKey(legacyJobId);
+        BreedingPopulationReplayState exactReplay = replayLookup.state(attemptKey);
+        if (!exactReplay.usable()
+                || !exactReplay.hasPendingChildren()
+                || !attemptKey.equals(exactReplay.attemptKey())) {
+            return null;
+        }
+        return new BreedingPairingAttempt(legacyJobId, exactReplay, true);
     }
 
     @Nullable
@@ -77,5 +117,12 @@ final class BreedingPairingAttemptSelector {
         } catch (IllegalArgumentException invalid) {
             return null;
         }
+    }
+
+    interface ReplayLookup {
+        BreedingPopulationReplayState stateForPair(
+                String worldId, List<String> parentProfiles);
+
+        BreedingPopulationReplayState state(String attemptKey);
     }
 }

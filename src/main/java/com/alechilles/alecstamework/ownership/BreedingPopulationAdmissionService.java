@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.integration.claims.ClaimLookupSession;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancySnapshot;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderRegistry;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import javax.annotation.Nullable;
 public final class BreedingPopulationAdmissionService {
     private final CompanionPopulationBatchAdmissionCoordinator batchCoordinator;
     private final ClaimOccupancyIndex claimOccupancyIndex;
+    private final BreedingPopulationRetryBaselineResolver retryBaselineResolver;
     private final CompanionAdmissionPolicyResolver policyResolver;
     private final OwnerComponentMutationService mutationService;
     private final CompanionIdentityResolver identityResolver;
@@ -34,30 +37,21 @@ public final class BreedingPopulationAdmissionService {
 
     BreedingPopulationAdmissionService(
             @Nonnull CompanionPopulationBatchAdmissionCoordinator batchCoordinator,
+            @Nonnull OwnerPopulationIndex ownerPopulationIndex,
             @Nonnull ClaimOccupancyIndex claimOccupancyIndex,
             @Nonnull ClaimProviderRegistry claimProviderRegistry,
             @Nonnull OwnerComponentMutationService mutationService,
             @Nonnull CompanionIdentityResolver identityResolver
     ) {
-        this(batchCoordinator, claimOccupancyIndex, claimProviderRegistry, mutationService,
+        this(batchCoordinator, ownerPopulationIndex, claimOccupancyIndex,
+                claimProviderRegistry, mutationService,
                 identityResolver, new ClaimLookupMetrics(),
                 new BreedingPopulationReplayService(List.of()));
     }
 
     BreedingPopulationAdmissionService(
             @Nonnull CompanionPopulationBatchAdmissionCoordinator batchCoordinator,
-            @Nonnull ClaimOccupancyIndex claimOccupancyIndex,
-            @Nonnull ClaimProviderRegistry claimProviderRegistry,
-            @Nonnull OwnerComponentMutationService mutationService,
-            @Nonnull CompanionIdentityResolver identityResolver,
-            @Nonnull ClaimLookupMetrics lookupMetrics
-    ) {
-        this(batchCoordinator, claimOccupancyIndex, claimProviderRegistry, mutationService,
-                identityResolver, lookupMetrics, new BreedingPopulationReplayService(List.of()));
-    }
-
-    BreedingPopulationAdmissionService(
-            @Nonnull CompanionPopulationBatchAdmissionCoordinator batchCoordinator,
+            @Nonnull OwnerPopulationIndex ownerPopulationIndex,
             @Nonnull ClaimOccupancyIndex claimOccupancyIndex,
             @Nonnull ClaimProviderRegistry claimProviderRegistry,
             @Nonnull OwnerComponentMutationService mutationService,
@@ -69,12 +63,17 @@ public final class BreedingPopulationAdmissionService {
         this.claimOccupancyIndex = Objects.requireNonNull(
                 claimOccupancyIndex, "claimOccupancyIndex"
         );
+        this.retryBaselineResolver = new BreedingPopulationRetryBaselineResolver(
+                Objects.requireNonNull(ownerPopulationIndex, "ownerPopulationIndex"),
+                this.claimOccupancyIndex,
+                Objects.requireNonNull(identityResolver, "identityResolver")
+        );
         this.policyResolver = new CompanionAdmissionPolicyResolver(
                 this.claimOccupancyIndex,
                 Objects.requireNonNull(claimProviderRegistry, "claimProviderRegistry")
         );
         this.mutationService = Objects.requireNonNull(mutationService, "mutationService");
-        this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
+        this.identityResolver = identityResolver;
         this.lookupMetrics = Objects.requireNonNull(lookupMetrics, "lookupMetrics");
         this.replayService = Objects.requireNonNull(replayService, "replayService");
         this.unitFactory = new BreedingPopulationAdmissionUnitFactory();
@@ -124,9 +123,23 @@ public final class BreedingPopulationAdmissionService {
                 request.destinationChunkX(),
                 request.destinationChunkZ()
         );
-        BreedingPopulationAdmissionUnitFactory.PreparedUnits preparedUnits = unitFactory.build(
-                request, boundedCount, destination, policy
-        );
+        BreedingPopulationAdmissionUnitFactory.PreparedUnits preparedUnits;
+        try {
+            BreedingPopulationReplayState replay = replayService.state(request.idempotencyKey());
+            preparedUnits = unitFactory.build(
+                    request, boundedCount, destination, policy, retryBaselineResolver,
+                    replay.usable() && replay.hasPendingChildren()
+            );
+        } catch (IllegalStateException conflict) {
+            return CompletableFuture.completedFuture(new BreedingPopulationPreparationResult(
+                    false,
+                    "breeding-replay-baseline-conflict",
+                    requestedCount,
+                    0,
+                    null,
+                    null
+            ));
+        }
         return batchCoordinator.prepareAsync(
                 preparedUnits.units(),
                 context.lookupSession,
@@ -181,6 +194,10 @@ public final class BreedingPopulationAdmissionService {
     /** Rechecks settings/provider/topology and claims one exact child unit for holder mutation. */
     public boolean claimForSpawn(@Nonnull PreparedBreedingPopulationBatch batch, int unitIndex) {
         Objects.requireNonNull(batch, "batch");
+        PreparedBreedingPopulationBatch.ReservedChild child = batch.child(unitIndex);
+        if (!replayService.currentForSpawn(batch.attemptKey(), child.childKey())) {
+            return false;
+        }
         CompanionAdmissionPolicyResolver.Policy current = policyResolver.resolve(
                 OwnerPopulationOperation.BREEDING,
                 true
@@ -205,14 +222,43 @@ public final class BreedingPopulationAdmissionService {
             int unitIndex,
             @Nonnull Holder<EntityStore> holder
     ) {
+        Objects.requireNonNull(batch, "batch");
+        Objects.requireNonNull(holder, "holder");
         PreparedBreedingPopulationBatch.ReservedChild child = batch.child(unitIndex);
-        return mutationService.writeClaimedSpawnHolder(
+        if (!replayService.currentForSpawn(batch.attemptKey(), child.childKey())) {
+            return OwnerComponentMutationService.WriteResult.notApplied(
+                    "breeding-replay-evidence-changed-before-holder-write"
+            );
+        }
+        OwnerComponentMutationService.WriteResult identityWrite =
+                mutationService.writeClaimedSpawnHolder(
                 holder,
                 batch.populationBatch().admission(unitIndex).ownerAdmission(),
                 child.plannedNpcUuid(),
                 child.ownerId(),
                 child.ownerName()
         );
+        if (!identityWrite.applied()) {
+            return identityWrite;
+        }
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        if (markerType == null) {
+            return OwnerComponentMutationService.WriteResult.notApplied(
+                    "breeding-projection-marker-type-unavailable"
+            );
+        }
+        try {
+            holder.putComponent(markerType, BreedingChildProjectionMarker.create(
+                    batch.attemptKey(), child.childKey(), child.profileId(),
+                    child.plannedNpcUuid()
+            ));
+            return identityWrite;
+        } catch (RuntimeException | LinkageError failure) {
+            return OwnerComponentMutationService.WriteResult.notApplied(
+                    "breeding-projection-marker-write-failed"
+            );
+        }
     }
 
     @Nonnull

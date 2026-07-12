@@ -80,6 +80,19 @@ class ManagedCoopAuthorityResolverTest {
         ).resolve("world", null, "coop_chicken", new Vector3i(), 0, null));
     }
 
+    @Test
+    void rejectsBlockFallbackWhenObservedVanillaCoopIdDoesNotMatchConfig()
+            throws Exception {
+        TwCoopConfig config = config("Managed", "Coop_Chicken", true, false);
+        ManagedCoopAuthorityResolver resolver = resolver(
+                Map.of("coop_block", config), Map.of()
+        );
+
+        assertNull(resolver.resolve(
+                "world", "coop_block", "coop_duck", new Vector3i(), 0, null
+        ));
+    }
+
     private static ManagedCoopAuthorityResolver resolver(Map<String, TwCoopConfig> blockConfigs,
                                                          Map<String, TwCoopConfig> coopConfigs) {
         return resolver(blockConfigs, coopConfigs, ignored -> false);

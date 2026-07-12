@@ -31,19 +31,20 @@ class BreedingAdmissionTerminalityArchitectureTest {
                 "src", "main", "java", "com", "alechilles", "alecstamework",
                 "npc", "breeding", "BreedingJobExecutionService.java"
         ), StandardCharsets.UTF_8);
-        String prepared = Files.readString(Path.of(
+        String preparedEntry = Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework",
-                "npc", "breeding", "BreedingPreparedPopulationRegistry.java"
+                "npc", "breeding", "BreedingPreparedPopulationEntry.java"
         ), StandardCharsets.UTF_8);
 
         assertTrue(execution.contains("cancelPopulationSafely(job"));
         assertTrue(execution.contains("releaseChildReservation("));
-        assertTrue(prepared.contains("public void cancelRemaining("));
-        assertTrue(prepared.contains("definitelyCancelable(states[index])"));
-        assertTrue(prepared.contains("state == UnitState.RESERVED || state == UnitState.APPLYING"));
-        assertTrue(prepared.contains("states[index] = UnitState.MATERIALIZED"));
-        assertTrue(prepared.contains("UnitState.COMMITTED"));
-        assertTrue(prepared.contains("UnitState.CANCELED"));
+        assertTrue(preparedEntry.contains("void cancelRemaining("));
+        assertTrue(preparedEntry.contains("definitelyCancelable(state)"));
+        assertTrue(preparedEntry.contains("UnitState.RESERVED"));
+        assertTrue(preparedEntry.contains("UnitState.APPLYING"));
+        assertTrue(preparedEntry.contains("UnitState.MATERIALIZED"));
+        assertTrue(preparedEntry.contains("UnitState.COMMITTED"));
+        assertTrue(preparedEntry.contains("UnitState.CANCELED"));
     }
 
     @Test
@@ -54,12 +55,20 @@ class BreedingAdmissionTerminalityArchitectureTest {
         String spawn = Files.readString(
                 ACTIONS.resolve("BreedingOffspringSpawnService.java"), StandardCharsets.UTF_8
         );
+        String projectionProbe = Files.readString(
+                ACTIONS.resolve("BreedingChildProjectionProbe.java"), StandardCharsets.UTF_8
+        );
         String childSpawn = Files.readString(
                 ACTIONS.resolve("BreedingPreparedChildSpawnService.java"),
                 StandardCharsets.UTF_8
         );
+        String admission = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework",
+                "ownership", "BreedingPopulationAdmissionService.java"
+        ), StandardCharsets.UTF_8);
 
-        assertFalse(attemptSelector.contains("BreedingAttemptIdentity.forPersistedCooldowns("));
+        assertTrue(attemptSelector.contains("BreedingAttemptIdentity.forPersistedCooldowns("));
+        assertTrue(attemptSelector.contains("breeding-replay-pair-metadata-missing"));
         assertTrue(attemptSelector.contains("BreedingAttemptIdentity.forAppliedCooldowns("));
         assertTrue(attemptSelector.contains("this(UUID::randomUUID)"));
         assertTrue(spawn.contains("spawnPreparedWithFallback("));
@@ -68,6 +77,28 @@ class BreedingAdmissionTerminalityArchitectureTest {
         assertTrue(childSpawn.contains("preparedPopulation.markMaterialized("));
         assertTrue(childSpawn.contains("reservedOwner(reserved)"));
         assertTrue(childSpawn.contains("plannedLifecycleFamily(config, child)"));
+        assertTrue(childSpawn.contains("BreedingChildProjectionMarker.create("));
+        assertTrue(childSpawn.contains("installReservedLegacyUuid(npc, reserved);"));
+        assertTrue(childSpawn.indexOf("installReservedLegacyUuid(npc, reserved);")
+                < childSpawn.indexOf("preparedPopulation.writeSpawnHolder("));
+        assertTrue(spawn.contains("requiredNpcUuid.equals(npc.getUuid())"));
+        assertTrue(spawn.contains("BreedingChildProjectionMarker.matches("));
+        assertTrue(projectionProbe.contains("PlannedCompanionSpawnProbe.probe("));
+        int replayFence = admission.indexOf("replayService.currentForSpawn(");
+        int claim = admission.indexOf("batchCoordinator.claimForApply(", replayFence);
+        assertTrue(replayFence >= 0 && claim > replayFence,
+                "Restart absence must remain current at the physical child spawn claim.");
+        int holderMethod = admission.indexOf("public OwnerComponentMutationService.WriteResult writeSpawnHolder(");
+        int holderReplayFence = admission.indexOf(
+                "replayService.currentForSpawn(", holderMethod
+        );
+        int holderMutation = admission.indexOf(
+                "mutationService.writeClaimedSpawnHolder(", holderMethod
+        );
+        assertTrue(holderMethod >= 0
+                        && holderReplayFence > holderMethod
+                        && holderMutation > holderReplayFence,
+                "Restart absence must be rechecked inside the final pre-insertion holder callback.");
     }
 
     /** Regression: a post-add exception must be recoverable by deterministic child UUID. */
@@ -80,7 +111,7 @@ class BreedingAdmissionTerminalityArchitectureTest {
                 ACTIONS.resolve("BreedingSpawnTypes.java"), StandardCharsets.UTF_8
         );
 
-        assertTrue(spawn.contains("PlannedCompanionSpawnProbe.probe("));
+        assertTrue(spawn.contains("BreedingChildProjectionProbe.probe("));
         assertTrue(spawn.contains("BreedingPreparedSpawnResult.ambiguous("));
         assertTrue(types.contains("boolean outcomeAmbiguous"));
     }
@@ -93,6 +124,10 @@ class BreedingAdmissionTerminalityArchitectureTest {
         String prepared = Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework",
                 "npc", "breeding", "BreedingPreparedPopulationRegistry.java"
+        ), StandardCharsets.UTF_8);
+        String preparedEntry = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework",
+                "npc", "breeding", "BreedingPreparedPopulationEntry.java"
         ), StandardCharsets.UTF_8);
         String coordinator = Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework",
@@ -107,7 +142,7 @@ class BreedingAdmissionTerminalityArchitectureTest {
         assertTrue(handoff.contains("cancelPrepared("));
         assertTrue(handoff.contains("cancelLocal("));
         assertTrue(prepared.contains("entries.putIfAbsent("));
-        assertTrue(prepared.contains("states[index] = UnitState.AMBIGUOUS"));
+        assertTrue(preparedEntry.contains("UnitState.AMBIGUOUS"));
         assertTrue(coordinator.contains("public PairingResult reserve("));
         assertTrue(coordinator.contains("public PairingResult activate("));
         assertTrue(handoff.contains("cancelOwnedJob("));

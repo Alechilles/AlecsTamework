@@ -67,7 +67,7 @@ final class BreedingJobPlanSnapshotMapper {
             List<PlannedChild> children = new ArrayList<>(snapshot.children().size());
             for (int index = 0; index < snapshot.children().size(); index++) {
                 BreedingBirthPlanSnapshot.PlannedChild child = snapshot.children().get(index);
-                if (!childKey(index).equals(child.childKey())) {
+                if (parseChildIndex(child.childKey()) != index) {
                     return null;
                 }
                 children.add(new PlannedChild(
@@ -94,9 +94,14 @@ final class BreedingJobPlanSnapshotMapper {
             return plan.children();
         }
         Set<String> pending = replayState.pendingChildKeys();
+        List<BreedingBirthPlanSnapshot.PlannedChild> durableChildren =
+                replayState.birthPlan().children();
+        if (durableChildren.size() != plan.children().size()) {
+            return List.of();
+        }
         List<PlannedChild> outstanding = new ArrayList<>();
         for (int index = 0; index < plan.children().size(); index++) {
-            if (pending.contains(childKey(index))) {
+            if (pending.contains(durableChildren.get(index).childKey())) {
                 outstanding.add(plan.children().get(index));
             }
         }
@@ -173,7 +178,16 @@ final class BreedingJobPlanSnapshotMapper {
         if (childKey == null || !childKey.startsWith(CHILD_KEY_PREFIX)) {
             throw new IllegalArgumentException("Invalid breeding child key");
         }
-        return Integer.parseInt(childKey.substring(CHILD_KEY_PREFIX.length()));
+        String suffix = childKey.substring(CHILD_KEY_PREFIX.length());
+        if (suffix.isEmpty()) {
+            throw new IllegalArgumentException("Invalid breeding child key");
+        }
+        for (int index = 0; index < suffix.length(); index++) {
+            if (!Character.isDigit(suffix.charAt(index))) {
+                throw new IllegalArgumentException("Invalid breeding child key");
+            }
+        }
+        return Integer.parseInt(suffix);
     }
 
     private static BreedingFertilitySnapshot restoreFertility(

@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -23,6 +24,7 @@ class LoadedNpcIdentityBootstrapServiceTest {
     private static final UUID COMPONENT_UUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID LEGACY_UUID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID MISSING_UUID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID ALTERNATE_UUID = UUID.fromString("88888888-8888-8888-8888-888888888888");
     private static final LoadedNpcIdentityIndex.Location WORLD_A =
             new LoadedNpcIdentityIndex.Location("world-a", "store-a");
     private static final LoadedNpcIdentityIndex.Location WORLD_B =
@@ -47,9 +49,11 @@ class LoadedNpcIdentityBootstrapServiceTest {
                 )
         );
         LoadedNpcIdentityBootstrapService service = service(index, List.of(first, second), warnings);
+        CompletableFuture<LoadedNpcIdentitySnapshot> completion = service.awaitCurrentBootstrap();
 
         service.bootstrapUniverse();
 
+        assertFalse(completion.isDone());
         assertFalse(index.isInitializationComplete());
         assertEquals(2, service.pendingLocationCount());
         scheduler.tasks().get(0).run();
@@ -57,6 +61,7 @@ class LoadedNpcIdentityBootstrapServiceTest {
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION, index.probe(LEGACY_UUID).status());
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(MISSING_UUID).status());
         assertEquals(1, service.pendingLocationCount());
+        assertFalse(completion.isDone());
 
         scheduler.tasks().get(1).run();
 
@@ -64,6 +69,139 @@ class LoadedNpcIdentityBootstrapServiceTest {
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(MISSING_UUID).status());
         assertEquals(0, service.pendingLocationCount());
         assertTrue(warnings.isEmpty());
+        assertTrue(completion.isDone());
+        assertTrue(completion.getNow(null).initializationComplete());
+        assertEquals(2, completion.getNow(null).observations().size());
+    }
+
+    @Test
+    void bootstrapPublishesProjectionMarkersWithBothNpcIdentities() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        LoadedNpcIdentityIndex.ProjectionKey key = projectionKey();
+        LoadedNpcIdentityBootstrapService service = service(
+                index,
+                List.of(new LoadedNpcIdentityBootstrapService.ScanTarget(
+                        WORLD_A,
+                        Runnable::run,
+                        recorder -> recorder.record(COMPONENT_UUID, LEGACY_UUID, key)
+                )),
+                new CopyOnWriteArrayList<>()
+        );
+
+        service.bootstrapUniverse();
+
+        LoadedNpcIdentityIndex.ProjectionProbe probe = index.probeProjection(key);
+        assertEquals(LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH, probe.status());
+        assertEquals(COMPONENT_UUID, probe.matches().getFirst().componentUuid());
+        assertEquals(LEGACY_UUID, probe.matches().getFirst().legacyNpcUuid());
+        assertEquals(WORLD_A, probe.matches().getFirst().location());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION,
+                index.probe(COMPONENT_UUID).status());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION,
+                index.probe(LEGACY_UUID).status());
+    }
+
+    @Test
+    void lifecycleExactProjectionAddedDuringScanCannotBeOverwritten() {
+        // Regression: scan replacement previously erased an exact marker added by a callback.
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        LoadedNpcIdentityIndex.ProjectionKey key = projectionKey();
+        ManualScheduler scheduler = new ManualScheduler();
+        AtomicInteger scans = new AtomicInteger();
+        List<String> warnings = new CopyOnWriteArrayList<>();
+        LoadedNpcIdentityBootstrapService service = service(
+                index,
+                List.of(target(WORLD_A, scheduler, recorder -> {
+                    if (scans.getAndIncrement() == 0) {
+                        index.recordAdded(observation(COMPONENT_UUID, key));
+                    } else {
+                        recorder.record(COMPONENT_UUID, COMPONENT_UUID, key);
+                    }
+                })),
+                warnings
+        );
+
+        service.bootstrapUniverse();
+        scheduler.tasks().getFirst().run();
+
+        LoadedNpcIdentityIndex.ProjectionProbe probe = index.probeProjection(key);
+        assertFalse(index.isInitializationComplete());
+        assertEquals(1, service.pendingLocationCount());
+        assertEquals(2, scheduler.tasks().size());
+        assertTrue(warnings.isEmpty());
+        assertEquals(LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH, probe.status());
+        assertEquals(COMPONENT_UUID, probe.matches().getFirst().componentUuid());
+        assertTrue(index.probe(COMPONENT_UUID).isKnownLive());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(MISSING_UUID).status());
+
+        scheduler.tasks().get(1).run();
+
+        assertTrue(index.isInitializationComplete());
+        assertEquals(0, service.pendingLocationCount());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(MISSING_UUID).status());
+    }
+
+    @Test
+    void lifecycleAlternateProjectionAddedDuringScanCannotBeReplacedByScannedExactIdentity() {
+        // Regression: a stale exact snapshot previously hid an alternate-UUID marker conflict.
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        LoadedNpcIdentityIndex.ProjectionKey key = projectionKey();
+        ManualScheduler scheduler = new ManualScheduler();
+        AtomicInteger scans = new AtomicInteger();
+        LoadedNpcIdentityBootstrapService service = service(
+                index,
+                List.of(target(WORLD_A, scheduler, recorder -> {
+                    if (scans.getAndIncrement() == 0) {
+                        recorder.record(COMPONENT_UUID, COMPONENT_UUID, key);
+                        index.recordAdded(observation(ALTERNATE_UUID, key));
+                    } else {
+                        recorder.record(ALTERNATE_UUID, ALTERNATE_UUID, key);
+                    }
+                })),
+                new CopyOnWriteArrayList<>()
+        );
+
+        service.bootstrapUniverse();
+        scheduler.tasks().getFirst().run();
+
+        LoadedNpcIdentityIndex.ProjectionProbe probe = index.probeProjection(key);
+        assertFalse(index.isInitializationComplete());
+        assertEquals(LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH, probe.status());
+        assertEquals(ALTERNATE_UUID, probe.matches().getFirst().componentUuid());
+        assertTrue(index.probe(ALTERNATE_UUID).isKnownLive());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(COMPONENT_UUID).status());
+
+        scheduler.tasks().get(1).run();
+
+        assertTrue(index.isInitializationComplete());
+        assertEquals(ALTERNATE_UUID,
+                index.probeProjection(key).matches().getFirst().componentUuid());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(COMPONENT_UUID).status());
+    }
+
+    @Test
+    void repeatedLifecycleChurnExhaustsRetryWithoutAuthoritativeAbsence() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        LoadedNpcIdentityIndex.ProjectionKey key = projectionKey();
+        ManualScheduler scheduler = new ManualScheduler();
+        List<String> warnings = new CopyOnWriteArrayList<>();
+        LoadedNpcIdentityBootstrapService service = service(
+                index,
+                List.of(target(WORLD_A, scheduler, recorder ->
+                        index.recordAdded(observation(ALTERNATE_UUID, key)))),
+                warnings
+        );
+
+        service.bootstrapUniverse();
+        scheduler.tasks().getFirst().run();
+        scheduler.tasks().get(1).run();
+
+        assertFalse(index.isInitializationComplete());
+        assertEquals(0, service.pendingLocationCount());
+        assertEquals(1, warnings.size());
+        assertEquals(LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH,
+                index.probeProjection(key).status());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(MISSING_UUID).status());
     }
 
     @Test
@@ -132,13 +270,15 @@ class LoadedNpcIdentityBootstrapServiceTest {
                 );
         LoadedNpcIdentityBootstrapService service =
                 service(index, List.of(schedulingFailure, scanFailure), warnings);
+        CompletableFuture<LoadedNpcIdentitySnapshot> completion = service.awaitCurrentBootstrap();
 
         service.bootstrapUniverse();
 
+        assertFalse(completion.isDone());
         assertFalse(index.isInitializationComplete());
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(MISSING_UUID).status());
-        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(COMPONENT_UUID).status());
-        assertFalse(index.probe(COMPONENT_UUID).isKnownLive());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION, index.probe(COMPONENT_UUID).status());
+        assertTrue(index.probe(COMPONENT_UUID).isKnownLive());
         assertEquals(0, service.pendingLocationCount());
         assertEquals(1, warnings.size());
         assertTrue(warnings.getFirst().contains("absence checks remain UNKNOWN"));
@@ -175,6 +315,7 @@ class LoadedNpcIdentityBootstrapServiceTest {
                 (message, error) -> {
                 }
         );
+        CompletableFuture<LoadedNpcIdentitySnapshot> completion = service.awaitCurrentBootstrap();
         try {
             service.bootstrapUniverse();
             assertTrue(staleScanCollected.await(5, TimeUnit.SECONDS));
@@ -183,6 +324,9 @@ class LoadedNpcIdentityBootstrapServiceTest {
 
             assertTrue(index.isInitializationComplete());
             assertTrue(index.probe(freshUuid).isKnownLive());
+            assertTrue(completion.isDone());
+            assertEquals(freshUuid,
+                    completion.getNow(null).observations().getFirst().componentUuid());
             releaseStaleScan.countDown();
             staleExecutor.shutdown();
             assertTrue(staleExecutor.awaitTermination(5, TimeUnit.SECONDS));
@@ -234,6 +378,8 @@ class LoadedNpcIdentityBootstrapServiceTest {
         ManualScheduler scheduler = new ManualScheduler();
         LoadedNpcIdentityBootstrapService service = service(index, List.of(), new CopyOnWriteArrayList<>());
         service.bootstrapUniverse();
+        CompletableFuture<LoadedNpcIdentitySnapshot> initial = service.awaitCurrentBootstrap();
+        assertTrue(initial.isDone());
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(MISSING_UUID).status());
 
         service.scheduleStartedTarget(target(
@@ -242,11 +388,20 @@ class LoadedNpcIdentityBootstrapServiceTest {
                 recorder -> recorder.record(COMPONENT_UUID, COMPONENT_UUID)
         ));
 
+        CompletableFuture<LoadedNpcIdentitySnapshot> startedWorld = service.awaitCurrentBootstrap();
+        assertFalse(startedWorld.isDone());
         assertFalse(index.isInitializationComplete());
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.UNKNOWN, index.probe(MISSING_UUID).status());
         scheduler.tasks().getFirst().run();
         assertTrue(index.isInitializationComplete());
+        assertTrue(startedWorld.isDone());
         assertTrue(index.probe(COMPONENT_UUID).isKnownLive());
+
+        index.recordAdded(observation(ALTERNATE_UUID, projectionKey()));
+        LoadedNpcIdentitySnapshot refreshed = service.awaitCurrentBootstrap().getNow(null);
+        assertTrue(refreshed.mutationRevision()
+                > startedWorld.getNow(null).mutationRevision());
+        assertEquals(2, refreshed.observations().size());
 
         service.clearLocation(WORLD_A);
         assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(COMPONENT_UUID).status());
@@ -267,11 +422,14 @@ class LoadedNpcIdentityBootstrapServiceTest {
         assertTrue(source.contains("public void onStartWorld(@Nonnull StartWorldEvent event)"));
         assertTrue(source.contains("world::execute"));
         assertTrue(source.contains("Query.and(npcType, uuidType)"));
-        assertTrue(source.contains("legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)"));
+        assertTrue(source.contains("TameworkProjectionIdentityComponent.getComponentType()"));
+        assertTrue(source.contains("CommandLinkedNpcStateSnapshotService.projectionKey(marker)"));
+        assertTrue(source.contains("identityIndex.replaceLocationObservations"));
         assertFalse(source.contains("RemoveWorldEvent"));
         assertTrue(source.contains("LoadedNpcLocationResolver.resolve(store)"));
         assertTrue(snapshotSource.contains("LoadedNpcLocationResolver.resolve(store)"));
-        assertTrue(snapshotSource.contains("legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)"));
+        assertTrue(snapshotSource.contains("LoadedNpcIdentityIndex.LoadedNpcObservation"));
+        assertTrue(snapshotSource.contains("projectionKey(marker)"));
         int startWorldRegistration = pluginSource.indexOf("StartWorldEvent.class");
         int initialBootstrap = pluginSource.indexOf("loadedNpcIdentityBootstrapService.bootstrapUniverse()");
         assertTrue(startWorldRegistration >= 0 && initialBootstrap > startWorldRegistration);
@@ -293,6 +451,21 @@ class LoadedNpcIdentityBootstrapServiceTest {
             ManualScheduler scheduler,
             LoadedNpcIdentityBootstrapService.IdentityScanner scanner) {
         return new LoadedNpcIdentityBootstrapService.ScanTarget(location, scheduler::schedule, scanner);
+    }
+
+    private static LoadedNpcIdentityIndex.ProjectionKey projectionKey() {
+        return new LoadedNpcIdentityIndex.ProjectionKey(
+                "profile-a", "operation-a", "MANAGED_COOP_RELEASE",
+                "slot-a", COMPONENT_UUID, 1L
+        );
+    }
+
+    private static LoadedNpcIdentityIndex.LoadedNpcObservation observation(
+            UUID componentUuid,
+            LoadedNpcIdentityIndex.ProjectionKey key) {
+        return new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                componentUuid, componentUuid, WORLD_A, key
+        );
     }
 
     private static void await(CountDownLatch latch) {

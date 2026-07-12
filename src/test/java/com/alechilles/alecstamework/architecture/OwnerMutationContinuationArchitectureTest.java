@@ -118,7 +118,7 @@ class OwnerMutationContinuationArchitectureTest {
     void deferredMutationCallbacksReceiveFreshlyResolvedWorldState() throws IOException {
         String scheduler = read("ownership", "OwnerMutationScheduler.java");
         String capture = read("items", "SpawnerCaptureFinalizerService.java");
-        String coop = read("items", "CoopPopulationMutationService.java");
+        String coop = read("items", "ManagedCoopCaptureRuntimeAdapter.java");
         String release = read("items", "CommandOwnerReleaseService.java");
 
         assertTrue(scheduler.contains("Ref<EntityStore> liveRef = world.getEntityRef(npcUuid)"));
@@ -128,7 +128,16 @@ class OwnerMutationContinuationArchitectureTest {
                 && scheduler.contains("profileId, mutationContext"));
         assertTrue(capture.contains("context.store().getComponent("));
         assertTrue(capture.contains("context.npcRef(), NPCEntity.getComponentType()"));
-        assertTrue(coop.contains("context.npcRef(), context.store(), resolution.stateSnapshot()"));
+        int cancellation = coop.indexOf("cancelForCapturedParentDurably(");
+        int continuation = coop.indexOf(
+                "private CompletableFuture<CaptureOutcome> continueCapture(");
+        int snapshot = coop.indexOf(
+                "captureSnapshotForManagedCoopPersistence(", continuation);
+        int attempt = coop.indexOf("CaptureAttempt attempt = buildAttempt(", snapshot);
+        int submit = coop.indexOf("captureGateway.coordinate(attempt)", attempt);
+        assertTrue(cancellation >= 0 && continuation > cancellation);
+        assertTrue(snapshot > continuation && attempt > snapshot && submit > attempt);
+        assertTrue(coop.contains("CompletableFuture<CaptureOutcome> coordinate("));
         assertTrue(release.contains("clearTamedAndLinks(context.npcRef(), context.store())"));
     }
 

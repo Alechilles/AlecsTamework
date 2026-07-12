@@ -86,7 +86,7 @@ public final class ManagedCoopLifecycleRecoveryService {
                 releaseRecovery::resume,
                 new HytaleManagedCoopReleaseProjectionGateway(
                         releaseAdapter, residentIndex, compositeIndexes,
-                        releasePopulations)::project,
+                        releasePopulations, releaseRecovery::projectionCurrent)::project,
                 System::currentTimeMillis
         );
     }
@@ -243,7 +243,8 @@ public final class ManagedCoopLifecycleRecoveryService {
         }
         return releaseRecovery.resume(command.operation()).thenCompose(recovered -> {
             if (recovered == null || !recovered.ready()
-                    || recovered.spawnClaim() == null || recovered.resident() == null) {
+                    || recovered.spawnClaim() == null || recovered.resident() == null
+                    || recovered.projectionToken() == null) {
                 RecoveryStatus status = recovered != null
                         && recovered.status() == ManagedCoopReleaseRecoveryService.Status.DEDUPLICATED
                         ? RecoveryStatus.DEDUPLICATED : RecoveryStatus.FAILED;
@@ -256,7 +257,8 @@ public final class ManagedCoopLifecycleRecoveryService {
                         "release_recovery_identity_mismatch");
             }
             return projections.project(new ReleaseProjectionCommand(
-                            recovered.spawnClaim(), recovered.resident(), command.releaseSite()))
+                            recovered.spawnClaim(), recovered.resident(), command.releaseSite(),
+                            recovered.projectionToken()))
                     .thenApply(outcome -> outcome != null && outcome.finalized()
                             ? new Outcome(RecoveryStatus.RELEASE_COMPLETED,
                                     command.operation().operationId(), outcome.detail())

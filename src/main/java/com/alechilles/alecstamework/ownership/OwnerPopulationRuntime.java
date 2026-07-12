@@ -4,10 +4,13 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.integration.claims.ClaimAdmissionService;
 import com.alechilles.alecstamework.integration.claims.ClaimLookupMetrics;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
+import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderRegistry;
 import com.alechilles.alecstamework.integration.questlinesclaims.QuestLinesClaimsProviderProbe;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsProviderProbe;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionLiveEvidenceRevision;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationProgress;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationRuntime;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRuntimeReconciler;
@@ -107,7 +110,8 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                 identityResolver,
                 claimOccupancyIndex
         );
-        CompanionPopulationBootstrapService.BootstrapResult bootstrap = bootstrapService.load();
+        CompanionPopulationBootstrapService.BootstrapResult bootstrap =
+                bootstrapService.loadForReconciliation();
         OwnerPopulationAdmissionCoordinator coordinator = new OwnerPopulationAdmissionCoordinator(
                 index,
                 persistence.getCompanionPopulationRepository(),
@@ -136,12 +140,15 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                         claimLookupMetrics
                 );
         BreedingReplayJournalLoader breedingReplayJournal = new BreedingReplayJournalLoader(
-                persistence.getCompanionPopulationRepository(), persistence.getHealthService()
+                persistence.getCompanionPopulationRepository(),
+                persistence.getHealthService(),
+                persistence.getCompanionPersistedProjectionEvidenceRegistry()
         );
         breedingReplayJournal.refresh();
         BreedingPopulationAdmissionService breedingAdmissionService =
                 new BreedingPopulationAdmissionService(
                         companionBatchCoordinator,
+                        index,
                         claimOccupancyIndex,
                         claimProviderRegistry,
                         mutationService,
@@ -321,6 +328,18 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         return reconciliationRuntime.runtimeReconciler();
     }
 
+    /** Returns the single loaded-NPC identity index shared with startup reconciliation. */
+    @Nonnull
+    public LoadedNpcIdentityIndex loadedNpcIdentityIndex() {
+        return reconciliationRuntime.loadedNpcIdentityIndex();
+    }
+
+    /** Shared online inventory/NPC mutation fence for startup reconciliation. */
+    @Nonnull
+    public CompanionLiveEvidenceRevision liveEvidenceRevision() {
+        return reconciliationRuntime.liveEvidenceRevision();
+    }
+
     @Nonnull
     public CustomContainerReconciliationRegistry customContainerReconciliationRegistry() {
         return reconciliationRuntime.customContainers();
@@ -330,11 +349,20 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     public CompletableFuture<CompanionPopulationReconciliationProgress> startReconciliation(
             @Nonnull Universe universe,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-            @Nonnull ItemFeatureRegistry itemFeatures
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady
     ) {
-        return reconciliationRuntime.start(universe, ownerType, itemFeatures)
-                .thenCompose(progress -> breedingReplayJournal.refreshAsync()
-                        .thenApply(ignored -> progress));
+        breedingReplayJournal.markUnavailable();
+        return reconciliationRuntime.start(
+                        universe, ownerType, itemFeatures, loadedIdentitiesReady
+                )
+                .thenCompose(progress -> {
+                    if (progress.status()
+                            != CompanionPopulationReconciliationProgress.Status.READY) {
+                        return CompletableFuture.completedFuture(progress);
+                    }
+                    return breedingReplayJournal.refreshAsync().thenApply(ignored -> progress);
+                });
     }
 
     @Nonnull

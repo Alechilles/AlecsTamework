@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
@@ -16,6 +17,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
@@ -73,6 +75,20 @@ public final class TameworkPopulationRuntimeLifecycle {
         return new LinkedServices(capture, coop, death, lost);
     }
 
+    /** Builds the snapshot service against the canonical all-world loaded identity index. */
+    @Nonnull
+    public static CommandLinkedNpcStateSnapshotService createStateSnapshotService(
+            @Nonnull TameworkPersistenceRuntime persistence,
+            @Nonnull OwnerPopulationRuntime runtime
+    ) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(runtime, "runtime");
+        return new CommandLinkedNpcStateSnapshotService(
+                persistence.getNpcProfileRepository(),
+                runtime.loadedNpcIdentityIndex()
+        );
+    }
+
     public static void registerSystems(
             @Nonnull ComponentRegistryProxy<EntityStore> registry,
             @Nonnull OwnerPopulationRuntime runtime,
@@ -80,6 +96,9 @@ public final class TameworkPopulationRuntimeLifecycle {
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
             @Nonnull CompanionPopulationRuntimeReconciler.WarningSink warningSink
     ) {
+        registry.registerSystem(new CompanionLiveInventoryEvidenceSystem(
+                runtime.liveEvidenceRevision()
+        ));
         CompanionPopulationSystemRegistration.register(
                 registry,
                 runtime,
@@ -95,11 +114,14 @@ public final class TameworkPopulationRuntimeLifecycle {
     public static void start(@Nonnull OwnerPopulationRuntime runtime,
                              @Nonnull Universe universe,
                              @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-                             @Nonnull ItemFeatureRegistry itemFeatures) {
+                             @Nonnull ItemFeatureRegistry itemFeatures,
+                             @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady) {
         runtime.customContainerReconciliationRegistry().seal(
                 "tamework-builtins:no-additional-custom-persisted-item-containers:v1"
         );
-        runtime.startReconciliation(universe, ownerType, itemFeatures);
+        runtime.startReconciliation(
+                universe, ownerType, itemFeatures, loadedIdentitiesReady
+        );
     }
 
     public record LinkedServices(

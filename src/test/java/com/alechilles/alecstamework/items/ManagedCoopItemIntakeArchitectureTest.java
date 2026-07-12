@@ -68,6 +68,9 @@ class ManagedCoopItemIntakeArchitectureTest {
         int replacement = interaction.indexOf("replaceItemStackInSlot(", managedEnvelope);
         int succeeded = interaction.indexOf(".succeeded()", replacement);
         int removal = interaction.indexOf("commandBuffer.removeEntity(", succeeded);
+        int capturedOutcome = interaction.indexOf("captured = true;", removal);
+        int fenceCompletion = interaction.indexOf(
+                "prepared.completeCapture(captured);", capturedOutcome);
 
         assertTrue(tick >= 0);
         assertTrue(vanillaMetadata > tick);
@@ -75,11 +78,15 @@ class ManagedCoopItemIntakeArchitectureTest {
         assertTrue(replacement > managedEnvelope);
         assertTrue(succeeded > replacement);
         assertTrue(removal > succeeded);
-        assertTrue(authoring.indexOf("cancelThenCaptureSnapshot(")
+        assertTrue(capturedOutcome > removal);
+        assertTrue(fenceCompletion > capturedOutcome);
+        assertEquals(2, occurrences(interaction, "prepared.completeCapture(false);"));
+        assertTrue(interaction.contains("} finally {"));
+        assertTrue(authoring.indexOf("cancelThenCaptureSnapshotRetainingFence(")
                 < authoring.indexOf("captureSnapshotForPersistence("));
         assertTrue(authoring.contains("CancellationReason.CAPTURE_CRATE"));
-        assertTrue(authoring.contains("CancellationStatus.SCOPE_CLOSED"));
-        assertTrue(authoring.contains("CancellationStatus.REJECTED"));
+        assertTrue(authoring.contains("handoff.cancellation().safeToCapture()"));
+        assertTrue(authoring.contains("breeding_capture_cancellation_not_durable"));
     }
 
     @Test

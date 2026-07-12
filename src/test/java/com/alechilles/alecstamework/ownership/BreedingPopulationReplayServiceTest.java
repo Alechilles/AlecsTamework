@@ -91,6 +91,26 @@ class BreedingPopulationReplayServiceTest {
     }
 
     @Test
+    void retryableRecoveryRowRemainsPendingForExactReplay() {
+        BreedingBirthPlanSnapshot plan = plan();
+        BreedingPopulationReplayService service = new BreedingPopulationReplayService(List.of(
+                operation(
+                        ATTEMPT, "child-1",
+                        CompanionPopulationOperationRecord.State.RETRYABLE,
+                        plan, true, true, WORLD
+                )
+        ));
+
+        BreedingPopulationReplayState exact = service.state(ATTEMPT);
+        BreedingPopulationReplayState pair = service.stateForPair(WORLD, PARENTS);
+
+        assertTrue(exact.usable());
+        assertEquals(Set.of("child-1"), exact.pendingChildKeys());
+        assertEquals(ATTEMPT, pair.attemptKey());
+        assertEquals(Set.of("child-1"), pair.pendingChildKeys());
+    }
+
+    @Test
     void twoPendingAttemptsForCanonicalPairFailClosed() {
         BreedingBirthPlanSnapshot plan = plan();
         BreedingPopulationReplayState replay = new BreedingPopulationReplayService(List.of(

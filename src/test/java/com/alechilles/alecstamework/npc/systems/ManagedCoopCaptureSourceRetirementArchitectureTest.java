@@ -24,6 +24,8 @@ class ManagedCoopCaptureSourceRetirementArchitectureTest {
                 "commandBuffer.getComponent(reference, uuidType)"));
         assertTrue(source.contains(
                 "commandBuffer.getComponent(reference, markerType)"));
+        assertTrue(source.contains("reason != RemoveReason.REMOVE"),
+                "chunk unload is not durable source removal evidence");
         assertTrue(source.contains("new RemovalObservation("));
         assertTrue(source.contains("retirementService.confirmRemoved(observation)"));
         assertFalse(source.contains("store.getComponent("));
@@ -47,6 +49,8 @@ class ManagedCoopCaptureSourceRetirementArchitectureTest {
         assertTrue(source.contains("store.assertThread()"));
         assertTrue(source.contains(
                 "world.getEntityRef(command.sourceNpcUuid())"));
+        assertTrue(source.contains("source_not_loaded_absence_unproven"));
+        assertFalse(source.contains("LiveSourceDecision.absent()"));
         assertTrue(source.contains("store.putComponent(reference, markerType, expected)"));
         assertTrue(source.contains("npc.setToDespawn()"));
         assertTrue(source.contains(

@@ -169,46 +169,55 @@ public final class CoopPopulationCaptureAdmissionService {
             return PlanResult.denied("coop-capture-durable-context-invalid");
         }
 
-        boolean newProfile = request.newlyEnsuredUnownedProfile();
-        long expectedRevision = newProfile
-                ? OwnerPopulationTransitionRequest.NEW_PROFILE_REVISION
-                : owner.revision();
-        long nextRevision = newProfile ? 1L : owner.revision() + 1L;
-        UUID expectedOwnerId = newProfile ? null : owner.ownerId();
-        String expectedWorld = newProfile ? null : owner.ownershipWorldName();
-        ClaimOccupancyEntry proposedClaim = new ClaimOccupancyEntry(
-                request.profileId(), request.ownerId(), CompanionLifecycleState.COOP,
-                null, nextRevision);
-        ClaimOccupancyTransition claimTransition = new ClaimOccupancyTransition(
-                claim, proposedClaim);
+        CaptureTransitionBasis basis = CaptureTransitionBasis.resolve(request, owner);
+        OwnerPopulationAdmissionPlan ownerPlan = ownerPlan(
+                request, owner, claim, policy, targetContext, basis);
+        ClaimAdmissionRequest claimRequest = claimRequest(
+                request, claim, policy, basis.nextRevision());
+        return PlanResult.allowed(policy, ownerPlan, claimRequest);
+    }
+
+    @Nonnull
+    private static OwnerPopulationAdmissionPlan ownerPlan(
+            CaptureRequest request,
+            @Nullable OwnerPopulationEntry owner,
+            @Nullable ClaimOccupancyEntry claim,
+            CompanionAdmissionPolicyResolver.Policy policy,
+            String targetContext,
+            CaptureTransitionBasis basis) {
         OwnerPopulationTransitionRequest ownerTransition = new OwnerPopulationTransitionRequest(
                 request.profileId(),
-                expectedRevision,
-                expectedOwnerId,
-                expectedWorld,
+                basis.expectedRevision(),
+                basis.expectedOwnerId(),
+                basis.expectedWorld(),
                 request.ownerId(),
-                expectedWorld,
+                basis.expectedWorld(),
                 CompanionLifecycleState.COOP,
                 OwnerPopulationOperation.LIFECYCLE_CHANGE,
                 policy.scope(),
                 policy.limit(),
                 false
         );
-        OwnerPopulationAdmissionPlan ownerPlan = new OwnerPopulationAdmissionPlan(
-                ownerTransition,
-                baseline(request, owner, claim),
-                request.sourceNpcUuid(),
-                null,
-                null,
-                null,
-                OPERATION_NAME,
-                ownerJson(expectedOwnerId),
-                ownerJson(request.ownerId()),
-                targetContext,
-                policy.settingsRevision(),
-                policy.claimContext().providerGeneration()
+        return new OwnerPopulationAdmissionPlan(
+                ownerTransition, baseline(request, owner, claim), request.sourceNpcUuid(),
+                null, null, null, OPERATION_NAME,
+                ownerJson(basis.expectedOwnerId()), ownerJson(request.ownerId()), targetContext,
+                policy.settingsRevision(), policy.claimContext().providerGeneration()
         );
-        ClaimAdmissionRequest claimRequest = new ClaimAdmissionRequest(
+    }
+
+    @Nonnull
+    private static ClaimAdmissionRequest claimRequest(
+            CaptureRequest request,
+            @Nullable ClaimOccupancyEntry claim,
+            CompanionAdmissionPolicyResolver.Policy policy,
+            long nextRevision) {
+        ClaimOccupancyEntry proposedClaim = new ClaimOccupancyEntry(
+                request.profileId(), request.ownerId(), CompanionLifecycleState.COOP,
+                null, nextRevision);
+        ClaimOccupancyTransition claimTransition = new ClaimOccupancyTransition(
+                claim, proposedClaim);
+        return new ClaimAdmissionRequest(
                 ClaimAdmissionOperation.COOP_CAPTURE,
                 List.of(claimTransition),
                 null,
@@ -219,7 +228,6 @@ public final class CoopPopulationCaptureAdmissionService {
                 false,
                 OwnerPopulationTransitionRequest.DEFAULT_LEASE_DURATION.toNanos()
         );
-        return PlanResult.allowed(policy, ownerPlan, claimRequest);
     }
 
     /** Validates both canonical alias directions and the exact paired population projection. */
@@ -380,6 +388,26 @@ public final class CoopPopulationCaptureAdmissionService {
             throw new IllegalArgumentException(field + " must not be blank");
         }
         return value.trim();
+    }
+
+    private record CaptureTransitionBasis(
+            long expectedRevision,
+            long nextRevision,
+            @Nullable UUID expectedOwnerId,
+            @Nullable String expectedWorld) {
+        private static CaptureTransitionBasis resolve(
+                CaptureRequest request,
+                @Nullable OwnerPopulationEntry owner) {
+            if (request.newlyEnsuredUnownedProfile()) {
+                return new CaptureTransitionBasis(
+                        OwnerPopulationTransitionRequest.NEW_PROFILE_REVISION,
+                        1L, null, null);
+            }
+            OwnerPopulationEntry existing = Objects.requireNonNull(owner, "owner");
+            return new CaptureTransitionBasis(
+                    existing.revision(), existing.revision() + 1L,
+                    existing.ownerId(), existing.ownershipWorldName());
+        }
     }
 
     public enum SourceKind {

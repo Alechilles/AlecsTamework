@@ -3,9 +3,12 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,7 +42,48 @@ class CommandLinkedNpcStateSnapshotServiceTest {
         assertTrue(addedIndex >= 0 && refreshIndex > addedIndex);
         assertTrue(removedIndex >= 0 && snapshotReasonIndex > removedIndex);
         assertTrue(npcGuardIndex >= 0 && addEvidenceIndex > npcGuardIndex);
+        assertTrue(source.contains("LoadedNpcIdentityIndex.LoadedNpcObservation"));
+        assertTrue(source.contains("projectionKey(marker)"));
         assertFalse(source.contains("markInitializationComplete"));
+    }
+
+    @Test
+    void projectionMarkerIsCopiedIntoAnImmutableIndexKey() {
+        UUID sourceUuid = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        TameworkProjectionIdentityComponent marker = new TameworkProjectionIdentityComponent(
+                " profile-a ",
+                " operation-a ",
+                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE,
+                " slot-a ",
+                sourceUuid,
+                2L
+        );
+
+        LoadedNpcIdentityIndex.ProjectionKey key =
+                CommandLinkedNpcStateSnapshotService.projectionKey(marker);
+
+        assertEquals("profile-a", key.profileId());
+        assertEquals("operation-a", key.operationId());
+        assertEquals(TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE,
+                key.projectionKind());
+        assertEquals("slot-a", key.slotKey());
+        assertEquals(sourceUuid, key.sourceNpcUuid());
+        assertEquals(2L, key.generation());
+    }
+
+    @Test
+    void incompleteProjectionMarkerIsExcludedFromExactIdentityIndexing() {
+        assertNull(CommandLinkedNpcStateSnapshotService.projectionKey(null));
+        assertNull(CommandLinkedNpcStateSnapshotService.projectionKey(
+                new TameworkProjectionIdentityComponent(
+                        "profile-a", "operation-a", " ", null, null, 0L
+                )
+        ));
+        assertNull(CommandLinkedNpcStateSnapshotService.projectionKey(
+                new TameworkProjectionIdentityComponent(
+                        "profile-a", "operation-a", "RECOVERY", null, null, -1L
+                )
+        ));
     }
 
     @Test
@@ -55,6 +99,9 @@ class CommandLinkedNpcStateSnapshotServiceTest {
         )));
         assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
                 TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION
+        )));
+        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
+                TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD
         )));
     }
 

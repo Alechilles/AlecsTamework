@@ -27,18 +27,31 @@ import org.joml.Vector3d;
 final class BreedingParentPreparationService {
     private final BreedingParentStateService parentStateService;
     private final BreedingParentCooldownResolver cooldownResolver;
+    private final BreedingParentLifecycleGate lifecycleGate;
 
     BreedingParentPreparationService() {
-        this(new BreedingParentStateService(), new BreedingParentCooldownResolver());
+        this(
+                new BreedingParentStateService(),
+                new BreedingParentCooldownResolver(),
+                new BreedingParentLifecycleGate()
+        );
     }
 
     BreedingParentPreparationService(
             @Nonnull BreedingParentStateService parentStateService,
             @Nonnull BreedingParentCooldownResolver cooldownResolver) {
+        this(parentStateService, cooldownResolver, new BreedingParentLifecycleGate());
+    }
+
+    BreedingParentPreparationService(
+            @Nonnull BreedingParentStateService parentStateService,
+            @Nonnull BreedingParentCooldownResolver cooldownResolver,
+            @Nonnull BreedingParentLifecycleGate lifecycleGate) {
         this.parentStateService = Objects.requireNonNull(
                 parentStateService, "parentStateService"
         );
         this.cooldownResolver = Objects.requireNonNull(cooldownResolver, "cooldownResolver");
+        this.lifecycleGate = Objects.requireNonNull(lifecycleGate, "lifecycleGate");
     }
 
     @Nullable
@@ -159,7 +172,9 @@ final class BreedingParentPreparationService {
                 )
                 && parentStateService.matchesIdentity(
                         prepared.partnerIdentity(), prepared.partnerRef(), partner, store
-                );
+                )
+                && lifecycleGate.inspect(prepared.sourceIdentity()).allowed()
+                && lifecycleGate.inspect(prepared.partnerIdentity()).allowed();
     }
 
     @Nullable

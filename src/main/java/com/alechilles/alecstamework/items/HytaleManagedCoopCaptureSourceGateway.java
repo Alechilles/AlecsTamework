@@ -51,7 +51,8 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
         }
         Ref<EntityStore> reference = world.getEntityRef(command.sourceNpcUuid());
         if (reference == null || !reference.isValid()) {
-            return LiveSourceDecision.absent();
+            return LiveSourceDecision.unavailable(
+                    "source_not_loaded_absence_unproven");
         }
         return retireResolvedSource(store, reference, command);
     }
@@ -140,7 +141,8 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
             @Nonnull RetirementCommand command) {
         return canTransitionFinalizedRelease(marker, command)
                 || canTransitionFinalizedImport(marker, command)
-                || canTransitionFinalizedRecovery(marker, command);
+                || canTransitionFinalizedRecovery(marker, command)
+                || canTransitionFinalizedBreedingChild(marker, command);
     }
 
     private static boolean canTransitionFinalizedRelease(
@@ -187,6 +189,22 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
                 && marker.getSourceNpcUuid() != null
                 && !marker.getSourceNpcUuid().equals(command.sourceNpcUuid())
                 && marker.getGeneration() == 0L;
+    }
+
+    private static boolean canTransitionFinalizedBreedingChild(
+            @Nullable TameworkProjectionIdentityComponent marker,
+            RetirementCommand command) {
+        return marker != null
+                && TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(
+                        marker.getProjectionKind())
+                && marker.getOperationId() != null
+                && marker.getOperationId().startsWith("breeding:")
+                && canonicalUuid(marker.getOperationId().substring("breeding:".length()))
+                && Objects.equals(marker.getProfileId(), command.profileId())
+                && marker.getSlotKey() != null
+                && !marker.getSlotKey().isBlank()
+                && Objects.equals(marker.getSourceNpcUuid(), command.sourceNpcUuid())
+                && marker.getGeneration() > 0L;
     }
 
     private static boolean canonicalUuid(@Nullable String value) {

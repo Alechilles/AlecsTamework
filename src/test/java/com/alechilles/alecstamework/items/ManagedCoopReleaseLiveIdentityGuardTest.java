@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex.Location;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex.Probe;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex.ProbeStatus;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseLiveIdentityGuard.AliasEvidence;
-import com.alechilles.alecstamework.items.ManagedCoopReleaseLiveIdentityGuard.ProjectionRead;
+import com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionProbe.Result;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityDecision;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityRequest;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityStatus;
@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,16 +62,16 @@ class ManagedCoopReleaseLiveIdentityGuardTest {
                         HISTORICAL, probe(HISTORICAL, ProbeStatus.ABSENT),
                         PLANNED, probe(PLANNED, ProbeStatus.ABSENT)
                 ),
-                (owningStore, planned, location) -> {
+                (request, owningStore) -> {
                     projectionReads.incrementAndGet();
-                    return ProjectionRead.unavailable("must_not_read");
+                    return Result.absent();
                 }
         );
 
         LiveIdentityDecision decision = guard.inspect(request(), store);
 
         assertEquals(LiveIdentityStatus.CLEAR_TO_SPAWN, decision.status());
-        assertEquals(0, projectionReads.get());
+        assertEquals(1, projectionReads.get());
     }
 
     @Test
@@ -119,12 +118,8 @@ class ManagedCoopReleaseLiveIdentityGuardTest {
     }
 
     @Test
-    void exactPlannedUuidAndEveryMarkerFieldReturnsMatching() {
-        TameworkProjectionIdentityComponent marker = marker(
-                "operation-a", "profile-a",
-                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE,
-                AUTHORITY.slotKey(2), SOURCE, 1L);
-        ManagedCoopReleaseLiveIdentityGuard guard = matchingGuard(marker);
+    void exactProjectionProbeResultReturnsMatching() {
+        ManagedCoopReleaseLiveIdentityGuard guard = matchingGuard();
 
         LiveIdentityDecision decision = guard.inspect(request(), store);
 
@@ -133,34 +128,21 @@ class ManagedCoopReleaseLiveIdentityGuardTest {
     }
 
     @Test
-    void mismatchInAnyMarkerFieldIsConflict() {
-        List<TameworkProjectionIdentityComponent> mismatches = List.of(
-                marker("other-operation", "profile-a", kind(), slot(), SOURCE, 1L),
-                marker("operation-a", "other-profile", kind(), slot(), SOURCE, 1L),
-                marker("operation-a", "profile-a", "RECOVERY", slot(), SOURCE, 1L),
-                marker("operation-a", "profile-a", kind(), "other-slot", SOURCE, 1L),
-                marker("operation-a", "profile-a", kind(), slot(), HISTORICAL, 1L),
-                marker("operation-a", "profile-a", kind(), slot(), SOURCE, 2L)
+    void alternateOrDuplicateMarkerEvidenceFailsLookupAndNeverClearsToSpawn() {
+        ManagedCoopReleaseLiveIdentityGuard guard = guard(
+                AliasEvidence.trusted(List.of(SOURCE)),
+                Map.of(
+                        SOURCE, probe(SOURCE, ProbeStatus.ABSENT),
+                        PLANNED, probe(PLANNED, ProbeStatus.ABSENT)
+                ),
+                (request, owningStore) -> Result.ambiguous(
+                        "release_projection_marker_found_at_unexpected_identity")
         );
 
-        for (TameworkProjectionIdentityComponent mismatch : mismatches) {
-            LiveIdentityDecision decision = matchingGuard(mismatch).inspect(request(), store);
-            assertEquals(LiveIdentityStatus.CONFLICT, decision.status());
-        }
-    }
+        LiveIdentityDecision decision = guard.inspect(request(), store);
 
-    @Test
-    void unavailableProjectionReadFailsLookupAndOtherStoreIsConflict() {
-        ManagedCoopReleaseLiveIdentityGuard unavailable = matchingGuard(
-                ProjectionRead.unavailable("projection_unloaded"));
-        ManagedCoopReleaseLiveIdentityGuard conflict = matchingGuard(
-                ProjectionRead.conflict("planned_uuid_loaded_in_other_store"));
-
-        LiveIdentityDecision unavailableDecision = unavailable.inspect(request(), store);
-        LiveIdentityDecision conflictDecision = conflict.inspect(request(), store);
-
-        assertEquals(LiveIdentityStatus.LOOKUP_FAILED, unavailableDecision.status());
-        assertEquals(LiveIdentityStatus.CONFLICT, conflictDecision.status());
+        assertEquals(LiveIdentityStatus.LOOKUP_FAILED, decision.status());
+        assertTrue(decision.detail().contains("unexpected_identity"));
     }
 
     @Test
@@ -191,35 +173,30 @@ class ManagedCoopReleaseLiveIdentityGuardTest {
                 guard.inspect(request(), store).status());
     }
 
-    private ManagedCoopReleaseLiveIdentityGuard matchingGuard(
-            TameworkProjectionIdentityComponent marker) {
-        return matchingGuard(ProjectionRead.found(marker));
-    }
-
-    private ManagedCoopReleaseLiveIdentityGuard matchingGuard(ProjectionRead read) {
+    private ManagedCoopReleaseLiveIdentityGuard matchingGuard() {
         return guard(
                 AliasEvidence.trusted(List.of(SOURCE)),
                 Map.of(
                         SOURCE, probe(SOURCE, ProbeStatus.ABSENT),
                         PLANNED, probe(PLANNED, ProbeStatus.ONE_LOCATION, LOCATION)
                 ),
-                (owningStore, planned, location) -> read
+                (request, owningStore) -> Result.present(PLANNED)
         );
     }
 
     private ManagedCoopReleaseLiveIdentityGuard guard(
             AliasEvidence aliases,
             Map<UUID, Probe> probes,
-            ManagedCoopReleaseLiveIdentityGuard.ProjectionReader reader) {
+            ManagedCoopReleaseLiveIdentityGuard.ProjectionProbeGateway projectionProbe) {
         return new ManagedCoopReleaseLiveIdentityGuard(
                 request -> aliases,
                 npcUuid -> probes.get(npcUuid),
-                reader
+                projectionProbe
         );
     }
 
-    private ManagedCoopReleaseLiveIdentityGuard.ProjectionReader unavailableReader() {
-        return (owningStore, planned, location) -> ProjectionRead.unavailable("unavailable");
+    private ManagedCoopReleaseLiveIdentityGuard.ProjectionProbeGateway unavailableReader() {
+        return (request, owningStore) -> Result.ambiguous("unavailable");
     }
 
     private LiveIdentityRequest request() {
@@ -242,16 +219,6 @@ class ManagedCoopReleaseLiveIdentityGuardTest {
                 SOURCE, SOURCE, null, "{}", "a".repeat(64), 1,
                 ResidentState.RELEASING, 1L, true, -100L, 0L, -100L, -90L
         );
-    }
-
-    private TameworkProjectionIdentityComponent marker(String operationId,
-                                                       String profileId,
-                                                       String projectionKind,
-                                                       String slotKey,
-                                                       UUID source,
-                                                       long generation) {
-        return new TameworkProjectionIdentityComponent(
-                profileId, operationId, projectionKind, slotKey, source, generation);
     }
 
     private Probe probe(UUID uuid, ProbeStatus status, Location... locations) {

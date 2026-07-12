@@ -8,6 +8,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -21,37 +22,70 @@ final class CompanionPopulationCoveragePublisher {
             catalogKeys();
 
     private final CompanionPopulationReconciliationCatalog catalog;
-    private final CompanionPopulationReconciliationRepository repository;
+    private final CatalogPruner pruner;
+    private final CoverageWriter writer;
 
     CompanionPopulationCoveragePublisher(
             @Nonnull CompanionPopulationReconciliationCatalog catalog,
             @Nonnull CompanionPopulationReconciliationRepository repository
     ) {
+        this(
+                catalog,
+                activeCoverageKeys -> committed(repository.pruneInactiveSourcesAsync(
+                        activeCoverageKeys
+                )),
+                coverage -> committed(repository.upsertCoverageAsync(coverage))
+        );
+    }
+
+    CompanionPopulationCoveragePublisher(
+            @Nonnull CompanionPopulationReconciliationCatalog catalog,
+            @Nonnull CoverageWriter writer
+    ) {
+        this(catalog, activeCoverageKeys -> CompletableFuture.completedFuture(true), writer);
+    }
+
+    private CompanionPopulationCoveragePublisher(
+            @Nonnull CompanionPopulationReconciliationCatalog catalog,
+            @Nonnull CatalogPruner pruner,
+            @Nonnull CoverageWriter writer
+    ) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
-        this.repository = Objects.requireNonNull(repository, "repository");
+        this.pruner = Objects.requireNonNull(pruner, "pruner");
+        this.writer = Objects.requireNonNull(writer, "writer");
     }
 
     @Nonnull
     CompletableFuture<Boolean> initializeAsync() {
-        return committed(repository.pruneInactiveSourcesAsync(
-                catalog.activeCoverageKeys(CATALOG_KEYS)
-        )).thenCompose(pruned -> {
+        return pruner.prune(catalog.activeCoverageKeys(CATALOG_KEYS)).thenCompose(pruned -> {
             if (!pruned) {
                 return CompletableFuture.completedFuture(false);
             }
-            CompletableFuture<Boolean> chain = CompletableFuture.completedFuture(true);
-            for (CompanionPopulationCoverageRecord.Dimension dimension : CATALOG_KEYS.keySet()) {
-                chain = chain.thenCompose(success -> success
-                        ? writeCatalogCoverage(
-                                dimension,
-                                CompanionPopulationCoverageRecord.State.RECONCILING,
-                                0,
-                                null
-                        )
-                        : CompletableFuture.completedFuture(false));
-            }
-            return chain;
+            return publishBothAsync(
+                    CompanionPopulationCoverageRecord.State.RECONCILING,
+                    "reconciliation-scan-in-progress",
+                    0,
+                    0
+            ).thenCompose(staged -> staged
+                    ? initializeCatalogCoverageAsync()
+                    : CompletableFuture.completedFuture(false));
         });
+    }
+
+    @Nonnull
+    private CompletableFuture<Boolean> initializeCatalogCoverageAsync() {
+        CompletableFuture<Boolean> chain = CompletableFuture.completedFuture(true);
+        for (CompanionPopulationCoverageRecord.Dimension dimension : CATALOG_KEYS.keySet()) {
+            chain = chain.thenCompose(success -> success
+                    ? writeCatalogCoverage(
+                            dimension,
+                            CompanionPopulationCoverageRecord.State.RECONCILING,
+                            0,
+                            null
+                    )
+                    : CompletableFuture.completedFuture(false));
+        }
+        return chain;
     }
 
     @Nonnull
@@ -83,12 +117,12 @@ final class CompanionPopulationCoveragePublisher {
                 state,
                 scanned,
                 reason
-        ).thenCompose(written -> writeOwnerCoverage(
+        ).thenCompose(globalWritten -> writeOwnerCoverage(
                 CompanionPopulationCoverageRecord.Dimension.PER_WORLD_OWNER,
                 state,
                 scanned,
                 reason + ":unresolved=" + unresolved
-        ));
+        ).thenApply(perWorldWritten -> globalWritten && perWorldWritten));
     }
 
     @Nonnull
@@ -107,7 +141,7 @@ final class CompanionPopulationCoveragePublisher {
                 perWorldState,
                 profiles,
                 perWorldReason
-        ));
+        ).thenApply(perWorldWritten -> globalWritten && perWorldWritten));
     }
 
     @Nonnull
@@ -166,7 +200,7 @@ final class CompanionPopulationCoveragePublisher {
     private CompletableFuture<Boolean> writeCoverage(
             @Nonnull CompanionPopulationCoverageRecord coverage
     ) {
-        return committed(repository.upsertCoverageAsync(coverage));
+        return writer.write(coverage);
     }
 
     private boolean allCatalogsSealed() {
@@ -204,5 +238,17 @@ final class CompanionPopulationCoveragePublisher {
             @Nonnull PersistenceWriteQueue.WriteSubmission<?> submission
     ) {
         return submission.completion().thenApply(PersistenceWriteQueue.WriteOutcome::isCommitted);
+    }
+
+    @FunctionalInterface
+    interface CoverageWriter {
+        @Nonnull
+        CompletableFuture<Boolean> write(@Nonnull CompanionPopulationCoverageRecord coverage);
+    }
+
+    @FunctionalInterface
+    private interface CatalogPruner {
+        @Nonnull
+        CompletableFuture<Boolean> prune(@Nonnull Set<String> activeCoverageKeys);
     }
 }

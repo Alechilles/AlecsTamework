@@ -163,7 +163,9 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                     return CompletableFuture.completedFuture(
                             new ManagedCoopReleaseRecoveryService.RecoveryOutcome(
                                     ManagedCoopReleaseRecoveryService.Status.READY,
-                                    claim, fixture.resident, null));
+                                    claim, fixture.resident,
+                                    new ManagedCoopReleaseRecoveryService.ProjectionToken(7L, 11L),
+                                    null));
                 },
                 command -> {
                     projected.set(command);
@@ -190,6 +192,8 @@ class ManagedCoopLifecycleRecoveryServiceTest {
         assertNotNull(projected.get());
         assertEquals(AUTHORITY.worldName(), projected.get().site().worldName());
         assertEquals(PLANNED, projected.get().claim().plannedTargetUuid());
+        assertEquals(new ManagedCoopReleaseRecoveryService.ProjectionToken(7L, 11L),
+                projected.get().recoveryToken());
     }
 
     @Test
@@ -208,7 +212,9 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                     return CompletableFuture.completedFuture(
                             new ManagedCoopReleaseRecoveryService.RecoveryOutcome(
                                     ManagedCoopReleaseRecoveryService.Status.READY,
-                                    claim, fixture.resident, null));
+                                    claim, fixture.resident,
+                                    new ManagedCoopReleaseRecoveryService.ProjectionToken(7L, 11L),
+                                    null));
                 },
                 command -> {
                     projected.set(command);
@@ -226,6 +232,8 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                 outcome.status());
         assertEquals(1, recoveryCalls.get());
         assertNotNull(projected.get());
+        assertEquals(new ManagedCoopReleaseRecoveryService.ProjectionToken(7L, 11L),
+                projected.get().recoveryToken());
         assertEquals(
                 ManagedCoopRuntimeOperationDispatcher.ReleaseSitePolicy
                         .EXACT_MANAGED_OR_DISABLED_REMOVAL,
@@ -244,7 +252,9 @@ class ManagedCoopLifecycleRecoveryServiceTest {
                         new ManagedCoopReleaseRecoveryService.RecoveryOutcome(
                                 ManagedCoopReleaseRecoveryService.Status.READY,
                                 releaseClaim(fixture, "different-operation"),
-                                fixture.resident, null)),
+                                fixture.resident,
+                                new ManagedCoopReleaseRecoveryService.ProjectionToken(7L, 11L),
+                                null)),
                 command -> {
                     projections.incrementAndGet();
                     return CompletableFuture.completedFuture(null);

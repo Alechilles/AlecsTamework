@@ -2,10 +2,13 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.npc.breeding.BreedingAttemptIdentity;
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthJob;
 import com.alechilles.alecstamework.npc.breeding.BreedingJobExecutionService;
 import com.alechilles.alecstamework.npc.breeding.BreedingPreparedPopulationRegistry;
 import com.alechilles.alecstamework.npc.breeding.PlannedChild;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.ownership.BreedingChildProjectionMarker;
 import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
 import com.alechilles.alecstamework.ownership.PreparedBreedingPopulationBatch;
 import com.hypixel.hytale.component.Ref;
@@ -147,7 +150,15 @@ final class BreedingPreparedChildSpawnService {
                 spawnRotation(context),
                 preparedPopulation.destination(job.jobId(), unitIndex),
                 reserved.plannedNpcUuid(),
-                (npc, holder, spawnStore) -> prepareSpawnHolder(job, unitIndex, holder)
+                BreedingChildProjectionMarker.create(
+                        BreedingAttemptIdentity.attemptKey(job.jobId()),
+                        reserved.childKey(),
+                        reserved.profileId(),
+                        reserved.plannedNpcUuid()
+                ),
+                (npc, holder, spawnStore) -> prepareSpawnHolder(
+                        job, unitIndex, reserved, npc, holder
+                )
         );
     }
 
@@ -207,7 +218,10 @@ final class BreedingPreparedChildSpawnService {
     private String prepareSpawnHolder(
             BreedingBirthJob job,
             int unitIndex,
+            PreparedBreedingPopulationBatch.ReservedChild reserved,
+            NPCEntity npc,
             com.hypixel.hytale.component.Holder<EntityStore> holder) {
+        installReservedLegacyUuid(npc, reserved);
         OwnerComponentMutationService.WriteResult write =
                 preparedPopulation.writeSpawnHolder(job.jobId(), unitIndex, holder);
         if (write.applied()) {
@@ -219,6 +233,13 @@ final class BreedingPreparedChildSpawnService {
             preparedPopulation.retainAmbiguous(job.jobId(), unitIndex, write.reason());
         }
         return write.reason();
+    }
+
+    /** Keeps the legacy NPC identity aligned with the reserved UUID before world insertion. */
+    static void installReservedLegacyUuid(
+            @Nonnull NPCEntity npc,
+            @Nonnull PreparedBreedingPopulationBatch.ReservedChild reserved) {
+        npc.setLegacyUUID(reserved.plannedNpcUuid());
     }
 
     private void initializeSpawnedChild(
@@ -264,6 +285,7 @@ final class BreedingPreparedChildSpawnService {
                 child.adultRoleId(),
                 TwBreedingConfig.Gender.fromConfigValue(child.gender()),
                 lifecycleFamily(context.config(), child),
+                CompanionLifeStageService.LifecycleFamilyResolution.PLANNED_SELECTION_ONLY,
                 resolution -> logInfo(
                         "Breeding child cooldown resolved: job=" + job.jobId()
                                 + " durationMs=" + resolution.durationMs() + "."

@@ -1,11 +1,14 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepairRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
@@ -31,11 +34,18 @@ final class CompanionPopulationOperationRecoveryTestSupport {
         PersistenceWriteQueue queue = new PersistenceWriteQueue(
                 connections, new PersistenceHealthService(), null
         );
-        CompanionPopulationRepository repository = new CompanionPopulationRepository(connections, queue);
+        ManagedCoopResidentRepository residents = new ManagedCoopResidentRepository(
+                connections, queue);
+        CoopLifecycleOperationRepository lifecycle = new CoopLifecycleOperationRepository(
+                connections, queue, residents);
+        CompanionPopulationRepository repository = new CompanionPopulationRepository(
+                connections, queue, lifecycle);
         return new Harness(
                 connections,
                 queue,
                 repository,
+                residents,
+                lifecycle,
                 new CompanionPopulationRepairRepository(queue),
                 new CompanionPopulationOperationRecoveryService(repository)
         );
@@ -156,7 +166,9 @@ final class CompanionPopulationOperationRecoveryTestSupport {
             journal.setString(3, operationState.name());
             journal.setString(4, stateJson(oldOwner, oldLifecycle, oldWorld));
             journal.setString(5, stateJson(newOwner, newLifecycle, newWorld));
-            journal.setString(6, "{\"" + targetKey + "\":\"" + npcUuid
+            String breedingFields = breedingContext
+                    ? "\"idempotencyKey\":\"attempt\",\"childKey\":\"child-0000\"," : "";
+            journal.setString(6, "{" + breedingFields + "\"" + targetKey + "\":\"" + npcUuid
                     + "\",\"world\":\"" + newWorld + "\",\"chunkX\":0,\"chunkZ\":0}");
             journal.executeUpdate();
         }
@@ -179,6 +191,24 @@ final class CompanionPopulationOperationRecoveryTestSupport {
             update.setString(1, targetContextJson);
             update.executeUpdate();
         }
+    }
+
+    static void markPermanentRelease(Harness harness, UUID npcUuid) throws Exception {
+        updateTargetContext(
+                harness,
+                "{\"npcUuid\":\"" + npcUuid
+                        + "\",\"world\":\"default\",\"chunkX\":0,\"chunkZ\":0,"
+                        + "\"permanentRelease\":true}"
+        );
+    }
+
+    static void markPermanentDeath(Harness harness, UUID npcUuid) throws Exception {
+        updateTargetContext(
+                harness,
+                "{\"npcUuid\":\"" + npcUuid
+                        + "\",\"world\":\"default\",\"chunkX\":0,\"chunkZ\":0,"
+                        + "\"permanentRelease\":true,\"permanentDeath\":true}"
+        );
     }
 
     static CompanionPopulationEvidence physical(UUID npcUuid,
@@ -237,14 +267,24 @@ final class CompanionPopulationOperationRecoveryTestSupport {
     record Harness(SqliteConnectionManager connections,
                    PersistenceWriteQueue queue,
                    CompanionPopulationRepository repository,
+                   ManagedCoopResidentRepository residents,
+                   CoopLifecycleOperationRepository lifecycle,
                    CompanionPopulationRepairRepository repair,
                    CompanionPopulationOperationRecoveryService recovery) implements AutoCloseable {
         CompanionPopulationOperationRecoveryService.RecoveryResult recover(
                 List<CompanionPopulationEvidence> evidence
         ) throws Exception {
+            return recover(evidence, new LoadedNpcIdentitySnapshot(0L, true, List.of()));
+        }
+
+        CompanionPopulationOperationRecoveryService.RecoveryResult recover(
+                List<CompanionPopulationEvidence> evidence,
+                LoadedNpcIdentitySnapshot loadedIdentities
+        ) throws Exception {
             return recovery.recoverAsync(
                     repository.loadNonterminalOperations(),
-                    new CompanionPopulationEvidenceSet(evidence)
+                    new CompanionPopulationEvidenceSet(evidence),
+                    loadedIdentities
             ).get(3, TimeUnit.SECONDS);
         }
 

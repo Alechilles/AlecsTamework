@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -21,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -33,6 +36,7 @@ import javax.annotation.Nullable;
  * world/store only until their scheduled task finishes, and probes never scan {@link Universe}.
  */
 public final class LoadedNpcIdentityBootstrapService {
+    private static final int MAX_CONCURRENT_MUTATION_RETRIES = 1;
     private static final String WARNING_PREFIX =
             "Loaded NPC identity bootstrap is incomplete; absence checks remain UNKNOWN. ";
 
@@ -42,6 +46,8 @@ public final class LoadedNpcIdentityBootstrapService {
     private final Object stateLock = new Object();
     private final Set<LoadedNpcIdentityIndex.Location> pendingLocations = ConcurrentHashMap.newKeySet();
     private final Set<LoadedNpcIdentityIndex.Location> failedLocations = ConcurrentHashMap.newKeySet();
+    private final Map<LoadedNpcIdentityIndex.Location, Integer> mutationRetries = new LinkedHashMap<>();
+    private CompletableFuture<LoadedNpcIdentitySnapshot> bootstrapReady = new CompletableFuture<>();
 
     private long attemptGeneration;
     private boolean unresolvedGlobalFailure;
@@ -97,7 +103,7 @@ public final class LoadedNpcIdentityBootstrapService {
         Throwable resolutionFailure = null;
         synchronized (stateLock) {
             beginAdditionalAttemptIfIdleLocked();
-            identityIndex.markInitializationIncomplete();
+            markCoverageIncompleteLocked();
             try {
                 target = Objects.requireNonNull(
                         targetSource.targetForWorld(event.getWorld()),
@@ -132,6 +138,7 @@ public final class LoadedNpcIdentityBootstrapService {
         identityIndex.clearLocation(location);
         synchronized (stateLock) {
             failedLocations.remove(location);
+            mutationRetries.remove(location);
             completeIfReadyLocked(attemptGeneration);
         }
     }
@@ -145,6 +152,21 @@ public final class LoadedNpcIdentityBootstrapService {
         return Set.copyOf(pendingLocations);
     }
 
+    /** Returns a non-blocking future for the next complete, authoritative loaded-identity snapshot. */
+    @Nonnull
+    public CompletableFuture<LoadedNpcIdentitySnapshot> awaitCurrentBootstrap() {
+        synchronized (stateLock) {
+            if (bootstrapReady.isDone()) {
+                LoadedNpcIdentitySnapshot current = identityIndex.snapshot();
+                if (current.initializationComplete()) {
+                    return CompletableFuture.completedFuture(current);
+                }
+                bootstrapReady = new CompletableFuture<>();
+            }
+            return bootstrapReady.copy();
+        }
+    }
+
     void scheduleStartedTarget(@Nonnull ScanTarget target) {
         Objects.requireNonNull(target, "target");
         if (hasUnresolvedBootstrapFailure()) {
@@ -153,12 +175,13 @@ public final class LoadedNpcIdentityBootstrapService {
         long generation;
         synchronized (stateLock) {
             beginAdditionalAttemptIfIdleLocked();
-            identityIndex.markInitializationIncomplete();
+            markCoverageIncompleteLocked();
             generation = attemptGeneration;
             if (!pendingLocations.add(target.location())) {
                 return;
             }
             failedLocations.remove(target.location());
+            mutationRetries.remove(target.location());
         }
         scheduleTarget(generation, target);
     }
@@ -173,9 +196,10 @@ public final class LoadedNpcIdentityBootstrapService {
         attemptGeneration++;
         pendingLocations.clear();
         failedLocations.clear();
+        mutationRetries.clear();
         unresolvedGlobalFailure = false;
         warningLogged = false;
-        identityIndex.markInitializationIncomplete();
+        markCoverageIncompleteLocked();
         return attemptGeneration;
     }
 
@@ -201,46 +225,72 @@ public final class LoadedNpcIdentityBootstrapService {
     }
 
     private void runScan(long generation, @Nonnull ScanTarget target) {
-        if (!beginCurrentScan(generation, target.location())) {
+        Long scanRevision = beginCurrentScan(generation, target.location());
+        if (scanRevision == null) {
             return;
         }
-        Set<UUID> scannedUuids = new LinkedHashSet<>();
+        Set<LoadedNpcIdentityIndex.LoadedNpcObservation> observations = new LinkedHashSet<>();
         try {
-            target.scanner().scan((componentUuid, legacyNpcUuid) -> {
-                if (componentUuid != null) {
-                    scannedUuids.add(componentUuid);
-                }
-                if (legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)) {
-                    scannedUuids.add(legacyNpcUuid);
+            target.scanner().scan((componentUuid, legacyNpcUuid, projectionKey) -> {
+                if (componentUuid != null || legacyNpcUuid != null) {
+                    observations.add(new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                            componentUuid,
+                            legacyNpcUuid,
+                            target.location(),
+                            projectionKey
+                    ));
                 }
             });
-            commitSuccessfulScan(generation, target.location(), scannedUuids);
+            ScanCommitOutcome outcome = commitSuccessfulScan(
+                    generation, target.location(), observations, scanRevision
+            );
+            if (outcome == ScanCommitOutcome.RETRY) {
+                scheduleTarget(generation, target);
+            } else if (outcome == ScanCommitOutcome.FAILED) {
+                finishFailure(
+                        generation,
+                        target.location(),
+                        "Retry after concurrent entity lifecycle mutations settle.",
+                        new IllegalStateException("Entity lifecycle changed during identity scan.")
+                );
+            }
         } catch (Throwable error) {
             finishFailure(generation, target.location(), "Retry after the entity-store scan error is resolved.", error);
         }
     }
 
-    private boolean beginCurrentScan(long generation, @Nonnull LoadedNpcIdentityIndex.Location location) {
+    @Nullable
+    private Long beginCurrentScan(long generation,
+                                  @Nonnull LoadedNpcIdentityIndex.Location location) {
         synchronized (stateLock) {
             if (generation != attemptGeneration || !pendingLocations.contains(location)) {
-                return false;
+                return null;
             }
-            identityIndex.markInitializationIncomplete();
-            identityIndex.clearLocation(location);
-            return true;
+            markCoverageIncompleteLocked();
+            return identityIndex.locationMutationRevision(location);
         }
     }
 
-    private void commitSuccessfulScan(long generation,
-                                      @Nonnull LoadedNpcIdentityIndex.Location location,
-                                      @Nonnull Collection<UUID> scannedUuids) {
+    private ScanCommitOutcome commitSuccessfulScan(
+            long generation,
+            @Nonnull LoadedNpcIdentityIndex.Location location,
+            @Nonnull Collection<LoadedNpcIdentityIndex.LoadedNpcObservation> observations,
+            long expectedRevision) {
         synchronized (stateLock) {
             if (generation != attemptGeneration || !pendingLocations.contains(location)) {
-                return;
+                return ScanCommitOutcome.SUPERSEDED;
             }
-            identityIndex.replaceLocation(location, scannedUuids);
+            if (!identityIndex.replaceLocationObservationsIfUnchanged(
+                    location, observations, expectedRevision
+            )) {
+                int retries = mutationRetries.merge(location, 1, Integer::sum);
+                return retries <= MAX_CONCURRENT_MUTATION_RETRIES
+                        ? ScanCommitOutcome.RETRY : ScanCommitOutcome.FAILED;
+            }
             pendingLocations.remove(location);
+            mutationRetries.remove(location);
             completeIfReadyLocked(generation);
+            return ScanCommitOutcome.COMMITTED;
         }
     }
 
@@ -255,7 +305,8 @@ public final class LoadedNpcIdentityBootstrapService {
             }
             pendingLocations.remove(location);
             failedLocations.add(location);
-            identityIndex.markInitializationIncomplete();
+            mutationRetries.remove(location);
+            markCoverageIncompleteLocked();
             shouldWarn = !warningLogged;
             warningLogged = true;
         }
@@ -273,6 +324,17 @@ public final class LoadedNpcIdentityBootstrapService {
             return;
         }
         identityIndex.markInitializationComplete();
+        LoadedNpcIdentitySnapshot snapshot = identityIndex.snapshot();
+        if (snapshot.initializationComplete()) {
+            bootstrapReady.complete(snapshot);
+        }
+    }
+
+    private void markCoverageIncompleteLocked() {
+        if (bootstrapReady.isDone()) {
+            bootstrapReady = new CompletableFuture<>();
+        }
+        identityIndex.markInitializationIncomplete();
     }
 
     private void warnOnce(@Nonnull String action, @Nonnull Throwable error) {
@@ -347,6 +409,8 @@ public final class LoadedNpcIdentityBootstrapService {
                                   @Nonnull IdentityRecorder recorder) {
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, UUIDComponent> uuidType = UUIDComponent.getComponentType();
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
         if (npcType == null || uuidType == null) {
             throw new IllegalStateException("NPCEntity or UUIDComponent type is unavailable.");
         }
@@ -359,7 +423,15 @@ public final class LoadedNpcIdentityBootstrapService {
                         if (npc == null || uuidComponent == null) {
                             continue;
                         }
-                        recorder.record(uuidComponent.getUuid(), npc.getUuid());
+                        Ref<EntityStore> reference = chunk.getReferenceTo(index);
+                        TameworkProjectionIdentityComponent marker = markerType != null
+                                && reference != null
+                                ? store.getComponent(reference, markerType) : null;
+                        recorder.record(
+                                uuidComponent.getUuid(),
+                                npc.getUuid(),
+                                CommandLinkedNpcStateSnapshotService.projectionKey(marker)
+                        );
                     }
                 }
         );
@@ -393,9 +465,21 @@ public final class LoadedNpcIdentityBootstrapService {
         void scan(@Nonnull IdentityRecorder recorder);
     }
 
-    @FunctionalInterface
     interface IdentityRecorder {
-        void record(@Nullable UUID componentUuid, @Nullable UUID legacyNpcUuid);
+        void record(@Nullable UUID componentUuid,
+                    @Nullable UUID legacyNpcUuid,
+                    @Nullable LoadedNpcIdentityIndex.ProjectionKey projectionKey);
+
+        default void record(@Nullable UUID componentUuid, @Nullable UUID legacyNpcUuid) {
+            record(componentUuid, legacyNpcUuid, null);
+        }
+    }
+
+    private enum ScanCommitOutcome {
+        COMMITTED,
+        SUPERSEDED,
+        RETRY,
+        FAILED
     }
 
     @FunctionalInterface

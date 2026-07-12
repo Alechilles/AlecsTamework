@@ -22,6 +22,17 @@ class LoadedNpcIdentityIndexTest {
             new LoadedNpcIdentityIndex.Location("world-a", "store-a");
     private static final LoadedNpcIdentityIndex.Location WORLD_B =
             new LoadedNpcIdentityIndex.Location("world-b", "store-b");
+    private static final UUID OTHER_UUID =
+            UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final LoadedNpcIdentityIndex.ProjectionKey PROJECTION_KEY =
+            new LoadedNpcIdentityIndex.ProjectionKey(
+                    "profile-a",
+                    "operation-a",
+                    "MANAGED_COOP_RELEASE",
+                    "slot-a",
+                    NPC_UUID,
+                    1L
+            );
 
     @Test
     void absenceIsUnknownUntilStoreBootstrapCompletes() {
@@ -129,6 +140,198 @@ class LoadedNpcIdentityIndexTest {
     }
 
     @Test
+    void exactProjectionProbeSharesTheUuidCompletenessBarrier() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+
+        assertEquals(
+                LoadedNpcIdentityIndex.ProjectionProbeStatus.UNKNOWN,
+                index.probeProjection(PROJECTION_KEY).status()
+        );
+
+        index.markInitializationComplete();
+
+        LoadedNpcIdentityIndex.ProjectionProbe probe = index.probeProjection(PROJECTION_KEY);
+        assertEquals(LoadedNpcIdentityIndex.ProjectionProbeStatus.ABSENT, probe.status());
+        assertTrue(probe.matches().isEmpty());
+        assertThrows(
+                UnsupportedOperationException.class,
+                () -> probe.matches().add(observation(NPC_UUID, WORLD_A, PROJECTION_KEY))
+        );
+    }
+
+    @Test
+    void duplicateProjectionMarkersRemainDistinctWithinOneStore() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        LoadedNpcIdentityIndex.LoadedNpcObservation first = observation(
+                NPC_UUID, WORLD_A, PROJECTION_KEY
+        );
+        LoadedNpcIdentityIndex.LoadedNpcObservation second = observation(
+                OTHER_UUID, WORLD_A, PROJECTION_KEY
+        );
+
+        index.recordAdded(second);
+        index.recordAdded(first);
+        index.recordAdded(first);
+
+        LoadedNpcIdentityIndex.ProjectionProbe duplicate = index.probeProjection(PROJECTION_KEY);
+        assertEquals(
+                LoadedNpcIdentityIndex.ProjectionProbeStatus.MULTIPLE_MATCHES,
+                duplicate.status()
+        );
+        assertEquals(List.of(NPC_UUID, OTHER_UUID), duplicate.matches().stream()
+                .map(LoadedNpcIdentityIndex.LoadedNpcObservation::componentUuid)
+                .toList());
+        assertEquals(
+                LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION,
+                index.probe(NPC_UUID).status()
+        );
+
+        index.recordRemoved(new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                NPC_UUID, NPC_UUID, WORLD_A, null
+        ));
+
+        LoadedNpcIdentityIndex.ProjectionProbe remaining = index.probeProjection(PROJECTION_KEY);
+        assertEquals(LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH, remaining.status());
+        assertEquals(OTHER_UUID, remaining.matches().getFirst().componentUuid());
+    }
+
+    @Test
+    void markerRefreshReplacesTheSameEntityInsteadOfInventingAnotherMatch() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        LoadedNpcIdentityIndex.ProjectionKey replacementKey =
+                new LoadedNpcIdentityIndex.ProjectionKey(
+                        "profile-a", "operation-b", "RECOVERY", null, null, 0L
+                );
+        index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
+
+        index.recordAdded(observation(NPC_UUID, WORLD_A, replacementKey));
+        index.markInitializationComplete();
+
+        assertEquals(
+                LoadedNpcIdentityIndex.ProjectionProbeStatus.ABSENT,
+                index.probeProjection(PROJECTION_KEY).status()
+        );
+        assertEquals(
+                LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH,
+                index.probeProjection(replacementKey).status()
+        );
+    }
+
+    @Test
+    void locationReplacementAtomicallyReconcilesProjectionObservations() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
+
+        index.replaceLocationObservations(
+                WORLD_A,
+                List.of(observation(OTHER_UUID, WORLD_A, PROJECTION_KEY))
+        );
+        index.markInitializationComplete();
+
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ABSENT, index.probe(NPC_UUID).status());
+        assertEquals(LoadedNpcIdentityIndex.ProbeStatus.ONE_LOCATION, index.probe(OTHER_UUID).status());
+        assertEquals(
+                OTHER_UUID,
+                index.probeProjection(PROJECTION_KEY).matches().getFirst().componentUuid()
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> index.replaceLocationObservations(
+                        WORLD_A,
+                        List.of(observation(NPC_UUID, WORLD_B, PROJECTION_KEY))
+                )
+        );
+    }
+
+    @Test
+    void everyLocationMutationAndCompletenessTransitionAdvancesSnapshotRevision() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        long revision = index.snapshot().mutationRevision();
+
+        index.recordAdded(NPC_UUID, WORLD_A);
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.recordRemoved(NPC_UUID, WORLD_A);
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.recordRemoved(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.clearLocation(WORLD_A);
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.replaceLocation(WORLD_A, List.of(NPC_UUID));
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.replaceLocationObservations(
+                WORLD_A, List.of(observation(NPC_UUID, WORLD_A, PROJECTION_KEY))
+        );
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        long locationRevision = index.locationMutationRevision(WORLD_A);
+        assertTrue(index.replaceLocationObservationsIfUnchanged(
+                WORLD_A, List.of(observation(NPC_UUID, WORLD_A, PROJECTION_KEY)), locationRevision
+        ));
+        assertEquals(++revision, index.snapshot().mutationRevision());
+
+        index.markInitializationComplete();
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.markInitializationComplete();
+        assertEquals(revision, index.snapshot().mutationRevision());
+        index.markInitializationIncomplete();
+        assertEquals(++revision, index.snapshot().mutationRevision());
+        index.markInitializationIncomplete();
+        assertEquals(revision, index.snapshot().mutationRevision());
+    }
+
+    @Test
+    void atomicSnapshotIsImmutableCompleteAndDeterministicallyOrdered() {
+        LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
+        index.recordAdded(observation(OTHER_UUID, WORLD_B, PROJECTION_KEY));
+        index.recordAdded(observation(NPC_UUID, WORLD_A, PROJECTION_KEY));
+
+        LoadedNpcIdentitySnapshot incomplete = index.snapshot();
+
+        assertFalse(incomplete.initializationComplete());
+        assertEquals(List.of(NPC_UUID, OTHER_UUID), incomplete.observations().stream()
+                .map(LoadedNpcIdentityIndex.LoadedNpcObservation::componentUuid)
+                .toList());
+        assertThrows(UnsupportedOperationException.class,
+                () -> incomplete.observations().add(observation(NPC_UUID, WORLD_A, PROJECTION_KEY)));
+
+        index.markInitializationComplete();
+
+        assertFalse(index.isMutationRevisionCurrent(incomplete.mutationRevision()));
+        assertTrue(index.snapshot().initializationComplete());
+    }
+
+    @Test
+    void projectionRecordsRejectIncompleteOrInconsistentEvidence() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new LoadedNpcIdentityIndex.ProjectionKey(
+                        " ", "operation-a", "RECOVERY", null, null, 0L
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new LoadedNpcIdentityIndex.ProjectionKey(
+                        "profile-a", "operation-a", "RECOVERY", null, null, -1L
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                        null, null, WORLD_A, null
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new LoadedNpcIdentityIndex.ProjectionProbe(
+                        PROJECTION_KEY,
+                        LoadedNpcIdentityIndex.ProjectionProbeStatus.ONE_MATCH,
+                        List.of()
+                )
+        );
+    }
+
+    @Test
     void concurrentReplayProducesDeterministicEvidence() throws Exception {
         LoadedNpcIdentityIndex index = new LoadedNpcIdentityIndex();
         ExecutorService executor = Executors.newFixedThreadPool(8);
@@ -176,5 +379,14 @@ class LoadedNpcIdentityIndexTest {
         for (Future<?> future : futures) {
             future.get(10, TimeUnit.SECONDS);
         }
+    }
+
+    private static LoadedNpcIdentityIndex.LoadedNpcObservation observation(
+            UUID componentUuid,
+            LoadedNpcIdentityIndex.Location location,
+            LoadedNpcIdentityIndex.ProjectionKey projectionKey) {
+        return new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                componentUuid, componentUuid, location, projectionKey
+        );
     }
 }

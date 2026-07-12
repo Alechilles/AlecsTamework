@@ -15,6 +15,7 @@ import javax.annotation.Nullable;
 final class BreedingPopulationReplayService {
     private static final String OPERATION_TYPE = OwnerPopulationOperation.BREEDING.name();
 
+    private final BreedingPersistedProjectionReplayGuard projectionGuard;
     private final Map<String, Attempt> attempts = new HashMap<>();
     private final Map<ParentPair, Set<String>> pendingAttemptsByPair = new HashMap<>();
     private final Map<String, Set<String>> pendingAttemptsByParent = new HashMap<>();
@@ -27,13 +28,21 @@ final class BreedingPopulationReplayService {
 
     BreedingPopulationReplayService(@Nonnull List<CompanionPopulationOperationRecord> operations,
                                     boolean loaded) {
+        this(operations, loaded, new BreedingPersistedProjectionReplayGuard());
+    }
+
+    BreedingPopulationReplayService(
+            @Nonnull List<CompanionPopulationOperationRecord> operations,
+            boolean loaded,
+            @Nonnull BreedingPersistedProjectionReplayGuard projectionGuard) {
+        this.projectionGuard = Objects.requireNonNull(projectionGuard, "projectionGuard");
         this.loaded = loaded;
         ingestAll(operations);
     }
 
     synchronized void replace(@Nonnull List<CompanionPopulationOperationRecord> operations) {
         attempts.clear();
-        loaded = true;
+        loaded = projectionGuard.ready();
         ingestAll(operations);
     }
 
@@ -49,13 +58,13 @@ final class BreedingPopulationReplayService {
     @Nonnull
     synchronized BreedingPopulationReplayState state(@Nonnull String attemptKey) {
         String key = requireText(attemptKey, "attemptKey");
-        if (!loaded) {
+        if (!loaded || !projectionGuard.ready()) {
             return empty(false, "breeding-replay-journal-unavailable");
         }
         Attempt attempt = attempts.get(key);
         return attempt == null
                 ? empty(true, "breeding-replay-empty")
-                : attempt.snapshot();
+                : snapshotCurrent(attempt);
     }
 
     /**
@@ -69,7 +78,7 @@ final class BreedingPopulationReplayService {
     ) {
         String world = requireText(worldName, "worldName");
         ParentPair pair = ParentPair.from(parentProfileIds);
-        if (!loaded) {
+        if (!loaded || !projectionGuard.ready()) {
             return empty(false, "breeding-replay-journal-unavailable");
         }
         if (!pendingAttemptsWithoutPairMetadata.isEmpty()) {
@@ -89,6 +98,9 @@ final class BreedingPopulationReplayService {
         if (attempt == null) {
             return empty(false, "breeding-replay-pair-index-conflict");
         }
+        if (!attempt.replayEvidenceCurrent(projectionGuard)) {
+            return attempt.snapshot(false, "breeding-replay-projection-evidence-changed");
+        }
         if (!world.equals(attempt.worldName)) {
             return attempt.snapshot(false, "breeding-replay-world-mismatch");
         }
@@ -96,7 +108,7 @@ final class BreedingPopulationReplayService {
     }
 
     synchronized boolean accepts(@Nonnull BreedingPopulationAdmissionRequest request) {
-        if (!loaded) {
+        if (!loaded || !projectionGuard.ready()) {
             return false;
         }
         String attemptKey = requireText(request.idempotencyKey(), "attemptKey");
@@ -111,7 +123,24 @@ final class BreedingPopulationReplayService {
             }
         }
         Attempt attempt = attempts.get(attemptKey);
-        return attempt == null || attempt.compatibleWith(request);
+        return attempt == null
+                || attempt.replayEvidenceCurrent(projectionGuard)
+                && attempt.compatibleWith(request);
+    }
+
+    /** Revalidates the exact pending child's restart token at the physical spawn-claim boundary. */
+    synchronized boolean currentForSpawn(
+            @Nonnull String attemptKey,
+            @Nonnull String childKey) {
+        if (!loaded || !projectionGuard.ready()) {
+            return false;
+        }
+        Attempt attempt = attempts.get(requireText(attemptKey, "attemptKey"));
+        String child = requireText(childKey, "childKey");
+        return attempt != null
+                && !attempt.conflicted
+                && attempt.pendingChildren.contains(child)
+                && attempt.replayEvidenceCurrent(child, projectionGuard);
     }
 
     /** Records only the exact stable prefix that the shared authority successfully admitted. */
@@ -119,12 +148,15 @@ final class BreedingPopulationReplayService {
             @Nonnull BreedingPopulationAdmissionRequest request,
             @Nonnull List<PreparedBreedingPopulationBatch.ReservedChild> admittedChildren
     ) {
-        if (!loaded) {
+        if (!loaded || !projectionGuard.ready()) {
             return false;
         }
-        Attempt attempt = attempts.computeIfAbsent(
-                requireText(request.idempotencyKey(), "attemptKey"), Attempt::new
-        );
+        String attemptKey = requireText(request.idempotencyKey(), "attemptKey");
+        Attempt existing = attempts.get(attemptKey);
+        if (existing != null && !existing.replayEvidenceCurrent(projectionGuard)) {
+            return false;
+        }
+        Attempt attempt = attempts.computeIfAbsent(attemptKey, Attempt::new);
         attempt.mergeRequest(request);
         for (PreparedBreedingPopulationBatch.ReservedChild child : List.copyOf(admittedChildren)) {
             if (child == null || !matchesIdentity(
@@ -146,7 +178,7 @@ final class BreedingPopulationReplayService {
                                       @Nonnull String profileId,
                                       @Nonnull UUID plannedNpcUuid,
                                       @Nonnull BreedingBirthPlanSnapshot plan) {
-        if (!loaded) {
+        if (!loaded || !projectionGuard.ready()) {
             return;
         }
         String key = requireText(attemptKey, "attemptKey");
@@ -164,7 +196,7 @@ final class BreedingPopulationReplayService {
     synchronized void recordAborted(@Nonnull String attemptKey,
                                     @Nonnull String childKey,
                                     @Nonnull BreedingBirthPlanSnapshot plan) {
-        if (!loaded) {
+        if (!loaded || !projectionGuard.ready()) {
             return;
         }
         String key = requireText(attemptKey, "attemptKey");
@@ -204,7 +236,24 @@ final class BreedingPopulationReplayService {
         }
         attempt.mergeMetadata(target.parentProfileIds(), target.worldName());
         mergePersistedPlan(attempt, target, operation.state());
-        if (operation.state() == CompanionPopulationOperationRecord.State.COMMITTED) {
+        boolean committedByProjection = false;
+        if (operation.state() == CompanionPopulationOperationRecord.State.RETRYABLE) {
+            BreedingPersistedProjectionReplayGuard.Decision projection =
+                    projectionGuard.inspect(operation, target);
+            committedByProjection = projection.status()
+                    == BreedingPersistedProjectionReplayGuard.Status.COMMITTED_BY_EVIDENCE;
+            if (projection.status() == BreedingPersistedProjectionReplayGuard.Status.BLOCKED) {
+                attempt.conflicted = true;
+                attempt.conflictReason = projection.detail();
+            } else if (projection.status()
+                    == BreedingPersistedProjectionReplayGuard.Status.CLEAR) {
+                attempt.addReplayToken(
+                        target.childKey(),
+                        Objects.requireNonNull(projection.replayToken(), "replayToken"));
+            }
+        }
+        if (operation.state() == CompanionPopulationOperationRecord.State.COMMITTED
+                || committedByProjection) {
             attempt.commit(target.childKey());
         } else if (operation.state() == CompanionPopulationOperationRecord.State.FAILED) {
             attempt.abort(target.childKey());
@@ -294,6 +343,13 @@ final class BreedingPopulationReplayService {
         );
     }
 
+    @Nonnull
+    private BreedingPopulationReplayState snapshotCurrent(@Nonnull Attempt attempt) {
+        return attempt.replayEvidenceCurrent(projectionGuard)
+                ? attempt.snapshot()
+                : attempt.snapshot(false, "breeding-replay-projection-evidence-changed");
+    }
+
     private static final class Attempt {
         private final String attemptKey;
         @Nullable
@@ -305,7 +361,11 @@ final class BreedingPopulationReplayService {
         private final Set<String> pendingChildren = new HashSet<>();
         private final Set<String> committedChildren = new HashSet<>();
         private final Set<String> abortedChildren = new HashSet<>();
+        private final Map<String, BreedingPersistedProjectionReplayGuard.ReplayToken>
+                replayTokens = new HashMap<>();
         private boolean conflicted;
+        @Nullable
+        private String conflictReason;
 
         private Attempt(@Nonnull String attemptKey) {
             this.attemptKey = requireText(attemptKey, "attemptKey");
@@ -378,10 +438,42 @@ final class BreedingPopulationReplayService {
             }
         }
 
+        private void addReplayToken(
+                String childKey,
+                BreedingPersistedProjectionReplayGuard.ReplayToken replayToken) {
+            String child = requireText(childKey, "childKey");
+            BreedingPersistedProjectionReplayGuard.ReplayToken current =
+                    replayTokens.putIfAbsent(child, replayToken);
+            if (current != null && !current.equals(replayToken)) {
+                conflicted = true;
+                conflictReason = "breeding-replay-projection-evidence-conflict";
+            }
+        }
+
+        private boolean replayEvidenceCurrent(
+                BreedingPersistedProjectionReplayGuard projectionGuard) {
+            for (BreedingPersistedProjectionReplayGuard.ReplayToken replayToken
+                    : replayTokens.values()) {
+                if (!projectionGuard.current(replayToken)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private boolean replayEvidenceCurrent(
+                String childKey,
+                BreedingPersistedProjectionReplayGuard projectionGuard) {
+            BreedingPersistedProjectionReplayGuard.ReplayToken replayToken =
+                    replayTokens.get(requireText(childKey, "childKey"));
+            return replayToken == null || projectionGuard.current(replayToken);
+        }
+
         private void commit(String childKey) {
             String child = requireText(childKey, "childKey");
             pendingChildren.remove(child);
             abortedChildren.remove(child);
+            replayTokens.remove(child);
             committedChildren.add(child);
         }
 
@@ -391,6 +483,7 @@ final class BreedingPopulationReplayService {
                 return;
             }
             pendingChildren.remove(child);
+            replayTokens.remove(child);
             abortedChildren.add(child);
         }
 
@@ -423,7 +516,8 @@ final class BreedingPopulationReplayService {
                             : "breeding-replay-ready"
                     : missingPlan
                             ? "breeding-replay-plan-missing"
-                            : "breeding-replay-plan-conflict";
+                            : conflictReason != null
+                                    ? conflictReason : "breeding-replay-plan-conflict";
             return snapshot(usable, reason);
         }
 

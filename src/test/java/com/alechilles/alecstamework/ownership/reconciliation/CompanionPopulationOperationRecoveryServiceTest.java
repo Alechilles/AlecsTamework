@@ -1,9 +1,13 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
+import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.Harness;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -12,11 +16,18 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.dormant;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.insertScenario;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.markPermanentDeath;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.markPermanentRelease;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.physical;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.physicalDead;
 import static com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationOperationRecoveryTestSupport.updateTargetContext;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionProjectionRecoveryTestSupport.breedingMarker;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionProjectionRecoveryTestSupport.coopReleaseMarker;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionProjectionRecoveryTestSupport.operationRecord;
+import static com.alechilles.alecstamework.ownership.reconciliation.CompanionProjectionRecoveryTestSupport.prepareManagedCoopRelease;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPopulationOperationRecoveryServiceTest {
@@ -441,7 +452,7 @@ class CompanionPopulationOperationRecoveryServiceTest {
     }
 
     @Test
-    void applyingBreedingCommitsWhenChildExistsAndClosesWhenCompleteEvidenceIsAbsent() throws Exception {
+    void applyingBreedingCommitsWhenChildExistsAndMakesAbsentTargetsRetryable() throws Exception {
         UUID ownerUuid = UUID.randomUUID();
         try (Harness present = harness("breeding-present.sqlite")) {
             UUID npcUuid = UUID.randomUUID();
@@ -457,6 +468,26 @@ class CompanionPopulationOperationRecoveryServiceTest {
             assertEquals(1, result.committed());
             assertEquals(ownerUuid, present.state().ownerUuid());
         }
+        try (Harness unownedPresent = harness("breeding-unowned-present.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            insertScenario(
+                    unownedPresent, "profile", npcUuid, null, null,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result =
+                    unownedPresent.recover(List.of(physical(
+                            npcUuid, null, "default", 0, 0
+                    )));
+
+            assertEquals(1, result.committed());
+            assertTrue(result.complete());
+            assertNull(unownedPresent.state().ownerUuid());
+            assertEquals(CompanionPopulationOperationRecord.State.COMMITTED,
+                    unownedPresent.operationState());
+        }
         try (Harness absent = harness("breeding-absent.sqlite")) {
             UUID npcUuid = UUID.randomUUID();
             insertScenario(
@@ -469,8 +500,424 @@ class CompanionPopulationOperationRecoveryServiceTest {
                     dormant(npcUuid, null, CompanionPopulationEvidence.Kind.PROFILE_RECORD, "default")
             ));
             assertEquals(0, result.committed());
+            assertEquals(1, result.retryable());
+            assertEquals(0, result.canceled());
+            assertTrue(result.complete());
+            assertEquals(CompanionPopulationOperationRecord.State.RETRYABLE,
+                    absent.operationState());
+        }
+        try (Harness unowned = harness("breeding-unowned-absent.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            insertScenario(
+                    unowned, "profile", npcUuid, null, null,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = unowned.recover(
+                    List.of(dormant(
+                            npcUuid, null, CompanionPopulationEvidence.Kind.PROFILE_RECORD, "default"
+                    ))
+            );
+
+            assertEquals(0, result.committed());
+            assertEquals(1, result.retryable());
+            assertEquals(0, result.canceled());
+            assertTrue(result.complete());
+            assertEquals(CompanionPopulationOperationRecord.State.RETRYABLE,
+                    unowned.operationState());
+        }
+    }
+
+    @Test
+    void preparedBreedingOperationRetainsItsExactReplayBaseline() throws Exception {
+        try (Harness harness = harness("prepared-breeding.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.PREPARED, true
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result =
+                    harness.recover(List.of());
+
+            assertEquals(0, result.committed());
+            assertEquals(1, result.retryable());
+            assertEquals(0, result.canceled());
+            assertTrue(result.complete());
+            assertEquals(
+                    CompanionPopulationOperationRecord.State.RETRYABLE,
+                    harness.operationState()
+            );
+            assertEquals(0L, harness.state().revision());
+            assertEquals(npcUuid, harness.state().currentNpcUuid());
+        }
+    }
+
+    @Test
+    void loadedBreedingMarkerCannotBeMisclassifiedAsAbsentBeforeItsChunkSave() throws Exception {
+        try (Harness harness = harness("prepared-breeding-live-marker.sqlite")) {
+            UUID plannedNpcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.PREPARED, true
+            );
+            LoadedNpcIdentityIndex.ProjectionKey marker =
+                    new LoadedNpcIdentityIndex.ProjectionKey(
+                            "profile",
+                            "attempt",
+                            TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD,
+                            "child-0000",
+                            plannedNpcUuid,
+                            1L
+                    );
+            LoadedNpcIdentitySnapshot loaded = new LoadedNpcIdentitySnapshot(
+                    5L,
+                    true,
+                    List.of(new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                            plannedNpcUuid,
+                            plannedNpcUuid,
+                            new LoadedNpcIdentityIndex.Location("default", "store-default"),
+                            marker
+                    ))
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result =
+                    harness.recover(List.of(), loaded);
+
+            assertFalse(result.complete());
+            assertEquals(0, result.retryable());
+            assertEquals(
+                    "operation-recovery-projection-live-evidence-not-persisted",
+                    result.ambiguous().getFirst().reason()
+            );
+            assertEquals(
+                    CompanionPopulationOperationRecord.State.PREPARED,
+                    harness.operationState()
+            );
+        }
+    }
+
+    @Test
+    void compensatingBreedingWithNoChildClosesAsCanceled() throws Exception {
+        try (Harness harness = harness("compensating-breeding-absent.sqlite")) {
+            UUID npcUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", npcUuid, null, UUID.randomUUID(),
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.COMPENSATING, true
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result =
+                    harness.recover(List.of());
+
+            assertEquals(0, result.committed());
             assertEquals(1, result.canceled());
             assertTrue(result.complete());
+            assertEquals(
+                    CompanionPopulationOperationRecord.State.FAILED,
+                    harness.operationState()
+            );
+        }
+    }
+
+    @Test
+    void preparedBreedingWithExactPersistedMarkerCommitsInsteadOfRetrying() throws Exception {
+        try (Harness harness = harness("prepared-breeding-exact-marker.sqlite")) {
+            UUID plannedNpcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.PREPARED, true
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(
+                    List.of(breedingMarker(
+                            plannedNpcUuid, plannedNpcUuid, plannedNpcUuid, ownerUuid, true,
+                            "default", 0, 0, "exact"
+                    ))
+            );
+
+            assertEquals(1, result.committed());
+            assertEquals(0, result.retryable());
+            assertTrue(result.complete());
+            assertEquals(CompanionPopulationOperationRecord.State.COMMITTED,
+                    harness.operationState());
+            assertEquals(ownerUuid, harness.state().ownerUuid());
+        }
+    }
+
+    @Test
+    void persistedAlternateBreedingMarkerRetainsPreparedJournal() throws Exception {
+        UUID plannedNpcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness("prepared-breeding-alternate-marker.sqlite")) {
+            UUID alternateNpcUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.PREPARED, true
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(
+                    List.of(breedingMarker(
+                            plannedNpcUuid, alternateNpcUuid, alternateNpcUuid, ownerUuid, true,
+                            "default", 0, 0, "alternate"
+                    ))
+            );
+
+            assertFalse(result.complete());
+            assertEquals(0, result.retryable());
+            assertEquals("operation-recovery-projection-evidence-identity-mismatch",
+                    result.ambiguous().getFirst().reason());
+            assertEquals(CompanionPopulationOperationRecord.State.PREPARED,
+                    harness.operationState());
+        }
+        try (Harness harness = harness("prepared-breeding-missing-legacy-marker.sqlite")) {
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.PREPARED, true
+            );
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(
+                    List.of(breedingMarker(
+                            plannedNpcUuid, plannedNpcUuid, null, ownerUuid, true,
+                            "default", 0, 0, "missing-legacy"
+                    ))
+            );
+            assertFalse(result.complete());
+            assertEquals(0, result.retryable());
+            assertEquals("operation-recovery-projection-evidence-identity-mismatch",
+                    result.ambiguous().getFirst().reason());
+            assertEquals(CompanionPopulationOperationRecord.State.PREPARED,
+                    harness.operationState());
+        }
+    }
+
+    @Test
+    void exactBreedingMarkerWithUnknownOwnerRemainsAmbiguous() throws Exception {
+        UUID plannedNpcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness("breeding-marker-owner-unknown.sqlite")) {
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(
+                    List.of(breedingMarker(
+                            plannedNpcUuid, plannedNpcUuid, plannedNpcUuid, ownerUuid, false,
+                            "default", 0, 0, "unknown-owner"
+                    ))
+            );
+
+            assertFalse(result.complete());
+            assertEquals("operation-recovery-projection-owner-mismatch",
+                    result.ambiguous().getFirst().reason());
+            assertEquals(CompanionPopulationOperationRecord.State.APPLYING,
+                    harness.operationState());
+        }
+        try (Harness harness = harness("breeding-marker-location-mismatch.sqlite")) {
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(
+                    List.of(breedingMarker(
+                            plannedNpcUuid, plannedNpcUuid, plannedNpcUuid, ownerUuid, true,
+                            "other", 0, 0, "wrong-location"
+                    ))
+            );
+            assertEquals("operation-recovery-projection-location-mismatch",
+                    result.ambiguous().getFirst().reason());
+            assertEquals(CompanionPopulationOperationRecord.State.APPLYING,
+                    harness.operationState());
+        }
+    }
+
+    @Test
+    void duplicateExactBreedingMarkersAndOrdinaryLocationMismatchStayAmbiguous() throws Exception {
+        UUID plannedNpcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness duplicate = harness("breeding-marker-duplicate.sqlite")) {
+            insertScenario(
+                    duplicate, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = duplicate.recover(
+                    List.of(
+                            breedingMarker(plannedNpcUuid, plannedNpcUuid, plannedNpcUuid,
+                                    ownerUuid, true, "default", 0, 0, "duplicate-a"),
+                            breedingMarker(plannedNpcUuid, plannedNpcUuid, plannedNpcUuid,
+                                    ownerUuid, true, "default", 0, 0, "duplicate-b")
+                    )
+            );
+            assertEquals("operation-recovery-projection-evidence-duplicated",
+                    result.ambiguous().getFirst().reason());
+        }
+        try (Harness mismatch = harness("breeding-marker-ordinary-mismatch.sqlite")) {
+            insertScenario(
+                    mismatch, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = mismatch.recover(
+                    List.of(
+                            breedingMarker(plannedNpcUuid, plannedNpcUuid, plannedNpcUuid,
+                                    ownerUuid, true, "default", 0, 0, "marker"),
+                            physical(plannedNpcUuid, ownerUuid, "other", 0, 0)
+                    )
+            );
+            assertEquals("operation-recovery-projection-ordinary-evidence-mismatch",
+                    result.ambiguous().getFirst().reason());
+        }
+        try (Harness agrees = harness("breeding-marker-ordinary-agrees.sqlite")) {
+            insertScenario(
+                    agrees, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = agrees.recover(
+                    List.of(
+                            breedingMarker(plannedNpcUuid, plannedNpcUuid, plannedNpcUuid,
+                                    ownerUuid, true, "default", 0, 0, "marker"),
+                            physical(plannedNpcUuid, ownerUuid, "default", 0, 0)
+                    )
+            );
+            assertEquals(1, result.committed());
+            assertTrue(result.complete());
+        }
+    }
+
+    @Test
+    void malformedBreedingProjectionMetadataDoesNotBecomeRetryable() throws Exception {
+        try (Harness harness = harness("breeding-marker-metadata-invalid.sqlite")) {
+            UUID plannedNpcUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, UUID.randomUUID(),
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+            updateTargetContext(harness,
+                    "{\"idempotencyKey\":\"attempt\",\"plannedNpcUuid\":\""
+                            + plannedNpcUuid
+                            + "\",\"world\":\"default\",\"chunkX\":0,\"chunkZ\":0}");
+
+            CompanionPopulationOperationRecoveryService.RecoveryResult result =
+                    harness.recover(List.of());
+
+            assertFalse(result.complete());
+            assertEquals(0, result.retryable());
+            assertEquals("operation-recovery-projection-metadata-invalid",
+                    result.ambiguous().getFirst().reason());
+            assertEquals(CompanionPopulationOperationRecord.State.APPLYING,
+                    harness.operationState());
+        }
+    }
+
+    @Test
+    void exactPersistedBreedingCorpseNeverRecoversAsALiveChild() throws Exception {
+        try (Harness harness = harness("breeding-marker-dead.sqlite")) {
+            UUID plannedNpcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertScenario(
+                    harness, "profile", plannedNpcUuid, null, ownerUuid,
+                    CompanionLifecycleState.ACTIVE, CompanionLifecycleState.ACTIVE,
+                    "default", "default", OwnerPopulationOperation.BREEDING,
+                    CompanionPopulationOperationRecord.State.APPLYING, true
+            );
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = harness.recover(
+                    List.of(breedingMarker(
+                            plannedNpcUuid, plannedNpcUuid, plannedNpcUuid, ownerUuid, true,
+                            "default", 0, 0, "dead", true
+                    ))
+            );
+
+            assertFalse(result.complete());
+            assertEquals(0, result.committed());
+            assertEquals(0, result.retryable());
+            assertEquals(CompanionPopulationOperationRecord.State.APPLYING,
+                    harness.operationState());
+        }
+    }
+
+    @Test
+    void managedCoopPersistedMarkerResolvesExactAndQuarantinesAlternateIdentity() throws Exception {
+        UUID previousNpcUuid = UUID.randomUUID();
+        UUID plannedNpcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        ManagedCoopAuthorityKey authority = new ManagedCoopAuthorityKey("default", 10, 20, 30);
+        try (Harness exact = harness("coop-release-marker-exact.sqlite")) {
+            prepareManagedCoopRelease(
+                    exact, previousNpcUuid, plannedNpcUuid, ownerUuid, authority);
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = exact.recover(
+                    List.of(coopReleaseMarker(
+                            previousNpcUuid, plannedNpcUuid, plannedNpcUuid, ownerUuid,
+                            authority, "exact"
+                    ))
+            );
+            assertEquals(1, result.committed(), result.toString());
+            assertTrue(result.complete());
+            assertEquals(plannedNpcUuid, exact.state().currentNpcUuid());
+        }
+        try (Harness alternate = harness("coop-release-marker-alternate.sqlite")) {
+            UUID alternateNpcUuid = UUID.randomUUID();
+            prepareManagedCoopRelease(
+                    alternate, previousNpcUuid, plannedNpcUuid, ownerUuid, authority);
+            CompanionPopulationOperationRecoveryService.RecoveryResult result = alternate.recover(
+                    List.of(coopReleaseMarker(
+                            previousNpcUuid, alternateNpcUuid, alternateNpcUuid, ownerUuid,
+                            authority, "alternate"
+                    ))
+            );
+            assertFalse(result.complete());
+            assertEquals("operation-recovery-projection-evidence-identity-mismatch",
+                    result.ambiguous().getFirst().reason());
+            assertEquals(CompanionPopulationOperationRecord.State.APPLYING,
+                    alternate.operationState());
+        }
+    }
+
+    @Test
+    void nonProjectionContextsDoNotInventProjectionMetadataFailures() {
+        UUID ownerUuid = UUID.randomUUID();
+        for (String target : new String[]{null, " ", "{\"npcUuid\":\""
+                + UUID.randomUUID() + "\"}"}) {
+            CompanionPopulationOperationRecord operation = operationRecord(
+                    OwnerPopulationOperation.RESTORE,
+                    CompanionPopulationOperationRecord.State.PREPARED,
+                    ownerUuid,
+                    CompanionLifecycleState.COOP,
+                    ownerUuid,
+                    CompanionLifecycleState.ACTIVE,
+                    target
+            );
+            CompanionOperationProjectionExpectationResolver.Resolution resolution =
+                    CompanionOperationProjectionExpectationResolver.resolve(
+                            operation, new CompanionPopulationEvidenceSet(List.of()));
+            assertNull(resolution.ambiguityReason());
+            assertNull(resolution.exactEvidence());
         }
     }
 
@@ -533,24 +980,6 @@ class CompanionPopulationOperationRecoveryServiceTest {
 
     private Harness harness(String file) throws Exception {
         return CompanionPopulationOperationRecoveryTestSupport.open(tempDir, file);
-    }
-
-    private static void markPermanentRelease(Harness harness, UUID npcUuid) throws Exception {
-        updateTargetContext(
-                harness,
-                "{\"npcUuid\":\"" + npcUuid
-                        + "\",\"world\":\"default\",\"chunkX\":0,\"chunkZ\":0,"
-                        + "\"permanentRelease\":true}"
-        );
-    }
-
-    private static void markPermanentDeath(Harness harness, UUID npcUuid) throws Exception {
-        updateTargetContext(
-                harness,
-                "{\"npcUuid\":\"" + npcUuid
-                        + "\",\"world\":\"default\",\"chunkX\":0,\"chunkZ\":0,"
-                        + "\"permanentRelease\":true,\"permanentDeath\":true}"
-        );
     }
 
     private record DormantCase(CompanionPopulationEvidence.Kind kind,

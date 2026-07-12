@@ -29,7 +29,13 @@ final class CoopResidentPopulationReleaseAdmissionBackend
                 .thenApply(result -> {
                     var prepared = result != null ? result.preparedRelease() : null;
                     return new ManagedCoopReleasePopulationCoordinator.BackendPreparation(
-                            result != null && result.allowed() && prepared != null,
+                            result == null
+                                    ? ManagedCoopReleasePopulationCoordinator.PreparationStatus.AMBIGUOUS
+                                    : switch (result.disposition()) {
+                                        case PREPARED -> ManagedCoopReleasePopulationCoordinator.PreparationStatus.PREPARED;
+                                        case DEFINITIVE_DENIAL -> ManagedCoopReleasePopulationCoordinator.PreparationStatus.DENIED;
+                                        case AMBIGUOUS -> ManagedCoopReleasePopulationCoordinator.PreparationStatus.AMBIGUOUS;
+                                    },
                             prepared != null ? prepared.profileId() : null,
                             prepared != null ? prepared.plannedNpcUuid() : null,
                             prepared,

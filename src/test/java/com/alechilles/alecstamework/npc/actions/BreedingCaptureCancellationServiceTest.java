@@ -23,14 +23,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationReason.COOP_CAPTURE;
 import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus.CANCELLED;
+import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus.DURABILITY_FAILED;
+import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus.DURABILITY_PENDING;
 import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus.NOT_FOUND;
+import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus.ALREADY_TERMINAL;
 import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.MatchKind.ENTITY_UUID;
 import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.MatchKind.PROFILE_ID;
 import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.ParentRollbackStatus.ERROR;
@@ -38,10 +44,43 @@ import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellati
 import static com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.ParentRollbackStatus.SKIPPED_NEWER_STATE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for registry-first cancellation before managed-coop snapshots. */
 class BreedingCaptureCancellationServiceTest {
+    /** Regression: capture-crate callers retain the fence until their mutation explicitly ends. */
+    @Test
+    void successfulRetainedSnapshotDoesNotReleaseButExceptionFailsClosed() {
+        AtomicInteger releases = new AtomicInteger();
+        BreedingCaptureCancellationService.CancellationResult cancellation =
+                new BreedingCaptureCancellationService.CancellationResult(
+                        NOT_FOUND, COOP_CAPTURE,
+                        BreedingCaptureCancellationService.MatchKind.NONE,
+                        Optional.empty(), Optional.empty(), Optional.empty()
+        );
+
+        BreedingCaptureCancellationService.SnapshotHandoff<String> retained =
+                BreedingCaptureSnapshotFenceHandoff.capture(
+                        () -> cancellation, () -> "snapshot", releases::incrementAndGet
+                );
+
+        assertEquals(NOT_FOUND, retained.cancellation().status());
+        assertEquals("snapshot", retained.snapshot());
+        assertEquals(0, releases.get());
+
+        assertThrows(IllegalStateException.class, () ->
+                BreedingCaptureSnapshotFenceHandoff.capture(
+                        () -> cancellation,
+                        () -> {
+                            throw new IllegalStateException("snapshot failed");
+                        },
+                        releases::incrementAndGet
+                ));
+        assertEquals(1, releases.get());
+    }
+
     @Test
     void cancellationAndBothRollbacksFinishBeforeSnapshotReadsCapturedState() {
         BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
@@ -95,7 +134,7 @@ class BreedingCaptureCancellationServiceTest {
     }
 
     @Test
-    void cancellationReplayDoesNotRollbackTwiceAndLateExecutionIsTerminal() {
+    void cancellationRetryReusesDurabilityResultWithoutRollingBackTwice() {
         TameworkBreedingServices services = new TameworkBreedingServices(() -> 0.5);
         Object scope = new Object();
         BreedingBirthJob job = job(200L);
@@ -133,11 +172,278 @@ class BreedingCaptureCancellationServiceTest {
         BreedingJobExecutionService.ExecutionResult late = execution.execute(job.jobId());
 
         assertEquals(CANCELLED, first.status());
-        assertEquals(NOT_FOUND, replay.status());
+        assertEquals(ALREADY_TERMINAL, replay.status());
         assertEquals(2, rollbacks.get());
         assertEquals(BreedingJobExecutionService.ExecutionStatus.TERMINAL, late.status());
         assertEquals(0, runtime.parentResolutions.get());
         assertEquals(0, runtime.spawnAttempts.get());
+    }
+
+    @Test
+    void pendingDurabilityBlocksSnapshotAndRetryReusesTheSameBarrier() throws Exception {
+        BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
+        Object scope = new Object();
+        BreedingBirthJob job = job(250L);
+        registry.register(scope, job);
+        CompletableFuture<Boolean> durability = new CompletableFuture<>();
+        AtomicInteger durabilityStarts = new AtomicInteger();
+        AtomicInteger snapshots = new AtomicInteger();
+        BreedingCaptureCancellationService service = new BreedingCaptureCancellationService(
+                registry,
+                (ignoredScope, ignoredJobId, ignoredReason) -> {
+                    durabilityStarts.incrementAndGet();
+                    return durability;
+                },
+                (ignoredScope, ignoredJob, ignoredFirst, ignoredLiveUuid) ->
+                        new BreedingCaptureCancellationService.ParentRollbackOutcome(RESTORED, true),
+                null
+        );
+
+        BreedingCaptureCancellationService.SnapshotHandoff<String> pending =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope,
+                        job.firstParent().entityUuid(),
+                        job.firstParent().profileId(),
+                        COOP_CAPTURE,
+                        () -> {
+                            snapshots.incrementAndGet();
+                            return "snapshot";
+                        }
+                );
+        CompletableFuture<BreedingCaptureCancellationService.CancellationResult> retry =
+                service.cancelForCapturedParentDurablyInScope(
+                        scope,
+                        job.firstParent().entityUuid(),
+                        job.firstParent().profileId(),
+                        COOP_CAPTURE
+                );
+
+        assertEquals(DURABILITY_PENDING, pending.cancellation().status());
+        assertNull(pending.snapshot());
+        assertFalse(retry.isDone());
+        assertEquals(0, snapshots.get());
+        assertEquals(1, durabilityStarts.get());
+
+        durability.complete(true);
+        assertEquals(ALREADY_TERMINAL, retry.get(1, TimeUnit.SECONDS).status());
+        BreedingCaptureCancellationService.SnapshotHandoff<String> completed =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope,
+                        job.firstParent().entityUuid(),
+                        job.firstParent().profileId(),
+                        COOP_CAPTURE,
+                        () -> {
+                            snapshots.incrementAndGet();
+                            return "snapshot";
+                        }
+                );
+
+        assertEquals(ALREADY_TERMINAL, completed.cancellation().status());
+        assertEquals("snapshot", completed.snapshot());
+        assertEquals(1, snapshots.get());
+        assertEquals(1, durabilityStarts.get());
+    }
+
+    @Test
+    void failedDurabilityNeverRunsSnapshotOnRetry() {
+        BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
+        Object scope = new Object();
+        BreedingBirthJob job = job(275L);
+        registry.register(scope, job);
+        AtomicInteger snapshots = new AtomicInteger();
+        BreedingCaptureCancellationService service = new BreedingCaptureCancellationService(
+                registry,
+                (ignoredScope, ignoredJobId, ignoredReason) ->
+                        CompletableFuture.completedFuture(false),
+                (ignoredScope, ignoredJob, ignoredFirst, ignoredLiveUuid) ->
+                        new BreedingCaptureCancellationService.ParentRollbackOutcome(RESTORED, true),
+                null
+        );
+
+        BreedingCaptureCancellationService.SnapshotHandoff<String> first =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope,
+                        job.firstParent().entityUuid(),
+                        job.firstParent().profileId(),
+                        COOP_CAPTURE,
+                        () -> {
+                            snapshots.incrementAndGet();
+                            return "unsafe";
+                        }
+                );
+        BreedingCaptureCancellationService.SnapshotHandoff<String> retry =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope,
+                        job.firstParent().entityUuid(),
+                        job.firstParent().profileId(),
+                        COOP_CAPTURE,
+                        () -> {
+                            snapshots.incrementAndGet();
+                            return "unsafe";
+                        }
+                );
+
+        assertEquals(DURABILITY_FAILED, first.cancellation().status());
+        assertEquals(DURABILITY_FAILED, retry.cancellation().status());
+        assertNull(first.snapshot());
+        assertNull(retry.snapshot());
+        assertEquals(0, snapshots.get());
+    }
+
+    @Test
+    void terminalJobStillFindsPendingParentGateAndRetainsItAcrossRetry() throws Exception {
+        BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
+        Object scope = new Object();
+        UUID parentUuid = uuid(290L);
+        CompletableFuture<Boolean> retainedGate = new CompletableFuture<>();
+        AtomicInteger parentLookups = new AtomicInteger();
+        AtomicInteger snapshots = new AtomicInteger();
+        BreedingCaptureCancellationService.PreparedCancellationGateway prepared =
+                new BreedingCaptureCancellationService.PreparedCancellationGateway() {
+                    @Override
+                    public CompletableFuture<Boolean> cancel(
+                            Object ignoredScope, UUID ignoredJobId, String ignoredReason) {
+                        throw new AssertionError("terminal job must use its parent gate");
+                    }
+
+                    @Override
+                    public CompletableFuture<Boolean> cancelByParent(
+                            Object ignoredScope,
+                            UUID ignoredParentUuid,
+                            String ignoredProfileId,
+                            String ignoredReason) {
+                        parentLookups.incrementAndGet();
+                        return retainedGate;
+                    }
+                };
+        BreedingCaptureCancellationService service = new BreedingCaptureCancellationService(
+                registry,
+                prepared,
+                (ignoredScope, ignoredJob, ignoredFirst, ignoredLiveUuid) ->
+                        new BreedingCaptureCancellationService.ParentRollbackOutcome(RESTORED, true),
+                null
+        );
+
+        BreedingCaptureCancellationService.SnapshotHandoff<String> pending =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope, parentUuid, null, COOP_CAPTURE,
+                        () -> {
+                            snapshots.incrementAndGet();
+                            return "unsafe";
+                        }
+                );
+        assertEquals(DURABILITY_PENDING, pending.cancellation().status());
+        assertNull(pending.snapshot());
+        assertEquals(1, parentLookups.get());
+
+        retainedGate.complete(true);
+        BreedingCaptureCancellationService.SnapshotHandoff<String> retry =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope, parentUuid, null, COOP_CAPTURE,
+                        () -> {
+                            snapshots.incrementAndGet();
+                            return "snapshot";
+                        }
+                );
+
+        assertEquals(ALREADY_TERMINAL, retry.cancellation().status());
+        assertEquals("snapshot", retry.snapshot());
+        assertEquals(1, snapshots.get());
+        assertEquals(2, parentLookups.get());
+    }
+
+    @Test
+    void terminalJobWithFailedParentGateRemainsUnsafeForever() {
+        BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
+        Object scope = new Object();
+        UUID parentUuid = uuid(295L);
+        BreedingCaptureCancellationService.PreparedCancellationGateway prepared =
+                new BreedingCaptureCancellationService.PreparedCancellationGateway() {
+                    @Override
+                    public CompletableFuture<Boolean> cancel(
+                            Object ignoredScope, UUID ignoredJobId, String ignoredReason) {
+                        throw new AssertionError("terminal job must use its parent gate");
+                    }
+
+                    @Override
+                    public CompletableFuture<Boolean> cancelByParent(
+                            Object ignoredScope,
+                            UUID ignoredParentUuid,
+                            String ignoredProfileId,
+                            String ignoredReason) {
+                        return CompletableFuture.completedFuture(false);
+                    }
+                };
+        BreedingCaptureCancellationService service = new BreedingCaptureCancellationService(
+                registry,
+                prepared,
+                (ignoredScope, ignoredJob, ignoredFirst, ignoredLiveUuid) ->
+                        new BreedingCaptureCancellationService.ParentRollbackOutcome(RESTORED, true),
+                null
+        );
+
+        BreedingCaptureCancellationService.SnapshotHandoff<String> first =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope, parentUuid, null, COOP_CAPTURE, () -> "unsafe"
+                );
+        BreedingCaptureCancellationService.SnapshotHandoff<String> retry =
+                service.cancelThenCaptureSnapshotInScope(
+                        scope, parentUuid, null, COOP_CAPTURE, () -> "unsafe"
+                );
+
+        assertEquals(DURABILITY_FAILED, first.cancellation().status());
+        assertEquals(DURABILITY_FAILED, retry.cancellation().status());
+        assertNull(first.snapshot());
+        assertNull(retry.snapshot());
+    }
+
+    @Test
+    void newerActiveJobCannotHideAnOlderFailedCaptureAttempt() {
+        BreedingBirthJobRegistry registry = new BreedingBirthJobRegistry();
+        Object scope = new Object();
+        AtomicReference<CompletableFuture<Boolean>> retained = new AtomicReference<>(
+                CompletableFuture.completedFuture(false)
+        );
+        BreedingCaptureCancellationService.PreparedCancellationGateway prepared =
+                new BreedingCaptureCancellationService.PreparedCancellationGateway() {
+                    @Override
+                    public CompletableFuture<Boolean> cancel(
+                            Object ignoredScope, UUID ignoredJobId, String ignoredReason) {
+                        return CompletableFuture.completedFuture(true);
+                    }
+
+                    @Override
+                    public CompletableFuture<Boolean> cancelByParent(
+                            Object ignoredScope,
+                            UUID ignoredParentUuid,
+                            String ignoredProfileId,
+                            String ignoredReason) {
+                        return retained.get();
+                    }
+                };
+        BreedingCaptureCancellationService service = new BreedingCaptureCancellationService(
+                registry,
+                prepared,
+                (ignoredScope, ignoredJob, ignoredFirst, ignoredLiveUuid) ->
+                        new BreedingCaptureCancellationService.ParentRollbackOutcome(RESTORED, true),
+                null
+        );
+        UUID parentUuid = uuid(1L);
+
+        assertEquals(DURABILITY_FAILED, service.cancelForCapturedParentInScope(
+                scope, parentUuid, "profile-a", COOP_CAPTURE
+        ).status());
+        retained.set(CompletableFuture.completedFuture(true));
+        assertEquals(BreedingBirthJobRegistry.AdmissionStatus.ACCEPTED,
+                registry.register(scope, job(296L)).status());
+
+        BreedingCaptureCancellationService.CancellationResult newer =
+                service.cancelForCapturedParentInScope(
+                        scope, parentUuid, "profile-a", COOP_CAPTURE
+                );
+
+        assertEquals(DURABILITY_FAILED, newer.status());
+        assertFalse(newer.safeToCapture());
     }
 
     @Test

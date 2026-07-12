@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -130,6 +131,41 @@ class CoopPopulationReleaseAdmissionServiceTest {
         );
     }
 
+    @Test
+    void classifiesOnlyReadyPolicyDenialsAsDefinitiveBeforeAdmission() {
+        CompanionPopulationPreparationResult result = deniedPopulationResult(
+                "owner-cap-reached", OwnerPopulationReadiness.READY);
+
+        assertEquals(
+                CoopPopulationReleaseAdmissionService.PreparationDisposition.DEFINITIVE_DENIAL,
+                CoopPopulationReleaseAdmissionService.PreparationResult.denied(result)
+                        .disposition());
+    }
+
+    @Test
+    void classifiesRecoveredInFlightProfileAsAmbiguous() {
+        CompanionPopulationPreparationResult result = deniedPopulationResult(
+                "profile_operation_in_flight", OwnerPopulationReadiness.READY);
+
+        assertEquals(
+                CoopPopulationReleaseAdmissionService.PreparationDisposition.AMBIGUOUS,
+                CoopPopulationReleaseAdmissionService.PreparationResult.denied(result)
+                        .disposition());
+        assertFalse(CoopPopulationReleaseAdmissionService
+                .definitivePreAdmissionDenial(result));
+    }
+
+    @Test
+    void degradedReadinessCannotAuthorizeLifecycleRollback() {
+        CompanionPopulationPreparationResult result = deniedPopulationResult(
+                "owner-cap-reached", OwnerPopulationReadiness.DEGRADED);
+
+        assertEquals(
+                CoopPopulationReleaseAdmissionService.PreparationDisposition.AMBIGUOUS,
+                CoopPopulationReleaseAdmissionService.PreparationResult.denied(result)
+                        .disposition());
+    }
+
     private static CoopPopulationReleaseAdmissionService.ReleaseRequest request(UUID plannedUuid) {
         return new CoopPopulationReleaseAdmissionService.ReleaseRequest(
                 HOUSED,
@@ -141,5 +177,14 @@ class CoopPopulationReleaseAdmissionServiceTest {
                 7,
                 " managed-release "
         );
+    }
+
+    private static CompanionPopulationPreparationResult deniedPopulationResult(
+            String reason,
+            OwnerPopulationReadiness readiness) {
+        OwnerPopulationDecision ownerDecision = new OwnerPopulationDecision(
+                false, reason, null, readiness, 10, 1L, 0L, 7L, true, false);
+        return new CompanionPopulationPreparationResult(
+                false, reason, ownerDecision, null, null);
     }
 }

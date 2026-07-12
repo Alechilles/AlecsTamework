@@ -278,7 +278,7 @@ public final class OwnerPopulationAdmissionCoordinator {
             index.cancel(decision.reservation());
             OwnerPopulationDecision denied = deniedWithoutReservation(
                     decision,
-                    "owner-population-prepare-failed"
+                    preparationFailureReason(outcome)
             );
             return CompletableFuture.completedFuture(
                     new OwnerPopulationPreparationResult(false, denied.reason(), denied, null)
@@ -464,5 +464,15 @@ public final class OwnerPopulationAdmissionCoordinator {
                 original.positiveDelta(),
                 original.forced()
         );
+    }
+
+    @Nonnull
+    private static String preparationFailureReason(
+            @Nonnull PersistenceWriteQueue.WriteOutcome<PopulationPersistenceTransition.Result> outcome
+    ) {
+        PopulationPersistenceTransition.Result result = outcome.value();
+        return result != null && result.reason() != null && !result.reason().isBlank()
+                ? result.reason()
+                : "owner-population-prepare-failed";
     }
 }

@@ -31,15 +31,22 @@ class ManagedCoopCaptureRuntimeAdapterTest {
         )).replace("\r\n", "\n");
 
         int capacity = source.indexOf("occupancy.resolveCapturePlacement(");
-        int cancellation = source.indexOf("cancelThenCaptureSnapshot(");
-        int snapshot = source.indexOf("captureSnapshotForManagedCoopPersistence(");
+        int cancellation = source.indexOf("cancelForCapturedParentDurably(");
+        int continuation = source.indexOf(
+                "private CompletableFuture<CaptureOutcome> continueCapture(");
+        int snapshot = source.indexOf(
+                "captureSnapshotForManagedCoopPersistence(", continuation);
         int persistence = source.indexOf("captureGateway.coordinate(attempt)");
 
         assertTrue(capacity >= 0 && capacity < cancellation);
-        assertTrue(cancellation < snapshot && snapshot < persistence);
+        assertTrue(cancellation < continuation && continuation < snapshot);
+        assertTrue(snapshot < persistence);
         assertTrue(source.contains("store.assertThread()"));
-        assertFalse(source.contains("thenApply"));
-        assertFalse(source.contains("thenCompose"));
+        assertTrue(source.contains("LeaseBoundWorldDispatcher.execute("));
+        assertTrue(source.contains("withCaptureFence("));
+        assertTrue(source.contains("breedingCancellation.releaseCaptureFence("));
+        assertTrue(source.contains("outcome.isRetirementReady()"));
+        assertFalse(source.contains(".join()"));
         assertFalse(source.contains("Universe"));
     }
 

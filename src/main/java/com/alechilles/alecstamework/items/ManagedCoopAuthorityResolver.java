@@ -48,7 +48,10 @@ public final class ManagedCoopAuthorityResolver {
             return null;
         }
         String coopId = normalizeIdentifier(config.getCoopId());
-        if (coopId == null || !Boolean.FALSE.equals(
+        String observedCoopId = normalizeIdentifier(rawCoopAssetId);
+        if (coopId == null
+                || observedCoopId != null && !coopId.equals(observedCoopId)
+                || !Boolean.FALSE.equals(
                 vanillaCoopLookup.capturesWildNpcsAutomatically(coopId))) {
             return null;
         }

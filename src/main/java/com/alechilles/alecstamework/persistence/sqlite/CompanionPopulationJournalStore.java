@@ -95,7 +95,8 @@ final class CompanionPopulationJournalStore {
                 """
                 UPDATE companion_population_operations
                 SET state = ?, updated_at_ms = ?,
-                    completed_at_ms = CASE WHEN ? IN ('COMMITTED', 'FAILED') THEN ? ELSE 0 END,
+                    completed_at_ms = CASE
+                        WHEN ? IN ('COMMITTED', 'RETRYABLE', 'FAILED') THEN ? ELSE 0 END,
                     last_error = ?
                 WHERE operation_id = ? AND state = ?
                 """

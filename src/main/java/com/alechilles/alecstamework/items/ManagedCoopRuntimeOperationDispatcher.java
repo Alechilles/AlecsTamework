@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.items.ManagedCoopCaptureSourceRetirementServ
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.ReleaseAttempt;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.ReleaseOutcome;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
+import com.alechilles.alecstamework.items.ManagedCoopReleaseRecoveryService.ProjectionToken;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
@@ -134,7 +135,15 @@ public final class ManagedCoopRuntimeOperationDispatcher {
     /** Stable release projection command safe to queue by world name. */
     public record ReleaseProjectionCommand(@Nonnull SpawnReady claim,
                                            @Nonnull ResidentRecord resident,
-                                           @Nonnull ReleaseSite site) {
+                                           @Nonnull ReleaseSite site,
+                                           @Nullable ProjectionToken recoveryToken) {
+        public ReleaseProjectionCommand(
+                SpawnReady claim,
+                ResidentRecord resident,
+                ReleaseSite site) {
+            this(claim, resident, site, null);
+        }
+
         public ReleaseProjectionCommand {
             Objects.requireNonNull(claim, "claim");
             Objects.requireNonNull(resident, "resident");

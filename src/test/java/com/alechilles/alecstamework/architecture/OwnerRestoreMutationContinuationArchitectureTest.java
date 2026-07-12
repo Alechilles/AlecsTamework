@@ -21,7 +21,7 @@ class OwnerRestoreMutationContinuationArchitectureTest {
     void replacementSpawnPathsUsePreparedPopulationAdmission() throws IOException {
         List<Path> paths = List.of(
                 item("NpcSpawnCommandService.java"),
-                item("CommandLostRecoveryService.java"),
+                item("CommandLostRecoveryCoordinator.java"),
                 item("CommandRespawnService.java")
         );
         for (Path path : paths) {
@@ -32,14 +32,18 @@ class OwnerRestoreMutationContinuationArchitectureTest {
             );
         }
         assertTrue(readItem("NpcSpawnCommandService.java").contains("batchSpawnService.schedule("));
-        assertTrue(readItem("CommandLostRecoveryService.java").contains("fallbackSpawnService.schedule("));
+        String recovery = readItem("CommandLostRecoveryCoordinator.java");
+        assertTrue(recovery.contains("operationRepository.claim("));
+        assertTrue(recovery.contains("projectionSpawner.spawn("));
+        assertTrue(recovery.contains("operationRepository.finalizeRecovery("));
         assertTrue(readItem("CommandRespawnService.java").contains("preparedSpawnService.schedule("));
         String prepared = readItem("CompanionPreparedSpawnService.java");
         assertTrue(prepared.contains("admissionService.writeSpawnHolder"));
         assertTrue(prepared.indexOf("admissionService.claimForSpawn") < prepared.indexOf("npcPlugin.spawnEntity"));
         String handler = readItem("CommandItemFeatureHandler.java");
         assertTrue(handler.contains("ownerReleaseService.release("));
-        assertTrue(handler.contains("respawnMenuService.respawn("));
+        assertTrue(handler.contains("respawnService.respawnDeadLinkedNpc("));
+        assertTrue(handler.contains("lostRecoveryCoordinator.request("));
     }
 
     @Test
@@ -52,13 +56,14 @@ class OwnerRestoreMutationContinuationArchitectureTest {
         assertTrue(respawnPrepare >= 0 && respawnLive > respawnPrepare);
         assertTrue(clearDeathSnapshot > respawnFinalize, "death snapshot must survive admission/commit denial");
 
-        String lost = readItem("CommandLostFallbackSpawnService.java");
-        int lostPrepare = lost.indexOf("preparedSpawnService.schedule(");
-        int lostLive = lost.indexOf("public void onSpawned", lostPrepare);
-        int lostFinalize = lost.indexOf("public boolean finalizeSource", lostLive);
-        int markRecovered = lost.indexOf("lostService.markRecovered", lostFinalize);
-        assertTrue(lostPrepare >= 0 && lostLive > lostPrepare);
-        assertTrue(markRecovered > lostFinalize, "lost snapshot must survive admission/commit denial");
+        String lost = readItem("CommandLostRecoveryCoordinator.java");
+        int lostClaim = lost.indexOf("operationRepository.claim(");
+        int lostSpawn = lost.indexOf("projectionSpawner.spawn(", lostClaim);
+        int recordProjection = lost.indexOf("operationRepository.recordProjectionCreated(", lostSpawn);
+        int finalizeRecovery = lost.indexOf("operationRepository.finalizeRecovery(", recordProjection);
+        assertTrue(lostClaim >= 0 && lostSpawn > lostClaim);
+        assertTrue(recordProjection > lostSpawn && finalizeRecovery > recordProjection,
+                "lost recovery must journal the exact projection before finalizing its source");
     }
 
     @Test

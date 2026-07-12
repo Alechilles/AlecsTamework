@@ -354,6 +354,22 @@ public final class OwnerPopulationIndex {
         return queries.entry(profileId);
     }
 
+    /** Captures readiness, reload, transition, and lifecycle state under the index's single lock. */
+    public OwnerPopulationProfileStateSnapshot profileStateSnapshot(String profileId) {
+        String normalized = OwnerPopulationEntry.normalizeProfileId(profileId);
+        lock.lock();
+        try {
+            return new OwnerPopulationProfileStateSnapshot(
+                    readiness.overall(),
+                    canonicalReloadInProgress,
+                    pendingTokenByProfile.containsKey(normalized),
+                    Optional.ofNullable(entriesByProfile.get(normalized))
+            );
+        } finally {
+            lock.unlock();
+        }
+    }
+
     /** Returns whether a prepared/applying transition currently suppresses observer reconciliation. */
     public boolean hasPendingTransition(String profileId) {
         return reconciliation.hasPending(profileId);

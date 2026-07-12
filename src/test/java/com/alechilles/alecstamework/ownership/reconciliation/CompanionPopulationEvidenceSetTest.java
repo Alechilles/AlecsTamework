@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPopulationEvidenceSetTest {
@@ -135,6 +136,90 @@ class CompanionPopulationEvidenceSetTest {
         assertEquals("conflicting-physical-death-evidence", set.conflicts().getFirst().reason());
     }
 
+    @Test
+    void exactMarkerEvidenceIsIndexedOutsideOrdinaryRepairEvidence() {
+        String fingerprint = projectionFingerprint();
+        UUID planned = new UUID(0L, 101L);
+        CompanionPopulationEvidence marker = projection(
+                "exact", fingerprint, planned, planned, 2, 3
+        );
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(marker));
+
+        assertTrue(set.evidence().isEmpty());
+        assertTrue(set.byNpcUuid().isEmpty());
+        assertTrue(set.observations(planned).isEmpty());
+        CompanionPopulationEvidenceSet.ProjectionObservation observation =
+                set.projectionObservations(fingerprint).getFirst();
+        assertEquals(marker, observation.evidence());
+        assertEquals(planned, observation.componentUuid());
+        assertEquals(planned, observation.legacyNpcUuid());
+        assertEquals("default", observation.evidence().physicalWorldName());
+        assertTrue(observation.evidence().ownerObserved());
+        assertThrows(UnsupportedOperationException.class,
+                () -> set.projectionObservations(fingerprint).add(observation));
+    }
+
+    @Test
+    void alternateMarkerIdentityRemainsVisibleByExactFingerprint() {
+        String fingerprint = projectionFingerprint();
+        UUID alternate = new UUID(0L, 102L);
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                projection("alternate", fingerprint, alternate, alternate, 4, 5)
+        ));
+
+        CompanionPopulationEvidenceSet.ProjectionObservation observation =
+                set.projectionObservations(fingerprint).getFirst();
+        assertEquals(alternate, observation.componentUuid());
+        assertEquals(alternate, observation.legacyNpcUuid());
+        assertTrue(set.evidence().isEmpty());
+    }
+
+    @Test
+    void duplicateMarkerEvidencePreservesEveryUnderlyingObservation() {
+        String fingerprint = projectionFingerprint();
+        UUID planned = new UUID(0L, 103L);
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                projection("first", fingerprint, planned, planned, 6, 7),
+                projection("second", fingerprint, planned, planned, 8, 9)
+        ));
+
+        assertEquals(2, set.projectionObservations(fingerprint).size());
+        assertTrue(set.conflicts().isEmpty());
+        assertTrue(set.evidence().isEmpty());
+    }
+
+    @Test
+    void legacyMismatchRetainsBothIdentitiesForFailClosedRecovery() {
+        String fingerprint = projectionFingerprint();
+        UUID componentUuid = new UUID(0L, 104L);
+        UUID legacyUuid = new UUID(0L, 105L);
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                projection("mismatch", fingerprint, componentUuid, legacyUuid, 10, 11)
+        ));
+
+        CompanionPopulationEvidenceSet.ProjectionObservation observation =
+                set.projectionObservations(fingerprint).getFirst();
+        assertEquals(componentUuid, observation.componentUuid());
+        assertEquals(legacyUuid, observation.legacyNpcUuid());
+        assertTrue(set.projectionObservations(projectionFingerprint() + "x").isEmpty());
+    }
+
+    @Test
+    void corpseMarkerRetainsDeathStateWithoutEnteringOrdinaryRepair() {
+        String fingerprint = projectionFingerprint();
+        UUID planned = new UUID(0L, 106L);
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                projection("corpse", fingerprint, planned, planned, 12, 13, true)
+        ));
+
+        CompanionPopulationEvidenceSet.ProjectionObservation observation =
+                set.projectionObservations(fingerprint).getFirst();
+        assertTrue(observation.deathObserved());
+        assertTrue(observation.evidence().projectionObservation().deathObserved());
+        assertTrue(set.byNpcUuid().isEmpty());
+        assertTrue(set.evidence().isEmpty());
+    }
+
     static CompanionPopulationEvidence physical(String key,
                                                   UUID npcUuid,
                                                   UUID ownerUuid,
@@ -201,6 +286,55 @@ class CompanionPopulationEvidenceSetTest {
                 null,
                 null,
                 "test"
+        );
+    }
+
+    private static CompanionPopulationEvidence projection(
+            String key,
+            String fingerprint,
+            UUID componentUuid,
+            UUID legacyUuid,
+            int chunkX,
+            int chunkZ
+    ) {
+        return projection(
+                key, fingerprint, componentUuid, legacyUuid, chunkX, chunkZ, false
+        );
+    }
+
+    private static CompanionPopulationEvidence projection(
+            String key,
+            String fingerprint,
+            UUID componentUuid,
+            UUID legacyUuid,
+            int chunkX,
+            int chunkZ,
+            boolean deathObserved
+    ) {
+        return new CompanionPopulationEvidence(
+                CompanionProjectionEvidence.appendToEvidenceKey(
+                        key, fingerprint, componentUuid, legacyUuid, deathObserved
+                ),
+                componentUuid,
+                null,
+                true,
+                CompanionPopulationEvidence.Kind.PROJECTION_MARKER,
+                "default",
+                "default",
+                chunkX,
+                chunkZ,
+                "test"
+        );
+    }
+
+    private static String projectionFingerprint() {
+        return CompanionProjectionEvidence.fingerprint(
+                "profile-projection",
+                "operation-projection",
+                "BREEDING_CHILD",
+                "child-0000",
+                new UUID(0L, 99L),
+                1L
         );
     }
 }

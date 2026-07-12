@@ -37,9 +37,9 @@ class ManagedCoopCaptureSourceRetirementServiceTest {
     private static final String HASH = "a".repeat(64);
 
     @Test
-    void absentSourceCompletesDurablyThenPublishesPairedRefresh() throws Exception {
+    void provenAbsentSourceCompletesDurablyThenPublishesPairedRefresh() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.world.live = LiveSourceDecision.absent();
+        fixture.world.live = LiveSourceDecision.provenAbsent();
 
         Outcome outcome = fixture.service.retire(ready()).get(3, TimeUnit.SECONDS);
 
@@ -132,7 +132,7 @@ class ManagedCoopCaptureSourceRetirementServiceTest {
     @Test
     void completionRevalidationFailureNeverSubmitsTheTerminalWrite() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.world.live = LiveSourceDecision.absent();
+        fixture.world.live = LiveSourceDecision.provenAbsent();
         fixture.evidence.revalidationFailure =
                 new IllegalStateException("trust_epoch_changed");
         fixture.evidence.failRevalidationAt = 2;
@@ -147,7 +147,7 @@ class ManagedCoopCaptureSourceRetirementServiceTest {
     @Test
     void completionFailureLeavesRefreshUntouchedAndAllowsRetry() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.world.live = LiveSourceDecision.absent();
+        fixture.world.live = LiveSourceDecision.provenAbsent();
         fixture.completionFailure = new IllegalStateException("write_failed");
 
         Outcome failed = fixture.service.retire(ready()).get(3, TimeUnit.SECONDS);
@@ -164,7 +164,7 @@ class ManagedCoopCaptureSourceRetirementServiceTest {
     @Test
     void refreshFailureReportsFailureAfterExactCompletionCommit() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.world.live = LiveSourceDecision.absent();
+        fixture.world.live = LiveSourceDecision.provenAbsent();
         fixture.refreshAccepted = false;
 
         Outcome outcome = fixture.service.retire(ready()).get(3, TimeUnit.SECONDS);
@@ -178,7 +178,7 @@ class ManagedCoopCaptureSourceRetirementServiceTest {
     @Test
     void invalidCompletionIdentityFailsClosed() throws Exception {
         Fixture fixture = new Fixture();
-        fixture.world.live = LiveSourceDecision.absent();
+        fixture.world.live = LiveSourceDecision.provenAbsent();
         fixture.completionMutation = new MutationResult(
                 MutationStatus.IDEMPOTENT,
                 completedOperation("different-operation"),
@@ -189,6 +189,20 @@ class ManagedCoopCaptureSourceRetirementServiceTest {
 
         assertEquals(FAILED, outcome.status());
         assertEquals("capture_completion_identity_mismatch", outcome.detail());
+        assertEquals(0, fixture.refreshCalls.get());
+    }
+
+    @Test
+    void unloadedSourceNeverCompletesCaptureWithoutDurableAbsenceProof() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.world.live = LiveSourceDecision.unavailable(
+                "source_not_loaded_absence_unproven");
+
+        Outcome outcome = fixture.service.retire(ready()).get(3, TimeUnit.SECONDS);
+
+        assertEquals(FAILED, outcome.status());
+        assertEquals("source_not_loaded_absence_unproven", outcome.detail());
+        assertEquals(0, fixture.completionCalls.get());
         assertEquals(0, fixture.refreshCalls.get());
     }
 

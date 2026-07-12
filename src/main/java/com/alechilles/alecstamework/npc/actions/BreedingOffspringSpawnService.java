@@ -2,7 +2,8 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
-import com.alechilles.alecstamework.ownership.PlannedCompanionSpawnProbe;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.ownership.BreedingChildProjectionMarker;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
@@ -190,11 +191,19 @@ final class BreedingOffspringSpawnService {
             @Nullable Rotation3f spawnRotation,
             @Nullable ClaimChunkCoordinate requiredDestination,
             @Nonnull UUID requiredNpcUuid,
+            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
             @Nonnull BreedingSpawnHolderPreparation holderPreparation
     ) {
         if (npcPlugin == null || store == null || roleIndex < 0
                 || spawnPosition == null || spawnRotation == null) {
             return BreedingPreparedSpawnResult.failed("breeding-spawn-context-invalid");
+        }
+        BreedingPreparedSpawnResult preflight = recoverSpawn(
+                store, requiredNpcUuid, expectedProjectionMarker,
+                "breeding-spawn-preflight-absent"
+        );
+        if (preflight.spawned() != null || preflight.outcomeAmbiguous()) {
+            return preflight;
         }
         for (double yOffset : SPAWN_VERTICAL_OFFSETS) {
             for (double[] offset : SPAWN_POSITION_OFFSETS) {
@@ -214,14 +223,22 @@ final class BreedingOffspringSpawnService {
                         safeCandidate,
                         spawnRotation,
                         requiredNpcUuid,
+                        expectedProjectionMarker,
                         holderPreparation
                 );
-                if (attempt.spawned() != null || attempt.preparationFailed()) {
+                if (terminalPreparedAttempt(attempt)) {
                     return attempt;
                 }
             }
         }
         return BreedingPreparedSpawnResult.failed("breeding-spawn-placement-failed");
+    }
+
+    /** An unknown add outcome must never fall through to another placement candidate. */
+    static boolean terminalPreparedAttempt(@Nonnull BreedingPreparedSpawnResult attempt) {
+        return attempt.spawned() != null
+                || attempt.preparationFailed()
+                || attempt.outcomeAmbiguous();
     }
 
     private static boolean matchesDestination(@Nonnull Vector3d candidate,
@@ -243,6 +260,7 @@ final class BreedingOffspringSpawnService {
             @Nonnull Vector3d candidate,
             @Nonnull Rotation3f spawnRotation,
             @Nonnull UUID requiredNpcUuid,
+            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
             @Nonnull BreedingSpawnHolderPreparation holderPreparation
     ) {
         PreparationFailure failure = new PreparationFailure();
@@ -265,12 +283,24 @@ final class BreedingOffspringSpawnService {
             );
             if (spawned == null || spawned.first() == null || spawned.second() == null) {
                 despawnQuietly(spawned);
-                return recoverSpawn(store, requiredNpcUuid, "breeding-spawn-store-rejected");
+                return recoverSpawn(
+                        store, requiredNpcUuid, expectedProjectionMarker,
+                        "breeding-spawn-store-rejected"
+                );
             }
             UUIDComponent uuid = store.getComponent(
                     spawned.first(), UUIDComponent.getComponentType()
             );
-            if (uuid == null || !requiredNpcUuid.equals(uuid.getUuid())) {
+            TameworkProjectionIdentityComponent marker = store.getComponent(
+                    spawned.first(), TameworkProjectionIdentityComponent.getComponentType()
+            );
+            if (!matchesPreparedIdentity(
+                    requiredNpcUuid,
+                    expectedProjectionMarker,
+                    uuid,
+                    spawned.second(),
+                    marker
+            )) {
                 despawnQuietly(spawned);
                 return BreedingPreparedSpawnResult.ambiguous(
                         "breeding-spawn-identity-mismatch"
@@ -280,7 +310,10 @@ final class BreedingOffspringSpawnService {
         } catch (SpawnHolderPreparationException exception) {
             return new BreedingPreparedSpawnResult(null, failure.reason, true, false);
         } catch (RuntimeException | LinkageError exception) {
-            return recoverSpawn(store, requiredNpcUuid, "breeding-spawn-exception");
+            return recoverSpawn(
+                    store, requiredNpcUuid, expectedProjectionMarker,
+                    "breeding-spawn-exception"
+            );
         }
     }
 
@@ -288,21 +321,55 @@ final class BreedingOffspringSpawnService {
     private static BreedingPreparedSpawnResult recoverSpawn(
             @Nonnull Store<EntityStore> store,
             @Nonnull UUID requiredNpcUuid,
+            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
             @Nonnull String absentReason
     ) {
-        World world = store.getExternalData() == null
-                ? null
-                : store.getExternalData().getWorld();
-        PlannedCompanionSpawnProbe.Result probe =
-                PlannedCompanionSpawnProbe.probe(world, store, requiredNpcUuid);
+        BreedingChildProjectionProbe.Result probe = BreedingChildProjectionProbe.probe(
+                store, requiredNpcUuid, expectedProjectionMarker
+        );
         if (probe.present()) {
-            return new BreedingPreparedSpawnResult(
-                    Pair.of(probe.ref(), probe.npc()), null, false, false
+            try {
+                UUIDComponent uuid = store.getComponent(
+                        probe.ref(), UUIDComponent.getComponentType()
+                );
+                TameworkProjectionIdentityComponent marker = store.getComponent(
+                        probe.ref(), TameworkProjectionIdentityComponent.getComponentType()
+                );
+                if (matchesPreparedIdentity(
+                        requiredNpcUuid,
+                        expectedProjectionMarker,
+                        uuid,
+                        probe.npc(),
+                        marker
+                )) {
+                    return new BreedingPreparedSpawnResult(
+                            Pair.of(probe.ref(), probe.npc()), null, false, false
+                    );
+                }
+            } catch (RuntimeException | LinkageError ignored) {
+                // Identity must remain fully observable before an applying unit can commit.
+            }
+            return BreedingPreparedSpawnResult.ambiguous(
+                    absentReason + "-identity-mismatch"
             );
         }
         return probe.absenceProven()
                 ? BreedingPreparedSpawnResult.failed(absentReason)
                 : BreedingPreparedSpawnResult.ambiguous(absentReason + "-outcome-ambiguous");
+    }
+
+    /** Requires every live identity representation to agree with the reserved child. */
+    static boolean matchesPreparedIdentity(
+            @Nonnull UUID requiredNpcUuid,
+            @Nonnull TameworkProjectionIdentityComponent expectedProjectionMarker,
+            @Nullable UUIDComponent uuid,
+            @Nullable NPCEntity npc,
+            @Nullable TameworkProjectionIdentityComponent marker) {
+        return uuid != null
+                && requiredNpcUuid.equals(uuid.getUuid())
+                && npc != null
+                && requiredNpcUuid.equals(npc.getUuid())
+                && BreedingChildProjectionMarker.matches(marker, expectedProjectionMarker);
     }
 
     private static void despawnQuietly(@Nullable Pair<Ref<EntityStore>, NPCEntity> spawned) {

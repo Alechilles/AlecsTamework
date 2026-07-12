@@ -74,7 +74,8 @@ public final class CoopPopulationReleaseAdmissionService {
         Objects.requireNonNull(request, "request");
         PlanResult planned = plan(request, durableContextFactory);
         if (!planned.allowed()) {
-            return CompletableFuture.completedFuture(PreparationResult.denied(planned.reason()));
+            return CompletableFuture.completedFuture(new PreparationResult(
+                    false, planned.reason(), null, planned.disposition()));
         }
         ClaimLookupSession session = new ClaimLookupSession(
                 planned.policy().claimContext(),
@@ -82,14 +83,19 @@ public final class CoopPopulationReleaseAdmissionService {
                 lookupMetrics
         );
         return coordinator.prepareAsync(planned.ownerPlan(), planned.claimRequest(), session)
-                .thenApply(result -> result.allowed() && result.preparedAdmission() != null
-                        ? PreparationResult.prepared(new PreparedRelease(
-                        request,
-                        planned.profileId(),
-                        request.plannedNpcUuid(),
-                        result.preparedAdmission()
-                ))
-                        : PreparationResult.denied(result.reason()));
+                .thenApply(result -> {
+                    if (result != null
+                            && result.allowed()
+                            && result.preparedAdmission() != null) {
+                        return PreparationResult.prepared(new PreparedRelease(
+                                request,
+                                planned.profileId(),
+                                request.plannedNpcUuid(),
+                                result.preparedAdmission()
+                        ));
+                    }
+                    return PreparationResult.denied(result);
+                });
     }
 
     public boolean claimForSpawn(@Nonnull PreparedRelease prepared) {
@@ -261,7 +267,8 @@ public final class CoopPopulationReleaseAdmissionService {
             return PlanResult.denied(invalidSource);
         }
         if (claim.revision() == Long.MAX_VALUE) {
-            return PlanResult.denied("coop-release-population-revision-exhausted");
+            return PlanResult.definitivelyDenied(
+                    "coop-release-population-revision-exhausted");
         }
         CompanionAdmissionPolicyResolver.Policy policy = policyResolver.resolve(
                 OwnerPopulationOperation.RESTORE,
@@ -299,7 +306,7 @@ public final class CoopPopulationReleaseAdmissionService {
         try {
             targetContext = contextJson(request, durableContextFactory);
         } catch (RuntimeException | LinkageError invalidContext) {
-            return PlanResult.denied("coop-release-durable-context-invalid");
+            return PlanResult.definitivelyDenied("coop-release-durable-context-invalid");
         }
         OwnerPopulationAdmissionPlan ownerPlan = new OwnerPopulationAdmissionPlan(
                 transition,
@@ -467,20 +474,78 @@ public final class CoopPopulationReleaseAdmissionService {
         }
     }
 
+    /** Whether a failed preparation can safely release its managed-coop lifecycle claim. */
+    public enum PreparationDisposition {
+        PREPARED,
+        DEFINITIVE_DENIAL,
+        AMBIGUOUS
+    }
+
     public record PreparationResult(boolean allowed,
                                     @Nonnull String reason,
-                                    @Nullable PreparedRelease preparedRelease) {
-        static PreparationResult prepared(PreparedRelease release) {
-            return new PreparationResult(true, "coop-release-population-prepared", release);
+                                    @Nullable PreparedRelease preparedRelease,
+                                    @Nonnull PreparationDisposition disposition) {
+        public PreparationResult {
+            reason = Objects.requireNonNull(reason, "reason");
+            disposition = Objects.requireNonNull(disposition, "disposition");
+            if (allowed != (preparedRelease != null)
+                    || (allowed != (disposition == PreparationDisposition.PREPARED))) {
+                throw new IllegalArgumentException(
+                        "Prepared release, allowed state, and disposition must agree.");
+            }
         }
 
-        static PreparationResult denied(String reason) {
-            return new PreparationResult(false, reason, null);
+        static PreparationResult prepared(PreparedRelease release) {
+            return new PreparationResult(
+                    true,
+                    "coop-release-population-prepared",
+                    release,
+                    PreparationDisposition.PREPARED);
         }
+
+        static PreparationResult denied(@Nullable CompanionPopulationPreparationResult result) {
+            String reason = result != null && result.reason() != null
+                    ? result.reason()
+                    : "coop-release-population-prepare-result-missing";
+            PreparationDisposition disposition = definitivePreAdmissionDenial(result)
+                    ? PreparationDisposition.DEFINITIVE_DENIAL
+                    : PreparationDisposition.AMBIGUOUS;
+            return new PreparationResult(false, reason, null, disposition);
+        }
+    }
+
+    /**
+     * Allows rollback only for policy denials proven to occur before owner-journal preparation.
+     * Pending, degraded, identity, revision, and unknown outcomes can describe a replay of an
+     * already-APPLYING release and must therefore retain the managed-coop lifecycle journal.
+     */
+    static boolean definitivePreAdmissionDenial(
+            @Nullable CompanionPopulationPreparationResult result) {
+        if (result == null || result.reason() == null) {
+            return false;
+        }
+        if (result.ownerDecision() != null
+                && result.ownerDecision().readiness() != OwnerPopulationReadiness.READY) {
+            return false;
+        }
+        if (result.claimDecision() != null
+                && result.claimDecision().readiness()
+                != com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness.READY) {
+            return false;
+        }
+        return switch (result.reason()) {
+            case "owner-cap-reached",
+                    "owner-cap-world-context-required",
+                    "claim-cap-reached",
+                    "claim-required",
+                    "claim-footprint-required" -> true;
+            default -> false;
+        };
     }
 
     private record PlanResult(boolean allowed,
                               @Nonnull String reason,
+                              @Nonnull PreparationDisposition disposition,
                               @Nullable String profileId,
                               @Nullable UUID plannedNpcUuid,
                               @Nullable CompanionAdmissionPolicyResolver.Policy policy,
@@ -491,12 +556,19 @@ public final class CoopPopulationReleaseAdmissionService {
                                   CompanionAdmissionPolicyResolver.Policy policy,
                                   OwnerPopulationAdmissionPlan ownerPlan,
                                   ClaimAdmissionRequest claimRequest) {
-            return new PlanResult(true, "coop-release-population-planned", profileId,
+            return new PlanResult(true, "coop-release-population-planned",
+                    PreparationDisposition.PREPARED, profileId,
                     plannedNpcUuid, policy, ownerPlan, claimRequest);
         }
 
         static PlanResult denied(String reason) {
-            return new PlanResult(false, reason, null, null, null, null, null);
+            return new PlanResult(false, reason, PreparationDisposition.AMBIGUOUS,
+                    null, null, null, null, null);
+        }
+
+        static PlanResult definitivelyDenied(String reason) {
+            return new PlanResult(false, reason, PreparationDisposition.DEFINITIVE_DENIAL,
+                    null, null, null, null, null);
         }
     }
 }

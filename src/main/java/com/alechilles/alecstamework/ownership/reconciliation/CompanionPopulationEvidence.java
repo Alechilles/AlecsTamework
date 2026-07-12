@@ -28,7 +28,8 @@ public record CompanionPopulationEvidence(
         LOST_SNAPSHOT,
         COOP_SNAPSHOT,
         CAPTURED_ITEM,
-        PROFILE_RECORD;
+        PROFILE_RECORD,
+        PROJECTION_MARKER;
 
         public boolean isPhysical() {
             return this == PHYSICAL_ENTITY || this == PHYSICAL_DEAD_ENTITY;
@@ -36,6 +37,10 @@ public record CompanionPopulationEvidence(
 
         public boolean isDeadPhysical() {
             return this == PHYSICAL_DEAD_ENTITY;
+        }
+
+        public boolean isProjectionMarker() {
+            return this == PROJECTION_MARKER;
         }
     }
 
@@ -55,11 +60,23 @@ public record CompanionPopulationEvidence(
         if (!noPhysicalLocation && !completePhysicalLocation) {
             throw new IllegalArgumentException("Physical evidence location must be entirely present or absent.");
         }
-        if (kind.isPhysical() && !completePhysicalLocation) {
-            throw new IllegalArgumentException("Physical entity evidence requires a complete chunk location.");
+        if ((kind.isPhysical() || kind.isProjectionMarker()) && !completePhysicalLocation) {
+            throw new IllegalArgumentException(
+                    "Physical and projection-marker evidence requires a complete chunk location."
+            );
         }
-        if (!kind.isPhysical() && !noPhysicalLocation) {
+        if (!kind.isPhysical() && !kind.isProjectionMarker() && !noPhysicalLocation) {
             throw new IllegalArgumentException("Dormant/profile evidence cannot claim physical occupancy.");
+        }
+        CompanionProjectionEvidence.ProjectionObservation projection =
+                CompanionProjectionEvidence.parseEvidenceKey(evidenceKey);
+        if (CompanionProjectionEvidence.containsReservedSuffix(evidenceKey) && projection == null) {
+            throw new IllegalArgumentException("Projection evidence key suffix is malformed.");
+        }
+        if (kind.isProjectionMarker() != (projection != null)) {
+            throw new IllegalArgumentException(
+                    "Projection marker kind and evidence key suffix must be present together."
+            );
         }
     }
 
@@ -87,6 +104,12 @@ public record CompanionPopulationEvidence(
                 physicalChunkZ,
                 source
         );
+    }
+
+    /** Returns marker identity encoded in this row without changing the persisted schema. */
+    @Nullable
+    public CompanionProjectionEvidence.ProjectionObservation projectionObservation() {
+        return CompanionProjectionEvidence.parseEvidenceKey(evidenceKey);
     }
 
     @Nonnull

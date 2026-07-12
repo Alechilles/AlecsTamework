@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPersistedProjectionEvidenceRegistry;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -357,6 +358,13 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public CompanionPopulationScanSessionRepository getCompanionPopulationScanSessionRepository() {
         return populationReconciliationPersistence.scanSessionRepository();
+    }
+
+    /** Restart-recovery view published only after a content-stable persisted-world scan. */
+    @Nonnull
+    public CompanionPersistedProjectionEvidenceRegistry
+    getCompanionPersistedProjectionEvidenceRegistry() {
+        return populationReconciliationPersistence.projectionEvidenceRegistry();
     }
 
     @Nonnull

@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.items.ManagedCoopCompositeIndexRefreshServic
 import com.alechilles.alecstamework.items.ManagedCoopCompositeIndexRefreshService.RefreshResult;
 import com.alechilles.alecstamework.items.ManagedCoopCompositeIndexRefreshService.RefreshStatus;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRecoveryService.RecoveryOutcome;
+import com.alechilles.alecstamework.items.ManagedCoopPersistedProjectionRecovery.Adoption;
+import com.alechilles.alecstamework.items.ManagedCoopPersistedProjectionRecovery.Resolution;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationResult;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationStatus;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationKind;
@@ -24,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,7 +57,54 @@ class ManagedCoopReleaseRecoveryServiceTest {
             assertEquals(TARGET, outcome.spawnClaim().plannedTargetUuid());
             assertEquals(SOURCE, outcome.spawnClaim().sourceNpcUuid());
             assertEquals(fixture.resident(), outcome.resident());
+            assertNotNull(outcome.projectionToken());
         }
+    }
+
+    /** Regression: add+unload after restart recovery must invalidate the queued world projection. */
+    @Test
+    void persistedAbsenceTokenSurvivesRecoveryAndIsRecheckedAtProjectionTime() {
+        Fixture fixture = fixture(OperationState.SPAWN_CLAIMED);
+        boolean[] current = {true};
+        ManagedCoopPersistedProjectionRecovery persisted =
+                new ManagedCoopPersistedProjectionRecovery() {
+                    @Override
+                    public Resolution resolve(OperationRecord operation, ResidentRecord resident) {
+                        return Resolution.absent(7L, 11L);
+                    }
+
+                    @Override
+                    public boolean current(Resolution resolution) {
+                        return current[0]
+                                && resolution.evidenceRevision() == 7L
+                                && resolution.loadedIdentityRevision() == 11L;
+                    }
+
+                    @Override
+                    public CompletableFuture<Adoption> adopt(
+                            OperationRecord operation,
+                            ManagedCoopReleaseCoordinator.SpawnReady claim,
+                            ResidentRecord resident,
+                            Resolution projection) {
+                        throw new AssertionError("absent projection must not adopt");
+                    }
+                };
+        ManagedCoopReleaseRecoveryService service = fixture.service(
+                (operationId, generation, nowMs) -> {
+                    throw new AssertionError("claim was not expected");
+                },
+                () -> {
+                    throw new AssertionError("refresh was not expected");
+                },
+                persisted);
+
+        RecoveryOutcome recovered = service.resume(fixture.operation()).join();
+
+        assertTrue(recovered.ready());
+        assertNotNull(recovered.projectionToken());
+        assertTrue(service.projectionCurrent(recovered.projectionToken()));
+        current[0] = false;
+        assertFalse(service.projectionCurrent(recovered.projectionToken()));
     }
 
     @Test
@@ -127,6 +178,51 @@ class ManagedCoopReleaseRecoveryServiceTest {
         canonical.operationIndex().rebuild(ManagedCoopReadResult.loaded(List.of(wrongId)));
         assertEquals(ManagedCoopReleaseRecoveryService.Status.FAILED,
                 canonical.service().resume(wrongId).join().status());
+    }
+
+    @Test
+    void exactPersistedProjectionIsAdoptedBeforeAnySpawnClaimIsPublished() {
+        Fixture fixture = fixture(OperationState.SPAWN_CLAIMED);
+        AtomicInteger adoptions = new AtomicInteger();
+        ManagedCoopPersistedProjectionRecovery persisted =
+                new ManagedCoopPersistedProjectionRecovery() {
+                    @Override
+                    public Resolution resolve(OperationRecord operation, ResidentRecord resident) {
+                        return Resolution.exact("world", 0, 0, 7L);
+                    }
+
+                    @Override
+                    public boolean current(Resolution resolution) {
+                        return resolution.evidenceRevision() == 7L;
+                    }
+
+                    @Override
+                    public CompletableFuture<Adoption> adopt(
+                            OperationRecord operation,
+                            ManagedCoopReleaseCoordinator.SpawnReady claim,
+                            ResidentRecord resident,
+                            Resolution projection) {
+                        adoptions.incrementAndGet();
+                        assertEquals(TARGET, claim.plannedTargetUuid());
+                        return CompletableFuture.completedFuture(
+                                Adoption.adopted("persisted-projection-adopted"));
+                    }
+                };
+        ManagedCoopReleaseRecoveryService service = fixture.service(
+                (operationId, generation, nowMs) -> {
+                    throw new AssertionError("SPAWN_CLAIMED must not be claimed again");
+                },
+                () -> {
+                    throw new AssertionError("refresh was not expected");
+                },
+                persisted);
+
+        RecoveryOutcome outcome = service.resume(fixture.operation()).join();
+
+        assertEquals(ManagedCoopReleaseRecoveryService.Status.DEDUPLICATED, outcome.status());
+        assertEquals("persisted-projection-adopted", outcome.detail());
+        assertEquals(1, adoptions.get());
+        assertNull(outcome.spawnClaim());
     }
 
     private static Fixture fixture(OperationState state) {
@@ -252,12 +348,20 @@ class ManagedCoopReleaseRecoveryServiceTest {
         private ManagedCoopReleaseRecoveryService service(
                 ManagedCoopReleaseRecoveryService.ClaimGateway claims,
                 ManagedCoopReleaseRecoveryService.RefreshGateway refresh) {
+            return service(claims, refresh, ManagedCoopPersistedProjectionRecovery.passthrough());
+        }
+
+        private ManagedCoopReleaseRecoveryService service(
+                ManagedCoopReleaseRecoveryService.ClaimGateway claims,
+                ManagedCoopReleaseRecoveryService.RefreshGateway refresh,
+                ManagedCoopPersistedProjectionRecovery persisted) {
             return new ManagedCoopReleaseRecoveryService(
                     residentIndex,
                     operationIndex,
                     () -> trusted[0],
                     claims,
                     refresh,
+                    persisted,
                     () -> -50L
             );
         }

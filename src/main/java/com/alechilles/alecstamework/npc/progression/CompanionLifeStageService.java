@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -31,7 +32,6 @@ public final class CompanionLifeStageService {
     public static final String STAGE_ADOLESCENT = "Adolescent";
     public static final String STAGE_ADULT = "Adult";
 
-    private static final long DEFAULT_GROWTH_DURATION_SECONDS = TimeUnit.MINUTES.toSeconds(7);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
     private static final long INITIAL_SCALE_RETRY_INTERVAL_MS = 10L;
     private static final int INITIAL_SCALE_MAX_RETRIES = 120;
@@ -41,6 +41,12 @@ public final class CompanionLifeStageService {
     private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
     private static final Set<UUID> ACTIVE_GROWTH_TICKERS = ConcurrentHashMap.newKeySet();
+
+    /** Controls whether offspring initialization may reinterpret a missing planned family. */
+    public enum LifecycleFamilyResolution {
+        CURRENT_CONFIG_FALLBACK,
+        PLANNED_SELECTION_ONLY
+    }
 
     private CompanionLifeStageService() {
     }
@@ -93,6 +99,27 @@ public final class CompanionLifeStageService {
                                                     @Nullable TwBreedingConfig breedingConfig,
                                                     @Nullable String selectedAdultRoleId,
                                                     @Nullable TwBreedingConfig.RoleFamily preResolvedFamily) {
+        initializeOffspringLifeStage(
+                childRef,
+                childNpc,
+                store,
+                spawnedRoleId,
+                breedingConfig,
+                selectedAdultRoleId,
+                preResolvedFamily,
+                LifecycleFamilyResolution.CURRENT_CONFIG_FALLBACK
+        );
+    }
+
+    /** Initializes offspring while honoring the caller's durable family-resolution policy. */
+    public static void initializeOffspringLifeStage(@Nullable Ref<EntityStore> childRef,
+                                                    @Nullable NPCEntity childNpc,
+                                                    @Nullable Store<EntityStore> store,
+                                                    @Nullable String spawnedRoleId,
+                                                    @Nullable TwBreedingConfig breedingConfig,
+                                                    @Nullable String selectedAdultRoleId,
+                                                    @Nullable TwBreedingConfig.RoleFamily preResolvedFamily,
+                                                    @Nonnull LifecycleFamilyResolution familyResolution) {
         if (childRef == null || !childRef.isValid() || store == null) {
             return;
         }
@@ -102,11 +129,9 @@ public final class CompanionLifeStageService {
         }
 
         long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
-        String adultRoleId = preResolvedFamily != null
-                && selectedAdultRoleId != null
-                && !selectedAdultRoleId.isBlank()
-                ? selectedAdultRoleId
-                : resolveAdultRoleId(spawnedRoleId, preResolvedFamily);
+        String adultRoleId = resolveOffspringAdultRoleId(
+                spawnedRoleId, selectedAdultRoleId, preResolvedFamily
+        );
         double adultScale = resolveAdultScale(childRef, store, adultRoleId);
         LifecycleComputation lifecycle = computeLifecycle(
                 nowMs,
@@ -114,7 +139,8 @@ public final class CompanionLifeStageService {
                 breedingConfig,
                 preResolvedFamily,
                 spawnedRoleId,
-                store
+                store,
+                familyResolution
         );
         TameworkLifeStageComponent component = new TameworkLifeStageComponent(
                 STAGE_BABY,
@@ -135,7 +161,7 @@ public final class CompanionLifeStageService {
             component.setBabyRoleId(preResolvedFamily.getBabyRoleId());
             component.setAdolescentRoleId(preResolvedFamily.getAdolescentRoleId());
         } else {
-            component.setAdultRoleId(spawnedRoleId);
+            component.setAdultRoleId(adultRoleId);
             component.setBabyRoleId(spawnedRoleId);
         }
         store.putComponent(childRef, type, component);
@@ -152,6 +178,15 @@ public final class CompanionLifeStageService {
             return family.getAdultRoleId();
         }
         return spawnedRoleId;
+    }
+
+    @Nullable
+    static String resolveOffspringAdultRoleId(@Nullable String spawnedRoleId,
+                                              @Nullable String selectedAdultRoleId,
+                                              @Nullable TwBreedingConfig.RoleFamily family) {
+        return selectedAdultRoleId != null && !selectedAdultRoleId.isBlank()
+                ? selectedAdultRoleId
+                : resolveAdultRoleId(spawnedRoleId, family);
     }
 
     @Nullable
@@ -228,13 +263,21 @@ public final class CompanionLifeStageService {
                 adultAtMs = lifecycle.adultAtMs();
                 fullyGrownAtMs = lifecycle.fullyGrownAtMs();
                 if (STAGE_ADOLESCENT.equals(stage)) {
-                    long babyDurationMs = Math.max(1L, lifecycle.adolescentAtMs() - nowMs);
-                    long adolescentDurationMs = Math.max(1L, lifecycle.adultAtMs() - lifecycle.adolescentAtMs());
-                    long adultDurationMs = Math.max(1L, lifecycle.fullyGrownAtMs() - lifecycle.adultAtMs());
-                    bornAtMs = nowMs - babyDurationMs;
+                    long babyDurationMs = Math.max(1L, BreedingTimeService.saturatingSubtract(
+                            lifecycle.adolescentAtMs(), nowMs
+                    ));
+                    long adolescentDurationMs = Math.max(1L, BreedingTimeService.saturatingSubtract(
+                            lifecycle.adultAtMs(), lifecycle.adolescentAtMs()
+                    ));
+                    long adultDurationMs = Math.max(1L, BreedingTimeService.saturatingSubtract(
+                            lifecycle.fullyGrownAtMs(), lifecycle.adultAtMs()
+                    ));
+                    bornAtMs = BreedingTimeService.saturatingSubtract(nowMs, babyDurationMs);
                     adolescentAtMs = nowMs;
-                    adultAtMs = nowMs + adolescentDurationMs;
-                    fullyGrownAtMs = adultAtMs + adultDurationMs;
+                    adultAtMs = BreedingTimeService.saturatingAdd(nowMs, adolescentDurationMs);
+                    fullyGrownAtMs = BreedingTimeService.saturatingAdd(
+                            adultAtMs, adultDurationMs
+                    );
                 }
             }
         }
@@ -813,96 +856,50 @@ public final class CompanionLifeStageService {
                                                          @Nullable TwBreedingConfig.RoleFamily preResolvedFamily,
                                                          @Nullable String spawnedRoleId,
                                                          @Nullable Store<EntityStore> store) {
-        TwBreedingConfig.OffspringLifecycleSettings lifecycle = breedingConfig != null
-                ? breedingConfig.resolveOffspringLifecycle(spawnedRoleId)
-                : null;
-        TwBreedingConfig.RoleFamily family = preResolvedFamily;
-        if (family == null && breedingConfig != null && spawnedRoleId != null && !spawnedRoleId.isBlank()) {
-            family = resolveLifecycleFamilyForProgression(breedingConfig, spawnedRoleId);
-        }
-
-        boolean lifecycleEnabled = lifecycle != null && lifecycle.isEnabled();
-        boolean useFamilyScales = lifecycleEnabled && family != null;
-        boolean hasAdolescentStage = useFamilyScales
-                && family.getAdolescentRoleId() != null
-                && !family.getAdolescentRoleId().isBlank();
-
-        double babyStartScale;
-        double adolescentStartScale;
-        double adolescentSwitchScale;
-        double adultStartScale;
-        double adultSwitchScale;
-        double adultFinalScale = clampScale(adultScale);
-
-        if (useFamilyScales) {
-            babyStartScale = clampScale(adultFinalScale * lifecycle.resolveBabyStartScale(family));
-            adolescentStartScale = clampScale(adultFinalScale * lifecycle.resolveAdolescentStartScale(family));
-            adolescentSwitchScale = clampScale(adultFinalScale * lifecycle.resolveAdolescentSwitchScale(family));
-            adultStartScale = clampScale(adultFinalScale * lifecycle.resolveAdultStartScale(family));
-            adultSwitchScale = clampScale(adultFinalScale * lifecycle.resolveAdultSwitchScale(family));
-        } else {
-            babyStartScale = resolveBabyScale(adultFinalScale);
-            adolescentStartScale = resolveAdolescentScale(adultFinalScale);
-            adolescentSwitchScale = adolescentStartScale;
-            adultStartScale = adolescentStartScale;
-            adultSwitchScale = adultFinalScale;
-        }
-
-        long totalGrowthMs = resolveGrowthDurationMs(breedingConfig, lifecycle, family, spawnedRoleId, store);
-        double babySwitchScale = hasAdolescentStage ? adolescentSwitchScale : adultSwitchScale;
-        double babyDelta = Math.abs(babySwitchScale - babyStartScale);
-        double adolescentDelta = hasAdolescentStage ? Math.abs(adultSwitchScale - adolescentStartScale) : 0.0;
-        double adultDelta = Math.abs(adultFinalScale - adultStartScale);
-        double totalDelta = babyDelta + adolescentDelta + adultDelta;
-        if (totalDelta <= 0.000001) {
-            totalDelta = 1.0;
-            babyDelta = 1.0;
-            adolescentDelta = 0.0;
-            adultDelta = 0.0;
-        }
-
-        long babyDurationMs = Math.max(1L, Math.round(totalGrowthMs * (babyDelta / totalDelta)));
-        long adolescentDurationMs = hasAdolescentStage
-                ? Math.max(1L, Math.round(totalGrowthMs * (adolescentDelta / totalDelta)))
-                : 0L;
-        long adultDurationMs = Math.max(1L, totalGrowthMs - babyDurationMs - adolescentDurationMs);
-        long adolescentAtMs = nowMs + babyDurationMs;
-        long adultAtMs = adolescentAtMs + adolescentDurationMs;
-        long fullyGrownAtMs = adultAtMs + adultDurationMs;
-
-        return new LifecycleComputation(
-                babyStartScale,
-                adolescentStartScale,
-                adolescentSwitchScale,
-                adultStartScale,
-                adultSwitchScale,
-                adultFinalScale,
-                adolescentAtMs,
-                adultAtMs,
-                fullyGrownAtMs
+        return computeLifecycle(
+                nowMs,
+                adultScale,
+                breedingConfig,
+                preResolvedFamily,
+                spawnedRoleId,
+                store,
+                LifecycleFamilyResolution.CURRENT_CONFIG_FALLBACK
         );
     }
 
-    private static long resolveGrowthDurationMs(@Nullable TwBreedingConfig breedingConfig,
-                                                @Nullable TwBreedingConfig.OffspringLifecycleSettings lifecycle,
-                                                @Nullable TwBreedingConfig.RoleFamily family,
-                                                @Nullable String roleId,
-                                                @Nullable Store<EntityStore> store) {
-        long configuredSeconds = DEFAULT_GROWTH_DURATION_SECONDS;
-        if (lifecycle != null && lifecycle.isEnabled()) {
-            int resolved = lifecycle.resolveTimeToFullGrownSeconds(family);
-            if (resolved > 0) {
-                configuredSeconds = resolved;
-            }
+    private static LifecycleComputation computeLifecycle(long nowMs,
+                                                         double adultScale,
+                                                         @Nullable TwBreedingConfig breedingConfig,
+                                                         @Nullable TwBreedingConfig.RoleFamily preResolvedFamily,
+                                                         @Nullable String spawnedRoleId,
+                                                         @Nullable Store<EntityStore> store,
+                                                         @Nonnull LifecycleFamilyResolution familyResolution) {
+        TwBreedingConfig.RoleFamily family = resolveLifecycleFamilyForInitialization(
+                breedingConfig, preResolvedFamily, spawnedRoleId, familyResolution
+        );
+        CompanionOffspringLifecycleComputation.Result result =
+                CompanionOffspringLifecycleComputation.compute(
+                        nowMs, adultScale, breedingConfig, family, spawnedRoleId, store
+                );
+        return new LifecycleComputation(
+                result.babyStartScale(), result.adolescentStartScale(),
+                result.adolescentSwitchScale(), result.adultStartScale(),
+                result.adultSwitchScale(), result.adultFinalScale(),
+                result.adolescentAtMs(), result.adultAtMs(), result.fullyGrownAtMs()
+        );
+    }
+
+    @Nullable
+    static TwBreedingConfig.RoleFamily resolveLifecycleFamilyForInitialization(
+            @Nullable TwBreedingConfig breedingConfig,
+            @Nullable TwBreedingConfig.RoleFamily preResolvedFamily,
+            @Nullable String spawnedRoleId,
+            @Nonnull LifecycleFamilyResolution familyResolution) {
+        if (preResolvedFamily != null
+                || familyResolution == LifecycleFamilyResolution.PLANNED_SELECTION_ONLY) {
+            return preResolvedFamily;
         }
-        TwBreedingConfig.TimerBasis timerBasis = breedingConfig != null
-                ? breedingConfig.resolveTiming(roleId).getTimerBasis()
-                : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
-        long converted = BreedingTimeService.toGameDurationMs(configuredSeconds, timerBasis, store);
-        if (converted > 0L) {
-            return converted;
-        }
-        return TimeUnit.SECONDS.toMillis(Math.max(1L, configuredSeconds));
+        return resolveLifecycleFamilyForProgression(breedingConfig, spawnedRoleId);
     }
 
     private static void scheduleGrowthTick(Ref<EntityStore> npcRef,

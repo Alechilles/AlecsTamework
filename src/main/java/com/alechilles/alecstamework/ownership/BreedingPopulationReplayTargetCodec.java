@@ -27,6 +27,11 @@ final class BreedingPopulationReplayTargetCodec {
             String childKey = requiredText(json, "childKey");
             UUID npcUuid = UUID.fromString(requiredText(json, "plannedNpcUuid"));
             String worldName = optionalText(json, "world");
+            Integer chunkX = optionalInt(json, "chunkX");
+            Integer chunkZ = optionalInt(json, "chunkZ");
+            if ((chunkX == null) != (chunkZ == null)) {
+                throw new IllegalArgumentException("Breeding target chunk must be complete.");
+            }
             List<String> parentProfileIds = parseParentProfileIds(json);
             if (!parentProfileIds.isEmpty() && worldName == null) {
                 throw new IllegalArgumentException(
@@ -39,7 +44,9 @@ final class BreedingPopulationReplayTargetCodec {
                     npcUuid,
                     json.get("birthPlan"),
                     parentProfileIds,
-                    worldName
+                    worldName,
+                    chunkX,
+                    chunkZ
             );
         } catch (RuntimeException ignored) {
             return null;
@@ -83,6 +90,12 @@ final class BreedingPopulationReplayTargetCodec {
         return value;
     }
 
+    @Nullable
+    private static Integer optionalInt(@Nonnull JsonObject json, @Nonnull String key) {
+        JsonElement element = json.get(key);
+        return element == null || element.isJsonNull() ? null : element.getAsInt();
+    }
+
     @Nonnull
     private static String requireText(@Nonnull String value, @Nonnull String field) {
         String normalized = Objects.requireNonNull(value, field).trim();
@@ -98,7 +111,9 @@ final class BreedingPopulationReplayTargetCodec {
             @Nonnull UUID plannedNpcUuid,
             @Nullable JsonElement planElement,
             @Nonnull List<String> parentProfileIds,
-            @Nullable String worldName
+            @Nullable String worldName,
+            @Nullable Integer chunkX,
+            @Nullable Integer chunkZ
     ) {
     }
 }

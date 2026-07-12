@@ -437,12 +437,16 @@ public final class ManagedCoopStaleEntityPolicy {
                                  @Nullable String operationId,
                                  @Nullable String projectionKind,
                                  @Nullable String slotKey,
-                                 @Nullable UUID sourceNpcUuid,
-                                 long generation) {
+                                  @Nullable UUID sourceNpcUuid,
+                                  long generation) {
         boolean indicatesManagedCoop() {
-            return (projectionKind != null
-                    && projectionKind.toUpperCase(Locale.ROOT).startsWith("MANAGED_COOP_"))
-                    || (operationId != null
+            String normalizedKind = projectionKind == null
+                    ? null
+                    : projectionKind.trim().toUpperCase(Locale.ROOT);
+            if (normalizedKind != null && !normalizedKind.isEmpty()) {
+                return normalizedKind.startsWith("MANAGED_COOP_");
+            }
+            return (operationId != null
                     && operationId.toLowerCase(Locale.ROOT).startsWith("managed-coop-"))
                     || (slotKey != null && sourceNpcUuid != null);
         }

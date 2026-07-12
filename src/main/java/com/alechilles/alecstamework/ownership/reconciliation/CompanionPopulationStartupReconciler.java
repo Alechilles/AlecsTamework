@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.ownership.reconciliation;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
+import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
@@ -36,20 +38,23 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     private final CompanionPopulationRuntimeReconciler runtimeReconciler;
     private final OwnerPopulationIndex ownerIndex;
     private final ClaimOccupancyIndex claimIndex;
+    private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
+    private final CompanionLiveEvidenceRevision liveEvidenceRevision;
     private final ScheduledExecutorService executor;
     private final AtomicReference<CompanionPopulationReconciliationProgress> progress =
             new AtomicReference<>(CompanionPopulationReconciliationProgress.idle());
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private volatile CompletableFuture<CompanionPopulationReconciliationProgress> completion;
-
     public CompanionPopulationStartupReconciler(
             @Nonnull TameworkPersistenceRuntime persistence,
             @Nonnull CompanionPopulationBootstrapService bootstrapService,
             @Nonnull CoalescedCompanionPopulationWriter observationWriter,
             @Nonnull CompanionPopulationRuntimeReconciler runtimeReconciler,
             @Nonnull OwnerPopulationIndex ownerIndex,
-            @Nonnull ClaimOccupancyIndex claimIndex
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision
     ) {
         this(
                 persistence,
@@ -58,6 +63,8 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 runtimeReconciler,
                 ownerIndex,
                 claimIndex,
+                loadedNpcIdentityIndex,
+                liveEvidenceRevision,
                 Executors.newSingleThreadScheduledExecutor(runnable -> {
                     Thread thread = new Thread(runnable, "tamework-population-reconciliation");
                     thread.setDaemon(true);
@@ -65,7 +72,6 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 })
         );
     }
-
     CompanionPopulationStartupReconciler(
             @Nonnull TameworkPersistenceRuntime persistence,
             @Nonnull CompanionPopulationBootstrapService bootstrapService,
@@ -73,6 +79,8 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
             @Nonnull CompanionPopulationRuntimeReconciler runtimeReconciler,
             @Nonnull OwnerPopulationIndex ownerIndex,
             @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
             @Nonnull ScheduledExecutorService executor
     ) {
         this.persistence = Objects.requireNonNull(persistence, "persistence");
@@ -81,9 +89,14 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         this.runtimeReconciler = Objects.requireNonNull(runtimeReconciler, "runtimeReconciler");
         this.ownerIndex = Objects.requireNonNull(ownerIndex, "ownerIndex");
         this.claimIndex = Objects.requireNonNull(claimIndex, "claimIndex");
+        this.loadedNpcIdentityIndex = Objects.requireNonNull(
+                loadedNpcIdentityIndex, "loadedNpcIdentityIndex"
+        );
+        this.liveEvidenceRevision = Objects.requireNonNull(
+                liveEvidenceRevision, "liveEvidenceRevision"
+        );
         this.executor = Objects.requireNonNull(executor, "executor");
     }
-
     /**
      * Starts at most one reconciliation pass. Every expensive scan and final reload runs away from
      * world threads; the returned future is suitable for diagnostics/logging only.
@@ -93,12 +106,14 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
             @Nonnull Universe universe,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
             @Nonnull ItemFeatureRegistry itemFeatures,
-            @Nonnull CustomContainerReconciliationRegistry customContainers
+            @Nonnull CustomContainerReconciliationRegistry customContainers,
+            @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady
     ) {
         Objects.requireNonNull(universe, "universe");
         Objects.requireNonNull(ownerType, "ownerType");
         Objects.requireNonNull(itemFeatures, "itemFeatures");
         Objects.requireNonNull(customContainers, "customContainers");
+        Objects.requireNonNull(loadedIdentitiesReady, "loadedIdentitiesReady");
         if (closed.get()) {
             return CompletableFuture.completedFuture(progress.get());
         }
@@ -110,25 +125,78 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         long startedAt = System.currentTimeMillis();
         progress.set(running("waiting-for-universe-ready", 0L, 0L, startedAt));
         CompletableFuture<CompanionPopulationReconciliationProgress> future = universe.getUniverseReady()
+                .thenComposeAsync(ignored -> loadedIdentitiesReady, executor)
+                .thenApplyAsync(this::requireCompleteLoadedIdentities, executor)
                 .thenComposeAsync(ignored -> acquireScanSession(), executor)
                 .thenComposeAsync(session -> new PersistedWorldCoverageLoader()
                         .ensureLoaded(universe)
                         .thenApply(ignored -> session), executor)
-                .thenApplyAsync(session -> new StartupCatalog(
-                        HytaleCompanionPopulationCatalogFactory.create(
-                                universe,
-                                ownerType,
-                                itemFeatures,
-                                persistence.getCompanionPopulationLegacyEvidenceRepository(),
-                                customContainers,
-                                session.epoch()
-                        ),
-                        session.epoch()
-                ), executor)
-                .thenCompose(startup -> reconcile(startup, startedAt))
+                .thenComposeAsync(session -> new HytaleSavedWorldScanBarrier(universe)
+                        .acquireAsync()
+                        .thenApply(lease -> new BarrierSession(session, lease)), executor)
+                .thenCompose(barrier -> reconcileUnderBarrier(
+                        barrier,
+                        universe,
+                        ownerType,
+                        itemFeatures,
+                        customContainers,
+                        startedAt
+                ))
                 .exceptionally(exception -> fail(exception, startedAt));
         completion = future;
         return future;
+    }
+    @Nonnull
+    private CompletableFuture<CompanionPopulationReconciliationProgress> reconcileUnderBarrier(
+            @Nonnull BarrierSession barrier,
+            @Nonnull Universe universe,
+            @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CustomContainerReconciliationRegistry customContainers,
+            long startedAt
+    ) {
+        CompletableFuture<CompanionPopulationReconciliationProgress> work;
+        try {
+            String epoch = barrier.session().epoch();
+            StartupCatalog startup = new StartupCatalog(
+                    HytaleCompanionPopulationCatalogFactory.create(
+                            universe,
+                            ownerType,
+                            itemFeatures,
+                            persistence.getCompanionPopulationLegacyEvidenceRepository(),
+                            customContainers,
+                            epoch
+                    ),
+                    epoch
+            );
+            work = reconcile(startup, startedAt);
+        } catch (Throwable failure) {
+            work = CompletableFuture.failedFuture(failure);
+        }
+        return work.handle(BarrierCompletion::new).thenCompose(completion ->
+                barrier.lease().releaseAsync().handle((ignored, releaseFailure) -> {
+                    if (completion.failure() != null) {
+                        if (releaseFailure != null) {
+                            completion.failure().addSuppressed(rootCause(releaseFailure));
+                        }
+                        throw new java.util.concurrent.CompletionException(completion.failure());
+                    }
+                    if (releaseFailure != null) {
+                        throw new java.util.concurrent.CompletionException(rootCause(releaseFailure));
+                    }
+                    return completion.value();
+                })
+        );
+    }
+    @Nonnull
+    private LoadedNpcIdentitySnapshot requireCompleteLoadedIdentities(
+            @Nonnull LoadedNpcIdentitySnapshot snapshot
+    ) {
+        LoadedNpcIdentitySnapshot current = loadedNpcIdentityIndex.snapshot();
+        if (!snapshot.initializationComplete() || !current.initializationComplete()) {
+            throw new IllegalStateException("Loaded NPC identity bootstrap is incomplete.");
+        }
+        return current;
     }
 
     @Nonnull
@@ -143,6 +211,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         return submission.completion().thenCompose(outcome -> {
             CompanionPopulationScanSessionRepository.Session session = outcome.value();
             if (outcome.isCommitted() && session != null) {
+                persistence.getCompanionPersistedProjectionEvidenceRegistry().begin(session.epoch());
                 return CompletableFuture.completedFuture(session);
             }
             String reason = outcome.failureReason() == null
@@ -170,14 +239,22 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 persistence.getCompanionPopulationRepairRepository(),
                 persistence.getCompanionPopulationScanSessionRepository(),
                 startup.scanSessionEpoch(),
+                loadedNpcIdentityIndex,
+                persistence.getCompanionPersistedProjectionEvidenceRegistry(),
+                liveEvidenceRevision,
                 (descriptor, offset) -> progress.set(tracker.update(descriptor, offset))
         );
-        return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE)
-                .thenCompose(result -> beginFinalReload().thenCompose(ignored ->
-                        observationWriter.flushPendingNow()
-                                .thenApplyAsync(value -> finish(result, tracker), executor)
-                                .whenComplete((value, failure) -> finishFinalReload())
-                ));
+        return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE).thenCompose(result ->
+                beginFinalReload().thenCompose(ignored -> CanonicalReloadCompletion.run(
+                        () -> observationWriter.flushPendingNow().thenComposeAsync(value ->
+                                finish(result, tracker, service), executor),
+                        this::finishFinalReload
+                )).exceptionallyCompose(failure -> service.rejectAfterCanonicalReloadAsync(
+                        result,
+                        "reconciliation-final-reload-failed:"
+                                + rootCause(failure).getClass().getSimpleName()
+                ).thenCompose(ignored -> CompletableFuture.failedFuture(failure)))
+        );
     }
 
     @Nonnull
@@ -216,18 +293,70 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     }
 
     @Nonnull
-    private CompanionPopulationReconciliationProgress finish(
+    private CompletableFuture<CompanionPopulationReconciliationProgress> finish(
             @Nonnull CompanionPopulationReconciliationService.Result result,
-            @Nonnull ProgressTracker tracker
+            @Nonnull ProgressTracker tracker,
+            @Nonnull CompanionPopulationReconciliationService service
     ) {
         if (closed.get()) {
-            return progress.get();
+            return CompletableFuture.completedFuture(progress.get());
         }
-        CompanionPopulationBootstrapService.BootstrapResult bootstrap =
-                bootstrapService.loadForReconciliation();
+        boolean candidate = result.loadedIdentityRevision() != null
+                && result.liveEvidenceRevision() != null
+                && result.projectionEvidenceSet() != null;
+        CompanionPopulationBootstrapService.BootstrapResult bootstrap = candidate
+                ? bootstrapService.loadForFinalizationCandidate()
+                : bootstrapService.loadForReconciliation();
         runtimeReconciler.finishCanonicalReload();
-        bootstrapService.publishReadiness(bootstrap);
         CompanionPopulationReconciliationProgress.Status status = finalStatus(result, bootstrap);
+        if (!candidate) {
+            if (status == CompanionPopulationReconciliationProgress.Status.DEGRADED) {
+                ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
+                claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
+            } else {
+                bootstrapService.publishReadiness(bootstrap);
+            }
+            return CompletableFuture.completedFuture(publishProgress(
+                    result, tracker, status
+            ));
+        }
+
+        CompletableFuture<CompanionPopulationReconciliationService.Result> finalization;
+        if (status == CompanionPopulationReconciliationProgress.Status.READY) {
+            finalization = service.completeAfterCanonicalReloadAsync(result);
+        } else if (result.status() == CompanionPopulationReconciliationService.Status.RECONCILING
+                && status == CompanionPopulationReconciliationProgress.Status.RECONCILING
+                && bootstrap.globalReadiness() == OwnerPopulationReadiness.READY
+                && bootstrap.perWorldReadiness() == OwnerPopulationReadiness.RECONCILING) {
+            finalization = service.completePartialAfterCanonicalReloadAsync(result);
+        } else {
+            finalization = service.rejectAfterCanonicalReloadAsync(
+                    result, "reconciliation-final-index-" + bootstrap.reason()
+            );
+        }
+        return finalization.thenApply(finalResult -> {
+            CompanionPopulationReconciliationProgress.Status finalStatus =
+                    switch (finalResult.status()) {
+                        case READY -> CompanionPopulationReconciliationProgress.Status.READY;
+                        case RECONCILING -> CompanionPopulationReconciliationProgress.Status.RECONCILING;
+                        case DEGRADED -> CompanionPopulationReconciliationProgress.Status.DEGRADED;
+                    };
+            if (finalStatus != CompanionPopulationReconciliationProgress.Status.DEGRADED) {
+                bootstrapService.publishReadiness(bootstrap);
+            } else {
+                ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
+                claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
+            }
+            return publishProgress(finalResult, tracker, finalStatus);
+        });
+    }
+
+    @Nonnull
+    private CompanionPopulationReconciliationProgress publishProgress(
+            @Nonnull CompanionPopulationReconciliationService.Result result,
+            @Nonnull ProgressTracker tracker,
+            @Nonnull CompanionPopulationReconciliationProgress.Status status
+    ) {
         CompanionPopulationReconciliationProgress finished = tracker.finish(
                 status,
                 result.reason(),
@@ -247,6 +376,13 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         }
         Throwable root = rootCause(exception);
         String reason = "reconciliation-startup-failed:" + root.getClass().getSimpleName();
+        CompanionPersistedProjectionEvidenceRegistry registry =
+                persistence.getCompanionPersistedProjectionEvidenceRegistry();
+        CompanionPersistedProjectionEvidenceRegistry.Snapshot projectionSnapshot =
+                registry.snapshot();
+        if (projectionSnapshot.scanEpoch() != null) {
+            registry.degrade(projectionSnapshot.scanEpoch(), reason);
+        }
         persistence.getHealthService().markDegraded(reason);
         ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
         claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
@@ -342,6 +478,18 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     private record StartupCatalog(
             @Nonnull HytaleCompanionPopulationCatalogFactory.BuildResult build,
             @Nonnull String scanSessionEpoch
+    ) {
+    }
+
+    private record BarrierSession(
+            @Nonnull CompanionPopulationScanSessionRepository.Session session,
+            @Nonnull HytaleSavedWorldScanBarrier.Lease lease
+    ) {
+    }
+
+    private record BarrierCompletion(
+            CompanionPopulationReconciliationProgress value,
+            Throwable failure
     ) {
     }
 

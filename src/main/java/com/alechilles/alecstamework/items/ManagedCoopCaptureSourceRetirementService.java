@@ -23,8 +23,9 @@ import javax.annotation.Nullable;
  *
  * <p>World work is scheduled by name and carries only {@link RetirementCommand}. Persistence
  * continuations likewise retain no world, store, reference, NPC, or component. A capture becomes
- * complete only after the source is absent or an entity-removal callback supplies the exact
- * persistent capture-source marker.</p>
+ * complete only after sealed all-world evidence proves absence or an actual entity-removal
+ * callback supplies the exact persistent capture-source marker. A missing loaded-world lookup is
+ * never absence proof.</p>
  */
 public final class ManagedCoopCaptureSourceRetirementService {
     public enum OutcomeStatus {
@@ -34,7 +35,7 @@ public final class ManagedCoopCaptureSourceRetirementService {
         FAILED
     }
     public enum LiveSourceStatus {
-        ABSENT,
+        PROVEN_ABSENT,
         DESPAWN_REQUESTED,
         CONFLICT,
         UNAVAILABLE
@@ -100,8 +101,8 @@ public final class ManagedCoopCaptureSourceRetirementService {
         }
 
         @Nonnull
-        public static LiveSourceDecision absent() {
-            return new LiveSourceDecision(LiveSourceStatus.ABSENT, null);
+        public static LiveSourceDecision provenAbsent() {
+            return new LiveSourceDecision(LiveSourceStatus.PROVEN_ABSENT, null);
         }
 
         @Nonnull
@@ -255,7 +256,7 @@ public final class ManagedCoopCaptureSourceRetirementService {
         }
         if (live == null) {
             finish(pending, OutcomeStatus.FAILED, "source_retirement_result_missing");
-        } else if (live.status() == LiveSourceStatus.ABSENT) {
+        } else if (live.status() == LiveSourceStatus.PROVEN_ABSENT) {
             completeDurably(pending);
         } else if (live.status() == LiveSourceStatus.CONFLICT) {
             finish(pending, OutcomeStatus.BLOCKED,

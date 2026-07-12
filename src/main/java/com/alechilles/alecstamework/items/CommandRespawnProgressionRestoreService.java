@@ -126,7 +126,7 @@ final class CommandRespawnProgressionRestoreService {
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
         boolean present = (snapshot.breedingConfigId() != null && !snapshot.breedingConfigId().isBlank())
                 || snapshot.breedingHappiness() != null || snapshot.breedingEnabled()
-                || snapshot.breedingCooldownUntilMs() > 0L || snapshot.breedingLastPartnerUuid() != null;
+                || snapshot.breedingCooldownUntilMs() != 0L || snapshot.breedingLastPartnerUuid() != null;
         if (type == null || !present) return;
         Double restored = restoredHappiness(ref, store);
         double happiness = restored != null ? restored
@@ -134,19 +134,19 @@ final class CommandRespawnProgressionRestoreService {
         String configId = snapshot.breedingConfigId();
         boolean ready = snapshot.breedingEnabled() && breedingReady(configId, happiness, ref, store);
         long cooldownUntil = snapshot.breedingCooldownUntilMs();
-        long duration = 0L;
-        long started = 0L;
-        if (cooldownUntil > 0L) {
-            long now = BreedingTimeService.resolveCurrentTimeMs(store);
-            duration = Math.max(0L, cooldownUntil - now);
-            started = duration > 0L ? now : 0L;
-        }
+        BreedingTimeService.CooldownTiming timing = restoreCooldownTiming(
+                cooldownUntil, BreedingTimeService.resolveCurrentTimeMs(store)
+        );
         long happinessUpdated = restoredHappinessTimestamp(ref, store);
         store.putComponent(ref, type, new TameworkBreedingComponent(
                 configId, happiness, happinessUpdated > 0L ? happinessUpdated : System.currentTimeMillis(),
                 ready, snapshot.breedingEnabled(), cooldownUntil, snapshot.breedingLastPartnerUuid(),
-                started, duration
+                timing.startedAtMs(), timing.durationMs()
         ));
+    }
+
+    static BreedingTimeService.CooldownTiming restoreCooldownTiming(long deadlineMs, long nowMs) {
+        return BreedingTimeService.reconstructCooldownTiming(deadlineMs, nowMs);
     }
 
     private void applyTraits(Ref<EntityStore> ref, Store<EntityStore> store,
@@ -190,8 +190,8 @@ final class CommandRespawnProgressionRestoreService {
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
         if (type == null) return;
         boolean present = (snapshot.lifeStage() != null && !snapshot.lifeStage().isBlank())
-                || snapshot.lifeStageBornAtMs() > 0L || snapshot.lifeStageAdolescentAtMs() > 0L
-                || snapshot.lifeStageAdultAtMs() > 0L || snapshot.lifeStageFullyGrownAtMs() > 0L;
+                || snapshot.lifeStageBornAtMs() != 0L || snapshot.lifeStageAdolescentAtMs() != 0L
+                || snapshot.lifeStageAdultAtMs() != 0L || snapshot.lifeStageFullyGrownAtMs() != 0L;
         if (!present) {
             CompanionLifeStageService.ensureLifeStageComponent(ref, store);
             applyGender(ref, store, type, snapshot.lifeStageGender());

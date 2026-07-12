@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
 import com.alechilles.alecstamework.items.CommandCompanionSpawnPhysicsResetService;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -117,6 +118,7 @@ final class BreedingOffspringPostSpawnService {
                 request.adultRoleId(),
                 request.gender(),
                 request.lifecycleFamily(),
+                request.lifecycleResolution(),
                 request.store()
         );
     }
@@ -147,6 +149,7 @@ final class BreedingOffspringPostSpawnService {
             @Nullable String adultRoleId,
             @Nullable TwBreedingConfig.Gender gender,
             @Nullable TwBreedingConfig.RoleFamily lifecycleFamily,
+            @Nonnull CompanionLifeStageService.LifecycleFamilyResolution lifecycleResolution,
             @Nonnull Consumer<BreedingCooldownService.Resolution> cooldownLogger,
             @Nonnull Consumer<String> successLogger
     ) {

@@ -79,6 +79,15 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                 new ManagedCoopReleasePopulationCoordinator(
                         population.coopReleaseAdmissionService(),
                         services.lifecycleRepository());
+        ManagedCoopPersistedProjectionRecovery persistedRelease =
+                new ManagedCoopPersistedReleaseProjectionRecoveryService(
+                        persistence.getCompanionPersistedProjectionEvidenceRegistry(),
+                        releasePopulations,
+                        services.lifecycleRepository(),
+                        services.compositeIndexRefreshService(),
+                        population.index(),
+                        population.identityResolver(),
+                        population.claimOccupancyIndex());
         ManagedCoopReleaseRuntimeAdapter releaseAdapter = releaseAdapter(
                 services, loadedIdentities, presentation);
         ManagedCoopReleaseRecoveryService releaseRecovery =
@@ -86,7 +95,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         services.lifecycleRepository(),
                         services.residentIndex(),
                         services.lifecycleIndex(),
-                        services.compositeIndexRefreshService());
+                        services.compositeIndexRefreshService(),
+                        persistedRelease);
         ManagedCoopLifecycleRecoveryService lifecycleRecovery =
                 new ManagedCoopLifecycleRecoveryService(
                         services.lifecycleRepository(),

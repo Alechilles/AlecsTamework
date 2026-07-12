@@ -135,6 +135,8 @@ final class BreedingPairingPopulationPreparationService {
                 world,
                 store,
                 job.jobId(),
+                job.firstParent(),
+                job.secondParent(),
                 populationService,
                 populationRequest,
                 preparationContext,

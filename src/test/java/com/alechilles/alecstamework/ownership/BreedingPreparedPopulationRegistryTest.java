@@ -105,6 +105,27 @@ class BreedingPreparedPopulationRegistryTest {
     }
 
     @Test
+    void unsuccessfulCancellationRetainsTheUnitAsAmbiguous() throws Exception {
+        try (Harness harness = harness("cancel-ambiguous.sqlite")) {
+            PreparedBreedingPopulationBatch batch = harness.prepare(1);
+            BreedingPreparedPopulationRegistry registry = installedRegistry(harness, batch);
+            UUID jobId = harness.jobId;
+
+            assertTrue(registry.claimForSpawn(jobId, 0));
+            assertTrue(harness.service.commitAsync(batch, 0)
+                    .get(4, TimeUnit.SECONDS).committed());
+
+            registry.cancelRemaining(jobId, "stale-runtime-cleanup");
+
+            awaitState(registry, jobId, 0,
+                    BreedingPreparedPopulationRegistry.UnitState.AMBIGUOUS);
+            assertFalse(registry.claimForSpawn(jobId, 0));
+            assertTrue(harness.service.replayState(batch.attemptKey())
+                    .pendingChildKeys().isEmpty());
+        }
+    }
+
+    @Test
     void materializedUnitIsNeverCanceledByRemainingOrScopeCleanup() throws Exception {
         try (Harness harness = harness("materialized-cleanup.sqlite")) {
             PreparedBreedingPopulationBatch batch = harness.prepare(1);
@@ -273,6 +294,7 @@ class BreedingPreparedPopulationRegistryTest {
         );
         BreedingPopulationAdmissionService service = new BreedingPopulationAdmissionService(
                 new CompanionPopulationBatchAdmissionCoordinator(combined),
+                ownerIndex,
                 claimIndex,
                 providers,
                 new OwnerComponentMutationService(ownerCoordinator),

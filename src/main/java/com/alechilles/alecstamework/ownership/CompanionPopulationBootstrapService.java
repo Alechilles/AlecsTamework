@@ -71,6 +71,15 @@ public final class CompanionPopulationBootstrapService {
         return load(false);
     }
 
+    /**
+     * Loads a canonical-reload candidate while treating its durably staged owner rows as pending.
+     * In-memory admission remains RECONCILING until the caller completes finalization.
+     */
+    @Nonnull
+    public BootstrapResult loadForFinalizationCandidate() {
+        return load(false, true);
+    }
+
     /** Publishes readiness derived by a preceding reconciliation snapshot load. */
     public void publishReadiness(@Nonnull BootstrapResult result) {
         Objects.requireNonNull(result, "result");
@@ -80,6 +89,14 @@ public final class CompanionPopulationBootstrapService {
 
     @Nonnull
     private BootstrapResult load(boolean publishFinalReadiness) {
+        return load(publishFinalReadiness, false);
+    }
+
+    @Nonnull
+    private BootstrapResult load(
+            boolean publishFinalReadiness,
+            boolean assumeStagedOwnerCoverage
+    ) {
         if (!persistenceHealth.isHealthy()) {
             index.replaceCommittedEntries(List.of(), OwnerPopulationReadiness.DEGRADED);
             claimOccupancyIndex.replaceCommittedEntries(List.of(), ClaimOccupancyReadiness.DEGRADED);
@@ -101,9 +118,14 @@ public final class CompanionPopulationBootstrapService {
             List<ClaimOccupancyEntry> claimEntries = toClaimEntries(states);
             identityResolver.replaceDurableAliases(identityRepository.loadAllAliases());
 
-            OwnerPopulationReadiness global = deriveGlobalReadiness(coverage, operations);
+            Map<CompanionPopulationCoverageRecord.Dimension, CompanionPopulationCoverageRecord.State>
+                    coverageStates = aggregateCoverage(coverage);
+            if (assumeStagedOwnerCoverage) {
+                promoteStagedOwnerCoverage(coverageStates);
+            }
+            OwnerPopulationReadiness global = deriveGlobalReadiness(coverageStates, operations);
             OwnerPopulationReadiness perWorld = derivePerWorldReadiness(
-                    coverage,
+                    coverageStates,
                     operations,
                     entries,
                     global
@@ -208,20 +230,20 @@ public final class CompanionPopulationBootstrapService {
 
     @Nonnull
     private static OwnerPopulationReadiness deriveGlobalReadiness(
-            @Nonnull List<CompanionPopulationCoverageRecord> coverage,
+            @Nonnull Map<CompanionPopulationCoverageRecord.Dimension,
+                    CompanionPopulationCoverageRecord.State> states,
             @Nonnull List<CompanionPopulationOperationRecord> operations
     ) {
         if (!operations.isEmpty()) {
             return OwnerPopulationReadiness.RECONCILING;
         }
-        Map<CompanionPopulationCoverageRecord.Dimension, CompanionPopulationCoverageRecord.State> states =
-                aggregateCoverage(coverage);
         return readinessFor(GLOBAL_REQUIRED, states);
     }
 
     @Nonnull
     private static OwnerPopulationReadiness derivePerWorldReadiness(
-            @Nonnull List<CompanionPopulationCoverageRecord> coverage,
+            @Nonnull Map<CompanionPopulationCoverageRecord.Dimension,
+                    CompanionPopulationCoverageRecord.State> states,
             @Nonnull List<CompanionPopulationOperationRecord> operations,
             @Nonnull List<OwnerPopulationEntry> entries,
             @Nonnull OwnerPopulationReadiness global
@@ -239,7 +261,20 @@ public final class CompanionPopulationBootstrapService {
         EnumSet<CompanionPopulationCoverageRecord.Dimension> required =
                 EnumSet.copyOf(GLOBAL_REQUIRED);
         required.add(CompanionPopulationCoverageRecord.Dimension.PER_WORLD_OWNER);
-        return readinessFor(required, aggregateCoverage(coverage));
+        return readinessFor(required, states);
+    }
+
+    private static void promoteStagedOwnerCoverage(
+            @Nonnull Map<CompanionPopulationCoverageRecord.Dimension,
+                    CompanionPopulationCoverageRecord.State> states
+    ) {
+        for (CompanionPopulationCoverageRecord.Dimension dimension : List.of(
+                CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER,
+                CompanionPopulationCoverageRecord.Dimension.PER_WORLD_OWNER)) {
+            if (states.get(dimension) == CompanionPopulationCoverageRecord.State.RECONCILING) {
+                states.put(dimension, CompanionPopulationCoverageRecord.State.READY);
+            }
+        }
     }
 
     @Nonnull

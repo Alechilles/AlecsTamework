@@ -32,6 +32,7 @@ class ClaimsOwnerPopulationStructuralPolicyTest {
         assertLineLimit("integration/questlinesclaims/QuestLinesReflectionAccess.java", 500);
         assertLineLimit("ownership/BreedingPopulationAdmissionService.java", 500);
         assertLineLimit("ownership/BreedingPopulationAdmissionUnitFactory.java", 500);
+        assertLineLimit("npc/breeding/BreedingPreparedPopulationRegistry.java", 500);
         assertLineLimit("ownership/OwnerPopulationIndex.java", 500);
         assertLineLimit("ownership/OwnerPopulationReservationBook.java", 500);
     }

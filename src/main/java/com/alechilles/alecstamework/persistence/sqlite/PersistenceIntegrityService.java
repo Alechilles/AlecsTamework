@@ -131,6 +131,10 @@ public final class PersistenceIntegrityService {
                           GROUP BY profile_id HAVING COUNT(*) > 1
                         )
                         """),
+                check("nonbreeding_retryable_population_operation", "only breeding operations may retain retryable replay evidence", """
+                        SELECT COUNT(*) FROM companion_population_operations
+                        WHERE state = 'RETRYABLE' AND operation_type <> 'BREEDING'
+                        """),
                 check("duplicate_active_coop_operation_slot", "managed slot has multiple active coop operations", """
                         SELECT COUNT(*) FROM (
                           SELECT authority_id, resident_slot FROM coop_lifecycle_operations WHERE active = 1

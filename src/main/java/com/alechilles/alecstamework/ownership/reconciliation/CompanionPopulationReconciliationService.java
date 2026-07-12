@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
+import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationReconciliationRepository;
@@ -30,10 +32,11 @@ public final class CompanionPopulationReconciliationService {
     private final CompanionPopulationRepository populationRepository;
     private final CompanionPopulationOperationRecoveryService operationRecovery;
     private final CompanionPopulationRepairRepository repairRepository;
-    private final CompanionPopulationScanSessionRepository scanSessionRepository;
-    private final String scanSessionEpoch;
+    private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
+    private final CompanionLiveEvidenceRevision liveEvidenceRevision;
     private final BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver;
     private final CompanionPopulationCoveragePublisher coveragePublisher;
+    private final CompanionPopulationFinalizationService finalizationService;
 
     public CompanionPopulationReconciliationService(
             @Nonnull CompanionPopulationReconciliationCatalog catalog,
@@ -42,6 +45,9 @@ public final class CompanionPopulationReconciliationService {
             @Nonnull CompanionPopulationRepairRepository repairRepository,
             @Nonnull CompanionPopulationScanSessionRepository scanSessionRepository,
             @Nonnull String scanSessionEpoch,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
+            @Nonnull CompanionPersistedProjectionEvidenceRegistry projectionEvidenceRegistry,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
             @Nonnull BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver
     ) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
@@ -52,11 +58,19 @@ public final class CompanionPopulationReconciliationService {
         this.populationRepository = Objects.requireNonNull(populationRepository, "populationRepository");
         this.operationRecovery = new CompanionPopulationOperationRecoveryService(populationRepository);
         this.repairRepository = Objects.requireNonNull(repairRepository, "repairRepository");
-        this.scanSessionRepository = Objects.requireNonNull(scanSessionRepository, "scanSessionRepository");
-        this.scanSessionEpoch = Objects.requireNonNull(scanSessionEpoch, "scanSessionEpoch");
+        this.loadedNpcIdentityIndex = Objects.requireNonNull(
+                loadedNpcIdentityIndex, "loadedNpcIdentityIndex"
+        );
+        this.liveEvidenceRevision = Objects.requireNonNull(
+                liveEvidenceRevision, "liveEvidenceRevision"
+        );
         this.progressObserver = Objects.requireNonNull(progressObserver, "progressObserver");
         this.coveragePublisher = new CompanionPopulationCoveragePublisher(
                 catalog, reconciliationRepository
+        );
+        this.finalizationService = new CompanionPopulationFinalizationService(
+                scanSessionRepository, scanSessionEpoch, loadedNpcIdentityIndex,
+                projectionEvidenceRegistry, liveEvidenceRevision, coveragePublisher
         );
     }
 
@@ -73,9 +87,22 @@ public final class CompanionPopulationReconciliationService {
             if (!initialized) {
                 return CompletableFuture.completedFuture(Result.degraded("reconciliation-initialize-failed"));
             }
+            LoadedNpcIdentitySnapshot initialIdentities = loadedNpcIdentityIndex.snapshot();
+            if (!initialIdentities.initializationComplete()) {
+                return loadedIdentityFailure("reconciliation-loaded-identity-incomplete");
+            }
+            long initialLiveEvidenceRevision = liveEvidenceRevision.capture();
             return scanNextSource(0, batchSize).thenCompose(scan -> {
                 if (!scan.success()) {
                     return CompletableFuture.completedFuture(Result.degraded(scan.reason()));
+                }
+                LoadedNpcIdentitySnapshot scannedIdentities = loadedNpcIdentityIndex.snapshot();
+                if (!scannedIdentities.initializationComplete()
+                        || scannedIdentities.mutationRevision()
+                        != initialIdentities.mutationRevision()) {
+                    return loadedIdentityFailure(
+                            "reconciliation-loaded-identity-mutated-during-scan"
+                    );
                 }
                 return coveragePublisher.finishCatalogAsync().thenCompose(catalogReady -> {
                     if (!catalogReady) {
@@ -84,30 +111,81 @@ public final class CompanionPopulationReconciliationService {
                                 "reconciliation-catalog-not-sealed",
                                 0,
                                 0
-                        ).thenApply(ignored -> Result.reconciling("reconciliation-catalog-not-sealed"));
+                        ).thenApply(written -> written
+                                ? Result.reconciling("reconciliation-catalog-not-sealed")
+                                : Result.degraded("reconciliation-coverage-publish-failed"));
                     }
-                    return finalizePopulation();
+                    return finalizePopulation(scannedIdentities, initialLiveEvidenceRevision);
                 });
             });
-        }).thenCompose(this::completeScanSessionIfReady);
+        }).thenCompose(this::verifyLoadedIdentityStableAfterFinalization);
     }
 
     @Nonnull
-    private CompletableFuture<Result> completeScanSessionIfReady(@Nonnull Result result) {
-        if (result.status() != Status.READY) {
-            return CompletableFuture.completedFuture(result);
+    private CompletableFuture<Result> verifyLoadedIdentityStableAfterFinalization(
+            @Nonnull Result result
+    ) {
+        boolean candidate = result.loadedIdentityRevision() != null
+                && result.liveEvidenceRevision() != null
+                && result.projectionEvidenceSet() != null;
+        if (result.status() != Status.READY
+                && !(result.status() == Status.RECONCILING && candidate)) {
+            return CompletableFuture.completedFuture(finalizationService.reject(
+                    result, result.status(), result.reason()
+            ));
         }
-        return scanSessionRepository.markReadyAsync(scanSessionEpoch).completion().thenCompose(outcome -> {
-            if (outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())) {
-                return CompletableFuture.completedFuture(result);
-            }
-            return coveragePublisher.publishBothAsync(
-                    CompanionPopulationCoverageRecord.State.DEGRADED,
-                    "reconciliation-session-complete-failed",
-                    result.profileCount(),
-                    1
-            ).thenApply(ignored -> Result.degraded("reconciliation-session-complete-failed"));
-        });
+        if (!candidate) {
+            return CompletableFuture.completedFuture(finalizationService.reject(
+                    result, Status.DEGRADED, "reconciliation-final-readiness-invalid"
+            ));
+        }
+        if (!loadedNpcIdentityIndex.isMutationRevisionCurrent(result.loadedIdentityRevision())) {
+            return rejectStabilityFailure(
+                    "reconciliation-loaded-identity-mutated-during-finalization"
+            );
+        }
+        if (!liveEvidenceRevision.isCurrent(result.liveEvidenceRevision())) {
+            return rejectStabilityFailure(
+                    "reconciliation-live-evidence-mutated-during-finalization"
+            );
+        }
+        return CompletableFuture.completedFuture(result);
+    }
+
+    @Nonnull
+    private CompletableFuture<Result> rejectStabilityFailure(@Nonnull String reason) {
+        return loadedIdentityFailure(reason).thenApply(failure -> finalizationService.reject(
+                failure, failure.status(), failure.reason()
+        ));
+    }
+
+    @Nonnull
+    private CompletableFuture<Result> loadedIdentityFailure(@Nonnull String reason) {
+        return coveragePublisher.publishBothAsync(
+                CompanionPopulationCoverageRecord.State.DEGRADED,
+                reason,
+                0,
+                1
+        ).thenApply(written -> Result.degraded(
+                written ? reason : "reconciliation-coverage-publish-failed"
+        ));
+    }
+
+    /** Seals restart evidence and the scan session only after canonical reload succeeds. */
+    @Nonnull
+    CompletableFuture<Result> completeAfterCanonicalReloadAsync(@Nonnull Result result) {
+        return finalizationService.completeAsync(result);
+    }
+
+    @Nonnull
+    CompletableFuture<Result> completePartialAfterCanonicalReloadAsync(@Nonnull Result result) {
+        return finalizationService.completePartialAsync(result);
+    }
+
+    @Nonnull
+    CompletableFuture<Result> rejectAfterCanonicalReloadAsync(
+            @Nonnull Result result, @Nonnull String reason) {
+        return finalizationService.invalidateAndFail(result, reason);
     }
 
     @Nonnull
@@ -206,20 +284,27 @@ public final class CompanionPopulationReconciliationService {
     }
 
     @Nonnull
-    private CompletableFuture<Result> finalizePopulation() {
+    private CompletableFuture<Result> finalizePopulation(
+            @Nonnull LoadedNpcIdentitySnapshot loadedIdentities,
+            long expectedLiveEvidenceRevision
+    ) {
         List<CompanionPopulationEvidenceSource.Descriptor> descriptors = catalog.sources().stream()
                 .map(CompanionPopulationEvidenceSource::descriptor)
                 .toList();
         return loadEvidenceSet(descriptors).thenCompose(evidenceSet -> {
             return loadOperations().thenCompose(operations ->
-                    operationRecovery.recoverAsync(operations, evidenceSet).thenCompose(recovery -> {
+                    operationRecovery.recoverAsync(
+                            operations, evidenceSet, loadedIdentities
+                    ).thenCompose(recovery -> {
                         if (!recovery.complete()) {
                             return coveragePublisher.publishBothAsync(
                                     CompanionPopulationCoverageRecord.State.DEGRADED,
                                     "reconciliation-operation-ambiguous",
                                     evidenceSet.evidence().size(),
                                     recovery.ambiguous().size()
-                            ).thenApply(ignored -> Result.degraded("reconciliation-operation-ambiguous"));
+                            ).thenApply(written -> Result.degraded(written
+                                    ? "reconciliation-operation-ambiguous"
+                                    : "reconciliation-coverage-publish-failed"));
                         }
                         if (!evidenceSet.isConflictFree()) {
                             return coveragePublisher.publishBothAsync(
@@ -227,9 +312,16 @@ public final class CompanionPopulationReconciliationService {
                                     "reconciliation-evidence-conflict",
                                     evidenceSet.evidence().size(),
                                     evidenceSet.conflicts().size()
-                            ).thenApply(ignored -> Result.degraded("reconciliation-evidence-conflict"));
+                            ).thenApply(written -> Result.degraded(written
+                                    ? "reconciliation-evidence-conflict"
+                                    : "reconciliation-coverage-publish-failed"));
                         }
-                        return mergeEvidence(evidenceSet, recovery);
+                        return mergeEvidence(
+                                evidenceSet,
+                                recovery,
+                                loadedIdentities.mutationRevision(),
+                                expectedLiveEvidenceRevision
+                        );
                     })
             );
         }).exceptionally(exception -> Result.degraded(
@@ -240,7 +332,9 @@ public final class CompanionPopulationReconciliationService {
     @Nonnull
     private CompletableFuture<Result> mergeEvidence(
             @Nonnull CompanionPopulationEvidenceSet evidenceSet,
-            @Nonnull CompanionPopulationOperationRecoveryService.RecoveryResult recovery
+            @Nonnull CompanionPopulationOperationRecoveryService.RecoveryResult recovery,
+            long loadedIdentityRevision,
+            long expectedLiveEvidenceRevision
     ) {
         PersistenceWriteQueue.WriteSubmission<CompanionPopulationRepairRepository.RepairResult> submission =
                 repairRepository.mergeAsync(evidenceSet);
@@ -266,23 +360,25 @@ public final class CompanionPopulationReconciliationService {
                             remaining.size()
                     ).thenApply(ignored -> Result.degraded("reconciliation-operations-remain"));
                 }
-                CompanionPopulationCoverageRecord.State perWorldState = repair.reason() == null
-                        ? CompanionPopulationCoverageRecord.State.READY
-                        : CompanionPopulationCoverageRecord.State.RECONCILING;
-                return coveragePublisher.publishMergedAsync(
-                        perWorldState, repair.profileCount(), repair.reason()
-                ).thenApply(written -> new Result(
-                        perWorldState == CompanionPopulationCoverageRecord.State.READY
-                                ? Status.READY
-                                : Status.RECONCILING,
-                        perWorldState == CompanionPopulationCoverageRecord.State.READY
-                                ? "reconciliation-ready"
-                                : repair.reason(),
+                Status stagedStatus = repair.reason() == null ? Status.READY : Status.RECONCILING;
+                String stagedReason = repair.reason() == null
+                        ? "reconciliation-awaiting-final-fence" : repair.reason();
+                return coveragePublisher.publishBothAsync(
+                        CompanionPopulationCoverageRecord.State.RECONCILING,
+                        stagedReason,
+                        repair.profileCount(),
+                        repair.reason() == null ? 0 : 1
+                ).thenApply(written -> written ? new Result(
+                        stagedStatus,
+                        stagedStatus == Status.READY ? "reconciliation-ready" : repair.reason(),
                         repair.profileCount(),
                         repair.duplicateObservations(),
-                        recovery.committed(),
-                        recovery.canceled()
-                ));
+                        recovery.committed() + recovery.retryable(),
+                        recovery.canceled(),
+                        loadedIdentityRevision,
+                        expectedLiveEvidenceRevision,
+                        evidenceSet
+                ) : Result.degraded("reconciliation-coverage-publish-failed"));
             });
         });
     }
@@ -339,15 +435,42 @@ public final class CompanionPopulationReconciliationService {
                          int profileCount,
                          int duplicateObservations,
                          int recoveredOperations,
-                         int canceledOperations) {
+                         int canceledOperations,
+                         @Nullable Long loadedIdentityRevision,
+                         @Nullable Long liveEvidenceRevision,
+                         @Nullable CompanionPopulationEvidenceSet projectionEvidenceSet) {
+        public Result(@Nonnull Status status,
+                      @Nonnull String reason,
+                      int profileCount,
+                      int duplicateObservations,
+                      int recoveredOperations,
+                      int canceledOperations) {
+            this(
+                    status, reason, profileCount, duplicateObservations,
+                    recoveredOperations, canceledOperations, null, null, null
+            );
+        }
+
+        @Nonnull
+        Result withoutFinalizationMetadata() {
+            return loadedIdentityRevision == null
+                    && liveEvidenceRevision == null
+                    && projectionEvidenceSet == null
+                    ? this
+                    : new Result(
+                            status, reason, profileCount, duplicateObservations,
+                            recoveredOperations, canceledOperations, null, null, null
+                    );
+        }
+
         @Nonnull
         private static Result reconciling(@Nonnull String reason) {
-            return new Result(Status.RECONCILING, reason, 0, 0, 0, 0);
+            return new Result(Status.RECONCILING, reason, 0, 0, 0, 0, null, null, null);
         }
 
         @Nonnull
         private static Result degraded(@Nonnull String reason) {
-            return new Result(Status.DEGRADED, reason, 0, 0, 0, 0);
+            return new Result(Status.DEGRADED, reason, 0, 0, 0, 0, null, null, null);
         }
     }
 

@@ -32,11 +32,7 @@ import javax.annotation.Nullable;
  * invoke the legacy projection coordinator for an admission produced here.</p>
  */
 public final class ManagedCoopReleasePopulationCoordinator {
-    public enum PreparationStatus {
-        PREPARED,
-        DENIED,
-        FAILED
-    }
+    public enum PreparationStatus { PREPARED, DENIED, AMBIGUOUS, FAILED }
     /** Immutable result of acquiring or reacquiring one exact release admission. */
     public record Preparation(@Nonnull PreparationStatus status,
                               @Nullable PreparedRelease prepared,
@@ -168,10 +164,23 @@ public final class ManagedCoopReleasePopulationCoordinator {
                 return new Preparation(PreparationStatus.FAILED, null,
                         failureDetail("population_release_prepare", unwrap(failure)));
             }
-            if (result == null || !result.prepared() || result.handle() == null) {
-                String detail = result != null && result.detail() != null
+            if (result == null) {
+                markReadinessDegraded("managed_coop_population_prepare_result_missing");
+                return new Preparation(PreparationStatus.AMBIGUOUS, null,
+                        "population_release_prepare_result_missing");
+            }
+            if (result.status() != PreparationStatus.PREPARED) {
+                String detail = result.detail() != null
                         ? result.detail() : "population_release_prepare_denied";
-                return new Preparation(PreparationStatus.DENIED, null, detail);
+                if (result.status() != PreparationStatus.DENIED) {
+                    markReadinessDegraded("managed_coop_population_prepare_ambiguous");
+                }
+                return new Preparation(result.status(), null, detail);
+            }
+            if (result.handle() == null) {
+                markReadinessDegraded("managed_coop_population_prepare_handle_missing");
+                return new Preparation(PreparationStatus.AMBIGUOUS, null,
+                        "population_release_prepare_handle_missing");
             }
             if (!claim.profileId().equals(result.profileId())
                     || !claim.plannedTargetUuid().equals(result.plannedTargetUuid())) {
@@ -260,7 +269,7 @@ public final class ManagedCoopReleasePopulationCoordinator {
                                                    @Nonnull String reason) {
         Objects.requireNonNull(prepared, "prepared");
         String requiredReason = requireText(reason, "reason");
-        return cancelPopulation(prepared, requiredReason).thenCompose(cancelled -> {
+        return cancelPreparedPopulationOnlyAsync(prepared, requiredReason).thenCompose(cancelled -> {
             if (!Boolean.TRUE.equals(cancelled)) {
                 return CompletableFuture.completedFuture(false);
             }
@@ -285,14 +294,14 @@ public final class ManagedCoopReleasePopulationCoordinator {
                 claim.operationId(), claim.operationGeneration(),
                 requireText(reason, "reason"));
     }
-
+    /** Cancels population preparation without rolling a possibly projected resident back to HOUSED. */
     @Nonnull
-    private CompletableFuture<Boolean> cancelPopulation(
-            PreparedRelease prepared,
-            String reason) {
+    public CompletableFuture<Boolean> cancelPreparedPopulationOnlyAsync(
+            @Nonnull PreparedRelease prepared, @Nonnull String reason) {
+        Objects.requireNonNull(prepared, "prepared");
         final CompletableFuture<Boolean> completion;
         try {
-            completion = backend.cancel(prepared.backendHandle, reason);
+            completion = backend.cancel(prepared.backendHandle, requireText(reason, "reason"));
         } catch (RuntimeException exception) {
             markReadinessDegraded("managed_coop_population_cancel_start_failed");
             return CompletableFuture.completedFuture(false);
@@ -442,19 +451,13 @@ public final class ManagedCoopReleasePopulationCoordinator {
         return value;
     }
 
-    private record PreparedInput(ReleaseRequest request,
-                                 PopulationReleaseCommitRequest durableRequest,
+    private record PreparedInput(ReleaseRequest request, PopulationReleaseCommitRequest durableRequest,
                                  ReleaseFingerprint fingerprint) {
     }
 
-    private record ReleaseFingerprint(String operationId,
-                                      String profileId,
-                                      String residentId,
-                                      UUID sourceNpcUuid,
-                                      UUID plannedTargetUuid,
-                                      String snapshotHash,
-                                      long expectedResidentGeneration,
-                                      long operationGeneration) {
+    private record ReleaseFingerprint(String operationId, String profileId, String residentId,
+                                      UUID sourceNpcUuid, UUID plannedTargetUuid, String snapshotHash,
+                                      long expectedResidentGeneration, long operationGeneration) {
         static ReleaseFingerprint from(SpawnReady claim) {
             return new ReleaseFingerprint(
                     claim.operationId(), claim.profileId(), claim.residentId(),
@@ -463,10 +466,8 @@ public final class ManagedCoopReleasePopulationCoordinator {
         }
     }
 
-    record BackendPreparation(boolean prepared,
-                              @Nullable String profileId,
-                              @Nullable UUID plannedTargetUuid,
-                              @Nullable Object handle,
+    record BackendPreparation(@Nonnull PreparationStatus status, @Nullable String profileId,
+                              @Nullable UUID plannedTargetUuid, @Nullable Object handle,
                               @Nullable String detail) {
     }
 

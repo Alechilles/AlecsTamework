@@ -43,13 +43,23 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
     private final BreedingCooldownRollbackService rollbackService = new BreedingCooldownRollbackService();
     private final BreedingPreparedPopulationRegistry preparedPopulation;
     private final BreedingPreparedChildSpawnService childSpawnService;
+    private final BreedingParentLifecycleGate parentLifecycleGate;
 
     BreedingHytaleJobRuntime() {
         this(TameworkBreedingServices.shared());
     }
 
     BreedingHytaleJobRuntime(@Nonnull TameworkBreedingServices services) {
+        this(services, new BreedingParentLifecycleGate());
+    }
+
+    BreedingHytaleJobRuntime(
+            @Nonnull TameworkBreedingServices services,
+            @Nonnull BreedingParentLifecycleGate parentLifecycleGate) {
         this.preparedPopulation = services.preparedPopulationRegistry();
+        this.parentLifecycleGate = java.util.Objects.requireNonNull(
+                parentLifecycleGate, "parentLifecycleGate"
+        );
         BreedingOffspringPostSpawnService postSpawnService = new BreedingOffspringPostSpawnService(
                 new BreedingOffspringProgressionService(),
                 new BreedingCooldownService(),
@@ -90,6 +100,20 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
         if (!parentStateService.matchesIdentity(job.firstParent(), firstRef, firstNpc, store)
                 || !parentStateService.matchesIdentity(job.secondParent(), secondRef, secondNpc, store)) {
             return BreedingJobExecutionService.ParentResolution.invalid("parent-identity-mismatch");
+        }
+        BreedingParentLifecycleGate.Decision firstLifecycle =
+                parentLifecycleGate.inspect(job.firstParent());
+        if (!firstLifecycle.allowed()) {
+            return BreedingJobExecutionService.ParentResolution.invalid(
+                    firstLifecycle.reason()
+            );
+        }
+        BreedingParentLifecycleGate.Decision secondLifecycle =
+                parentLifecycleGate.inspect(job.secondParent());
+        if (!secondLifecycle.allowed()) {
+            return BreedingJobExecutionService.ParentResolution.invalid(
+                    secondLifecycle.reason()
+            );
         }
         Context context = context(
                 world,

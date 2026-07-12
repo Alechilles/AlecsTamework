@@ -16,13 +16,32 @@ import javax.annotation.Nullable;
 public final class CompanionPopulationEvidenceSet {
     private final Map<UUID, ResolvedEvidence> byNpcUuid;
     private final Map<UUID, List<CompanionPopulationEvidence>> observationsByNpcUuid;
+    private final Map<String, List<ProjectionObservation>> projectionObservationsByFingerprint;
     private final List<Conflict> conflicts;
 
     public CompanionPopulationEvidenceSet(@Nonnull Collection<CompanionPopulationEvidence> evidence) {
         Objects.requireNonNull(evidence, "evidence");
         Map<UUID, List<CompanionPopulationEvidence>> grouped = new LinkedHashMap<>();
+        Map<String, List<ProjectionObservation>> projections = new LinkedHashMap<>();
         for (CompanionPopulationEvidence observation : evidence) {
             Objects.requireNonNull(observation, "observation");
+            CompanionProjectionEvidence.ProjectionObservation projection =
+                    observation.projectionObservation();
+            if (projection != null) {
+                ProjectionObservation indexed = new ProjectionObservation(
+                        observation,
+                        projection.fingerprint(),
+                        projection.componentUuid(),
+                        projection.legacyNpcUuid(),
+                        projection.deathObserved()
+                );
+                projections.computeIfAbsent(
+                        projection.fingerprint(), ignored -> new ArrayList<>()
+                ).add(indexed);
+            }
+            if (observation.kind().isProjectionMarker()) {
+                continue;
+            }
             grouped.computeIfAbsent(observation.npcUuid(), ignored -> new ArrayList<>()).add(observation);
         }
         Map<UUID, List<CompanionPopulationEvidence>> copied = new LinkedHashMap<>();
@@ -30,6 +49,11 @@ public final class CompanionPopulationEvidenceSet {
             copied.put(entry.getKey(), List.copyOf(entry.getValue()));
         }
         this.observationsByNpcUuid = Map.copyOf(copied);
+        Map<String, List<ProjectionObservation>> copiedProjections = new LinkedHashMap<>();
+        for (Map.Entry<String, List<ProjectionObservation>> entry : projections.entrySet()) {
+            copiedProjections.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+        this.projectionObservationsByFingerprint = Map.copyOf(copiedProjections);
         Map<UUID, ResolvedEvidence> resolved = new LinkedHashMap<>();
         List<Conflict> foundConflicts = new ArrayList<>();
         for (Map.Entry<UUID, List<CompanionPopulationEvidence>> entry : grouped.entrySet()) {
@@ -62,6 +86,14 @@ public final class CompanionPopulationEvidenceSet {
     @Nonnull
     public List<CompanionPopulationEvidence> observations(@Nonnull UUID npcUuid) {
         return observationsByNpcUuid.getOrDefault(npcUuid, List.of());
+    }
+
+    /** Returns every saved projection carrying the exact marker fingerprint. */
+    @Nonnull
+    public List<ProjectionObservation> projectionObservations(@Nonnull String fingerprint) {
+        return projectionObservationsByFingerprint.getOrDefault(
+                Objects.requireNonNull(fingerprint, "fingerprint"), List.of()
+        );
     }
 
     public boolean isConflictFree() {
@@ -218,6 +250,39 @@ public final class CompanionPopulationEvidenceSet {
                 throw new IllegalArgumentException("Physical world name must not be blank.");
             }
             worldName = worldName.trim();
+        }
+    }
+
+    /** Projection-only observation retained outside ordinary by-UUID repair selection. */
+    public record ProjectionObservation(
+            @Nonnull CompanionPopulationEvidence evidence,
+            @Nonnull String fingerprint,
+            @Nullable UUID componentUuid,
+            @Nullable UUID legacyNpcUuid,
+            boolean deathObserved
+    ) {
+        public ProjectionObservation {
+            Objects.requireNonNull(evidence, "evidence");
+            CompanionProjectionEvidence.ProjectionObservation parsed =
+                    Objects.requireNonNull(evidence.projectionObservation(), "projection evidence");
+            if (!Objects.equals(parsed.fingerprint(), fingerprint)
+                    || !Objects.equals(parsed.componentUuid(), componentUuid)
+                    || !Objects.equals(parsed.legacyNpcUuid(), legacyNpcUuid)
+                    || parsed.deathObserved() != deathObserved) {
+                throw new IllegalArgumentException(
+                        "Projection observation must match its encoded evidence key."
+                );
+            }
+        }
+
+        /** Compatibility constructor for version-one live projection evidence. */
+        public ProjectionObservation(
+                @Nonnull CompanionPopulationEvidence evidence,
+                @Nonnull String fingerprint,
+                @Nullable UUID componentUuid,
+                @Nullable UUID legacyNpcUuid
+        ) {
+            this(evidence, fingerprint, componentUuid, legacyNpcUuid, false);
         }
     }
 

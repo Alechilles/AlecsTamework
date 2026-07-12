@@ -7,8 +7,6 @@ import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
 import com.alechilles.alecstamework.ownership.PreparedBreedingPopulationBatch;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,12 +20,40 @@ import javax.annotation.Nullable;
 /**
  * Owns exactly-once terminality for prepared owner/claim units attached to active birth jobs.
  *
- * <p>Nearby reservations remain owned by {@link BreedingBirthJobRegistry}. This registry owns only
- * the shared durable owner/claim capability, so releasing nearby headroom can never accidentally
- * cancel a successfully materialized child's canonical population slot.</p>
+ * <p>Nearby reservations remain owned by {@link BreedingBirthJobRegistry}. This registry also
+ * joins asynchronous preparation to durable cancellation, so parent capture cannot outrun a late
+ * prepared batch or a still-replayable child operation.</p>
  */
 public final class BreedingPreparedPopulationRegistry {
-    private final Map<UUID, Entry> entries = new ConcurrentHashMap<>();
+    private final Map<UUID, BreedingPreparedPopulationEntry> entries =
+            new ConcurrentHashMap<>();
+    private final BreedingPreparedCancellationCoordinator cancellation =
+            new BreedingPreparedCancellationCoordinator();
+
+    /** Registers preparation before durable admission can create replayable child operations. */
+    public boolean beginPreparation(@Nonnull Object storeScope, @Nonnull UUID jobId) {
+        return cancellation.beginPreparation(storeScope, jobId);
+    }
+
+    /** Registers exact parent identities so terminal jobs cannot hide an unsafe preparation gate. */
+    public boolean beginPreparation(@Nonnull Object storeScope,
+                                    @Nonnull UUID jobId,
+                                    @Nonnull BreedingParentIdentity firstParent,
+                                    @Nonnull BreedingParentIdentity secondParent) {
+        return cancellation.beginPreparation(
+                storeScope, jobId, firstParent, secondParent
+        );
+    }
+
+    /** Closes one registered preparation only after its prepared capability has been installed. */
+    public boolean finishPreparation(@Nonnull Object storeScope, @Nonnull UUID jobId) {
+        return cancellation.finishPreparation(storeScope, jobId);
+    }
+
+    /** Permanently fails a capture gate when a produced capability could not be registered. */
+    public void failPreparation(@Nonnull Object storeScope, @Nonnull UUID jobId) {
+        cancellation.failPreparation(storeScope, jobId);
+    }
 
     /** Installs one prepared batch before provisional parent effects are allowed to run. */
     @Nonnull
@@ -35,14 +61,25 @@ public final class BreedingPreparedPopulationRegistry {
                                  @Nonnull UUID jobId,
                                  @Nonnull BreedingPopulationAdmissionService service,
                                  @Nonnull PreparedBreedingPopulationBatch batch) {
-        Entry candidate = new Entry(storeScope, jobId, service, batch);
-        Entry existing = entries.putIfAbsent(jobId, candidate);
+        BreedingPreparedPopulationEntry candidate = new BreedingPreparedPopulationEntry(
+                storeScope, jobId, service, batch
+        );
+        BreedingPreparedPopulationEntry existing = entries.putIfAbsent(jobId, candidate);
         if (existing == null) {
+            cancellation.registerCapability(
+                    storeScope, jobId, candidate::cancelRemainingDurably
+            );
             return InstallStatus.INSTALLED;
         }
-        return existing.sameCapability(storeScope, service, batch)
-                ? InstallStatus.ALREADY_INSTALLED
-                : InstallStatus.CONFLICT;
+        if (existing.sameCapability(storeScope, service, batch)) {
+            return InstallStatus.ALREADY_INSTALLED;
+        }
+        cancellation.registerCapability(
+                storeScope,
+                jobId,
+                reason -> cancelCandidateDurably(service, batch, reason)
+        );
+        return InstallStatus.CONFLICT;
     }
 
     /** Returns whether this registry owns the exact prepared capability supplied by the caller. */
@@ -50,171 +87,193 @@ public final class BreedingPreparedPopulationRegistry {
                                   @Nonnull UUID jobId,
                                   @Nonnull BreedingPopulationAdmissionService service,
                                   @Nonnull PreparedBreedingPopulationBatch batch) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry != null && entry.sameCapability(storeScope, service, batch);
     }
 
     /** Returns whether any prepared capability is attached to this exact scoped job. */
     public boolean ownsJob(@Nonnull Object storeScope, @Nonnull UUID jobId) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry != null && entry.belongsTo(storeScope);
     }
 
-    /**
-     * Makes the registry the sole terminal owner once a job has an installed capability.
-     * A conflicting uninstalled candidate is a distinct capability and is closed here as well.
-     */
+    /** Cancels the installed capability and any conflicting candidate owned by this job gate. */
     public boolean cancelOwnedJob(@Nonnull Object storeScope,
                                   @Nonnull UUID jobId,
                                   @Nonnull BreedingPopulationAdmissionService service,
                                   @Nonnull PreparedBreedingPopulationBatch candidate,
                                   @Nonnull String reason) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         if (entry == null || !entry.belongsTo(storeScope)) {
             return false;
         }
         boolean exact = entry.sameCapability(storeScope, service, candidate);
         entry.cancelRemaining(reason);
         if (!exact) {
-            cancelCandidate(service, candidate, reason);
+            cancelCandidateDurably(service, candidate, reason);
         }
         return true;
     }
 
-    /** Returns the deterministic child identity attached to one active job unit. */
+    /**
+     * Returns the shared durability barrier for capture-triggered cancellation.
+     * The result is true only after preparation is closed and all units are COMMITTED or CANCELED.
+     */
+    @Nonnull
+    public CompletableFuture<Boolean> cancelRemainingDurably(
+            @Nonnull Object storeScope,
+            @Nonnull UUID jobId,
+            @Nonnull String reason) {
+        return cancellation.cancelDurably(storeScope, jobId, reason);
+    }
+
+    /** Finds every retained preparation gate for either exact parent identity. */
+    @Nullable
+    public CompletableFuture<Boolean> cancelRemainingDurablyByParent(
+            @Nonnull Object storeScope,
+            @Nonnull UUID parentUuid,
+            @Nullable String stableProfileId,
+            @Nonnull String reason) {
+        return cancellation.cancelDurablyByParent(
+                storeScope, parentUuid, stableProfileId, reason
+        );
+    }
+
+    /** Releases one capture fence after capture persistence or a safely terminal failure. */
+    public void releaseCaptureFence(@Nonnull Object storeScope,
+                                    @Nonnull UUID parentUuid,
+                                    @Nullable String stableProfileId,
+                                    boolean captured) {
+        cancellation.releaseParentFence(
+                storeScope, parentUuid, stableProfileId, captured
+        );
+    }
+
     @Nonnull
     public Optional<PreparedBreedingPopulationBatch.ReservedChild> child(
             @Nonnull UUID jobId,
             int unitIndex) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry == null ? Optional.empty() : entry.child(unitIndex);
     }
 
-    /** Maps the current shrink-only active ordinal to its original prepared batch index. */
     public int unitIndexForActiveOrdinal(@Nonnull UUID jobId, int activeOrdinal) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry == null ? -1 : entry.unitIndexForActiveOrdinal(activeOrdinal);
     }
 
-    /** Returns the exact destination chunk reserved for a child, if claim policy supplied one. */
     @Nullable
     public ClaimChunkCoordinate destination(@Nonnull UUID jobId, int unitIndex) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry == null ? null : entry.destination(unitIndex);
     }
 
-    /** Revalidates current policy and moves one unit from RESERVED to APPLYING. */
     public boolean claimForSpawn(@Nonnull UUID jobId, int unitIndex) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry != null && entry.claimForSpawn(unitIndex);
     }
 
-    /** Writes the deterministic child profile/UUID/owner into the spawn holder. */
     @Nonnull
     public OwnerComponentMutationService.WriteResult writeSpawnHolder(
             @Nonnull UUID jobId,
             int unitIndex,
             @Nonnull Holder<EntityStore> holder) {
-        Entry entry = requireEntry(jobId);
-        return entry.writeSpawnHolder(unitIndex, holder);
+        return requireEntry(jobId).writeSpawnHolder(unitIndex, holder);
     }
 
-    /** Crosses the live-entity boundary before any post-add initialization can fail. */
     public boolean markMaterialized(@Nonnull UUID jobId, int unitIndex) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry != null && entry.markMaterialized(unitIndex);
     }
 
-    /** Converts one live child from APPLYING to a durable committed population unit. */
     @Nonnull
     public CompletableFuture<CompanionPopulationCommitResult> commitSpawn(
             @Nonnull UUID jobId,
             int unitIndex) {
-        Entry entry = requireEntry(jobId);
-        return entry.commit(unitIndex);
+        return requireEntry(jobId).commit(unitIndex);
     }
 
-    /** Cancels one definitively unspawned unit. Repeated calls are idempotent. */
     public void cancelUnit(@Nonnull UUID jobId, int unitIndex, @Nonnull String reason) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         if (entry != null) {
-            entry.cancel(unitIndex, reason);
+            entry.cancelUnit(unitIndex, reason);
         }
     }
 
-    /** Cancels every unit that has not crossed the live-spawn boundary. */
     public void cancelRemaining(@Nonnull UUID jobId, @Nonnull String reason) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         if (entry != null) {
             entry.cancelRemaining(reason);
         }
     }
 
-    /** Cancels prepared units removed by a spawn-time nearby-cap shrink. */
     public void retainOnly(@Nonnull UUID jobId,
                            @Nonnull List<String> retainedChildKeys,
                            @Nonnull String reason) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         if (entry != null) {
             entry.retainOnly(retainedChildKeys, reason);
         }
     }
 
-    /** Leaves an APPLYING unit intact for startup reconciliation after an ambiguous add outcome. */
     public void retainAmbiguous(@Nonnull UUID jobId, int unitIndex, @Nonnull String reason) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         if (entry != null) {
             entry.retainAmbiguous(unitIndex, reason);
         }
     }
 
-    /** Cancels all unstarted units for one world/store lifecycle. */
     public void clearScope(@Nonnull Object storeScope, @Nonnull String reason) {
-        for (Entry entry : List.copyOf(entries.values())) {
+        for (BreedingPreparedPopulationEntry entry : List.copyOf(entries.values())) {
             if (entry.belongsTo(storeScope)) {
                 entry.cancelRemaining(reason);
                 entries.remove(entry.jobId, entry);
             }
         }
+        cancellation.clearScope(storeScope);
     }
 
-    /** Cancels every unstarted unit during plugin shutdown. */
     public void clearAll(@Nonnull String reason) {
-        for (Entry entry : List.copyOf(entries.values())) {
+        for (BreedingPreparedPopulationEntry entry : List.copyOf(entries.values())) {
             entry.cancelRemaining(reason);
         }
         entries.clear();
+        cancellation.clearAll();
     }
 
-    /** Snapshot used by deterministic tests and diagnostics. */
     @Nonnull
     public List<UnitState> states(@Nonnull UUID jobId) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         return entry == null ? List.of() : entry.states();
     }
 
-    private Entry requireEntry(UUID jobId) {
-        Entry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
+    private BreedingPreparedPopulationEntry requireEntry(UUID jobId) {
+        BreedingPreparedPopulationEntry entry = entries.get(Objects.requireNonNull(jobId, "jobId"));
         if (entry == null) {
             throw new IllegalStateException("Prepared breeding population batch is missing");
         }
         return entry;
     }
 
-    private static void cancelCandidate(BreedingPopulationAdmissionService service,
-                                        PreparedBreedingPopulationBatch candidate,
-                                        String reason) {
+    private static CompletableFuture<Boolean> cancelCandidateDurably(
+            BreedingPopulationAdmissionService service,
+            PreparedBreedingPopulationBatch candidate,
+            String reason) {
         try {
             CompletableFuture<Integer> completion = service.cancelRemainingAsync(
                     candidate, normalizeReason(reason)
             );
             if (completion == null) {
                 service.markReadinessDegraded("breeding_population_conflict_cancel_missing");
-                return;
+                return CompletableFuture.completedFuture(false);
             }
-            completion.exceptionally(failure -> {
-                service.markReadinessDegraded("breeding_population_conflict_cancel_failed");
-                return 0;
+            return completion.handle((count, failure) -> {
+                boolean terminal = failure == null
+                        && count != null && count == candidate.admittedCount();
+                if (!terminal) {
+                    service.markReadinessDegraded("breeding_population_conflict_cancel_failed");
+                }
+                return terminal;
             });
         } catch (RuntimeException | LinkageError failure) {
             try {
@@ -222,6 +281,7 @@ public final class BreedingPreparedPopulationRegistry {
             } catch (RuntimeException | LinkageError ignored) {
                 // Both conservative journal capabilities remain available to reconciliation.
             }
+            return CompletableFuture.completedFuture(false);
         }
     }
 
@@ -246,244 +306,5 @@ public final class BreedingPreparedPopulationRegistry {
         CANCELING,
         CANCELED,
         AMBIGUOUS
-    }
-
-    private static final class Entry {
-        private final Object storeScope;
-        private final UUID jobId;
-        private final BreedingPopulationAdmissionService service;
-        private final PreparedBreedingPopulationBatch batch;
-        private final UnitState[] states;
-        private List<Integer> activeUnitIndexes;
-
-        private Entry(Object storeScope,
-                      UUID jobId,
-                      BreedingPopulationAdmissionService service,
-                      PreparedBreedingPopulationBatch batch) {
-            this.storeScope = Objects.requireNonNull(storeScope, "storeScope");
-            this.jobId = Objects.requireNonNull(jobId, "jobId");
-            this.service = Objects.requireNonNull(service, "service");
-            this.batch = Objects.requireNonNull(batch, "batch");
-            this.states = new UnitState[batch.admittedCount()];
-            Arrays.fill(this.states, UnitState.RESERVED);
-            List<Integer> indexes = new ArrayList<>(batch.admittedCount());
-            for (int index = 0; index < batch.admittedCount(); index++) {
-                indexes.add(index);
-            }
-            this.activeUnitIndexes = List.copyOf(indexes);
-        }
-
-        private synchronized boolean sameCapability(Object scope,
-                                                    BreedingPopulationAdmissionService authority,
-                                                    PreparedBreedingPopulationBatch candidate) {
-            return storeScope == scope
-                    && service == authority
-                    && batch.populationBatch().batchId().equals(
-                            candidate.populationBatch().batchId()
-                    )
-                    && batch.attemptKey().equals(candidate.attemptKey())
-                    && batch.children().equals(candidate.children());
-        }
-
-        private synchronized Optional<PreparedBreedingPopulationBatch.ReservedChild> child(int index) {
-            return validIndex(index) ? Optional.of(batch.child(index)) : Optional.empty();
-        }
-
-        private synchronized int unitIndexForActiveOrdinal(int activeOrdinal) {
-            return activeOrdinal >= 0 && activeOrdinal < activeUnitIndexes.size()
-                    ? activeUnitIndexes.get(activeOrdinal)
-                    : -1;
-        }
-
-        private synchronized ClaimChunkCoordinate destination(int index) {
-            return validIndex(index)
-                    ? batch.populationBatch().admission(index).claimReservation().destinationChunk()
-                    : null;
-        }
-
-        private synchronized boolean claimForSpawn(int index) {
-            if (!validIndex(index) || states[index] != UnitState.RESERVED) {
-                return false;
-            }
-            boolean claimed;
-            try {
-                claimed = service.claimForSpawn(batch, index);
-            } catch (RuntimeException | LinkageError failure) {
-                claimed = false;
-            }
-            if (claimed) {
-                states[index] = UnitState.APPLYING;
-                return true;
-            }
-            cancel(index, "breeding-population-spawn-claim-rejected");
-            return false;
-        }
-
-        private synchronized OwnerComponentMutationService.WriteResult writeSpawnHolder(
-                int index,
-                Holder<EntityStore> holder) {
-            if (!validIndex(index) || states[index] != UnitState.APPLYING) {
-                throw new IllegalStateException("Breeding population unit is not APPLYING");
-            }
-            return service.writeSpawnHolder(batch, index, holder);
-        }
-
-        private CompletableFuture<CompanionPopulationCommitResult> commit(int index) {
-            synchronized (this) {
-                if (!validIndex(index) || states[index] != UnitState.MATERIALIZED) {
-                    return CompletableFuture.completedFuture(new CompanionPopulationCommitResult(
-                            false, "breeding-population-unit-not-applying", false, null
-                    ));
-                }
-                states[index] = UnitState.COMMITTING;
-            }
-            final CompletableFuture<CompanionPopulationCommitResult> completion;
-            try {
-                completion = service.commitAsync(batch, index);
-            } catch (RuntimeException | LinkageError failure) {
-                retainAmbiguous(index, "breeding-population-commit-start-failed");
-                return CompletableFuture.completedFuture(new CompanionPopulationCommitResult(
-                        false, "breeding-population-commit-start-failed", false, null
-                ));
-            }
-            if (completion == null) {
-                retainAmbiguous(index, "breeding-population-commit-stage-missing");
-                return CompletableFuture.completedFuture(new CompanionPopulationCommitResult(
-                        false, "breeding-population-commit-stage-missing", false, null
-                ));
-            }
-            return completion.handle((result, failure) -> {
-                boolean degraded;
-                synchronized (Entry.this) {
-                    if (failure == null && result != null && result.committed()) {
-                        states[index] = UnitState.COMMITTED;
-                        degraded = false;
-                    } else {
-                        states[index] = UnitState.AMBIGUOUS;
-                        degraded = true;
-                    }
-                }
-                if (degraded) {
-                    markDegraded("breeding_population_commit_ambiguous");
-                }
-                return result == null
-                        ? new CompanionPopulationCommitResult(
-                                false, "breeding-population-commit-failed", false, null
-                        )
-                        : result;
-            });
-        }
-
-        private boolean markMaterialized(int index) {
-            synchronized (this) {
-                if (validIndex(index) && states[index] == UnitState.APPLYING) {
-                    states[index] = UnitState.MATERIALIZED;
-                    return true;
-                }
-            }
-            markDegraded("breeding_population_materialized_state_conflict");
-            return false;
-        }
-
-        private void cancelRemaining(String reason) {
-            for (int index = 0; index < states.length; index++) {
-                cancel(index, reason);
-            }
-        }
-
-        private void retainOnly(List<String> retainedChildKeys, String reason) {
-            List<String> retained = List.copyOf(retainedChildKeys);
-            List<Integer> retainedIndexes = new ArrayList<>(retained.size());
-            for (int index = 0; index < states.length; index++) {
-                if (retained.contains(batch.child(index).childKey())) {
-                    retainedIndexes.add(index);
-                } else {
-                    cancel(index, reason);
-                }
-            }
-            synchronized (this) {
-                activeUnitIndexes = List.copyOf(retainedIndexes);
-            }
-        }
-
-        private void cancel(int index, String reason) {
-            synchronized (this) {
-                if (!validIndex(index) || !definitelyCancelable(states[index])) {
-                    return;
-                }
-                states[index] = UnitState.CANCELING;
-            }
-            CompletableFuture<Boolean> completion;
-            try {
-                completion = service.cancelAsync(batch, index, normalizeReason(reason));
-            } catch (RuntimeException | LinkageError failure) {
-                completion = null;
-            }
-            if (completion == null) {
-                cancellationAmbiguous(index);
-                return;
-            }
-            completion.whenComplete((cancelled, failure) -> {
-                boolean degraded;
-                synchronized (Entry.this) {
-                    if (failure == null && Boolean.TRUE.equals(cancelled)) {
-                        states[index] = UnitState.CANCELED;
-                        degraded = false;
-                    } else {
-                        states[index] = UnitState.AMBIGUOUS;
-                        degraded = true;
-                    }
-                }
-                if (degraded) {
-                    markDegraded("breeding_population_cancel_ambiguous");
-                }
-            });
-        }
-
-        private void retainAmbiguous(int index, String reason) {
-            synchronized (this) {
-                if (!validIndex(index) || states[index] == UnitState.COMMITTED
-                        || states[index] == UnitState.CANCELED) {
-                    return;
-                }
-                states[index] = UnitState.AMBIGUOUS;
-            }
-            markDegraded(normalizeReason(reason));
-        }
-
-        private synchronized List<UnitState> states() {
-            return List.copyOf(Arrays.asList(states.clone()));
-        }
-
-        private synchronized boolean belongsTo(Object scope) {
-            return storeScope == scope;
-        }
-
-        private synchronized boolean validIndex(int index) {
-            return index >= 0 && index < states.length;
-        }
-
-        private static boolean definitelyCancelable(UnitState state) {
-            return state == UnitState.RESERVED || state == UnitState.APPLYING;
-        }
-
-        private void cancellationAmbiguous(int index) {
-            synchronized (this) {
-                states[index] = UnitState.AMBIGUOUS;
-            }
-            markDegraded("breeding_population_cancel_start_failed");
-        }
-
-        private void markDegraded(String reason) {
-            try {
-                service.markReadinessDegraded(reason);
-            } catch (RuntimeException | LinkageError ignored) {
-                // The nonterminal journal remains the conservative source of truth.
-            }
-        }
-
-        private static String normalizeReason(String reason) {
-            return BreedingPreparedPopulationRegistry.normalizeReason(reason);
-        }
     }
 }

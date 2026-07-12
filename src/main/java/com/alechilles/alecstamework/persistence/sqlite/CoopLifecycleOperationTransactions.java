@@ -265,6 +265,10 @@ final class CoopLifecycleOperationTransactions {
                 || !releasingResidentMatches(operation, resident)) {
             return conflict(operation, "release_cancel_operation_state_conflict");
         }
+        if (!populationOperationAllowsPreProjectionRollback(
+                connection, operation)) {
+            return conflict(operation, "release_population_operation_may_be_in_flight");
+        }
 
         Savepoint rollbackBoundary = connection.setSavepoint();
         ManagedCoopResidentRepository.MutationResult restored =
@@ -296,6 +300,32 @@ final class CoopLifecycleOperationTransactions {
         }
         connection.releaseSavepoint(rollbackBoundary);
         return applied(requireOperation(connection, operation.operationId()));
+    }
+
+    /** Missing or exclusively failed population rows are the only durable proof no apply ran. */
+    private static boolean populationOperationAllowsPreProjectionRollback(
+            Connection connection,
+            OperationRecord operation) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COUNT(*) AS matching_rows,
+                       COALESCE(SUM(CASE WHEN state = 'FAILED' THEN 0 ELSE 1 END), 0)
+                           AS unsafe_rows
+                FROM companion_population_operations
+                WHERE profile_id = ?
+                  AND (
+                    json_extract(target_context_json, '$.managedCoopMutation.operationId') = ?
+                    OR json_extract(target_context_json, '$.idempotencyKey') = ?
+                  )
+                """)) {
+            statement.setString(1, operation.profileId());
+            statement.setString(2, operation.operationId());
+            statement.setString(3, operation.operationId());
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next()
+                        && (result.getLong("matching_rows") == 0L
+                        || result.getLong("unsafe_rows") == 0L);
+            }
+        }
     }
 
     MutationResult finalizeRelease(Connection connection,

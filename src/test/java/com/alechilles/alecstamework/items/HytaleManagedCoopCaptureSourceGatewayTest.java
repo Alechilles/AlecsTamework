@@ -131,6 +131,38 @@ class HytaleManagedCoopCaptureSourceGatewayTest {
                 recovered, command));
     }
 
+    @Test
+    void exactBreedingChildCanTransitionButNearMatchesCannot() {
+        RetirementCommand command = command();
+        TameworkProjectionIdentityComponent bred =
+                new TameworkProjectionIdentityComponent(
+                        "profile-a",
+                        "breeding:11fd5d1a-c328-4dad-8c91-b6a8ca652c97",
+                        TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD,
+                        "child-0000",
+                        SOURCE,
+                        1L);
+
+        assertTrue(HytaleManagedCoopCaptureSourceGateway.canTransitionFinalizedProjection(
+                bred, command));
+
+        bred.setProfileId("profile-b");
+        assertFalse(HytaleManagedCoopCaptureSourceGateway.canTransitionFinalizedProjection(
+                bred, command));
+        bred.setProfileId("profile-a");
+        bred.setSourceNpcUuid(new UUID(0L, 80L));
+        assertFalse(HytaleManagedCoopCaptureSourceGateway.canTransitionFinalizedProjection(
+                bred, command));
+        bred.setSourceNpcUuid(SOURCE);
+        bred.setOperationId("breeding:not-a-uuid");
+        assertFalse(HytaleManagedCoopCaptureSourceGateway.canTransitionFinalizedProjection(
+                bred, command));
+        bred.setOperationId("breeding:11fd5d1a-c328-4dad-8c91-b6a8ca652c97");
+        bred.setGeneration(0L);
+        assertFalse(HytaleManagedCoopCaptureSourceGateway.canTransitionFinalizedProjection(
+                bred, command));
+    }
+
     private RetirementCommand command() {
         return new RetirementCommand(
                 SOURCE, "profile-a", "resident-a", "capture-a", AUTHORITY,

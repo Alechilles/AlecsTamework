@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
+import com.alechilles.alecstamework.items.ManagedCoopPersistedProjectionRecovery.Adoption;
+import com.alechilles.alecstamework.items.ManagedCoopPersistedProjectionRecovery.Resolution;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationResult;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationKind;
@@ -35,13 +37,37 @@ public final class ManagedCoopReleaseRecoveryService {
         FAILED
     }
 
+    /** Exact sealed/loaded generations that must remain current until physical projection. */
+    public record ProjectionToken(long evidenceRevision, long loadedIdentityRevision) {
+        public ProjectionToken {
+            if (evidenceRevision < 0L || loadedIdentityRevision < 0L) {
+                throw new IllegalArgumentException("projection revisions must not be negative");
+            }
+        }
+    }
+
     /** Stable callback payload safe to pass to an owning-world-thread runtime adapter. */
     public record RecoveryOutcome(@Nonnull Status status,
                                   @Nullable SpawnReady spawnClaim,
                                   @Nullable ResidentRecord resident,
+                                  @Nullable ProjectionToken projectionToken,
                                   @Nullable String detail) {
+        public RecoveryOutcome(
+                Status status,
+                SpawnReady spawnClaim,
+                ResidentRecord resident,
+                String detail) {
+            this(status, spawnClaim, resident, null, detail);
+        }
+
         public boolean ready() {
             return status == Status.READY && spawnClaim != null && resident != null;
+        }
+
+        private RecoveryOutcome withProjectionToken(ProjectionToken token) {
+            return ready()
+                    ? new RecoveryOutcome(status, spawnClaim, resident, token, detail)
+                    : this;
         }
     }
 
@@ -50,6 +76,7 @@ public final class ManagedCoopReleaseRecoveryService {
     private final TrustGate trust;
     private final ClaimGateway claims;
     private final RefreshGateway refresh;
+    private final ManagedCoopPersistedProjectionRecovery persistedProjections;
     private final LongSupplier clock;
     private final ConcurrentHashMap<String, Boolean> inFlight = new ConcurrentHashMap<>();
 
@@ -58,6 +85,17 @@ public final class ManagedCoopReleaseRecoveryService {
             @Nonnull ManagedCoopResidentIndex residentIndex,
             @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
             @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes) {
+        this(repository, residentIndex, operationIndex, compositeIndexes,
+                ManagedCoopPersistedProjectionRecovery.passthrough());
+    }
+
+    /** Creates restart recovery with a sealed persisted-projection preflight. */
+    ManagedCoopReleaseRecoveryService(
+            @Nonnull CoopLifecycleOperationRepository repository,
+            @Nonnull ManagedCoopResidentIndex residentIndex,
+            @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
+            @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
+            @Nonnull ManagedCoopPersistedProjectionRecovery persistedProjections) {
         this(
                 residentIndex,
                 operationIndex,
@@ -65,6 +103,7 @@ public final class ManagedCoopReleaseRecoveryService {
                 (operationId, generation, nowMs) ->
                         committedClaim(repository, operationId, generation, nowMs),
                 compositeIndexes::refresh,
+                persistedProjections,
                 System::currentTimeMillis
         );
     }
@@ -76,11 +115,25 @@ public final class ManagedCoopReleaseRecoveryService {
             @Nonnull ClaimGateway claims,
             @Nonnull RefreshGateway refresh,
             @Nonnull LongSupplier clock) {
+        this(residents, operations, trust, claims, refresh,
+                ManagedCoopPersistedProjectionRecovery.passthrough(), clock);
+    }
+
+    ManagedCoopReleaseRecoveryService(
+            @Nonnull ManagedCoopResidentIndex residents,
+            @Nonnull ManagedCoopLifecycleOperationIndex operations,
+            @Nonnull TrustGate trust,
+            @Nonnull ClaimGateway claims,
+            @Nonnull RefreshGateway refresh,
+            @Nonnull ManagedCoopPersistedProjectionRecovery persistedProjections,
+            @Nonnull LongSupplier clock) {
         this.residents = Objects.requireNonNull(residents, "residents");
         this.operations = Objects.requireNonNull(operations, "operations");
         this.trust = Objects.requireNonNull(trust, "trust");
         this.claims = Objects.requireNonNull(claims, "claims");
         this.refresh = Objects.requireNonNull(refresh, "refresh");
+        this.persistedProjections = Objects.requireNonNull(
+                persistedProjections, "persistedProjections");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -93,21 +146,69 @@ public final class ManagedCoopReleaseRecoveryService {
         } catch (RuntimeException exception) {
             return completed(failed(detail("release_recovery_authorization", exception)));
         }
+        Resolution projection = persistedProjections.resolve(
+                evidence.operation(), evidence.resident());
+        if (projection == null || projection.status()
+                == ManagedCoopPersistedProjectionRecovery.Status.BLOCKED) {
+            return completed(failed(projection != null && projection.detail() != null
+                    ? projection.detail() : "persisted_release_projection_evidence_unavailable"));
+        }
         if (inFlight.putIfAbsent(evidence.operation().operationId(), Boolean.TRUE) != null) {
             return completed(new RecoveryOutcome(
                     Status.DEDUPLICATED, null, null, "release_recovery_already_in_flight"));
         }
 
-        CompletableFuture<RecoveryOutcome> recovery = evidence.operation().state()
+        CompletableFuture<RecoveryOutcome> claimed = evidence.operation().state()
                 == OperationState.PREPARED
                 ? claimPrepared(evidence)
                 : completed(ready(evidence));
+        CompletableFuture<RecoveryOutcome> recovery = projection.exact()
+                ? claimed.thenCompose(outcome -> adoptPersisted(evidence, projection, outcome))
+                : claimed.thenApply(outcome -> persistedProjections.current(projection)
+                        ? outcome.withProjectionToken(new ProjectionToken(
+                                projection.evidenceRevision(),
+                                projection.loadedIdentityRevision()))
+                        : failed("persisted_release_projection_evidence_changed"));
         return recovery.handle((outcome, failure) -> failure == null
                         ? outcome
                         : failed(detail("release_recovery", unwrap(failure))))
                 .whenComplete((ignored, failure) ->
                         inFlight.remove(evidence.operation().operationId()))
                 .toCompletableFuture();
+    }
+
+    /** Revalidates a carried recovery token at the owning-world physical projection boundary. */
+    boolean projectionCurrent(@Nullable ProjectionToken token) {
+        if (token == null) {
+            return false;
+        }
+        try {
+            return persistedProjections.current(Resolution.absent(
+                    token.evidenceRevision(), token.loadedIdentityRevision()));
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
+    }
+
+    @Nonnull
+    private CompletableFuture<RecoveryOutcome> adoptPersisted(
+            Evidence evidence,
+            Resolution projection,
+            RecoveryOutcome claimed) {
+        if (claimed == null || !claimed.ready()
+                || claimed.spawnClaim() == null || claimed.resident() == null) {
+            return completed(claimed != null ? claimed
+                    : failed("persisted_release_projection_claim_missing"));
+        }
+        CompletableFuture<Adoption> adoption = persistedProjections.adopt(
+                evidence.operation(), claimed.spawnClaim(), claimed.resident(), projection);
+        if (adoption == null) {
+            return completed(failed("persisted_release_projection_adoption_missing"));
+        }
+        return adoption.thenApply(result -> result != null && result.adopted()
+                ? new RecoveryOutcome(Status.DEDUPLICATED, null, null, result.detail())
+                : failed(result != null && result.detail() != null
+                        ? result.detail() : "persisted_release_projection_adoption_failed"));
     }
 
     @Nonnull
@@ -383,4 +484,5 @@ public final class ManagedCoopReleaseRecoveryService {
         @Nullable
         ManagedCoopCompositeIndexRefreshService.RefreshResult refresh();
     }
+
 }

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.breeding.PlannedChild;
 import com.alechilles.alecstamework.ownership.PreparedBreedingPopulationBatch;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Constructor;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,25 @@ class BreedingHytaleJobRuntimeIdentityTest {
 
         assertEquals(reservedOwnerId, actual.ownerId());
         assertEquals("Reserved Owner", actual.ownerName());
+    }
+
+    /** Regression: prepared children need the same planned UUID in legacy and ECS identity. */
+    @Test
+    void reservedNpcUuidIsInstalledAsLegacyIdentityBeforeSpawn() {
+        UUID plannedNpcUuid = UUID.randomUUID();
+        PreparedBreedingPopulationBatch.ReservedChild reserved =
+                new PreparedBreedingPopulationBatch.ReservedChild(
+                        "child-0000",
+                        "profile-child",
+                        plannedNpcUuid,
+                        UUID.randomUUID(),
+                        "Reserved Owner"
+                );
+        NPCEntity npc = new NPCEntity();
+
+        BreedingPreparedChildSpawnService.installReservedLegacyUuid(npc, reserved);
+
+        assertEquals(plannedNpcUuid, npc.getUuid());
     }
 
     @Test

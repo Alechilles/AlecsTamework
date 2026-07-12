@@ -27,19 +27,22 @@ public record CompanionPopulationOperationRecord(
         APPLIED,
         COMMITTED,
         COMPENSATING,
+        RETRYABLE,
         FAILED;
 
         public boolean isTerminal() {
-            return this == COMMITTED || this == FAILED;
+            return this == COMMITTED || this == RETRYABLE || this == FAILED;
         }
 
         public boolean canTransitionTo(@Nonnull State next) {
             return switch (this) {
-                case PREPARED -> next == APPLYING || next == FAILED;
-                case APPLYING -> next == APPLIED || next == COMPENSATING || next == FAILED;
-                case APPLIED -> next == COMMITTED || next == COMPENSATING || next == FAILED;
+                case PREPARED -> next == APPLYING || next == RETRYABLE || next == FAILED;
+                case APPLYING -> next == APPLIED || next == COMPENSATING
+                        || next == RETRYABLE || next == FAILED;
+                case APPLIED -> next == COMMITTED || next == COMPENSATING
+                        || next == RETRYABLE || next == FAILED;
                 case COMPENSATING -> next == FAILED;
-                case COMMITTED, FAILED -> false;
+                case COMMITTED, RETRYABLE, FAILED -> false;
             };
         }
     }

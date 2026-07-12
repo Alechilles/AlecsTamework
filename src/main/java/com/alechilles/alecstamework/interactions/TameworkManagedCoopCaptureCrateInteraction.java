@@ -231,9 +231,11 @@ public final class TameworkManagedCoopCaptureCrateInteraction
         }
         AuthoringResult prepared = authoring.prepare(target, store, sourceUuid, roleId);
         if (prepared.status() == AuthoringStatus.NOT_ELIGIBLE) {
+            prepared.completeCapture(false);
             return CaptureDisposition.DELEGATE_TO_VANILLA;
         }
         if (!prepared.prepared()) {
+            prepared.completeCapture(false);
             return CaptureDisposition.FAILED_CLOSED;
         }
         return replaceThenRemove(commandBuffer, context, item, target, vanilla, prepared);
@@ -246,29 +248,35 @@ public final class TameworkManagedCoopCaptureCrateInteraction
             Ref<EntityStore> target,
             CapturedNPCMetadata vanilla,
             AuthoringResult prepared) {
-        InventoryComponent.Hotbar hotbar = commandBuffer.getComponent(
-                context.getEntity(), InventoryComponent.Hotbar.getComponentType());
-        if (hotbar == null) {
-            return CaptureDisposition.FAILED_CLOSED;
+        boolean captured = false;
+        try {
+            InventoryComponent.Hotbar hotbar = commandBuffer.getComponent(
+                    context.getEntity(), InventoryComponent.Hotbar.getComponentType());
+            if (hotbar == null) {
+                return CaptureDisposition.FAILED_CLOSED;
+            }
+            short activeSlot = hotbar.getActiveSlot();
+            ItemStack current = hotbar.getActiveItem();
+            if (current == null || !interactionItem.isStackableWith(current)) {
+                return CaptureDisposition.FAILED_CLOSED;
+            }
+            ItemStack capturedItem = current
+                    .withMetadata(CapturedNPCMetadata.KEYED_CODEC, vanilla)
+                    .withMetadata(
+                            ManagedCoopCapturedItemEnvelopeCodec.METADATA_KEY,
+                            Codec.STRING,
+                            prepared.envelopeJson());
+            if (!hotbar.getInventory().replaceItemStackInSlot(
+                    activeSlot, interactionItem, capturedItem).succeeded()) {
+                return CaptureDisposition.FAILED_CLOSED;
+            }
+            context.setHeldItem(capturedItem);
+            commandBuffer.removeEntity(target, RemoveReason.REMOVE);
+            captured = true;
+            return CaptureDisposition.CAPTURED;
+        } finally {
+            prepared.completeCapture(captured);
         }
-        short activeSlot = hotbar.getActiveSlot();
-        ItemStack current = hotbar.getActiveItem();
-        if (current == null || !interactionItem.isStackableWith(current)) {
-            return CaptureDisposition.FAILED_CLOSED;
-        }
-        ItemStack captured = current
-                .withMetadata(CapturedNPCMetadata.KEYED_CODEC, vanilla)
-                .withMetadata(
-                        ManagedCoopCapturedItemEnvelopeCodec.METADATA_KEY,
-                        Codec.STRING,
-                        prepared.envelopeJson());
-        if (!hotbar.getInventory().replaceItemStackInSlot(
-                activeSlot, interactionItem, captured).succeeded()) {
-            return CaptureDisposition.FAILED_CLOSED;
-        }
-        context.setHeldItem(captured);
-        commandBuffer.removeEntity(target, RemoveReason.REMOVE);
-        return CaptureDisposition.CAPTURED;
     }
 
     private boolean acceptedGroupContains(int roleIndex) {

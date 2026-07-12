@@ -15,9 +15,21 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderProbe;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbeResult;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderRegistry;
 import com.alechilles.alecstamework.integration.claims.ClaimResolution;
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
+import com.alechilles.alecstamework.npc.breeding.AppliedCooldownFingerprint;
+import com.alechilles.alecstamework.npc.breeding.BreedingBirthAnchor;
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan;
+import com.alechilles.alecstamework.npc.breeding.BreedingCapacityHeadroom;
 import com.alechilles.alecstamework.npc.breeding.BreedingFertilitySnapshot;
+import com.alechilles.alecstamework.npc.breeding.BreedingJobExecutionService;
+import com.alechilles.alecstamework.npc.breeding.BreedingPairingCoordinator;
+import com.alechilles.alecstamework.npc.breeding.BreedingParentIdentity;
+import com.alechilles.alecstamework.npc.breeding.BreedingPopulationAdmissionService;
+import com.alechilles.alecstamework.npc.breeding.BreedingPreparedPopulationRegistry;
+import com.alechilles.alecstamework.npc.breeding.BreedingReservationScope;
+import com.alechilles.alecstamework.npc.breeding.ParentBreedingSnapshot;
 import com.alechilles.alecstamework.npc.breeding.PlannedChild;
+import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.alechilles.alecstamework.ownership.BreedingBirthPlanSnapshot;
 import com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionRequest;
 import com.alechilles.alecstamework.ownership.BreedingPopulationPreparationResult;
@@ -26,11 +38,14 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationEntry;
 import com.alechilles.alecstamework.ownership.OwnerPopulationReadiness;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
 import com.alechilles.alecstamework.ownership.PreparedBreedingPopulationBatch;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPersistedProjectionEvidenceRegistry;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationEvidenceSet;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.assetstore.AssetStore;
 import com.hypixel.hytale.assetstore.TestTwGlobalAssetStore;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -154,12 +169,169 @@ class BreedingPopulationHeadroomIntegrationTest {
         }
     }
 
+    /** One job must retain exact child ownership across every hard-cap and delayed-spawn boundary. */
+    @Test
+    void reservedJobDurablyShrinksThenSpawnRecheckTerminalizesEachUnitExactlyOnce()
+            throws Exception {
+        try (GlobalConfigScope ignored = GlobalConfigScope.install(2, 2, true);
+             Harness harness = Harness.open(tempDir.resolve("execution"), 0, 0);
+             TameworkBreedingServices services = new TameworkBreedingServices(() -> 0.25)) {
+            HardCapPairing pairing = reserveHardCapPairing(services);
+            PreparedBreedingPopulationBatch batch = prepareHardCapPopulation(
+                    harness, services, pairing
+            );
+            assertHardCapExecution(harness, services, pairing, batch);
+        }
+    }
+
+    private static HardCapPairing reserveHardCapPairing(TameworkBreedingServices services) {
+        UUID jobId = UUID.nameUUIDFromBytes(
+                "headroom:execution".getBytes(StandardCharsets.UTF_8)
+        );
+        Object storeScope = new Object();
+        BreedingBirthPlan plan = indexedBirthPlan();
+        BreedingBirthAnchor anchor = new BreedingBirthAnchor(CENTER.x, CENTER.y, CENTER.z);
+        BreedingReservationScope nearbyScope = new BreedingReservationScope(
+                10.0, null, List.of()
+        );
+        AtomicReference<Map<String, Integer>> liveNearby = new AtomicReference<>(
+                Map.of(POPULATION_TYPE, 1)
+        );
+        BreedingPairingCoordinator coordinator = new BreedingPairingCoordinator(
+                services, (scheduledJobId, delayMs) -> { }, 0L
+        );
+        BreedingPairingCoordinator.PairingRequest request = pairingRequest(
+                jobId, storeScope, plan, anchor, nearbyScope, liveNearby
+        );
+        BreedingPairingCoordinator.PairingResult reserved = coordinator.reserve(request);
+        assertTrue(reserved.reserved());
+        assertEquals(4, reserved.job().orElseThrow().plan().children().size());
+        assertEquals(3, reserved.job().orElseThrow().initiallyAdmittedChildren().size());
+        assertEquals(3, services.jobRegistry().activeReservations(storeScope)
+                .getFirst().reservation().totalChildren());
+        return new HardCapPairing(
+                jobId, storeScope, plan, nearbyScope, liveNearby, coordinator, request
+        );
+    }
+
+    private static PreparedBreedingPopulationBatch prepareHardCapPopulation(
+            Harness harness,
+            TameworkBreedingServices services,
+            HardCapPairing pairing) throws Exception {
+        BreedingPreparedPopulationRegistry prepared = services.preparedPopulationRegistry();
+        assertTrue(prepared.beginPreparation(pairing.storeScope(), pairing.jobId()));
+        BreedingPopulationPreparationResult population = harness.runtime()
+                .breedingAdmissionService()
+                .prepareAsync(request(pairing.plan(), OWNER, 3, "execution"))
+                .get(5, TimeUnit.SECONDS);
+        assertTrue(population.allowed(), population.reason());
+        assertEquals(2, population.admittedCount());
+        PreparedBreedingPopulationBatch batch = assertPrepared(population);
+        assertEquals(2L, harness.runtime().index().counts(OWNER, WORLD).globalPending());
+        assertEquals(2L, harness.runtime().claimAdmissionService().pendingForClaim(CLAIM_KEY));
+        installAndActivate(harness, services, pairing, prepared, batch);
+        return batch;
+    }
+
+    private static void installAndActivate(
+            Harness harness,
+            TameworkBreedingServices services,
+            HardCapPairing pairing,
+            BreedingPreparedPopulationRegistry prepared,
+            PreparedBreedingPopulationBatch batch) {
+        assertEquals(BreedingPreparedPopulationRegistry.InstallStatus.INSTALLED,
+                prepared.install(
+                        pairing.storeScope(), pairing.jobId(),
+                        harness.runtime().breedingAdmissionService(), batch
+                ));
+        assertTrue(prepared.finishPreparation(pairing.storeScope(), pairing.jobId()));
+        List<String> childKeys = batch.children().stream()
+                .map(PreparedBreedingPopulationBatch.ReservedChild::childKey)
+                .toList();
+        List<PlannedChild> retained = new BreedingJobPlanSnapshotMapper()
+                .coreChildrenForKeys(pairing.plan(), childKeys);
+        assertEquals(
+                com.alechilles.alecstamework.npc.breeding.BreedingBirthJobRegistry
+                        .AdmissionUpdateStatus.APPLIED,
+                services.jobRegistry().shrinkAdmission(
+                        pairing.storeScope(), pairing.jobId(), retained
+                ).status()
+        );
+        assertEquals(BreedingPreparedPopulationRegistry.InstallStatus.ALREADY_INSTALLED,
+                prepared.install(
+                        pairing.storeScope(), pairing.jobId(),
+                        harness.runtime().breedingAdmissionService(), batch
+                ));
+        assertTrue(pairing.coordinator().activate(
+                pairing.request(), pairing.jobId()
+        ).accepted());
+    }
+
+    private static void assertHardCapExecution(
+            Harness harness,
+            TameworkBreedingServices services,
+            HardCapPairing pairing,
+            PreparedBreedingPopulationBatch batch) throws Exception {
+        BreedingPreparedPopulationRegistry prepared = services.preparedPopulationRegistry();
+        BreedingPreparedExecutionRuntime runtime = new BreedingPreparedExecutionRuntime(
+                pairing.storeScope(), WORLD, LITTER_SIZE, pairing.nearbyScope(),
+                pairing.liveNearby(), prepared
+        );
+        BreedingJobExecutionService<String> execution = new BreedingJobExecutionService<>(
+                services, runtime, (scheduledJobId, delayMs) -> { }, 0L
+        );
+        assertEquals(BreedingJobExecutionService.ExecutionStatus.HEARTS_SHOWN,
+                execution.execute(pairing.jobId()).status());
+        pairing.liveNearby().set(Map.of(POPULATION_TYPE, 3));
+        BreedingJobExecutionService.ExecutionResult completed =
+                execution.execute(pairing.jobId());
+        assertEquals(BreedingJobExecutionService.ExecutionStatus.COMPLETED, completed.status());
+        assertEquals(1, completed.spawnedChildren());
+        assertHardCapTerminals(harness, services, pairing, batch, prepared);
+        assertEquals(BreedingJobExecutionService.ExecutionStatus.TERMINAL,
+                execution.execute(pairing.jobId()).status());
+        assertEquals(1, runtime.spawnCalls());
+    }
+
+    private static void assertHardCapTerminals(
+            Harness harness,
+            TameworkBreedingServices services,
+            HardCapPairing pairing,
+            PreparedBreedingPopulationBatch batch,
+            BreedingPreparedPopulationRegistry prepared) throws Exception {
+        awaitPreparedStates(prepared, pairing.jobId(), List.of(
+                BreedingPreparedPopulationRegistry.UnitState.COMMITTED,
+                BreedingPreparedPopulationRegistry.UnitState.CANCELED
+        ));
+        assertEquals(1L, harness.runtime().index().counts(OWNER, WORLD).globalCommitted());
+        assertEquals(0L, harness.runtime().index().counts(OWNER, WORLD).globalPending());
+        assertEquals(0L, harness.runtime().claimAdmissionService().pendingForClaim(CLAIM_KEY));
+        assertEquals(0, harness.runtime().claimAdmissionService().pendingReservationCount());
+        assertEquals(Set.of(batch.child(0).profileId()), harness.runtime()
+                .claimOccupancyIndex().snapshot().profilesByChunk().get(DESTINATION));
+        assertTrue(harness.runtime().breedingAdmissionService()
+                .replayState(batch.attemptKey()).pendingChildKeys().isEmpty());
+        assertTrue(services.jobRegistry().activeReservations(pairing.storeScope()).isEmpty());
+    }
+
     private static void awaitNoPending(Harness harness) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (harness.runtime().index().counts(OWNER, WORLD).globalPending() != 0L
                 && System.nanoTime() < deadline) {
             Thread.sleep(10L);
         }
+    }
+
+    private static void awaitPreparedStates(
+            BreedingPreparedPopulationRegistry registry,
+            UUID jobId,
+            List<BreedingPreparedPopulationRegistry.UnitState> expected
+    ) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!expected.equals(registry.states(jobId)) && System.nanoTime() < deadline) {
+            Thread.sleep(10L);
+        }
+        assertEquals(expected, registry.states(jobId));
     }
 
     private void assertHeadroom(Scenario scenario) throws Exception {
@@ -247,6 +419,43 @@ class BreedingPopulationHeadroomIntegrationTest {
         );
     }
 
+    private static BreedingPairingCoordinator.PairingRequest pairingRequest(
+            UUID jobId,
+            Object storeScope,
+            BreedingBirthPlan plan,
+            BreedingBirthAnchor anchor,
+            BreedingReservationScope scope,
+            AtomicReference<Map<String, Integer>> liveNearby
+    ) {
+        return new BreedingPairingCoordinator.PairingRequest(
+                storeScope,
+                WORLD,
+                BreedingPopulationAdmissionService.BreedingMode.PASSIVE,
+                new BreedingParentIdentity(new UUID(0L, 301L), "parent-a-profile"),
+                new BreedingParentIdentity(new UUID(0L, 302L), "parent-b-profile"),
+                1.0,
+                1.0,
+                index -> { throw new AssertionError("Immutable plan must not reroll"); },
+                (resolvedJobId, resolvedPlan) -> BreedingPairingCoordinator.CapacityDecision.allow(
+                        new BreedingPopulationAdmissionService.AdmissionRequest(
+                                resolvedJobId, WORLD,
+                                BreedingPopulationAdmissionService.BreedingMode.PASSIVE,
+                                resolvedPlan, anchor, scope, LITTER_SIZE, liveNearby.get(),
+                                BreedingCapacityHeadroom.unlimited()
+                        )
+                ),
+                ParentBreedingSnapshot.empty(),
+                ParentBreedingSnapshot.empty(),
+                AppliedCooldownFingerprint.none(),
+                AppliedCooldownFingerprint.none(),
+                anchor,
+                job -> true,
+                job -> { },
+                (resolvedJobId, freshPlan) -> plan,
+                jobId
+        );
+    }
+
     private static BreedingBirthPlan birthPlan() {
         List<PlannedChild> children = new ArrayList<>();
         for (int index = 0; index < LITTER_SIZE; index++) {
@@ -256,6 +465,19 @@ class BreedingPopulationHeadroomIntegrationTest {
                     null,
                     null,
                     POPULATION_TYPE
+            ));
+        }
+        return new BreedingBirthPlan(
+                new BreedingFertilitySnapshot(1.0, 1.0, LITTER_SIZE, 0.0, LITTER_SIZE),
+                children
+        );
+    }
+
+    private static BreedingBirthPlan indexedBirthPlan() {
+        List<PlannedChild> children = new ArrayList<>();
+        for (int index = 0; index < LITTER_SIZE; index++) {
+            children.add(new PlannedChild(
+                    "Test_Child_" + index, null, null, null, POPULATION_TYPE
             ));
         }
         return new BreedingBirthPlan(
@@ -296,6 +518,16 @@ class BreedingPopulationHeadroomIntegrationTest {
         return Math.max(0, Math.min(LITTER_SIZE, limit - existing));
     }
 
+    private record HardCapPairing(
+            UUID jobId,
+            Object storeScope,
+            BreedingBirthPlan plan,
+            BreedingReservationScope nearbyScope,
+            AtomicReference<Map<String, Integer>> liveNearby,
+            BreedingPairingCoordinator coordinator,
+            BreedingPairingCoordinator.PairingRequest request) {
+    }
+
     private record Scenario(String name,
                             int ownerLimit,
                             int ownerExisting,
@@ -316,6 +548,7 @@ class BreedingPopulationHeadroomIntegrationTest {
             OwnerPopulationRuntime runtime = OwnerPopulationRuntime.initialize(persistence);
             FixedClaimBridge bridge = new FixedClaimBridge();
             installSimpleClaimsProbe(runtime.claimProviderRegistry(), bridge);
+            establishEmptyStartupProjectionBaseline(persistence, runtime);
             Seed seed = seed(ownerExisting, claimExisting);
             runtime.index().replaceCommittedEntries(seed.ownerEntries(), OwnerPopulationReadiness.READY);
             runtime.claimOccupancyIndex().replaceCommittedEntries(
@@ -329,6 +562,34 @@ class BreedingPopulationHeadroomIntegrationTest {
             runtime.close();
             persistence.close();
         }
+    }
+
+    /** Mirrors successful startup finalization before this focused harness forces ready indexes. */
+    private static void establishEmptyStartupProjectionBaseline(
+            TameworkPersistenceRuntime persistence,
+            OwnerPopulationRuntime runtime
+    ) throws Exception {
+        runtime.loadedNpcIdentityIndex().markInitializationComplete();
+        CompanionPersistedProjectionEvidenceRegistry projections =
+                persistence.getCompanionPersistedProjectionEvidenceRegistry();
+        LoadedNpcIdentitySnapshot loaded = runtime.loadedNpcIdentityIndex().snapshot();
+        long liveRevision = runtime.liveEvidenceRevision().capture();
+        String scanEpoch = "breeding-headroom-empty";
+        projections.begin(scanEpoch);
+        assertTrue(projections.publishSealed(
+                scanEpoch,
+                new CompanionPopulationEvidenceSet(List.of()),
+                loaded.mutationRevision(),
+                liveRevision
+        ));
+
+        Field journalField = OwnerPopulationRuntime.class.getDeclaredField(
+                "breedingReplayJournal");
+        journalField.setAccessible(true);
+        Object journal = journalField.get(runtime);
+        Method refresh = journal.getClass().getDeclaredMethod("refresh");
+        refresh.setAccessible(true);
+        refresh.invoke(journal);
     }
 
     private static Seed seed(int ownerExisting, int claimExisting) {

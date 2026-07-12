@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -13,6 +14,7 @@ import com.hypixel.hytale.server.core.universe.world.chunk.EntityChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.storage.IChunkLoader;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Bounded scan of detached saved-chunk holders through Hytale 0.5.6 {@link IChunkLoader}.
@@ -152,6 +155,8 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
         Set<UUID> requiredKnownNpcUuids = Set.copyOf(
                 Objects.requireNonNull(knownNpcUuids, "knownNpcUuids")
         );
+        SavedEntityComponentTypes entityTypes = requiredMode == Mode.WORLD_ENTITIES
+                ? savedEntityComponentTypes() : null;
         String worldName = requireText(requiredWorld.getName(), "worldName");
         ChunkStore chunkStore = Objects.requireNonNull(requiredWorld.getChunkStore(), "chunkStore");
         IChunkLoader loader = Objects.requireNonNull(chunkStore.getLoader(), "chunkLoader");
@@ -175,7 +180,8 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
                             coverageKey,
                             requiredOwnerType,
                             requiredItemContainers,
-                            requiredKnownNpcUuids
+                            requiredKnownNpcUuids,
+                            entityTypes
                     );
                 })
         );
@@ -198,51 +204,65 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             @Nonnull String coverageKey,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
             @Nonnull RecursiveItemContainerEvidenceScanner itemContainers,
-            @Nonnull Set<UUID> knownNpcUuids
+            @Nonnull Set<UUID> knownNpcUuids,
+            @Nullable SavedEntityComponentTypes entityTypes
     ) {
         return mode == Mode.WORLD_ENTITIES
-                ? scanEntities(holder, chunkX, chunkZ, worldName, coverageKey, ownerType, knownNpcUuids)
+                ? scanEntities(
+                        holder, chunkX, chunkZ, worldName, coverageKey,
+                        ownerType, knownNpcUuids,
+                        Objects.requireNonNull(entityTypes, "saved entity component types")
+                )
                 : scanBaseContainers(holder, chunkX, chunkZ, worldName, coverageKey, itemContainers);
     }
 
     @Nonnull
-    private static List<CompanionPopulationEvidence> scanEntities(
+    static List<CompanionPopulationEvidence> scanEntities(
             @Nonnull Holder<ChunkStore> holder,
             int chunkX,
             int chunkZ,
             @Nonnull String worldName,
             @Nonnull String coverageKey,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-            @Nonnull Set<UUID> knownNpcUuids
+            @Nonnull Set<UUID> knownNpcUuids,
+            @Nonnull SavedEntityComponentTypes types
     ) {
-        ComponentType<ChunkStore, EntityChunk> entityChunkType = EntityChunk.getComponentType();
-        ComponentType<EntityStore, UUIDComponent> uuidType = UUIDComponent.getComponentType();
-        ComponentType<EntityStore, DeathComponent> deathType = DeathComponent.getComponentType();
-        if (entityChunkType == null || uuidType == null || deathType == null) {
-            throw new IllegalStateException("Saved entity reconciliation component types are not registered.");
-        }
-        EntityChunk entityChunk = holder.getComponent(entityChunkType);
+        EntityChunk entityChunk = holder.getComponent(types.entityChunkType());
         if (entityChunk == null || entityChunk.getEntityHolders() == null) {
             return List.of();
         }
         List<CompanionPopulationEvidence> evidence = new ArrayList<>();
-        for (Holder<EntityStore> entity : entityChunk.getEntityHolders()) {
-            UUIDComponent identity = entity.getComponent(uuidType);
+        List<Holder<EntityStore>> entities = entityChunk.getEntityHolders();
+        for (int entityIndex = 0; entityIndex < entities.size(); entityIndex++) {
+            Holder<EntityStore> entity = entities.get(entityIndex);
+            UUIDComponent identity = entity.getComponent(types.uuidType());
+            UUID componentUuid = identity == null ? null : identity.getUuid();
             TameworkOwnerComponent owner = entity.getComponent(ownerType);
-            if (identity == null || identity.getUuid() == null) {
+            NPCEntity npc = entity.getComponent(types.npcType());
+            UUID legacyNpcUuid = npc == null ? null : npc.getUuid();
+            TameworkProjectionIdentityComponent marker = entity.getComponent(types.projectionType());
+            boolean deathObserved = entity.getComponent(types.deathType()) != null;
+            if (marker != null) {
+                evidence.add(projectionEvidence(
+                        marker, componentUuid, legacyNpcUuid, owner,
+                        worldName, coverageKey, chunkX, chunkZ, entityIndex,
+                        deathObserved
+                ));
+            }
+            if (componentUuid == null) {
                 if (owner == null) {
                     continue;
                 }
                 throw new IllegalStateException("Owned saved entity is missing UUIDComponent.");
             }
-            UUID npcUuid = identity.getUuid();
-            if (owner == null && !knownNpcUuids.contains(npcUuid)) {
+            if (owner == null && !knownNpcUuids.contains(componentUuid)) {
                 continue;
             }
-            CompanionPopulationEvidence.Kind kind = entityKind(entity.getComponent(deathType) != null);
+            CompanionPopulationEvidence.Kind kind = entityKind(deathObserved);
             evidence.add(new CompanionPopulationEvidence(
-                    "world/" + worldName + "/chunk-" + chunkX + "," + chunkZ + "/entity-" + npcUuid,
-                    npcUuid,
+                    "world/" + worldName + "/chunk-" + chunkX + "," + chunkZ
+                            + "/entity-" + componentUuid,
+                    componentUuid,
                     owner == null ? null : owner.getOwnerId(),
                     kind,
                     worldName,
@@ -253,6 +273,116 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             ));
         }
         return List.copyOf(evidence);
+    }
+
+    @Nonnull
+    static CompanionPopulationEvidence projectionEvidence(
+            @Nonnull TameworkProjectionIdentityComponent marker,
+            @Nullable UUID componentUuid,
+            @Nullable UUID legacyNpcUuid,
+            @Nullable TameworkOwnerComponent owner,
+            @Nonnull String worldName,
+            @Nonnull String coverageKey,
+            int chunkX,
+            int chunkZ,
+            int entityIndex
+    ) {
+        return projectionEvidence(
+                marker, componentUuid, legacyNpcUuid, owner,
+                worldName, coverageKey, chunkX, chunkZ, entityIndex, false
+        );
+    }
+
+    @Nonnull
+    static CompanionPopulationEvidence projectionEvidence(
+            @Nonnull TameworkProjectionIdentityComponent marker,
+            @Nullable UUID componentUuid,
+            @Nullable UUID legacyNpcUuid,
+            @Nullable TameworkOwnerComponent owner,
+            @Nonnull String worldName,
+            @Nonnull String coverageKey,
+            int chunkX,
+            int chunkZ,
+            int entityIndex,
+            boolean deathObserved
+    ) {
+        if (marker.getGeneration() < 1L) {
+            throw new IllegalStateException(
+                    "Saved projection marker generation must be positive."
+            );
+        }
+        String fingerprint = CompanionProjectionEvidence.fingerprint(
+                marker.getProfileId(), marker.getOperationId(), marker.getProjectionKind(),
+                marker.getSlotKey(), marker.getSourceNpcUuid(), marker.getGeneration()
+        );
+        String baseKey = "world/" + worldName + "/chunk-" + chunkX + "," + chunkZ
+                + "/projection-marker-" + entityIndex;
+        return new CompanionPopulationEvidence(
+                CompanionProjectionEvidence.appendToEvidenceKey(
+                        baseKey, fingerprint, componentUuid, legacyNpcUuid, deathObserved
+                ),
+                projectionEvidenceUuid(componentUuid, legacyNpcUuid, fingerprint),
+                owner == null ? null : owner.getOwnerId(),
+                true,
+                CompanionPopulationEvidence.Kind.PROJECTION_MARKER,
+                worldName,
+                worldName,
+                chunkX,
+                chunkZ,
+                coverageKey
+        );
+    }
+
+    @Nonnull
+    private static UUID projectionEvidenceUuid(
+            @Nullable UUID componentUuid,
+            @Nullable UUID legacyNpcUuid,
+            @Nonnull String fingerprint
+    ) {
+        if (componentUuid != null) {
+            return componentUuid;
+        }
+        if (legacyNpcUuid != null) {
+            return legacyNpcUuid;
+        }
+        return UUID.fromString(
+                fingerprint.substring(0, 8) + "-" + fingerprint.substring(8, 12)
+                        + "-" + fingerprint.substring(12, 16)
+                        + "-" + fingerprint.substring(16, 20)
+                        + "-" + fingerprint.substring(20, 32)
+        );
+    }
+
+    @Nonnull
+    private static SavedEntityComponentTypes savedEntityComponentTypes() {
+        ComponentType<ChunkStore, EntityChunk> entityChunkType = EntityChunk.getComponentType();
+        ComponentType<EntityStore, UUIDComponent> uuidType = UUIDComponent.getComponentType();
+        ComponentType<EntityStore, DeathComponent> deathType = DeathComponent.getComponentType();
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
+        requireAuthoritativeEntityTypes(
+                entityChunkType, uuidType, deathType, projectionType, npcType
+        );
+        return new SavedEntityComponentTypes(
+                entityChunkType, uuidType, deathType, projectionType, npcType
+        );
+    }
+
+    static void requireAuthoritativeEntityTypes(
+            @Nullable ComponentType<ChunkStore, EntityChunk> entityChunkType,
+            @Nullable ComponentType<EntityStore, UUIDComponent> uuidType,
+            @Nullable ComponentType<EntityStore, DeathComponent> deathType,
+            @Nullable ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType,
+            @Nullable ComponentType<EntityStore, NPCEntity> npcType
+    ) {
+        if (entityChunkType == null || uuidType == null || deathType == null
+                || projectionType == null || npcType == null) {
+            throw new IllegalStateException(
+                    "Saved entity reconciliation component, projection-marker, and NPC types"
+                            + " must all be registered."
+            );
+        }
     }
 
     @Nonnull
@@ -350,6 +480,15 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             String worldName,
             SavedChunkCatalog catalog,
             SavedChunkReader reader
+    ) {
+    }
+
+    record SavedEntityComponentTypes(
+            ComponentType<ChunkStore, EntityChunk> entityChunkType,
+            ComponentType<EntityStore, UUIDComponent> uuidType,
+            ComponentType<EntityStore, DeathComponent> deathType,
+            ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType,
+            ComponentType<EntityStore, NPCEntity> npcType
     ) {
     }
 }

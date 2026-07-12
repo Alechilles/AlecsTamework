@@ -304,6 +304,109 @@ class ManagedCoopPopulationAtomicityTest {
         }
     }
 
+    @Test
+    void releaseJournalFailureRollsBackPopulationResidentAndLifecycleTogether() throws Exception {
+        try (Harness harness = harness("release-rollback.sqlite")) {
+            UUID sourceUuid = UUID.randomUUID();
+            UUID targetUuid = UUID.randomUUID();
+            String profileId = UUID.randomUUID().toString();
+            CaptureRequest capture = capture(profileId, sourceUuid, 0, 0L, 100L);
+            prepareApplying(
+                    harness,
+                    "population-capture",
+                    baseline(profileId, sourceUuid, null, "ACTIVE", 0L),
+                    ManagedCoopPopulationMutationContext.captureExtensionJson(capture)
+            );
+            assertTrue(await(harness.population().commitAsync(
+                    new PopulationPersistenceTransition.Commit(
+                            "population-capture", profileId, 0L,
+                            ProfileOwnerMutation.unchanged(), sourceUuid,
+                            "default", "COOP", null, null, null, "coop_capture"
+                    ))).isSuccess());
+            MutationResult retire = await(harness.lifecycle().requestCaptureSourceRetirement(
+                    capture.operationId(), 1L, 110L
+            ));
+            assertTrue(retire.succeeded());
+            assertTrue(await(harness.lifecycle().completeCapture(
+                    capture.operationId(), retire.operation().generation(), 120L
+            )).succeeded());
+
+            ResidentRecord housed = harness.residents().loadById(capture.residentId());
+            String populationOperationId = "population-release-reservation";
+            ReleaseRequest release = new ReleaseRequest(
+                    "population-release-rollback", housed.residentId(), AUTHORITY, COOP_ID, 0,
+                    profileId, targetUuid, housed.snapshotHash(), housed.generation(), 200L
+            );
+            MutationResult prepared = await(harness.lifecycle().prepareRelease(release));
+            assertTrue(prepared.succeeded());
+            assertFalse(release.operationId().equals(populationOperationId));
+            MutationResult claimed = await(harness.lifecycle().claimReleaseSpawn(
+                    release.operationId(), prepared.operation().generation(), 210L
+            ));
+            assertEquals(OperationState.SPAWN_CLAIMED, claimed.operation().state());
+
+            CompanionPopulationStateRecord cooped = harness.population().loadAllStates().getFirst();
+            PopulationReleaseCommitRequest releaseCommit = new PopulationReleaseCommitRequest(
+                    release.operationId(), release.residentId(), release.authorityKey(),
+                    release.coopId(), release.residentSlot(), release.profileId(), targetUuid,
+                    targetUuid, release.snapshotHash(), release.expectedResidentGeneration(),
+                    claimed.operation().generation(), 220L
+            );
+            prepareApplying(
+                    harness,
+                    populationOperationId,
+                    cooped,
+                    ManagedCoopPopulationMutationContext.releaseExtensionJson(releaseCommit)
+            );
+            MutationResult unsafeRollback = await(
+                    harness.lifecycle().failReleaseBeforeProjection(
+                            release.operationId(), claimed.operation().generation(),
+                            "retry-validation-failed", 215L
+                    )
+            );
+            assertFalse(unsafeRollback.succeeded());
+            assertEquals("release_population_operation_may_be_in_flight",
+                    unsafeRollback.detail());
+            assertEquals(ResidentState.RELEASING,
+                    harness.residents().loadById(capture.residentId()).state());
+            assertEquals(OperationState.SPAWN_CLAIMED,
+                    harness.lifecycle().load(release.operationId()).state());
+            try (Connection connection = harness.connections().openConnection();
+                 Statement statement = connection.createStatement()) {
+                statement.execute("""
+                        CREATE TRIGGER reject_release_population_commit
+                        BEFORE UPDATE OF state ON companion_population_operations
+                        WHEN NEW.operation_id = '%s'
+                          AND NEW.state = 'COMMITTED'
+                        BEGIN
+                            SELECT RAISE(ABORT, 'simulated release journal failure');
+                        END
+                        """.formatted(populationOperationId));
+            }
+
+            PersistenceWriteQueue.WriteOutcome<PopulationPersistenceTransition.Result> outcome =
+                    harness.population().commitAsync(new PopulationPersistenceTransition.Commit(
+                            populationOperationId, profileId, cooped.revision(),
+                            ProfileOwnerMutation.unchanged(), targetUuid,
+                            "default", "ACTIVE", "default", 1, 2, "coop_release"
+                    )).completion().get(3, TimeUnit.SECONDS);
+
+            assertFalse(outcome.isCommitted());
+            CompanionPopulationStateRecord unchanged = harness.population().loadAllStates().getFirst();
+            assertEquals("COOP", unchanged.lifecycleState());
+            assertEquals(sourceUuid, unchanged.currentNpcUuid());
+            assertEquals(cooped.revision(), unchanged.revision());
+            ResidentRecord releasing = harness.residents().loadById(capture.residentId());
+            assertEquals(ResidentState.RELEASING, releasing.state());
+            assertNull(releasing.deployedNpcUuid());
+            OperationRecord lifecycle = harness.lifecycle().load(release.operationId());
+            assertEquals(OperationState.SPAWN_CLAIMED, lifecycle.state());
+            assertTrue(lifecycle.active());
+            assertEquals("APPLYING", populationOperationState(
+                    harness.connections(), populationOperationId));
+        }
+    }
+
     private Harness harness(String fileName) throws Exception {
         SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve(fileName));
         try (Connection connection = connections.openConnection()) {

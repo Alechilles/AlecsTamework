@@ -34,8 +34,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -46,12 +44,12 @@ final class BreedingOffspringProgressionService {
     private static final String TRAIT_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY = "TraitMutationChanceMultiplier";
     private static final String APPEARANCE_MUTATION_CHANCE_MULTIPLIER_EFFECT_KEY = "AppearanceMutationChanceMultiplier";
     private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
-    private static final long FAMILY_FLOCK_RETRY_INTERVAL_MS = 100L;
-    private static final int FAMILY_FLOCK_RETRY_MAX_ATTEMPTS = 12;
     private final BreedingFamilyFlockService familyFlockService;
+    private final BreedingFamilyFlockRetryService familyFlockRetryService;
 
     BreedingOffspringProgressionService() {
         this.familyFlockService = new BreedingFamilyFlockService();
+        this.familyFlockRetryService = new BreedingFamilyFlockRetryService(familyFlockService);
     }
 
     void applyOffspringState(Ref<EntityStore> childRef,
@@ -68,6 +66,7 @@ final class BreedingOffspringProgressionService {
                              @Nullable String selectedAdultRoleId,
                              @Nullable TwBreedingConfig.Gender selectedGender,
                              @Nullable TwBreedingConfig.RoleFamily lifecycleFamily,
+                             @Nonnull CompanionLifeStageService.LifecycleFamilyResolution lifecycleResolution,
                              Store<EntityStore> store) {
         if (childRef == null || !childRef.isValid() || store == null || childRoleId == null || childRoleId.isBlank()) {
             return;
@@ -106,50 +105,15 @@ final class BreedingOffspringProgressionService {
                 childRoleId,
                 breedingConfig,
                 selectedAdultRoleId,
-                lifecycleFamily
+                lifecycleFamily,
+                lifecycleResolution
         );
         CompanionGenderService.ensureGender(childRef, store, childRoleId, breedingConfig, selectedGender);
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
         boolean familyAssigned = familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
         if (!familyAssigned) {
-            scheduleFamilyFlockRetry(childRef, parentARef, parentBRef, store, FAMILY_FLOCK_RETRY_MAX_ATTEMPTS);
-        }
-    }
-
-    private void scheduleFamilyFlockRetry(@Nullable Ref<EntityStore> childRef,
-                                          @Nullable Ref<EntityStore> parentARef,
-                                          @Nullable Ref<EntityStore> parentBRef,
-                                          @Nullable Store<EntityStore> store,
-                                          int attemptsRemaining) {
-        if (childRef == null || !childRef.isValid() || store == null || attemptsRemaining <= 0) {
-            return;
-        }
-        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
-        if (world == null) {
-            return;
-        }
-        CompletableFuture.runAsync(
-                () -> world.execute(() -> onFamilyFlockRetry(childRef, parentARef, parentBRef, world, attemptsRemaining)),
-                CompletableFuture.delayedExecutor(FAMILY_FLOCK_RETRY_INTERVAL_MS, TimeUnit.MILLISECONDS)
-        );
-    }
-
-    private void onFamilyFlockRetry(@Nullable Ref<EntityStore> childRef,
-                                    @Nullable Ref<EntityStore> parentARef,
-                                    @Nullable Ref<EntityStore> parentBRef,
-                                    @Nullable World world,
-                                    int attemptsRemaining) {
-        if (world == null || childRef == null || !childRef.isValid() || attemptsRemaining <= 0) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
-        if (store == null) {
-            return;
-        }
-        boolean assigned = familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
-        if (!assigned) {
-            scheduleFamilyFlockRetry(childRef, parentARef, parentBRef, store, attemptsRemaining - 1);
+            familyFlockRetryService.schedule(childRef, parentARef, parentBRef, store);
         }
     }
 

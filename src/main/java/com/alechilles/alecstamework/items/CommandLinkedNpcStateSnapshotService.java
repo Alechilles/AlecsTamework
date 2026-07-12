@@ -84,9 +84,11 @@ public final class CommandLinkedNpcStateSnapshotService {
         UUID componentUuid = resolveComponentUuid(reference, store);
         UUID legacyNpcUuid = npc != null ? npc.getUuid() : null;
         LoadedNpcIdentityIndex.Location location = LoadedNpcLocationResolver.resolve(store);
-        loadedNpcIdentityIndex.recordRemoved(componentUuid, location);
-        if (legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)) {
-            loadedNpcIdentityIndex.recordRemoved(legacyNpcUuid, location);
+        LoadedNpcIdentityIndex.LoadedNpcObservation observation = observation(
+                reference, store, componentUuid, legacyNpcUuid, location
+        );
+        if (observation != null) {
+            loadedNpcIdentityIndex.recordRemoved(observation);
         }
         UUID indexedUuid = componentUuid != null ? componentUuid : legacyNpcUuid;
         UUID npcUuid = npc != null && npc.getUuid() != null ? npc.getUuid() : indexedUuid;
@@ -115,10 +117,53 @@ public final class CommandLinkedNpcStateSnapshotService {
         UUID componentUuid = resolveComponentUuid(reference, store);
         UUID legacyNpcUuid = npc.getUuid();
         LoadedNpcIdentityIndex.Location location = LoadedNpcLocationResolver.resolve(store);
-        loadedNpcIdentityIndex.recordAdded(componentUuid, location);
-        if (legacyNpcUuid != null && !legacyNpcUuid.equals(componentUuid)) {
-            loadedNpcIdentityIndex.recordAdded(legacyNpcUuid, location);
+        LoadedNpcIdentityIndex.LoadedNpcObservation observation = observation(
+                reference, store, componentUuid, legacyNpcUuid, location
+        );
+        if (observation != null) {
+            loadedNpcIdentityIndex.recordAdded(observation);
         }
+    }
+
+    @Nullable
+    private LoadedNpcIdentityIndex.LoadedNpcObservation observation(
+            @Nonnull Ref<EntityStore> reference,
+            @Nonnull Store<EntityStore> store,
+            @Nullable UUID componentUuid,
+            @Nullable UUID legacyNpcUuid,
+            @Nonnull LoadedNpcIdentityIndex.Location location) {
+        if (componentUuid == null && legacyNpcUuid == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        TameworkProjectionIdentityComponent marker = markerType != null
+                ? store.getComponent(reference, markerType) : null;
+        return new LoadedNpcIdentityIndex.LoadedNpcObservation(
+                componentUuid,
+                legacyNpcUuid,
+                location,
+                projectionKey(marker)
+        );
+    }
+
+    @Nullable
+    static LoadedNpcIdentityIndex.ProjectionKey projectionKey(
+            @Nullable TameworkProjectionIdentityComponent marker) {
+        if (marker == null || marker.getProfileId() == null || marker.getProfileId().isBlank()
+                || marker.getOperationId() == null || marker.getOperationId().isBlank()
+                || marker.getProjectionKind() == null || marker.getProjectionKind().isBlank()
+                || marker.getGeneration() < 0L) {
+            return null;
+        }
+        return new LoadedNpcIdentityIndex.ProjectionKey(
+                marker.getProfileId(),
+                marker.getOperationId(),
+                marker.getProjectionKind(),
+                marker.getSlotKey(),
+                marker.getSourceNpcUuid(),
+                marker.getGeneration()
+        );
     }
 
     @Nullable
@@ -205,7 +250,8 @@ public final class CommandLinkedNpcStateSnapshotService {
         return TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(kind);
+                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(kind)
+                || TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD.equals(kind);
     }
 
     private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {

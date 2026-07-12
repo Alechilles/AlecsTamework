@@ -18,68 +18,60 @@ class CoopPreparedReleaseSpawnArchitectureTest {
 
     @Test
     void managedCoopSystemCannotSpawnAReplacementBeforePopulationAdmission() throws IOException {
-        String managed = read("CommandCoopManagedWildCaptureSystem.java");
-        String prepared = read("CoopPreparedReleaseSpawnService.java");
+        String gateway = read("HytaleManagedCoopReleaseProjectionGateway.java");
+        String adapter = read("ManagedCoopReleaseRuntimeAdapter.java");
+        String spawner = read("ManagedCoopReleaseProjectionSpawner.java");
+        String population = read("ManagedCoopReleasePopulationCoordinator.java");
 
         assertFalse(
-                managed.contains("npcPlugin.spawnEntity("),
-                "Managed coop orchestration must delegate replacement spawning to the prepared service."
+                gateway.contains("npcPlugin.spawnEntity("),
+                "Managed coop orchestration must delegate live creation to the release spawner."
         );
-        int prepare = prepared.indexOf("admissionService.prepareAsync(");
-        int durableLedger = prepared.indexOf("CoopPopulationLedgerMutationJson.release(");
-        int claim = prepared.indexOf("admissionService.claimForSpawn(prepared)");
-        int spawn = prepared.indexOf("SpawnAttempt attempt = spawn(");
-        int preview = prepared.indexOf("preview = previewRelease(");
-        int snapshot = prepared.indexOf("applySnapshot(spawned.first(), store, preview)");
-        int commit = prepared.indexOf("admissionService.commitAsync(prepared)");
-        int ledgerFinalize = prepared.indexOf("coopService.resolveReleaseInPopulationCommit(");
-        assertTrue(prepare >= 0 && prepare < claim);
-        assertTrue(prepare < durableLedger && durableLedger < claim,
-                "The exact coop-slot transition must be embedded in the durable admission journal.");
-        assertTrue(claim < spawn, "No denied/recheck-failed release may create a live NPC.");
-        assertTrue(prepared.contains("npcPlugin.spawnEntity("),
-                "The delegated spawn helper must remain the only live-NPC creation point.");
-        assertTrue(spawn < preview && preview < snapshot && snapshot < commit,
-                "The source is previewed and restored before durable finalization begins.");
-        assertFalse(
-                prepared.substring(0, commit).contains("coopService.resolveRelease("),
-                "The in-memory coop slot must not be cleared before the atomic SQLite commit."
-        );
-        assertTrue(commit < ledgerFinalize,
-                "The in-memory ledger follows the durable population/ledger transaction.");
+        int prepare = gateway.indexOf("populations.prepareAsync(");
+        int dispatch = gateway.indexOf("dispatchPrepared(", prepare);
+        int claim = adapter.indexOf("populations.claimForSpawn(prepared, claim)");
+        int coordinate = adapter.indexOf("orchestrator.coordinate(", claim);
+        int spawn = adapter.indexOf("() -> spawnWithPopulation(", coordinate);
+        int commit = adapter.indexOf("populations.commitAsync(prepared", spawn);
+        assertTrue(prepare >= 0 && dispatch > prepare,
+                "Population preparation must complete before world-thread projection dispatch.");
+        assertTrue(claim < coordinate && coordinate < spawn,
+                "No denied/recheck-failed release may create a live NPC.");
+        assertTrue(spawn < commit,
+                "The exact materialized identity must be supplied to the atomic finalizer.");
+        assertTrue(spawner.contains("plugin.spawnEntity("),
+                "The dedicated managed-release spawner remains the only live creation point.");
+        assertTrue(adapter.contains("populationProjectionSpawner.spawn("));
+        assertTrue(population.contains("backend.commit(prepared.backendHandle)"));
+        assertFalse(adapter.contains("resolveReleaseInPopulationCommit("));
     }
 
     /** Regression: an exception after Store.addEntity cannot safely cancel the coop admission. */
     @Test
     void ambiguousSpawnOutcomeIsProbedAndQuarantinedWithoutCancellation() throws IOException {
-        String prepared = read("CoopPreparedReleaseSpawnService.java");
+        String adapter = read("ManagedCoopReleaseRuntimeAdapter.java");
+        int method = adapter.indexOf("private SpawnAttempt spawnWithPopulation(");
+        int next = adapter.indexOf("private VerifiedSnapshot verifySnapshot(", method);
+        String spawn = adapter.substring(method, next);
 
-        assertTrue(prepared.contains("PlannedCompanionSpawnProbe.probe("));
-        assertTrue(prepared.contains("if (attempt.outcomeAmbiguous())"));
-        assertTrue(prepared.contains("coop_release_spawn_outcome_ambiguous"));
-        int mismatch = prepared.indexOf("coop_release_spawn_identity_mismatch");
-        int commit = prepared.indexOf("admissionService.commitAsync(prepared)");
-        assertTrue(mismatch >= 0 && mismatch < commit);
-        assertFalse(
-                prepared.substring(mismatch, commit).contains(
-                        "cancelQuietly(admissionService, prepared"
-                ),
-                "Once a resident may be live, its APPLYING journal must remain recoverable."
-        );
+        assertTrue(spawn.contains("liveIdentityGuard.inspect("));
+        assertTrue(spawn.contains("populations.markReadinessDegraded("));
+        assertTrue(spawn.contains("SpawnAttempt.ambiguous("));
+        assertTrue(spawn.contains("managed_coop_release_post_spawn_identity_ambiguous"));
+        assertFalse(spawn.contains("populations.cancelAsync("),
+                "A possibly materialized projection must keep its APPLYING recovery evidence.");
     }
 
-    /** Regression: restoring a coop slot on compensation must remove its physical duplicate. */
+    /** Regression: definite rollback cannot delete an uncertain live projection. */
     @Test
-    void loadedResidentCompensationDespawnsTheMaterializedEntity() throws IOException {
-        String sync = read("CommandCoopResidentSyncSystem.java");
-        int compensated = sync.indexOf("public void onCompensated(@Nonnull String reason)");
-        int despawn = sync.indexOf(
-                "despawnReleasedResident(store, currentUuid, npc)", compensated
-        );
+    void preProjectionRollbackIsExactAndNeverDespawnsAnUncertainEntity() throws IOException {
+        String rollback = read("ManagedCoopReleaseLifecycleRollbackService.java");
+        String spawner = read("ManagedCoopReleaseProjectionSpawner.java");
 
-        assertTrue(compensated >= 0 && despawn > compensated);
-        assertTrue(sync.contains("World world = originalStore.getExternalData()"));
-        assertTrue(sync.contains("world.getEntityRef(currentUuid)"));
+        assertTrue(rollback.contains("failBeforeProjection("));
+        assertTrue(rollback.contains("operationId, operationGeneration"));
+        assertFalse(rollback.contains("setToDespawn("));
+        assertTrue(spawner.contains("never despawns an uncertain"));
     }
 
     private static String read(String fileName) throws IOException {

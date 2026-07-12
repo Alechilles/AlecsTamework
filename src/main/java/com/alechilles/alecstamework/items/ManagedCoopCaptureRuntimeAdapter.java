@@ -7,19 +7,22 @@ import com.alechilles.alecstamework.items.ManagedCoopCaptureCoordinator.OutcomeS
 import com.alechilles.alecstamework.items.ManagedCoopOccupancyService.CapturePlacement;
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService;
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationReason;
-import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus;
-import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.SnapshotHandoff;
+import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationResult;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.ownership.CoopPopulationCaptureAdmissionService.SourceKind;
+import com.alechilles.alecstamework.ownership.OwnerPopulationTransitionRequest;
+import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -104,6 +107,7 @@ public final class ManagedCoopCaptureRuntimeAdapter {
         Objects.requireNonNull(sourceRef, "sourceRef");
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(candidate, "candidate");
+        boolean cancellationStarted = false;
         try {
             store.assertThread();
             if (!sourceRef.isValid()) {
@@ -117,33 +121,139 @@ public final class ManagedCoopCaptureRuntimeAdapter {
             if (!placement.permitted()) {
                 return failed(placement.detail());
             }
-            SnapshotHandoff<CoopResidentStateSnapshot> handoff =
-                    breedingCancellation.cancelThenCaptureSnapshot(
+            CompletableFuture<CancellationResult> cancellation =
+                    breedingCancellation.cancelForCapturedParentDurably(
                             store,
                             candidate.sourceNpcUuid(),
                             candidate.stableProfileId(),
-                            CancellationReason.COOP_CAPTURE,
-                            () -> snapshots.captureSnapshotForManagedCoopPersistence(
-                                    sourceRef,
-                                    store,
-                                    candidate.sourceNpcUuid(),
-                                    context.coopId(),
-                                    placement.residentSlot(),
-                                    candidate.roleId()
-                            )
+                            CancellationReason.COOP_CAPTURE
                     );
-            if (handoff.cancellation().status() == CancellationStatus.SCOPE_CLOSED
-                    || handoff.cancellation().status() == CancellationStatus.REJECTED) {
-                return failed("breeding_capture_cancellation_rejected");
+            cancellationStarted = true;
+            CancellationResult current = cancellation.getNow(null);
+            if (current != null) {
+                CompletableFuture<CaptureOutcome> outcome = current.safeToCapture()
+                        ? continueCapture(store, context, candidate)
+                        : failed("breeding_capture_cancellation_rejected");
+                return withCaptureFence(store, candidate, outcome);
             }
-            CaptureAttempt attempt = buildAttempt(context, placement, candidate, handoff.snapshot());
-            CompletableFuture<CaptureOutcome> completion = captureGateway.coordinate(attempt);
-            return completion != null
-                    ? completion
-                    : failed("managed_coop_capture_completion_missing");
+            World world = store.getExternalData() == null
+                    ? null : store.getExternalData().getWorld();
+            if (world == null) {
+                return withCaptureFence(
+                        store,
+                        candidate,
+                        failed("managed_coop_capture_world_unavailable")
+                );
+            }
+            return withCaptureFence(
+                    store,
+                    candidate,
+                    awaitDurableCancellation(
+                            world, store, context, candidate, cancellation
+                    )
+            );
         } catch (RuntimeException exception) {
+            if (cancellationStarted) {
+                breedingCancellation.releaseCaptureFence(
+                        store,
+                        candidate.sourceNpcUuid(),
+                        candidate.stableProfileId(),
+                        false
+                );
+            }
             return failed(failureDetail("managed_coop_capture_runtime", exception));
         }
+    }
+
+    private CompletableFuture<CaptureOutcome> withCaptureFence(
+            Object storeScope,
+            Candidate candidate,
+            CompletableFuture<CaptureOutcome> completion) {
+        CompletableFuture<CaptureOutcome> fenced = new CompletableFuture<>();
+        completion.whenComplete((outcome, failure) -> {
+            breedingCancellation.releaseCaptureFence(
+                    storeScope,
+                    candidate.sourceNpcUuid(),
+                    candidate.stableProfileId(),
+                    failure == null && outcome != null && outcome.isRetirementReady()
+            );
+            if (failure != null || outcome == null) {
+                fenced.complete(failedOutcome("managed_coop_capture_completion_failed"));
+            } else {
+                fenced.complete(outcome);
+            }
+        });
+        return fenced;
+    }
+
+    private CompletableFuture<CaptureOutcome> awaitDurableCancellation(
+            World world,
+            Store<EntityStore> store,
+            ManagedCoopContext context,
+            Candidate candidate,
+            CompletableFuture<CancellationResult> cancellation) {
+        CompletableFuture<CaptureOutcome> result = new CompletableFuture<>();
+        cancellation.thenApply(value -> value).completeOnTimeout(
+                null,
+                OwnerPopulationTransitionRequest.DEFAULT_LEASE_DURATION.toNanos(),
+                TimeUnit.NANOSECONDS
+        ).whenComplete((terminal, failure) -> {
+            if (failure != null || terminal == null || !terminal.safeToCapture()) {
+                result.complete(failedOutcome("breeding_capture_cancellation_not_durable"));
+                return;
+            }
+            LeaseBoundWorldDispatcher.execute(
+                    world,
+                    () -> forward(continueCapture(store, context, candidate), result),
+                    () -> result.complete(failedOutcome(
+                            "managed_coop_capture_world_dispatch_rejected"))
+            );
+        });
+        return result;
+    }
+
+    private CompletableFuture<CaptureOutcome> continueCapture(
+            Store<EntityStore> store,
+            ManagedCoopContext context,
+            Candidate candidate) {
+        store.assertThread();
+        World world = store.getExternalData() == null
+                ? null : store.getExternalData().getWorld();
+        Ref<EntityStore> currentRef = world == null
+                ? null : world.getEntityRef(candidate.sourceNpcUuid());
+        if (currentRef == null || !currentRef.isValid()) {
+            return failed("capture_source_reference_invalid_after_cancellation");
+        }
+        CapturePlacement placement = occupancy.resolveCapturePlacement(
+                context, candidate.sourceNpcUuid(), candidate.stableProfileId()
+        );
+        if (!placement.permitted()) {
+            return failed(placement.detail());
+        }
+        CoopResidentStateSnapshot snapshot = snapshots.captureSnapshotForManagedCoopPersistence(
+                currentRef,
+                store,
+                candidate.sourceNpcUuid(),
+                context.coopId(),
+                placement.residentSlot(),
+                candidate.roleId()
+        );
+        CaptureAttempt attempt = buildAttempt(context, placement, candidate, snapshot);
+        CompletableFuture<CaptureOutcome> completion = captureGateway.coordinate(attempt);
+        return completion != null
+                ? completion
+                : failed("managed_coop_capture_completion_missing");
+    }
+
+    private void forward(CompletableFuture<CaptureOutcome> source,
+                         CompletableFuture<CaptureOutcome> target) {
+        source.whenComplete((outcome, failure) -> {
+            if (failure != null || outcome == null) {
+                target.complete(failedOutcome("managed_coop_capture_completion_failed"));
+            } else {
+                target.complete(outcome);
+            }
+        });
     }
 
     @Nonnull
@@ -199,8 +309,13 @@ public final class ManagedCoopCaptureRuntimeAdapter {
 
     @Nonnull
     private CompletableFuture<CaptureOutcome> failed(String detail) {
-        return CompletableFuture.completedFuture(
-                new CaptureOutcome(OutcomeStatus.FAILED, null, requireText(detail, "detail")));
+        return CompletableFuture.completedFuture(failedOutcome(detail));
+    }
+
+    private CaptureOutcome failedOutcome(String detail) {
+        return new CaptureOutcome(
+                OutcomeStatus.FAILED, null, requireText(detail, "detail")
+        );
     }
 
     @Nonnull

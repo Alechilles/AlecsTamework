@@ -246,6 +246,41 @@ class OwnerPopulationIndexTest {
     }
 
     @Test
+    void profileStateSnapshotKeepsLifecycleTransitionAndReloadFencesTogether() {
+        OwnerPopulationEntry active = entry("guarded-parent", null, "alpha", 3L);
+        OwnerPopulationIndex index = indexWith(
+                List.of(active), OwnerPopulationReadiness.READY
+        );
+
+        OwnerPopulationProfileStateSnapshot initial =
+                index.profileStateSnapshot(active.profileId());
+        assertEquals(OwnerPopulationReadiness.READY, initial.readiness());
+        assertEquals(active, initial.entry().orElseThrow());
+        assertFalse(initial.transitionPending());
+        assertFalse(initial.canonicalReloadInProgress());
+
+        OwnerPopulationDecision capture = index.reserve(change(
+                active, null, "alpha", CompanionLifecycleState.CAPTURED,
+                OwnerPopulationOperation.LIFECYCLE_CHANGE,
+                OwnerPopulationLimitScope.GLOBAL, 0, false
+        ));
+        assertTrue(capture.allowed());
+        OwnerPopulationProfileStateSnapshot pending =
+                index.profileStateSnapshot(active.profileId());
+        assertTrue(pending.transitionPending());
+        assertEquals(CompanionLifecycleState.ACTIVE,
+                pending.entry().orElseThrow().lifecycleState());
+
+        assertTrue(index.cancel(capture.reservation()));
+        assertTrue(index.tryBeginCanonicalReload());
+        OwnerPopulationProfileStateSnapshot reloading =
+                index.profileStateSnapshot(active.profileId());
+        assertTrue(reloading.canonicalReloadInProgress());
+        assertFalse(reloading.transitionPending());
+        index.finishCanonicalReload();
+    }
+
+    @Test
     void explicitForceCanCommitOverCapButCannotBypassRevisionCheck() {
         OwnerPopulationEntry existing = entry("existing", OWNER_A, "alpha", 3L);
         OwnerPopulationIndex index = indexWith(List.of(existing), OwnerPopulationReadiness.DEGRADED);

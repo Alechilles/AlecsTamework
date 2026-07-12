@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.ownership.reconciliation;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
+import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
+import com.alechilles.alecstamework.items.LoadedNpcIdentitySnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
@@ -22,6 +24,8 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
     private static final long SHUTDOWN_FLUSH_TIMEOUT_SECONDS = 2L;
 
     private final CustomContainerReconciliationRegistry customContainers;
+    private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
+    private final CompanionLiveEvidenceRevision liveEvidenceRevision;
     private final CoalescedCompanionPopulationWriter writer;
     private final CompanionPopulationRuntimeReconciler runtimeReconciler;
     private final CompanionPopulationStartupReconciler startupReconciler;
@@ -39,6 +43,12 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
         Objects.requireNonNull(identityResolver, "identityResolver");
         Objects.requireNonNull(claimIndex, "claimIndex");
         this.customContainers = new CustomContainerReconciliationRegistry();
+        this.loadedNpcIdentityIndex = new LoadedNpcIdentityIndex();
+        persistence.getCompanionPersistedProjectionEvidenceRegistry()
+                .bindLoadedIdentityIndex(loadedNpcIdentityIndex);
+        this.liveEvidenceRevision = new CompanionLiveEvidenceRevision();
+        persistence.getCompanionPersistedProjectionEvidenceRegistry()
+                .bindLiveEvidenceRevision(liveEvidenceRevision);
         this.writer = new CoalescedCompanionPopulationWriter(
                 persistence.getCompanionPopulationObservationRepository(),
                 (observation, result) -> { }
@@ -48,7 +58,8 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
                 claimIndex,
                 identityResolver,
                 writer,
-                persistence.getHealthService()
+                persistence.getHealthService(),
+                liveEvidenceRevision
         );
         writer.setListener(runtimeReconciler);
         this.startupReconciler = new CompanionPopulationStartupReconciler(
@@ -57,7 +68,9 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
                 writer,
                 runtimeReconciler,
                 ownerIndex,
-                claimIndex
+                claimIndex,
+                loadedNpcIdentityIndex,
+                liveEvidenceRevision
         );
         if (persistence.getHealthService().isHealthy()) {
             ownerIndex.setReadiness(OwnerPopulationReadiness.RECONCILING);
@@ -75,13 +88,28 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
         return customContainers;
     }
 
+    /** Shared all-world loaded identity authority used by runtime probes and startup recovery. */
+    @Nonnull
+    public LoadedNpcIdentityIndex loadedNpcIdentityIndex() {
+        return loadedNpcIdentityIndex;
+    }
+
+    /** Shared live inventory/NPC mutation fence used by startup scan validation. */
+    @Nonnull
+    public CompanionLiveEvidenceRevision liveEvidenceRevision() {
+        return liveEvidenceRevision;
+    }
+
     @Nonnull
     public CompletableFuture<CompanionPopulationReconciliationProgress> start(
             @Nonnull Universe universe,
             @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
-            @Nonnull ItemFeatureRegistry itemFeatures
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CompletableFuture<LoadedNpcIdentitySnapshot> loadedIdentitiesReady
     ) {
-        return startupReconciler.start(universe, ownerType, itemFeatures, customContainers);
+        return startupReconciler.start(
+                universe, ownerType, itemFeatures, customContainers, loadedIdentitiesReady
+        );
     }
 
     @Nonnull

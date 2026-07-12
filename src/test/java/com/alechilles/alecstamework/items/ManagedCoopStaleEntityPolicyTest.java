@@ -332,6 +332,18 @@ class ManagedCoopStaleEntityPolicyTest {
         assertDecision(orphanFixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(uuid(88L), releaseMarker(RELEASE_ID))
         ), DEFER, ORPHAN_MANAGED_MARKER);
+        ManagedCoopStaleEntityPolicy.MarkerEvidence breedingChild =
+                new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                        "profile-child",
+                        "breeding:11fd5d1a-c328-4dad-8c91-b6a8ca652c97",
+                        TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD,
+                        "child-0000",
+                        uuid(88L),
+                        1L
+                );
+        assertDecision(orphanFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(uuid(88L), breedingChild)
+        ), IGNORE, UNRELATED_NPC);
     }
 
     @Test

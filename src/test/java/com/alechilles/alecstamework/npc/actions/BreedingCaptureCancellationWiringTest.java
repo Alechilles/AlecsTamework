@@ -7,20 +7,27 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Static guards for the synchronous, fingerprint-safe coop-capture cancellation seam. */
+/** Static guards for the world-thread snapshot and asynchronous durability seam. */
 class BreedingCaptureCancellationWiringTest {
     @Test
     void publicHandoffIsWorldThreadBoundAndCarriesNoLiveStateOffThread() throws Exception {
         String service = source("BreedingCaptureCancellationService.java");
+        String handoff = source("BreedingCaptureSnapshotFenceHandoff.java");
+        String combined = service + handoff;
 
         assertTrue(service.contains("store.assertThread()"));
         assertTrue(service.contains("cancelThenCaptureSnapshot"));
-        assertTrue(service.contains("snapshotCapture.capture()"));
-        assertFalse(service.contains("CompletableFuture"));
-        assertFalse(service.contains("Executor"));
-        assertFalse(service.contains("PlayerRef"));
-        assertFalse(service.contains("Universe"));
-        assertFalse(service.contains("sqlite"));
+        assertTrue(service.contains("cancelForCapturedParentDurably"));
+        assertTrue(service.contains("cancellationAttempts.findAll("));
+        assertTrue(service.contains("BreedingCaptureSnapshotFenceHandoff.capture("));
+        assertTrue(handoff.contains("snapshotCapture.capture()"));
+        assertTrue(handoff.contains("failedCaptureRelease.run()"));
+        assertTrue(service.contains("releaseCaptureFenceInScope("));
+        assertFalse(combined.contains("Executor"));
+        assertFalse(combined.contains("supplyAsync"));
+        assertFalse(combined.contains("PlayerRef"));
+        assertFalse(combined.contains("Universe"));
+        assertFalse(combined.contains("sqlite"));
     }
 
     @Test

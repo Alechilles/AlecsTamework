@@ -25,15 +25,19 @@ final class BreedingPopulationAdmissionUnitFactory {
             @Nonnull BreedingPopulationAdmissionRequest request,
             int boundedCount,
             @Nonnull ClaimChunkCoordinate destination,
-            @Nonnull CompanionAdmissionPolicyResolver.Policy policy
+            @Nonnull CompanionAdmissionPolicyResolver.Policy policy,
+            @Nonnull BreedingPopulationRetryBaselineResolver retryBaselineResolver,
+            boolean replaying
     ) {
         List<CompanionPopulationAdmissionUnit> units = new ArrayList<>(boundedCount);
         List<PreparedBreedingPopulationBatch.ReservedChild> children = new ArrayList<>(boundedCount);
         for (int index = 0; index < boundedCount; index++) {
             BreedingPopulationAdmissionRequest.PlannedChild child = request.plannedChildren().get(index);
             PreparedBreedingPopulationBatch.ReservedChild reservedChild = reservedChild(request, child);
+            BreedingPopulationRetryBaselineResolver.Baseline retryBaseline =
+                    retryBaselineResolver.resolve(reservedChild, destination, replaying);
             children.add(reservedChild);
-            units.add(unit(request, reservedChild, destination, policy));
+            units.add(unit(request, reservedChild, destination, policy, retryBaseline));
         }
         return new PreparedUnits(List.copyOf(units), List.copyOf(children));
     }
@@ -63,13 +67,17 @@ final class BreedingPopulationAdmissionUnitFactory {
             @Nonnull BreedingPopulationAdmissionRequest request,
             @Nonnull PreparedBreedingPopulationBatch.ReservedChild child,
             @Nonnull ClaimChunkCoordinate destination,
-            @Nonnull CompanionAdmissionPolicyResolver.Policy policy
+            @Nonnull CompanionAdmissionPolicyResolver.Policy policy,
+            @Nonnull BreedingPopulationRetryBaselineResolver.Baseline retryBaseline
     ) {
+        OwnerPopulationEntry owner = retryBaseline.owner();
+        ClaimOccupancyEntry claim = retryBaseline.claim();
         OwnerPopulationTransitionRequest transition = new OwnerPopulationTransitionRequest(
                 child.profileId(),
-                OwnerPopulationTransitionRequest.NEW_PROFILE_REVISION,
-                null,
-                null,
+                owner == null
+                        ? OwnerPopulationTransitionRequest.NEW_PROFILE_REVISION : owner.revision(),
+                owner == null ? null : owner.ownerId(),
+                owner == null ? null : owner.ownershipWorldName(),
                 child.ownerId(),
                 request.worldName(),
                 CompanionLifecycleState.ACTIVE,
@@ -80,26 +88,26 @@ final class BreedingPopulationAdmissionUnitFactory {
         );
         OwnerPopulationAdmissionPlan ownerPlan = new OwnerPopulationAdmissionPlan(
                 transition,
-                baseline(request, child, destination),
+                baseline(request, child, destination, owner, claim),
                 child.plannedNpcUuid(),
                 request.worldName(),
                 destination.chunkX(),
                 destination.chunkZ(),
-                "breeding",
-                ownerJson(null),
+                retryBaseline.reusable() ? "breeding_retry" : "breeding",
+                ownerJson(owner == null ? null : owner.ownerId()),
                 ownerJson(child.ownerId()),
                 targetJson(request, child, destination),
                 policy.settingsRevision(),
                 policy.claimContext().providerGeneration()
         );
         ClaimOccupancyTransition claimTransition = new ClaimOccupancyTransition(
-                null,
+                claim,
                 new ClaimOccupancyEntry(
                         child.profileId(),
                         child.ownerId(),
                         CompanionLifecycleState.ACTIVE,
                         destination,
-                        1L
+                        claim == null ? 1L : increment(claim.revision())
                 )
         );
         ClaimAdmissionRequest claimRequest = new ClaimAdmissionRequest(
@@ -120,24 +128,35 @@ final class BreedingPopulationAdmissionUnitFactory {
     private static CompanionPopulationStateRecord baseline(
             @Nonnull BreedingPopulationAdmissionRequest request,
             @Nonnull PreparedBreedingPopulationBatch.ReservedChild child,
-            @Nonnull ClaimChunkCoordinate destination
+            @Nonnull ClaimChunkCoordinate destination,
+            OwnerPopulationEntry owner,
+            ClaimOccupancyEntry claim
     ) {
         long now = System.currentTimeMillis();
+        ClaimChunkCoordinate physical = claim == null ? destination : claim.physicalChunk();
         return new CompanionPopulationStateRecord(
                 child.profileId(),
                 child.plannedNpcUuid(),
-                null,
-                request.worldName(),
-                request.worldName(),
-                CompanionLifecycleState.ACTIVE.name(),
-                request.worldName(),
-                destination.chunkX(),
-                destination.chunkZ(),
-                0L,
-                "breeding_prepared",
+                owner == null ? null : owner.ownerId(),
+                physical.worldName(),
+                owner == null ? request.worldName() : owner.ownershipWorldName(),
+                owner == null
+                        ? CompanionLifecycleState.ACTIVE.name() : owner.lifecycleState().name(),
+                physical.worldName(),
+                physical.chunkX(),
+                physical.chunkZ(),
+                owner == null ? 0L : owner.revision(),
+                owner == null ? "breeding_prepared" : "breeding_retry",
                 now,
                 now
         );
+    }
+
+    private static long increment(long revision) {
+        if (revision == Long.MAX_VALUE) {
+            throw new IllegalStateException("Companion population revision exhausted.");
+        }
+        return revision + 1L;
     }
 
     @Nonnull

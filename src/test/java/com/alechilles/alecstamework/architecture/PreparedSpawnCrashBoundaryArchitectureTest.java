@@ -44,7 +44,7 @@ class PreparedSpawnCrashBoundaryArchitectureTest {
         );
         String spawner = read(ITEMS, "SpawnerPreparedSpawnService.java");
         String death = read(ITEMS, "CommandRespawnService.java");
-        String lost = read(ITEMS, "CommandLostFallbackSpawnService.java");
+        String lost = read(ITEMS, "CommandRespawnService.java");
         String context = read(OWNERSHIP, "CompanionSpawnSourceFinalizationContext.java");
 
         assertTrue(repository.contains("journalStore.markApplied(connection, request.operationId())"));
@@ -59,14 +59,20 @@ class PreparedSpawnCrashBoundaryArchitectureTest {
     }
 
     @Test
-    void coopCompletionDoesNotCaptureSpawnPairAcrossCommit() throws Exception {
-        String coop = read(ITEMS, "CoopPreparedReleaseSpawnService.java");
-        int finish = coop.indexOf("completion.finish(");
-        int callback = coop.indexOf("ignored -> finishDurableRelease(", finish);
-        int resolver = coop.indexOf("PlannedCompanionSpawnProbe.probe(", callback);
+    void coopCompletionCarriesOnlyExactIdentityAcrossCommit() throws Exception {
+        String gateway = read(ITEMS, "HytaleManagedCoopReleaseProjectionGateway.java");
+        String adapter = read(ITEMS, "ManagedCoopReleaseRuntimeAdapter.java");
+        int prepare = gateway.indexOf("populations.prepareAsync(");
+        int dispatch = gateway.indexOf("dispatchPrepared(", prepare);
+        int claim = adapter.indexOf("populations.claimForSpawn(prepared, claim)");
+        int coordinate = adapter.indexOf("orchestrator.coordinate(", claim);
+        int spawn = adapter.indexOf("() -> spawnWithPopulation(", coordinate);
+        int commit = adapter.indexOf("populations.commitAsync(prepared", spawn);
 
-        assertTrue(finish >= 0 && callback > finish && resolver > callback);
-        assertFalse(coop.substring(finish, callback + 80).contains("spawned, callbacks"));
+        assertTrue(prepare >= 0 && dispatch > prepare);
+        assertTrue(claim >= 0 && coordinate > claim && spawn > coordinate && commit > spawn);
+        assertTrue(adapter.contains("actualTargetUuid"));
+        assertFalse(adapter.substring(spawn, commit).contains("Pair<"));
     }
 
     private static String read(Path root, String file) throws Exception {

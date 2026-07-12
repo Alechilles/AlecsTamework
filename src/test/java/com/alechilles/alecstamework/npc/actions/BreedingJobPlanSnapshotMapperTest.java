@@ -108,4 +108,69 @@ class BreedingJobPlanSnapshotMapperTest {
                 restored.fertilitySnapshot().expectedOffspring());
         assertEquals(plan.rolledChildCount(), restored.rolledChildCount());
     }
+
+    @Test
+    void legacyUnpaddedChildKeysKeepTheirPersistedReplayIdentity() {
+        PlannedChild first = new PlannedChild("baby-a", "adult-a", null, null, "family");
+        PlannedChild second = new PlannedChild("baby-b", "adult-b", null, null, "family");
+        BreedingBirthPlan plan = new BreedingBirthPlan(
+                new BreedingFertilitySnapshot(1.0, 1.0, 2.0, 0.5, 2),
+                List.of(first, second)
+        );
+        BreedingJobPlanSnapshotMapper mapper = new BreedingJobPlanSnapshotMapper();
+        BreedingBirthPlanSnapshot current = mapper.snapshot(
+                plan,
+                null,
+                BreedingOffspringProgressionService.OwnerSnapshot.empty(),
+                BreedingOffspringProgressionService.OwnerSnapshot.empty()
+        );
+        BreedingBirthPlanSnapshot legacy = new BreedingBirthPlanSnapshot(
+                current.parentAMultiplier(),
+                current.parentBMultiplier(),
+                current.expectedOffspring(),
+                current.offspringCount(),
+                List.of(
+                        withKey(current.children().get(0), "child-0"),
+                        withKey(current.children().get(1), "child-1")
+                )
+        );
+        BreedingPopulationReplayState replay = new BreedingPopulationReplayState(
+                true,
+                "breeding:legacy-attempt",
+                legacy,
+                Set.of("child-1"),
+                Set.of("child-0"),
+                "breeding-replay-ready"
+        );
+
+        BreedingBirthPlan restored = mapper.restore(legacy);
+
+        assertNotNull(restored);
+        assertEquals(List.of(second), mapper.outstandingChildren(restored, replay));
+        assertEquals(
+                List.of("child-1"),
+                mapper.outstandingSnapshots(legacy, replay).stream()
+                        .map(BreedingBirthPlanSnapshot.PlannedChild::childKey)
+                        .toList()
+        );
+    }
+
+    private static BreedingBirthPlanSnapshot.PlannedChild withKey(
+            BreedingBirthPlanSnapshot.PlannedChild child,
+            String key
+    ) {
+        return new BreedingBirthPlanSnapshot.PlannedChild(
+                key,
+                child.roleId(),
+                child.roleIndex(),
+                child.adultRoleId(),
+                child.gender(),
+                child.lifecycleFamilyPresent(),
+                child.lifecycleFamilyId(),
+                child.lifecycleLineId(),
+                child.ownerId(),
+                child.ownerName(),
+                child.populationType()
+        );
+    }
 }

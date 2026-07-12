@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for the exact UUID/chunk population handoff on managed release. */
@@ -114,6 +115,26 @@ class ManagedCoopReleasePopulationCoordinatorTest {
         assertEquals(-500L, rollback.nowMs.get());
     }
 
+    /** Stale restart evidence must release only population state, never recreate housed occupancy. */
+    @Test
+    void populationOnlyCancelRetainsLifecycleClaim() {
+        Bundle bundle = bundle();
+        RecordingBackend backend = new RecordingBackend();
+        RecordingRollback rollback = new RecordingRollback();
+        ManagedCoopReleasePopulationCoordinator coordinator = coordinator(backend, rollback);
+        var prepared = coordinator.prepareAsync(
+                bundle.claim(), bundle.resident(), "world", 1, 2).join().prepared();
+
+        boolean cancelled = coordinator.cancelPreparedPopulationOnlyAsync(
+                prepared, "persisted_projection_generation_changed").join();
+
+        assertTrue(cancelled);
+        assertEquals(1, backend.cancelOrder.get());
+        assertEquals(0, rollback.order.get());
+        assertEquals(0, backend.claims.get());
+        assertEquals(0, backend.commits.get());
+    }
+
     @Test
     void prePreparationFailureRollsBackExactSpawnClaimWithoutPopulationCancel() {
         Bundle bundle = bundle();
@@ -157,6 +178,29 @@ class ManagedCoopReleasePopulationCoordinatorTest {
         assertEquals(0, backend.prepares.get());
     }
 
+    @Test
+    void inFlightPopulationDenialRetainsLifecycleAndNeverExposesSpawnCapability() {
+        Bundle bundle = bundle();
+        RecordingBackend backend = new RecordingBackend();
+        backend.preparation.set(new BackendPreparation(
+                ManagedCoopReleasePopulationCoordinator.PreparationStatus.AMBIGUOUS,
+                null, null, null, "profile_operation_in_flight"));
+        RecordingRollback rollback = new RecordingRollback();
+        ManagedCoopReleasePopulationCoordinator coordinator = coordinator(backend, rollback);
+
+        Preparation result = coordinator.prepareAsync(
+                bundle.claim(), bundle.resident(), "world", 1, 2).join();
+
+        assertEquals(ManagedCoopReleasePopulationCoordinator.PreparationStatus.AMBIGUOUS,
+                result.status());
+        assertEquals("profile_operation_in_flight", result.detail());
+        assertNull(result.prepared());
+        assertEquals(0, rollback.order.get());
+        assertEquals(0, backend.claims.get());
+        assertEquals(0, backend.commits.get());
+        assertTrue(backend.degraded.get() > 0);
+    }
+
     private static ManagedCoopReleasePopulationCoordinator coordinator(
             RecordingBackend backend,
             RecordingRollback rollback) {
@@ -192,6 +236,7 @@ class ManagedCoopReleasePopulationCoordinatorTest {
         private final Object handle = new Object();
         private final AtomicReference<ReleaseRequest> request = new AtomicReference<>();
         private final AtomicReference<String> extension = new AtomicReference<>();
+        private final AtomicReference<BackendPreparation> preparation = new AtomicReference<>();
         private final AtomicInteger prepares = new AtomicInteger();
         private final AtomicInteger claims = new AtomicInteger();
         private final AtomicInteger commits = new AtomicInteger();
@@ -214,8 +259,13 @@ class ManagedCoopReleasePopulationCoordinatorTest {
             prepares.incrementAndGet();
             this.request.set(request);
             extension.set(durableContextFactory.apply(request.plannedNpcUuid()));
+            BackendPreparation configured = preparation.get();
+            if (configured != null) {
+                return CompletableFuture.completedFuture(configured);
+            }
             return CompletableFuture.completedFuture(new BackendPreparation(
-                    true, "profile-a", request.plannedNpcUuid(), handle, "prepared"));
+                    ManagedCoopReleasePopulationCoordinator.PreparationStatus.PREPARED,
+                    "profile-a", request.plannedNpcUuid(), handle, "prepared"));
         }
 
         @Override

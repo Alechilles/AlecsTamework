@@ -54,7 +54,7 @@ public final class ManagedCoopCaptureSourceRetirementSystem extends RefSystem<En
                                @Nonnull RemoveReason reason,
                                @Nonnull Store<EntityStore> store,
                                @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        if (uuidType == null || markerType == null) {
+        if (reason != RemoveReason.REMOVE || uuidType == null || markerType == null) {
             return;
         }
         UUIDComponent uuidComponent = commandBuffer.getComponent(reference, uuidType);

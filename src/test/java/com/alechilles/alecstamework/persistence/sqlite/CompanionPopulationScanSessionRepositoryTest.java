@@ -16,7 +16,7 @@ class CompanionPopulationScanSessionRepositoryTest {
     Path tempDir;
 
     @Test
-    void activeEpochResumesAcrossRestartAndRotatesOnlyAfterReady() throws Exception {
+    void everyProcessAcquisitionRotatesEvenWhenThePriorEpochWasActive() throws Exception {
         Path database = tempDir.resolve("restart.sqlite");
         CompanionPopulationScanSessionRepository.Session first;
         try (Harness harness = harness(database)) {
@@ -25,9 +25,10 @@ class CompanionPopulationScanSessionRepositoryTest {
         }
 
         try (Harness restarted = harness(database)) {
-            CompanionPopulationScanSessionRepository.Session resumed = acquire(restarted.repository());
-            assertEquals(first.epoch(), resumed.epoch());
-            assertTrue(markReady(restarted.repository(), resumed.epoch()));
+            CompanionPopulationScanSessionRepository.Session replacement = acquire(restarted.repository());
+            assertNotEquals(first.epoch(), replacement.epoch());
+            assertFalse(markReady(restarted.repository(), first.epoch()));
+            assertTrue(markReady(restarted.repository(), replacement.epoch()));
         }
 
         try (Harness freshCycle = harness(database)) {
@@ -46,6 +47,35 @@ class CompanionPopulationScanSessionRepositoryTest {
 
             assertFalse(markReady(harness.repository(), first.epoch()));
             assertEquals(current, harness.repository().loadCurrent());
+        }
+    }
+
+    @Test
+    void readyEpochCanBeDurablyInvalidatedAfterAFailedPostCommitFence() throws Exception {
+        try (Harness harness = harness(tempDir.resolve("invalidate-ready.sqlite"))) {
+            CompanionPopulationScanSessionRepository.Session session = acquire(harness.repository());
+            assertTrue(markReady(harness.repository(), session.epoch()));
+
+            PersistenceWriteQueue.WriteOutcome<Boolean> invalidated = harness.repository()
+                    .invalidateReadyAsync(session.epoch())
+                    .completion()
+                    .get(2, TimeUnit.SECONDS);
+
+            assertTrue(invalidated.isCommitted());
+            assertTrue(Boolean.TRUE.equals(invalidated.value()));
+            assertEquals(
+                    CompanionPopulationScanSessionRepository.State.ACTIVE,
+                    harness.repository().loadCurrent().state()
+            );
+            assertTrue(Boolean.TRUE.equals(harness.repository()
+                    .invalidateReadyAsync(session.epoch()).completion()
+                    .get(2, TimeUnit.SECONDS).value()));
+            CompanionPopulationScanSessionRepository.Session replacement =
+                    acquire(harness.repository());
+            assertFalse(Boolean.TRUE.equals(harness.repository()
+                    .invalidateReadyAsync(session.epoch()).completion()
+                    .get(2, TimeUnit.SECONDS).value()));
+            assertEquals(replacement, harness.repository().loadCurrent());
         }
     }
 

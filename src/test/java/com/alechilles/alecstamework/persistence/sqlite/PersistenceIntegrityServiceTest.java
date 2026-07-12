@@ -89,6 +89,30 @@ class PersistenceIntegrityServiceTest {
     }
 
     @Test
+    void reportsRetryablePopulationEvidenceForANonbreedingOperation() throws Exception {
+        SqliteConnectionManager connections = migrated("invalid-retryable-kind.sqlite");
+        try (Connection connection = connections.openConnection();
+             Statement statement = connection.createStatement()) {
+            insertProfile(connection, "profile-retryable", uuid(4));
+            statement.execute("""
+                    INSERT INTO companion_population_operations (
+                      operation_id, profile_id, operation_type, state, expected_revision,
+                      old_state_json, new_state_json, created_at_ms, updated_at_ms,
+                      completed_at_ms
+                    ) VALUES (
+                      'operation-retryable', 'profile-retryable', 'OWNER_TRANSFER',
+                      'RETRYABLE', 0, '{}', '{}', 1, 1, 1
+                    )
+                    """);
+        }
+
+        PersistenceIntegrityService.IntegrityReport report =
+                new PersistenceIntegrityService(connections).inspect();
+
+        assertIssue(report, "nonbreeding_retryable_population_operation", 1L);
+    }
+
+    @Test
     void reportsBothCoopOperationActivityDirectionMismatches() throws Exception {
         SqliteConnectionManager connections = migrated("operation-activity.sqlite");
         String authorityId = authorityId(10);

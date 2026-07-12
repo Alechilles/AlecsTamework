@@ -24,8 +24,16 @@ final class CompanionPopulationRecoveryDecisionService {
                     && matches(previousObserved, context.oldState(), context.oldPhysical(), true)) {
                 return Decision.close("startup-recovery-old-source-state-observed");
             }
+            if (operationState == CompanionPopulationOperationRecord.State.COMPENSATING
+                    && context.operation() == OwnerPopulationOperation.BREEDING
+                    && context.oldState().ownerUuid() == null) {
+                return Decision.close("startup-recovery-breeding-compensation-target-absent");
+            }
             if (isAppliedPhase(operationState) && isPermanentRelease(context)) {
                 return Decision.commit("startup-recovery-permanent-release-target-absent");
+            }
+            if (canRetryAbsentBreedingTarget(operationState, context)) {
+                return Decision.retry("startup-recovery-breeding-target-absent");
             }
             if (canCloseAbsentTarget(context)) {
                 return Decision.close("startup-recovery-target-absent");
@@ -52,6 +60,12 @@ final class CompanionPopulationRecoveryDecisionService {
                 && observed.ownerObserved()
                 && observed.ownerUuid() == null) {
             return Decision.commit("startup-recovery-permanent-release-ownerless");
+        }
+        if (isAppliedPhase(operationState)
+                && context.operation() == OwnerPopulationOperation.BREEDING
+                && observed.physical()
+                && targetCompatible(context, observed)) {
+            return Decision.commit("startup-recovery-breeding-child-observed");
         }
 
         UUID oldOwner = context.oldState().ownerUuid();
@@ -185,8 +199,16 @@ final class CompanionPopulationRecoveryDecisionService {
         return context.oldState().ownerUuid() == null
                 && context.newState().ownerUuid() != null
                 && (context.operation() == OwnerPopulationOperation.NEW_OWNERSHIP
-                || context.operation() == OwnerPopulationOperation.BREEDING
                 || context.operation() == OwnerPopulationOperation.LEGACY_ADOPTION);
+    }
+
+    private static boolean canRetryAbsentBreedingTarget(
+            @Nonnull CompanionPopulationOperationRecord.State operationState,
+            @Nonnull Context context
+    ) {
+        return isAppliedPhase(operationState)
+                && context.operation() == OwnerPopulationOperation.BREEDING
+                && context.oldState().ownerUuid() == null;
     }
 
     private static boolean isAppliedPhase(CompanionPopulationOperationRecord.State state) {
@@ -240,6 +262,7 @@ final class CompanionPopulationRecoveryDecisionService {
     enum Outcome {
         COMMIT,
         CLOSE,
+        RETRY,
         AMBIGUOUS
     }
 
@@ -257,6 +280,11 @@ final class CompanionPopulationRecoveryDecisionService {
         @Nonnull
         private static Decision close(@Nonnull String reason) {
             return new Decision(Outcome.CLOSE, reason);
+        }
+
+        @Nonnull
+        private static Decision retry(@Nonnull String reason) {
+            return new Decision(Outcome.RETRY, reason);
         }
 
         @Nonnull

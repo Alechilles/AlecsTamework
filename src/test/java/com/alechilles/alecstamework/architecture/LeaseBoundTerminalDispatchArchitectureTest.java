@@ -22,7 +22,7 @@ class LeaseBoundTerminalDispatchArchitectureTest {
                 MAIN.resolve("items/CommandPreparedRestoreSpawnService.java"),
                 MAIN.resolve("items/NpcOwnedBatchSpawnService.java"),
                 MAIN.resolve("items/SpawnerPreparedSpawnService.java"),
-                MAIN.resolve("items/CoopPreparedReleaseSpawnService.java"),
+                MAIN.resolve("items/HytaleManagedCoopReleaseProjectionGateway.java"),
                 MAIN.resolve("items/CompanionPreparedSpawnService.java"),
                 MAIN.resolve("npc/actions/BreedingPreparedPairingHandoffService.java"),
                 MAIN.resolve("npc/actions/BreedingPairingEffectsService.java")
@@ -37,9 +37,9 @@ class LeaseBoundTerminalDispatchArchitectureTest {
         String breeding = read(MAIN.resolve(
                 "npc/actions/BreedingPreparedPairingHandoffService.java"
         ));
-        assertTrue(breeding.contains(
-                "() -> terminality.cancel(\"breeding-world-unavailable\")"
-        ));
+        assertTrue(breeding.contains("breeding-population-world-unavailable"));
+        assertTrue(breeding.contains("cancelPrepared("));
+        assertTrue(breeding.contains("cancelLocal("));
         String effects = read(MAIN.resolve(
                 "npc/actions/BreedingPairingEffectsService.java"
         ));
@@ -108,14 +108,19 @@ class LeaseBoundTerminalDispatchArchitectureTest {
     }
 
     @Test
-    void coopWatchdogCleanupUsesCapturedThreadSafeFlightKey() throws IOException {
-        String system = read(MAIN.resolve(
-                "items/CommandCoopManagedWildCaptureSystem.java"
+    void coopWatchdogCleanupUsesOnlyPreparedThreadSafeCapability() throws IOException {
+        String gateway = read(MAIN.resolve(
+                "items/HytaleManagedCoopReleaseProjectionGateway.java"
         ));
+        int cleanup = gateway.indexOf("private void cancelThenComplete(");
+        int next = gateway.indexOf("private static Outcome blocked(", cleanup);
+        String rejection = gateway.substring(cleanup, next);
 
-        assertTrue(system.contains("String terminalFlightKey = releaseFlightKey(world, slotContext)"));
-        assertTrue(system.contains("completeReleaseFlight(terminalFlightKey)"));
-        assertTrue(system.contains("May run from a lease watchdog"));
+        assertTrue(gateway.contains("managed_coop_release_pre_spawn_dispatch_rejected"));
+        assertTrue(rejection.contains("populations.cancelAsync(prepared, reason)"));
+        assertFalse(rejection.contains("World "));
+        assertFalse(rejection.contains("Store<"));
+        assertFalse(rejection.contains("Ref<"));
     }
 
     @Test

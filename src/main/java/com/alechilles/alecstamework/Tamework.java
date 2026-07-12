@@ -789,9 +789,8 @@ public class Tamework extends JavaPlugin {
         );
         traitEffectRegistry = new TraitEffectRegistry(getLogger(), persistenceRuntime.getNpcProfileRepository());
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
-        commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
-                persistenceRuntime.getNpcProfileRepository()
-        );
+        commandLinkedNpcStateSnapshotService = TameworkPopulationRuntimeLifecycle
+                .createStateSnapshotService(persistenceRuntime, ownerPopulationRuntime);
         loadedNpcIdentityBootstrapService = new LoadedNpcIdentityBootstrapService(
                 commandLinkedNpcStateSnapshotService.getLoadedNpcIdentityIndex(),
                 getLogger()
@@ -1198,9 +1197,9 @@ public class Tamework extends JavaPlugin {
         CreditorIntegration.start(this);
         initializeOverridesForLoadedWorlds();
         if (ownerPopulationRuntime != null && itemFeatureRegistry != null) {
-            TameworkPopulationRuntimeLifecycle.start(
-                    ownerPopulationRuntime, Universe.get(), ownerComponentType, itemFeatureRegistry
-            );
+            TameworkPopulationRuntimeLifecycle.start(ownerPopulationRuntime, Universe.get(),
+                    ownerComponentType, itemFeatureRegistry,
+                    loadedNpcIdentityBootstrapService.awaitCurrentBootstrap());
         }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (hStatsIntegration != null) {

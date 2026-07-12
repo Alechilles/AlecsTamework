@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService.CoopResidentStateSnapshot;
 import com.alechilles.alecstamework.items.ManagedCoopCapturedItemAuthoringService.AuthoringResult;
 import com.alechilles.alecstamework.items.ManagedCoopCapturedItemAuthoringService.AuthoringStatus;
+import com.alechilles.alecstamework.items.ManagedCoopCapturedItemAuthoringService.CaptureCompletion;
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationReason;
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationResult;
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.CancellationStatus;
@@ -10,9 +11,12 @@ import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationServi
 import com.alechilles.alecstamework.npc.actions.BreedingCaptureCancellationService.SnapshotHandoff;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,7 +49,7 @@ class ManagedCoopCapturedItemAuthoringServiceTest {
                     handoff(status, portableSnapshot()));
 
             assertEquals(AuthoringStatus.FAILED, result.status());
-            assertEquals("breeding_capture_cancellation_rejected", result.detail());
+            assertEquals("breeding_capture_cancellation_not_durable", result.detail());
             assertNull(result.envelopeJson());
         }
     }
@@ -64,6 +68,35 @@ class ManagedCoopCapturedItemAuthoringServiceTest {
 
         assertEquals(AuthoringStatus.FAILED, result.status());
         assertEquals("portable_snapshot_incomplete_or_mismatched", result.detail());
+    }
+
+    /** Regression: capture-crate mutation must own the retained fence through one final outcome. */
+    @Test
+    void captureCompletionPublishesTheFirstTerminalOutcomeExactlyOnce() {
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<Boolean> captured = new AtomicReference<>();
+        CaptureCompletion completion = new CaptureCompletion(
+                (scope, sourceUuid, profileId, outcome) -> {
+                    calls.incrementAndGet();
+                    captured.set(outcome);
+                },
+                new Object(),
+                SOURCE,
+                "profile-a"
+        );
+        AuthoringResult result = new AuthoringResult(
+                AuthoringStatus.PREPARED,
+                "profile-a",
+                "{}",
+                null,
+                completion
+        );
+
+        result.completeCapture(false);
+        result.completeCapture(true);
+
+        assertEquals(1, calls.get());
+        assertFalse(captured.get());
     }
 
     private ManagedCoopCapturedItemAuthoringService service() {

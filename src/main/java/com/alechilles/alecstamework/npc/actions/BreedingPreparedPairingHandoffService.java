@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
+import com.alechilles.alecstamework.npc.breeding.BreedingParentIdentity;
 import com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionRequest;
 import com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionService;
 import com.alechilles.alecstamework.ownership.BreedingPopulationPreparationResult;
@@ -32,19 +33,27 @@ final class BreedingPreparedPairingHandoffService {
             @Nonnull World world,
             @Nonnull Object storeScope,
             @Nonnull UUID jobId,
+            @Nonnull BreedingParentIdentity firstParent,
+            @Nonnull BreedingParentIdentity secondParent,
             @Nonnull BreedingPopulationAdmissionService populationService,
             @Nonnull BreedingPopulationAdmissionRequest request,
             @Nullable BreedingPopulationAdmissionService.PreparationContext preparationContext,
             @Nonnull Finalizer finalizer) {
+        if (!beginPreparation(storeScope, jobId, firstParent, secondParent)) {
+            cancelLocal(storeScope, jobId);
+            return;
+        }
         CompletableFuture<BreedingPopulationPreparationResult> completion;
         try {
             completion = populationService.prepareAsync(request, preparationContext);
         } catch (RuntimeException | LinkageError failure) {
+            failPreparation(storeScope, jobId);
             cancelLocal(storeScope, jobId);
             warn("Breeding population preparation could not start", failure);
             return;
         }
         if (completion == null) {
+            failPreparation(storeScope, jobId);
             cancelLocal(storeScope, jobId);
             warning.accept("Breeding population preparation returned no completion stage.");
             return;
@@ -63,8 +72,40 @@ final class BreedingPreparedPairingHandoffService {
             Throwable failure,
             Finalizer finalizer) {
         PreparedBreedingPopulationBatch batch = result == null ? null : result.preparedBatch();
+        if (batch != null) {
+            try {
+                services.preparedPopulationRegistry().install(
+                        storeScope, jobId, populationService, batch
+                );
+            } catch (RuntimeException | LinkageError registrationFailure) {
+                failPreparation(storeScope, jobId);
+                cancelPrepared(
+                        populationService, batch, "breeding-population-registration-failed"
+                );
+                cancelLocal(storeScope, jobId);
+                warn("Breeding prepared capability registration failed", registrationFailure);
+                return;
+            }
+        }
+        if (!finishPreparation(storeScope, jobId)) {
+            cancelRegisteredOrCandidate(
+                    storeScope,
+                    jobId,
+                    populationService,
+                    batch,
+                    "breeding-population-preparation-gate-failed"
+            );
+            cancelLocal(storeScope, jobId);
+            return;
+        }
         if (failure != null || result == null || !result.allowed() || batch == null) {
-            cancelPrepared(populationService, batch, "breeding-population-prepare-denied");
+            cancelRegisteredOrCandidate(
+                    storeScope,
+                    jobId,
+                    populationService,
+                    batch,
+                    "breeding-population-prepare-denied"
+            );
             cancelLocal(storeScope, jobId);
             info.accept("Breeding pairing blocked by shared population admission: job="
                     + jobId + " reason=" + reason(result, failure) + ".");
@@ -76,8 +117,12 @@ final class BreedingPreparedPairingHandoffService {
                         storeScope, jobId, populationService, batch, finalizer
                 ),
                 () -> {
-                    cancelPrepared(
-                            populationService, batch, "breeding-population-world-unavailable"
+                    cancelRegisteredOrCandidate(
+                            storeScope,
+                            jobId,
+                            populationService,
+                            batch,
+                            "breeding-population-world-unavailable"
                     );
                     cancelLocal(storeScope, jobId);
                 }
@@ -114,6 +159,60 @@ final class BreedingPreparedPairingHandoffService {
             services.jobRegistry().cancel(storeScope, jobId);
         } catch (RuntimeException | LinkageError ignored) {
             // A closed scope already released its nearby reservation.
+        }
+    }
+
+    private boolean beginPreparation(Object storeScope,
+                                     UUID jobId,
+                                     BreedingParentIdentity firstParent,
+                                     BreedingParentIdentity secondParent) {
+        try {
+            return services.preparedPopulationRegistry().beginPreparation(
+                    storeScope, jobId, firstParent, secondParent
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            warn("Breeding preparation durability gate could not open", failure);
+            return false;
+        }
+    }
+
+    private boolean finishPreparation(Object storeScope, UUID jobId) {
+        try {
+            boolean finished = services.preparedPopulationRegistry().finishPreparation(
+                    storeScope, jobId
+            );
+            if (finished) {
+                return true;
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            warn("Breeding preparation durability gate could not close", failure);
+        }
+        failPreparation(storeScope, jobId);
+        return false;
+    }
+
+    private void failPreparation(Object storeScope, UUID jobId) {
+        try {
+            services.preparedPopulationRegistry().failPreparation(storeScope, jobId);
+        } catch (RuntimeException | LinkageError failure) {
+            warn("Breeding preparation durability gate failed closed", failure);
+        }
+    }
+
+    private void cancelRegisteredOrCandidate(
+            Object storeScope,
+            UUID jobId,
+            BreedingPopulationAdmissionService populationService,
+            @Nullable PreparedBreedingPopulationBatch batch,
+            String reason) {
+        if (batch == null) {
+            return;
+        }
+        boolean registryOwned = services.preparedPopulationRegistry().cancelOwnedJob(
+                storeScope, jobId, populationService, batch, reason
+        );
+        if (!registryOwned) {
+            cancelPrepared(populationService, batch, reason);
         }
     }
 

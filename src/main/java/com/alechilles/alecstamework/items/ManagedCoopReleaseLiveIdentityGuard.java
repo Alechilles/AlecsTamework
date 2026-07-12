@@ -1,18 +1,15 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex.Location;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex.Probe;
 import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex.ProbeStatus;
+import com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionProbe.Outcome;
+import com.alechilles.alecstamework.items.ManagedCoopReleaseProjectionProbe.Result;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityDecision;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityGuard;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.LiveIdentityRequest;
-import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
-import com.hypixel.hytale.component.ComponentType;
-import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,19 +22,13 @@ import javax.annotation.Nullable;
 /**
  * Fail-closed live UUID, profile-alias, and projection-marker guard for managed-coop release.
  *
- * <p>All durable evidence comes from immutable trusted indexes. The only ECS read is the exact
- * planned UUID in the caller's owning store, performed synchronously after the loaded-identity
- * index proves that UUID has exactly one current location.</p>
+ * <p>All cross-world evidence comes from immutable trusted indexes. The exact planned UUID is
+ * read synchronously in the caller's owning store only after both the UUID and projection-marker
+ * indexes agree that it is the sole release projection.</p>
  */
 public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGuard {
     enum EvidenceStatus {
         TRUSTED,
-        CONFLICT,
-        UNAVAILABLE
-    }
-
-    enum ProjectionStatus {
-        FOUND,
         CONFLICT,
         UNAVAILABLE
     }
@@ -63,22 +54,6 @@ public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGu
         }
     }
 
-    record ProjectionRead(@Nonnull ProjectionStatus status,
-                          @Nullable TameworkProjectionIdentityComponent marker,
-                          @Nullable String detail) {
-        static ProjectionRead found(TameworkProjectionIdentityComponent marker) {
-            return new ProjectionRead(ProjectionStatus.FOUND, marker, null);
-        }
-
-        static ProjectionRead conflict(String detail) {
-            return new ProjectionRead(ProjectionStatus.CONFLICT, null, detail);
-        }
-
-        static ProjectionRead unavailable(String detail) {
-            return new ProjectionRead(ProjectionStatus.UNAVAILABLE, null, detail);
-        }
-    }
-
     @FunctionalInterface
     interface AliasEvidenceGateway {
         @Nonnull
@@ -92,16 +67,15 @@ public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGu
     }
 
     @FunctionalInterface
-    interface ProjectionReader {
+    interface ProjectionProbeGateway {
         @Nonnull
-        ProjectionRead read(@Nonnull Store<EntityStore> owningStore,
-                            @Nonnull UUID plannedTargetUuid,
-                            @Nonnull Location indexedLocation);
+        Result probe(@Nonnull LiveIdentityRequest request,
+                     @Nonnull Store<EntityStore> owningStore);
     }
 
     private final AliasEvidenceGateway aliasEvidence;
     private final LoadedIdentityGateway loadedIdentities;
-    private final ProjectionReader projectionReader;
+    private final ProjectionProbeGateway projectionProbe;
 
     public ManagedCoopReleaseLiveIdentityGuard(
             @Nonnull LoadedNpcIdentityIndex loadedIdentityIndex,
@@ -112,17 +86,17 @@ public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGu
                         Objects.requireNonNull(residentIndex, "residentIndex"),
                         Objects.requireNonNull(compositeTrust, "compositeTrust")),
                 Objects.requireNonNull(loadedIdentityIndex, "loadedIdentityIndex")::probe,
-                new HytaleProjectionReader()
+                new ManagedCoopReleaseProjectionProbe(loadedIdentityIndex)::probe
         );
     }
 
     ManagedCoopReleaseLiveIdentityGuard(
             @Nonnull AliasEvidenceGateway aliasEvidence,
             @Nonnull LoadedIdentityGateway loadedIdentities,
-            @Nonnull ProjectionReader projectionReader) {
+            @Nonnull ProjectionProbeGateway projectionProbe) {
         this.aliasEvidence = Objects.requireNonNull(aliasEvidence, "aliasEvidence");
         this.loadedIdentities = Objects.requireNonNull(loadedIdentities, "loadedIdentities");
-        this.projectionReader = Objects.requireNonNull(projectionReader, "projectionReader");
+        this.projectionProbe = Objects.requireNonNull(projectionProbe, "projectionProbe");
     }
 
     @Override
@@ -155,11 +129,18 @@ public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGu
             if (aliasDecision != null) {
                 return aliasDecision;
             }
-            Probe planned = trustedProbe(request.plannedTargetUuid());
-            if (planned == null) {
-                return LiveIdentityDecision.lookupFailed("planned_uuid_probe_untrusted");
+            Result projection = projectionProbe.probe(request, owningStore);
+            if (projection == null || projection.outcome() == null) {
+                return LiveIdentityDecision.lookupFailed("release_projection_probe_missing");
             }
-            return inspectPlanned(request, owningStore, planned);
+            if (projection.outcome() == Outcome.PRESENT) {
+                return LiveIdentityDecision.matching(projection.observedUuid());
+            }
+            if (projection.outcome() == Outcome.ABSENT) {
+                return LiveIdentityDecision.clearToSpawn();
+            }
+            return LiveIdentityDecision.lookupFailed(detail(
+                    projection.detail(), "release_projection_identity_ambiguous"));
         } catch (RuntimeException exception) {
             return LiveIdentityDecision.lookupFailed(
                     "release_live_identity_lookup_failed:" + exceptionDetail(exception));
@@ -186,36 +167,6 @@ public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGu
         return null;
     }
 
-    @Nonnull
-    private LiveIdentityDecision inspectPlanned(LiveIdentityRequest request,
-                                                Store<EntityStore> owningStore,
-                                                Probe planned) {
-        if (planned.status() == ProbeStatus.UNKNOWN) {
-            return LiveIdentityDecision.lookupFailed("planned_uuid_presence_untrusted");
-        }
-        if (planned.status() == ProbeStatus.ABSENT) {
-            return LiveIdentityDecision.clearToSpawn();
-        }
-        if (planned.status() == ProbeStatus.MULTIPLE_LOCATIONS) {
-            return LiveIdentityDecision.conflict("planned_uuid_loaded_in_multiple_locations");
-        }
-        ProjectionRead read = projectionReader.read(
-                owningStore, request.plannedTargetUuid(), planned.locations().getFirst());
-        if (read == null || read.status() == null) {
-            return LiveIdentityDecision.lookupFailed("planned_projection_read_missing");
-        }
-        if (read.status() == ProjectionStatus.UNAVAILABLE) {
-            return LiveIdentityDecision.lookupFailed(detail(
-                    read.detail(), "planned_projection_unavailable"));
-        }
-        if (read.status() == ProjectionStatus.CONFLICT
-                || !markerMatches(request, read.marker())) {
-            return LiveIdentityDecision.conflict(detail(
-                    read.detail(), "planned_projection_marker_conflict"));
-        }
-        return LiveIdentityDecision.matching(request.plannedTargetUuid());
-    }
-
     @Nullable
     private Probe trustedProbe(UUID expectedUuid) {
         Probe probe = loadedIdentities.probe(expectedUuid);
@@ -230,17 +181,6 @@ public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGu
             case MULTIPLE_LOCATIONS -> locations > 1;
         };
         return shapeMatches ? probe : null;
-    }
-
-    private boolean markerMatches(LiveIdentityRequest request,
-                                  @Nullable TameworkProjectionIdentityComponent marker) {
-        return marker != null
-                && Objects.equals(request.operationId(), marker.getOperationId())
-                && Objects.equals(request.profileId(), marker.getProfileId())
-                && Objects.equals(request.projectionKind(), marker.getProjectionKind())
-                && Objects.equals(request.authoritySlotKey(), marker.getSlotKey())
-                && Objects.equals(request.sourceNpcUuid(), marker.getSourceNpcUuid())
-                && request.operationGeneration() == marker.getGeneration();
     }
 
     private static final class ResidentIndexAliasEvidence implements AliasEvidenceGateway {
@@ -301,37 +241,6 @@ public final class ManagedCoopReleaseLiveIdentityGuard implements LiveIdentityGu
             return resident.state() == ResidentState.DEPLOYED
                     && Objects.equals(resident.residentUuid(), request.plannedTargetUuid())
                     && Objects.equals(resident.deployedNpcUuid(), request.plannedTargetUuid());
-        }
-    }
-
-    private static final class HytaleProjectionReader implements ProjectionReader {
-        @Override
-        public ProjectionRead read(Store<EntityStore> owningStore,
-                                   UUID plannedTargetUuid,
-                                   Location indexedLocation) {
-            Location owningLocation = LoadedNpcLocationResolver.resolve(owningStore);
-            if (!owningLocation.equals(indexedLocation)) {
-                return ProjectionRead.conflict("planned_uuid_loaded_in_other_store");
-            }
-            owningStore.assertThread();
-            World world = owningStore.getExternalData() != null
-                    ? owningStore.getExternalData().getWorld() : null;
-            if (world == null) {
-                return ProjectionRead.unavailable("owning_world_unavailable");
-            }
-            Ref<EntityStore> reference = world.getEntityRef(plannedTargetUuid);
-            if (reference == null || !reference.isValid()) {
-                return ProjectionRead.unavailable("planned_projection_not_resolvable");
-            }
-            ComponentType<EntityStore, TameworkProjectionIdentityComponent> type =
-                    TameworkProjectionIdentityComponent.getComponentType();
-            if (type == null) {
-                return ProjectionRead.unavailable("projection_marker_type_unavailable");
-            }
-            TameworkProjectionIdentityComponent marker = owningStore.getComponent(reference, type);
-            return marker != null
-                    ? ProjectionRead.found(marker.clone())
-                    : ProjectionRead.conflict("planned_projection_marker_missing");
         }
     }
 
