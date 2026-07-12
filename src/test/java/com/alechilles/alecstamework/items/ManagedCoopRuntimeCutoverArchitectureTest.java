@@ -13,9 +13,14 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
     private static final Path MAIN = Path.of(
             "src/main/java/com/alechilles/alecstamework/items");
     private static final List<String> FILES = List.of(
+            "ManagedCoopAuthorityEligibilityIndex.java",
+            "ManagedCoopCrossWorldAliasRetirement.java",
+            "ManagedCoopCrossWorldAliasRetirementCoordinator.java",
+            "HytaleManagedCoopCrossWorldAliasRuntimeGateway.java",
             "ManagedCoopChunkScanner.java",
             "ManagedCoopCaptureCandidate.java",
             "ManagedCoopRuntimeCandidateScanner.java",
+            "ManagedCoopProjectionMarkerPolicy.java",
             "ManagedCoopLifecycleAdmissionGuard.java",
             "ManagedCoopRuntimeSweepPlanner.java",
             "ManagedCoopRuntimeOperationDispatcher.java",
@@ -89,6 +94,35 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
         assertTrue(composition.contains("ManagedCoopVanillaImportBehavior"));
         assertTrue(composition.contains("ManagedCoopRemovedCoopReconciler"));
         assertTrue(composition.contains("new ManagedCoopStaleEntitySuppressionSystem("));
+        assertTrue(composition.contains(
+                "ManagedCoopAuthorityEligibilityIndex authorityEligibility"));
+        assertTrue(composition.contains(
+                "new ManagedCoopChunkScanner(authorityEligibility)"));
+        assertTrue(composition.contains("staleEntitySuppressionSystem::reevaluate"));
+        assertTrue(composition.contains("authorityEligibility.invalidateAll()"));
+        assertTrue(composition.contains("authorityEligibility.close()"));
+        assertTrue(composition.contains("ManagedCoopImportControl.shared()"));
+        assertTrue(composition.contains("importControl.clearAll()"));
+        assertTrue(composition.contains("persistence.getNpcIdentityRepository()"));
+        assertTrue(composition.contains("loadedIdentities"));
+    }
+
+    @Test
+    void currentAuthorityPublicationRetriesLoadedNpcsAndRevokesOnLifecycleChanges()
+            throws Exception {
+        String orchestrator = Files.readString(MAIN.resolve(
+                "ManagedCoopRuntimeSweepOrchestrator.java"));
+        String plugin = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/Tamework.java"));
+        int contextScan = orchestrator.indexOf("contextScanner.scan(chunkStore, world)");
+        int reevaluation = orchestrator.indexOf("reevaluateStaleEntities(entityStore)");
+        int imports = orchestrator.indexOf("ImportFilter imported = filterImports");
+
+        assertTrue(contextScan >= 0 && contextScan < reevaluation);
+        assertTrue(reevaluation < imports);
+        assertTrue(plugin.contains("onWorldRemovedForProgressionTiming"));
+        assertTrue(plugin.contains("invalidateManagedAuthorityWorld(worldName)"));
+        assertTrue(plugin.contains("managedCoopRuntime.invalidateManagedAuthorityEvidence()"));
     }
 
     @Test

@@ -264,6 +264,7 @@ public final class VanillaResidentImportPlanner {
                                      ManagedIndex managed,
                                      List<VanillaResidentEvidence> candidates,
                                      List<Decision> decisions) {
+        TreeSet<Integer> occupied = new TreeSet<>(managed.occupiedSlots());
         TreeSet<Integer> available = new TreeSet<>();
         for (int slot = 0; slot < authority.maximumResidents(); slot++) {
             if (!managed.occupiedSlots().contains(slot)) {
@@ -274,17 +275,38 @@ public final class VanillaResidentImportPlanner {
         for (VanillaResidentEvidence source : candidates) {
             Integer targetSlot = chooseSlot(source.sourceSlot(), available, remainingCapacity);
             if (targetSlot == null) {
+                int overflowSlot = chooseOverflowSlot(
+                        source.sourceSlot(), occupied, authority.maximumResidents());
+                occupied.add(overflowSlot);
                 decisions.add(new Decision(
-                        Classification.OVERFLOW, source, null, source.resolvedProfileId(), null,
+                        Classification.OVERFLOW, source, null, source.resolvedProfileId(),
+                        overflowSlot,
                         List.of(Reason.CAPACITY_EXCEEDED)));
                 continue;
             }
             available.remove(targetSlot);
+            occupied.add(targetSlot);
             remainingCapacity--;
             decisions.add(new Decision(
                     Classification.IMPORTABLE, source, null, source.resolvedProfileId(), targetSlot,
                     List.of(Reason.NEW_DISTINCT_SOURCE)));
         }
+    }
+
+    private int chooseOverflowSlot(@Nullable Integer preferred,
+                                   Set<Integer> occupied,
+                                   int maximumResidents) {
+        if (preferred != null && !occupied.contains(preferred)) {
+            return preferred;
+        }
+        int candidate = Math.max(0, maximumResidents);
+        while (occupied.contains(candidate)) {
+            if (candidate == Integer.MAX_VALUE) {
+                throw new IllegalStateException("managed coop resident slot space exhausted");
+            }
+            candidate++;
+        }
+        return candidate;
     }
 
     @Nullable

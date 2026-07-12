@@ -19,21 +19,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Action.ALLOW;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Action.DEFER;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Action.IGNORE;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Action.SUPPRESS;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.ACTIVE_CAPTURE_SOURCE;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.ACTIVE_RELEASE_PROJECTION;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.AUTHORITY_NOT_CURRENTLY_MANAGED;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.CONFLICTING_EVIDENCE;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.DEPLOYED_IMPORT_ADOPTION;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.DEPLOYED_RELEASE_PROJECTION;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.DEPLOYED_IDENTITY_MISMATCH;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.HISTORICAL_RESIDENT_ALIAS;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.HOUSED_ALIAS;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.INVALID_CAPTURE_PROJECTION;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.INVALID_DEPLOYED_MARKER;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.INVALID_RELEASE_MARKER;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.ORPHAN_MANAGED_MARKER;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.BLOCKED_RESIDENT_STATE;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.RELEASE_NOT_SPAWN_VISIBLE;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.RELEASE_OPERATION_MISSING;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.RELEASE_TARGET_MISMATCH;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.RELEASE_RESIDENT_MISMATCH;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.RESIDENT_IDENTITY_MISMATCH;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.UNRELATED_NPC;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.UNTRUSTED_COMPOSITE;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.UNSUPPORTED_OPERATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -63,16 +73,16 @@ class ManagedCoopStaleEntityPolicyTest {
     }
 
     @Test
-    void mappedEvidenceFailsClosedWhenCompositeIsUntrusted() {
-        ResidentRecord housed = resident(
-                COOP, PROFILE, SOURCE, SOURCE, null, ResidentState.HOUSED, 0L);
-        Fixture fixture = fixture(List.of(housed), List.of(), false);
+    void validDeployedProjectionDefersWhenCompositeIsUntrusted() {
+        ResidentRecord deployed = resident(
+                COOP, PROFILE, TARGET, SOURCE, TARGET, ResidentState.DEPLOYED, 2L);
+        Fixture fixture = fixture(List.of(deployed), List.of(), false);
 
         ManagedCoopStaleEntityPolicy.Decision decision = fixture.policy().decide(
-                ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, releaseMarker(RELEASE_ID))
         );
 
-        assertDecision(decision, SUPPRESS, UNTRUSTED_COMPOSITE);
+        assertDecision(decision, DEFER, UNTRUSTED_COMPOSITE);
     }
 
     @Test
@@ -93,9 +103,49 @@ class ManagedCoopStaleEntityPolicyTest {
         assertDecision(housedFixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
         ), SUPPRESS, HOUSED_ALIAS);
+        assertDecision(housedFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, releaseMarker(RELEASE_ID))
+        ), DEFER, RESIDENT_IDENTITY_MISMATCH);
         assertDecision(captureFixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
         ), SUPPRESS, ACTIVE_CAPTURE_SOURCE);
+    }
+
+    @Test
+    void mappedNpcDefersWhenExactAuthorityIsNoLongerCurrentlyManaged() {
+        ResidentRecord housed = resident(
+                COOP, PROFILE, SOURCE, SOURCE, null, ResidentState.HOUSED, 0L);
+        Fixture fixture = fixture(List.of(housed), List.of(), true);
+        fixture.authorityEligibility().invalidateWorld(COOP.worldName());
+
+        assertDecision(fixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
+        ), DEFER, AUTHORITY_NOT_CURRENTLY_MANAGED);
+
+        fixture.authorityEligibility().replaceWorld(
+                COOP.worldName(),
+                List.of(new ManagedCoopAuthorityEligibilityIndex.AuthorityEvidence(
+                        OTHER_COOP, COOP_ID)));
+        assertDecision(fixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
+        ), DEFER, AUTHORITY_NOT_CURRENTLY_MANAGED);
+
+        fixture.authorityEligibility().replaceWorld(
+                COOP.worldName(),
+                List.of(new ManagedCoopAuthorityEligibilityIndex.AuthorityEvidence(
+                        COOP, "coop_duck")));
+        assertDecision(fixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
+        ), DEFER, AUTHORITY_NOT_CURRENTLY_MANAGED);
+
+        ResidentRecord deployed = resident(
+                COOP, PROFILE, TARGET, SOURCE, TARGET, ResidentState.DEPLOYED, 2L);
+        Fixture deployedFixture = fixture(List.of(deployed), List.of(), true);
+        deployedFixture.authorityEligibility().invalidateWorld(COOP.worldName());
+        assertDecision(deployedFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(
+                        TARGET, releaseMarker(RELEASE_ID))
+        ), DEFER, AUTHORITY_NOT_CURRENTLY_MANAGED);
     }
 
     @Test
@@ -142,11 +192,14 @@ class ManagedCoopStaleEntityPolicyTest {
         for (ManagedCoopStaleEntityPolicy.MarkerEvidence marker : invalidMarkers) {
             assertDecision(fixture.policy().decide(
                     ManagedCoopStaleEntityPolicy.Observation.of(TARGET, marker)
-            ), SUPPRESS, INVALID_RELEASE_MARKER);
+            ), DEFER, INVALID_RELEASE_MARKER);
         }
         assertDecision(fixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, releaseMarker(RELEASE_ID))
-        ), SUPPRESS, RELEASE_TARGET_MISMATCH);
+        ), SUPPRESS, HISTORICAL_RESIDENT_ALIAS);
+        assertDecision(fixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(uuid(78L), releaseMarker(RELEASE_ID))
+        ), DEFER, RELEASE_TARGET_MISMATCH);
 
         OperationRecord sourceAliasingRelease = new OperationRecord(
                 RELEASE_ID, OperationKind.RELEASE, PROFILE, COOP, COOP_ID, 0,
@@ -160,7 +213,7 @@ class ManagedCoopStaleEntityPolicyTest {
         );
         assertDecision(sourceAliasFixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, releaseMarker(RELEASE_ID))
-        ), SUPPRESS, RELEASE_RESIDENT_MISMATCH);
+        ), DEFER, RELEASE_RESIDENT_MISMATCH);
     }
 
     @Test
@@ -185,12 +238,14 @@ class ManagedCoopStaleEntityPolicyTest {
 
         assertDecision(deployedDecision, ALLOW, DEPLOYED_RELEASE_PROJECTION);
         assertDecision(sourceDecision, SUPPRESS, HISTORICAL_RESIDENT_ALIAS);
+        assertEquals(TARGET, sourceDecision.requiredLiveProjectionUuid());
+        assertEquals(SOURCE, deployedDecision.staleAliasUuid());
         assertNull(deployedDecision.operationId(),
                 "no active operation is invented for finalized resident evidence");
     }
 
     @Test
-    void deployedProjectionWithoutExactManagedReleaseMarkerIsSuppressed() {
+    void deployedProjectionWithoutExactManagedReleaseMarkerIsDeferred() {
         ResidentRecord deployed = resident(
                 COOP, PROFILE, TARGET, SOURCE, TARGET, ResidentState.DEPLOYED, 2L);
         Fixture fixture = fixture(List.of(deployed), List.of(), true);
@@ -202,20 +257,60 @@ class ManagedCoopStaleEntityPolicyTest {
 
         assertDecision(fixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(TARGET, null)
-        ), SUPPRESS, INVALID_DEPLOYED_MARKER);
+        ), DEFER, INVALID_DEPLOYED_MARKER);
         assertDecision(fixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(TARGET, recovery)
-        ), SUPPRESS, INVALID_DEPLOYED_MARKER);
+        ), DEFER, INVALID_DEPLOYED_MARKER);
         assertDecision(fixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(
                         TARGET,
                         releaseMarker("managed-coop-release:not-a-hash")
                 )
-        ), SUPPRESS, INVALID_DEPLOYED_MARKER);
+        ), DEFER, INVALID_DEPLOYED_MARKER);
     }
 
     @Test
-    void conflictingCrossIndexAssignmentsAndOrphanManagedMarkersSuppress() {
+    void exactFinalizedImportAdoptionMarkerAllowsOnlyThePersistedLiveUuid() {
+        ResidentRecord deployed = resident(
+                COOP, PROFILE, TARGET, TARGET, TARGET, ResidentState.DEPLOYED, 0L);
+        Fixture fixture = fixture(List.of(deployed), List.of(), true);
+        String operationId = "managed-coop-import-operation:" + "d".repeat(64);
+        ManagedCoopStaleEntityPolicy.MarkerEvidence exact =
+                new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                        PROFILE, operationId,
+                        TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION,
+                        slotKey(), TARGET, 0L);
+
+        assertDecision(fixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, exact)
+        ), ALLOW, DEPLOYED_IMPORT_ADOPTION);
+
+        List<ManagedCoopStaleEntityPolicy.MarkerEvidence> invalid = List.of(
+                new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                        PROFILE, "managed-coop-import-operation:not-a-hash",
+                        TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION,
+                        slotKey(), TARGET, 0L),
+                new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                        PROFILE, operationId,
+                        TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION,
+                        COOP.slotKey(1), TARGET, 0L),
+                new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                        PROFILE, operationId,
+                        TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION,
+                        slotKey(), SOURCE, 0L),
+                new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                        PROFILE, operationId,
+                        TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION,
+                        slotKey(), TARGET, 1L));
+        for (ManagedCoopStaleEntityPolicy.MarkerEvidence marker : invalid) {
+            assertDecision(fixture.policy().decide(
+                    ManagedCoopStaleEntityPolicy.Observation.of(TARGET, marker)
+            ), DEFER, INVALID_DEPLOYED_MARKER);
+        }
+    }
+
+    @Test
+    void conflictingCrossIndexAssignmentsAndOrphanManagedMarkersDefer() {
         ResidentRecord resident = resident(
                 COOP, PROFILE, TARGET, SOURCE, TARGET, ResidentState.DEPLOYED, 2L);
         OperationRecord conflictingRelease = new OperationRecord(
@@ -233,10 +328,70 @@ class ManagedCoopStaleEntityPolicyTest {
 
         assertDecision(conflictFixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(TARGET, conflictMarker)
-        ), SUPPRESS, CONFLICTING_EVIDENCE);
+        ), DEFER, CONFLICTING_EVIDENCE);
         assertDecision(orphanFixture.policy().decide(
                 ManagedCoopStaleEntityPolicy.Observation.of(uuid(88L), releaseMarker(RELEASE_ID))
-        ), SUPPRESS, ORPHAN_MANAGED_MARKER);
+        ), DEFER, ORPHAN_MANAGED_MARKER);
+    }
+
+    @Test
+    void invalidAndUnsupportedOperationEvidenceDefers() {
+        OperationRecord capture = capture(
+                "managed-coop-capture:" + "c".repeat(64), PROFILE, COOP, SOURCE,
+                OperationState.SOURCE_RETIRE_REQUESTED, 2L);
+        Fixture captureFixture = fixture(List.of(), List.of(capture), true);
+        assertDecision(captureFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(
+                        TARGET, managedMarker(capture.operationId(), "MANAGED_COOP_CAPTURE_SOURCE"))
+        ), DEFER, INVALID_CAPTURE_PROJECTION);
+
+        OperationRecord importOperation = importOperation();
+        Fixture importFixture = fixture(List.of(), List.of(importOperation), true);
+        assertDecision(importFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(
+                        TARGET, managedMarker(importOperation.operationId(), "MANAGED_COOP_IMPORT"))
+        ), DEFER, UNSUPPORTED_OPERATION);
+    }
+
+    @Test
+    void incompleteReleaseEvidenceDefers() {
+        ResidentRecord releasing = resident(
+                COOP, PROFILE, SOURCE, SOURCE, null, ResidentState.RELEASING, 1L);
+        Fixture hiddenReleaseFixture = fixture(
+                List.of(releasing), List.of(release(OperationState.PREPARED, 0L, null)), true);
+        assertDecision(hiddenReleaseFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, releaseMarker(RELEASE_ID))
+        ), DEFER, RELEASE_NOT_SPAWN_VISIBLE);
+
+        Fixture missingResidentFixture = fixture(
+                List.of(), List.of(release(OperationState.SPAWN_CLAIMED, 1L, null)), true);
+        assertDecision(missingResidentFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, releaseMarker(RELEASE_ID))
+        ), DEFER, RELEASE_RESIDENT_MISMATCH);
+    }
+
+    @Test
+    void blockedAndIncompleteResidentEvidenceDefers() {
+        ResidentRecord releasing = resident(
+                COOP, PROFILE, SOURCE, SOURCE, null, ResidentState.RELEASING, 1L);
+        Fixture missingOperationFixture = fixture(List.of(releasing), List.of(), true);
+        assertDecision(missingOperationFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
+        ), DEFER, RELEASE_OPERATION_MISSING);
+
+        ResidentRecord quarantined = resident(
+                COOP, PROFILE, SOURCE, SOURCE, null, ResidentState.QUARANTINED, 0L);
+        Fixture blockedFixture = fixture(List.of(quarantined), List.of(), true);
+        assertDecision(blockedFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, null)
+        ), DEFER, BLOCKED_RESIDENT_STATE);
+
+        ResidentRecord missingDeployment = resident(
+                COOP, PROFILE, SOURCE, SOURCE, null, ResidentState.DEPLOYED, 2L);
+        Fixture missingDeploymentFixture = fixture(List.of(missingDeployment), List.of(), true);
+        assertDecision(missingDeploymentFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(SOURCE, releaseMarker(RELEASE_ID))
+        ), DEFER, DEPLOYED_IDENTITY_MISMATCH);
     }
 
     private static Fixture fixture(List<ResidentRecord> residents,
@@ -254,13 +409,35 @@ class ManagedCoopStaleEntityPolicyTest {
         ).rebuilt());
         assertTrue(operationIndex.rebuild(ManagedCoopReadResult.loaded(operations)).rebuilt());
         AtomicBoolean compositeTrust = new AtomicBoolean(trusted);
+        ManagedCoopAuthorityEligibilityIndex authorityEligibility =
+                new ManagedCoopAuthorityEligibilityIndex();
+        LinkedHashMap<ManagedCoopAuthorityKey, String> eligible = new LinkedHashMap<>();
+        for (ResidentRecord resident : residents) {
+            eligible.put(resident.authorityKey(), resident.coopId());
+        }
+        for (OperationRecord operation : operations) {
+            eligible.put(operation.authorityKey(), operation.coopId());
+        }
+        Map<String, List<ManagedCoopAuthorityEligibilityIndex.AuthorityEvidence>> byWorld =
+                new LinkedHashMap<>();
+        for (Map.Entry<ManagedCoopAuthorityKey, String> entry : eligible.entrySet()) {
+            byWorld.computeIfAbsent(entry.getKey().worldName(), ignored -> new ArrayList<>())
+                    .add(new ManagedCoopAuthorityEligibilityIndex.AuthorityEvidence(
+                            entry.getKey(), entry.getValue()));
+        }
+        for (Map.Entry<String, List<ManagedCoopAuthorityEligibilityIndex.AuthorityEvidence>> entry
+                : byWorld.entrySet()) {
+            authorityEligibility.replaceWorld(entry.getKey(), entry.getValue());
+        }
         return new Fixture(
                 new ManagedCoopStaleEntityPolicy(
                         residentIndex,
                         operationIndex,
+                        authorityEligibility,
                         compositeTrust::get
                 ),
-                compositeTrust
+                compositeTrust,
+                authorityEligibility
         );
     }
 
@@ -363,6 +540,43 @@ class ManagedCoopStaleEntityPolicyTest {
         );
     }
 
+    private static OperationRecord importOperation() {
+        return new OperationRecord(
+                "managed-coop-import:" + "d".repeat(64),
+                OperationKind.IMPORT,
+                PROFILE,
+                COOP,
+                COOP_ID,
+                0,
+                null,
+                null,
+                null,
+                OperationState.PREPARED,
+                HASH,
+                0L,
+                0L,
+                0,
+                true,
+                -100L,
+                -90L,
+                0L,
+                null
+        );
+    }
+
+    private static ManagedCoopStaleEntityPolicy.MarkerEvidence managedMarker(
+            String operationId,
+            String projectionKind) {
+        return new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                PROFILE,
+                operationId,
+                projectionKind,
+                slotKey(),
+                SOURCE,
+                1L
+        );
+    }
+
     private static ManagedCoopStaleEntityPolicy.MarkerEvidence releaseMarker(String operationId) {
         return new ManagedCoopStaleEntityPolicy.MarkerEvidence(
                 PROFILE,
@@ -398,6 +612,7 @@ class ManagedCoopStaleEntityPolicyTest {
     }
 
     private record Fixture(ManagedCoopStaleEntityPolicy policy,
-                           AtomicBoolean compositeTrust) {
+                           AtomicBoolean compositeTrust,
+                           ManagedCoopAuthorityEligibilityIndex authorityEligibility) {
     }
 }

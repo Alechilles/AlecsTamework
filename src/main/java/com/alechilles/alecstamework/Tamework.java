@@ -1238,6 +1238,10 @@ public class Tamework extends JavaPlugin {
     private void onWorldRemovedForProgressionTiming(@Nonnull RemoveWorldEvent event) {
         if (event != null) {
             World world = event.getWorld();
+            String worldName = world != null ? world.getName() : null;
+            if (managedCoopRuntime != null && worldName != null && !worldName.isBlank()) {
+                managedCoopRuntime.invalidateManagedAuthorityWorld(worldName);
+            }
             if (world != null && world.getEntityStore() != null
                     && world.getEntityStore().getStore() != null) {
                 TameworkBreedingServices.shared().clearScope(
@@ -2206,6 +2210,9 @@ public class Tamework extends JavaPlugin {
 
     private void onCoopAssetsLoaded(
             LoadedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
+        if (managedCoopRuntime != null) {
+            managedCoopRuntime.invalidateManagedAuthorityEvidence();
+        }
         TwCoopConfig.clearCoopCache();
         DefaultAssetMap<String, TwCoopConfig> resolvedAssets = TwCoopConfig.getAssetMap();
         TwCoopConfigValidationService.logInvalidManagedConfigs(
@@ -2221,6 +2228,9 @@ public class Tamework extends JavaPlugin {
 
     private void onCoopAssetsRemoved(
             RemovedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
+        if (managedCoopRuntime != null) {
+            managedCoopRuntime.invalidateManagedAuthorityEvidence();
+        }
         TwCoopConfig.clearCoopCache();
         DefaultAssetMap<String, TwCoopConfig> resolvedAssets = TwCoopConfig.getAssetMap();
         TwCoopConfigValidationService.logInvalidManagedConfigs(

@@ -53,6 +53,9 @@ class CommandLinkedNpcStateSnapshotServiceTest {
         assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
                 TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE
         )));
+        assertTrue(CommandLinkedNpcStateSnapshotService.shouldDeferProfileUpsert(marker(
+                TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION
+        )));
     }
 
     @Test

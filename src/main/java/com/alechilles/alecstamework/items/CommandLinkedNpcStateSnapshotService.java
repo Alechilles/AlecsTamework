@@ -204,7 +204,8 @@ public final class CommandLinkedNpcStateSnapshotService {
         String kind = marker.getProjectionKind();
         return TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(kind)
                 || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(kind)
-                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind);
+                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(kind)
+                || TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(kind);
     }
 
     private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {

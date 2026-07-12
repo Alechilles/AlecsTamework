@@ -13,14 +13,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class ManagedCoopRuntimeCandidateScannerTest {
 
     @Test
-    void unrelatedNpcIsCopiedWhileManagedMarkerAndVanillaResidentFailClosed() {
-        ManagedCoopRuntimeCandidateScanner scanner = new ManagedCoopRuntimeCandidateScanner(policy());
+    void scannerAcceptsIgnoreButNeverTurnsDeferIntoCaptureCandidate() {
+        ManagedCoopStaleEntityPolicy policy = policy();
+        ManagedCoopRuntimeCandidateScanner scanner = new ManagedCoopRuntimeCandidateScanner(policy);
         String[] tools = {"tool-a"};
-        var unrelated = raw(1, tools, false, null);
-        var orphanManaged = raw(2, tools, false, new MarkerEvidence(
+        MarkerEvidence orphanMarker = new MarkerEvidence(
                 "profile", "managed-coop-capture:deadbeef", "MANAGED_COOP_CAPTURE_SOURCE",
-                "world|1|2|3|slot=0", uuid(2), 1L));
+                "world|1|2|3|slot=0", uuid(2), 1L);
+        var unrelated = raw(1, tools, false, null);
+        var orphanManaged = raw(2, tools, false, orphanMarker);
         var vanilla = raw(3, tools, true, null);
+
+        assertEquals(ManagedCoopStaleEntityPolicy.Action.DEFER,
+                policy.decide(ManagedCoopStaleEntityPolicy.Observation.of(
+                        orphanManaged.npcUuid(), orphanMarker)).action());
 
         ManagedCoopRuntimeCandidateScanner.ScanResult result =
                 scanner.filter(List.of(unrelated, orphanManaged, vanilla));
@@ -53,7 +59,11 @@ class ManagedCoopRuntimeCandidateScannerTest {
                 ManagedCoopReadResult.loaded(List.of()));
         ManagedCoopLifecycleOperationIndex operations = new ManagedCoopLifecycleOperationIndex();
         operations.rebuild(ManagedCoopReadResult.loaded(List.of()));
-        return new ManagedCoopStaleEntityPolicy(residents, operations, () -> true);
+        return new ManagedCoopStaleEntityPolicy(
+                residents,
+                operations,
+                new ManagedCoopAuthorityEligibilityIndex(),
+                () -> true);
     }
 
     private static UUID uuid(long value) {

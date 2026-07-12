@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for immutable, order-independent vanilla import evidence. */
@@ -83,20 +84,113 @@ class VanillaCoopImportAuditPreparerTest {
         assertEquals("deployed_source_requires_live_projection_adoption", plan.conflictKind());
     }
 
+    @Test
+    void distinctHousedOverflowReceivesManagedSlotInsteadOfQuarantine() {
+        CoopBlock.CoopResident first = resident("Mob_Chicken", new UUID(0L, 20L), -500L);
+        CoopBlock.CoopResident overflow = resident("Mob_Pigeon", new UUID(0L, 21L), -600L);
+        CoopBlock coop = new CoopBlock(
+                "coop_chicken", List.of(first, overflow), new SimpleItemContainer((short) 5));
+
+        List<SourceEvidence> sources = preparer.prepare(
+                new VanillaCoopImportAuditPreparer.Request(
+                        AUTHORITY, "coop_chicken", 1, adapter.auditForImport(coop),
+                        List.of(), List.of(), ignored -> null, -1_000L))
+                .beginRequest().sources();
+        Map<String, SourceEvidence> byRole = sources.stream()
+                .collect(Collectors.toMap(
+                        source -> source.roleId().toLowerCase(),
+                        Function.identity()));
+        VanillaCoopImportEvidenceCodec.SourcePlan admitted =
+                codec.decodeSourcePlan(byRole.get("mob_chicken"));
+        VanillaCoopImportEvidenceCodec.SourcePlan overflowPlan =
+                codec.decodeSourcePlan(byRole.get("mob_pigeon"));
+
+        assertEquals(PlannedDisposition.IMPORTED, admitted.disposition());
+        assertEquals(0, admitted.targetSlot());
+        assertFalse(admitted.overflow());
+        assertFalse(byRole.get("mob_chicken").sourceEnvelopeJson().contains("\"overflow\""),
+                "missing legacy-compatible overflow evidence must decode as false");
+        assertEquals(PlannedDisposition.IMPORTED, overflowPlan.disposition());
+        assertEquals(1, overflowPlan.targetSlot());
+        assertTrue(overflowPlan.overflow());
+        assertTrue(byRole.get("mob_pigeon").sourceEnvelopeJson()
+                .contains("\"overflow\":true"));
+    }
+
+    @Test
+    void auditFingerprintBindsExactDurablePlanButNotSyntheticSnapshotTime() {
+        UUID sourceUuid = new UUID(0L, 31L);
+        CoopBlock.CoopResident source = resident("Mob_Chicken", sourceUuid, -700L);
+        Function<UUID, String> profile = ignored -> "profile-source";
+
+        VanillaCoopImportAuditPreparer.PreparedAudit imported = prepare(
+                List.of(source), List.of(), profile, 4, -1_000L);
+        VanillaCoopImportAuditPreparer.PreparedAudit importedLater = prepare(
+                List.of(source), List.of(), profile, 4, -2_000L);
+        VanillaCoopImportAuditPreparer.PreparedAudit shifted = prepare(
+                List.of(source),
+                List.of(managedResident("resident-other", 0, "profile-other",
+                        new UUID(0L, 32L))),
+                profile, 4, -1_000L);
+        VanillaCoopImportAuditPreparer.PreparedAudit matched = prepare(
+                List.of(source),
+                List.of(managedResident("resident-source", 2, "profile-source", sourceUuid)),
+                profile, 4, -1_000L);
+
+        String importedFingerprint = imported.beginRequest().envelope().auditFingerprint();
+        assertEquals(VanillaCoopImportEvidenceCodec.AUDIT_VERSION,
+                imported.beginRequest().envelope().auditVersion());
+        assertTrue(imported.beginRequest().envelope().auditEnvelopeJson()
+                .contains("\"sourcePlans\""));
+        assertEquals(importedFingerprint,
+                importedLater.beginRequest().envelope().auditFingerprint(),
+                "housed synthetic snapshot timestamps must not churn operator approval");
+        assertNotEquals(importedFingerprint,
+                shifted.beginRequest().envelope().auditFingerprint(),
+                "a changed target slot must invalidate the prior approval fingerprint");
+        assertNotEquals(shifted.beginRequest().envelope().auditFingerprint(),
+                matched.beginRequest().envelope().auditFingerprint(),
+                "a changed MATCHED versus IMPORTED plan must invalidate prior approval");
+    }
+
     private VanillaCoopImportAuditPreparer.PreparedAudit prepare(
             List<CoopBlock.CoopResident> residents) {
+        return prepare(residents, List.of(), uuid -> null, 4, -1_000L);
+    }
+
+    private VanillaCoopImportAuditPreparer.PreparedAudit prepare(
+            List<CoopBlock.CoopResident> residents,
+            List<ResidentRecord> managedResidents,
+            Function<UUID, String> profileResolver,
+            int maximumResidents,
+            long auditedAtMs) {
         CoopBlock coop = new CoopBlock(
                 "coop_chicken", residents, new SimpleItemContainer((short) 5));
         return preparer.prepare(new VanillaCoopImportAuditPreparer.Request(
                 AUTHORITY,
                 "coop_chicken",
-                4,
+                maximumResidents,
                 adapter.auditForImport(coop),
+                managedResidents,
                 List.of(),
-                List.of(),
-                uuid -> null,
-                -1_000L
+                profileResolver::apply,
+                auditedAtMs
         ));
+    }
+
+    private ResidentRecord managedResident(String residentId,
+                                            int slot,
+                                            String profileId,
+                                            UUID uuid) {
+        String snapshot = codec.managedSnapshot(
+                uuid, "coop_chicken", slot, "mob_chicken", -900L);
+        return new ResidentRecord(
+                residentId, AUTHORITY, "coop_chicken", slot, profileId, "mob_chicken",
+                uuid, uuid, null, snapshot,
+                com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator
+                        .snapshotSha256(snapshot),
+                1, ResidentState.HOUSED, 0L, true,
+                -900L, 0L, -900L, -900L);
     }
 
     private Map<String, String> fingerprints(

@@ -13,11 +13,17 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Owning-world implementation for exact managed-coop capture-source retirement. */
 final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
+    private static final Pattern FINALIZED_RELEASE_OPERATION = Pattern.compile(
+            "managed-coop-release:[0-9a-f]{64}");
+    private static final Pattern FINALIZED_IMPORT_OPERATION = Pattern.compile(
+            "managed-coop-import-operation:[0-9a-f]{64}");
     @Override
     public boolean enqueue(@Nonnull String worldName, @Nonnull Runnable task) {
         World world = resolveWorld(worldName);
@@ -85,10 +91,11 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
             RetirementCommand command) {
         TameworkProjectionIdentityComponent expected = marker(command);
         TameworkProjectionIdentityComponent existing = store.getComponent(reference, markerType);
-        if (existing != null && !matches(existing, command)) {
+        if (existing != null && !matches(existing, command)
+                && !canTransitionFinalizedProjection(existing, command)) {
             return LiveSourceDecision.conflict("source_projection_marker_conflict");
         }
-        if (existing == null) {
+        if (!matches(existing, command)) {
             store.putComponent(reference, markerType, expected);
         }
         TameworkProjectionIdentityComponent installed = store.getComponent(reference, markerType);
@@ -122,6 +129,75 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
                 && Objects.equals(marker.getSlotKey(), command.authoritySlotKey())
                 && Objects.equals(marker.getSourceNpcUuid(), command.sourceNpcUuid())
                 && marker.getGeneration() == command.operationGeneration();
+    }
+
+    /**
+     * Allows an exact finalized managed release to become the source of a committed recapture.
+     * Arbitrary, active, cross-profile, or cross-slot markers remain conflicts.
+     */
+    static boolean canTransitionFinalizedProjection(
+            @Nullable TameworkProjectionIdentityComponent marker,
+            @Nonnull RetirementCommand command) {
+        return canTransitionFinalizedRelease(marker, command)
+                || canTransitionFinalizedImport(marker, command)
+                || canTransitionFinalizedRecovery(marker, command);
+    }
+
+    private static boolean canTransitionFinalizedRelease(
+            @Nullable TameworkProjectionIdentityComponent marker,
+            RetirementCommand command) {
+        if (marker == null
+                || !TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_RELEASE.equals(
+                        marker.getProjectionKind())
+                || marker.getOperationId() == null
+                || !FINALIZED_RELEASE_OPERATION.matcher(marker.getOperationId()).matches()
+                || !Objects.equals(marker.getProfileId(), command.profileId())
+                || !Objects.equals(marker.getSlotKey(), command.authoritySlotKey())
+                || marker.getSourceNpcUuid() == null
+                || marker.getSourceNpcUuid().equals(command.sourceNpcUuid())
+                || marker.getGeneration() != 1L) {
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean canTransitionFinalizedImport(
+            @Nullable TameworkProjectionIdentityComponent marker,
+            RetirementCommand command) {
+        return marker != null
+                && TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_IMPORT_ADOPTION.equals(
+                marker.getProjectionKind())
+                && marker.getOperationId() != null
+                && FINALIZED_IMPORT_OPERATION.matcher(marker.getOperationId()).matches()
+                && Objects.equals(marker.getProfileId(), command.profileId())
+                && Objects.equals(marker.getSlotKey(), command.authoritySlotKey())
+                && Objects.equals(marker.getSourceNpcUuid(), command.sourceNpcUuid())
+                && marker.getGeneration() == command.expectedResidentGeneration();
+    }
+
+    private static boolean canTransitionFinalizedRecovery(
+            @Nullable TameworkProjectionIdentityComponent marker,
+            RetirementCommand command) {
+        return marker != null
+                && TameworkProjectionIdentityComponent.KIND_RECOVERY.equals(
+                marker.getProjectionKind())
+                && canonicalUuid(marker.getOperationId())
+                && Objects.equals(marker.getProfileId(), command.profileId())
+                && marker.getSlotKey() == null
+                && marker.getSourceNpcUuid() != null
+                && !marker.getSourceNpcUuid().equals(command.sourceNpcUuid())
+                && marker.getGeneration() == 0L;
+    }
+
+    private static boolean canonicalUuid(@Nullable String value) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            return UUID.fromString(value).toString().equals(value);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     @Nullable

@@ -52,6 +52,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
 
     private final ManagedCoopChunkScanner contextScanner;
     private final ManagedCoopRuntimeCandidateScanner candidateScanner;
+    private final StaleEntityReevaluation staleEntities;
     private final ManagedCoopRuntimeSweepPlanner planner;
     private final ManagedCoopRuntimeOperationDispatcher operations;
     private final ImportBehavior imports;
@@ -62,6 +63,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
     public ManagedCoopRuntimeSweepOrchestrator(
             @Nonnull ManagedCoopChunkScanner contextScanner,
             @Nonnull ManagedCoopRuntimeCandidateScanner candidateScanner,
+            @Nonnull StaleEntityReevaluation staleEntities,
             @Nonnull ManagedCoopRuntimeSweepPlanner planner,
             @Nonnull ManagedCoopRuntimeOperationDispatcher operations,
             @Nonnull ImportBehavior imports,
@@ -70,6 +72,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
             @Nonnull RemovedCoopReconciler removedCoops) {
         this.contextScanner = Objects.requireNonNull(contextScanner, "contextScanner");
         this.candidateScanner = Objects.requireNonNull(candidateScanner, "candidateScanner");
+        this.staleEntities = Objects.requireNonNull(staleEntities, "staleEntities");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.operations = Objects.requireNonNull(operations, "operations");
         this.imports = Objects.requireNonNull(imports, "imports");
@@ -99,7 +102,7 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
             return outcome(SweepStatus.CONTEXT_SCAN_UNAVAILABLE, 0, 0, 0, 0, 0, false, false,
                     List.of(), contexts.detail());
         }
-
+        reevaluateStaleEntities(entityStore);
         Set<String> physicalCoopKeys = activeCoopKeys(contexts.contexts());
         ImportFilter imported = filterImports(
                 chunkStore, world, contexts.contexts(), nowMs);
@@ -235,6 +238,20 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
         } catch (RuntimeException ignored) {
             return false;
         }
+    }
+
+    private void reevaluateStaleEntities(Store<EntityStore> entityStore) {
+        try {
+            staleEntities.reevaluate(entityStore);
+        } catch (RuntimeException | AssertionError ignored) {
+            // Cleanup is opportunistic and must never broaden authority or block normal work.
+        }
+    }
+
+    /** Owning-thread retry for NPCs that loaded before current authority evidence was published. */
+    @FunctionalInterface
+    public interface StaleEntityReevaluation {
+        void reevaluate(@Nonnull Store<EntityStore> entityStore);
     }
 
     /**

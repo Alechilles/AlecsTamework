@@ -31,7 +31,8 @@ import javax.annotation.Nullable;
  * later resident during replay.</p>
  */
 public final class VanillaCoopImportEvidenceCodec {
-    public static final int AUDIT_VERSION = 1;
+    /** Version two binds operator approval to the exact durable source plans. */
+    public static final int AUDIT_VERSION = 2;
     public static final int SOURCE_ENVELOPE_VERSION = 1;
 
     public enum PlannedDisposition {
@@ -77,7 +78,22 @@ public final class VanillaCoopImportEvidenceCodec {
                              @Nullable UUID residentUuid,
                              @Nullable Integer targetSlot,
                              @Nullable String roleId,
-                             @Nullable String conflictKind) {
+                             @Nullable String conflictKind,
+                             boolean overflow) {
+        /** Preserves source compatibility for plans written before overflow was diagnostic data. */
+        public SourcePlan(PlannedDisposition disposition,
+                          String stablePayload,
+                          int multiplicity,
+                          String residentId,
+                          String profileId,
+                          UUID residentUuid,
+                          Integer targetSlot,
+                          String roleId,
+                          String conflictKind) {
+            this(disposition, stablePayload, multiplicity, residentId, profileId, residentUuid,
+                    targetSlot, roleId, conflictKind, false);
+        }
+
         public SourcePlan {
             Objects.requireNonNull(disposition, "disposition");
             stablePayload = requirePayload(stablePayload, "stablePayload");
@@ -101,6 +117,9 @@ public final class VanillaCoopImportEvidenceCodec {
                     roleId,
                     conflictKind
             );
+            if (overflow && disposition != PlannedDisposition.IMPORTED) {
+                throw new IllegalArgumentException("only an imported source may be overflow");
+            }
         }
     }
 
@@ -217,6 +236,9 @@ public final class VanillaCoopImportEvidenceCodec {
         }
         putOptional(decision, "roleId", plan.roleId());
         putOptional(decision, "conflictKind", plan.conflictKind());
+        if (plan.overflow()) {
+            decision.addProperty("overflow", true);
+        }
         root.add("plan", decision);
         return root.toString();
     }
@@ -245,7 +267,8 @@ public final class VanillaCoopImportEvidenceCodec {
                 optionalUuid(plan, "residentUuid"),
                 optionalInt(plan, "targetSlot"),
                 optionalString(plan, "roleId"),
-                optionalString(plan, "conflictKind")
+                optionalString(plan, "conflictKind"),
+                optionalBoolean(plan, "overflow", false)
         );
         String expectedPayload = decoded.multiplicity() == 1
                 ? decoded.stablePayload()
@@ -389,6 +412,17 @@ public final class VanillaCoopImportEvidenceCodec {
     @Nullable
     private static Integer optionalInt(JsonObject root, String field) {
         return root.has(field) ? requiredInt(root, field) : null;
+    }
+
+    private static boolean optionalBoolean(JsonObject root, String field, boolean defaultValue) {
+        JsonElement value = root.get(field);
+        if (value == null || value.isJsonNull()) {
+            return defaultValue;
+        }
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
+            throw new IllegalArgumentException("source envelope field is not a boolean: " + field);
+        }
+        return value.getAsBoolean();
     }
 
     @Nullable

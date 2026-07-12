@@ -11,8 +11,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.ACTIVE_RELEASE_PROJECTION;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.HISTORICAL_RESIDENT_ALIAS;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.HOUSED_ALIAS;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.UNRELATED_NPC;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.UNTRUSTED_COMPOSITE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,12 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Behavioral boundary coverage for actionable stale-entity suppression. */
 class ManagedCoopStaleEntitySuppressionSystemTest {
     @Test
-    void onlySuppressStartsDespawnAndEmitsOneTransitionEvent() {
+    void onlySuppressStartsDespawnAndDeferIsNonDestructive() {
         List<ManagedCoopStaleEntitySuppressionSystem.SuppressionEvent> events = new ArrayList<>();
         ManagedCoopStaleEntitySuppressionSystem system = system(events::add);
         Observation observation = Observation.of(uuid(1L), null);
         NPCEntity ignored = new NPCEntity();
         NPCEntity allowed = new NPCEntity();
+        NPCEntity deferred = new NPCEntity();
         NPCEntity suppressed = new NPCEntity();
 
         assertFalse(system.applyDecision(
@@ -37,6 +40,11 @@ class ManagedCoopStaleEntitySuppressionSystemTest {
                 allowed,
                 observation,
                 decision(Action.ALLOW, ACTIVE_RELEASE_PROJECTION)
+        ));
+        assertFalse(system.applyDecision(
+                deferred,
+                observation,
+                decision(Action.DEFER, UNTRUSTED_COMPOSITE)
         ));
         assertTrue(system.applyDecision(
                 suppressed,
@@ -51,6 +59,7 @@ class ManagedCoopStaleEntitySuppressionSystemTest {
 
         assertFalse(ignored.isDespawning());
         assertFalse(allowed.isDespawning());
+        assertFalse(deferred.isDespawning());
         assertTrue(suppressed.isDespawning());
         assertEquals(1, events.size());
         assertEquals(HOUSED_ALIAS, events.getFirst().reason());
@@ -72,6 +81,70 @@ class ManagedCoopStaleEntitySuppressionSystemTest {
 
         assertTrue(applied);
         assertTrue(stale.isDespawning());
+    }
+
+    @Test
+    void historicalSuppressionRequiresExactAllowProofForItsReplacement() {
+        UUID staleUuid = uuid(2L);
+        UUID retainedUuid = uuid(3L);
+        Decision guarded = new Decision(
+                Action.SUPPRESS,
+                HISTORICAL_RESIDENT_ALIAS,
+                "profile-a",
+                "operation-a",
+                retainedUuid,
+                null);
+        Observation stale = Observation.of(staleUuid, null);
+        Observation retained = Observation.of(retainedUuid, null);
+        Decision exactAllow = new Decision(
+                Action.ALLOW,
+                ACTIVE_RELEASE_PROJECTION,
+                "profile-a",
+                "operation-a",
+                null,
+                staleUuid);
+
+        assertFalse(ManagedCoopStaleEntitySuppressionSystem.exactRetainedProjectionProof(
+                guarded, stale, retained, null),
+                "mere retained UUID presence is not policy proof");
+        assertTrue(ManagedCoopStaleEntitySuppressionSystem.suppressionAuthorized(
+                guarded,
+                ManagedCoopStaleEntitySuppressionSystem.exactRetainedProjectionProof(
+                        guarded, stale, retained, exactAllow)));
+
+        Decision unrelatedAllow = new Decision(
+                Action.ALLOW,
+                ACTIVE_RELEASE_PROJECTION,
+                "profile-b",
+                "operation-a",
+                null,
+                staleUuid);
+        assertFalse(ManagedCoopStaleEntitySuppressionSystem.exactRetainedProjectionProof(
+                guarded, stale, retained, unrelatedAllow));
+        Decision wrongOperationAllow = new Decision(
+                Action.ALLOW,
+                ACTIVE_RELEASE_PROJECTION,
+                "profile-a",
+                "operation-b",
+                null,
+                staleUuid);
+        assertFalse(ManagedCoopStaleEntitySuppressionSystem.exactRetainedProjectionProof(
+                guarded, stale, retained, wrongOperationAllow));
+        assertFalse(ManagedCoopStaleEntitySuppressionSystem.exactRetainedProjectionProof(
+                guarded, stale, Observation.of(uuid(4L), null), exactAllow));
+        assertFalse(ManagedCoopStaleEntitySuppressionSystem.exactRetainedProjectionProof(
+                guarded, Observation.of(uuid(5L), null), retained, exactAllow));
+
+        Decision finalizedGuard = new Decision(
+                Action.SUPPRESS,
+                HISTORICAL_RESIDENT_ALIAS,
+                "profile-a",
+                null,
+                retainedUuid,
+                null);
+        assertTrue(ManagedCoopStaleEntitySuppressionSystem.exactRetainedProjectionProof(
+                finalizedGuard, stale, retained, exactAllow),
+                "finalized evidence has no active operation constraint");
     }
 
     private static ManagedCoopStaleEntitySuppressionSystem system(

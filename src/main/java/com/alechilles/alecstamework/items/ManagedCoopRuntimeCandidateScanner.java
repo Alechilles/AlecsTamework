@@ -116,7 +116,7 @@ public final class ManagedCoopRuntimeCandidateScanner {
                 suppressed++;
                 continue;
             }
-            if (decision == null || decision.action() == Action.SUPPRESS) {
+            if (decision == null || !captureEligible(decision.action())) {
                 suppressed++;
                 continue;
             }
@@ -132,6 +132,10 @@ public final class ManagedCoopRuntimeCandidateScanner {
             }
         }
         return new ScanResult(ScanStatus.COMPLETE, accepted, suppressed, rejected, null);
+    }
+
+    private boolean captureEligible(Action action) {
+        return action == Action.IGNORE || action == Action.ALLOW;
     }
 
     @Nonnull

@@ -19,6 +19,8 @@ class ManagedCoopStaleEntitySuppressionSystemArchitectureTest {
         assertTrue(source.contains("commandBuffer.getComponent(reference, npcType)"));
         assertTrue(source.contains("commandBuffer.getComponent(reference, uuidType)"));
         assertTrue(source.contains("commandBuffer.getComponent(reference, projectionType)"));
+        assertTrue(source.contains("evaluator.decide(retainedObservation)"));
+        assertTrue(source.contains("ManagedCoopStaleEntityPolicy.exactRetainedProjectionProof("));
         assertTrue(source.contains("decision.action() != Action.SUPPRESS"));
         assertTrue(source.contains("npc.setToDespawn()"));
         assertTrue(source.contains("decisionSink.onSuppressed(new SuppressionEvent("));
@@ -52,11 +54,19 @@ class ManagedCoopStaleEntitySuppressionSystemArchitectureTest {
                 "src/main/java/com/alechilles/alecstamework/items/"
                         + "ManagedCoopStaleEntityPolicy.java"
         ));
+        String markers = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/"
+                        + "ManagedCoopProjectionMarkerPolicy.java"
+        ));
 
         assertTrue(source.contains("ManagedCoopResidentIndex.Snapshot"));
         assertTrue(source.contains("ManagedCoopLifecycleOperationIndex.Snapshot"));
+        assertTrue(source.contains("ManagedCoopAuthorityEligibilityIndex.Snapshot"));
         assertTrue(source.contains("BooleanSupplier compositeTrust"));
-        assertTrue(source.contains("canonicalReleaseOperationId(marker.operationId())"));
+        assertTrue(source.contains("retainedDecision.action() == Action.ALLOW"));
+        assertTrue(source.contains(
+                "staleObservation.npcUuid().equals(retainedDecision.staleAliasUuid())"));
+        assertTrue(markers.contains("canonicalReleaseOperationId(marker.operationId())"));
         assertFalse(source.contains("TameworkProjectionIdentityComponent"));
         assertFalse(source.contains("ComponentType"));
         assertFalse(source.contains("Store<EntityStore>"));

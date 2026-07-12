@@ -180,6 +180,9 @@ public final class ManagedCoopOccupancyService {
             return -1;
         }
         int maxResidents = Math.max(0, context.config().getLifecycleRules().getMaxResidents());
+        if (view.residents().size() >= maxResidents) {
+            return -1;
+        }
         boolean[] occupied = new boolean[maxResidents];
         for (ResidentRecord resident : view.residents()) {
             if (resident.residentSlot() >= 0 && resident.residentSlot() < maxResidents) {
@@ -198,7 +201,6 @@ public final class ManagedCoopOccupancyService {
                                      UUID sourceNpcUuid,
                                      @Nullable String stableProfileId,
                                      ResidentRecord resident) {
-        int maximum = Math.max(0, context.config().getLifecycleRules().getMaxResidents());
         boolean profileMatches = stableProfileId == null || stableProfileId.isBlank()
                 || resident.profileId().equals(stableProfileId.trim());
         return resident.state() == ResidentState.DEPLOYED
@@ -207,7 +209,6 @@ public final class ManagedCoopOccupancyService {
                 && resident.authorityKey().equals(context.authorityKey())
                 && normalize(resident.coopId()).equals(context.coopId())
                 && resident.residentSlot() >= 0
-                && resident.residentSlot() < maximum
                 && profileMatches;
     }
 
@@ -221,12 +222,10 @@ public final class ManagedCoopOccupancyService {
         if (view.status() != AuthorityStatus.READY) {
             return -1;
         }
-        int maxResidents = Math.max(0, context.config().getLifecycleRules().getMaxResidents());
         int first = Integer.MAX_VALUE;
         for (ResidentRecord resident : view.residents()) {
             if (resident.state() == ResidentState.HOUSED
-                    && resident.residentSlot() >= 0
-                    && resident.residentSlot() < maxResidents) {
+                    && resident.residentSlot() >= 0) {
                 first = Math.min(first, resident.residentSlot());
             }
         }

@@ -49,6 +49,11 @@ final class ManagedCoopImportTransactions {
         return sources.recordNeutralization(connection, proof);
     }
 
+    MutationResult refreshNeutralization(Connection connection, NeutralizationProof proof)
+            throws SQLException {
+        return sources.refreshNeutralization(connection, proof);
+    }
+
     MutationResult finalizeAuthority(Connection connection, FinalizationRequest request)
             throws SQLException {
         return sessions.finalizeAuthority(connection, request);

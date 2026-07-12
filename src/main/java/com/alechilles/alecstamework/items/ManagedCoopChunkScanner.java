@@ -90,15 +90,21 @@ public final class ManagedCoopChunkScanner {
 
     private final ManagedCoopAuthorityResolver authorityResolver;
     private final EvidenceSource evidenceSource;
+    private final ManagedCoopAuthorityEligibilityIndex authorityEligibility;
 
-    public ManagedCoopChunkScanner() {
-        this(new ManagedCoopAuthorityResolver(), new HytaleEvidenceSource());
+    public ManagedCoopChunkScanner(
+            @Nonnull ManagedCoopAuthorityEligibilityIndex authorityEligibility) {
+        this(new ManagedCoopAuthorityResolver(), new HytaleEvidenceSource(), authorityEligibility);
     }
 
-    ManagedCoopChunkScanner(@Nonnull ManagedCoopAuthorityResolver authorityResolver,
-                            @Nonnull EvidenceSource evidenceSource) {
+    ManagedCoopChunkScanner(
+            @Nonnull ManagedCoopAuthorityResolver authorityResolver,
+            @Nonnull EvidenceSource evidenceSource,
+            @Nonnull ManagedCoopAuthorityEligibilityIndex authorityEligibility) {
         this.authorityResolver = Objects.requireNonNull(authorityResolver, "authorityResolver");
         this.evidenceSource = Objects.requireNonNull(evidenceSource, "evidenceSource");
+        this.authorityEligibility = Objects.requireNonNull(
+                authorityEligibility, "authorityEligibility");
     }
 
     /** Reads one synchronous chunk-store snapshot and resolves only authority-eligible contexts. */
@@ -106,16 +112,66 @@ public final class ManagedCoopChunkScanner {
     public ScanResult scan(@Nonnull Store<ChunkStore> chunkStore, @Nonnull World world) {
         Objects.requireNonNull(chunkStore, "chunkStore");
         Objects.requireNonNull(world, "world");
+        ManagedCoopAuthorityEligibilityIndex.PublicationToken eligibilityToken =
+                authorityEligibility.publicationToken(world.getName());
         final EvidenceRead read;
         try {
             chunkStore.assertThread();
             read = evidenceSource.read(chunkStore, world);
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | AssertionError exception) {
+            invalidateWorld(world.getName());
             return new ScanResult(
                     ScanStatus.FAILED, List.of(), 0, 0,
                     failureDetail("managed_coop_chunk_scan", exception));
         }
-        return resolve(read);
+        return publishEligibility(world.getName(), resolve(read), eligibilityToken);
+    }
+
+    @Nonnull
+    ScanResult publishEligibility(@Nonnull String worldName, @Nonnull ScanResult result) {
+        return publishEligibility(
+                worldName, result, authorityEligibility.publicationToken(worldName));
+    }
+
+    @Nonnull
+    private ScanResult publishEligibility(@Nonnull String worldName,
+                                          @Nonnull ScanResult result,
+                                          ManagedCoopAuthorityEligibilityIndex.PublicationToken token) {
+        Objects.requireNonNull(result, "result");
+        if (!result.reliable()) {
+            invalidateWorld(worldName);
+            return result;
+        }
+        try {
+            ArrayList<ManagedCoopAuthorityEligibilityIndex.AuthorityEvidence> evidence =
+                    new ArrayList<>(result.contexts().size());
+            for (ManagedCoopContext context : result.contexts()) {
+                evidence.add(
+                        ManagedCoopAuthorityEligibilityIndex.AuthorityEvidence.copyOf(context));
+            }
+            if (!authorityEligibility.replaceWorldIfCurrent(
+                    worldName, evidence, token)) {
+                return new ScanResult(
+                        ScanStatus.FAILED, List.of(), result.rejectedEvidence(),
+                        result.duplicateEvidence(),
+                        "managed_coop_authority_eligibility_stale_scan");
+            }
+            return result;
+        } catch (RuntimeException exception) {
+            invalidateWorld(worldName);
+            return new ScanResult(
+                    ScanStatus.FAILED, List.of(), result.rejectedEvidence(),
+                    result.duplicateEvidence(),
+                    failureDetail("managed_coop_authority_eligibility_publish", exception));
+        }
+    }
+
+    private void invalidateWorld(String worldName) {
+        try {
+            authorityEligibility.invalidateWorld(worldName);
+        } catch (RuntimeException ignored) {
+            // Invalid world identity cannot retain valid exact authority evidence.
+        }
     }
 
     @Nonnull
@@ -284,7 +340,7 @@ public final class ManagedCoopChunkScanner {
         }
     }
 
-    private static String failureDetail(String stage, RuntimeException exception) {
+    private static String failureDetail(String stage, Throwable exception) {
         String message = exception.getMessage();
         return stage + (message == null || message.isBlank()
                 ? ":" + exception.getClass().getSimpleName()

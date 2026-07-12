@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
 /**
  * Owns the complete live schema-v5 managed-coop graph and its process-local intake binding.
  *
- * <p>The plugin registers only the two exposed systems. Every lifecycle collaborator shares one
+ * <p>The plugin registers only the three exposed systems. Every lifecycle collaborator shares one
  * trusted composite index epoch, and shutdown clears only this composition's captured-item
  * handler before persistence begins draining.</p>
  */
@@ -27,6 +27,9 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
     private final ManagedCoopCaptureSourceRetirementSystem sourceRetirementSystem;
     private final ManagedCoopStaleEntitySuppressionSystem staleEntitySuppressionSystem;
     private final ManagedCoopItemIntakeHandler itemIntakeHandler;
+    private final ManagedCoopImportControl importControl;
+    private final ManagedCoopAuthorityEligibilityIndex authorityEligibility;
+    private final ManagedCoopCrossWorldAliasRetirementCoordinator crossWorldAliasRetirement;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public ManagedCoopRuntimeComposition(
@@ -40,6 +43,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
         Objects.requireNonNull(loadedIdentities, "loadedIdentities");
         Objects.requireNonNull(projectionIdentityType, "projectionIdentityType");
 
+        importControl = ManagedCoopImportControl.shared();
+        importControl.clearAll();
         ManagedCoopRuntimeServices services = persistence.getManagedCoopServices();
         BreedingCaptureCancellationService breedingCancellation =
                 new BreedingCaptureCancellationService();
@@ -85,7 +90,12 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         releaseAdapter);
         ManagedCoopRuntimeOperationDispatcher operations = operationDispatcher(
                 services, captureAdapter, sourceRetirements, releaseAdapter);
-        ManagedCoopVanillaImportBehavior imports = importBehavior(persistence, services);
+        ManagedCoopVanillaImportBehavior imports = importBehavior(
+                persistence,
+                services,
+                snapshots,
+                loadedIdentities,
+                projectionIdentityType);
 
         ManagedCoopLifecycleAdmissionGuard lifecycleAdmission =
                 new ManagedCoopLifecycleAdmissionGuard(
@@ -93,15 +103,27 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         services.compositeIndexRefreshService()::isTrusted);
         ManagedCoopRuntimeSweepPlanner planner = new ManagedCoopRuntimeSweepPlanner(
                 services.occupancyService(), lifecycleAdmission);
+        authorityEligibility = new ManagedCoopAuthorityEligibilityIndex();
         ManagedCoopStaleEntityPolicy stalePolicy = new ManagedCoopStaleEntityPolicy(
                 services.residentIndex(),
                 services.lifecycleIndex(),
+                authorityEligibility,
                 services.compositeIndexRefreshService()::isTrusted);
+        crossWorldAliasRetirement = new ManagedCoopCrossWorldAliasRetirementCoordinator(
+                loadedIdentities,
+                stalePolicy::decide,
+                new HytaleManagedCoopCrossWorldAliasRuntimeGateway(
+                        NPCEntity.getComponentType(),
+                        UUIDComponent.getComponentType(),
+                        projectionIdentityType),
+                ManagedCoopCrossWorldAliasRetirementCoordinator.RetirementObserver.noop());
         staleEntitySuppressionSystem = new ManagedCoopStaleEntitySuppressionSystem(
                 stalePolicy,
                 NPCEntity.getComponentType(),
                 UUIDComponent.getComponentType(),
-                projectionIdentityType);
+                projectionIdentityType,
+                ManagedCoopStaleEntitySuppressionSystem.DecisionSink.noop(),
+                crossWorldAliasRetirement);
         ManagedCoopAncillaryBehavior ancillary = new ManagedCoopAncillaryBehavior(
                 services.residentIndex(),
                 services.lifecycleIndex(),
@@ -115,8 +137,9 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         operations);
         ManagedCoopRuntimeSweepOrchestrator orchestrator =
                 new ManagedCoopRuntimeSweepOrchestrator(
-                        new ManagedCoopChunkScanner(),
+                        new ManagedCoopChunkScanner(authorityEligibility),
                         new ManagedCoopRuntimeCandidateScanner(stalePolicy),
+                        staleEntitySuppressionSystem::reevaluate,
                         planner,
                         operations,
                         importGate(imports),
@@ -156,10 +179,25 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
         return staleEntitySuppressionSystem;
     }
 
+    /** Revokes one unloaded world's authority proof before any future entity-add callback. */
+    public void invalidateManagedAuthorityWorld(@Nonnull String worldName) {
+        authorityEligibility.invalidateWorld(worldName);
+        crossWorldAliasRetirement.invalidateWorld(worldName);
+    }
+
+    /** Revokes all authority proof after managed-coop config assets change. */
+    public void invalidateManagedAuthorityEvidence() {
+        authorityEligibility.invalidateAll();
+        crossWorldAliasRetirement.invalidateAll();
+    }
+
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
             ManagedCoopItemIntakeRuntime.clear(itemIntakeHandler);
+            importControl.clearAll();
+            authorityEligibility.close();
+            crossWorldAliasRetirement.close();
         }
     }
 
@@ -204,13 +242,22 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
     @Nonnull
     private ManagedCoopVanillaImportBehavior importBehavior(
             TameworkPersistenceRuntime persistence,
-            ManagedCoopRuntimeServices services) {
+            ManagedCoopRuntimeServices services,
+            CoopResidentStateSnapshotService snapshots,
+            LoadedNpcIdentityIndex loadedIdentities,
+            ComponentType<EntityStore, TameworkProjectionIdentityComponent>
+                    projectionIdentityType) {
         ManagedCoopVanillaImportService importService = new ManagedCoopVanillaImportService(
                 services.residentRepository(),
                 services.lifecycleRepository(),
                 services.importRepository(),
                 persistence.getNpcProfileRepository(),
-                services.compositeIndexRefreshService());
+                services.compositeIndexRefreshService(),
+                importControl,
+                snapshots,
+                projectionIdentityType,
+                persistence.getNpcIdentityRepository(),
+                loadedIdentities);
         return new ManagedCoopVanillaImportBehavior(importService);
     }
 

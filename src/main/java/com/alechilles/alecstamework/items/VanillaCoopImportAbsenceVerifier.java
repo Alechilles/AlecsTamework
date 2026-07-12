@@ -2,10 +2,12 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.items.VanillaCoopImportEvidenceCodec.SourcePlan;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopImportRepository.NeutralizationProof;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopImportRepository.NeutralizationState;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopImportRepository.SessionRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopImportRepository.SourceRecord;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -85,7 +87,7 @@ public final class VanillaCoopImportAbsenceVerifier {
             if (current.getOrDefault(targetPlan.stablePayload(), 0) != 0) {
                 return blocked("target_source_still_present");
             }
-            String proofJson = proofJson(session, target, original, current);
+            String proofJson = proofJson(session, target, original, current, verifiedAtMs);
             return new Result(
                     Status.VERIFIED,
                     new NeutralizationProof(
@@ -107,6 +109,36 @@ public final class VanillaCoopImportAbsenceVerifier {
             );
         } catch (RuntimeException exception) {
             return blocked("absence_evidence_invalid:" + detail(exception));
+        }
+    }
+
+    /**
+     * Returns whether a persisted proof was produced by this verifier instance (this runtime boot).
+     * Older proofs remain valid audit evidence, but cannot authorize current-boot finalization.
+     */
+    boolean isCurrentBootProof(@Nonnull SourceRecord source) {
+        Objects.requireNonNull(source, "source");
+        if (source.neutralizationState() != NeutralizationState.VERIFIED_ABSENT
+                || source.absenceProofVersion() != 1
+                || source.absenceProofJson() == null
+                || source.absenceProofHash() == null
+                || !VanillaCoopImportEvidenceCodec.sha256(source.absenceProofJson())
+                .equals(source.absenceProofHash())) {
+            return false;
+        }
+        try {
+            JsonObject proof = JsonParser.parseString(source.absenceProofJson()).getAsJsonObject();
+            return proof.get("version").getAsInt() == 1
+                    && bootId.equals(proof.get("verificationBootId").getAsString())
+                    && source.sessionId().equals(proof.get("sessionId").getAsString())
+                    && proof.has("auditFingerprint")
+                    && source.evidence().sourceId().equals(proof.get("sourceId").getAsString())
+                    && source.evidence().sourceFingerprint().equals(
+                    proof.get("sourceFingerprint").getAsString())
+                    && source.evidence().sourcePayloadHash().equals(
+                    proof.get("sourcePayloadHash").getAsString());
+        } catch (RuntimeException exception) {
+            return false;
         }
     }
 
@@ -138,7 +170,8 @@ public final class VanillaCoopImportAbsenceVerifier {
     private String proofJson(SessionRecord session,
                              SourceRecord target,
                              Map<String, Integer> original,
-                             Map<String, Integer> current) {
+                             Map<String, Integer> current,
+                             long verifiedAtMs) {
         JsonObject root = new JsonObject();
         root.addProperty("version", 1);
         root.addProperty("verificationBootId", bootId);
@@ -148,6 +181,7 @@ public final class VanillaCoopImportAbsenceVerifier {
         root.addProperty("sourceId", target.evidence().sourceId());
         root.addProperty("sourceFingerprint", target.evidence().sourceFingerprint());
         root.addProperty("sourcePayloadHash", target.evidence().sourcePayloadHash());
+        root.addProperty("verifiedAtMs", verifiedAtMs);
         root.add("originalPayloadCounts", counts(original));
         root.add("currentPayloadCounts", counts(current));
         root.addProperty("currentResidentCount",

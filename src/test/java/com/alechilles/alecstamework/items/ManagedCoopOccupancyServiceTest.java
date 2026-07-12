@@ -82,6 +82,39 @@ class ManagedCoopOccupancyServiceTest {
     }
 
     @Test
+    void overflowResidentsBlockNewIntakeButStillReleaseAndRecapture() throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 2);
+        ResidentRecord configured = resident(
+                0, "profile-a", uuid(1), ResidentState.DEPLOYED);
+        ResidentRecord overflowDeployed = resident(
+                3, "profile-b", uuid(3), uuid(2), ResidentState.DEPLOYED, 5L);
+        ResidentRecord overflowHoused = resident(
+                4, "profile-c", uuid(4), ResidentState.HOUSED);
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index(
+                List.of(authority("coop_chicken", AuthorityState.TWORK_MANAGED)),
+                List.of(configured, overflowDeployed, overflowHoused)
+        ));
+
+        assertEquals(-1, service.firstEmptySlot(context),
+                "a low-slot hole cannot admit a new resident while total occupancy is over cap");
+        assertEquals(4, service.firstHousedSlot(context),
+                "overflow residents retain normal scheduled release semantics");
+
+        ManagedCoopOccupancyService.CapturePlacement recapture =
+                service.resolveCapturePlacement(context, uuid(3), "profile-b");
+        ManagedCoopOccupancyService.CapturePlacement intake =
+                service.resolveCapturePlacement(context, uuid(9), null);
+
+        assertEquals(ManagedCoopOccupancyService.CapturePlacementStatus.RECAPTURE,
+                recapture.status());
+        assertEquals(3, recapture.residentSlot());
+        assertEquals(5L, recapture.expectedResidentGeneration());
+        assertEquals(ManagedCoopOccupancyService.CapturePlacementStatus.REJECTED,
+                intake.status());
+        assertEquals("managed_coop_capture_capacity_unavailable", intake.detail());
+    }
+
+    @Test
     void historicalAliasAndProfileUuidMismatchCannotRecapture() throws Exception {
         ManagedCoopContext context = context("coop_chicken", 2);
         ResidentRecord deployed = resident(

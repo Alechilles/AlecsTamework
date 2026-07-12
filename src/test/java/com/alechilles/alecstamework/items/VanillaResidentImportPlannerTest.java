@@ -67,6 +67,7 @@ class VanillaResidentImportPlannerTest {
 
         assertEquals(IMPORTABLE, plan.decisions().get(0).classification());
         assertEquals(OVERFLOW, plan.decisions().get(1).classification());
+        assertEquals(1, plan.decisions().get(1).targetSlot());
         assertSame(second, plan.decisions().get(1).source());
         assertEquals("  exact raw payload  ", plan.decisions().get(1).source().sourcePayload());
         assertTrue(plan.isOverCapacity());

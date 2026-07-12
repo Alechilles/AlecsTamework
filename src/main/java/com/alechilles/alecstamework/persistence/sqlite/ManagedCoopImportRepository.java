@@ -344,6 +344,18 @@ public final class ManagedCoopImportRepository {
         );
     }
 
+    /** Replaces only the boot-scoped proof after current live state is reverified. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> refreshVerifiedNeutralization(
+            @Nonnull NeutralizationProof proof) {
+        Objects.requireNonNull(proof, "proof");
+        return writeQueue.submitTracked(
+                "managed_coop_import_neutralization_reverified",
+                connection -> transactions.refreshNeutralization(connection, proof),
+                null
+        );
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> finalizeAuthority(
             @Nonnull FinalizationRequest request) {

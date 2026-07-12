@@ -92,6 +92,34 @@ final class ManagedCoopImportSourceTransactions {
         return result(MutationStatus.APPLIED, session, verified, null);
     }
 
+    MutationResult refreshNeutralization(Connection connection, NeutralizationProof proof)
+            throws SQLException {
+        SessionRecord session = reader.loadById(connection, proof.sessionId());
+        SourceRecord source = reader.loadSource(connection, proof.sourceId());
+        MutationResult gate = neutralizationGate(session, source, proof);
+        if (gate != null) {
+            return gate;
+        }
+        if (source.neutralizationState() != NeutralizationState.VERIFIED_ABSENT) {
+            return result(MutationStatus.CONFLICT, session, source,
+                    "source_absence_proof_not_yet_recorded");
+        }
+        if (sameProof(source, proof)) {
+            return result(MutationStatus.IDEMPOTENT, session, source, null);
+        }
+        if (proof.verifiedAtMs() != source.verifiedAbsentAtMs()
+                || !operationCompletedForNeutralization(connection, source.operationId())) {
+            return result(MutationStatus.INVARIANT_BLOCKED, session, source,
+                    "completed_import_operation_required_for_absence_revalidation");
+        }
+        refreshNeutralizationProof(connection, source, proof);
+        SourceRecord refreshed = reader.loadSource(connection, proof.sourceId());
+        if (refreshed == null || !sameProof(refreshed, proof)) {
+            throw integrity("managed_coop_import_neutralization_refresh_failed");
+        }
+        return result(MutationStatus.APPLIED, session, refreshed, null);
+    }
+
     String validateAllTerminalBindings(Connection connection, SessionRecord session)
             throws SQLException {
         for (SourceRecord source : reader.loadSources(connection, session.envelope().sessionId())) {
@@ -206,6 +234,29 @@ final class ManagedCoopImportSourceTransactions {
         }
     }
 
+    private void refreshNeutralizationProof(Connection connection,
+                                            SourceRecord source,
+                                            NeutralizationProof proof) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE managed_coop_import_sources
+                SET absence_proof_json = ?, absence_proof_hash = ?, absence_proof_version = ?,
+                    verified_absent_at_ms = ?
+                WHERE source_id = ? AND session_id = ?
+                  AND neutralization_state = 'VERIFIED_ABSENT'
+                  AND neutralization_command_id = ?
+                """)) {
+            statement.setString(1, proof.absenceProofJson());
+            statement.setString(2, proof.absenceProofHash());
+            statement.setInt(3, proof.absenceProofVersion());
+            statement.setLong(4, proof.verifiedAtMs());
+            statement.setString(5, proof.sourceId());
+            statement.setString(6, proof.sessionId());
+            statement.setString(7, source.neutralizationCommandId());
+            requireOne(statement.executeUpdate(),
+                    "managed_coop_import_neutralization_refresh_count");
+        }
+    }
+
     private boolean operationReadyForNeutralization(Connection connection, String operationId)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
@@ -219,6 +270,25 @@ final class ManagedCoopImportSourceTransactions {
                         && resultSet.getLong("generation") == 2L
                         && resultSet.getInt("active") == 1
                         && resultSet.getLong("completed_at_ms") == 0L
+                        && !resultSet.next();
+            }
+        }
+    }
+
+    private boolean operationCompletedForNeutralization(Connection connection,
+                                                         String operationId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT operation_kind, state, generation, active, completed_at_ms
+                FROM coop_lifecycle_operations WHERE operation_id = ? LIMIT 2
+                """)) {
+            statement.setString(1, operationId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next()
+                        && "IMPORT".equals(resultSet.getString("operation_kind"))
+                        && "COMPLETE".equals(resultSet.getString("state"))
+                        && resultSet.getLong("generation") == 3L
+                        && resultSet.getInt("active") == 0
+                        && resultSet.getLong("completed_at_ms") != 0L
                         && !resultSet.next();
             }
         }
