@@ -23,6 +23,8 @@ Compatibility note:
 ## Authority Boundary
 An enabled config hands the matching coop's occupancy and resident lifecycle to Tamework. Its managed-slot ledger is the capacity authority, and Tamework owns capture, housing, release, scheduling, and produce transitions for that coop.
 
+The matching base `FarmingCoopAsset` must explicitly set `CaptureWildNPCsInRange` to `false`. Tamework verifies that flag and the exact observed coop id before accepting managed authority. This disables only vanilla's automatic wild-intake tick; the parallel Tamework `LifecycleRules.CaptureWildNPCsInRange` may still be `true` because Tamework's durable capture pipeline owns that behavior. A missing base asset, mismatched id, or enabled vanilla automatic intake rejects the managed overlay fail-closed.
+
 Coops without an enabled matching config remain purely vanilla. Tamework does not maintain a shadow ledger for them. This is the post-overhaul boundary: it deliberately does **not** revive the older v2.5 hybrid where vanilla residents were observed and mirrored into a second Tamework representation. That hybrid required repeated slot inference and UUID remapping and was vulnerable to state drift.
 
 ## Vanilla field parity
@@ -192,6 +194,7 @@ Use `/tw coop import-status` to see pending or quarantined import work, and use 
 
 ## Gotchas
 - `CoopId` is the lookup key. Keep it stable once content ships.
+- Set the matching base coop asset's `CaptureWildNPCsInRange` to `false`; do not enable both automatic intake paths.
 - `DropsByRole` keys must match the role ids your coop will actually host.
 - Do not combine an enabled `TwCoopConfig` with a second custom resident sidecar or direct vanilla resident mutation for the same coop.
 - Keep `IdentityRules.PreserveUUID` omitted or `false`; UUID preservation is no longer a supported managed-coop mode.

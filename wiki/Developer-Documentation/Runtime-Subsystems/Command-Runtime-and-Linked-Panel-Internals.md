@@ -17,7 +17,7 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 - Command execution: `CommandStepExecutionService`, `CommandMenuMoveService`
 - Panel entry assembly and preferences: `CommandLinkedPanelEntryService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
 - Group flows: `CommandGroupService`, `CommandGroupAssignPageService`, `CommandGroupManagerPageService`
-- Relocation and recovery: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandRespawnService`, `CommandLostRecoveryService`, `CommandLinkedNpcDeathService`, `CommandLinkedNpcLostService`
+- Relocation and recovery: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandRespawnService`, `CommandLostRecoveryCoordinator`, `CommandLinkedNpcDeathService`, `CommandLinkedNpcLostService`
 
 ## UI layer
 - `TameworkCommandSelectionPage`
