@@ -29,6 +29,10 @@ class AvatarFlightRiderVisualComponentArchitectureTest {
         String plugin = Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework", "Tamework.java"
         ), StandardCharsets.UTF_8);
+        String registrar = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework",
+                "TameworkComponentRegistrar.java"
+        ), StandardCharsets.UTF_8);
 
         assertTrue(component.contains("BuilderCodec<AvatarFlightRiderVisualComponent> CODEC"));
         assertTrue(component.contains("private String riderEntityUuid"));
@@ -40,6 +44,6 @@ class AvatarFlightRiderVisualComponentArchitectureTest {
         assertFalse(component.contains("LastEquipmentSentAtMs"));
         assertFalse(component.contains("lastEquipmentSentAtMs"));
         assertTrue(plugin.contains("ComponentType<EntityStore, AvatarFlightRiderVisualComponent> avatarFlightRiderVisualComponentType"));
-        assertTrue(plugin.contains("\"TameworkAvatarFlightRiderVisual\""));
+        assertTrue(registrar.contains("\"TameworkAvatarFlightRiderVisual\""));
     }
 }

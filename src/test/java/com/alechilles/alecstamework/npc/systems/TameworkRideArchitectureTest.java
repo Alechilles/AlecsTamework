@@ -52,6 +52,9 @@ class TameworkRideArchitectureTest {
     @Test
     void rideComponentsSystemsAndBuildersAreRegistered() throws IOException {
         String plugin = readMain("com", "alechilles", "alecstamework", "Tamework.java");
+        String componentRegistrar = readMain(
+                "com", "alechilles", "alecstamework", "TameworkComponentRegistrar.java"
+        );
         String registrar = readMain(
                 "com",
                 "alechilles",
@@ -60,8 +63,8 @@ class TameworkRideArchitectureTest {
                 "TameworkNpcBuilderRegistrar.java"
         );
 
-        assertTrue(plugin.contains("\"TameworkRideMount\""));
-        assertTrue(plugin.contains("\"TameworkRideRider\""));
+        assertTrue(componentRegistrar.contains("\"TameworkRideMount\""));
+        assertTrue(componentRegistrar.contains("\"TameworkRideRider\""));
         assertTrue(plugin.contains("new MountedRideInputCaptureSystem("));
         assertTrue(plugin.contains("new MountedRideCleanupSystem("));
         assertTrue(plugin.contains("new MountedRideRiderFollowSystem("));

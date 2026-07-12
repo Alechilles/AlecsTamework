@@ -43,9 +43,9 @@ class RespawnTraceDiagnosticsWiringTest {
             "src", "main", "java",
             "com", "alechilles", "alecstamework", "items", "CommandCompanionSpawnPhysicsResetService.java"
     );
-    private static final Path BREEDING_OFFSPRING_SERVICE = Paths.get(
+    private static final Path BREEDING_JOB_RUNTIME = Paths.get(
             "src", "main", "java",
-            "com", "alechilles", "alecstamework", "npc", "actions", "BreedingOffspringService.java"
+            "com", "alechilles", "alecstamework", "npc", "actions", "BreedingHytaleJobRuntime.java"
     );
     private static final Path DEATH_SERVICE = Paths.get(
             "src", "main", "java",
@@ -175,7 +175,7 @@ class RespawnTraceDiagnosticsWiringTest {
 
     @Test
     void breedingOffspringUsesSpawnPhysicsResetAndFallDamageGrace() throws IOException {
-        String content = Files.readString(BREEDING_OFFSPRING_SERVICE, StandardCharsets.UTF_8);
+        String content = Files.readString(BREEDING_JOB_RUNTIME, StandardCharsets.UTF_8);
         int reset = content.indexOf("CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics");
         int protection = content.indexOf("RecentSpawnProtectionService.getInstance().record");
         int progression = content.indexOf("progressionService.applyOffspringState");
