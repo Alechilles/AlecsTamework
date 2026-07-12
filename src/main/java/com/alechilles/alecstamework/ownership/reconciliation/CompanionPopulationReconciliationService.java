@@ -7,10 +7,7 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepair
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationScanSessionRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
-import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -23,10 +20,10 @@ import javax.annotation.Nullable;
  * persisted-world, player-save, base-container, and explicitly sealed custom-container coverage.
  */
 public final class CompanionPopulationReconciliationService {
-    public static final String GLOBAL_OWNER_COVERAGE_KEY = "owner-population:global";
-    public static final String PER_WORLD_OWNER_COVERAGE_KEY = "owner-population:per-world";
-
-    private static final Map<CompanionPopulationCoverageRecord.Dimension, String> CATALOG_KEYS = catalogKeys();
+    public static final String GLOBAL_OWNER_COVERAGE_KEY =
+            CompanionPopulationCoveragePublisher.GLOBAL_OWNER_COVERAGE_KEY;
+    public static final String PER_WORLD_OWNER_COVERAGE_KEY =
+            CompanionPopulationCoveragePublisher.PER_WORLD_OWNER_COVERAGE_KEY;
 
     private final CompanionPopulationReconciliationCatalog catalog;
     private final CompanionPopulationReconciliationRepository reconciliationRepository;
@@ -36,6 +33,7 @@ public final class CompanionPopulationReconciliationService {
     private final CompanionPopulationScanSessionRepository scanSessionRepository;
     private final String scanSessionEpoch;
     private final BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver;
+    private final CompanionPopulationCoveragePublisher coveragePublisher;
 
     public CompanionPopulationReconciliationService(
             @Nonnull CompanionPopulationReconciliationCatalog catalog,
@@ -57,6 +55,9 @@ public final class CompanionPopulationReconciliationService {
         this.scanSessionRepository = Objects.requireNonNull(scanSessionRepository, "scanSessionRepository");
         this.scanSessionEpoch = Objects.requireNonNull(scanSessionEpoch, "scanSessionEpoch");
         this.progressObserver = Objects.requireNonNull(progressObserver, "progressObserver");
+        this.coveragePublisher = new CompanionPopulationCoveragePublisher(
+                catalog, reconciliationRepository
+        );
     }
 
     /**
@@ -68,7 +69,7 @@ public final class CompanionPopulationReconciliationService {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize must be positive.");
         }
-        return initializeCoverage().thenCompose(initialized -> {
+        return coveragePublisher.initializeAsync().thenCompose(initialized -> {
             if (!initialized) {
                 return CompletableFuture.completedFuture(Result.degraded("reconciliation-initialize-failed"));
             }
@@ -76,9 +77,9 @@ public final class CompanionPopulationReconciliationService {
                 if (!scan.success()) {
                     return CompletableFuture.completedFuture(Result.degraded(scan.reason()));
                 }
-                return finishCatalogCoverage().thenCompose(catalogReady -> {
+                return coveragePublisher.finishCatalogAsync().thenCompose(catalogReady -> {
                     if (!catalogReady) {
-                        return publishOwnerState(
+                        return coveragePublisher.publishBothAsync(
                                 CompanionPopulationCoverageRecord.State.RECONCILING,
                                 "reconciliation-catalog-not-sealed",
                                 0,
@@ -100,30 +101,12 @@ public final class CompanionPopulationReconciliationService {
             if (outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())) {
                 return CompletableFuture.completedFuture(result);
             }
-            return publishOwnerState(
+            return coveragePublisher.publishBothAsync(
                     CompanionPopulationCoverageRecord.State.DEGRADED,
                     "reconciliation-session-complete-failed",
                     result.profileCount(),
                     1
             ).thenApply(ignored -> Result.degraded("reconciliation-session-complete-failed"));
-        });
-    }
-
-    @Nonnull
-    private CompletableFuture<Boolean> initializeCoverage() {
-        return committed(reconciliationRepository.pruneInactiveSourcesAsync(
-                catalog.activeCoverageKeys(CATALOG_KEYS)
-        )).thenCompose(pruned -> {
-            if (!pruned) {
-                return CompletableFuture.completedFuture(false);
-            }
-            CompletableFuture<Boolean> chain = CompletableFuture.completedFuture(true);
-            for (CompanionPopulationCoverageRecord.Dimension dimension : CATALOG_KEYS.keySet()) {
-                chain = chain.thenCompose(success -> success
-                        ? writeCatalogCoverage(dimension, CompanionPopulationCoverageRecord.State.RECONCILING, 0, null)
-                        : CompletableFuture.completedFuture(false));
-            }
-            return chain;
         });
     }
 
@@ -223,23 +206,6 @@ public final class CompanionPopulationReconciliationService {
     }
 
     @Nonnull
-    private CompletableFuture<Boolean> finishCatalogCoverage() {
-        CompletableFuture<Boolean> chain = CompletableFuture.completedFuture(true);
-        for (CompanionPopulationCoverageRecord.Dimension dimension : CATALOG_KEYS.keySet()) {
-            boolean sealed = catalog.sealed(dimension);
-            CompanionPopulationCoverageRecord.State state = sealed
-                    ? CompanionPopulationCoverageRecord.State.READY
-                    : CompanionPopulationCoverageRecord.State.RECONCILING;
-            String error = sealed ? null : "coverage-catalog-not-sealed";
-            int completeSources = catalog.sources(dimension).size();
-            chain = chain.thenCompose(success -> success
-                    ? writeCatalogCoverage(dimension, state, completeSources, error)
-                    : CompletableFuture.completedFuture(false));
-        }
-        return chain.thenApply(written -> written && allCatalogsSealed());
-    }
-
-    @Nonnull
     private CompletableFuture<Result> finalizePopulation() {
         List<CompanionPopulationEvidenceSource.Descriptor> descriptors = catalog.sources().stream()
                 .map(CompanionPopulationEvidenceSource::descriptor)
@@ -248,7 +214,7 @@ public final class CompanionPopulationReconciliationService {
             return loadOperations().thenCompose(operations ->
                     operationRecovery.recoverAsync(operations, evidenceSet).thenCompose(recovery -> {
                         if (!recovery.complete()) {
-                            return publishOwnerState(
+                            return coveragePublisher.publishBothAsync(
                                     CompanionPopulationCoverageRecord.State.DEGRADED,
                                     "reconciliation-operation-ambiguous",
                                     evidenceSet.evidence().size(),
@@ -256,7 +222,7 @@ public final class CompanionPopulationReconciliationService {
                             ).thenApply(ignored -> Result.degraded("reconciliation-operation-ambiguous"));
                         }
                         if (!evidenceSet.isConflictFree()) {
-                            return publishOwnerState(
+                            return coveragePublisher.publishBothAsync(
                                     CompanionPopulationCoverageRecord.State.DEGRADED,
                                     "reconciliation-evidence-conflict",
                                     evidenceSet.evidence().size(),
@@ -284,7 +250,7 @@ public final class CompanionPopulationReconciliationService {
                 String reason = repair != null && repair.reason() != null
                         ? repair.reason()
                         : "reconciliation-repair-failed";
-                return publishOwnerState(
+                return coveragePublisher.publishBothAsync(
                         CompanionPopulationCoverageRecord.State.DEGRADED,
                         reason,
                         evidenceSet.evidence().size(),
@@ -293,7 +259,7 @@ public final class CompanionPopulationReconciliationService {
             }
             return loadOperations().thenCompose(remaining -> {
                 if (!remaining.isEmpty()) {
-                    return publishOwnerState(
+                    return coveragePublisher.publishBothAsync(
                             CompanionPopulationCoverageRecord.State.DEGRADED,
                             "reconciliation-operations-remain",
                             repair.profileCount(),
@@ -303,17 +269,9 @@ public final class CompanionPopulationReconciliationService {
                 CompanionPopulationCoverageRecord.State perWorldState = repair.reason() == null
                         ? CompanionPopulationCoverageRecord.State.READY
                         : CompanionPopulationCoverageRecord.State.RECONCILING;
-                return writeOwnerCoverage(
-                        CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER,
-                        CompanionPopulationCoverageRecord.State.READY,
-                        repair.profileCount(),
-                        null
-                ).thenCompose(globalWritten -> writeOwnerCoverage(
-                        CompanionPopulationCoverageRecord.Dimension.PER_WORLD_OWNER,
-                        perWorldState,
-                        repair.profileCount(),
-                        repair.reason()
-                )).thenApply(written -> new Result(
+                return coveragePublisher.publishMergedAsync(
+                        perWorldState, repair.profileCount(), repair.reason()
+                ).thenApply(written -> new Result(
                         perWorldState == CompanionPopulationCoverageRecord.State.READY
                                 ? Status.READY
                                 : Status.RECONCILING,
@@ -354,117 +312,10 @@ public final class CompanionPopulationReconciliationService {
     }
 
     @Nonnull
-    private CompletableFuture<Boolean> publishOwnerState(
-            @Nonnull CompanionPopulationCoverageRecord.State state,
-            @Nonnull String reason,
-            int scanned,
-            int unresolved
-    ) {
-        return writeOwnerCoverage(
-                CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER,
-                state,
-                scanned,
-                reason
-        ).thenCompose(written -> writeOwnerCoverage(
-                CompanionPopulationCoverageRecord.Dimension.PER_WORLD_OWNER,
-                state,
-                scanned,
-                reason + ":unresolved=" + unresolved
-        ));
-    }
-
-    @Nonnull
-    private CompletableFuture<Boolean> writeCatalogCoverage(
-            @Nonnull CompanionPopulationCoverageRecord.Dimension dimension,
-            @Nonnull CompanionPopulationCoverageRecord.State state,
-            int completedSources,
-            @Nullable String error
-    ) {
-        int total = catalog.sources(dimension).size();
-        return writeCoverage(new CompanionPopulationCoverageRecord(
-                CATALOG_KEYS.get(dimension),
-                dimension,
-                "catalog",
-                catalog.generation(dimension),
-                state,
-                "{\"completedSources\":" + completedSources + "}",
-                completedSources,
-                total,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                state == CompanionPopulationCoverageRecord.State.READY ? System.currentTimeMillis() : 0L,
-                error
-        ));
-    }
-
-    @Nonnull
-    private CompletableFuture<Boolean> writeOwnerCoverage(
-            @Nonnull CompanionPopulationCoverageRecord.Dimension dimension,
-            @Nonnull CompanionPopulationCoverageRecord.State state,
-            int profiles,
-            @Nullable String error
-    ) {
-        String key = dimension == CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER
-                ? GLOBAL_OWNER_COVERAGE_KEY
-                : PER_WORLD_OWNER_COVERAGE_KEY;
-        String generation = overallGeneration();
-        long now = System.currentTimeMillis();
-        return writeCoverage(new CompanionPopulationCoverageRecord(
-                key,
-                dimension,
-                "canonical",
-                generation,
-                state,
-                "{\"profiles\":" + profiles + "}",
-                profiles,
-                profiles,
-                now,
-                now,
-                state == CompanionPopulationCoverageRecord.State.READY ? now : 0L,
-                error
-        ));
-    }
-
-    @Nonnull
-    private CompletableFuture<Boolean> writeCoverage(@Nonnull CompanionPopulationCoverageRecord coverage) {
-        return committed(reconciliationRepository.upsertCoverageAsync(coverage));
-    }
-
-    @Nonnull
     private static CompletableFuture<Boolean> committed(
             @Nonnull PersistenceWriteQueue.WriteSubmission<?> submission
     ) {
         return submission.completion().thenApply(PersistenceWriteQueue.WriteOutcome::isCommitted);
-    }
-
-    private boolean allCatalogsSealed() {
-        for (CompanionPopulationCoverageRecord.Dimension dimension : CATALOG_KEYS.keySet()) {
-            if (!catalog.sealed(dimension)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    @Nonnull
-    private String overallGeneration() {
-        List<String> generations = new ArrayList<>();
-        for (CompanionPopulationCoverageRecord.Dimension dimension : CATALOG_KEYS.keySet()) {
-            generations.add(dimension.name() + "=" + catalog.generation(dimension));
-        }
-        return ReconciliationGeneration.forStrings("owner-population", generations);
-    }
-
-    @Nonnull
-    private static Map<CompanionPopulationCoverageRecord.Dimension, String> catalogKeys() {
-        EnumMap<CompanionPopulationCoverageRecord.Dimension, String> keys =
-                new EnumMap<>(CompanionPopulationCoverageRecord.Dimension.class);
-        keys.put(CompanionPopulationCoverageRecord.Dimension.PROFILE_STATE, "catalog:profile-state");
-        keys.put(CompanionPopulationCoverageRecord.Dimension.WORLD_ENTITIES, "catalog:world-entities");
-        keys.put(CompanionPopulationCoverageRecord.Dimension.PLAYER_SAVES, "catalog:player-saves");
-        keys.put(CompanionPopulationCoverageRecord.Dimension.BASE_CONTAINER_BLOCKS, "catalog:base-containers");
-        keys.put(CompanionPopulationCoverageRecord.Dimension.CUSTOM_CONTAINERS, "catalog:custom-containers");
-        return Map.copyOf(keys);
     }
 
     @Nonnull
