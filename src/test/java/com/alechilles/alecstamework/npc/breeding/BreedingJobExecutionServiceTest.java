@@ -113,6 +113,44 @@ class BreedingJobExecutionServiceTest {
     }
 
     @Test
+    void ambiguousPostAddOutcomeRetainsCooldownAndCompletesWithoutRetryingTheLitter() {
+        Fixture fixture = fixture(plan(1), scope(), 8, Map.of(), index -> false, true);
+        fixture.runtime.ambiguousChildIndex = 0;
+        fixture.execution.execute(fixture.job.jobId());
+
+        BreedingJobExecutionService.ExecutionResult result =
+                fixture.execution.execute(fixture.job.jobId());
+        BreedingJobExecutionService.ExecutionResult replay =
+                fixture.execution.execute(fixture.job.jobId());
+
+        assertEquals(COMPLETED, result.status());
+        assertEquals(0, result.spawnedChildren());
+        assertEquals(0, fixture.runtime.rollbackCalls.get());
+        assertEquals(1, fixture.runtime.spawnCalls.get());
+        assertEquals(BreedingJobExecutionService.ExecutionStatus.TERMINAL, replay.status());
+        assertTrue(fixture.services.jobDiagnostics()
+                .find(fixture.job.jobId())
+                .orElseThrow()
+                .reason()
+                .contains("APPLYING journal retained for startup recovery"));
+    }
+
+    @Test
+    void linkageFailureForOneChildCannotStrandOrRollbackAPartialLitter() {
+        Fixture fixture = fixture(plan(2), scope(), 8, Map.of(), index -> true, true);
+        fixture.runtime.linkageFailureChildIndex = 0;
+        fixture.execution.execute(fixture.job.jobId());
+
+        BreedingJobExecutionService.ExecutionResult result =
+                fixture.execution.execute(fixture.job.jobId());
+
+        assertEquals(COMPLETED, result.status());
+        assertEquals(1, result.spawnedChildren());
+        assertEquals(2, fixture.runtime.spawnCalls.get());
+        assertEquals(0, fixture.runtime.rollbackCalls.get());
+    }
+
+    @Test
     void naturalZeroCompletesAndRetainsCooldown() {
         Fixture fixture = fixture(BreedingBirthPlan.of(List.of()), BreedingReservationScope.unscoped(),
                 0, Map.of(), index -> false, true);
@@ -304,6 +342,8 @@ class BreedingJobExecutionServiceTest {
         private boolean throwOnHearts;
         private boolean throwOnCompleted;
         private boolean throwOnRollback;
+        private int ambiguousChildIndex = -1;
+        private int linkageFailureChildIndex = -1;
 
         private FakeRuntime(Object storeScope,
                             BreedingReservationScope reservationScope,
@@ -361,6 +401,24 @@ class BreedingJobExecutionServiceTest {
                                   String context) {
             spawnCalls.incrementAndGet();
             return spawnResult.test(childIndex);
+        }
+
+        @Override
+        public BreedingJobExecutionService.ChildSpawnResult spawnChildResult(
+                BreedingBirthJob job,
+                PlannedChild child,
+                int childIndex,
+                String context) {
+            spawnCalls.incrementAndGet();
+            if (childIndex == linkageFailureChildIndex) {
+                throw new LinkageError("spawn adapter changed");
+            }
+            if (childIndex == ambiguousChildIndex) {
+                return BreedingJobExecutionService.ChildSpawnResult.AMBIGUOUS;
+            }
+            return spawnResult.test(childIndex)
+                    ? BreedingJobExecutionService.ChildSpawnResult.SPAWNED
+                    : BreedingJobExecutionService.ChildSpawnResult.FAILED;
         }
 
         @Override

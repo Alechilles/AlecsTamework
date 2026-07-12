@@ -38,6 +38,7 @@ class BreedingRuntimeWiringTest {
     void delayedSchedulerCarriesJobIdAndExecutorConsumesOnlyPlannedRoles() throws Exception {
         String scheduler = source("HytaleBreedingJobScheduler.java");
         String runtime = source("BreedingHytaleJobRuntime.java");
+        String childSpawn = source("BreedingPreparedChildSpawnService.java");
         String parentState = source("BreedingParentStateService.java");
 
         assertTrue(scheduler.contains("() -> dispatch(jobId)"));
@@ -45,9 +46,9 @@ class BreedingRuntimeWiringTest {
         assertFalse(scheduler.contains("NPCEntity"));
         assertFalse(scheduler.contains("currentHandler.accept(jobId);\n            return;"));
         assertFalse(scheduler.contains("currentFailureHandler.accept(jobId);\n            return;"));
-        assertTrue(runtime.contains("child.roleId()"));
-        assertFalse(runtime.contains("resolveSpawnRole("));
-        assertFalse(runtime.contains("rollOffspring("));
+        assertTrue(childSpawn.contains("child.roleId()"));
+        assertFalse(childSpawn.contains("resolveSpawnRole("));
+        assertFalse(childSpawn.contains("rollOffspring("));
         assertFalse(parentState.contains("loadProfileByNpcUuid"));
         assertFalse(parentState.contains("NpcProfileRepository"));
         assertFalse(parentState.contains("java.lang.reflect"));

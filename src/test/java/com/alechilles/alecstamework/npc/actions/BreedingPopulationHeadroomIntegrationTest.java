@@ -15,6 +15,11 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderProbe;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderProbeResult;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderRegistry;
 import com.alechilles.alecstamework.integration.claims.ClaimResolution;
+import com.alechilles.alecstamework.npc.breeding.BreedingBirthPlan;
+import com.alechilles.alecstamework.npc.breeding.BreedingFertilitySnapshot;
+import com.alechilles.alecstamework.npc.breeding.PlannedChild;
+import com.alechilles.alecstamework.ownership.BreedingBirthPlanSnapshot;
+import com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionRequest;
 import com.alechilles.alecstamework.ownership.BreedingPopulationPreparationResult;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.OwnerPopulationEntry;
@@ -52,7 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BreedingPopulationHeadroomIntegrationTest {
     private static final String WORLD = "breeding-headroom-world";
     private static final String POPULATION_TYPE = "family:test";
-    private static final int LITTER_SIZE = 5;
+    private static final int LITTER_SIZE = 4;
     private static final Vector3d CENTER = new Vector3d(8.0, 64.0, 8.0);
     private static final ClaimChunkCoordinate DESTINATION = new ClaimChunkCoordinate(WORLD, 0, 0);
     private static final UUID OWNER = UUID.fromString("00000000-0000-0000-0000-000000000101");
@@ -77,26 +82,19 @@ class BreedingPopulationHeadroomIntegrationTest {
     void unownedChildrenIgnoreFullParentOwnerCapacityButStillUseNearbyHeadroom() throws Exception {
         try (GlobalConfigScope ignored = GlobalConfigScope.install(2, 1, true);
              Harness harness = Harness.open(tempDir.resolve("unowned"), 2, 1)) {
-            BreedingBirthPlan plan = birthPlan("unowned", null);
-            BreedingNearbyReservationService nearby = new BreedingNearbyReservationService(
-                    new BreedingPopulationTypeService()
-            );
-            BreedingNearbyReservationService.Reservation nearbyReservation = nearby.reserveEvaluated(
-                    WORLD, CENTER, 12.0, 5, populationTypes(), Map.of(POPULATION_TYPE, 2)
-            );
-            BreedingPairAdmissionRegistry registry = BreedingPairAdmissionRegistry.shared();
-            BreedingPairAdmissionRegistry.Token pair = reservePair(registry, "unowned");
+            BreedingBirthPlan plan = birthPlan();
+            int nearbyHeadroom = nearbyHeadroom(5, 2);
             PreparedBreedingPopulationBatch prepared = null;
             try {
                 BreedingPopulationPreparationResult result = harness.runtime()
                         .breedingAdmissionService()
                         .prepareAsync(
-                                request(plan, nearbyReservation, pair),
+                                request(plan, null, nearbyHeadroom, "unowned"),
                                 harness.runtime().breedingAdmissionService().openPreparationContext()
                         ).get(5, TimeUnit.SECONDS);
 
                 assertTrue(result.allowed());
-                assertEquals(3, nearbyReservation.admittedCount());
+                assertEquals(3, nearbyHeadroom);
                 assertEquals(3, result.admittedCount());
                 prepared = assertPrepared(result);
                 assertTrue(prepared.children().stream().allMatch(child -> child.ownerId() == null));
@@ -115,8 +113,6 @@ class BreedingPopulationHeadroomIntegrationTest {
                             .cancelRemainingAsync(prepared, "test-finally-cleanup")
                             .get(5, TimeUnit.SECONDS);
                 }
-                nearby.releaseFrom(nearbyReservation, 0);
-                registry.cancel(pair);
             }
         }
     }
@@ -126,20 +122,12 @@ class BreedingPopulationHeadroomIntegrationTest {
     void providerGenerationChangeBetweenPreparationAndSpawnClosesAdmission() throws Exception {
         try (GlobalConfigScope ignored = GlobalConfigScope.install(10, 10, true);
              Harness harness = Harness.open(tempDir.resolve("provider-switch"), 0, 0)) {
-            BreedingBirthPlan plan = birthPlan("provider-switch", OWNER);
-            BreedingNearbyReservationService nearby = new BreedingNearbyReservationService(
-                    new BreedingPopulationTypeService()
-            );
-            BreedingNearbyReservationService.Reservation nearbyReservation = nearby.reserveEvaluated(
-                    WORLD, CENTER, 12.0, 1, populationTypes(), Map.of()
-            );
-            BreedingPairAdmissionRegistry registry = BreedingPairAdmissionRegistry.shared();
-            BreedingPairAdmissionRegistry.Token pair = reservePair(registry, "provider-switch");
+            BreedingBirthPlan plan = birthPlan();
             PreparedBreedingPopulationBatch prepared = null;
             try {
                 BreedingPopulationPreparationResult result = harness.runtime()
                         .breedingAdmissionService()
-                        .prepareAsync(request(plan, nearbyReservation, pair))
+                        .prepareAsync(request(plan, OWNER, nearbyHeadroom(1, 0), "provider-switch"))
                         .get(5, TimeUnit.SECONDS);
                 assertTrue(result.allowed());
                 assertEquals(1, result.admittedCount());
@@ -162,8 +150,6 @@ class BreedingPopulationHeadroomIntegrationTest {
                             .cancelRemainingAsync(prepared, "test-finally-cleanup")
                             .get(5, TimeUnit.SECONDS);
                 }
-                nearby.releaseFrom(nearbyReservation, 0);
-                registry.cancel(pair);
             }
         }
     }
@@ -182,29 +168,19 @@ class BreedingPopulationHeadroomIntegrationTest {
         ); Harness harness = Harness.open(
                 tempDir.resolve(scenario.name()), scenario.ownerExisting(), scenario.claimExisting()
         )) {
-            BreedingBirthPlan plan = birthPlan(scenario.name(), OWNER);
-            BreedingNearbyReservationService nearby = new BreedingNearbyReservationService(
-                    new BreedingPopulationTypeService()
+            BreedingBirthPlan plan = birthPlan();
+            int nearbyHeadroom = nearbyHeadroom(
+                    scenario.nearbyLimit(), scenario.nearbyExisting()
             );
-            BreedingNearbyReservationService.Reservation nearbyReservation = nearby.reserveEvaluated(
-                    WORLD,
-                    CENTER,
-                    12.0,
-                    scenario.nearbyLimit(),
-                    populationTypes(),
-                    Map.of(POPULATION_TYPE, scenario.nearbyExisting())
-            );
-            BreedingPairAdmissionRegistry registry = BreedingPairAdmissionRegistry.shared();
-            BreedingPairAdmissionRegistry.Token pair = reservePair(registry, scenario.name());
             PreparedBreedingPopulationBatch prepared = null;
             try {
                 BreedingPopulationPreparationResult result = scenario.passive()
                         ? harness.runtime().breedingAdmissionService().prepareAsync(
-                                request(plan, nearbyReservation, pair),
+                                request(plan, OWNER, nearbyHeadroom, scenario.name()),
                                 harness.runtime().breedingAdmissionService().openPreparationContext()
                         ).get(5, TimeUnit.SECONDS)
                         : harness.runtime().breedingAdmissionService().prepareAsync(
-                                request(plan, nearbyReservation, pair)
+                                request(plan, OWNER, nearbyHeadroom, scenario.name())
                         ).get(5, TimeUnit.SECONDS);
 
                 assertTrue(result.allowed(), scenario.name());
@@ -237,8 +213,6 @@ class BreedingPopulationHeadroomIntegrationTest {
                             .cancelRemainingAsync(prepared, "test-finally-cleanup")
                             .get(5, TimeUnit.SECONDS);
                 }
-                nearby.releaseFrom(nearbyReservation, 0);
-                registry.cancel(pair);
             }
         }
     }
@@ -251,52 +225,75 @@ class BreedingPopulationHeadroomIntegrationTest {
         return result.preparedBatch();
     }
 
-    private static com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionRequest request(
+    private static BreedingPopulationAdmissionRequest request(
             BreedingBirthPlan plan,
-            BreedingNearbyReservationService.Reservation nearby,
-            BreedingPairAdmissionRegistry.Token pair
+            UUID ownerId,
+            int maximumAdmittedCount,
+            String attempt
     ) {
+        BreedingBirthPlanSnapshot snapshot = snapshot(plan, ownerId);
+        UUID jobId = UUID.nameUUIDFromBytes(
+                ("headroom:" + attempt).getBytes(StandardCharsets.UTF_8)
+        );
         return BreedingPopulationAdmissionRequestFactory.create(
                 WORLD,
                 CENTER,
-                plan,
-                new BreedingBirthPlanSnapshotMapper().snapshot(plan),
-                nearby,
-                pair
+                snapshot,
+                snapshot.children(),
+                maximumAdmittedCount,
+                jobId,
+                attempt + ":parent-a-profile",
+                attempt + ":parent-b-profile"
         );
     }
 
-    private static BreedingBirthPlan birthPlan(String prefix, UUID ownerId) {
-        List<BreedingBirthPlan.PlannedChild> children = new ArrayList<>();
+    private static BreedingBirthPlan birthPlan() {
+        List<PlannedChild> children = new ArrayList<>();
         for (int index = 0; index < LITTER_SIZE; index++) {
-            children.add(new BreedingBirthPlan.PlannedChild(
-                    prefix + "-child-" + index,
-                    new BreedingResolvedSpawnRole("Test_Child", 0, null, null, null),
-                    new BreedingOffspringProgressionService.OwnerSnapshot(
-                            ownerId, ownerId == null ? null : "Test Owner"
-                    ),
+            children.add(new PlannedChild(
+                    "Test_Child",
+                    null,
+                    null,
+                    null,
                     POPULATION_TYPE
             ));
         }
         return new BreedingBirthPlan(
-                new BreedingFertilityOffspringService.FertilityRoll(1.0, 1.0, LITTER_SIZE, LITTER_SIZE),
+                new BreedingFertilitySnapshot(1.0, 1.0, LITTER_SIZE, 0.0, LITTER_SIZE),
                 children
         );
     }
 
-    private static List<String> populationTypes() {
-        return java.util.Collections.nCopies(LITTER_SIZE, POPULATION_TYPE);
+    private static BreedingBirthPlanSnapshot snapshot(BreedingBirthPlan plan, UUID ownerId) {
+        List<BreedingBirthPlanSnapshot.PlannedChild> children = new ArrayList<>();
+        for (int index = 0; index < plan.children().size(); index++) {
+            PlannedChild child = plan.children().get(index);
+            children.add(new BreedingBirthPlanSnapshot.PlannedChild(
+                    BreedingJobPlanSnapshotMapper.childKey(index),
+                    child.roleId(),
+                    -1,
+                    child.adultRoleId(),
+                    child.gender(),
+                    false,
+                    null,
+                    null,
+                    ownerId,
+                    ownerId == null ? null : "Test Owner",
+                    child.populationType()
+            ));
+        }
+        BreedingFertilitySnapshot fertility = plan.fertilitySnapshot();
+        return new BreedingBirthPlanSnapshot(
+                fertility.parentAMultiplier(),
+                fertility.parentBMultiplier(),
+                fertility.expectedOffspring(),
+                fertility.rolledChildCount(),
+                children
+        );
     }
 
-    private static BreedingPairAdmissionRegistry.Token reservePair(
-            BreedingPairAdmissionRegistry registry,
-            String key
-    ) {
-        UUID first = UUID.nameUUIDFromBytes((key + ":a").getBytes(StandardCharsets.UTF_8));
-        UUID second = UUID.nameUUIDFromBytes((key + ":b").getBytes(StandardCharsets.UTF_8));
-        BreedingPairAdmissionRegistry.Token token = registry.tryReserve(first, second, 1L, 1L);
-        assertNotNull(token);
-        return token;
+    private static int nearbyHeadroom(int limit, int existing) {
+        return Math.max(0, Math.min(LITTER_SIZE, limit - existing));
     }
 
     private record Scenario(String name,

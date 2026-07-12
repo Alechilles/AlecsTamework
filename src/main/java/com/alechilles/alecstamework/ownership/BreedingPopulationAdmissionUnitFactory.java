@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyTransition;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
@@ -166,6 +167,13 @@ final class BreedingPopulationAdmissionUnitFactory {
         json.addProperty("chunkX", destination.chunkX());
         json.addProperty("chunkZ", destination.chunkZ());
         json.addProperty("plannedNpcUuid", child.plannedNpcUuid().toString());
+        if (request.hasCanonicalParentPair()) {
+            JsonArray parentProfileIds = new JsonArray();
+            for (String profileId : request.parentProfileIds()) {
+                parentProfileIds.add(profileId);
+            }
+            json.add("parentProfileIds", parentProfileIds);
+        }
         json.add("birthPlan", BreedingBirthPlanSnapshotJsonCodec.encode(request.birthPlan()));
         return json.toString();
     }

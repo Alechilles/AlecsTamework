@@ -11,8 +11,22 @@ class BreedingSpawnCompletionGuardTest {
     @Test
     void followUpFailureCannotReclassifyAnAlreadyCreatedChildAsFailed() {
         BreedingSpawnCompletionGuard guard = new BreedingSpawnCompletionGuard();
-        List<RuntimeException> failures = new ArrayList<>();
+        List<Throwable> failures = new ArrayList<>();
         RuntimeException failure = new IllegalStateException("progression failed");
+
+        boolean spawned = guard.complete(() -> {
+            throw failure;
+        }, failures::add);
+
+        assertTrue(spawned);
+        assertEquals(List.of(failure), failures);
+    }
+
+    @Test
+    void linkageFailureAfterAddCannotRevokeSpawnSuccess() {
+        BreedingSpawnCompletionGuard guard = new BreedingSpawnCompletionGuard();
+        List<Throwable> failures = new ArrayList<>();
+        LinkageError failure = new LinkageError("optional integration disappeared");
 
         boolean spawned = guard.complete(() -> {
             throw failure;

@@ -33,7 +33,7 @@ final class BreedingOffspringService {
     BreedingOffspringService(@Nonnull BreedingPartnerService partnerService,
                              @Nonnull TameworkBreedingServices services) {
         HytaleBreedingJobScheduler scheduler = new HytaleBreedingJobScheduler(services.jobRegistry());
-        BreedingHytaleJobRuntime runtime = new BreedingHytaleJobRuntime();
+        BreedingHytaleJobRuntime runtime = new BreedingHytaleJobRuntime(services);
         BreedingJobExecutionService<BreedingHytaleJobRuntime.Context> executionService =
                 new BreedingJobExecutionService<>(
                         services,
@@ -47,14 +47,16 @@ final class BreedingOffspringService {
                 scheduler,
                 APPROACH_DELAY_MS
         );
-        this.pairingService = new BreedingHytalePairingService(partnerService, coordinator);
+        this.pairingService = new BreedingHytalePairingService(
+                partnerService, coordinator, services
+        );
     }
 
     boolean tryCompletePairing(@Nullable Ref<EntityStore> sourceRef,
                                @Nullable Store<EntityStore> store,
                                @Nullable TameworkBreedingComponent sourceBreeding,
                                @Nullable TwBreedingConfig config) {
-        return pairingService.tryPassive(sourceRef, store, sourceBreeding, config, null);
+        return pairingService.tryPassive(sourceRef, store, sourceBreeding, config);
     }
 
     boolean tryCompletePairing(@Nullable Ref<EntityStore> sourceRef,
@@ -81,7 +83,23 @@ final class BreedingOffspringService {
                                @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> ignoredClaims,
                                @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> ignoredPlayers,
                                @Nullable CommandBuffer<EntityStore> commandBuffer) {
-        return pairingService.tryPassive(sourceRef, store, sourceBreeding, config, commandBuffer);
+        return pairingService.tryPassive(sourceRef, store, sourceBreeding, config);
+    }
+
+    boolean tryCompletePairing(
+            @Nullable Ref<EntityStore> sourceRef,
+            @Nullable Store<EntityStore> store,
+            @Nullable TameworkBreedingComponent sourceBreeding,
+            @Nullable TwBreedingConfig config,
+            @Nullable CommandBuffer<EntityStore> commandBuffer,
+            @Nonnull BreedingPopulationSweepContext populationContext) {
+        return pairingService.tryPassive(
+                sourceRef,
+                store,
+                sourceBreeding,
+                config,
+                populationContext
+        );
     }
 
     boolean tryCompletePairing(@Nullable Ref<EntityStore> sourceRef,
@@ -89,7 +107,7 @@ final class BreedingOffspringService {
                                @Nullable TameworkBreedingComponent sourceBreeding,
                                @Nullable TwBreedingConfig config,
                                @Nullable CommandBuffer<EntityStore> commandBuffer) {
-        return pairingService.tryPassive(sourceRef, store, sourceBreeding, config, commandBuffer);
+        return pairingService.tryPassive(sourceRef, store, sourceBreeding, config);
     }
 
     boolean tryCompleteManualPairing(@Nullable Ref<EntityStore> sourceRef,

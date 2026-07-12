@@ -49,6 +49,12 @@ final class BreedingPairEffectsService {
         return true;
     }
 
+    /** Replays only presentation/movement; the original durable cooldown generation is retained. */
+    boolean resume(@Nonnull EffectContext context) {
+        moveParents(context);
+        return true;
+    }
+
     void rollback(@Nonnull EffectContext context, @Nonnull BreedingBirthJob job) {
         rollbackParent(
                 context.sourceRef(), context.sourceNpc(), context.sourceBreeding(), context, job

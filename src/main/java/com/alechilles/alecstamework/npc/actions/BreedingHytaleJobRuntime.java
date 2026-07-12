@@ -2,23 +2,23 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
-import com.alechilles.alecstamework.damage.RecentSpawnProtectionService;
-import com.alechilles.alecstamework.items.CommandCompanionSpawnPhysicsResetService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.breeding.BreedingBirthJob;
 import com.alechilles.alecstamework.npc.breeding.BreedingJobExecutionService;
 import com.alechilles.alecstamework.npc.breeding.BreedingPairingCoordinator;
+import com.alechilles.alecstamework.npc.breeding.BreedingPreparedPopulationRegistry;
 import com.alechilles.alecstamework.npc.breeding.BreedingPopulationAdmissionService;
 import com.alechilles.alecstamework.npc.breeding.PlannedChild;
+import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.ownership.PreparedBreedingPopulationBatch;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -27,9 +27,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import it.unimi.dsi.fastutil.Pair;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -41,14 +39,28 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
 
     private final BreedingParentStateService parentStateService = new BreedingParentStateService();
     private final BreedingCapacityRequestFactory capacityFactory = new BreedingCapacityRequestFactory();
-    private final BreedingOffspringSpawnService spawnService =
-            new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
-    private final BreedingOffspringProgressionService progressionService = new BreedingOffspringProgressionService();
     private final BreedingParticleOffsetResolver particleOffsetResolver = new BreedingParticleOffsetResolver();
-    private final BreedingParentCooldownResolver cooldownResolver = new BreedingParentCooldownResolver();
     private final BreedingCooldownRollbackService rollbackService = new BreedingCooldownRollbackService();
-    private final BreedingSpawnCompletionGuard spawnCompletionGuard =
-            new BreedingSpawnCompletionGuard();
+    private final BreedingPreparedPopulationRegistry preparedPopulation;
+    private final BreedingPreparedChildSpawnService childSpawnService;
+
+    BreedingHytaleJobRuntime() {
+        this(TameworkBreedingServices.shared());
+    }
+
+    BreedingHytaleJobRuntime(@Nonnull TameworkBreedingServices services) {
+        this.preparedPopulation = services.preparedPopulationRegistry();
+        BreedingOffspringPostSpawnService postSpawnService = new BreedingOffspringPostSpawnService(
+                new BreedingOffspringProgressionService(),
+                new BreedingCooldownService(),
+                new BreedingPairingEffectsService(particleOffsetResolver)
+        );
+        this.childSpawnService = new BreedingPreparedChildSpawnService(
+                preparedPopulation,
+                new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver()),
+                postSpawnService
+        );
+    }
 
     @Override
     @Nonnull
@@ -122,70 +134,18 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
                               @Nonnull PlannedChild child,
                               int childIndex,
                               @Nonnull Context context) {
-        NPCPlugin plugin = NPCPlugin.get();
-        int roleIndex = plugin != null ? plugin.getIndex(child.roleId()) : -1;
-        if (plugin == null || roleIndex < 0) {
-            return false;
-        }
-        Vector3d spawnPosition = spawnPosition(job, childIndex);
-        Pair<Ref<EntityStore>, NPCEntity> spawned = spawnService.spawnWithFallback(
-                plugin,
-                context.store(),
-                roleIndex,
-                spawnPosition,
-                spawnRotation(context)
-        );
-        if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            return false;
-        }
-        Ref<EntityStore> childRef = spawned.first();
-        NPCEntity childNpc = spawned.second();
-        return spawnCompletionGuard.complete(
-                () -> initializeSpawnedChild(job, child, childRef, childNpc, context),
-                exception -> logSpawnFollowUpFailure(job, childNpc, exception));
+        return spawnChildResult(job, child, childIndex, context)
+                == BreedingJobExecutionService.ChildSpawnResult.SPAWNED;
     }
 
-    private void initializeSpawnedChild(BreedingBirthJob job,
-                                        PlannedChild child,
-                                        Ref<EntityStore> childRef,
-                                        NPCEntity childNpc,
-                                        Context context) {
-        String physicsReset = CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
-                childRef,
-                childNpc,
-                context.store()
-        );
-        RecentSpawnProtectionService.getInstance().record(
-                childNpc.getUuid(),
-                "breeding_offspring",
-                child.roleId(),
-                System.currentTimeMillis()
-        );
-        BreedingParentCooldownResolver.ResolvedCooldown childCooldown = cooldownResolver.resolve(
-                context.config(),
-                childRef,
-                context.store()
-        );
-        progressionService.applyOffspringState(
-                childRef,
-                childNpc,
-                context.firstRef(),
-                context.secondRef(),
-                child.roleId(),
-                context.firstOwner(),
-                context.secondOwner(),
-                context.firstTamed(),
-                context.secondTamed(),
-                configId(context.config()),
-                childCooldown.durationMs(),
-                child.adultRoleId(),
-                TwBreedingConfig.Gender.fromConfigValue(child.gender()),
-                lifecycleFamily(context.config(), child),
-                context.store()
-        );
-        spawnHearts(childRef, childNpc, context.store());
-        logInfo("Breeding spawn success: child=" + childNpc.getUuid()
-                + " role=" + child.roleId() + " physicsReset={" + physicsReset + "}.");
+    @Override
+    @Nonnull
+    public BreedingJobExecutionService.ChildSpawnResult spawnChildResult(
+            @Nonnull BreedingBirthJob job,
+            @Nonnull PlannedChild child,
+            int childIndex,
+            @Nonnull Context context) {
+        return childSpawnService.spawn(job, child, childIndex, context);
     }
 
     @Override
@@ -200,6 +160,43 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
             logInfo("Breeding produced multiple offspring: job=" + job.jobId()
                     + " count=" + spawnedChildren + ".");
         }
+    }
+
+    @Override
+    public void onAdmissionShrunk(
+            @Nonnull BreedingBirthJob original,
+            @Nonnull java.util.List<PlannedChild> retainedChildren,
+            @Nonnull Context context) {
+        java.util.List<PlannedChild> source = original.admittedChildren();
+        java.util.List<String> retainedKeys = new java.util.ArrayList<>(
+                retainedChildren.size()
+        );
+        int retainedIndex = 0;
+        for (int sourceIndex = 0;
+             sourceIndex < source.size() && retainedIndex < retainedChildren.size();
+             sourceIndex++) {
+            if (!source.get(sourceIndex).equals(retainedChildren.get(retainedIndex))) {
+                continue;
+            }
+            PreparedBreedingPopulationBatch.ReservedChild reserved =
+                    preparedPopulation.child(original.jobId(), sourceIndex).orElse(null);
+            if (reserved == null) {
+                throw new IllegalStateException("Prepared breeding child mapping is incomplete");
+            }
+            retainedKeys.add(reserved.childKey());
+            retainedIndex++;
+        }
+        if (retainedIndex != retainedChildren.size()) {
+            throw new IllegalStateException("Spawn-time admission no longer matches prepared litter");
+        }
+        preparedPopulation.retainOnly(
+                original.jobId(), retainedKeys, "breeding-spawn-capacity-shrunk"
+        );
+    }
+
+    @Override
+    public void cancelPopulation(@Nonnull BreedingBirthJob job, @Nonnull String reason) {
+        preparedPopulation.cancelRemaining(job.jobId(), reason);
     }
 
     @Override
@@ -234,38 +231,6 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
                 TamedStateResolver.isTamed(secondRef, store),
                 config
         );
-    }
-
-    private Vector3d spawnPosition(BreedingBirthJob job, int childIndex) {
-        double offsetX = childIndex == 0 ? 0.0 : ThreadLocalRandom.current().nextDouble(-0.55, 0.55);
-        double offsetZ = childIndex == 0 ? 0.0 : ThreadLocalRandom.current().nextDouble(-0.55, 0.55);
-        return new Vector3d(job.anchor().x() + offsetX, job.anchor().y(), job.anchor().z() + offsetZ);
-    }
-
-    private Rotation3f spawnRotation(Context context) {
-        TransformComponent first = transform(context.firstRef(), context.store());
-        TransformComponent second = transform(context.secondRef(), context.store());
-        if (first != null && second != null) {
-            Vector3d delta = new Vector3d(second.getPosition()).sub(first.getPosition());
-            if (delta.lengthSquared() > 0.00001) {
-                return Rotation3f.lookAt(delta);
-            }
-        }
-        TransformComponent fallback = first != null ? first : second;
-        return fallback != null ? new Rotation3f(fallback.getRotation()) : new Rotation3f();
-    }
-
-    @Nullable
-    private TwBreedingConfig.RoleFamily lifecycleFamily(@Nullable TwBreedingConfig config,
-                                                        PlannedChild child) {
-        if (config == null) {
-            return null;
-        }
-        TwBreedingConfig.RoleFamily family = config.resolveLifecycleLineFamilyForRole(child.adultRoleId());
-        if (family == null) {
-            family = config.resolveLifecycleLineFamilyForRole(child.roleId());
-        }
-        return family != null ? family : config.resolveLifecycleFamilyForRole(child.adultRoleId());
     }
 
     private void spawnHearts(Ref<EntityStore> ref, NPCEntity npc, Store<EntityStore> store) {
@@ -327,29 +292,11 @@ final class BreedingHytaleJobRuntime implements BreedingJobExecutionService.Runt
         return plugin != null && npc.getRoleIndex() >= 0 ? plugin.getName(npc.getRoleIndex()) : null;
     }
 
-    @Nullable
-    private String configId(@Nullable TwBreedingConfig config) {
-        return config != null ? config.getId() : null;
-    }
-
     private void logInfo(String message) {
         Tamework plugin = Tamework.getInstance();
         if (plugin != null && plugin.getLogger() != null && plugin.isDebugBreedingEnabled()) {
             plugin.getLogger().at(Level.INFO).log(message);
         }
-    }
-
-    private void logSpawnFollowUpFailure(BreedingBirthJob job,
-                                         NPCEntity childNpc,
-                                         RuntimeException failure) {
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getLogger() == null) {
-            return;
-        }
-        plugin.getLogger().at(Level.WARNING).withCause(failure).log(
-                "Breeding child was created but follow-up initialization failed: job="
-                        + job.jobId() + " child=" + childNpc.getUuid()
-                        + ". Birth remains committed to prevent a duplicate litter.");
     }
 
     record Context(

@@ -13,15 +13,15 @@ import javax.annotation.Nonnull;
  */
 final class BreedingSpawnCompletionGuard {
     boolean complete(@Nonnull Runnable followUp,
-                     @Nonnull Consumer<RuntimeException> failureSink) {
+                     @Nonnull Consumer<Throwable> failureSink) {
         Objects.requireNonNull(followUp, "followUp");
         Objects.requireNonNull(failureSink, "failureSink");
         try {
             followUp.run();
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
             try {
                 failureSink.accept(exception);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | LinkageError ignored) {
                 // The child already exists; reporting cannot revoke that authoritative outcome.
             }
         }

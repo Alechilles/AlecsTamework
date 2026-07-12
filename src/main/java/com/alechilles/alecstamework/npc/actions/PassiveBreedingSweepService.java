@@ -54,6 +54,7 @@ public final class PassiveBreedingSweepService {
             return;
         }
 
+        BreedingPopulationSweepContext populationContext = new BreedingPopulationSweepContext();
         store.forEachChunk(
                 Query.and(npcType, transformType, breedingType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
@@ -64,7 +65,8 @@ public final class PassiveBreedingSweepService {
                                 transformType,
                                 breedingType,
                                 store,
-                                nowMs
+                                nowMs,
+                                populationContext
                         )
         );
     }
@@ -75,7 +77,8 @@ public final class PassiveBreedingSweepService {
                               @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
                               @Nonnull ComponentType<EntityStore, TameworkBreedingComponent> breedingType,
                               @Nonnull Store<EntityStore> store,
-                              long nowMs) {
+                              long nowMs,
+                              @Nonnull BreedingPopulationSweepContext populationContext) {
         int size = chunk.size();
         for (int i = 0; i < size; i++) {
             Ref<EntityStore> ref = chunk.getReferenceTo(i);
@@ -117,7 +120,8 @@ public final class PassiveBreedingSweepService {
                     store,
                     breeding,
                     config,
-                    commandBuffer
+                    commandBuffer,
+                    populationContext
             );
         }
     }

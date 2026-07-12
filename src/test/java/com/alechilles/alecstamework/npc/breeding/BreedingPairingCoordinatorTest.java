@@ -21,6 +21,35 @@ class BreedingPairingCoordinatorTest {
     private static final UUID JOB_ID = uuid(100L);
 
     @Test
+    void asynchronousReserveMutatesNoParentUntilExplicitActivation() {
+        TameworkBreedingServices services = new TameworkBreedingServices(() -> 0.25);
+        Object scope = new Object();
+        AtomicInteger effects = new AtomicInteger();
+        BreedingPairingCoordinator coordinator = new BreedingPairingCoordinator(
+                services,
+                () -> JOB_ID,
+                (jobId, delayMs) -> { },
+                0L
+        );
+        BreedingPairingCoordinator.PairingRequest request = defaultRequest(
+                scope,
+                parent(1L, "profile-a"),
+                parent(2L, "profile-b"),
+                effects,
+                new AtomicInteger()
+        );
+
+        BreedingPairingCoordinator.PairingResult reserved = coordinator.reserve(request);
+
+        assertEquals(BreedingPairingCoordinator.PairingStatus.RESERVED, reserved.status());
+        assertEquals(0, effects.get());
+        assertEquals(BreedingBirthJobState.RESERVED,
+                services.jobRegistry().find(scope, JOB_ID).orElseThrow().state());
+        assertEquals(ACCEPTED, coordinator.activate(request, JOB_ID).status());
+        assertEquals(1, effects.get());
+    }
+
+    @Test
     void resolvesOnceRegistersBeforeEffectsThenSchedulesOnlyJobId() {
         TameworkBreedingServices services = new TameworkBreedingServices(() -> 0.25);
         Object scope = new Object();

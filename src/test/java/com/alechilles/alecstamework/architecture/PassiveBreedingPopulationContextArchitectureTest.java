@@ -17,7 +17,9 @@ class PassiveBreedingPopulationContextArchitectureTest {
     void passiveSweepCreatesOneLazyContextAndPassesItToEveryCandidate() throws IOException {
         String sweep = read("npc/actions/PassiveBreedingSweepService.java");
         String lazy = read("npc/actions/BreedingPopulationSweepContext.java");
-        String offspring = read("npc/actions/BreedingOffspringService.java");
+        String populationPreparation = read(
+                "npc/actions/BreedingPairingPopulationPreparationService.java"
+        );
 
         assertTrue(sweep.contains(
                 "BreedingPopulationSweepContext populationContext = new BreedingPopulationSweepContext()"
@@ -25,8 +27,10 @@ class PassiveBreedingPopulationContextArchitectureTest {
         assertTrue(sweep.contains("commandBuffer,\n                    populationContext"));
         assertTrue(lazy.contains("if (context == null)"));
         assertTrue(lazy.contains("context = service.openPreparationContext()"));
-        assertTrue(offspring.contains("populationContext.resolve(populationService)"));
-        assertTrue(offspring.contains("prepareAsync(admissionRequest, preparationContext)"));
+        assertTrue(populationPreparation.contains(
+                "populationContext.resolve(populationService)"
+        ));
+        assertTrue(populationPreparation.contains("preparedHandoff.prepareAndDispatch("));
     }
 
     @Test

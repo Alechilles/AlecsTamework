@@ -18,6 +18,7 @@ public final class TameworkBreedingServices implements AutoCloseable {
     private final BreedingBirthPlanService birthPlanService;
     private final BreedingPopulationAdmissionService populationAdmissionService;
     private final BreedingJobDiagnosticsService jobDiagnosticsService;
+    private final BreedingPreparedPopulationRegistry preparedPopulationRegistry;
 
     /** Creates isolated production services. Prefer {@link #shared()} from runtime entrypoints. */
     public TameworkBreedingServices() {
@@ -40,6 +41,7 @@ public final class TameworkBreedingServices implements AutoCloseable {
         this.birthPlanService = Objects.requireNonNull(birthPlanService, "birthPlanService");
         this.populationAdmissionService = new BreedingPopulationAdmissionService(jobRegistry);
         this.jobDiagnosticsService = new BreedingJobDiagnosticsService();
+        this.preparedPopulationRegistry = new BreedingPreparedPopulationRegistry();
     }
 
     /** Returns the shared plugin-wide seam consumed by both breeding entrypoints. */
@@ -83,8 +85,15 @@ public final class TameworkBreedingServices implements AutoCloseable {
         return jobDiagnosticsService;
     }
 
+    /** Owns durable owner/claim capabilities attached to active job units. */
+    @Nonnull
+    public BreedingPreparedPopulationRegistry preparedPopulationRegistry() {
+        return preparedPopulationRegistry;
+    }
+
     /** Permanently closes one world/store scope and releases its reservations. */
     public void clearScope(@Nonnull Object storeScope) {
+        preparedPopulationRegistry.clearScope(storeScope, "breeding-world-scope-closed");
         jobRegistry.clearScope(storeScope);
         jobDiagnosticsService.clearScope(storeScope);
     }
@@ -92,6 +101,7 @@ public final class TameworkBreedingServices implements AutoCloseable {
     /** Permanently closes this service bundle and releases every active reservation. */
     @Override
     public void close() {
+        preparedPopulationRegistry.clearAll("breeding-runtime-closed");
         jobRegistry.clearAll();
         jobDiagnosticsService.clearAll();
     }

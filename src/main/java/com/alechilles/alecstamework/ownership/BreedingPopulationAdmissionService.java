@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimOccupancySnapshot;
 import com.alechilles.alecstamework.integration.claims.ClaimProviderRegistry;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -94,7 +95,7 @@ public final class BreedingPopulationAdmissionService {
     ) {
         Objects.requireNonNull(request, "request");
         int requestedCount = request.plannedChildren().size();
-        if (!replayService.rememberPlan(request.idempotencyKey(), request.birthPlan())) {
+        if (!replayService.accepts(request)) {
             return CompletableFuture.completedFuture(new BreedingPopulationPreparationResult(
                     false,
                     "breeding-replay-plan-conflict",
@@ -131,13 +132,24 @@ public final class BreedingPopulationAdmissionService {
                 context.lookupSession,
                 CompanionPopulationBatchMode.UP_TO,
                 context.occupancySnapshot
-        ).thenApply(result -> mapResult(request, preparedUnits.children(), result));
+        ).thenCompose(result -> recordPreparation(
+                request, preparedUnits.children(), result
+        ));
     }
 
     /** Returns retained restart evidence for a stable breeding job without querying SQLite. */
     @Nonnull
     public BreedingPopulationReplayState replayState(@Nonnull String idempotencyKey) {
         return replayService.state(idempotencyKey);
+    }
+
+    /** Returns the sole journal-proven incomplete attempt for this canonical pair and world. */
+    @Nonnull
+    public BreedingPopulationReplayState replayStateForPair(
+            @Nonnull String worldName,
+            @Nonnull List<String> parentProfileIds
+    ) {
+        return replayService.stateForPair(worldName, parentProfileIds);
     }
 
     /** Captures one immutable policy, lookup cache, and optional occupancy snapshot for a sweep. */
@@ -299,7 +311,18 @@ public final class BreedingPopulationAdmissionService {
     public CompletableFuture<Boolean> cancelAsync(@Nonnull PreparedBreedingPopulationBatch batch,
                                                    int unitIndex,
                                                    @Nonnull String reason) {
-        return batchCoordinator.cancelAsync(batch.populationBatch(), unitIndex, reason);
+        Objects.requireNonNull(batch, "batch");
+        PreparedBreedingPopulationBatch.ReservedChild child = batch.child(unitIndex);
+        return batchCoordinator.cancelAsync(
+                batch.populationBatch(), unitIndex, reason
+        ).thenApply(canceled -> {
+            if (Boolean.TRUE.equals(canceled)) {
+                replayService.recordAborted(
+                        batch.attemptKey(), child.childKey(), batch.birthPlan()
+                );
+            }
+            return canceled;
+        });
     }
 
     @Nonnull
@@ -307,7 +330,52 @@ public final class BreedingPopulationAdmissionService {
             @Nonnull PreparedBreedingPopulationBatch batch,
             @Nonnull String reason
     ) {
-        return batchCoordinator.cancelRemainingAsync(batch.populationBatch(), reason);
+        Objects.requireNonNull(batch, "batch");
+        List<CompletableFuture<Boolean>> cancellations = new ArrayList<>(
+                batch.admittedCount()
+        );
+        for (int unitIndex = 0; unitIndex < batch.admittedCount(); unitIndex++) {
+            cancellations.add(cancelAsync(batch, unitIndex, reason));
+        }
+        CompletableFuture<?>[] waits = cancellations.toArray(CompletableFuture[]::new);
+        return CompletableFuture.allOf(waits).thenApply(ignored -> {
+            int canceled = 0;
+            for (CompletableFuture<Boolean> cancellation : cancellations) {
+                if (Boolean.TRUE.equals(cancellation.getNow(false))) {
+                    canceled++;
+                }
+            }
+            return canceled;
+        });
+    }
+
+    @Nonnull
+    private CompletableFuture<BreedingPopulationPreparationResult> recordPreparation(
+            @Nonnull BreedingPopulationAdmissionRequest request,
+            @Nonnull List<PreparedBreedingPopulationBatch.ReservedChild> plannedChildren,
+            @Nonnull CompanionPopulationBatchPreparationResult result
+    ) {
+        BreedingPopulationPreparationResult mapped = mapResult(
+                request, plannedChildren, result
+        );
+        PreparedBreedingPopulationBatch batch = mapped.preparedBatch();
+        if (!mapped.allowed() || batch == null) {
+            return CompletableFuture.completedFuture(mapped);
+        }
+        if (replayService.recordPrepared(request, batch.children())) {
+            return CompletableFuture.completedFuture(mapped);
+        }
+        markDegraded("breeding_replay_preparation_conflict");
+        return cancelRemainingAsync(
+                batch, "breeding-replay-preparation-conflict"
+        ).handle((ignored, failure) -> new BreedingPopulationPreparationResult(
+                false,
+                "breeding-replay-preparation-conflict",
+                request.plannedChildren().size(),
+                0,
+                result,
+                null
+        ));
     }
 
     @Nonnull

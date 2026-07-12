@@ -46,10 +46,11 @@ public final class BreedingJobExecutionService<C> {
                     runtime.resolveParents(job),
                     "runtime parent resolution"
             );
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
             return failJob(job, "parent-resolution-error:" + exception.getClass().getSimpleName());
         }
         if (!parents.valid()) {
+            cancelPopulationSafely(job, "breeding-parents-invalid");
             BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(job);
             BreedingBirthJobRegistry.TerminalResult cancelled = services.jobRegistry().cancel(jobId);
             recordOutcome(
@@ -105,7 +106,8 @@ public final class BreedingJobExecutionService<C> {
             runtime.showHearts(transition.job().orElseThrow(), parents.context());
             scheduler.schedule(job.jobId(), offspringDelayMs);
             return result(ExecutionStatus.HEARTS_SHOWN, transition.job().orElseThrow(), 0);
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
+            cancelPopulationSafely(job, "breeding-heart-stage-failed");
             BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(job);
             BreedingBirthJobRegistry.TerminalResult failed =
                     services.jobRegistry().fail(parents.storeScope(), job.jobId());
@@ -125,7 +127,7 @@ public final class BreedingJobExecutionService<C> {
         BreedingPopulationAdmissionService.AdmissionRequest request;
         try {
             request = runtime.buildSpawnAdmissionRequest(job, parents.context());
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
             return cancelForCapacity(
                     job,
                     "spawn-capacity-request-error:" + exception.getClass().getSimpleName()
@@ -140,7 +142,7 @@ public final class BreedingJobExecutionService<C> {
                     request,
                     job.activeAdmission()
             );
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
             return cancelForCapacity(
                     job,
                     "spawn-capacity-recheck-error:" + exception.getClass().getSimpleName()
@@ -157,6 +159,15 @@ public final class BreedingJobExecutionService<C> {
             return result(ExecutionStatus.NOT_READY, shrunk.job().orElse(job), 0);
         }
         BreedingBirthJob recheckedJob = shrunk.job().orElseThrow();
+        try {
+            runtime.onAdmissionShrunk(
+                    job,
+                    recheckedJob.admittedChildren(),
+                    parents.context()
+            );
+        } catch (RuntimeException | LinkageError exception) {
+            return cancelForCapacity(recheckedJob, "spawn-population-shrink-failed");
+        }
         if (!recheckedJob.plan().isNaturallyEmpty() && recheckedJob.admittedChildren().isEmpty()) {
             return cancelForCapacity(recheckedJob, "zero-spawn-headroom");
         }
@@ -179,13 +190,17 @@ public final class BreedingJobExecutionService<C> {
         List<PlannedChild> children = job.admittedChildren();
         int spawned = 0;
         int failed = 0;
+        int ambiguous = 0;
         for (int index = 0; index < children.size(); index++) {
             PlannedChild child = children.get(index);
-            boolean succeeded = false;
+            ChildSpawnResult outcome = ChildSpawnResult.FAILED;
             try {
-                succeeded = runtime.spawnChild(job, child, index, parents.context());
-            } catch (RuntimeException ignored) {
-                succeeded = false;
+                outcome = Objects.requireNonNull(
+                        runtime.spawnChildResult(job, child, index, parents.context()),
+                        "child spawn outcome"
+                );
+            } catch (RuntimeException | LinkageError ignored) {
+                outcome = ChildSpawnResult.FAILED;
             } finally {
                 services.jobRegistry().releaseChildReservation(
                         parents.storeScope(),
@@ -193,19 +208,21 @@ public final class BreedingJobExecutionService<C> {
                         child
                 );
             }
-            if (succeeded) {
-                spawned++;
-            } else {
-                failed++;
+            switch (outcome) {
+                case SPAWNED -> spawned++;
+                case FAILED -> failed++;
+                case AMBIGUOUS -> ambiguous++;
             }
         }
-        return new SpawnReport(children.size(), spawned, failed);
+        return new SpawnReport(children.size(), spawned, failed, ambiguous);
     }
 
     private ExecutionResult finishSpawn(BreedingBirthJob job,
                                         ParentResolution<C> parents,
                                         SpawnReport spawnReport) {
-        if (spawnReport.spawned() > 0 || job.plan().isNaturallyEmpty()) {
+        if (spawnReport.spawned() > 0
+                || spawnReport.ambiguous() > 0
+                || job.plan().isNaturallyEmpty()) {
             BreedingBirthJobRegistry.TerminalResult completed = services.jobRegistry().complete(
                     parents.storeScope(),
                     job.jobId()
@@ -214,6 +231,13 @@ public final class BreedingJobExecutionService<C> {
             String reason = spawnReport.failed() > 0
                     ? "child-spawn-failures=" + spawnReport.failed()
                     : null;
+            if (spawnReport.ambiguous() > 0) {
+                reason = appendReason(
+                        reason,
+                        "child-spawn-ambiguous=" + spawnReport.ambiguous()
+                                + ";APPLYING journal retained for startup recovery"
+                );
+            }
             recordOutcome(
                     job,
                     BreedingJobDiagnosticSnapshot.Outcome.COMPLETED,
@@ -224,7 +248,7 @@ public final class BreedingJobExecutionService<C> {
             );
             try {
                 runtime.onCompleted(completedJob, spawnReport.spawned(), parents.context());
-            } catch (RuntimeException exception) {
+            } catch (RuntimeException | LinkageError exception) {
                 // Completion is already authoritative; presentation follow-up must not reopen it.
                 recordOutcome(
                         job,
@@ -243,6 +267,7 @@ public final class BreedingJobExecutionService<C> {
         }
         BreedingBirthJobRegistry.TerminalResult failed =
                 services.jobRegistry().fail(parents.storeScope(), job.jobId());
+        cancelPopulationSafely(job, "breeding-all-child-spawns-failed");
         BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(job);
         recordOutcome(
                 job,
@@ -256,6 +281,7 @@ public final class BreedingJobExecutionService<C> {
     }
 
     private ExecutionResult cancelForCapacity(BreedingBirthJob job, String reason) {
+        cancelPopulationSafely(job, reason);
         BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(job);
         BreedingBirthJobRegistry.TerminalResult cancelled = services.jobRegistry().cancel(job.jobId());
         recordOutcome(
@@ -273,13 +299,14 @@ public final class BreedingJobExecutionService<C> {
         try {
             runtime.rollbackProvisionalCooldown(job);
             return BreedingJobDiagnosticSnapshot.RollbackStatus.ATTEMPTED;
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException | LinkageError ignored) {
             // Fingerprint-guarded rollback is best effort; terminal registry state still wins.
             return BreedingJobDiagnosticSnapshot.RollbackStatus.FAILED;
         }
     }
 
     private ExecutionResult failJob(BreedingBirthJob job, String reason) {
+        cancelPopulationSafely(job, reason);
         BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(job);
         BreedingBirthJobRegistry.TerminalResult failed = services.jobRegistry().fail(job.jobId());
         recordOutcome(
@@ -307,6 +334,14 @@ public final class BreedingJobExecutionService<C> {
                 rollbackStatus,
                 rollbackDetail
         );
+    }
+
+    private void cancelPopulationSafely(BreedingBirthJob job, String reason) {
+        try {
+            runtime.cancelPopulation(job, reason);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Durable APPLYING evidence remains conservative if cleanup cannot start.
+        }
     }
 
     private static String normalizeReason(String reason, String fallback) {
@@ -347,12 +382,19 @@ public final class BreedingJobExecutionService<C> {
         }
     }
 
-    private record SpawnReport(int attempted, int spawned, int failed) {
+    private record SpawnReport(int attempted, int spawned, int failed, int ambiguous) {
         private SpawnReport {
-            if (attempted < 0 || spawned < 0 || failed < 0 || attempted != spawned + failed) {
+            if (attempted < 0 || spawned < 0 || failed < 0 || ambiguous < 0
+                    || attempted != spawned + failed + ambiguous) {
                 throw new IllegalArgumentException("Spawn report counts must be exact");
             }
         }
+    }
+
+    public enum ChildSpawnResult {
+        SPAWNED,
+        FAILED,
+        AMBIGUOUS
     }
 
     public record ParentResolution<C>(boolean valid,
@@ -392,6 +434,27 @@ public final class BreedingJobExecutionService<C> {
                            @Nonnull PlannedChild child,
                            int childIndex,
                            @Nonnull C context);
+
+        /** Detailed spawn boundary used by prepared deterministic child admissions. */
+        @Nonnull
+        default ChildSpawnResult spawnChildResult(@Nonnull BreedingBirthJob job,
+                                                  @Nonnull PlannedChild child,
+                                                  int childIndex,
+                                                  @Nonnull C context) {
+            return spawnChild(job, child, childIndex, context)
+                    ? ChildSpawnResult.SPAWNED
+                    : ChildSpawnResult.FAILED;
+        }
+
+        /** Cancels shared units removed by the final nearby-cap recheck. */
+        default void onAdmissionShrunk(@Nonnull BreedingBirthJob original,
+                                       @Nonnull List<PlannedChild> retainedChildren,
+                                       @Nonnull C context) {
+        }
+
+        /** Cancels every definitively pre-live shared unit on a terminal path. */
+        default void cancelPopulation(@Nonnull BreedingBirthJob job, @Nonnull String reason) {
+        }
 
         void onCompleted(@Nonnull BreedingBirthJob job, int spawnedChildren, @Nonnull C context);
 

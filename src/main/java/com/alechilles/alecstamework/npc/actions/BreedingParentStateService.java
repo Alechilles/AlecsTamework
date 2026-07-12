@@ -1,10 +1,12 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.breeding.AppliedCooldownFingerprint;
 import com.alechilles.alecstamework.npc.breeding.BreedingParentIdentity;
 import com.alechilles.alecstamework.npc.breeding.ParentBreedingSnapshot;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -16,21 +18,51 @@ import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Captures and revalidates immutable parent identity, breeding state, and cooldown fingerprints. */
 final class BreedingParentStateService {
+    private final Supplier<CompanionIdentityResolver> identityResolverSupplier;
+
+    BreedingParentStateService() {
+        this(BreedingParentStateService::runtimeIdentityResolver);
+    }
+
+    BreedingParentStateService(@Nonnull Supplier<CompanionIdentityResolver> identityResolverSupplier) {
+        this.identityResolverSupplier = Objects.requireNonNull(
+                identityResolverSupplier, "identityResolverSupplier"
+        );
+    }
+
     @Nonnull
     BreedingParentIdentity resolveIdentity(@Nonnull Ref<EntityStore> ref,
                                            @Nonnull NPCEntity npc,
                                            @Nonnull Store<EntityStore> store) {
         UUID entityUuid = Objects.requireNonNull(npc.getUuid(), "parent NPC UUID");
-        String profileId = projectionProfileId(ref, store);
-        if (profileId == null) {
-            profileId = "entity:" + entityUuid;
-        }
+        String profileId = resolveProfileId(entityUuid, projectionProfileId(ref, store));
         return new BreedingParentIdentity(entityUuid, profileId);
+    }
+
+    @Nonnull
+    String resolveProfileId(@Nonnull UUID entityUuid, @Nullable String projectionProfileId) {
+        String markerProfile = normalize(projectionProfileId);
+        CompanionIdentityResolver resolver = identityResolverSupplier.get();
+        String aliasProfile = resolver == null
+                ? null
+                : resolver.resolveProfileId(entityUuid).orElse(null);
+        aliasProfile = normalize(aliasProfile);
+        if (markerProfile != null && aliasProfile != null
+                && !markerProfile.equals(aliasProfile)) {
+            throw new IllegalStateException(
+                    "Breeding parent projection identity conflicts with canonical alias"
+            );
+        }
+        if (aliasProfile != null) {
+            return aliasProfile;
+        }
+        return markerProfile != null ? markerProfile : "entity:" + entityUuid;
     }
 
     boolean matchesIdentity(@Nonnull BreedingParentIdentity expected,
@@ -40,7 +72,11 @@ final class BreedingParentStateService {
         if (!expected.entityUuid().equals(npc.getUuid())) {
             return false;
         }
-        return expected.profileId().equals(resolveIdentity(ref, npc, store).profileId());
+        try {
+            return expected.profileId().equals(resolveIdentity(ref, npc, store).profileId());
+        } catch (RuntimeException | LinkageError conflict) {
+            return false;
+        }
     }
 
     boolean matchesFingerprint(@Nonnull AppliedCooldownFingerprint expected,
@@ -166,6 +202,24 @@ final class BreedingParentStateService {
         );
     }
 
+    /** Uses the exact currently persisted parent state as a no-op replay fingerprint. */
+    @Nonnull
+    AppliedCooldownFingerprint fingerprint(@Nonnull ParentBreedingSnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        return new AppliedCooldownFingerprint(
+                true,
+                snapshot.ready(),
+                snapshot.cooldownUntilMs(),
+                snapshot.cooldownStartedAtMs(),
+                snapshot.cooldownDurationMs(),
+                snapshot.lastPartnerUuid(),
+                snapshot.lastHappinessUpdateMs(),
+                snapshot.manualBreedingPlayerUuid(),
+                snapshot.manualBreedingUntilMs(),
+                snapshot.alarm()
+        );
+    }
+
     @Nullable
     private ParentBreedingSnapshot.AlarmSnapshot snapshotAlarm(
             NPCEntity npc,
@@ -235,6 +289,12 @@ final class BreedingParentStateService {
     @Nullable
     private static String normalize(@Nullable String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    @Nullable
+    private static CompanionIdentityResolver runtimeIdentityResolver() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin == null ? null : plugin.getCompanionIdentityResolver();
     }
 
 }

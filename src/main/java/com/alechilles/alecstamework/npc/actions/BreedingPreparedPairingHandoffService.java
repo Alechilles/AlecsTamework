@@ -1,113 +1,167 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
+import com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionRequest;
 import com.alechilles.alecstamework.ownership.BreedingPopulationAdmissionService;
 import com.alechilles.alecstamework.ownership.BreedingPopulationPreparationResult;
 import com.alechilles.alecstamework.ownership.PreparedBreedingPopulationBatch;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Owns the exception-safe transition from async litter preparation to world-thread finalization. */
+/** Owns the exception-safe asynchronous handoff from shared population preparation to a job. */
 final class BreedingPreparedPairingHandoffService {
-    private final BreedingNearbyReservationService nearbyService;
-    private final BreedingPairAdmissionRegistry pairRegistry;
+    private final TameworkBreedingServices services;
     private final Consumer<String> warning;
     private final Consumer<String> info;
 
-    BreedingPreparedPairingHandoffService(
-            @Nonnull BreedingNearbyReservationService nearbyService,
-            @Nonnull BreedingPairAdmissionRegistry pairRegistry,
-            @Nonnull Consumer<String> warning,
-            @Nonnull Consumer<String> info
-    ) {
-        this.nearbyService = Objects.requireNonNull(nearbyService, "nearbyService");
-        this.pairRegistry = Objects.requireNonNull(pairRegistry, "pairRegistry");
+    BreedingPreparedPairingHandoffService(@Nonnull TameworkBreedingServices services,
+                                          @Nonnull Consumer<String> warning,
+                                          @Nonnull Consumer<String> info) {
+        this.services = Objects.requireNonNull(services, "services");
         this.warning = Objects.requireNonNull(warning, "warning");
         this.info = Objects.requireNonNull(info, "info");
     }
 
-    void dispatch(@Nonnull World world,
-                  @Nonnull BreedingPopulationAdmissionService populationService,
-                  @Nonnull BreedingPairAdmissionRegistry.Token pairToken,
-                  @Nonnull BreedingNearbyReservationService.Reservation nearbyReservation,
-                  @Nullable BreedingPopulationPreparationResult result,
-                  @Nullable Throwable failure,
-                  @Nonnull Runnable abortCompletion,
-                  @Nonnull Finalizer finalizer) {
-        PreparedBreedingPopulationBatch batch = result == null ? null : result.preparedBatch();
-        if (failure != null || result == null || !result.allowed() || batch == null) {
-            if (batch == null) {
-                runSafely(abortCompletion);
-                releaseUnprepared(nearbyReservation, pairToken);
-            } else {
-                terminality(
-                        populationService, batch, nearbyReservation, pairToken, abortCompletion
-                )
-                        .cancel("breeding-prepare-callback-failed");
-            }
-            info.accept("Breeding pairing blocked by population admission: reason="
-                    + (result == null ? "prepare-failed" : result.reason())
-                    + " parentA=" + pairToken.parentA() + " parentB=" + pairToken.parentB() + ".");
+    void prepareAndDispatch(
+            @Nonnull World world,
+            @Nonnull Object storeScope,
+            @Nonnull UUID jobId,
+            @Nonnull BreedingPopulationAdmissionService populationService,
+            @Nonnull BreedingPopulationAdmissionRequest request,
+            @Nullable BreedingPopulationAdmissionService.PreparationContext preparationContext,
+            @Nonnull Finalizer finalizer) {
+        CompletableFuture<BreedingPopulationPreparationResult> completion;
+        try {
+            completion = populationService.prepareAsync(request, preparationContext);
+        } catch (RuntimeException | LinkageError failure) {
+            cancelLocal(storeScope, jobId);
+            warn("Breeding population preparation could not start", failure);
             return;
         }
-        BreedingPreparedHandoffTerminality terminality = terminality(
-                populationService, batch, nearbyReservation, pairToken, abortCompletion
-        );
+        if (completion == null) {
+            cancelLocal(storeScope, jobId);
+            warning.accept("Breeding population preparation returned no completion stage.");
+            return;
+        }
+        completion.whenComplete((result, failure) -> dispatchPrepared(
+                world, storeScope, jobId, populationService, result, failure, finalizer
+        ));
+    }
+
+    private void dispatchPrepared(
+            World world,
+            Object storeScope,
+            UUID jobId,
+            BreedingPopulationAdmissionService populationService,
+            BreedingPopulationPreparationResult result,
+            Throwable failure,
+            Finalizer finalizer) {
+        PreparedBreedingPopulationBatch batch = result == null ? null : result.preparedBatch();
+        if (failure != null || result == null || !result.allowed() || batch == null) {
+            cancelPrepared(populationService, batch, "breeding-population-prepare-denied");
+            cancelLocal(storeScope, jobId);
+            info.accept("Breeding pairing blocked by shared population admission: job="
+                    + jobId + " reason=" + reason(result, failure) + ".");
+            return;
+        }
         LeaseBoundWorldDispatcher.execute(
                 world,
+                () -> finalizeOnWorld(
+                        storeScope, jobId, populationService, batch, finalizer
+                ),
                 () -> {
-                    try {
-                        finalizer.finalize(batch, terminality);
-                    } catch (RuntimeException | LinkageError exception) {
-                        terminality.cancel("breeding-world-finalization-failed");
-                    }
-                },
-                () -> terminality.cancel("breeding-world-unavailable")
+                    cancelPrepared(
+                            populationService, batch, "breeding-population-world-unavailable"
+                    );
+                    cancelLocal(storeScope, jobId);
+                }
         );
     }
 
-    void releaseUnprepared(
-            @Nonnull BreedingNearbyReservationService.Reservation nearbyReservation,
-            @Nonnull BreedingPairAdmissionRegistry.Token pairToken
-    ) {
-        runSafely(() -> nearbyService.releaseFrom(nearbyReservation, 0));
-        runSafely(() -> pairRegistry.cancel(pairToken));
-    }
-
-    @Nonnull
-    private BreedingPreparedHandoffTerminality terminality(
+    private void finalizeOnWorld(
+            Object storeScope,
+            UUID jobId,
             BreedingPopulationAdmissionService populationService,
             PreparedBreedingPopulationBatch batch,
-            BreedingNearbyReservationService.Reservation nearbyReservation,
-            BreedingPairAdmissionRegistry.Token pairToken,
-            Runnable abortCompletion
-    ) {
-        return new BreedingPreparedHandoffTerminality(
-                populationService,
-                batch,
-                nearbyService,
-                nearbyReservation,
-                pairRegistry,
-                pairToken,
-                abortCompletion,
-                warning
+            Finalizer finalizer) {
+        boolean accepted = false;
+        try {
+            accepted = finalizer.finalize(batch);
+        } catch (RuntimeException | LinkageError failure) {
+            warn("Breeding prepared population finalization failed", failure);
+        }
+        if (accepted) {
+            return;
+        }
+        String reason = "breeding-population-world-finalization-rejected";
+        boolean registryOwned = services.preparedPopulationRegistry().cancelOwnedJob(
+                storeScope, jobId, populationService, batch, reason
         );
+        if (!registryOwned) {
+            cancelPrepared(populationService, batch, reason);
+        }
+        cancelLocal(storeScope, jobId);
     }
 
-    private static void runSafely(Runnable action) {
+    private void cancelLocal(Object storeScope, UUID jobId) {
         try {
-            action.run();
+            services.jobRegistry().cancel(storeScope, jobId);
         } catch (RuntimeException | LinkageError ignored) {
-            // Both reservation types retain bounded lease fallbacks.
+            // A closed scope already released its nearby reservation.
+        }
+    }
+
+    private void cancelPrepared(BreedingPopulationAdmissionService populationService,
+                                @Nullable PreparedBreedingPopulationBatch batch,
+                                String reason) {
+        if (batch == null) {
+            return;
+        }
+        try {
+            CompletableFuture<Integer> completion =
+                    populationService.cancelRemainingAsync(batch, reason);
+            if (completion != null) {
+                completion.exceptionally(failure -> {
+                    populationService.markReadinessDegraded(
+                            "breeding_population_handoff_cancel_failed"
+                    );
+                    return 0;
+                });
+            } else {
+                populationService.markReadinessDegraded(
+                        "breeding_population_handoff_cancel_missing"
+                );
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            populationService.markReadinessDegraded(
+                    "breeding_population_handoff_cancel_start_failed"
+            );
+        }
+    }
+
+    private static String reason(BreedingPopulationPreparationResult result, Throwable failure) {
+        if (failure != null) {
+            return "prepare-error:" + failure.getClass().getSimpleName();
+        }
+        return result == null ? "prepare-result-missing" : result.reason();
+    }
+
+    private void warn(String message, Throwable failure) {
+        try {
+            warning.accept(message + ": " + failure.getClass().getSimpleName());
+        } catch (RuntimeException | LinkageError ignored) {
+            // Diagnostics must not strand the prepared batch.
         }
     }
 
     @FunctionalInterface
     interface Finalizer {
-        void finalize(@Nonnull PreparedBreedingPopulationBatch batch,
-                      @Nonnull BreedingPreparedHandoffTerminality terminality);
+        boolean finalize(@Nonnull PreparedBreedingPopulationBatch batch);
     }
 }

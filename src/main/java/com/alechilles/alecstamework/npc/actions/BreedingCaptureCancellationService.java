@@ -24,6 +24,8 @@ import javax.annotation.Nullable;
  */
 public final class BreedingCaptureCancellationService {
     private final BreedingBirthJobRegistry jobRegistry;
+    private final com.alechilles.alecstamework.npc.breeding.BreedingPreparedPopulationRegistry
+            preparedPopulationRegistry;
     private final ParentRollbackGateway parentRollbackGateway;
     @Nullable
     private final BreedingJobDiagnosticsService diagnosticsService;
@@ -36,6 +38,7 @@ public final class BreedingCaptureCancellationService {
     private BreedingCaptureCancellationService(TameworkBreedingServices services) {
         this(
                 services.jobRegistry(),
+                services.preparedPopulationRegistry(),
                 new BreedingCaptureParentRollbackService(),
                 services.jobDiagnostics()
         );
@@ -43,13 +46,35 @@ public final class BreedingCaptureCancellationService {
 
     BreedingCaptureCancellationService(@Nonnull BreedingBirthJobRegistry jobRegistry,
                                        @Nonnull ParentRollbackGateway parentRollbackGateway) {
-        this(jobRegistry, parentRollbackGateway, null);
+        this(
+                jobRegistry,
+                new com.alechilles.alecstamework.npc.breeding.BreedingPreparedPopulationRegistry(),
+                parentRollbackGateway,
+                null
+        );
     }
 
     BreedingCaptureCancellationService(@Nonnull BreedingBirthJobRegistry jobRegistry,
                                        @Nonnull ParentRollbackGateway parentRollbackGateway,
                                        @Nullable BreedingJobDiagnosticsService diagnosticsService) {
+        this(
+                jobRegistry,
+                new com.alechilles.alecstamework.npc.breeding.BreedingPreparedPopulationRegistry(),
+                parentRollbackGateway,
+                diagnosticsService
+        );
+    }
+
+    private BreedingCaptureCancellationService(
+            @Nonnull BreedingBirthJobRegistry jobRegistry,
+            @Nonnull com.alechilles.alecstamework.npc.breeding.BreedingPreparedPopulationRegistry
+                    preparedPopulationRegistry,
+            @Nonnull ParentRollbackGateway parentRollbackGateway,
+            @Nullable BreedingJobDiagnosticsService diagnosticsService) {
         this.jobRegistry = Objects.requireNonNull(jobRegistry, "jobRegistry");
+        this.preparedPopulationRegistry = Objects.requireNonNull(
+                preparedPopulationRegistry, "preparedPopulationRegistry"
+        );
         this.parentRollbackGateway = Objects.requireNonNull(
                 parentRollbackGateway,
                 "parentRollbackGateway"
@@ -155,6 +180,9 @@ public final class BreedingCaptureCancellationService {
         }
 
         BreedingBirthJob cancelledJob = terminal.job().orElseThrow();
+        preparedPopulationRegistry.cancelRemaining(
+                cancelledJob.jobId(), "breeding-parent-captured"
+        );
         boolean capturedIsFirst = isCapturedParent(
                 cancelledJob.firstParent(),
                 capturedParentUuid,

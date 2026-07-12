@@ -35,6 +35,24 @@ public final class BreedingPopulationAdmissionService {
     }
 
     /**
+     * Evaluates a replay-safe ordered subset of the immutable plan.
+     *
+     * <p>Already committed children are omitted by restart replay while the full plan remains the
+     * durable job identity. The subset may only preserve order and shrink the source plan.</p>
+     */
+    @Nonnull
+    public AdmissionResult admit(@Nonnull AdmissionRequest request,
+                                 @Nonnull List<PlannedChild> candidateChildren) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(candidateChildren, "candidateChildren");
+        List<PlannedChild> candidates = List.copyOf(candidateChildren);
+        if (!BreedingJobAdmission.isOrderedSubsequence(request.plan().children(), candidates)) {
+            throw new IllegalArgumentException("Candidate children must preserve source plan order");
+        }
+        return evaluate(request, candidates, null);
+    }
+
+    /**
      * Rechecks every cap while excluding this job's own reservation and preserving shrink-only
      * plan order.
      */

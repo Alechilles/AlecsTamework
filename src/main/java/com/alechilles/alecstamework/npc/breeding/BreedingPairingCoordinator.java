@@ -16,22 +16,29 @@ import javax.annotation.Nonnull;
  */
 public final class BreedingPairingCoordinator {
     private final TameworkBreedingServices services;
-    private final Supplier<UUID> jobIdSource;
+    private final JobIdFactory jobIdFactory;
     private final BreedingJobScheduler scheduler;
     private final long approachDelayMs;
 
     public BreedingPairingCoordinator(@Nonnull TameworkBreedingServices services,
                                       @Nonnull BreedingJobScheduler scheduler,
                                       long approachDelayMs) {
-        this(services, UUID::randomUUID, scheduler, approachDelayMs);
+        this(services, BreedingPairingCoordinator::defaultJobId, scheduler, approachDelayMs);
     }
 
     BreedingPairingCoordinator(@Nonnull TameworkBreedingServices services,
                                @Nonnull Supplier<UUID> jobIdSource,
                                @Nonnull BreedingJobScheduler scheduler,
                                long approachDelayMs) {
+        this(services, request -> jobIdSource.get(), scheduler, approachDelayMs);
+    }
+
+    private BreedingPairingCoordinator(@Nonnull TameworkBreedingServices services,
+                                       @Nonnull JobIdFactory jobIdFactory,
+                                       @Nonnull BreedingJobScheduler scheduler,
+                                       long approachDelayMs) {
         this.services = Objects.requireNonNull(services, "services");
-        this.jobIdSource = Objects.requireNonNull(jobIdSource, "jobIdSource");
+        this.jobIdFactory = Objects.requireNonNull(jobIdFactory, "jobIdFactory");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.approachDelayMs = Math.max(0L, approachDelayMs);
     }
@@ -39,12 +46,26 @@ public final class BreedingPairingCoordinator {
     /** Attempts one complete admission transaction. */
     @Nonnull
     public PairingResult admit(@Nonnull PairingRequest request) {
+        PairingResult reserved = reserve(request);
+        return reserved.reserved()
+                ? activate(request, reserved.job().orElseThrow().jobId())
+                : reserved;
+    }
+
+    /** Reserves exact nearby capacity and both parents without applying cooldown/effects yet. */
+    @Nonnull
+    public PairingResult reserve(@Nonnull PairingRequest request) {
         Objects.requireNonNull(request, "request");
-        UUID jobId = Objects.requireNonNull(jobIdSource.get(), "jobIdSource result");
+        UUID jobId = Objects.requireNonNull(
+                request.requestedJobId() != null
+                        ? request.requestedJobId()
+                        : jobIdFactory.create(request),
+                "jobId result"
+        );
         PreparedAdmission prepared;
         try {
             prepared = prepare(request, jobId);
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
             return new PairingResult(PairingStatus.INVALID_PREPARATION, Optional.empty(), null);
         }
         if (!prepared.capacityDecision().allowed()) {
@@ -55,7 +76,10 @@ public final class BreedingPairingCoordinator {
             );
         }
         BreedingPopulationAdmissionService.AdmissionResult admission =
-                services.populationAdmissionService().admit(prepared.capacityDecision().request());
+                services.populationAdmissionService().admit(
+                        prepared.capacityDecision().request(),
+                        prepared.capacityDecision().candidateChildren()
+                );
         if (!prepared.plan().isNaturallyEmpty() && !admission.admittedAny()) {
             return new PairingResult(PairingStatus.CAPACITY_REJECTED, Optional.empty(), "zero-headroom");
         }
@@ -75,14 +99,36 @@ public final class BreedingPairingCoordinator {
                 prepared.capacityDecision().request(),
                 admission
         );
+        return new PairingResult(PairingStatus.RESERVED, Optional.of(job), null);
+    }
+
+    /** Applies provisional parent state and schedules one already-reserved job. */
+    @Nonnull
+    public PairingResult activate(@Nonnull PairingRequest request, @Nonnull UUID jobId) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(jobId, "jobId");
+        Optional<BreedingBirthJob> located = services.jobRegistry().find(request.storeScope(), jobId);
+        if (located.isEmpty()) {
+            return new PairingResult(PairingStatus.REGISTRY_REJECTED, Optional.empty(), "reserved-job-missing");
+        }
+        BreedingBirthJob job = located.orElseThrow();
+        if (job.state() != BreedingBirthJobState.RESERVED) {
+            return new PairingResult(PairingStatus.ALREADY_REGISTERED, Optional.of(job), job.state().name());
+        }
         return applyEffectsAndSchedule(request, job);
     }
 
     private PreparedAdmission prepare(PairingRequest request, UUID jobId) {
-        BreedingBirthPlan plan = services.birthPlanService().createPlan(
-                request.parentAFertilityMultiplier(),
-                request.parentBFertilityMultiplier(),
-                request.childResolver()
+        BreedingBirthPlan plan = Objects.requireNonNull(
+                request.planResolver().resolve(
+                        jobId,
+                        () -> services.birthPlanService().createPlan(
+                                request.parentAFertilityMultiplier(),
+                                request.parentBFertilityMultiplier(),
+                                request.childResolver()
+                        )
+                ),
+                "planResolver result"
         );
         CapacityDecision capacityDecision = Objects.requireNonNull(
                 request.capacityResolver().resolve(jobId, plan),
@@ -96,6 +142,11 @@ public final class BreedingPairingCoordinator {
                     || !plan.equals(capacityRequest.plan())) {
                 throw new IllegalArgumentException("Capacity request must describe the prepared job and plan");
             }
+            if (!BreedingJobAdmission.isOrderedSubsequence(
+                    plan.children(), capacityDecision.candidateChildren()
+            )) {
+                throw new IllegalArgumentException("Capacity candidates must preserve birth-plan order");
+            }
         }
         return new PreparedAdmission(plan, capacityDecision);
     }
@@ -103,6 +154,9 @@ public final class BreedingPairingCoordinator {
     private PairingResult applyEffectsAndSchedule(PairingRequest request, BreedingBirthJob job) {
         try {
             if (!request.registeredEffects().apply(job)) {
+                services.preparedPopulationRegistry().cancelRemaining(
+                        job.jobId(), "breeding-registered-effects-rejected"
+                );
                 BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(request, job);
                 services.jobRegistry().fail(request.storeScope(), job.jobId());
                 recordEffectsFailure(job, "effects-rejected", rollback);
@@ -115,6 +169,9 @@ public final class BreedingPairingCoordinator {
                     BreedingBirthJobState.APPROACHING
             );
             if (advanced.status() != BreedingBirthJobRegistry.TransitionStatus.APPLIED) {
+                services.preparedPopulationRegistry().cancelRemaining(
+                        job.jobId(), "breeding-job-advance-rejected"
+                );
                 BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(request, job);
                 services.jobRegistry().fail(request.storeScope(), job.jobId());
                 recordEffectsFailure(job, advanced.status().name(), rollback);
@@ -122,7 +179,10 @@ public final class BreedingPairingCoordinator {
             }
             scheduler.schedule(job.jobId(), approachDelayMs);
             return new PairingResult(PairingStatus.ACCEPTED, advanced.job(), null);
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException | LinkageError exception) {
+            services.preparedPopulationRegistry().cancelRemaining(
+                    job.jobId(), "breeding-effects-or-schedule-error"
+            );
             BreedingJobDiagnosticSnapshot.RollbackStatus rollback = rollbackSafely(request, job);
             services.jobRegistry().fail(request.storeScope(), job.jobId());
             String reason = "effects-or-schedule-error:" + exception.getClass().getSimpleName();
@@ -137,7 +197,7 @@ public final class BreedingPairingCoordinator {
         try {
             request.rollbackEffects().rollback(job);
             return BreedingJobDiagnosticSnapshot.RollbackStatus.ATTEMPTED;
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException | LinkageError ignored) {
             // Rollback is fingerprint guarded and best effort; the registry still terminates the job.
             return BreedingJobDiagnosticSnapshot.RollbackStatus.FAILED;
         }
@@ -157,6 +217,7 @@ public final class BreedingPairingCoordinator {
     }
 
     public enum PairingStatus {
+        RESERVED,
         ACCEPTED,
         CAPACITY_REJECTED,
         ALREADY_REGISTERED,
@@ -176,20 +237,45 @@ public final class BreedingPairingCoordinator {
         public boolean accepted() {
             return status == PairingStatus.ACCEPTED;
         }
+
+        public boolean reserved() {
+            return status == PairingStatus.RESERVED;
+        }
     }
 
     public record CapacityDecision(boolean allowed,
                                    BreedingPopulationAdmissionService.AdmissionRequest request,
+                                   @Nonnull java.util.List<PlannedChild> candidateChildren,
                                    String reason) {
+        public CapacityDecision {
+            candidateChildren = java.util.List.copyOf(
+                    Objects.requireNonNull(candidateChildren, "candidateChildren")
+            );
+        }
+
         @Nonnull
         public static CapacityDecision allow(
                 @Nonnull BreedingPopulationAdmissionService.AdmissionRequest request) {
-            return new CapacityDecision(true, Objects.requireNonNull(request, "request"), null);
+            BreedingPopulationAdmissionService.AdmissionRequest resolved =
+                    Objects.requireNonNull(request, "request");
+            return new CapacityDecision(true, resolved, resolved.plan().children(), null);
+        }
+
+        @Nonnull
+        public static CapacityDecision allow(
+                @Nonnull BreedingPopulationAdmissionService.AdmissionRequest request,
+                @Nonnull java.util.List<PlannedChild> candidateChildren) {
+            return new CapacityDecision(
+                    true,
+                    Objects.requireNonNull(request, "request"),
+                    candidateChildren,
+                    null
+            );
         }
 
         @Nonnull
         public static CapacityDecision reject(String reason) {
-            return new CapacityDecision(false, null, reason);
+            return new CapacityDecision(false, null, java.util.List.of(), reason);
         }
     }
 
@@ -209,7 +295,39 @@ public final class BreedingPairingCoordinator {
             @Nonnull AppliedCooldownFingerprint parentBFingerprint,
             @Nonnull BreedingBirthAnchor anchor,
             @Nonnull RegisteredEffects registeredEffects,
-            @Nonnull RollbackEffects rollbackEffects) {
+            @Nonnull RollbackEffects rollbackEffects,
+            @Nonnull PlanResolver planResolver,
+            UUID requestedJobId) {
+        /** Backward-compatible request constructor for callers without replay or an explicit ID. */
+        public PairingRequest(
+                @Nonnull Object storeScope,
+                @Nonnull String worldId,
+                @Nonnull BreedingPopulationAdmissionService.BreedingMode mode,
+                @Nonnull BreedingParentIdentity parentA,
+                @Nonnull BreedingParentIdentity parentB,
+                double parentAFertilityMultiplier,
+                double parentBFertilityMultiplier,
+                @Nonnull BreedingBirthPlanService.PlannedChildResolver childResolver,
+                @Nonnull CapacityResolver capacityResolver,
+                @Nonnull ParentBreedingSnapshot parentASnapshot,
+                @Nonnull ParentBreedingSnapshot parentBSnapshot,
+                @Nonnull AppliedCooldownFingerprint parentAFingerprint,
+                @Nonnull AppliedCooldownFingerprint parentBFingerprint,
+                @Nonnull BreedingBirthAnchor anchor,
+                @Nonnull RegisteredEffects registeredEffects,
+                @Nonnull RollbackEffects rollbackEffects) {
+            this(
+                    storeScope, worldId, mode, parentA, parentB,
+                    parentAFertilityMultiplier, parentBFertilityMultiplier,
+                    childResolver, capacityResolver,
+                    parentASnapshot, parentBSnapshot,
+                    parentAFingerprint, parentBFingerprint,
+                    anchor, registeredEffects, rollbackEffects,
+                    (jobId, freshPlan) -> freshPlan.get(),
+                    null
+            );
+        }
+
         public PairingRequest {
             Objects.requireNonNull(storeScope, "storeScope");
             Objects.requireNonNull(worldId, "worldId");
@@ -225,6 +343,7 @@ public final class BreedingPairingCoordinator {
             Objects.requireNonNull(anchor, "anchor");
             Objects.requireNonNull(registeredEffects, "registeredEffects");
             Objects.requireNonNull(rollbackEffects, "rollbackEffects");
+            Objects.requireNonNull(planResolver, "planResolver");
         }
 
         private BreedingBirthJob createJob(UUID jobId,
@@ -261,6 +380,24 @@ public final class BreedingPairingCoordinator {
     @FunctionalInterface
     public interface RollbackEffects {
         void rollback(@Nonnull BreedingBirthJob registeredJob);
+    }
+
+    @FunctionalInterface
+    public interface PlanResolver {
+        @Nonnull
+        BreedingBirthPlan resolve(@Nonnull UUID jobId, @Nonnull Supplier<BreedingBirthPlan> freshPlan);
+    }
+
+    @FunctionalInterface
+    private interface JobIdFactory {
+        UUID create(PairingRequest request);
+    }
+
+    private static UUID defaultJobId(PairingRequest request) {
+        return BreedingAttemptIdentity.forAppliedCooldowns(
+                request.parentA(), request.parentAFingerprint(),
+                request.parentB(), request.parentBFingerprint()
+        );
     }
 
     private record PreparedAdmission(BreedingBirthPlan plan, CapacityDecision capacityDecision) {

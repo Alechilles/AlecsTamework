@@ -263,6 +263,29 @@ class BreedingPopulationAdmissionServiceTest {
         assertEquals(scope, result.reservation().scope());
     }
 
+    @Test
+    void replayCandidateSubsetDoesNotReserveAlreadyCommittedIdenticalChild() {
+        PlannedChild identical = child("cattle", 0);
+        BreedingBirthPlan fullPlan = BreedingBirthPlan.of(List.of(identical, identical));
+        BreedingPopulationAdmissionService.AdmissionRequest request = request(
+                44L,
+                PASSIVE,
+                fullPlan,
+                ORIGIN,
+                nearbyScope(10.0),
+                8,
+                Map.of("cattle", 7),
+                BreedingCapacityHeadroom.unlimited()
+        );
+
+        BreedingPopulationAdmissionService.AdmissionResult result =
+                service.admit(request, List.of(identical));
+
+        assertEquals(1, result.admittedCount());
+        assertEquals(List.of(identical), result.admittedChildren());
+        assertEquals(Map.of("cattle", 1), result.reservation().countsByPopulationType());
+    }
+
     private BreedingBirthJobRegistry.AdmissionResult register(
             long jobId,
             BreedingPopulationAdmissionService.BreedingMode mode,
