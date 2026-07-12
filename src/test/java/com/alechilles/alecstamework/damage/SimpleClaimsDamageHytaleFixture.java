@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.damage.SimpleClaimsDamageAdapterMatrix.LiveOwnerEvidence;
 import com.alechilles.alecstamework.damage.SimpleClaimsDamageAdapterMatrix.Scenario;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -200,28 +201,35 @@ public final class SimpleClaimsDamageHytaleFixture {
 
         @Nullable
         private TameworkOwnerComponent ownerComponent() {
+            if (scenario.liveOwnerEvidence() != LiveOwnerEvidence.CANONICAL
+                    && scenario.liveOwnerEvidence()
+                    != LiveOwnerEvidence.CANONICAL_WITH_DERIVED_METADATA) {
+                return null;
+            }
             UUID owner = scenario.targetOwnerUuid();
             return owner == null ? null : new TameworkOwnerComponent(owner, "Fixture Owner");
         }
 
         @Nullable
         private TameworkCommandLinksComponent linksComponent() {
-            if (!scenario.ownerPrecedence()) {
-                return null;
-            }
-            return new TameworkCommandLinksComponent(LINKS_OWNER, new String[] {"fixture-tool"});
+            return switch (scenario.liveOwnerEvidence()) {
+                case CANONICAL_WITH_DERIVED_METADATA ->
+                        new TameworkCommandLinksComponent(LINKS_OWNER, new String[] {"fixture-tool"});
+                case COMMAND_LINK_ONLY ->
+                        new TameworkCommandLinksComponent(ATTACKER, new String[] {"fixture-tool"});
+                default -> null;
+            };
         }
 
         @Nullable
         private TameworkNpcNameComponent nameComponent() {
-            if (!scenario.ownerPrecedence()) {
-                return null;
-            }
-            return new TameworkNpcNameComponent(
-                    "Fixture Name",
-                    NAME_OWNER,
-                    1L,
-                    TameworkNpcNameComponent.NameSource.Player
+            UUID owner = switch (scenario.liveOwnerEvidence()) {
+                case CANONICAL_WITH_DERIVED_METADATA -> NAME_OWNER;
+                case NPC_NAME_ONLY -> ATTACKER;
+                default -> null;
+            };
+            return owner == null ? null : new TameworkNpcNameComponent(
+                    "Fixture Name", owner, 1L, TameworkNpcNameComponent.NameSource.Player
             );
         }
 

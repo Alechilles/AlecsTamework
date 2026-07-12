@@ -38,6 +38,15 @@ public final class SimpleClaimsDamageAdapterMatrix {
         API_TARGET_NOT_LIVE
     }
 
+    /** Describes the live component evidence supplied to both damage adapters. */
+    public enum LiveOwnerEvidence {
+        NONE,
+        CANONICAL,
+        CANONICAL_WITH_DERIVED_METADATA,
+        COMMAND_LINK_ONLY,
+        NPC_NAME_ONLY
+    }
+
     /** One end-to-end adapter case with explicit runtime mutation and public API expectations. */
     public record Scenario(
             @Nonnull String name,
@@ -54,7 +63,8 @@ public final class SimpleClaimsDamageAdapterMatrix {
             @Nonnull DamagePolicyDecisionView.Status expectedApiStatus,
             @Nonnull String expectedApiReason,
             int expectedNativeCalls,
-            @Nonnull ParityExpectation parityExpectation) {
+            @Nonnull ParityExpectation parityExpectation,
+            @Nonnull LiveOwnerEvidence liveOwnerEvidence) {
 
         @Override
         public String toString() {
@@ -72,6 +82,16 @@ public final class SimpleClaimsDamageAdapterMatrix {
                 return null;
             }
             return ownerPrecedence ? ATTACKER : TARGET_OWNER;
+        }
+
+        @Nullable
+        public UUID persistedOwnerUuid() {
+            if (!targetOwned) {
+                return null;
+            }
+            return liveOwnerEvidence == LiveOwnerEvidence.COMMAND_LINK_ONLY
+                    || liveOwnerEvidence == LiveOwnerEvidence.NPC_NAME_ONLY
+                    ? TARGET_OWNER : targetOwnerUuid();
         }
 
         public boolean expectedApiAllowed() {
@@ -99,6 +119,18 @@ public final class SimpleClaimsDamageAdapterMatrix {
                         true, true, true, true, false, true,
                         true, 0.0f, DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
                         "block-owner-damage", 0, ParityExpectation.MATCH),
+                scenario("live-command-link-only-owner-protection-skips-provider",
+                        Mode.OUTSIDER_ALLOWED, SourceKind.DIRECT,
+                        true, true, true, true, false, true,
+                        true, 0.0f, DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
+                        "block-owner-damage", 0, ParityExpectation.MATCH,
+                        LiveOwnerEvidence.COMMAND_LINK_ONLY),
+                scenario("live-npc-name-only-owner-protection-skips-provider",
+                        Mode.OUTSIDER_ALLOWED, SourceKind.DIRECT,
+                        true, true, true, true, false, true,
+                        true, 0.0f, DamagePolicyDecisionView.Status.DENIED_OWNER_PROTECTION,
+                        "block-owner-damage", 0, ParityExpectation.MATCH,
+                        LiveOwnerEvidence.NPC_NAME_ONLY),
                 scenario("dormant-persisted-owner-protection-precedes-live-target-required",
                         Mode.OUTSIDER_ALLOWED, SourceKind.DIRECT,
                         true, true, true, true, false, false,
@@ -186,10 +218,38 @@ public final class SimpleClaimsDamageAdapterMatrix {
                                      String apiReason,
                                      int nativeCalls,
                                      ParityExpectation parityExpectation) {
+        LiveOwnerEvidence ownerEvidence = !targetOwned
+                ? LiveOwnerEvidence.NONE
+                : ownerPrecedence
+                        ? LiveOwnerEvidence.CANONICAL_WITH_DERIVED_METADATA
+                        : LiveOwnerEvidence.CANONICAL;
+        return scenario(
+                name, mode, sourceKind, protectionEnabled, targetTamed, targetOwned,
+                ownerPrecedence, initiallyCancelled, apiTargetLive, runtimeCancelled, runtimeAmount,
+                apiStatus, apiReason, nativeCalls, parityExpectation, ownerEvidence
+        );
+    }
+
+    private static Scenario scenario(String name,
+                                     Mode mode,
+                                     SourceKind sourceKind,
+                                     boolean protectionEnabled,
+                                     boolean targetTamed,
+                                     boolean targetOwned,
+                                     boolean ownerPrecedence,
+                                     boolean initiallyCancelled,
+                                     boolean apiTargetLive,
+                                     boolean runtimeCancelled,
+                                     float runtimeAmount,
+                                     DamagePolicyDecisionView.Status apiStatus,
+                                     String apiReason,
+                                     int nativeCalls,
+                                     ParityExpectation parityExpectation,
+                                     LiveOwnerEvidence liveOwnerEvidence) {
         return new Scenario(
                 name, mode, sourceKind, protectionEnabled, targetTamed, targetOwned,
                 ownerPrecedence, initiallyCancelled, apiTargetLive, runtimeCancelled, runtimeAmount,
-                apiStatus, apiReason, nativeCalls, parityExpectation
+                apiStatus, apiReason, nativeCalls, parityExpectation, liveOwnerEvidence
         );
     }
 

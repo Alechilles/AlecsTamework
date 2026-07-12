@@ -88,10 +88,20 @@ class SimpleClaimsDamageAdapterParityTest {
                                  WorldFixture worldFixture,
                                  Scenario scenario) throws Exception {
         NpcProfileRepository repository = runtime.getNpcProfileRepository();
+        if (scenario.liveOwnerEvidence()
+                == SimpleClaimsDamageAdapterMatrix.LiveOwnerEvidence.COMMAND_LINK_ONLY
+                || scenario.liveOwnerEvidence()
+                == SimpleClaimsDamageAdapterMatrix.LiveOwnerEvidence.NPC_NAME_ONLY) {
+            assertNotEquals(
+                    SimpleClaimsDamageAdapterMatrix.ATTACKER,
+                    scenario.persistedOwnerUuid(),
+                    "fallback cases require conflicting persisted ownership"
+            );
+        }
         assertTrue(repository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
                 worldFixture.targetUuid(),
-                scenario.targetOwnerUuid(),
-                scenario.targetOwned() ? "Fixture Owner" : null,
+                scenario.persistedOwnerUuid(),
+                scenario.persistedOwnerUuid() != null ? "Fixture Owner" : null,
                 scenario.targetTamed() ? "Tamed_DamageAdapter" : "Wild_DamageAdapter",
                 "Damage Adapter Target",
                 null,

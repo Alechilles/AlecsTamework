@@ -48,6 +48,32 @@ class OwnerPopulationIndexTest {
     }
 
     @Test
+    void concurrentGlobalAdmissionsAcrossWorldsShareOnlyAvailableHeadroom() throws Exception {
+        OwnerPopulationEntry existing = entry("existing", OWNER_A, "origin", 0L);
+        OwnerPopulationIndex index = indexWith(
+                List.of(existing), OwnerPopulationReadiness.READY
+        );
+
+        List<OwnerPopulationDecision> decisions = reserveTogether(index, List.of(
+                acquire("earth-contender", OWNER_A, "earth",
+                        OwnerPopulationLimitScope.GLOBAL, 2, false),
+                acquire("mars-contender", OWNER_A, "mars",
+                        OwnerPopulationLimitScope.GLOBAL, 2, false)
+        ));
+
+        assertEquals(1L, decisions.stream().filter(OwnerPopulationDecision::allowed).count());
+        assertEquals(1L, decisions.stream()
+                .filter(decision -> "owner-cap-reached".equals(decision.reason()))
+                .count());
+        int allowedIndex = decisions.getFirst().allowed() ? 0 : 1;
+        assertCounts(index, OWNER_A, "earth", 1L, 1L, 0L, allowedIndex == 0 ? 1L : 0L);
+        assertCounts(index, OWNER_A, "mars", 1L, 1L, 0L, allowedIndex == 1 ? 1L : 0L);
+
+        claimAndCommit(index, decisions.get(allowedIndex).reservation());
+        assertCounts(index, OWNER_A, "origin", 2L, 0L, 1L, 0L);
+    }
+
+    @Test
     void simultaneousPerWorldAdmissionsUseIndependentBuckets() throws Exception {
         OwnerPopulationIndex index = readyIndex(new AtomicLong(200L));
         List<OwnerPopulationDecision> decisions = reserveTogether(index, List.of(

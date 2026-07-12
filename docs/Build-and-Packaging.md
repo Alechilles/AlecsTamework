@@ -105,12 +105,18 @@ for QuestLines Claims 1.3.1. Wrong lanes, hashes, counts, text, stack traces, le
 `StaticLoggerBinder` warnings, and every
 other severe diagnostic remain fatal.
 
-SQLite is queried read-only for `integrity_check=ok`, WAL,
-FULL synchronous mode, schema v6, seven READY coverage dimensions, READY scan state, zero nonterminal
-operations, and canonical/profile row consistency. The copied upgrade must retain at least its pre-run
-profile/canonical row floor and must create a new, non-empty, `tamework_pre_v6_*.sqlite.bak` whose
-read-only integrity check passes and whose pre-v6 migration set and profile count match the source
-baseline. A copied/preexisting or unrelated valid SQLite file cannot satisfy that proof.
+SQLite is queried read-only for `integrity_check=ok`, WAL, FULL synchronous mode, schema v6, all seven
+coverage dimensions, configured owner-scope readiness, zero nonterminal operations, and
+canonical/profile row consistency. A fully authoritative save must report every row and the scan session
+`READY` with zero coverage errors. Because these fixtures configure the owner cap as `GLOBAL`, the copied
+upgrade may instead report exactly one non-ready row:
+`PER_WORLD_OWNER:owner-population:per-world:RECONCILING`, an `ACTIVE` scan session, and the exact
+`owned-profiles-have-unknown-world` reason. That sentinel proves global counts are authoritative while
+per-world positive admissions remain fail-closed until legacy profiles acquire an authoritative world;
+no other partial-readiness shape is accepted. The copied upgrade must also retain at least its pre-run
+profile/canonical row floor and create a new, non-empty, `tamework_pre_v6_*.sqlite.bak` whose read-only
+integrity check passes and whose pre-v6 migration set and profile count match the source baseline. A
+copied/preexisting or unrelated valid SQLite file cannot satisfy that proof.
 
 After the normal dwell, the copied-upgrade lane polls those SQLite invariants while the server remains
 running. It stops only after terminal readiness or after `UpgradeReadinessTimeoutSeconds`; the default is
