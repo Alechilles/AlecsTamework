@@ -121,7 +121,7 @@ class HytaleSavedWorldEvidenceSourceTest {
         );
     }
 
-    private static HytaleSavedWorldEvidenceSource source(long[] indexes, String epoch) {
+    private static HytaleSavedWorldEvidenceSource source(long[] indexes, String epoch) throws Exception {
         return new HytaleSavedWorldEvidenceSource(
                 "alpha",
                 HytaleSavedWorldEvidenceSource.Mode.WORLD_ENTITIES,
