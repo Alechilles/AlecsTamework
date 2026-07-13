@@ -18,8 +18,10 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -169,6 +171,7 @@ public final class ManagedCoopRuntimeOperationDispatcher {
     private final ReleaseClaimGateway releases;
     private final ReleaseProjectionGateway projections;
     private final Supplier<UUID> plannedUuidSource;
+    private final Set<String> releaseInFlightProfiles = ConcurrentHashMap.newKeySet();
 
     public ManagedCoopRuntimeOperationDispatcher(
             @Nonnull ManagedCoopCaptureRuntimeAdapter captureAdapter,
@@ -270,13 +273,39 @@ public final class ManagedCoopRuntimeOperationDispatcher {
         Objects.requireNonNull(site, "site");
         Objects.requireNonNull(resident, "resident");
         final UUID plannedUuid;
-        final CompletableFuture<ReleaseOutcome> release;
         try {
             if (!resident.authorityKey().equals(site.authorityKey())
                     || !resident.coopId().equalsIgnoreCase(site.expectedCoopId())) {
                 throw new IllegalArgumentException("release resident does not match release site");
             }
             plannedUuid = Objects.requireNonNull(plannedUuidSource.get(), "planned release UUID");
+        } catch (RuntimeException exception) {
+            return completed(DispatchStatus.RELEASE_FAILED, null,
+                    failureDetail("managed_coop_release_dispatch", exception));
+        }
+        if (!releaseInFlightProfiles.add(resident.profileId())) {
+            return completed(DispatchStatus.RELEASE_DEDUPLICATED, null,
+                    "managed_coop_release_profile_already_in_flight");
+        }
+        CompletableFuture<DispatchOutcome> pipeline = startRelease(
+                site, resident, plannedUuid, requestedAtMs);
+        return pipeline.whenComplete((ignored, failure) ->
+                releaseInFlightProfiles.remove(resident.profileId()));
+    }
+
+    /** True while this process owns a release claim or its resulting live projection. */
+    boolean releaseInFlight(@Nonnull String profileId) {
+        return releaseInFlightProfiles.contains(Objects.requireNonNull(profileId, "profileId"));
+    }
+
+    @Nonnull
+    private CompletableFuture<DispatchOutcome> startRelease(
+            ReleaseSite site,
+            ResidentRecord resident,
+            UUID plannedUuid,
+            long requestedAtMs) {
+        final CompletableFuture<ReleaseOutcome> release;
+        try {
             release = releases.coordinate(new ReleaseAttempt(resident, plannedUuid, requestedAtMs));
         } catch (RuntimeException exception) {
             return completed(DispatchStatus.RELEASE_FAILED, null,

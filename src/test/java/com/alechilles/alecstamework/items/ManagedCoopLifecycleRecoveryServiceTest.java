@@ -197,6 +197,33 @@ class ManagedCoopLifecycleRecoveryServiceTest {
     }
 
     @Test
+    void releaseRecoveryWaitsWhileCurrentProcessOwnsProjection() throws Exception {
+        Fixture fixture = releaseFixture();
+        AtomicInteger recoveryCalls = new AtomicInteger();
+        ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
+                fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
+                ready -> CompletableFuture.completedFuture(null),
+                (ready, resident) -> CompletableFuture.completedFuture(null),
+                operation -> {
+                    recoveryCalls.incrementAndGet();
+                    return CompletableFuture.failedFuture(
+                            new AssertionError("runtime-owned release must not enter recovery"));
+                },
+                command -> CompletableFuture.failedFuture(
+                        new AssertionError("runtime-owned release must not project through recovery")),
+                () -> -50L,
+                profileId -> PROFILE.equals(profileId));
+
+        ManagedCoopLifecycleRecoveryService.Outcome outcome =
+                service.recover("world", List.of(context())).join();
+
+        assertEquals(ManagedCoopLifecycleRecoveryService.RecoveryStatus.WAITING,
+                outcome.status());
+        assertEquals("release_recovery_owned_by_runtime_attempt", outcome.detail());
+        assertEquals(0, recoveryCalls.get());
+    }
+
+    @Test
     void disabledRemovedAuthorityRecoversReleaseWithoutPhysicalContext() {
         Fixture fixture = releaseFixture(AuthorityState.DISABLED);
         AtomicInteger recoveryCalls = new AtomicInteger();

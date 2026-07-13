@@ -92,4 +92,21 @@ class ManagedCoopReleasePopulationGatewayArchitectureTest {
         assertTrue(lifecycle.contains("recovered.projectionToken()"));
         assertTrue(lifecycle.contains("releaseRecovery::projectionCurrent"));
     }
+
+    /** Regression: a durable SPAWN_CLAIMED transition invalidates the sweep's HOUSED DTO. */
+    @Test
+    void releaseReResolvesCommittedResidentBeforeAdmissionAndSpawn() throws Exception {
+        String gateway = Files.readString(ITEMS.resolve(
+                "HytaleManagedCoopReleaseProjectionGateway.java"));
+        int firstResolve = gateway.indexOf("ResidentRecord currentResident = currentResident(command)");
+        int populationPrepare = gateway.indexOf("populations.prepareAsync(", firstResolve);
+        int secondResolve = gateway.indexOf(
+                "ResidentRecord currentResident = currentResident(command)", firstResolve + 1);
+        int preparedRelease = gateway.indexOf("releases.release(", secondResolve);
+
+        assertTrue(firstResolve >= 0 && populationPrepare > firstResolve);
+        assertTrue(secondResolve > populationPrepare && preparedRelease > secondResolve);
+        assertTrue(!gateway.substring(populationPrepare, preparedRelease)
+                .contains("command.resident(),"));
+    }
 }

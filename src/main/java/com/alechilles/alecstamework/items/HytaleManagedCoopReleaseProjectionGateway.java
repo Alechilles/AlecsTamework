@@ -1,11 +1,13 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRuntimeAdapter.SpawnPlacement;
+import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseRecoveryService.ProjectionToken;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Outcome;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Status;
 import com.alechilles.alecstamework.items.ManagedCoopRuntimeOperationDispatcher.ReleaseProjectionCommand;
 import com.alechilles.alecstamework.items.ManagedCoopRuntimeOperationDispatcher.ReleaseProjectionGateway;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -31,6 +33,7 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
     @Nullable
     private final ManagedCoopReleasePopulationCoordinator populations;
     private final ProjectionTokenCurrentness projectionCurrentness;
+    private final ManagedCoopCurrentReleaseResident currentResidents;
 
     HytaleManagedCoopReleaseProjectionGateway(ManagedCoopReleaseRuntimeAdapter releases) {
         this(releases, new CoopResidentReleasePositionService(),
@@ -52,7 +55,9 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             ManagedCoopCompositeIndexRefreshService compositeIndexes) {
         this(releases, new CoopResidentReleasePositionService(),
                 new HytaleManagedCoopRemovalEvidenceReader(),
-                new ManagedCoopReleaseSiteValidator(residents, compositeIndexes), null);
+                new ManagedCoopReleaseSiteValidator(residents, compositeIndexes), null,
+                token -> false, new ManagedCoopReleaseResidentResolver(
+                        residents, compositeIndexes::isTrusted));
     }
 
     HytaleManagedCoopReleaseProjectionGateway(
@@ -62,7 +67,9 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             ManagedCoopReleasePopulationCoordinator populations) {
         this(releases, new CoopResidentReleasePositionService(),
                 new HytaleManagedCoopRemovalEvidenceReader(),
-                new ManagedCoopReleaseSiteValidator(residents, compositeIndexes), populations);
+                new ManagedCoopReleaseSiteValidator(residents, compositeIndexes), populations,
+                token -> false, new ManagedCoopReleaseResidentResolver(
+                        residents, compositeIndexes::isTrusted));
     }
 
     HytaleManagedCoopReleaseProjectionGateway(
@@ -74,7 +81,8 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
         this(releases, new CoopResidentReleasePositionService(),
                 new HytaleManagedCoopRemovalEvidenceReader(),
                 new ManagedCoopReleaseSiteValidator(residents, compositeIndexes), populations,
-                projectionCurrentness);
+                projectionCurrentness, new ManagedCoopReleaseResidentResolver(
+                        residents, compositeIndexes::isTrusted));
     }
 
     HytaleManagedCoopReleaseProjectionGateway(
@@ -98,7 +106,8 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             HytaleManagedCoopRemovalEvidenceReader evidenceReader,
             ManagedCoopReleaseSiteValidator siteValidator,
             @Nullable ManagedCoopReleasePopulationCoordinator populations) {
-        this(releases, positions, evidenceReader, siteValidator, populations, token -> false);
+        this(releases, positions, evidenceReader, siteValidator, populations, token -> false,
+                (claim, selected) -> selected);
     }
 
     HytaleManagedCoopReleaseProjectionGateway(
@@ -107,7 +116,8 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             HytaleManagedCoopRemovalEvidenceReader evidenceReader,
             ManagedCoopReleaseSiteValidator siteValidator,
             @Nullable ManagedCoopReleasePopulationCoordinator populations,
-            ProjectionTokenCurrentness projectionCurrentness) {
+            ProjectionTokenCurrentness projectionCurrentness,
+            ManagedCoopCurrentReleaseResident currentResidents) {
         this.releases = Objects.requireNonNull(releases, "releases");
         this.positions = Objects.requireNonNull(positions, "positions");
         this.evidenceReader = Objects.requireNonNull(evidenceReader, "evidenceReader");
@@ -115,6 +125,7 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
         this.populations = populations;
         this.projectionCurrentness = Objects.requireNonNull(
                 projectionCurrentness, "projectionCurrentness");
+        this.currentResidents = Objects.requireNonNull(currentResidents, "currentResidents");
     }
 
     @Nonnull
@@ -169,14 +180,16 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             if (!validation.allowed()) {
                 throw new IllegalStateException(validation.detail());
             }
-            SpawnPlacement placement = placement(world, command, validation.currentRotationIndex());
+            ResidentRecord currentResident = currentResident(command);
+            SpawnPlacement placement = placement(
+                    world, command, currentResident, validation.currentRotationIndex());
             if (populations != null) {
-                preparePopulation(world, command, placement, completion);
+                preparePopulation(world, command, currentResident, placement, completion);
                 return;
             }
             requireRecoveryCurrent(command);
             CompletableFuture<Outcome> release = releases.release(
-                    command.claim(), command.resident(), placement, store);
+                    command.claim(), currentResident, placement, store);
             if (release == null) {
                 throw new IllegalStateException("managed_coop_release_projection_future_missing");
             }
@@ -206,13 +219,14 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
 
     private void preparePopulation(World world,
                                    ReleaseProjectionCommand command,
+                                   ResidentRecord currentResident,
                                    SpawnPlacement placement,
                                    CompletableFuture<Outcome> completion) {
         CompletableFuture<ManagedCoopReleasePopulationCoordinator.Preparation> preparation;
         try {
             preparation = populations.prepareAsync(
                     command.claim(),
-                    command.resident(),
+                    currentResident,
                     world.getName(),
                     ChunkUtil.chunkCoordinate(placement.x()),
                     ChunkUtil.chunkCoordinate(placement.z()));
@@ -341,8 +355,9 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             if (!validation.allowed()) {
                 throw new IllegalStateException(validation.detail());
             }
+            ResidentRecord currentResident = currentResident(command);
             SpawnPlacement currentPlacement = placement(
-                    world, command, validation.currentRotationIndex());
+                    world, command, currentResident, validation.currentRotationIndex());
             int chunkX = ChunkUtil.chunkCoordinate(currentPlacement.x());
             int chunkZ = ChunkUtil.chunkCoordinate(currentPlacement.z());
             if (world.getName() == null
@@ -356,7 +371,7 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             }
             requireRecoveryCurrent(command);
             CompletableFuture<Outcome> release = releases.release(
-                    command.claim(), command.resident(), preparedPlacement, store,
+                    command.claim(), currentResident, preparedPlacement, store,
                     prepared, populations);
             if (release == null) {
                 throw new IllegalStateException(
@@ -446,8 +461,9 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
     @Nonnull
     private SpawnPlacement placement(World world,
                                      ReleaseProjectionCommand command,
+                                     ResidentRecord resident,
                                      int currentRotationIndex) {
-        String roleId = command.resident().roleId();
+        String roleId = resident.roleId();
         NPCPlugin plugin = NPCPlugin.get();
         if (roleId == null || roleId.isBlank() || plugin == null) {
             throw new IllegalStateException("managed_coop_release_role_unavailable");
@@ -467,6 +483,11 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
         return new SpawnPlacement(
                 position.x, position.y, position.z,
                 0.0f, 0.0f, 0.0f);
+    }
+
+    @Nonnull
+    private ResidentRecord currentResident(ReleaseProjectionCommand command) {
+        return currentResidents.resolve(command.claim(), command.resident());
     }
 
     private World resolveWorld(String worldName) {

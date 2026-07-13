@@ -90,6 +90,11 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         population.claimOccupancyIndex());
         ManagedCoopReleaseRuntimeAdapter releaseAdapter = releaseAdapter(
                 services, loadedIdentities, presentation);
+        ManagedCoopReleaseCoordinator releaseCoordinator = new ManagedCoopReleaseCoordinator(
+                services.lifecycleRepository(), services.compositeIndexRefreshService());
+        ManagedCoopRuntimeOperationDispatcher operations = operationDispatcher(
+                services, captureAdapter, sourceRetirements, releaseCoordinator,
+                releaseAdapter, releasePopulations);
         ManagedCoopReleaseRecoveryService releaseRecovery =
                 new ManagedCoopReleaseRecoveryService(
                         services.lifecycleRepository(),
@@ -107,10 +112,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         itemRecovery,
                         releaseRecovery,
                         releaseAdapter,
-                        releasePopulations);
-        ManagedCoopRuntimeOperationDispatcher operations = operationDispatcher(
-                services, captureAdapter, sourceRetirements, releaseAdapter,
-                releasePopulations);
+                        releasePopulations,
+                        operations::releaseInFlight);
         ManagedCoopVanillaImportBehavior imports = importBehavior(
                 persistence,
                 services,
@@ -243,10 +246,9 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
             ManagedCoopRuntimeServices services,
             ManagedCoopCaptureRuntimeAdapter captureAdapter,
             ManagedCoopCaptureSourceRetirementService sourceRetirements,
+            ManagedCoopReleaseCoordinator releaseCoordinator,
             ManagedCoopReleaseRuntimeAdapter releaseAdapter,
             ManagedCoopReleasePopulationCoordinator releasePopulations) {
-        ManagedCoopReleaseCoordinator releaseCoordinator = new ManagedCoopReleaseCoordinator(
-                services.lifecycleRepository(), services.compositeIndexRefreshService());
         return new ManagedCoopRuntimeOperationDispatcher(
                 captureAdapter,
                 sourceRetirements,

@@ -91,6 +91,34 @@ class ManagedCoopRuntimeOperationDispatcherTest {
     }
 
     @Test
+    void releaseRemainsProcessOwnedUntilProjectionFinishes() throws Exception {
+        ManagedCoopContext context = context();
+        ResidentRecord resident = resident(context);
+        CompletableFuture<ManagedCoopReleaseSpawnOrchestrator.Outcome> projection =
+                new CompletableFuture<>();
+        ManagedCoopRuntimeOperationDispatcher dispatcher = dispatcher(
+                ignored -> CompletableFuture.completedFuture(new ReleaseOutcome(
+                        ManagedCoopReleaseCoordinator.OutcomeStatus.SPAWN_READY,
+                        ready(resident), null)),
+                ignored -> projection);
+
+        CompletableFuture<ManagedCoopRuntimeOperationDispatcher.DispatchOutcome> release =
+                dispatcher.release(context, resident, 100L);
+        var duplicate = dispatcher.release(context, resident, 101L).join();
+
+        assertTrue(dispatcher.releaseInFlight(resident.profileId()));
+        assertEquals(DispatchStatus.RELEASE_DEDUPLICATED, duplicate.status());
+        assertEquals("managed_coop_release_profile_already_in_flight", duplicate.detail());
+
+        projection.complete(new ManagedCoopReleaseSpawnOrchestrator.Outcome(
+                ManagedCoopReleaseSpawnOrchestrator.Status.FINALIZED,
+                PLANNED, true, true, null));
+
+        assertEquals(DispatchStatus.RELEASED, release.join().status());
+        assertFalse(dispatcher.releaseInFlight(resident.profileId()));
+    }
+
+    @Test
     void captureIsReportedOnlyAfterExactSourceRetirementCompletes() {
         AtomicReference<RetirementReady> retired = new AtomicReference<>();
         ManagedCoopRuntimeOperationDispatcher dispatcher = captureDispatcher(ready -> {

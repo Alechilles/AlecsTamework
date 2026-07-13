@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.items.ManagedCoopCaptureCoordinator.Retireme
 import com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryEvidence.Decision;
 import com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryEvidence.DecisionStatus;
 import com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryEvidence.RecoveryCommand;
+import com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryPlanner.ActionKind;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
 import com.alechilles.alecstamework.items.ManagedCoopRuntimeOperationDispatcher.ReleaseProjectionCommand;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository;
@@ -21,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -60,6 +62,7 @@ public final class ManagedCoopLifecycleRecoveryService {
     private final ReleaseRecoveryGateway releaseRecovery;
     private final ProjectionGateway projections;
     private final LongSupplier clock;
+    private final Predicate<String> processReleaseInFlight;
     private final ConcurrentHashMap<String, CompletableFuture<Outcome>> inFlight =
             new ConcurrentHashMap<>();
 
@@ -73,6 +76,22 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ManagedCoopReleaseRecoveryService releaseRecovery,
             @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
             @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations) {
+        this(repository, residentIndex, operationIndex, compositeIndexes,
+                entityRetirements, itemRetirements, releaseRecovery, releaseAdapter,
+                releasePopulations, ignored -> false);
+    }
+
+    public ManagedCoopLifecycleRecoveryService(
+            @Nonnull CoopLifecycleOperationRepository repository,
+            @Nonnull ManagedCoopResidentIndex residentIndex,
+            @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
+            @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
+            @Nonnull ManagedCoopCaptureSourceRetirementService entityRetirements,
+            @Nonnull ManagedCoopItemCaptureRecoveryService itemRetirements,
+            @Nonnull ManagedCoopReleaseRecoveryService releaseRecovery,
+            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
+            @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations,
+            @Nonnull Predicate<String> processReleaseInFlight) {
         this(
                 new ManagedCoopLifecycleRecoveryEvidence(
                         new ManagedCoopLifecycleRecoveryPlanner(),
@@ -87,7 +106,8 @@ public final class ManagedCoopLifecycleRecoveryService {
                 new HytaleManagedCoopReleaseProjectionGateway(
                         releaseAdapter, residentIndex, compositeIndexes,
                         releasePopulations, releaseRecovery::projectionCurrent)::project,
-                System::currentTimeMillis
+                System::currentTimeMillis,
+                processReleaseInFlight
         );
     }
 
@@ -100,6 +120,20 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ReleaseRecoveryGateway releaseRecovery,
             @Nonnull ProjectionGateway projections,
             @Nonnull LongSupplier clock) {
+        this(evidence, captureAdvances, refresh, entityRetirements, itemRetirements,
+                releaseRecovery, projections, clock, ignored -> false);
+    }
+
+    ManagedCoopLifecycleRecoveryService(
+            @Nonnull ManagedCoopLifecycleRecoveryEvidence evidence,
+            @Nonnull CaptureAdvanceGateway captureAdvances,
+            @Nonnull RefreshGateway refresh,
+            @Nonnull EntityRetirementGateway entityRetirements,
+            @Nonnull ItemRetirementGateway itemRetirements,
+            @Nonnull ReleaseRecoveryGateway releaseRecovery,
+            @Nonnull ProjectionGateway projections,
+            @Nonnull LongSupplier clock,
+            @Nonnull Predicate<String> processReleaseInFlight) {
         this.evidence = Objects.requireNonNull(evidence, "evidence");
         this.captureAdvances = Objects.requireNonNull(captureAdvances, "captureAdvances");
         this.refresh = Objects.requireNonNull(refresh, "refresh");
@@ -108,6 +142,8 @@ public final class ManagedCoopLifecycleRecoveryService {
         this.releaseRecovery = Objects.requireNonNull(releaseRecovery, "releaseRecovery");
         this.projections = Objects.requireNonNull(projections, "projections");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.processReleaseInFlight = Objects.requireNonNull(
+                processReleaseInFlight, "processReleaseInFlight");
     }
 
     /** Selects and resumes at most one deterministic active operation for this loaded world. */
@@ -126,6 +162,12 @@ public final class ManagedCoopLifecycleRecoveryService {
             return immediate(decision);
         }
         RecoveryCommand command = decision.command();
+        if (runtimeOwnsRelease(command)) {
+            return completed(
+                    RecoveryStatus.WAITING,
+                    command.operation().operationId(),
+                    "release_recovery_owned_by_runtime_attempt");
+        }
         CompletableFuture<Outcome> proposed = new CompletableFuture<>();
         CompletableFuture<Outcome> existing = inFlight.putIfAbsent(
                 command.operation().operationId(), proposed);
@@ -154,6 +196,17 @@ public final class ManagedCoopLifecycleRecoveryService {
                 .whenComplete((outcome, failure) -> finish(command, proposed, outcome))
                 .toCompletableFuture();
         return proposed;
+    }
+
+    private boolean runtimeOwnsRelease(RecoveryCommand command) {
+        if (command.action() != ActionKind.RESUME_RELEASE) {
+            return false;
+        }
+        try {
+            return processReleaseInFlight.test(command.operation().profileId());
+        } catch (RuntimeException exception) {
+            return true;
+        }
     }
 
     @Nonnull
