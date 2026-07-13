@@ -168,6 +168,24 @@ class CompanionPopulationStartupReconcilerTest {
         return CompanionPopulationStartupReconciler.finalStatus(result, bootstrap);
     }
 
+    @Test
+    void ordinaryLiveIdentityRacesRetryWithoutClassifyingCorruptionAsTransient() {
+        assertTrue(CompanionPopulationReconciliationRetryPolicy.shouldRetry(
+                "reconciliation-loaded-identity-mutated-during-scan"));
+        assertTrue(CompanionPopulationReconciliationRetryPolicy.shouldRetry(
+                "reconciliation-live-evidence-mutated-during-final-reload"));
+        assertFalse(CompanionPopulationReconciliationRetryPolicy.shouldRetry(
+                "reconciliation-operation-ambiguous"));
+        assertFalse(CompanionPopulationReconciliationRetryPolicy.shouldRetry(
+                "reconciliation-source-failed:IllegalStateException"));
+    }
+
+    @Test
+    void transientRetryBackoffStaysBounded() {
+        assertEquals(25L, CompanionPopulationReconciliationRetryPolicy.delayMs(0));
+        assertEquals(1_000L, CompanionPopulationReconciliationRetryPolicy.delayMs(100));
+    }
+
     private static LoadedNpcIdentityIndex.LoadedNpcObservation observation() {
         return new LoadedNpcIdentityIndex.LoadedNpcObservation(
                 NPC_UUID, NPC_UUID, WORLD, null

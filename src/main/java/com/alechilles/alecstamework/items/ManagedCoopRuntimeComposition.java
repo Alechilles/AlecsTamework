@@ -130,8 +130,7 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
         ManagedCoopLifecycleAdmissionGuard lifecycleAdmission =
                 new ManagedCoopLifecycleAdmissionGuard(
                         services.lifecycleIndex(),
-                        services.compositeIndexRefreshService()::isTrusted,
-                        () -> managedRuntimeReady(persistence, population));
+                        services.compositeIndexRefreshService()::isTrusted);
         ManagedCoopRuntimeSweepPlanner planner = new ManagedCoopRuntimeSweepPlanner(
                 services.occupancyService(), lifecycleAdmission);
         authorityEligibility = new ManagedCoopAuthorityEligibilityIndex();

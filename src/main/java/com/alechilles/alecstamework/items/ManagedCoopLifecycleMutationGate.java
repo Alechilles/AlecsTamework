@@ -15,15 +15,15 @@ import javax.annotation.Nullable;
  */
 final class ManagedCoopLifecycleMutationGate {
     private final AtomicReference<Lease> active = new AtomicReference<>();
-    private final BooleanSupplier runtimeAuthorityReady;
+    private final BooleanSupplier releaseAuthorityReady;
 
     ManagedCoopLifecycleMutationGate() {
         this(() -> true);
     }
 
-    ManagedCoopLifecycleMutationGate(@Nonnull BooleanSupplier runtimeAuthorityReady) {
-        this.runtimeAuthorityReady = Objects.requireNonNull(
-                runtimeAuthorityReady, "runtimeAuthorityReady");
+    ManagedCoopLifecycleMutationGate(@Nonnull BooleanSupplier releaseAuthorityReady) {
+        this.releaseAuthorityReady = Objects.requireNonNull(
+                releaseAuthorityReady, "releaseAuthorityReady");
     }
 
     @Nullable
@@ -40,9 +40,9 @@ final class ManagedCoopLifecycleMutationGate {
         return active.get() != null;
     }
 
-    boolean runtimeReady() {
+    boolean releaseReady() {
         try {
-            return runtimeAuthorityReady.getAsBoolean();
+            return releaseAuthorityReady.getAsBoolean();
         } catch (RuntimeException exception) {
             return false;
         }

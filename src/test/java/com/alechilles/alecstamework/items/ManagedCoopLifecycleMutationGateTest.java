@@ -11,6 +11,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Regression for concurrent coop releases revoking each other's shared composite-index epoch. */
 class ManagedCoopLifecycleMutationGateTest {
     @Test
+    void releaseReadinessDoesNotCloseTheSharedCaptureSerializationLease() {
+        ManagedCoopLifecycleMutationGate gate =
+                new ManagedCoopLifecycleMutationGate(() -> false);
+
+        assertFalse(gate.releaseReady());
+        assertNotNull(gate.tryAcquire("runtime-capture:profile"));
+    }
+
+    @Test
     void onlyExactLeaseCanReopenLifecycleGate() {
         ManagedCoopLifecycleMutationGate gate = new ManagedCoopLifecycleMutationGate();
         ManagedCoopLifecycleMutationGate.Lease first = gate.tryAcquire("release:first");

@@ -259,10 +259,6 @@ public final class ManagedCoopRuntimeOperationDispatcher {
         Objects.requireNonNull(sourceRef, "sourceRef");
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(candidate, "candidate");
-        if (!lifecycleGate.runtimeReady()) {
-            return completed(DispatchStatus.CAPTURE_DEDUPLICATED, null,
-                    "managed_coop_runtime_authority_not_ready");
-        }
         ManagedCoopLifecycleMutationGate.Lease lease = lifecycleGate.tryAcquire(
                 "runtime-capture:" + candidate.npcUuid());
         if (lease == null) {
@@ -323,7 +319,7 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             long requestedAtMs) {
         Objects.requireNonNull(site, "site");
         Objects.requireNonNull(resident, "resident");
-        if (!lifecycleGate.runtimeReady()) {
+        if (!lifecycleGate.releaseReady()) {
             return completed(DispatchStatus.RELEASE_DEDUPLICATED, null,
                     "managed_coop_runtime_authority_not_ready");
         }

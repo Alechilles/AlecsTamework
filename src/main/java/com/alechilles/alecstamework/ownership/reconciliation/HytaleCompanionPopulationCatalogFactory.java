@@ -37,12 +37,28 @@ public final class HytaleCompanionPopulationCatalogFactory {
             @Nonnull String scanSessionEpoch
     ) {
         return create(
+                universe, ownerType, itemFeatures, legacyEvidenceRepository,
+                customContainers, scanSessionEpoch, scanSessionEpoch);
+    }
+
+    @Nonnull
+    public static BuildResult create(
+            @Nonnull Universe universe,
+            @Nonnull ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            @Nonnull ItemFeatureRegistry itemFeatures,
+            @Nonnull CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository,
+            @Nonnull CustomContainerReconciliationRegistry customContainers,
+            @Nonnull String scanSessionEpoch,
+            @Nonnull String playerEvidenceEpoch
+    ) {
+        return create(
                 universe,
                 ownerType,
                 itemFeatures,
                 legacyEvidenceRepository,
                 customContainers,
                 scanSessionEpoch,
+                playerEvidenceEpoch,
                 PersistentWorldDirectoryCatalog.filesystem()
         );
     }
@@ -55,10 +71,12 @@ public final class HytaleCompanionPopulationCatalogFactory {
             @Nonnull CompanionPopulationLegacyEvidenceRepository legacyEvidenceRepository,
             @Nonnull CustomContainerReconciliationRegistry customContainers,
             @Nonnull String scanSessionEpoch,
+            @Nonnull String playerEvidenceEpoch,
             @Nonnull PersistentWorldDirectoryCatalog persistentWorldDirectories
     ) {
         Objects.requireNonNull(universe, "universe");
         Objects.requireNonNull(scanSessionEpoch, "scanSessionEpoch");
+        Objects.requireNonNull(playerEvidenceEpoch, "playerEvidenceEpoch");
         Objects.requireNonNull(persistentWorldDirectories, "persistentWorldDirectories");
         LegacyCapturedItemEvidenceReader itemReader = new LegacyCapturedItemEvidenceReader(itemFeatures);
         RecursiveItemContainerEvidenceScanner itemContainers =
@@ -84,7 +102,7 @@ public final class HytaleCompanionPopulationCatalogFactory {
         );
         worlds = new WorldResult(worlds.sealed() && knownIdentities.complete());
         boolean playersSealed = addPlayerSources(
-                universe, inventories, scanSessionEpoch, sources, incompleteReasons
+                universe, inventories, playerEvidenceEpoch, sources, incompleteReasons
         );
         CustomContainerReconciliationRegistry.Snapshot customSnapshot = customSnapshot(
                 customContainers, incompleteReasons

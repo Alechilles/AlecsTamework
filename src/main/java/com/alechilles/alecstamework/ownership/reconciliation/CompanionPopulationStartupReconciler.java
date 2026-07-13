@@ -163,13 +163,14 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         try {
             String epoch = barrier.session().epoch();
             StartupCatalog startup = new StartupCatalog(
-                    HytaleCompanionPopulationCatalogFactory.create(
+                    () -> HytaleCompanionPopulationCatalogFactory.create(
                             universe,
                             ownerType,
                             itemFeatures,
                             persistence.getCompanionPopulationLegacyEvidenceRepository(),
                             customContainers,
-                            epoch
+                            epoch,
+                            epoch + ":live:" + liveEvidenceRevision.capture()
                     ),
                     epoch
             );
@@ -219,6 +220,15 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
             @Nonnull StartupCatalog startup,
             long startedAt
     ) {
+        return reconcile(startup, startedAt, 0);
+    }
+
+    @Nonnull
+    private CompletableFuture<CompanionPopulationReconciliationProgress> reconcile(
+            @Nonnull StartupCatalog startup,
+            long startedAt,
+            int priorRetries
+    ) {
         if (closed.get()) {
             return CompletableFuture.completedFuture(progress.get());
         }
@@ -237,17 +247,61 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 liveEvidenceRevision,
                 (descriptor, offset) -> progress.set(tracker.update(descriptor, offset))
         );
-        return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE).thenCompose(result ->
-                beginFinalReload().thenCompose(ignored -> CanonicalReloadCompletion.run(
-                        () -> observationWriter.flushCurrentAttemptsNow().thenComposeAsync(value ->
-                                finish(result, tracker, service), executor),
-                        this::finishFinalReload
-                )).exceptionallyCompose(failure -> service.rejectAfterCanonicalReloadAsync(
-                        result,
-                        "reconciliation-final-reload-failed:"
-                                + rootCause(failure).getClass().getSimpleName()
-                ).thenCompose(ignored -> CompletableFuture.failedFuture(failure)))
-        );
+        return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE).thenCompose(result -> {
+            if (CompanionPopulationReconciliationRetryPolicy.shouldRetry(result.reason())) {
+                return retry(startup, startedAt, priorRetries, result.reason());
+            }
+            return beginFinalReload().thenCompose(ignored -> CanonicalReloadCompletion.run(
+                    () -> observationWriter.flushCurrentAttemptsNow().thenComposeAsync(value ->
+                            finish(result, tracker, service), executor),
+                    this::finishFinalReload
+            )).exceptionallyCompose(failure -> service.rejectAfterCanonicalReloadAsync(
+                    result,
+                    "reconciliation-final-reload-failed:"
+                            + rootCause(failure).getClass().getSimpleName()
+            ).thenCompose(ignored -> CompletableFuture.failedFuture(failure)))
+                    .thenCompose(finished ->
+                            CompanionPopulationReconciliationRetryPolicy.shouldRetry(
+                                    finished.reason())
+                                    ? retry(startup, startedAt, priorRetries, finished.reason())
+                                    : CompletableFuture.completedFuture(finished));
+        });
+    }
+
+    @Nonnull
+    private CompletableFuture<CompanionPopulationReconciliationProgress> retry(
+            StartupCatalog startup,
+            long startedAt,
+            int priorRetries,
+            String reason
+    ) {
+        persistence.getCompanionPersistedProjectionEvidenceRegistry()
+                .begin(startup.scanSessionEpoch());
+        CompanionPopulationReconciliationProgress previous = progress.get();
+        progress.set(running(
+                "reconciliation-retrying:" + reason,
+                previous.scannedUnits(), previous.totalUnits(), startedAt));
+        CompletableFuture<CompanionPopulationReconciliationProgress> retry =
+                new CompletableFuture<>();
+        try {
+            executor.schedule(() -> reconcile(startup, startedAt, priorRetries + 1)
+                            .whenComplete((value, failure) -> {
+                                if (failure == null) {
+                                    retry.complete(value);
+                                } else {
+                                    retry.completeExceptionally(failure);
+                                }
+                            }),
+                    CompanionPopulationReconciliationRetryPolicy.delayMs(priorRetries),
+                    TimeUnit.MILLISECONDS);
+        } catch (RuntimeException exception) {
+            if (closed.get()) {
+                retry.complete(progress.get());
+            } else {
+                retry.completeExceptionally(exception);
+            }
+        }
+        return retry;
     }
 
     @Nonnull
@@ -469,9 +523,12 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     }
 
     private record StartupCatalog(
-            @Nonnull HytaleCompanionPopulationCatalogFactory.BuildResult build,
+            @Nonnull Supplier<HytaleCompanionPopulationCatalogFactory.BuildResult> buildFactory,
             @Nonnull String scanSessionEpoch
     ) {
+        private HytaleCompanionPopulationCatalogFactory.BuildResult build() {
+            return Objects.requireNonNull(buildFactory.get(), "startup catalog");
+        }
     }
 
     private record BarrierSession(

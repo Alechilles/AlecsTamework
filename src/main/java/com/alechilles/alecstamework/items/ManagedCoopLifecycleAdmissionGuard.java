@@ -17,7 +17,6 @@ public final class ManagedCoopLifecycleAdmissionGuard {
     public enum Status {
         ALLOWED,
         BLOCKED_ACTIVE_OPERATION,
-        BLOCKED_RUNTIME_NOT_READY,
         BLOCKED_UNTRUSTED
     }
 
@@ -31,22 +30,12 @@ public final class ManagedCoopLifecycleAdmissionGuard {
 
     private final ManagedCoopLifecycleOperationIndex operations;
     private final BooleanSupplier compositeTrust;
-    private final BooleanSupplier runtimeAuthorityReady;
 
     public ManagedCoopLifecycleAdmissionGuard(
             @Nonnull ManagedCoopLifecycleOperationIndex operations,
             @Nonnull BooleanSupplier compositeTrust) {
-        this(operations, compositeTrust, () -> true);
-    }
-
-    public ManagedCoopLifecycleAdmissionGuard(
-            @Nonnull ManagedCoopLifecycleOperationIndex operations,
-            @Nonnull BooleanSupplier compositeTrust,
-            @Nonnull BooleanSupplier runtimeAuthorityReady) {
         this.operations = Objects.requireNonNull(operations, "operations");
         this.compositeTrust = Objects.requireNonNull(compositeTrust, "compositeTrust");
-        this.runtimeAuthorityReady = Objects.requireNonNull(
-                runtimeAuthorityReady, "runtimeAuthorityReady");
     }
 
     /** Returns one stable admission decision from the currently published operation epoch. */
@@ -55,12 +44,6 @@ public final class ManagedCoopLifecycleAdmissionGuard {
         Objects.requireNonNull(context, "context");
         if (!trusted()) {
             return untrusted("managed_coop_lifecycle_index_untrusted");
-        }
-        if (!runtimeReady()) {
-            return new Decision(
-                    Status.BLOCKED_RUNTIME_NOT_READY,
-                    null,
-                    "managed_coop_runtime_authority_not_ready");
         }
         ManagedCoopLifecycleOperationIndex.Snapshot snapshot = operations.snapshot();
         if (!snapshot.trusted()) {
@@ -99,14 +82,6 @@ public final class ManagedCoopLifecycleAdmissionGuard {
     private boolean trusted() {
         try {
             return compositeTrust.getAsBoolean() && operations.isTrusted();
-        } catch (RuntimeException exception) {
-            return false;
-        }
-    }
-
-    private boolean runtimeReady() {
-        try {
-            return runtimeAuthorityReady.getAsBoolean();
         } catch (RuntimeException exception) {
             return false;
         }
