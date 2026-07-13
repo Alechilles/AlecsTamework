@@ -50,6 +50,21 @@ class HytaleManagedCoopCaptureSourceGatewayTest {
         assertFalse(HytaleManagedCoopCaptureSourceGateway.matches(null, command));
     }
 
+    /** Regression: the v5 cutover dropped poof effects; replay must not duplicate them. */
+    @Test
+    void effectsRunOnlyForTheFirstExactCaptureRetirement() {
+        RetirementCommand command = command();
+        TameworkProjectionIdentityComponent exact =
+                HytaleManagedCoopCaptureSourceGateway.marker(command);
+
+        assertTrue(HytaleManagedCoopCaptureSourceGateway.shouldPlayCaptureEffects(
+                null, command, false));
+        assertFalse(HytaleManagedCoopCaptureSourceGateway.shouldPlayCaptureEffects(
+                exact, command, false));
+        assertFalse(HytaleManagedCoopCaptureSourceGateway.shouldPlayCaptureEffects(
+                null, command, true));
+    }
+
     /** Regression: released projections previously could commit a slot but fail source retirement. */
     @Test
     void exactFinalizedReleaseMarkerCanTransitionToCaptureSourceMarker() {

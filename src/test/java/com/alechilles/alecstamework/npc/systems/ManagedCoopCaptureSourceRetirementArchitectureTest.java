@@ -52,7 +52,11 @@ class ManagedCoopCaptureSourceRetirementArchitectureTest {
         assertTrue(source.contains("source_not_loaded_absence_unproven"));
         assertFalse(source.contains("LiveSourceDecision.absent()"));
         assertTrue(source.contains("store.putComponent(reference, markerType, expected)"));
-        assertTrue(source.contains("npc.setToDespawn()"));
+        int effects = source.indexOf("effects.playTransitionEffects(");
+        int despawn = source.indexOf("npc.setToDespawn()");
+        assertTrue(effects >= 0 && despawn > effects,
+                "capture effects must precede the exact source despawn request");
+        assertTrue(source.contains("shouldPlayCaptureEffects("));
         assertTrue(source.contains(
                 "KIND_MANAGED_COOP_CAPTURE_SOURCE"));
     }

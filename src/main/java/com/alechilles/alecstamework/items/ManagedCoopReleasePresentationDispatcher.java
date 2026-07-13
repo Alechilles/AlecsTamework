@@ -111,7 +111,8 @@ public final class ManagedCoopReleasePresentationDispatcher implements Presentat
 
     @FunctionalInterface
     interface PresentationApplier {
-        void apply(@Nonnull LiveProjection projection,
+        void apply(@Nonnull PresentationCommand command,
+                   @Nonnull LiveProjection projection,
                    @Nonnull CoopResidentStateRestorer.PostAddWork work);
     }
 
@@ -131,7 +132,8 @@ public final class ManagedCoopReleasePresentationDispatcher implements Presentat
                 new HytaleWorldThreadGateway(),
                 new CoopResidentStateSnapshotCodec(),
                 new CoopResidentStateRestorer(),
-                new HytalePresentationApplier(new PlannedNpcProjectionPostAddService())
+                new HytaleManagedCoopReleasePresentationApplier(
+                        new PlannedNpcProjectionPostAddService(), new CoopEffectService())
         );
     }
 
@@ -208,7 +210,7 @@ public final class ManagedCoopReleasePresentationDispatcher implements Presentat
                 entry.reject("live_projection_marker_conflict");
                 return;
             }
-            presentationApplier.apply(live.projection(), work);
+            presentationApplier.apply(command, live.projection(), work);
             entry.applied();
         } catch (RuntimeException exception) {
             entry.reject("release_presentation_failed:" + exceptionDetail(exception));
@@ -377,22 +379,6 @@ public final class ManagedCoopReleasePresentationDispatcher implements Presentat
         private static World resolveWorld(String worldName) {
             Universe universe = Universe.get();
             return universe != null ? universe.getWorld(worldName) : null;
-        }
-    }
-
-    private static final class HytalePresentationApplier implements PresentationApplier {
-        private final PlannedNpcProjectionPostAddService postAdd;
-
-        private HytalePresentationApplier(PlannedNpcProjectionPostAddService postAdd) {
-            this.postAdd = postAdd;
-        }
-
-        @Override
-        public void apply(LiveProjection projection,
-                          CoopResidentStateRestorer.PostAddWork work) {
-            postAdd.apply(projection.reference(), projection.npc(), projection.store(), work);
-            CommandCompanionSpawnPhysicsResetService.resetSpawnedCompanionPhysics(
-                    projection.reference(), projection.npc(), projection.store());
         }
     }
 

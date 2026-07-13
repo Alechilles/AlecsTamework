@@ -74,7 +74,7 @@ class ManagedCoopReleasePresentationDispatcherTest {
                     return StateEvidence.found(bundle.resident());
                 },
                 worlds,
-                (projection, work) -> {
+                (command, projection, work) -> {
                     applies.incrementAndGet();
                     appliedWork.set(work);
                 }
@@ -112,7 +112,7 @@ class ManagedCoopReleasePresentationDispatcherTest {
         ManagedCoopReleasePresentationDispatcher unavailable = dispatcher(
                 command -> StateEvidence.unavailable("indexes_untrusted"),
                 unavailableWorlds,
-                (projection, work) -> { }
+                (command, projection, work) -> { }
         );
         unavailable.dispatch(bundle.command());
         unavailableWorlds.runQueued();
@@ -124,7 +124,7 @@ class ManagedCoopReleasePresentationDispatcherTest {
         ManagedCoopReleasePresentationDispatcher releasingDispatcher = dispatcher(
                 command -> StateEvidence.found(releasing),
                 releasingWorlds,
-                (projection, work) -> { }
+                (command, projection, work) -> { }
         );
         releasingDispatcher.dispatch(bundle.command());
         releasingWorlds.runQueued();
@@ -152,7 +152,7 @@ class ManagedCoopReleasePresentationDispatcherTest {
         ManagedCoopReleasePresentationDispatcher corruptDispatcher = dispatcher(
                 command -> StateEvidence.found(corrupt),
                 corruptWorlds,
-                (projection, work) -> applies.incrementAndGet()
+                (command, projection, work) -> applies.incrementAndGet()
         );
         corruptDispatcher.dispatch(bundle.command());
         corruptWorlds.runQueued();
@@ -163,7 +163,7 @@ class ManagedCoopReleasePresentationDispatcherTest {
         ManagedCoopReleasePresentationDispatcher markerDispatcher = dispatcher(
                 command -> StateEvidence.found(bundle.resident()),
                 markerWorlds,
-                (projection, work) -> applies.incrementAndGet()
+                (command, projection, work) -> applies.incrementAndGet()
         );
         markerDispatcher.dispatch(bundle.command());
         markerWorlds.runQueued();
@@ -189,7 +189,7 @@ class ManagedCoopReleasePresentationDispatcherTest {
                     return StateEvidence.found(bundle.resident());
                 },
                 worlds,
-                (projection, work) -> { }
+                (command, projection, work) -> { }
         );
 
         dispatcher.dispatch(bundle.command());
@@ -258,12 +258,20 @@ class ManagedCoopReleasePresentationDispatcherTest {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/"
                         + "ManagedCoopReleasePresentationDispatcher.java"));
+        String applier = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/"
+                        + "HytaleManagedCoopReleasePresentationApplier.java"));
         assertTrue(source.contains("world.execute(() -> consumer.accept(command))"));
-        assertTrue(source.contains("new HytalePresentationApplier("));
-        assertTrue(source.contains("postAdd.apply("));
+        assertTrue(source.contains("new HytaleManagedCoopReleasePresentationApplier("));
+        int stateRestore = applier.indexOf("postAdd.apply(");
+        int effects = applier.indexOf("effects.playTransitionEffects(");
+        assertTrue(stateRestore >= 0 && effects > stateRestore,
+                "release effects must run only after finalized state presentation");
         assertFalse(source.contains("spawnEntity("));
         assertFalse(source.contains("projectionSpawner"));
         assertFalse(source.contains("remap("));
+        assertFalse(applier.contains("spawnEntity("));
+        assertFalse(applier.contains("remap("));
     }
 
     private ManagedCoopReleasePresentationDispatcher dispatcher(

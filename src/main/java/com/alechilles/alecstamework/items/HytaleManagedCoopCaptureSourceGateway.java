@@ -24,6 +24,8 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
             "managed-coop-release:[0-9a-f]{64}");
     private static final Pattern FINALIZED_IMPORT_OPERATION = Pattern.compile(
             "managed-coop-import-operation:[0-9a-f]{64}");
+    private final CoopEffectService effects = new CoopEffectService();
+
     @Override
     public boolean enqueue(@Nonnull String worldName, @Nonnull Runnable task) {
         World world = resolveWorld(worldName);
@@ -92,6 +94,8 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
             RetirementCommand command) {
         TameworkProjectionIdentityComponent expected = marker(command);
         TameworkProjectionIdentityComponent existing = store.getComponent(reference, markerType);
+        boolean playEffects = shouldPlayCaptureEffects(
+                existing, command, npc.isDespawning());
         if (existing != null && !matches(existing, command)
                 && !canTransitionFinalizedProjection(existing, command)) {
             return LiveSourceDecision.conflict("source_projection_marker_conflict");
@@ -102,6 +106,9 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
         TameworkProjectionIdentityComponent installed = store.getComponent(reference, markerType);
         if (!matches(installed, command)) {
             return LiveSourceDecision.unavailable("source_projection_marker_not_installed");
+        }
+        if (playEffects) {
+            effects.playTransitionEffects(store, reference, command.coopId());
         }
         if (!npc.isDespawning()) {
             npc.setToDespawn();
@@ -130,6 +137,14 @@ final class HytaleManagedCoopCaptureSourceGateway implements WorldGateway {
                 && Objects.equals(marker.getSlotKey(), command.authoritySlotKey())
                 && Objects.equals(marker.getSourceNpcUuid(), command.sourceNpcUuid())
                 && marker.getGeneration() == command.operationGeneration();
+    }
+
+    /** Effects belong only to the first exact retirement request, never replay/despawn recovery. */
+    static boolean shouldPlayCaptureEffects(
+            @Nullable TameworkProjectionIdentityComponent existing,
+            @Nonnull RetirementCommand command,
+            boolean alreadyDespawning) {
+        return !alreadyDespawning && !matches(existing, command);
     }
 
     /**
