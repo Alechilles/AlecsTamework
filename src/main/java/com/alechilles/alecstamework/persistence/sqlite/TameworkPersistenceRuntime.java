@@ -103,7 +103,13 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                                         @Nullable HytaleLogger logger) {
         Path normalizedDataDir = runtimeDataDirectory.toAbsolutePath().normalize();
         Path sqlitePath = normalizedDataDir.resolve(SQLITE_FILENAME);
-        PersistenceHealthService health = new PersistenceHealthService();
+        PersistenceHealthService health = new PersistenceHealthService(state -> {
+            if (logger != null) {
+                logger.at(Level.WARNING).log(
+                        "Tamework persistence entered degraded state: " + state.reason()
+                );
+            }
+        });
         SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
         SqliteSchemaMigrator schemaMigrator = new SqliteSchemaMigrator();
         SqliteMigrationBackupService backupService = new SqliteMigrationBackupService();

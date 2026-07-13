@@ -348,6 +348,51 @@ class CompanionPopulationRuntimeReconcilerTest {
     }
 
     @Test
+    void terminalObservationFailureLogsContextOnceAndKeepsItsOriginalReason() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(npcUuid, ownerUuid)) {
+            List<String> warnings = new ArrayList<>();
+            harness.reconciler.setWarningSink(warnings::add);
+            CompanionPopulationObservation observation = CompanionPopulationObservation.fromRuntime(
+                    harness.profileId,
+                    npcUuid,
+                    ownerUuid,
+                    "default",
+                    CompanionLifecycleState.ACTIVE,
+                    new ClaimChunkCoordinate("default", 2, 3),
+                    4L,
+                    "coop-release"
+            );
+
+            harness.reconciler.onCompleted(
+                    observation,
+                    new CompanionPopulationObservationPersistResult(
+                            CompanionPopulationObservationPersistResult.Status.IDENTITY_CONFLICT,
+                            4L,
+                            "npc-uuid-in-use"
+                    )
+            );
+            harness.reconciler.onCompleted(
+                    observation,
+                    new CompanionPopulationObservationPersistResult(
+                            CompanionPopulationObservationPersistResult.Status.FAILED,
+                            4L,
+                            "persistence_unhealthy"
+                    )
+            );
+
+            assertEquals("population-observation-failed:npc-uuid-in-use",
+                    harness.health.getState().reason());
+            assertEquals(1, warnings.size());
+            assertTrue(warnings.get(0).contains("profile=" + harness.profileId));
+            assertTrue(warnings.get(0).contains("npc=" + npcUuid));
+            assertTrue(warnings.get(0).contains("source=coop-release"));
+            assertTrue(warnings.get(0).contains("status=IDENTITY_CONFLICT"));
+        }
+    }
+
+    @Test
     void preparedReplacementAliasKeepsSpawnObservationOnPendingCanonicalProfile() {
         UUID previousNpcUuid = UUID.randomUUID();
         UUID plannedNpcUuid = UUID.randomUUID();
@@ -544,18 +589,20 @@ class CompanionPopulationRuntimeReconcilerTest {
                         System::currentTimeMillis
                 );
         CompanionLiveEvidenceRevision liveEvidence = new CompanionLiveEvidenceRevision();
+        PersistenceHealthService health = new PersistenceHealthService();
         CompanionPopulationRuntimeReconciler reconciler = new CompanionPopulationRuntimeReconciler(
                 ownerIndex,
                 claimIndex,
                 identities,
                 writer,
-                new PersistenceHealthService(),
+                health,
                 observationPolicy,
                 liveEvidence
         );
         writer.setListener(reconciler);
         return new Harness(
-                profileId, identities, ownerIndex, claimIndex, writer, reconciler, liveEvidence);
+                profileId, identities, ownerIndex, claimIndex, writer, reconciler, liveEvidence,
+                health);
     }
 
     private record Harness(String profileId,
@@ -564,7 +611,8 @@ class CompanionPopulationRuntimeReconcilerTest {
                            ClaimOccupancyIndex claimIndex,
                            CoalescedCompanionPopulationWriter writer,
                            CompanionPopulationRuntimeReconciler reconciler,
-                           CompanionLiveEvidenceRevision liveEvidence) implements AutoCloseable {
+                           CompanionLiveEvidenceRevision liveEvidence,
+                           PersistenceHealthService health) implements AutoCloseable {
         @Override
         public void close() {
             writer.close();
