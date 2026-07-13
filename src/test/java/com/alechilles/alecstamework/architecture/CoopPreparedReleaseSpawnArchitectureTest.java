@@ -46,6 +46,41 @@ class CoopPreparedReleaseSpawnArchitectureTest {
         assertFalse(adapter.contains("resolveReleaseInPopulationCommit("));
     }
 
+    /** Regression: random release placement must remain stable across async preparation. */
+    @Test
+    void preparedReleaseReusesItsFirstValidatedPlacement() throws IOException {
+        String gateway = read("HytaleManagedCoopReleaseProjectionGateway.java");
+        String positions = read("CoopResidentReleasePositionService.java");
+        int preparedProjection = gateway.indexOf("private void projectPreparedOnWorldThread(");
+        int recoveryCheck = gateway.indexOf("requireRecoveryCurrent(command);", preparedProjection);
+        String revalidation = gateway.substring(preparedProjection, recoveryCheck);
+
+        assertTrue(positions.contains("ThreadLocalRandom"),
+                "This guard is required while release position selection is randomized.");
+        assertTrue(gateway.contains("new PreparedReleaseSite("));
+        assertTrue(revalidation.contains("preparedSite.placement()"));
+        assertTrue(revalidation.contains(
+                "validation.currentRotationIndex() != preparedSite.rotationIndex()"));
+        assertFalse(revalidation.contains("= placement("),
+                "Prepared release revalidation must not roll a second random position.");
+        assertFalse(gateway.contains("samePlacement("));
+    }
+
+    /** Regression: persisted cancellation evidence must retain the exact validation failure. */
+    @Test
+    void preparedReleaseCancellationPersistsItsExactFailureReason() throws IOException {
+        String gateway = read("HytaleManagedCoopReleaseProjectionGateway.java");
+        int preparedProjection = gateway.indexOf("private void projectPreparedOnWorldThread(");
+        int recoveryCheck = gateway.indexOf("private void requireRecoveryCurrent(", preparedProjection);
+        String projection = gateway.substring(preparedProjection, recoveryCheck);
+
+        assertTrue(projection.contains("String detail = exception.getMessage()"));
+        assertTrue(projection.contains(
+                "prepared, detail, blocked(detail), completion"));
+        assertFalse(projection.contains(
+                "prepared,\n                    \"managed_coop_release_pre_spawn_validation_failed\""));
+    }
+
     /** Regression: an exception after Store.addEntity cannot safely cancel the coop admission. */
     @Test
     void ambiguousSpawnOutcomeIsProbedAndQuarantinedWithoutCancellation() throws IOException {

@@ -26,6 +26,9 @@ import org.joml.Vector3i;
 
 /** Re-resolves a release world/store and computes placement only after the durable spawn claim. */
 final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjectionGateway {
+    private record PreparedReleaseSite(@Nonnull SpawnPlacement placement, int rotationIndex) {
+    }
+
     private final ManagedCoopReleaseRuntimeAdapter releases;
     private final CoopResidentReleasePositionService positions;
     private final HytaleManagedCoopRemovalEvidenceReader evidenceReader;
@@ -184,7 +187,10 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             SpawnPlacement placement = placement(
                     world, command, currentResident, validation.currentRotationIndex());
             if (populations != null) {
-                preparePopulation(world, command, currentResident, placement, completion);
+                preparePopulation(world, command, currentResident,
+                        new PreparedReleaseSite(
+                                placement, validation.currentRotationIndex()),
+                        completion);
                 return;
             }
             requireRecoveryCurrent(command);
@@ -220,8 +226,9 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
     private void preparePopulation(World world,
                                    ReleaseProjectionCommand command,
                                    ResidentRecord currentResident,
-                                   SpawnPlacement placement,
+                                   PreparedReleaseSite preparedSite,
                                    CompletableFuture<Outcome> completion) {
+        SpawnPlacement placement = preparedSite.placement();
         CompletableFuture<ManagedCoopReleasePopulationCoordinator.Preparation> preparation;
         try {
             preparation = populations.prepareAsync(
@@ -285,7 +292,7 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
                         "managed_coop_population_preparation_inconsistent"));
                 return;
             }
-            dispatchPrepared(world, command, placement, result.prepared(), completion);
+            dispatchPrepared(world, command, preparedSite, result.prepared(), completion);
         });
     }
 
@@ -321,13 +328,13 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
     private void dispatchPrepared(
             World world,
             ReleaseProjectionCommand command,
-            SpawnPlacement preparedPlacement,
+            PreparedReleaseSite preparedSite,
             ManagedCoopReleasePopulationCoordinator.PreparedRelease prepared,
             CompletableFuture<Outcome> completion) {
         LeaseBoundWorldDispatcher.execute(
                 world,
                 () -> projectPreparedOnWorldThread(
-                        world, command, preparedPlacement, prepared, completion),
+                        world, command, preparedSite, prepared, completion),
                 () -> cancelThenComplete(
                         prepared,
                         "managed_coop_release_pre_spawn_dispatch_rejected",
@@ -338,7 +345,7 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
     private void projectPreparedOnWorldThread(
             World world,
             ReleaseProjectionCommand command,
-            SpawnPlacement preparedPlacement,
+            PreparedReleaseSite preparedSite,
             ManagedCoopReleasePopulationCoordinator.PreparedRelease prepared,
             CompletableFuture<Outcome> completion) {
         try {
@@ -355,19 +362,21 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
             if (!validation.allowed()) {
                 throw new IllegalStateException(validation.detail());
             }
+            if (validation.currentRotationIndex() != preparedSite.rotationIndex()) {
+                throw new IllegalStateException(
+                        "managed_coop_release_rotation_changed_after_prepare");
+            }
             ResidentRecord currentResident = currentResident(command);
-            SpawnPlacement currentPlacement = placement(
-                    world, command, currentResident, validation.currentRotationIndex());
-            int chunkX = ChunkUtil.chunkCoordinate(currentPlacement.x());
-            int chunkZ = ChunkUtil.chunkCoordinate(currentPlacement.z());
+            SpawnPlacement preparedPlacement = preparedSite.placement();
+            int chunkX = ChunkUtil.chunkCoordinate(preparedPlacement.x());
+            int chunkZ = ChunkUtil.chunkCoordinate(preparedPlacement.z());
             if (world.getName() == null
                     || !world.getName().equalsIgnoreCase(
                             prepared.destinationWorldName())
-                    || !samePlacement(preparedPlacement, currentPlacement)
                     || chunkX != prepared.destinationChunkX()
                     || chunkZ != prepared.destinationChunkZ()) {
                 throw new IllegalStateException(
-                        "managed_coop_release_resolved_chunk_changed_after_prepare");
+                        "managed_coop_release_prepared_destination_mismatch");
             }
             requireRecoveryCurrent(command);
             CompletableFuture<Outcome> release = releases.release(
@@ -389,13 +398,11 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
                 finishPopulationOutcome(prepared, outcome, completion);
             });
         } catch (RuntimeException exception) {
+            String detail = exception.getMessage() != null
+                    ? exception.getMessage()
+                    : "managed_coop_release_pre_spawn_validation_failed";
             cancelThenComplete(
-                    prepared,
-                    "managed_coop_release_pre_spawn_validation_failed",
-                    blocked(exception.getMessage() != null
-                            ? exception.getMessage()
-                            : "managed_coop_release_pre_spawn_validation_failed"),
-                    completion);
+                    prepared, detail, blocked(detail), completion);
         }
     }
 
@@ -447,15 +454,6 @@ final class HytaleManagedCoopReleaseProjectionGateway implements ReleaseProjecti
 
     private static Outcome ambiguous(String detail) {
         return new Outcome(Status.SPAWN_AMBIGUOUS, null, false, false, detail);
-    }
-
-    private static boolean samePlacement(SpawnPlacement expected, SpawnPlacement actual) {
-        return Double.compare(expected.x(), actual.x()) == 0
-                && Double.compare(expected.y(), actual.y()) == 0
-                && Double.compare(expected.z(), actual.z()) == 0
-                && Float.compare(expected.pitch(), actual.pitch()) == 0
-                && Float.compare(expected.yaw(), actual.yaw()) == 0
-                && Float.compare(expected.roll(), actual.roll()) == 0;
     }
 
     @Nonnull
