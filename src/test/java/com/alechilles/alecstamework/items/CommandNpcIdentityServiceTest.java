@@ -48,6 +48,60 @@ class CommandNpcIdentityServiceTest {
     }
 
     @Test
+    void stableProfileRepairsCachedUuidThatNowBelongsToAnotherProfile() {
+        UUID crossedCachedUuid = UUID.randomUUID();
+        UUID current = UUID.randomUUID();
+        NpcIdentityRepository.ProfileIdentity identity = identity(
+                "profile-a", current, List.of(current), true,
+                emptyFlags(), null, null);
+        ArrayList<UUID> probed = new ArrayList<>();
+        CommandNpcIdentityService service = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> historicalUuid != null
+                        ? conflict("profile-a", "profile-b")
+                        : found(identity),
+                npcUuid -> {
+                    probed.add(npcUuid);
+                    return absent(npcUuid);
+                }
+        );
+
+        CommandNpcIdentityService.IdentityResolution resolution =
+                service.resolve(record(crossedCachedUuid, "profile-a"));
+
+        assertEquals(CommandNpcIdentityService.ResolutionStatus.RESOLVED, resolution.status());
+        assertEquals("profile-a", resolution.profileId());
+        assertEquals(current, resolution.currentNpcUuid());
+        assertEquals(List.of(current), resolution.checkedUuids());
+        assertEquals(List.of(current), probed);
+    }
+
+    @Test
+    void profileUuidConflictRemainsClosedWhenProfileOnlyReloadIsNotSound() {
+        UUID crossedCachedUuid = UUID.randomUUID();
+        CommandNpcIdentityService service = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> historicalUuid != null
+                        ? conflict("profile-a", "profile-b")
+                        : new NpcIdentityRepository.IdentityLoadResult(
+                                NpcIdentityRepository.LoadStatus.FAILED,
+                                null,
+                                null,
+                                null,
+                                "profile_read_failed",
+                                null
+                        ),
+                this::absent
+        );
+
+        CommandNpcIdentityService.IdentityResolution resolution =
+                service.resolve(record(crossedCachedUuid, "profile-a"));
+
+        assertEquals(CommandNpcIdentityService.ResolutionStatus.CONFLICT, resolution.status());
+        assertEquals("profile-a", resolution.profileId());
+        assertEquals("profile-b", resolution.conflictingProfileId());
+        assertFalse(resolution.replacementAllowed());
+    }
+
+    @Test
     void onlyLostAwaitingRecoveryAuthorizesReplacement() {
         UUID current = UUID.randomUUID();
         NpcIdentityRepository.ProfileFlags awaitingLost =
@@ -553,6 +607,19 @@ class CommandNpcIdentityServiceTest {
         return new NpcIdentityRepository.IdentityLoadResult(
                 NpcIdentityRepository.LoadStatus.FOUND, identity,
                 null, null, null, null);
+    }
+
+    private NpcIdentityRepository.IdentityLoadResult conflict(
+            String requestedProfileId,
+            String uuidProfileId) {
+        return new NpcIdentityRepository.IdentityLoadResult(
+                NpcIdentityRepository.LoadStatus.CONFLICT,
+                null,
+                requestedProfileId,
+                uuidProfileId,
+                "profile_and_uuid_resolve_differently",
+                null
+        );
     }
 
     private NpcIdentityRepository.ProfileIdentity identity(

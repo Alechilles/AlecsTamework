@@ -15,6 +15,8 @@ import javax.annotation.Nullable;
  *
  * <p>This service is intended for command/event boundaries. Its adapters keep SQLite and loaded-world
  * access out of the identity rules, allowing deterministic tests and avoiding accidental tick polling.
+ * An explicit stable profile ID takes precedence over a cached projection UUID that durable identity
+ * now assigns to another profile; the profile is reloaded independently before any rewrite.</p>
  */
 final class CommandNpcIdentityService {
     enum ResolutionStatus {
@@ -139,10 +141,41 @@ final class CommandNpcIdentityService {
         return switch (loaded.status()) {
             case FOUND -> resolveFound(record, loaded.identity());
             case NOT_FOUND -> unresolved(record);
-            case CONFLICT -> repositoryConflict(record, loaded);
+            case CONFLICT -> resolveProfileAuthoritativeConflict(record, loaded);
             case FAILED -> failed(record.profileId, record.npcUuid,
                     loaded.failureReason(), loaded.failure());
         };
+    }
+
+    /**
+     * Repairs a crossed cached UUID by reloading the record's stable profile without that foreign
+     * projection hint. The profile's own aliases are still fully checked for duplicate live state.
+     */
+    @Nonnull
+    private IdentityResolution resolveProfileAuthoritativeConflict(
+            @Nonnull LinkedNpcRecord record,
+            @Nonnull NpcIdentityRepository.IdentityLoadResult conflict) {
+        String profileId = LinkedNpcRecordCodec.normalizeProfileId(record.profileId);
+        if (profileId == null) {
+            return repositoryConflict(record, conflict);
+        }
+        NpcIdentityRepository.IdentityLoadResult profileLoaded;
+        try {
+            profileLoaded = identityLoader.load(profileId, null);
+        } catch (RuntimeException exception) {
+            return failed(profileId, record.npcUuid,
+                    "profile_authoritative_identity_loader_threw", exception);
+        }
+        if (profileLoaded == null) {
+            return failed(profileId, record.npcUuid,
+                    "profile_authoritative_identity_loader_returned_null", null);
+        }
+        if (profileLoaded.status() != NpcIdentityRepository.LoadStatus.FOUND
+                || profileLoaded.identity() == null
+                || !profileId.equals(profileLoaded.identity().profileId())) {
+            return repositoryConflict(record, conflict);
+        }
+        return resolveFound(record, profileLoaded.identity());
     }
 
     @Nonnull

@@ -131,6 +131,54 @@ class CommandNpcProfileActionResolverTest {
     }
 
     @Test
+    void crossedCachedUuidsAreRestoredFromTheirStableProfiles() {
+        UUID currentA = UUID.randomUUID();
+        UUID currentB = UUID.randomUUID();
+        NpcIdentityRepository.ProfileIdentity profileA =
+                identity("profile-a", currentA, List.of(currentA));
+        NpcIdentityRepository.ProfileIdentity profileB =
+                identity("profile-b", currentB, List.of(currentB));
+        CommandNpcIdentityService identityService = new CommandNpcIdentityService(
+                (profileId, historicalUuid) -> {
+                    if (historicalUuid != null) {
+                        return new NpcIdentityRepository.IdentityLoadResult(
+                                NpcIdentityRepository.LoadStatus.CONFLICT,
+                                null,
+                                profileId,
+                                "profile-a".equals(profileId) ? "profile-b" : "profile-a",
+                                "profile_and_uuid_resolve_differently",
+                                null
+                        );
+                    }
+                    return new NpcIdentityRepository.IdentityLoadResult(
+                            NpcIdentityRepository.LoadStatus.FOUND,
+                            "profile-a".equals(profileId) ? profileA : profileB,
+                            null,
+                            null,
+                            null,
+                            null
+                    );
+                },
+                this::absent
+        );
+        CommandNpcProfileActionResolver resolver =
+                new CommandNpcProfileActionResolver(identityService);
+
+        CommandNpcProfileActionResolver.CanonicalRecords canonical =
+                resolver.canonicalizeRecords(List.of(
+                        record(currentB, "profile-a"),
+                        record(currentA, "profile-b")
+                ));
+
+        assertTrue(canonical.safeToPersist());
+        assertTrue(canonical.identityChanged());
+        assertEquals(currentA, canonical.records().get(0).npcUuid);
+        assertEquals("profile-a", canonical.records().get(0).profileId);
+        assertEquals(currentB, canonical.records().get(1).npcUuid);
+        assertEquals("profile-b", canonical.records().get(1).profileId);
+    }
+
+    @Test
     void terminalLostTransitionIsBlockedWhenAnyProfileAliasIsLive() {
         UUID droppedUuid = UUID.randomUUID();
         UUID liveUuid = UUID.randomUUID();
