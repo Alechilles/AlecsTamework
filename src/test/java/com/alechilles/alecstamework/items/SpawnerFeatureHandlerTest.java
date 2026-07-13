@@ -86,6 +86,23 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
+    void captureFreezesLinkedPanelSnapshotBeforeOwnershipMutationAndPublishesAfterApply() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
+        ));
+
+        int prepare = source.indexOf("prepareCapturedLinkedNpcSnapshot(");
+        int finalizeCapture = source.indexOf("captureFinalizerService.finalizeCapture(", prepare);
+        int applied = source.indexOf("public void onApplied(", finalizeCapture);
+        int publish = source.indexOf("publishPreparedCapturedLinkedNpcSnapshot(", applied);
+
+        assertTrue(prepare >= 0, "capture must freeze command links while the live component still exists");
+        assertTrue(prepare < finalizeCapture, "link snapshot must precede owner mutation scheduling");
+        assertTrue(applied > finalizeCapture, "capture publication must remain an applied-mutation continuation");
+        assertTrue(publish > applied, "prepared links must publish only after capture applies");
+    }
+
+    @Test
     void wildCaptureDoesNotInventAnOwnerWhenPreservingOwnership() {
         assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(null, false));
     }

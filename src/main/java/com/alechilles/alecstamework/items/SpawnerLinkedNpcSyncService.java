@@ -48,47 +48,95 @@ final class SpawnerLinkedNpcSyncService {
         return npc != null ? npc.getUuid() : null;
     }
 
-    void publishCapturedLinkedNpcSnapshot(@Nullable Ref<EntityStore> targetRef,
-                                          @Nullable World world,
-                                          @Nullable UUID targetUuid,
-                                          @Nullable UUID fallbackOwnerId,
-                                          @Nullable String roleId,
-                                          @Nullable String displayName) {
+    @Nullable
+    CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot prepareCapturedLinkedNpcSnapshot(
+            @Nullable Ref<EntityStore> targetRef,
+            @Nullable World world,
+            @Nullable UUID targetUuid,
+            @Nullable UUID fallbackOwnerId,
+            @Nullable String roleId,
+            @Nullable String displayName) {
         if (captureService == null || targetUuid == null || targetRef == null || !targetRef.isValid() || world == null) {
-            return;
+            return null;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
-            return;
+            return null;
         }
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
         if (linksType == null) {
-            return;
+            return null;
         }
         TameworkCommandLinksComponent links = store.getComponent(targetRef, linksType);
-        String[] toolIds = links != null ? links.getToolIds() : null;
-        if (toolIds == null || toolIds.length == 0) {
-            captureService.clearCapturedSnapshot(targetUuid);
+        TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
+        Vector3d lastKnownPosition = transform != null ? transform.getPosition() : null;
+        return buildPreparedSnapshot(
+                targetUuid,
+                fallbackOwnerId,
+                links,
+                roleId,
+                displayName,
+                lastKnownPosition,
+                System.currentTimeMillis()
+        );
+    }
+
+    void publishPreparedCapturedLinkedNpcSnapshot(
+            @Nullable CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot prepared,
+            @Nullable UUID liveNpcUuid) {
+        if (captureService == null || liveNpcUuid == null) {
             return;
         }
-        UUID ownerId = links.getOwnerId();
-        if (ownerId == null) {
-            ownerId = fallbackOwnerId;
+        if (prepared == null) {
+            captureService.clearCapturedSnapshot(liveNpcUuid);
+            return;
         }
-        TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
-        Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
+        captureService.recordCapturedSnapshot(withNpcUuid(prepared, liveNpcUuid));
+    }
+
+    /**
+     * Freezes command-link state before an ownership-clearing capture removes live authorization.
+     */
+    @Nullable
+    static CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot buildPreparedSnapshot(
+            @Nullable UUID npcUuid,
+            @Nullable UUID fallbackOwnerId,
+            @Nullable TameworkCommandLinksComponent links,
+            @Nullable String roleId,
+            @Nullable String displayName,
+            @Nullable Vector3d lastKnownPosition,
+            long capturedAtMs) {
+        String[] toolIds = links != null ? links.getToolIds() : null;
+        if (npcUuid == null || toolIds == null || toolIds.length == 0) {
+            return null;
+        }
+        UUID ownerId = links.getOwnerId() != null ? links.getOwnerId() : fallbackOwnerId;
+        Vector3d lastKnown = lastKnownPosition != null ? new Vector3d(lastKnownPosition) : null;
         Vector3d homePosition = links.hasHome() ? links.getHomePosition() : null;
-        captureService.recordCapturedSnapshot(
-                new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
-                        targetUuid,
-                        ownerId,
-                        toolIds,
-                        roleId,
-                        displayName,
-                        lastKnownPosition,
-                        homePosition,
-                        System.currentTimeMillis()
-                )
+        return new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
+                npcUuid,
+                ownerId,
+                toolIds.clone(),
+                roleId,
+                displayName,
+                lastKnown,
+                homePosition,
+                capturedAtMs
+        );
+    }
+
+    private static CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot withNpcUuid(
+            CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot prepared,
+            UUID liveNpcUuid) {
+        return new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
+                liveNpcUuid,
+                prepared.ownerId(),
+                prepared.toolIds(),
+                prepared.roleId(),
+                prepared.displayName(),
+                prepared.lastKnownPosition(),
+                prepared.homePosition(),
+                prepared.capturedAtMs()
         );
     }
 

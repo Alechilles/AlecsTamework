@@ -414,6 +414,15 @@ public final class SpawnerFeatureHandler {
                 }
             }
         }
+        CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot preparedLinkedSnapshot =
+                linkedNpcSyncService.prepareCapturedLinkedNpcSnapshot(
+                        targetRef,
+                        world,
+                        targetUuid,
+                        ownerToStore,
+                        snapshotRoleId,
+                        snapshotDisplayName
+                );
         ItemStack updated = itemStackMetadataService.swapItemId(itemStack, config.getSpawnerFilledItemId())
                 .withMetadata(TameworkMetadataKeys.CAPTURED, Codec.BOOLEAN, true)
                 .withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING, targetUuid);
@@ -455,8 +464,6 @@ public final class SpawnerFeatureHandler {
         ItemStack capturedItem = updated;
         ItemFeatureConfig finalizedConfig = config;
         UUID finalizedOwnerToStore = ownerToStore;
-        String finalizedSnapshotRoleId = snapshotRoleId;
-        String finalizedSnapshotDisplayName = snapshotDisplayName;
         Integer sourceHotbarSlot = resolveSourceHotbarSlot(player, null);
         SpawnerSourceItemTransaction sourceItem = new SpawnerSourceItemTransaction(
                 playerInventoryService,
@@ -493,13 +500,9 @@ public final class SpawnerFeatureHandler {
                     public void onApplied(String profileId,
                                           com.alechilles.alecstamework.ownership.OwnerMutationContext context) {
                         sourceItem.commit();
-                        linkedNpcSyncService.publishCapturedLinkedNpcSnapshot(
-                                context.npcRef(),
-                                world,
-                                context.npcUuid(),
-                                finalizedOwnerToStore,
-                                finalizedSnapshotRoleId,
-                                finalizedSnapshotDisplayName
+                        linkedNpcSyncService.publishPreparedCapturedLinkedNpcSnapshot(
+                                preparedLinkedSnapshot,
+                                context.npcUuid()
                         );
                         UUID liveUuid = context.npcUuid();
                         if (relocationService != null) {
