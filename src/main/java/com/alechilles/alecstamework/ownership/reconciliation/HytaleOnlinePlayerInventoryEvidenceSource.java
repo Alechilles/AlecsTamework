@@ -82,11 +82,24 @@ public final class HytaleOnlinePlayerInventoryEvidenceSource implements Companio
         }
         return future.thenApply(evidence -> {
             boolean complete = end == targets.size();
-            if (complete && !targets.equals(currentTargets(universe))) {
+            if (complete && !catalogStillCovers(
+                    targets, currentTargets(universe))) {
                 throw new IllegalStateException("Online-player catalog changed during reconciliation.");
             }
             return new Batch(evidence, end, end - start, complete);
         });
+    }
+
+    /**
+     * Allows players to join after the snapshot because their durable inventory was already
+     * covered by the stored-player source and subsequent changes advance the live-evidence fence.
+     * A departure or world transfer of a snapshotted player remains unsafe because that player's
+     * live inventory could no longer be scanned at the recorded location.
+     */
+    static boolean catalogStillCovers(
+            @Nonnull List<Target> snapshot,
+            @Nonnull List<Target> current) {
+        return current.containsAll(snapshot);
     }
 
     @Nonnull
@@ -170,7 +183,7 @@ public final class HytaleOnlinePlayerInventoryEvidenceSource implements Companio
         return normalized;
     }
 
-    private record Target(@Nonnull UUID playerUuid, @Nonnull UUID worldUuid) {
+    record Target(@Nonnull UUID playerUuid, @Nonnull UUID worldUuid) {
     }
 
     @FunctionalInterface
