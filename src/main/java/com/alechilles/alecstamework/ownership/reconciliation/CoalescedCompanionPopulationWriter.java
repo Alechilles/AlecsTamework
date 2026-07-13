@@ -109,6 +109,26 @@ public final class CoalescedCompanionPopulationWriter implements AutoCloseable {
         return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
     }
 
+    /**
+     * Attempts every currently pending profile through its latest observed version once.
+     * Retryable results remain queued, but do not keep callers waiting for the operation that
+     * currently fences their persistence to become terminal.
+     */
+    @Nonnull
+    public CompletableFuture<Void> flushCurrentAttemptsNow() {
+        Map<String, Long> cutoffs = new HashMap<>();
+        synchronized (lock) {
+            for (Map.Entry<String, Slot> entry : slots.entrySet()) {
+                cutoffs.put(entry.getKey(), entry.getValue().version);
+            }
+        }
+        List<CompletableFuture<Void>> futures = new ArrayList<>(cutoffs.size());
+        for (Map.Entry<String, Long> cutoff : cutoffs.entrySet()) {
+            futures.add(flushAttemptThrough(cutoff.getKey(), cutoff.getValue()));
+        }
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
+    }
+
     @Nonnull
     private CompletableFuture<Void> flushThrough(@Nonnull String profileId, long cutoffVersion) {
         return flushProfile(profileId).thenCompose(ignored -> {
@@ -123,6 +143,22 @@ public final class CoalescedCompanionPopulationWriter implements AutoCloseable {
             return retryDelayed
                     ? delay(retryDelayMs).thenCompose(value -> flushThrough(profileId, cutoffVersion))
                     : flushThrough(profileId, cutoffVersion);
+        });
+    }
+
+    @Nonnull
+    private CompletableFuture<Void> flushAttemptThrough(
+            @Nonnull String profileId,
+            long cutoffVersion
+    ) {
+        return flushProfile(profileId).thenCompose(ignored -> {
+            synchronized (lock) {
+                Slot slot = slots.get(profileId);
+                if (slot == null || slot.completedAttemptVersion >= cutoffVersion || closed) {
+                    return CompletableFuture.completedFuture(null);
+                }
+            }
+            return flushAttemptThrough(profileId, cutoffVersion);
         });
     }
 
@@ -208,6 +244,7 @@ public final class CoalescedCompanionPopulationWriter implements AutoCloseable {
             if (slot != null) {
                 slot.inFlight = false;
                 slot.inFlightCompletion = null;
+                slot.completedAttemptVersion = Math.max(slot.completedAttemptVersion, version);
                 slot.lastAttemptRetryable = effective.retryable();
                 if (closed) {
                     slots.remove(profileId);
@@ -370,6 +407,7 @@ public final class CoalescedCompanionPopulationWriter implements AutoCloseable {
         private CompanionPopulationObservation latest;
         private long version;
         private long persistedVersion = Long.MIN_VALUE;
+        private long completedAttemptVersion = Long.MIN_VALUE;
         private boolean inFlight;
         private boolean schedulePending;
         private boolean lastAttemptRetryable;

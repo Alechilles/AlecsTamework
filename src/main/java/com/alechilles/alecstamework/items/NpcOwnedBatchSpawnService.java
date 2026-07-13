@@ -35,6 +35,7 @@ final class NpcOwnedBatchSpawnService {
 
     private final NpcSpawnCommandService owner;
     private final SpawnerSpawnPositionService spawnPositionService;
+    private final CanonicalReloadSpawnPreparationRetry preparationRetry;
 
     NpcOwnedBatchSpawnService(
             @Nonnull NpcSpawnCommandService owner,
@@ -42,6 +43,7 @@ final class NpcOwnedBatchSpawnService {
     ) {
         this.owner = owner;
         this.spawnPositionService = spawnPositionService;
+        this.preparationRetry = new CanonicalReloadSpawnPreparationRetry();
     }
 
     void schedule(
@@ -78,7 +80,9 @@ final class NpcOwnedBatchSpawnService {
         List<CompanionSpawnAdmissionRequest> requests = requests(
                 player, world, ownerId, positions
         );
-        admission.prepareBatchAsync(requests, CompanionPopulationBatchMode.UP_TO)
+        preparationRetry.prepare(() -> admission.prepareBatchAsync(
+                        requests, CompanionPopulationBatchMode.UP_TO
+                ))
                 .whenComplete((preparation, failure) -> dispatch(
                          world,
                          () -> applyPrepared(

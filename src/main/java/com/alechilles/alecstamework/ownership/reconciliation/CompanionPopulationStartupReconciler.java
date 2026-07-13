@@ -239,7 +239,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         );
         return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE).thenCompose(result ->
                 beginFinalReload().thenCompose(ignored -> CanonicalReloadCompletion.run(
-                        () -> observationWriter.flushPendingNow().thenComposeAsync(value ->
+                        () -> observationWriter.flushCurrentAttemptsNow().thenComposeAsync(value ->
                                 finish(result, tracker, service), executor),
                         this::finishFinalReload
                 )).exceptionallyCompose(failure -> service.rejectAfterCanonicalReloadAsync(

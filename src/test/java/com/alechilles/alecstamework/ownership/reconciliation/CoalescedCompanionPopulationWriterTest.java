@@ -14,6 +14,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -165,6 +166,71 @@ class CoalescedCompanionPopulationWriterTest {
         }
     }
 
+    @Test
+    void currentAttemptFlushDoesNotWaitForeverForPendingOperation() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        CompanionPopulationObservationPersistence persistence = observation -> {
+            attempts.incrementAndGet();
+            return CompletableFuture.completedFuture(pendingOperation(observation));
+        };
+        CoalescedCompanionPopulationWriter writer = new CoalescedCompanionPopulationWriter(
+                persistence,
+                (observation, result) -> { },
+                Executors.newSingleThreadScheduledExecutor(),
+                TimeUnit.MINUTES.toMillis(1),
+                TimeUnit.MINUTES.toMillis(1)
+        );
+        try {
+            writer.record(observation(UUID.randomUUID(), UUID.randomUUID(), 1, 1));
+
+            writer.flushCurrentAttemptsNow().get(2, TimeUnit.SECONDS);
+
+            assertEquals(1, attempts.get());
+            assertEquals(1, writer.metrics().pendingProfiles());
+            assertEquals(1L, writer.metrics().submissions());
+        } finally {
+            writer.close();
+        }
+    }
+
+    @Test
+    void currentAttemptFlushCarriesANewerCutoffPastAnOlderInFlightWrite() throws Exception {
+        List<CompanionPopulationObservation> submissions = new ArrayList<>();
+        List<CompletableFuture<CompanionPopulationObservationPersistResult>> completions =
+                new ArrayList<>();
+        CompanionPopulationObservationPersistence persistence = observation -> {
+            submissions.add(observation);
+            CompletableFuture<CompanionPopulationObservationPersistResult> completion =
+                    new CompletableFuture<>();
+            completions.add(completion);
+            return completion;
+        };
+        CoalescedCompanionPopulationWriter writer = writer(persistence);
+        try {
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            CompanionPopulationObservation first = observation(npcUuid, ownerUuid, 1, 1);
+            CompanionPopulationObservation second = observation(npcUuid, ownerUuid, 9, 9);
+            writer.record(first);
+            CompletableFuture<Void> firstAttempt = writer.flushCurrentAttemptsNow();
+            writer.record(second);
+
+            CompletableFuture<Void> cutoffAttempt = writer.flushCurrentAttemptsNow();
+            completions.getFirst().complete(pendingOperation(first));
+
+            assertEquals(2, submissions.size());
+            assertEquals(second.withExpectedRevision(first.expectedRevision()), submissions.getLast());
+            assertTrue(firstAttempt.isDone());
+            assertFalse(cutoffAttempt.isDone());
+            completions.getLast().complete(pendingOperation(second));
+
+            cutoffAttempt.get(2, TimeUnit.SECONDS);
+            assertEquals(1, writer.metrics().pendingProfiles());
+        } finally {
+            writer.close();
+        }
+    }
+
     private static CoalescedCompanionPopulationWriter writer(
             CompanionPopulationObservationPersistence persistence
     ) {
@@ -185,6 +251,16 @@ class CoalescedCompanionPopulationWriterTest {
                 CompanionPopulationObservationPersistResult.Status.COMMITTED,
                 revision,
                 null
+        );
+    }
+
+    private static CompanionPopulationObservationPersistResult pendingOperation(
+            CompanionPopulationObservation observation
+    ) {
+        return new CompanionPopulationObservationPersistResult(
+                CompanionPopulationObservationPersistResult.Status.PENDING_OPERATION,
+                observation.expectedRevision(),
+                "population-operation-pending"
         );
     }
 
