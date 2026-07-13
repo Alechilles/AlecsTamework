@@ -15,6 +15,7 @@ import static com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResiden
 import static com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.MutationStatus;
 import static com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import static com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
+import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationDetachRequest;
 
 /**
  * Transactional SQL implementation kept separate from the managed-resident repository facade.
@@ -99,6 +100,9 @@ final class ManagedCoopResidentTransactions {
         validateClaim(claim);
         ResidentRecord existing = loadById(connection, claim.residentId());
         if (existing != null) {
+            if (!existing.active() && existing.state() == ResidentState.RETIRED) {
+                return reactivateRetired(connection, existing, claim);
+            }
             boolean same = existing.active() && existing.state() == ResidentState.HOUSED
                     && existing.authorityKey().equals(claim.authorityKey())
                     && existing.coopId().equalsIgnoreCase(claim.coopId())
@@ -144,6 +148,34 @@ final class ManagedCoopResidentTransactions {
                 ResidentState.RELEASING, nowMs);
         uuidClaims.claim(connection, residentId, "PLANNED", plannedTargetUuid, nowMs);
         return result(MutationStatus.APPLIED, loadById(connection, residentId), null);
+    }
+
+    MutationResult detachDeployed(Connection connection,
+                                  PopulationDetachRequest request) throws SQLException {
+        Objects.requireNonNull(request, "request");
+        ResidentRecord resident = loadById(connection, request.residentId());
+        if (retiredDetachMatches(resident, request)) {
+            return result(MutationStatus.IDEMPOTENT, resident, null);
+        }
+        if (!deployedDetachMatches(resident, request)) {
+            return result(MutationStatus.CONFLICT, resident, "deployed_detach_precondition_conflict");
+        }
+        try (PreparedStatement update = connection.prepareStatement("""
+                UPDATE managed_coop_residents
+                SET state = 'RETIRED', active = 0, generation = generation + 1,
+                    updated_at_ms = ?
+                WHERE resident_id = ? AND active = 1 AND state = 'DEPLOYED'
+                  AND generation = ? AND profile_id = ? AND deployed_npc_uuid = ?
+                """)) {
+            update.setLong(1, request.nowMs());
+            update.setString(2, request.residentId());
+            update.setLong(3, request.expectedResidentGeneration());
+            update.setString(4, request.profileId());
+            update.setString(5, request.deployedNpcUuid().toString());
+            requireUpdated(update, "deployed_detach_generation_changed");
+        }
+        uuidClaims.deactivateAll(connection, request.residentId(), request.nowMs());
+        return result(MutationStatus.APPLIED, loadById(connection, request.residentId()), null);
     }
 
     /** Restores a release only after the caller has definitive proof no projection was created. */
@@ -362,6 +394,77 @@ final class ManagedCoopResidentTransactions {
             insert.setLong(18, claim.capturedAtMs());
             insert.executeUpdate();
         }
+    }
+
+    private MutationResult reactivateRetired(Connection connection,
+                                             ResidentRecord existing,
+                                             HousedResidentClaim claim) throws SQLException {
+        if (!existing.profileId().equals(claim.profileId())
+                || !authorityMatches(connection, claim.authorityKey(), claim.coopId())
+                || hasActiveAssignmentConflict(connection, claim)
+                || !uuidClaims.canClaim(connection, claim.residentId(), claim.sourceNpcUuid())) {
+            return result(MutationStatus.CONFLICT, existing, "retired_resident_reassignment_conflict");
+        }
+        try (PreparedStatement update = connection.prepareStatement("""
+                UPDATE managed_coop_residents
+                SET authority_id = ?, world_name = ?, coop_id = ?, x = ?, y = ?, z = ?,
+                    resident_slot = ?, role_id = ?, resident_uuid = ?, source_npc_uuid = ?,
+                    deployed_npc_uuid = NULL, snapshot_json = ?, snapshot_hash = ?,
+                    snapshot_version = ?, state = 'HOUSED', generation = 0, active = 1,
+                    captured_at_ms = ?, released_at_ms = 0, updated_at_ms = ?
+                WHERE resident_id = ? AND profile_id = ? AND active = 0 AND state = 'RETIRED'
+                """)) {
+            update.setString(1, claim.authorityKey().authorityId());
+            update.setString(2, claim.authorityKey().worldName());
+            update.setString(3, normalizeCoopId(claim.coopId()));
+            update.setInt(4, claim.authorityKey().x());
+            update.setInt(5, claim.authorityKey().y());
+            update.setInt(6, claim.authorityKey().z());
+            update.setInt(7, claim.residentSlot());
+            update.setString(8, claim.roleId());
+            update.setString(9, claim.sourceNpcUuid().toString());
+            update.setString(10, claim.sourceNpcUuid().toString());
+            update.setString(11, claim.snapshotJson());
+            update.setString(12, claim.snapshotHash());
+            update.setInt(13, Math.max(1, claim.snapshotVersion()));
+            update.setLong(14, claim.capturedAtMs());
+            update.setLong(15, claim.capturedAtMs());
+            update.setString(16, claim.residentId());
+            update.setString(17, claim.profileId());
+            requireUpdated(update, "retired_resident_reassignment_changed");
+        }
+        uuidClaims.deactivateAll(connection, claim.residentId(), claim.capturedAtMs());
+        uuidClaims.claim(connection, claim.residentId(), "SOURCE",
+                claim.sourceNpcUuid(), claim.capturedAtMs());
+        return result(MutationStatus.APPLIED, loadById(connection, claim.residentId()), null);
+    }
+
+    private boolean deployedDetachMatches(@Nullable ResidentRecord resident,
+                                          PopulationDetachRequest request) {
+        return resident != null && resident.active()
+                && resident.state() == ResidentState.DEPLOYED
+                && resident.residentId().equals(request.residentId())
+                && resident.profileId().equals(request.profileId())
+                && resident.authorityKey().equals(request.authorityKey())
+                && resident.coopId().equalsIgnoreCase(request.coopId())
+                && resident.residentSlot() == request.residentSlot()
+                && resident.generation() == request.expectedResidentGeneration()
+                && request.deployedNpcUuid().equals(resident.residentUuid())
+                && request.deployedNpcUuid().equals(resident.deployedNpcUuid());
+    }
+
+    private boolean retiredDetachMatches(@Nullable ResidentRecord resident,
+                                         PopulationDetachRequest request) {
+        return resident != null && !resident.active()
+                && resident.state() == ResidentState.RETIRED
+                && resident.residentId().equals(request.residentId())
+                && resident.profileId().equals(request.profileId())
+                && resident.authorityKey().equals(request.authorityKey())
+                && resident.coopId().equalsIgnoreCase(request.coopId())
+                && resident.residentSlot() == request.residentSlot()
+                && resident.generation() == request.expectedResidentGeneration() + 1L
+                && request.deployedNpcUuid().equals(resident.residentUuid())
+                && request.deployedNpcUuid().equals(resident.deployedNpcUuid());
     }
 
     private boolean authorityMatches(Connection connection,

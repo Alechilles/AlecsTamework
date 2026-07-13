@@ -83,4 +83,15 @@ final class ManagedCoopUuidClaimStore {
             statement.executeUpdate();
         }
     }
+
+    void deactivateAll(Connection connection, String residentId, long nowMs) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE managed_coop_uuid_claims SET active = 0, updated_at_ms = ?
+                WHERE resident_id = ? AND active = 1
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, residentId);
+            statement.executeUpdate();
+        }
+    }
 }

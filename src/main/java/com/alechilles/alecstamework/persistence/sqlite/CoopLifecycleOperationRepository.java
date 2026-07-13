@@ -109,6 +109,18 @@ public final class CoopLifecycleOperationRepository {
             long nowMs) {
     }
 
+    /** Exact deployed assignment retired by a non-coop companion lifecycle transition. */
+    public record PopulationDetachRequest(
+            @Nonnull String residentId,
+            @Nonnull ManagedCoopAuthorityKey authorityKey,
+            @Nonnull String coopId,
+            int residentSlot,
+            @Nonnull String profileId,
+            @Nonnull UUID deployedNpcUuid,
+            long expectedResidentGeneration,
+            long nowMs) {
+    }
+
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
     private final CoopLifecycleOperationTransactions transactions;
@@ -246,6 +258,12 @@ public final class CoopLifecycleOperationRepository {
             long nowMs) throws SQLException {
         return transactions.failPopulationReleaseBeforeProjection(
                 connection, request, error, nowMs);
+    }
+
+    ManagedCoopResidentRepository.MutationResult detachPopulationResidentInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull PopulationDetachRequest request) throws SQLException {
+        return transactions.detachPopulationResident(connection, request);
     }
 
     @Nullable

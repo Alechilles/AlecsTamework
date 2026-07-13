@@ -264,9 +264,15 @@ public final class CompanionPopulationAdmissionCoordinator {
                     && ownerCommit != null
                     && ownerCommit.committed();
             if (!claimCommitted || !ownerCommitted) {
-                markReadinessDegradedSafely(!claimCommitted
-                        ? "companion_claim_index_commit_failed"
-                        : "companion_owner_commit_failed");
+                if (failure == null && ownerCommit != null
+                        && ownerCommit.status()
+                        == OwnerPopulationCommitResult.Status.DURABLE_CONFLICT) {
+                    markAdmissionReadinessDegradedSafely();
+                } else {
+                    markReadinessDegradedSafely(!claimCommitted
+                            ? "companion_claim_index_commit_failed"
+                            : "companion_owner_commit_failed");
+                }
             }
             String reason;
             if (!claimCommitted) {
@@ -415,6 +421,15 @@ public final class CompanionPopulationAdmissionCoordinator {
             markBothReadinessDegraded(reason);
         } catch (RuntimeException | LinkageError ignored) {
             // The unresolved reservation remains conservative even if diagnostics also fail.
+        }
+    }
+
+    private void markAdmissionReadinessDegradedSafely() {
+        try {
+            claimAdmissionService.markReadinessDegraded();
+            ownerCoordinator.markAdmissionReadinessDegraded();
+        } catch (RuntimeException | LinkageError ignored) {
+            // The unresolved APPLYING journal remains conservative without poisoning storage.
         }
     }
 

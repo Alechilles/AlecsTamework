@@ -46,6 +46,8 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCapturePolicyService capturePolicyService;
     private final SpawnerPreparedSpawnService preparedSpawnService;
     @Nullable
+    private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
+    @Nullable
     private final CommandNpcRelocationService relocationService;
     @Nullable
     private final CommandLinkedNpcLostService lostService;
@@ -59,6 +61,26 @@ public final class SpawnerFeatureHandler {
                                  @Nullable CommandNpcRelocationService relocationService,
                                  @Nullable CommandLinkedNpcLostService lostService,
                                  @Nullable TranslationRegistry translationRegistry) {
+        this(
+                logger,
+                registry,
+                captureService,
+                coopService,
+                relocationService,
+                lostService,
+                translationRegistry,
+                null
+        );
+    }
+
+    public SpawnerFeatureHandler(HytaleLogger logger,
+                                 ItemFeatureRegistry registry,
+                                 CommandLinkedNpcCaptureService captureService,
+                                 @Nullable CommandLinkedNpcCoopService coopService,
+                                 @Nullable CommandNpcRelocationService relocationService,
+                                 @Nullable CommandLinkedNpcLostService lostService,
+                                 @Nullable TranslationRegistry translationRegistry,
+                                 @Nullable SpawnerManagedCoopCaptureDetachService managedCoopDetachService) {
         this.logger = logger;
         this.registry = registry;
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
@@ -103,6 +125,7 @@ public final class SpawnerFeatureHandler {
         this.coopService = coopService;
         this.relocationService = relocationService;
         this.lostService = lostService;
+        this.managedCoopDetachService = managedCoopDetachService;
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -392,6 +415,21 @@ public final class SpawnerFeatureHandler {
         World world = player.getWorld();
         Store<EntityStore> worldStore = world != null ? world.getEntityStore().getStore() : null;
         UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
+        SpawnerManagedCoopCaptureDetachService.Plan detachPlan = managedCoopDetachService == null
+                ? new SpawnerManagedCoopCaptureDetachService.Plan(
+                        SpawnerManagedCoopCaptureDetachService.PlanStatus.NOT_MANAGED,
+                        null,
+                        null
+                )
+                : managedCoopDetachService.prepare(targetUuid);
+        if (!detachPlan.accepted()) {
+            logSpawnerFlowDebug(
+                    "capture denied reason=" + detachPlan.detail()
+                            + " player=" + player.getUuid()
+                            + " targetUuid=" + targetUuid
+            );
+            return false;
+        }
         UUID existingOwner = npcStateService.resolveOwnerFromComponent(targetRef, world);
         UUID ownerToStore = resolveCapturedOwnerMetadata(existingOwner, config.isCaptureClearsOwner());
         String snapshotDisplayName = (captureInfo.capturedName() != null
@@ -477,6 +515,7 @@ public final class SpawnerFeatureHandler {
                 player,
                 finalizedConfig,
                 targetRef,
+                detachPlan.durableContextJson(),
                 new SpawnerCaptureFinalizerService.CaptureCallbacks() {
                     @Override
                     public boolean beforeApply(String profileId) {
@@ -537,6 +576,18 @@ public final class SpawnerFeatureHandler {
                                         + " player=" + player.getUuid()
                                         + " targetUuid=" + targetUuid
                         );
+                    }
+
+                    @Override
+                    public void onPopulationCommitted(
+                            com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result) {
+                        if (detachPlan.requiresDetach()
+                                && (managedCoopDetachService == null
+                                || !managedCoopDetachService.refreshAfterCommit())) {
+                            logger.at(Level.WARNING).log(
+                                    "Spawner capture committed, but managed-coop indexes did not refresh."
+                            );
+                        }
                     }
 
                     @Override

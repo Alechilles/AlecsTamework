@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.CaptureRequest;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationDetachRequest;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationReleaseCommitRequest;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -72,6 +73,27 @@ public final class ManagedCoopPopulationMutationContext {
         return extension(mutation).toString();
     }
 
+    /** Builds a journal extension for retiring one exact deployed assignment during item capture. */
+    @Nonnull
+    public static String detachExtensionJson(@Nonnull PopulationDetachRequest request) {
+        Objects.requireNonNull(request, "request");
+        JsonObject mutation = base(Mode.DETACH);
+        writeCommon(
+                mutation,
+                "external-detach",
+                request.residentId(),
+                request.authorityKey(),
+                request.coopId(),
+                request.residentSlot(),
+                request.profileId(),
+                null,
+                request.expectedResidentGeneration(),
+                request.nowMs()
+        );
+        mutation.addProperty("deployedNpcUuid", request.deployedNpcUuid().toString());
+        return extension(mutation).toString();
+    }
+
     @Nullable
     static ParsedMutation parse(@Nullable String targetContextJson) {
         if (targetContextJson == null || targetContextJson.isBlank()) {
@@ -94,8 +116,9 @@ public final class ManagedCoopPopulationMutationContext {
         }
         Mode mode = Mode.valueOf(requiredString(mutation, "mode").toUpperCase(Locale.ROOT));
         return switch (mode) {
-            case CAPTURE -> new ParsedMutation(capture(mutation), null);
-            case RELEASE -> new ParsedMutation(null, release(mutation));
+            case CAPTURE -> new ParsedMutation(capture(mutation), null, null);
+            case RELEASE -> new ParsedMutation(null, release(mutation), null);
+            case DETACH -> new ParsedMutation(null, null, detach(mutation));
         };
     }
 
@@ -134,6 +157,21 @@ public final class ManagedCoopPopulationMutationContext {
                 common.snapshotHash(),
                 common.expectedResidentGeneration(),
                 requiredLong(source, "expectedOperationGeneration"),
+                common.nowMs()
+        );
+    }
+
+    @Nonnull
+    private static PopulationDetachRequest detach(@Nonnull JsonObject source) {
+        Common common = common(source);
+        return new PopulationDetachRequest(
+                common.residentId(),
+                common.authorityKey(),
+                common.coopId(),
+                common.residentSlot(),
+                common.profileId(),
+                requiredUuid(source, "deployedNpcUuid"),
+                common.expectedResidentGeneration(),
                 common.nowMs()
         );
     }
@@ -245,11 +283,13 @@ public final class ManagedCoopPopulationMutationContext {
 
     enum Mode {
         CAPTURE,
-        RELEASE
+        RELEASE,
+        DETACH
     }
 
     record ParsedMutation(@Nullable CaptureRequest capture,
-                          @Nullable PopulationReleaseCommitRequest release) {
+                          @Nullable PopulationReleaseCommitRequest release,
+                          @Nullable PopulationDetachRequest detach) {
     }
 
     private record Common(@Nonnull String operationId,

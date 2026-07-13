@@ -109,6 +109,7 @@ import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChar
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
+import com.alechilles.alecstamework.items.SpawnerManagedCoopCaptureDetachService;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
 import com.alechilles.alecstamework.lifecycle.TameworkEventRegistrationSupport;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
@@ -968,7 +969,11 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcCoopService,
                 commandNpcRelocationService,
                 commandLinkedNpcLostService,
-                translationRegistry
+                translationRegistry,
+                new SpawnerManagedCoopCaptureDetachService(
+                        persistenceRuntime.getManagedCoopServices().residentIndex(),
+                        persistenceRuntime.getManagedCoopServices().compositeIndexRefreshService()
+                )
         );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);

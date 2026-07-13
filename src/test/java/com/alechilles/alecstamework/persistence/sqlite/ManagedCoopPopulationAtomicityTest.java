@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRep
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationReleaseCommitRequest;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationDetachRequest;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.ReleaseRequest;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
@@ -186,7 +187,11 @@ class ManagedCoopPopulationAtomicityTest {
                             "coop_capture"
                     )).completion().get(3, TimeUnit.SECONDS);
 
-            assertFalse(outcome.isCommitted());
+            assertTrue(outcome.isCommitted());
+            assertNotNull(outcome.value());
+            assertEquals(PopulationPersistenceTransition.ResultStatus.MANAGED_COOP_CONFLICT,
+                    outcome.value().status());
+            assertTrue(harness.health().isHealthy());
             CompanionPopulationStateRecord original = harness.population().loadAllStates().stream()
                     .filter(row -> row.profileId().equals(profileId))
                     .findFirst()
@@ -197,6 +202,96 @@ class ManagedCoopPopulationAtomicityTest {
             assertEquals("competing-resident", harness.residents()
                     .loadActiveSlot(AUTHORITY, 0).residentId());
         }
+    }
+
+    @Test
+    void handheldCaptureDetachesDeployedAssignmentAndAllowsFreshCoopAdmission() throws Exception {
+        try (Harness harness = harness("handheld-detach.sqlite")) {
+            DeployedAssignment deployed = seedDeployedAssignment(harness);
+            ResidentRecord retired = captureWithHandheld(harness, deployed);
+            UUID respawnedUuid = respawnCapturedCompanion(harness, deployed.profileId());
+            assertFreshCoopAdmission(harness, retired, respawnedUuid);
+        }
+    }
+
+    private static DeployedAssignment seedDeployedAssignment(Harness harness) throws Exception {
+        UUID housedUuid = UUID.randomUUID();
+        UUID deployedUuid = UUID.randomUUID();
+        String profileId = UUID.randomUUID().toString();
+        prepareApplying(harness, "seed-profile",
+                baseline(profileId, housedUuid, null, "ACTIVE", 0L), "{\"test\":true}");
+        assertEquals(PopulationPersistenceTransition.ResultStatus.COMMITTED,
+                await(harness.population().commitAsync(new PopulationPersistenceTransition.Commit(
+                        "seed-profile", profileId, 0L, ProfileOwnerMutation.unchanged(), housedUuid,
+                        "default", "ACTIVE", "default", 0, 0, "seed"))).status());
+        CaptureRequest capture = capture(profileId, housedUuid, 0, 0L, 100L);
+        assertTrue(await(harness.residents().claimHoused(
+                new ManagedCoopResidentRepository.HousedResidentClaim(
+                        capture.residentId(), AUTHORITY, COOP_ID, 0, profileId, ROLE_ID,
+                        housedUuid, capture.snapshotJson(), capture.snapshotHash(), 1, 100L
+                ))).succeeded());
+        assertTrue(await(harness.residents().beginRelease(
+                capture.residentId(), 0L, deployedUuid, 110L)).succeeded());
+        assertTrue(await(harness.residents().finishRelease(
+                capture.residentId(), 1L, deployedUuid, 120L)).succeeded());
+        ResidentRecord resident = harness.residents().loadById(capture.residentId());
+        assertEquals(ResidentState.DEPLOYED, resident.state());
+        return new DeployedAssignment(profileId, deployedUuid, resident);
+    }
+
+    private static ResidentRecord captureWithHandheld(
+            Harness harness, DeployedAssignment assignment) throws Exception {
+        ResidentRecord deployed = assignment.resident();
+        CompanionPopulationStateRecord active = harness.population().loadAllStates().getFirst();
+        PopulationDetachRequest detach = new PopulationDetachRequest(
+                deployed.residentId(), deployed.authorityKey(), deployed.coopId(),
+                deployed.residentSlot(), deployed.profileId(), assignment.deployedUuid(),
+                deployed.generation(), 130L
+        );
+        prepareApplying(harness, "handheld-capture", active,
+                ManagedCoopPopulationMutationContext.detachExtensionJson(detach));
+        PopulationPersistenceTransition.Result captured = await(
+                harness.population().commitAsync(new PopulationPersistenceTransition.Commit(
+                        "handheld-capture", assignment.profileId(), active.revision(),
+                        ProfileOwnerMutation.unchanged(), assignment.deployedUuid(),
+                        "default", "CAPTURED", null, null, null, "spawner_capture")));
+        assertEquals(PopulationPersistenceTransition.ResultStatus.COMMITTED, captured.status());
+        ResidentRecord retired = harness.residents().loadById(deployed.residentId());
+        assertEquals(ResidentState.RETIRED, retired.state());
+        assertFalse(retired.active());
+        assertEquals(0, activeUuidClaims(harness.connections(), retired.residentId()));
+        return retired;
+    }
+
+    private static UUID respawnCapturedCompanion(Harness harness, String profileId) throws Exception {
+        UUID respawnedUuid = UUID.randomUUID();
+        CompanionPopulationStateRecord dormant = harness.population().loadAllStates().getFirst();
+        prepareApplying(harness, "handheld-spawn", dormant, "{\"test\":true}");
+        assertEquals(PopulationPersistenceTransition.ResultStatus.COMMITTED,
+                await(harness.population().commitAsync(new PopulationPersistenceTransition.Commit(
+                        "handheld-spawn", profileId, dormant.revision(),
+                        ProfileOwnerMutation.unchanged(), respawnedUuid,
+                        "default", "ACTIVE", "default", 0, 0, "spawner_restore"))).status());
+        return respawnedUuid;
+    }
+
+    private static void assertFreshCoopAdmission(
+            Harness harness, ResidentRecord retired, UUID respawnedUuid) throws Exception {
+        CompanionPopulationStateRecord restored = harness.population().loadAllStates().getFirst();
+        CaptureRequest freshCapture = capture(restored.profileId(), respawnedUuid, 1, 0L, 150L);
+        prepareApplying(harness, "fresh-coop-capture", restored,
+                ManagedCoopPopulationMutationContext.captureExtensionJson(freshCapture));
+        assertEquals(PopulationPersistenceTransition.ResultStatus.COMMITTED,
+                await(harness.population().commitAsync(new PopulationPersistenceTransition.Commit(
+                        "fresh-coop-capture", restored.profileId(), restored.revision(),
+                        ProfileOwnerMutation.unchanged(), respawnedUuid,
+                        "default", "COOP", null, null, null, "coop_capture"))).status());
+        ResidentRecord reassigned = harness.residents().loadById(retired.residentId());
+        assertTrue(reassigned.active());
+        assertEquals(ResidentState.HOUSED, reassigned.state());
+        assertEquals(1, reassigned.residentSlot());
+        assertEquals(0L, reassigned.generation());
+        assertEquals(respawnedUuid, reassigned.sourceNpcUuid());
     }
 
     @Test
@@ -414,9 +509,8 @@ class ManagedCoopPopulationAtomicityTest {
             new SqliteSchemaMigrator().migrate(connection);
             connection.commit();
         }
-        PersistenceWriteQueue queue = new PersistenceWriteQueue(
-                connections, new PersistenceHealthService(), null
-        );
+        PersistenceHealthService health = new PersistenceHealthService();
+        PersistenceWriteQueue queue = new PersistenceWriteQueue(connections, health, null);
         ManagedCoopResidentRepository residents = new ManagedCoopResidentRepository(
                 connections, queue
         );
@@ -432,7 +526,7 @@ class ManagedCoopPopulationAtomicityTest {
                 )
         );
         assertTrue(authority.succeeded());
-        return new Harness(connections, queue, residents, lifecycle, population);
+        return new Harness(connections, health, queue, residents, lifecycle, population);
     }
 
     private static CaptureRequest capture(String profileId,
@@ -544,6 +638,20 @@ class ManagedCoopPopulationAtomicityTest {
         }
     }
 
+    private static int activeUuidClaims(
+            SqliteConnectionManager connections,
+            String residentId) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM managed_coop_uuid_claims WHERE resident_id = ? AND active = 1"
+             )) {
+            statement.setString(1, residentId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getInt(1) : -1;
+            }
+        }
+    }
+
     private static <T> T await(PersistenceWriteQueue.WriteSubmission<T> submission) throws Exception {
         assertTrue(submission.accepted());
         PersistenceWriteQueue.WriteOutcome<T> outcome = submission.completion().get(
@@ -555,7 +663,12 @@ class ManagedCoopPopulationAtomicityTest {
         return outcome.value();
     }
 
+    private record DeployedAssignment(
+            String profileId, UUID deployedUuid, ResidentRecord resident) {
+    }
+
     private record Harness(SqliteConnectionManager connections,
+                           PersistenceHealthService health,
                            PersistenceWriteQueue queue,
                            ManagedCoopResidentRepository residents,
                            CoopLifecycleOperationRepository lifecycle,

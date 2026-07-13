@@ -73,6 +73,7 @@ public final class PopulationPersistenceTransition {
         REVISION_CONFLICT,
         IDENTITY_CONFLICT,
         OPERATION_CONFLICT,
+        MANAGED_COOP_CONFLICT,
         INVALID_STATE,
         NOT_FOUND
     }

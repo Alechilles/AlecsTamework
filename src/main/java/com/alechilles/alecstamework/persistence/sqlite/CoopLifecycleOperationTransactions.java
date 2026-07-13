@@ -17,6 +17,7 @@ import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOpera
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationRecord;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationReleaseCommitRequest;
+import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationDetachRequest;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.ReleaseRequest;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRules.deployedCaptureMatches;
 import static com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRules.deployedResidentMatches;
@@ -327,6 +328,30 @@ final class CoopLifecycleOperationTransactions {
                 nowMs);
     }
 
+    ManagedCoopResidentRepository.MutationResult detachPopulationResident(
+            Connection connection,
+            PopulationDetachRequest request) throws SQLException {
+        Objects.requireNonNull(request, "request");
+        if (request.residentSlot() < 0 || request.expectedResidentGeneration() < 0L) {
+            throw new IllegalArgumentException("detach slot and generation must be non-negative");
+        }
+        OperationRecord conflict = store.findActiveConflict(
+                connection,
+                "external-population-detach",
+                request.profileId(),
+                request.authorityKey(),
+                request.residentSlot()
+        );
+        if (conflict != null) {
+            return new ManagedCoopResidentRepository.MutationResult(
+                    ManagedCoopResidentRepository.MutationStatus.CONFLICT,
+                    residents.loadByIdInTransaction(connection, request.residentId()),
+                    "detach_active_lifecycle_operation_conflict"
+            );
+        }
+        return residents.detachDeployedInTransaction(connection, request);
+    }
+
     /** Missing or exclusively failed population rows are the only durable proof no apply ran. */
     private static boolean populationOperationAllowsPreProjectionRollback(
             Connection connection,
@@ -522,6 +547,12 @@ final class CoopLifecycleOperationTransactions {
             if (request.expectedResidentGeneration() != 0L || byProfile != null || bySlot != null) {
                 return "empty_slot_capture_assignment_conflict";
             }
+        } else if (!byId.active() && byId.state() == ResidentState.RETIRED) {
+            if (request.expectedResidentGeneration() != 0L
+                    || !byId.profileId().equals(request.profileId())
+                    || byProfile != null || bySlot != null) {
+                return "retired_capture_assignment_conflict";
+            }
         } else if (!deployedCaptureMatches(request, byId)
                 || differentResident(byProfile, byId) || differentResident(bySlot, byId)) {
             return "deployed_capture_precondition_conflict";
@@ -632,7 +663,7 @@ final class CoopLifecycleOperationTransactions {
             Connection connection,
             CaptureRequest request) throws SQLException {
         ResidentRecord resident = residents.loadByIdInTransaction(connection, request.residentId());
-        if (resident == null) {
+        if (resident == null || !resident.active() && resident.state() == ResidentState.RETIRED) {
             return residents.claimHousedInTransaction(connection, new HousedResidentClaim(
                     request.residentId(), request.authorityKey(), request.coopId(), request.residentSlot(),
                     request.profileId(), request.roleId(), request.sourceNpcUuid(), request.snapshotJson(),

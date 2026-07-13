@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.ownership.CompanionSpawnSourceFinalizationCo
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Savepoint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -259,21 +260,40 @@ public final class CompanionPopulationRepository {
             return result(PopulationPersistenceTransition.ResultStatus.IDENTITY_CONFLICT, revision, "npc_uuid_in_use");
         }
 
-        updateProfile(connection, request);
-        updatePopulationState(connection, request);
-        CompanionPopulationManagedCoopMutation.applyIfPresent(
-                connection, coopLifecycleRepository, operation.targetContextJson()
-        );
-        if (sourceFinalizationRequired) {
-            journalStore.markApplied(connection, request.operationId());
-            return result(
-                    PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING,
-                    revision + 1L,
-                    "source_finalization_pending"
-            );
+        Savepoint commitBoundary = connection.setSavepoint();
+        try {
+            updateProfile(connection, request);
+            updatePopulationState(connection, request);
+            CompanionPopulationManagedCoopMutation.ApplyResult managedCoop =
+                    CompanionPopulationManagedCoopMutation.applyIfPresent(
+                            connection, coopLifecycleRepository, operation.targetContextJson()
+                    );
+            if (!managedCoop.applied()) {
+                connection.rollback(commitBoundary);
+                connection.releaseSavepoint(commitBoundary);
+                return result(
+                        PopulationPersistenceTransition.ResultStatus.MANAGED_COOP_CONFLICT,
+                        revision,
+                        managedCoop.detail()
+                );
+            }
+            if (sourceFinalizationRequired) {
+                journalStore.markApplied(connection, request.operationId());
+                connection.releaseSavepoint(commitBoundary);
+                return result(
+                        PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING,
+                        revision + 1L,
+                        "source_finalization_pending"
+                );
+            }
+            journalStore.finalizeCommitted(connection, request.operationId());
+            connection.releaseSavepoint(commitBoundary);
+            return result(PopulationPersistenceTransition.ResultStatus.COMMITTED, revision + 1L, null);
+        } catch (Exception exception) {
+            connection.rollback(commitBoundary);
+            connection.releaseSavepoint(commitBoundary);
+            throw exception;
         }
-        journalStore.finalizeCommitted(connection, request.operationId());
-        return result(PopulationPersistenceTransition.ResultStatus.COMMITTED, revision + 1L, null);
     }
 
     private void insertProfile(@Nonnull Connection connection,

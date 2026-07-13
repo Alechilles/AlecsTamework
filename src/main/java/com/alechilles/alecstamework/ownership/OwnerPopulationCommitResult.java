@@ -15,6 +15,7 @@ public record OwnerPopulationCommitResult(@Nonnull Status status,
         SOURCE_FINALIZATION_PENDING,
         INVALID_CAPABILITY,
         INDEX_COMMIT_FAILED,
+        DURABLE_CONFLICT,
         PERSISTENCE_DEGRADED
     }
 

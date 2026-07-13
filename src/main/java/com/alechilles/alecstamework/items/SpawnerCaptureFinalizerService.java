@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
+import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
 import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
 import com.alechilles.alecstamework.ownership.OwnerMutationContext;
 import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
@@ -52,6 +53,14 @@ public final class SpawnerCaptureFinalizerService {
                                    ItemFeatureConfig config,
                                    Ref<EntityStore> targetRef,
                                    @Nullable CaptureCallbacks callbacks) {
+        return finalizeCapture(player, config, targetRef, null, callbacks);
+    }
+
+    public boolean finalizeCapture(Player player,
+                                   ItemFeatureConfig config,
+                                   Ref<EntityStore> targetRef,
+                                   @Nullable String durableContextJson,
+                                   @Nullable CaptureCallbacks callbacks) {
         CaptureCallbacks safeCallbacks = callbacks == null ? CaptureCallbacks.NOOP : callbacks;
         if (player == null || config == null || targetRef == null || !targetRef.isValid()) {
             safeCallbacks.onDenied("capture-owner-target-unavailable");
@@ -86,15 +95,7 @@ public final class SpawnerCaptureFinalizerService {
         OwnerPopulationOperation operation = config.isCaptureClearsOwner()
                 ? OwnerPopulationOperation.OWNER_CLEAR
                 : OwnerPopulationOperation.LIFECYCLE_CHANGE;
-        return scheduler.schedule(
-                targetRef,
-                store,
-                retainedOwnerId,
-                retainedOwnerName,
-                CompanionLifecycleState.CAPTURED,
-                operation,
-                false,
-                "spawner-capture:" + npcUuid + ":clear-owner=" + config.isCaptureClearsOwner(),
+        OwnerMutationScheduler.MutationCallbacks mutationCallbacks =
                 new OwnerMutationScheduler.MutationCallbacks() {
                     @Override
                     public void onDenied(@Nonnull String reason, @Nullable OwnerPopulationDecision decision) {
@@ -133,10 +134,39 @@ public final class SpawnerCaptureFinalizerService {
                     }
 
                     @Override
+                    public void onPopulationCommitted(
+                            @Nonnull CompanionPopulationCommitResult result) {
+                        safeCallbacks.onPopulationCommitted(result);
+                    }
+
+                    @Override
                     public void onDurabilityDegraded(@Nonnull String reason) {
                         safeCallbacks.onDurabilityDegraded(reason);
                     }
-                }
+                };
+        String idempotencyKey = "spawner-capture:" + npcUuid
+                + ":clear-owner=" + config.isCaptureClearsOwner();
+        if (durableContextJson == null || durableContextJson.isBlank()) {
+            return scheduler.schedule(
+                    targetRef, store, retainedOwnerId, retainedOwnerName,
+                    CompanionLifecycleState.CAPTURED, operation, false,
+                    idempotencyKey, mutationCallbacks
+            );
+        }
+        return scheduler.scheduleWithDurableContext(
+                targetRef,
+                store,
+                null,
+                null,
+                retainedOwnerId,
+                retainedOwnerId,
+                retainedOwnerName,
+                CompanionLifecycleState.CAPTURED,
+                operation,
+                false,
+                idempotencyKey,
+                durableContextJson,
+                mutationCallbacks
         );
     }
 
@@ -169,6 +199,9 @@ public final class SpawnerCaptureFinalizerService {
 
         default void onApplied(@Nonnull String profileId, @Nonnull OwnerMutationContext context) {
             onApplied(profileId);
+        }
+
+        default void onPopulationCommitted(@Nonnull CompanionPopulationCommitResult result) {
         }
 
         default void onDenied(@Nonnull String reason) {

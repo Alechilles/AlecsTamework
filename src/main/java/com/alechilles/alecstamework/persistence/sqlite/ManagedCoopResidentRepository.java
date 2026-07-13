@@ -339,6 +339,12 @@ public final class ManagedCoopResidentRepository {
                 snapshotJson, snapshotHash, snapshotVersion, nowMs);
     }
 
+    MutationResult detachDeployedInTransaction(
+            Connection connection,
+            CoopLifecycleOperationRepository.PopulationDetachRequest request) throws SQLException {
+        return transactions.detachDeployed(connection, request);
+    }
+
     @Nullable
     ResidentRecord loadByIdInTransaction(Connection connection, String residentId) throws SQLException {
         return transactions.loadById(connection, residentId);

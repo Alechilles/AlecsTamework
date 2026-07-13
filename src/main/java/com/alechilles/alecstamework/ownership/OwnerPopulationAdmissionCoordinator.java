@@ -357,6 +357,19 @@ public final class OwnerPopulationAdmissionCoordinator {
                     result
             );
         }
+        if (outcome.isCommitted() && result != null
+                && result.status()
+                == PopulationPersistenceTransition.ResultStatus.MANAGED_COOP_CONFLICT) {
+            terminality.degradeAdmissionOnly();
+            prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
+            return new OwnerPopulationCommitResult(
+                    OwnerPopulationCommitResult.Status.DURABLE_CONFLICT,
+                    result.reason() == null || result.reason().isBlank()
+                            ? "owner-population-managed-coop-conflict"
+                            : result.reason(),
+                    result
+            );
+        }
         terminality.degrade("owner_population_final_durability_failed");
         prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
         return new OwnerPopulationCommitResult(

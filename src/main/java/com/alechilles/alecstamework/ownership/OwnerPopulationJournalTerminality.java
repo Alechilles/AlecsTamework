@@ -21,6 +21,11 @@ final class OwnerPopulationJournalTerminality {
         health.markDegraded(Objects.requireNonNull(reason, "reason"));
     }
 
+    /** Blocks new admissions after a rolled-back domain CAS without poisoning healthy storage. */
+    void degradeAdmissionOnly() {
+        index.setReadiness(OwnerPopulationReadiness.DEGRADED);
+    }
+
     @Nonnull
     CompletableFuture<OwnerPopulationPreparationResult> preparationStartFailed(
             @Nonnull OwnerPopulationDecision decision,
