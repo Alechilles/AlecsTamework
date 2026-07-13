@@ -143,6 +143,7 @@ Unloaded flow:
 
 Lost flow:
 - If relocation retry windows are exhausted, a linked companion can transition to `LOST`; the shipped default wait budget is 10 seconds.
+- If an external destructive command removes a linked companion with Hytale's `REMOVE` reason, Tamework preserves the final complete state and transitions it directly to `LOST`; it does not reinterpret destructive removal as a normal chunk unload.
 - `Recall`/`Return Home` are blocked while `LOST`.
 - `Revive`/`Respawn` can perform strict recovery (replacement spawn + stale-original suppression mapping).
 

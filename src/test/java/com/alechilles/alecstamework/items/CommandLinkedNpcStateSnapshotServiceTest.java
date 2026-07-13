@@ -25,22 +25,30 @@ class CommandLinkedNpcStateSnapshotServiceTest {
     }
 
     @Test
-    void lifecycleIndexUpdatesSurroundSnapshotFiltering() throws Exception {
+    void lifecycleIndexUpdatesSurroundRemovalSnapshotBoundary() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandLinkedNpcStateSnapshotService.java"
         ));
         String addedBody = methodBody(source, "public void onNpcAdded");
         String removedBody = methodBody(source, "public void onNpcRemoved");
+        String beginRemovalBody = methodBody(source, "public UUID beginNpcRemoval");
+        String completeRemovalBody = methodBody(source, "public void completeNpcRemoval");
         String indexBody = methodBody(source, "private void indexNpcAdded");
 
         int addedIndex = addedBody.indexOf("indexNpcAdded(reference, store)");
         int refreshIndex = addedBody.indexOf("refreshFromEntity(reference, store)");
-        int removedIndex = removedBody.indexOf("loadedNpcIdentityIndex.recordRemoved");
-        int snapshotReasonIndex = removedBody.indexOf("if (reason == RemoveReason.REMOVE)");
+        int beginRemovalIndex = removedBody.indexOf("beginNpcRemoval(reference, reason, store)");
+        int completeRemovalIndex = removedBody.indexOf("completeNpcRemoval(reference, reason, store, npcUuid)");
+        int finalRefreshIndex = beginRemovalBody.indexOf("refreshFromEntity(reference, store)");
+        int removedIndex = beginRemovalBody.indexOf("loadedNpcIdentityIndex.recordRemoved");
+        int snapshotReasonIndex = completeRemovalBody.indexOf("if (reason == RemoveReason.REMOVE)");
+        int snapshotClearIndex = completeRemovalBody.indexOf("snapshotsByNpc.remove(npcUuid)");
         int npcGuardIndex = indexBody.indexOf("if (npc == null)");
         int addEvidenceIndex = indexBody.indexOf("loadedNpcIdentityIndex.recordAdded");
         assertTrue(addedIndex >= 0 && refreshIndex > addedIndex);
-        assertTrue(removedIndex >= 0 && snapshotReasonIndex > removedIndex);
+        assertTrue(beginRemovalIndex >= 0 && completeRemovalIndex > beginRemovalIndex);
+        assertTrue(finalRefreshIndex >= 0 && removedIndex > finalRefreshIndex);
+        assertTrue(snapshotReasonIndex >= 0 && snapshotClearIndex > snapshotReasonIndex);
         assertTrue(npcGuardIndex >= 0 && addEvidenceIndex > npcGuardIndex);
         assertTrue(source.contains("LoadedNpcIdentityIndex.LoadedNpcObservation"));
         assertTrue(source.contains("projectionKey(marker)"));

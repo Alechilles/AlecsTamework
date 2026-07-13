@@ -4,8 +4,11 @@ import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.items.CommandUnexpectedRemovalRecoveryService;
+import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -20,6 +23,7 @@ import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -38,6 +42,8 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcLostService lostService;
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
+    @Nullable
+    private final CommandUnexpectedRemovalRecoveryService unexpectedRemovalRecoveryService;
 
     public CommandNpcRelocationOnLoadSystem(CommandNpcRelocationService relocationService,
                                             CommandLinkedNpcDeathService deathService,
@@ -47,6 +53,9 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
         this.deathService = deathService;
         this.lostService = lostService;
         this.stateSnapshotService = stateSnapshotService;
+        this.unexpectedRemovalRecoveryService = lostService != null
+                ? new CommandUnexpectedRemovalRecoveryService(lostService)
+                : null;
     }
 
     @Override
@@ -81,18 +90,67 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                                @Nonnull RemoveReason reason,
                                @Nonnull Store<EntityStore> store,
                                @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        if (stateSnapshotService != null) {
-            stateSnapshotService.onNpcRemoved(reference, reason, store);
+        UUID npcUuid = stateSnapshotService != null
+                ? stateSnapshotService.beginNpcRemoval(reference, reason, store)
+                : resolveNpcUuid(reference, store);
+        try {
+            if (relocationService != null) {
+                relocationService.onNpcRemoved(reference, reason, store);
+            }
+            if (deathService != null) {
+                deathService.onNpcRemoved(reference, reason, store);
+            }
+            if (lostService != null) {
+                lostService.onNpcRemoved(reference, reason, store);
+            }
+            recordUnexpectedRemoval(reference, store, npcUuid, reason);
+        } finally {
+            if (stateSnapshotService != null) {
+                stateSnapshotService.completeNpcRemoval(reference, reason, store, npcUuid);
+            }
         }
-        if (relocationService != null) {
-            relocationService.onNpcRemoved(reference, reason, store);
+    }
+
+    private void recordUnexpectedRemoval(@Nonnull Ref<EntityStore> reference,
+                                         @Nonnull Store<EntityStore> store,
+                                         @Nullable UUID npcUuid,
+                                         @Nonnull RemoveReason reason) {
+        if (unexpectedRemovalRecoveryService == null || stateSnapshotService == null || npcUuid == null) {
+            return;
         }
-        if (deathService != null) {
-            deathService.onNpcRemoved(reference, reason, store);
-        }
-        if (lostService != null) {
-            lostService.onNpcRemoved(reference, reason, store);
-        }
+        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot =
+                stateSnapshotService.getSnapshot(npcUuid);
+        unexpectedRemovalRecoveryService.recordIfRecoverable(
+                new CommandUnexpectedRemovalRecoveryService.RemovalEvidence(
+                        npcUuid,
+                        reason,
+                        snapshot != null ? snapshot.ownerId() : null,
+                        snapshot != null ? snapshot.lastKnownPosition() : null,
+                        snapshot != null ? snapshot.homePosition() : null,
+                        stateSnapshotService.getFullSnapshot(npcUuid) != null,
+                        deathService != null && deathService.getDeadSnapshot(npcUuid) != null,
+                        deathService != null && deathService.isPermanentlyReleasedDeath(npcUuid),
+                        isManagedCaptureHandoff(reference, store),
+                        System.currentTimeMillis()
+                )
+        );
+    }
+
+    private boolean isManagedCaptureHandoff(@Nonnull Ref<EntityStore> reference,
+                                            @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> markerType =
+                TameworkProjectionIdentityComponent.getComponentType();
+        TameworkProjectionIdentityComponent marker = markerType != null
+                ? store.getComponent(reference, markerType)
+                : null;
+        return marker != null && TameworkProjectionIdentityComponent.KIND_MANAGED_COOP_CAPTURE_SOURCE.equals(
+                marker.getProjectionKind());
+    }
+
+    @Nullable
+    private UUID resolveNpcUuid(@Nonnull Ref<EntityStore> reference, @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        return npc != null ? npc.getUuid() : null;
     }
 
     @Override

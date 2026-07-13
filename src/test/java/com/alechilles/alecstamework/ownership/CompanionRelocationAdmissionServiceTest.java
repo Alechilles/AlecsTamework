@@ -93,6 +93,30 @@ class CompanionRelocationAdmissionServiceTest {
     }
 
     @Test
+    void missingDormantProjectionIsDistinguishedFromTemporaryStateUnavailability() throws Exception {
+        OwnerPopulationIndex owners = new OwnerPopulationIndex();
+        owners.reconcileCommittedEntry(new OwnerPopulationEntry(
+                "relocation-profile", OWNER, "alpha", CompanionLifecycleState.UNKNOWN_DORMANT, 2L
+        ));
+        ClaimOccupancyIndex claims = new ClaimOccupancyIndex();
+        claims.reconcileCommittedEntry(new ClaimOccupancyEntry(
+                "relocation-profile", OWNER, CompanionLifecycleState.UNKNOWN_DORMANT, null, 2L
+        ));
+        CompanionIdentityResolver identities = new CompanionIdentityResolver();
+        identities.markDurable("relocation-profile", NPC);
+        CompanionRelocationAdmissionService service = new CompanionRelocationAdmissionService(
+                owners, identities, claims, new FakeAdmissionApi(), Runnable::run
+        );
+
+        CompanionRelocationAdmissionService.Decision denied = service.prepare(
+                request(OWNER, "beta", 8, 9)
+        ).toCompletableFuture().get(5L, TimeUnit.SECONDS);
+
+        assertEquals(CompanionRelocationAdmissionService.Status.DENIED, denied.status());
+        assertEquals("relocation-source-projection-missing", denied.reason());
+    }
+
+    @Test
     void providerOrTopologyChangeAtFinalClaimClosesTheReservedCapability() throws Exception {
         FakeAdmissionApi api = new FakeAdmissionApi();
         OwnerPopulationIndex owners = new OwnerPopulationIndex();

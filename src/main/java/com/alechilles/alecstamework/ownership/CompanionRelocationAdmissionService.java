@@ -84,8 +84,13 @@ public final class CompanionRelocationAdmissionService {
         }
         OwnerPopulationEntry owner = ownerIndex.entry(profileId).orElse(null);
         ClaimOccupancyEntry claim = claimIndex.entry(profileId).orElse(null);
-        if (owner == null || claim == null || claim.physicalChunk() == null) {
+        if (owner == null || claim == null) {
             return Plan.denied("relocation-population-state-unavailable");
+        }
+        if (claim.physicalChunk() == null) {
+            return Plan.denied(owner.lifecycleState() == CompanionLifecycleState.UNKNOWN_DORMANT
+                    ? "relocation-source-projection-missing"
+                    : "relocation-population-state-unavailable");
         }
         if (owner.ownerId() == null || !owner.ownerId().equals(request.expectedOwnerUuid())
                 || !Objects.equals(claim.ownerId(), owner.ownerId())) {

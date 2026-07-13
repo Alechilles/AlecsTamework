@@ -51,6 +51,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed linked companions removed by destructive external cleanup becoming unrecoverable Recall entries. A complete last-live snapshot now transitions unexpected removals to Lost recovery, while ordinary chunk unloads continue to relocate the original NPC.
 - Fixed handheld capture items losing a linked companion's panel status when capture clears ownership. Command links are now frozen before the ownership transition and published as captured only after the capture succeeds.
 - Fixed bulk owned-NPC spawning racing the population observer, which could falsely report an identity conflict, degrade persistence, and leave the remaining batch operations pending. Startup recovery no longer leaves ownership behind `owner-population-canonical-reload` while retryable observations wait on intentionally quarantined operations, and `/tw npcspawntamed` retries the brief legitimate reload window before reporting a denial.
 - Fixed startup reconciliation binding to a stale loaded-NPC identity snapshot when worlds started after Tamework setup, and fixed ordinary player joins, inventory changes, or NPC loading during the longer saved-world scan becoming permanent degradation. Transient live-state races now refresh their affected evidence and retry automatically instead of requiring players to wait before using Tamework.

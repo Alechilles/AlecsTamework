@@ -77,8 +77,23 @@ public final class CommandLinkedNpcStateSnapshotService {
     public void onNpcRemoved(Ref<EntityStore> reference,
                              RemoveReason reason,
                              Store<EntityStore> store) {
+        UUID npcUuid = beginNpcRemoval(reference, reason, store);
+        completeNpcRemoval(reference, reason, store, npcUuid);
+    }
+
+    /**
+     * Refreshes the final linked state and removes live-identity evidence while retaining that state
+     * until all removal observers have classified the disappearance.
+     */
+    @Nullable
+    public UUID beginNpcRemoval(Ref<EntityStore> reference,
+                                RemoveReason reason,
+                                Store<EntityStore> store) {
         if (reference == null || store == null) {
-            return;
+            return null;
+        }
+        if (reason == RemoveReason.REMOVE) {
+            refreshFromEntity(reference, store);
         }
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
         UUID componentUuid = resolveComponentUuid(reference, store);
@@ -92,7 +107,15 @@ public final class CommandLinkedNpcStateSnapshotService {
         }
         UUID indexedUuid = componentUuid != null ? componentUuid : legacyNpcUuid;
         UUID npcUuid = npc != null && npc.getUuid() != null ? npc.getUuid() : indexedUuid;
-        if (npcUuid == null) {
+        return npcUuid;
+    }
+
+    /** Clears destructive-removal state only after death/lost observers have consumed the boundary snapshot. */
+    public void completeNpcRemoval(Ref<EntityStore> reference,
+                                   RemoveReason reason,
+                                   Store<EntityStore> store,
+                                   @Nullable UUID npcUuid) {
+        if (reference == null || store == null || npcUuid == null) {
             return;
         }
         if (reason == RemoveReason.REMOVE) {
