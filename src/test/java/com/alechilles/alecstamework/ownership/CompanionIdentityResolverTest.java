@@ -162,6 +162,41 @@ class CompanionIdentityResolverTest {
         );
     }
 
+    /** Regression: live observers must resolve a claimed batch spawn before its async commit. */
+    @Test
+    void preparedSpawnAliasPreventsObserverFromAllocatingACompetingProfile() {
+        UUID planned = UUID.randomUUID();
+        CompanionIdentityResolver resolver = new CompanionIdentityResolver();
+
+        assertTrue(resolver.retainPreparedAlias("profile-a", planned));
+
+        assertEquals("profile-a", resolver.resolveProfileId(planned).orElseThrow());
+        assertEquals(
+                "profile-a",
+                resolver.resolveOrAllocate(planned, "runtime-observation:" + planned).profileId()
+        );
+        resolver.remap("profile-a", null, planned);
+        assertEquals(planned, resolver.currentNpcUuid("profile-a").orElseThrow());
+        assertTrue(resolver.releasePreparedAlias("profile-a", planned));
+    }
+
+    @Test
+    void canceledPreparedSpawnReleasesOnlyItsOwnAliasLease() {
+        UUID planned = UUID.randomUUID();
+        CompanionIdentityResolver resolver = new CompanionIdentityResolver();
+
+        assertTrue(resolver.retainPreparedAlias("profile-a", planned));
+        assertTrue(resolver.retainPreparedAlias("profile-a", planned));
+        assertFalse(resolver.retainPreparedAlias("profile-b", planned));
+        assertFalse(resolver.releasePreparedAlias("profile-b", planned));
+
+        assertTrue(resolver.releasePreparedAlias("profile-a", planned));
+        assertEquals("profile-a", resolver.resolveProfileId(planned).orElseThrow());
+        assertTrue(resolver.releasePreparedAlias("profile-a", planned));
+        assertTrue(resolver.resolveProfileId(planned).isEmpty());
+        assertTrue(resolver.releasePreparedAlias("profile-a", planned));
+    }
+
     @Test
     void invalidReplacementSnapshotDoesNotPartiallyReplaceAliases() {
         UUID existing = UUID.randomUUID();
@@ -178,5 +213,24 @@ class CompanionIdentityResolverTest {
 
         assertEquals("profile-a", resolver.resolveProfileId(existing).orElseThrow());
         assertEquals(1, resolver.aliasCount());
+    }
+
+    @Test
+    void durableReloadConflictWithPreparedAliasIsAtomic() {
+        UUID existing = UUID.randomUUID();
+        UUID planned = UUID.randomUUID();
+        CompanionIdentityResolver resolver = new CompanionIdentityResolver();
+        resolver.replaceDurableAliases(List.of(
+                new CompanionIdentityRepository.AliasRecord(existing, "profile-a", true, 1L)
+        ));
+        assertTrue(resolver.retainPreparedAlias("profile-b", planned));
+
+        assertThrows(IllegalStateException.class, () -> resolver.replaceDurableAliases(List.of(
+                new CompanionIdentityRepository.AliasRecord(planned, "profile-c", true, 2L)
+        )));
+
+        assertEquals("profile-a", resolver.resolveProfileId(existing).orElseThrow());
+        assertEquals("profile-b", resolver.resolveProfileId(planned).orElseThrow());
+        assertEquals(existing, resolver.currentNpcUuid("profile-a").orElseThrow());
     }
 }

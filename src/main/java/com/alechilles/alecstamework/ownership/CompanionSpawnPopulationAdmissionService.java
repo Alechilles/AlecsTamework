@@ -109,6 +109,10 @@ public final class CompanionSpawnPopulationAdmissionService {
     /** Revalidates current settings, provider generation, and destination topology. */
     public boolean claimForSpawn(@Nonnull PreparedCompanionSpawnBatch batch, int unitIndex) {
         PreparedCompanionSpawnBatch.ReservedSpawn spawn = batch.spawn(unitIndex);
+        if (!identityResolver.retainPreparedAlias(spawn.profileId(), spawn.plannedNpcUuid())) {
+            releaseAfterCancellation(batch, unitIndex, "spawn-prepared-identity-conflict");
+            return false;
+        }
         CompanionAdmissionPolicyResolver.Policy current = policyResolver.resolve(
                 spawn.effectiveOperation(), spawn.request().ownerId() != null
         );
@@ -119,6 +123,7 @@ public final class CompanionSpawnPopulationAdmissionService {
                 batch.populationBatch(), unitIndex, current.settingsRevision(), refreshed
         );
         if (!claimed) {
+            releasePreparedAlias(spawn);
             releaseAfterCancellation(batch, unitIndex, "spawn-population-claim-invalid");
         }
         return claimed;
@@ -219,8 +224,8 @@ public final class CompanionSpawnPopulationAdmissionService {
         return batchCoordinator.cancelAsync(batch.populationBatch(), unitIndex, reason)
                 .thenApply(canceled -> {
                     if (Boolean.TRUE.equals(canceled)
-                            && !planner.releaseProvisional(batch.spawn(unitIndex))) {
-                        markDegraded("spawn_provisional_identity_release_failed");
+                            && !releaseCanceledIdentities(batch.spawn(unitIndex))) {
+                        markDegraded("spawn_canceled_identity_release_failed");
                         return false;
                     }
                     return canceled;
@@ -300,12 +305,32 @@ public final class CompanionSpawnPopulationAdmissionService {
             }
             cancellation.whenComplete((canceled, failure) -> {
                 if (failure != null || !Boolean.TRUE.equals(canceled)
-                        || !planner.releaseProvisional(batch.spawn(unitIndex))) {
-                    markDegraded("spawn_provisional_identity_release_failed");
+                        || !releaseCanceledIdentities(batch.spawn(unitIndex))) {
+                    markDegraded("spawn_canceled_identity_release_failed");
                 }
             });
         } catch (RuntimeException | LinkageError failure) {
-            markDegraded("spawn_provisional_identity_release_failed");
+            markDegraded("spawn_canceled_identity_release_failed");
+        }
+    }
+
+    private boolean releaseCanceledIdentities(
+            @Nonnull PreparedCompanionSpawnBatch.ReservedSpawn spawn
+    ) {
+        boolean preparedReleased = releasePreparedAlias(spawn);
+        boolean provisionalReleased = planner.releaseProvisional(spawn);
+        return preparedReleased && provisionalReleased;
+    }
+
+    private boolean releasePreparedAlias(
+            @Nonnull PreparedCompanionSpawnBatch.ReservedSpawn spawn
+    ) {
+        try {
+            return identityResolver.releasePreparedAlias(
+                    spawn.profileId(), spawn.plannedNpcUuid()
+            );
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
         }
     }
 

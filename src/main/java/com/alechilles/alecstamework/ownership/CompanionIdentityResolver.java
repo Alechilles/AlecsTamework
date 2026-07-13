@@ -18,6 +18,7 @@ public final class CompanionIdentityResolver {
     private final ReentrantLock lock = new ReentrantLock();
     private final Map<UUID, String> profileByNpcUuid = new HashMap<>();
     private final Map<String, UUID> currentUuidByProfile = new HashMap<>();
+    private final Map<UUID, PreparedAlias> preparedAliasByNpcUuid = new HashMap<>();
     private final Map<String, ProvisionalIdentity> provisionalByKey = new HashMap<>();
     private final Map<UUID, ProvisionalIdentity> provisionalByNpcUuid = new HashMap<>();
     private final Map<String, Integer> provisionalLeaseCountByProfile = new HashMap<>();
@@ -62,10 +63,20 @@ public final class CompanionIdentityResolver {
                     remainingByNpcUuid.put(provisional.npcUuid(), provisional);
                 }
             }
+            for (Map.Entry<UUID, PreparedAlias> entry : preparedAliasByNpcUuid.entrySet()) {
+                String durableProfile = replacementAliases.get(entry.getKey());
+                if (durableProfile != null
+                        && !durableProfile.equals(entry.getValue().profileId())) {
+                    throw new IllegalStateException(
+                            "Durable aliases conflict with a prepared spawn identity."
+                    );
+                }
+            }
             profileByNpcUuid.clear();
             profileByNpcUuid.putAll(replacementAliases);
             currentUuidByProfile.clear();
             currentUuidByProfile.putAll(replacementCurrent);
+            preparedAliasByNpcUuid.keySet().removeIf(replacementAliases::containsKey);
             provisionalByKey.clear();
             provisionalByKey.putAll(remainingByKey);
             provisionalByNpcUuid.clear();
@@ -87,7 +98,12 @@ public final class CompanionIdentityResolver {
         }
         lock.lock();
         try {
-            return Optional.ofNullable(profileByNpcUuid.get(npcUuid));
+            String profileId = profileByNpcUuid.get(npcUuid);
+            if (profileId == null) {
+                PreparedAlias prepared = preparedAliasByNpcUuid.get(npcUuid);
+                profileId = prepared == null ? null : prepared.profileId();
+            }
+            return Optional.ofNullable(profileId);
         } finally {
             lock.unlock();
         }
@@ -133,6 +149,10 @@ public final class CompanionIdentityResolver {
             if (existingProfile != null) {
                 return new Resolution(existingProfile, npcUuid, false);
             }
+            PreparedAlias prepared = preparedAliasByNpcUuid.get(npcUuid);
+            if (prepared != null) {
+                return new Resolution(prepared.profileId(), npcUuid, false);
+            }
             String profileId = UUID.randomUUID().toString();
             ProvisionalIdentity provisional = new ProvisionalIdentity(profileId, npcUuid);
             provisionalByKey.put(normalizedKey, provisional);
@@ -141,6 +161,59 @@ public final class CompanionIdentityResolver {
             profileByNpcUuid.put(npcUuid, profileId);
             currentUuidByProfile.put(profileId, npcUuid);
             return new Resolution(profileId, npcUuid, true);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Makes a claimed spawn capability visible to live observers without switching the profile's
+     * canonical current UUID before the entity is actually created.
+     */
+    public boolean retainPreparedAlias(@Nonnull String profileId, @Nonnull UUID npcUuid) {
+        String normalizedProfile = OwnerPopulationEntry.normalizeProfileId(profileId);
+        Objects.requireNonNull(npcUuid, "npcUuid");
+        lock.lock();
+        try {
+            String durableProfile = profileByNpcUuid.get(npcUuid);
+            if (durableProfile != null) {
+                return normalizedProfile.equals(durableProfile);
+            }
+            PreparedAlias prepared = preparedAliasByNpcUuid.get(npcUuid);
+            if (prepared != null && !normalizedProfile.equals(prepared.profileId())) {
+                return false;
+            }
+            int leases = prepared == null ? 1 : prepared.leases() + 1;
+            preparedAliasByNpcUuid.put(npcUuid, new PreparedAlias(normalizedProfile, leases));
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** Releases one prepared alias lease when its spawn is canceled before becoming live. */
+    public boolean releasePreparedAlias(@Nonnull String profileId, @Nonnull UUID npcUuid) {
+        String normalizedProfile = OwnerPopulationEntry.normalizeProfileId(profileId);
+        Objects.requireNonNull(npcUuid, "npcUuid");
+        lock.lock();
+        try {
+            PreparedAlias prepared = preparedAliasByNpcUuid.get(npcUuid);
+            if (prepared == null) {
+                String durableProfile = profileByNpcUuid.get(npcUuid);
+                return durableProfile == null || normalizedProfile.equals(durableProfile);
+            }
+            if (!normalizedProfile.equals(prepared.profileId())) {
+                return false;
+            }
+            if (prepared.leases() > 1) {
+                preparedAliasByNpcUuid.put(
+                        npcUuid,
+                        new PreparedAlias(normalizedProfile, prepared.leases() - 1)
+                );
+            } else {
+                preparedAliasByNpcUuid.remove(npcUuid);
+            }
+            return true;
         } finally {
             lock.unlock();
         }
@@ -160,6 +233,10 @@ public final class CompanionIdentityResolver {
             if (conflicting != null && !normalizedProfile.equals(conflicting)) {
                 throw new IllegalArgumentException("Replacement UUID belongs to another profile.");
             }
+            PreparedAlias prepared = preparedAliasByNpcUuid.get(currentNpcUuid);
+            if (prepared != null && !normalizedProfile.equals(prepared.profileId())) {
+                throw new IllegalArgumentException("Prepared replacement UUID belongs to another profile.");
+            }
             if (previousNpcUuid != null) {
                 String previousProfile = profileByNpcUuid.get(previousNpcUuid);
                 if (previousProfile != null && !normalizedProfile.equals(previousProfile)) {
@@ -167,6 +244,7 @@ public final class CompanionIdentityResolver {
                 }
                 profileByNpcUuid.put(previousNpcUuid, normalizedProfile);
             }
+            preparedAliasByNpcUuid.remove(currentNpcUuid);
             profileByNpcUuid.put(currentNpcUuid, normalizedProfile);
             currentUuidByProfile.put(normalizedProfile, currentNpcUuid);
         } finally {
@@ -184,6 +262,11 @@ public final class CompanionIdentityResolver {
             if (mappedProfile != null && !normalizedProfile.equals(mappedProfile)) {
                 throw new IllegalArgumentException("NPC UUID belongs to another profile.");
             }
+            PreparedAlias prepared = preparedAliasByNpcUuid.get(currentNpcUuid);
+            if (prepared != null && !normalizedProfile.equals(prepared.profileId())) {
+                throw new IllegalArgumentException("Prepared NPC UUID belongs to another profile.");
+            }
+            preparedAliasByNpcUuid.remove(currentNpcUuid);
             profileByNpcUuid.put(currentNpcUuid, normalizedProfile);
             currentUuidByProfile.put(normalizedProfile, currentNpcUuid);
             provisionalByKey.entrySet().removeIf(entry ->
@@ -258,5 +341,8 @@ public final class CompanionIdentityResolver {
     }
 
     private record ProvisionalIdentity(@Nonnull String profileId, @Nonnull UUID npcUuid) {
+    }
+
+    private record PreparedAlias(@Nonnull String profileId, int leases) {
     }
 }

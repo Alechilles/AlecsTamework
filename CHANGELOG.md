@@ -51,6 +51,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed bulk owned-NPC spawning racing the population observer, which could falsely report an identity conflict, degrade persistence, and leave the remaining batch operations pending.
 - Fixed startup reconciliation binding to a stale loaded-NPC identity snapshot when worlds started after Tamework setup, which could degrade persistence and block all taming and ownership changes.
 - Fixed managed-coop duplication paths by transacting canonical profile state, resident slots, and lifecycle operations together; capture sources and stale aliases remain suppressed until retirement is confirmed, and release callbacks require one exact all-world UUID/operation-marker match before adopting or spawning. Persisted release adoption rechecks that evidence after asynchronous capacity preparation and cancels only the provisional population reservation if it changed. Managed authority now also fails closed unless the observed vanilla coop id matches and its own automatic wild intake is explicitly disabled.
 - Fixed old vanilla residents discovered on newly managed coops being silently mirrored or discarded. Exact matches are journaled and imported without spawning replacements, while ambiguous evidence is retained and quarantined for operator review.

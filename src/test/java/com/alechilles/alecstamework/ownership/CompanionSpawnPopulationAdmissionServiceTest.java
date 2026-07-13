@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -134,6 +136,19 @@ class CompanionSpawnPopulationAdmissionServiceTest {
         );
 
         assertTrue(CompanionSpawnPopulationAdmissionService.shouldMarkIdentityDurable(result));
+    }
+
+    /** Regression: a claimed command batch must expose its planned identity before ECS spawn. */
+    @Test
+    void claimRetainsPreparedAliasBeforeThePopulationCapabilityIsApplied() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/ownership/CompanionSpawnPopulationAdmissionService.java"
+        ));
+        int retain = source.indexOf("identityResolver.retainPreparedAlias(");
+        int claim = source.indexOf("batchCoordinator.claimForApply(");
+
+        assertTrue(retain >= 0);
+        assertTrue(claim > retain);
     }
 
     private static String validate(UUID current, CompanionLifecycleState ownerState,
