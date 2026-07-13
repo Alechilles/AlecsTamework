@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.items.ManagedCoopOccupancyService;
 import com.alechilles.alecstamework.items.ManagedCoopResidentIndex;
 import com.alechilles.alecstamework.items.ManagedCoopResidentIndexRefreshService;
 import com.hypixel.hytale.logger.HytaleLogger;
+import java.sql.SQLException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -22,6 +23,7 @@ public final class ManagedCoopRuntimeServices {
     private final ManagedCoopLifecycleOperationIndexRefreshService lifecycleIndexRefreshService;
     private final ManagedCoopCompositeIndexRefreshService compositeIndexRefreshService;
     private final ManagedCoopOccupancyService occupancyService;
+    private final ManagedCoopStaleDeploymentReconciler staleDeploymentReconciler;
 
     ManagedCoopRuntimeServices(@Nonnull SqliteConnectionManager connectionManager,
                                @Nonnull PersistenceWriteQueue writeQueue,
@@ -56,6 +58,10 @@ public final class ManagedCoopRuntimeServices {
         occupancyService = new ManagedCoopOccupancyService(
                 residentIndex,
                 compositeIndexRefreshService::isTrusted
+        );
+        staleDeploymentReconciler = new ManagedCoopStaleDeploymentReconciler(
+                connectionManager,
+                residentRepository
         );
     }
 
@@ -107,5 +113,11 @@ public final class ManagedCoopRuntimeServices {
     @Nonnull
     public ManagedCoopOccupancyService occupancyService() {
         return occupancyService;
+    }
+
+    @Nonnull
+    ManagedCoopStaleDeploymentReconciler.RepairResult reconcileStaleDeployments()
+            throws SQLException {
+        return staleDeploymentReconciler.reconcile();
     }
 }

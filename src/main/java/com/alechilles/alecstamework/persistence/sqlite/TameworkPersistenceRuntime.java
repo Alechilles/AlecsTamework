@@ -221,8 +221,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
 
         if (health.isHealthy()) {
             runtime.runLegacyDatImport(logger);
-            managedCoopServices.compositeIndexRefreshService().refresh();
-            maintenanceService.start();
+            runtime.reconcileStaleManagedCoopDeployments(logger);
+            if (health.isHealthy()) {
+                managedCoopServices.compositeIndexRefreshService().refresh();
+                maintenanceService.start();
+            }
         }
         return runtime;
     }
@@ -447,6 +450,38 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             if (logger != null) {
                 logger.at(Level.SEVERE).log(
                         "Legacy .dat migration failed: " + exception.getMessage()
+                );
+            }
+        }
+    }
+
+    /** Repairs pre-fix handheld-capture drift before managed-coop indexes become visible. */
+    private void reconcileStaleManagedCoopDeployments(@Nullable HytaleLogger logger) {
+        if (!healthService.isHealthy()) {
+            return;
+        }
+        try {
+            ManagedCoopStaleDeploymentReconciler.RepairResult result =
+                    managedCoopServices.reconcileStaleDeployments();
+            if (logger != null && result.repairedCount() > 0) {
+                logger.at(Level.INFO).log(
+                        "Repaired stale managed-coop deployments: " + result.repairedCount()
+                );
+            }
+        } catch (Exception exception) {
+            String reason = "managed_coop_stale_deployment_repair_failed";
+            healthService.markDegraded(reason);
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    reason,
+                    exception,
+                    TameworkTelemetryContext.persistence(
+                            "managed_coop", "startup_repair", reason,
+                            "Managed-coop startup reconciliation failed."
+                    ).build()
+            );
+            if (logger != null) {
+                logger.at(Level.SEVERE).log(
+                        "Managed-coop startup reconciliation failed: " + exception.getMessage()
                 );
             }
         }
