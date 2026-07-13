@@ -6,9 +6,7 @@ import com.alechilles.alecstamework.npc.systems.ManagedCoopCaptureSourceRetireme
 import com.alechilles.alecstamework.npc.systems.ManagedCoopStaleEntitySuppressionSystem;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopRuntimeServices;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
-import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
-import com.alechilles.alecstamework.ownership.OwnerPopulationReadiness;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
@@ -93,8 +91,7 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
         ManagedCoopReleaseRuntimeAdapter releaseAdapter = releaseAdapter(
                 services, loadedIdentities, presentation);
         ManagedCoopLifecycleMutationGate lifecycleGate =
-                new ManagedCoopLifecycleMutationGate(
-                        () -> managedRuntimeReady(persistence, population));
+                new ManagedCoopLifecycleMutationGate();
         ManagedCoopReleaseCoordinator releaseCoordinator = new ManagedCoopReleaseCoordinator(
                 services.lifecycleRepository(), services.compositeIndexRefreshService());
         ManagedCoopRuntimeOperationDispatcher operations = operationDispatcher(
@@ -265,16 +262,6 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                 services.compositeIndexRefreshService(),
                 releasePopulations,
                 lifecycleGate);
-    }
-
-    private static boolean managedRuntimeReady(
-            TameworkPersistenceRuntime persistence,
-            OwnerPopulationRuntime population) {
-        return population.index().readiness() == OwnerPopulationReadiness.READY
-                && population.claimOccupancyIndex().readiness()
-                == ClaimOccupancyReadiness.READY
-                && persistence.getCompanionPersistedProjectionEvidenceRegistry()
-                .snapshot().sealed();
     }
 
     @Nonnull

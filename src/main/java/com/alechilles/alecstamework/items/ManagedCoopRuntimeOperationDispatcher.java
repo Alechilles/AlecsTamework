@@ -319,10 +319,6 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             long requestedAtMs) {
         Objects.requireNonNull(site, "site");
         Objects.requireNonNull(resident, "resident");
-        if (!lifecycleGate.releaseReady()) {
-            return completed(DispatchStatus.RELEASE_DEDUPLICATED, null,
-                    "managed_coop_runtime_authority_not_ready");
-        }
         final UUID plannedUuid;
         try {
             if (!resident.authorityKey().equals(site.authorityKey())

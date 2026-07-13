@@ -152,38 +152,6 @@ class ManagedCoopRuntimeOperationDispatcherTest {
     }
 
     @Test
-    void removedCoopReleaseCannotBypassStartupAuthorityGate() throws Exception {
-        AtomicInteger claims = new AtomicInteger();
-        ManagedCoopContext context = context();
-        ResidentRecord resident = resident(context);
-        ManagedCoopRuntimeOperationDispatcher dispatcher =
-                new ManagedCoopRuntimeOperationDispatcher(
-                        (store, ref, ignoredContext, candidate) ->
-                                CompletableFuture.failedFuture(
-                                        new AssertionError("capture not used")),
-                        ready -> CompletableFuture.failedFuture(
-                                new AssertionError("retirement not used")),
-                        attempt -> {
-                            claims.incrementAndGet();
-                            return CompletableFuture.failedFuture(
-                                    new AssertionError("release claim must stay closed"));
-                        },
-                        command -> CompletableFuture.failedFuture(
-                                new AssertionError("projection must stay closed")),
-                        () -> PLANNED,
-                        new ManagedCoopLifecycleMutationGate(() -> false));
-
-        var outcome = dispatcher.release(
-                ManagedCoopRuntimeOperationDispatcher.ReleaseSite.copyOf(context),
-                resident,
-                100L).join();
-
-        assertEquals(DispatchStatus.RELEASE_DEDUPLICATED, outcome.status());
-        assertEquals("managed_coop_runtime_authority_not_ready", outcome.detail());
-        assertEquals(0, claims.get());
-    }
-
-    @Test
     void captureIsReportedOnlyAfterExactSourceRetirementCompletes() {
         AtomicReference<RetirementReady> retired = new AtomicReference<>();
         ManagedCoopRuntimeOperationDispatcher dispatcher = captureDispatcher(ready -> {
