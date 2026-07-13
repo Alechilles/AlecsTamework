@@ -110,7 +110,7 @@ public final class VanillaCoopImportAdapter {
         if (source == null) {
             return result(AuditStatus.FAILED, null, List.of(), "vanilla_coop_source_required");
         }
-        if (source.getClass() != layout.coopClass()) {
+        if (!layout.coopClass().isInstance(source)) {
             return result(
                     AuditStatus.UNSUPPORTED,
                     null,

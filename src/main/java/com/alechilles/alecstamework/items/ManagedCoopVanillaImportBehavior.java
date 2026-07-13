@@ -149,7 +149,7 @@ public final class ManagedCoopVanillaImportBehavior {
             FarmingCoopAsset coopAsset = coop == null ? null : coop.getCoopAsset();
             ItemContainer container = containerBlock == null
                     ? null : containerBlock.getItemContainer();
-            if (coop == null || coop.getClass() != CoopBlock.class || coopAsset == null
+            if (coop == null || coopAsset == null
                     || blockType == null || !matchesBlockInfo(store, chunk, info, key)) {
                 return null;
             }

@@ -122,6 +122,21 @@ class VanillaCoopImportAdapterTest {
     }
 
     @Test
+    void compatibleCoopRuntimeSubclassKeepsImportGateReadable() {
+        FixtureCoopSubclass coop = new FixtureCoopSubclass();
+        coop.residents.add(new FixtureResident());
+        VanillaCoopImportAdapter adapter =
+                new VanillaCoopImportAdapter(FixtureCoop.class, FixtureResident.class);
+
+        VanillaCoopImportAdapter.AuditResult result = adapter.auditFixtureForTest(coop);
+
+        assertEquals(AuditStatus.SUPPORTED, result.status());
+        assertTrue(result.readable());
+        assertEquals("fixture_coop", result.coop().coopAssetId());
+        assertEquals(1, result.residents().size());
+    }
+
+    @Test
     void evidenceReadExceptionIsFailedAndNeverPresentedAsEmpty() {
         FixtureCoop coop = new FixtureCoop();
         coop.residents = new ExplodingList<>();
@@ -183,6 +198,9 @@ class VanillaCoopImportAdapterTest {
         protected String coopAssetId = "fixture_coop";
         protected List<FixtureResident> residents = new java.util.ArrayList<>();
         protected ItemContainer itemContainer;
+    }
+
+    private static final class FixtureCoopSubclass extends FixtureCoop {
     }
 
     private static final class WrongGenericCoop {

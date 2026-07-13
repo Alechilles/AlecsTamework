@@ -33,6 +33,7 @@ class ManagedCoopVanillaImportArchitectureTest {
                 "isManagedAuthorityEnabled")) {
             assertTrue(source.contains(required), required);
         }
+        assertFalse(source.contains("coop.getClass() != CoopBlock.class"));
         assertFalse(source.contains("CompletableFuture"));
         assertFalse(source.contains("CompletionStage"));
     }
