@@ -97,10 +97,18 @@ final class ManagedCoopPersistedReleaseProjectionRecoveryService
     @Nonnull
     public Resolution resolve(OperationRecord operation, ResidentRecord resident) {
         Resolution resolved = resolvePersisted(registry, snapshots, operation, resident);
-        if (resolved.status() == ManagedCoopPersistedProjectionRecovery.Status.BLOCKED) {
+        if (requiresReadinessDegradation(resolved)) {
             populations.markReadinessDegraded(resolved.detail());
         }
         return resolved;
+    }
+
+    /** An unsealed startup scan is expected waiting evidence, not persistence corruption. */
+    static boolean requiresReadinessDegradation(Resolution resolution) {
+        return resolution != null
+                && resolution.status() == ManagedCoopPersistedProjectionRecovery.Status.BLOCKED
+                && !"managed_coop_persisted_projection_evidence_unsealed".equals(
+                        resolution.detail());
     }
 
     @Nonnull

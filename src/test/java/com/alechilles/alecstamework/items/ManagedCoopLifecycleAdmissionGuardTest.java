@@ -48,6 +48,20 @@ class ManagedCoopLifecycleAdmissionGuardTest {
                 guard.inspect(context()).status());
     }
 
+    @Test
+    void startupProjectionAuthorityBlocksNormalCoopWorkUntilSealed() throws Exception {
+        ManagedCoopLifecycleOperationIndex index = index(List.of());
+        AtomicBoolean runtimeReady = new AtomicBoolean(false);
+        ManagedCoopLifecycleAdmissionGuard guard = new ManagedCoopLifecycleAdmissionGuard(
+                index, () -> true, runtimeReady::get);
+
+        assertEquals(ManagedCoopLifecycleAdmissionGuard.Status.BLOCKED_RUNTIME_NOT_READY,
+                guard.inspect(context()).status());
+
+        runtimeReady.set(true);
+        assertTrue(guard.inspect(context()).allowed());
+    }
+
     private static ManagedCoopLifecycleOperationIndex index(List<OperationRecord> operations) {
         ManagedCoopLifecycleOperationIndex index = new ManagedCoopLifecycleOperationIndex();
         assertTrue(index.rebuild(ManagedCoopReadResult.loaded(operations)).rebuilt());

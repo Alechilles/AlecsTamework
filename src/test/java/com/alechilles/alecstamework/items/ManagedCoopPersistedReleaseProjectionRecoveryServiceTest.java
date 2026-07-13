@@ -130,6 +130,17 @@ class ManagedCoopPersistedReleaseProjectionRecoveryServiceTest {
 
         assertEquals(Status.BLOCKED, resolution.status());
         assertEquals("managed_coop_persisted_projection_evidence_unsealed", resolution.detail());
+        assertFalse(ManagedCoopPersistedReleaseProjectionRecoveryService
+                .requiresReadinessDegradation(resolution));
+    }
+
+    @Test
+    void contradictorySealedEvidenceStillDegradesReadiness() {
+        Resolution resolution = resolve(registry(List.of(
+                marker("dead", PLANNED, PLANNED, true, "world", 2, 3))));
+
+        assertTrue(ManagedCoopPersistedReleaseProjectionRecoveryService
+                .requiresReadinessDegradation(resolution));
     }
 
     @Test

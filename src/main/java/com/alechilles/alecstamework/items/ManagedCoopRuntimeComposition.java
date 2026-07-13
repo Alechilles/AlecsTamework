@@ -6,7 +6,9 @@ import com.alechilles.alecstamework.npc.systems.ManagedCoopCaptureSourceRetireme
 import com.alechilles.alecstamework.npc.systems.ManagedCoopStaleEntitySuppressionSystem;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopRuntimeServices;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
 import com.alechilles.alecstamework.ownership.OwnerPopulationRuntime;
+import com.alechilles.alecstamework.ownership.OwnerPopulationReadiness;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
@@ -90,11 +92,14 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         population.claimOccupancyIndex());
         ManagedCoopReleaseRuntimeAdapter releaseAdapter = releaseAdapter(
                 services, loadedIdentities, presentation);
+        ManagedCoopLifecycleMutationGate lifecycleGate =
+                new ManagedCoopLifecycleMutationGate(
+                        () -> managedRuntimeReady(persistence, population));
         ManagedCoopReleaseCoordinator releaseCoordinator = new ManagedCoopReleaseCoordinator(
                 services.lifecycleRepository(), services.compositeIndexRefreshService());
         ManagedCoopRuntimeOperationDispatcher operations = operationDispatcher(
                 services, captureAdapter, sourceRetirements, releaseCoordinator,
-                releaseAdapter, releasePopulations);
+                releaseAdapter, releasePopulations, lifecycleGate);
         ManagedCoopReleaseRecoveryService releaseRecovery =
                 new ManagedCoopReleaseRecoveryService(
                         services.lifecycleRepository(),
@@ -113,7 +118,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         releaseRecovery,
                         releaseAdapter,
                         releasePopulations,
-                        operations::releaseInFlight);
+                        operations::releaseInFlight,
+                        lifecycleGate);
         ManagedCoopVanillaImportBehavior imports = importBehavior(
                 persistence,
                 services,
@@ -124,7 +130,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
         ManagedCoopLifecycleAdmissionGuard lifecycleAdmission =
                 new ManagedCoopLifecycleAdmissionGuard(
                         services.lifecycleIndex(),
-                        services.compositeIndexRefreshService()::isTrusted);
+                        services.compositeIndexRefreshService()::isTrusted,
+                        () -> managedRuntimeReady(persistence, population));
         ManagedCoopRuntimeSweepPlanner planner = new ManagedCoopRuntimeSweepPlanner(
                 services.occupancyService(), lifecycleAdmission);
         authorityEligibility = new ManagedCoopAuthorityEligibilityIndex();
@@ -248,7 +255,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
             ManagedCoopCaptureSourceRetirementService sourceRetirements,
             ManagedCoopReleaseCoordinator releaseCoordinator,
             ManagedCoopReleaseRuntimeAdapter releaseAdapter,
-            ManagedCoopReleasePopulationCoordinator releasePopulations) {
+            ManagedCoopReleasePopulationCoordinator releasePopulations,
+            ManagedCoopLifecycleMutationGate lifecycleGate) {
         return new ManagedCoopRuntimeOperationDispatcher(
                 captureAdapter,
                 sourceRetirements,
@@ -256,7 +264,18 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                 releaseAdapter,
                 services.residentIndex(),
                 services.compositeIndexRefreshService(),
-                releasePopulations);
+                releasePopulations,
+                lifecycleGate);
+    }
+
+    private static boolean managedRuntimeReady(
+            TameworkPersistenceRuntime persistence,
+            OwnerPopulationRuntime population) {
+        return population.index().readiness() == OwnerPopulationReadiness.READY
+                && population.claimOccupancyIndex().readiness()
+                == ClaimOccupancyReadiness.READY
+                && persistence.getCompanionPersistedProjectionEvidenceRegistry()
+                .snapshot().sealed();
     }
 
     @Nonnull

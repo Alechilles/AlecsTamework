@@ -171,6 +171,7 @@ public final class ManagedCoopRuntimeOperationDispatcher {
     private final ReleaseClaimGateway releases;
     private final ReleaseProjectionGateway projections;
     private final Supplier<UUID> plannedUuidSource;
+    private final ManagedCoopLifecycleMutationGate lifecycleGate;
     private final Set<String> releaseInFlightProfiles = ConcurrentHashMap.newKeySet();
 
     public ManagedCoopRuntimeOperationDispatcher(
@@ -205,16 +206,46 @@ public final class ManagedCoopRuntimeOperationDispatcher {
                 UUID::randomUUID);
     }
 
+    ManagedCoopRuntimeOperationDispatcher(
+            @Nonnull ManagedCoopCaptureRuntimeAdapter captureAdapter,
+            @Nonnull ManagedCoopCaptureSourceRetirementService retirementService,
+            @Nonnull ManagedCoopReleaseCoordinator releaseCoordinator,
+            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
+            @Nonnull ManagedCoopResidentIndex residentIndex,
+            @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
+            @Nonnull ManagedCoopReleasePopulationCoordinator populations,
+            @Nonnull ManagedCoopLifecycleMutationGate lifecycleGate) {
+        this(
+                captureAdapter::capture,
+                retirementService::retire,
+                releaseCoordinator::coordinate,
+                new HytaleManagedCoopReleaseProjectionGateway(
+                        releaseAdapter, residentIndex, compositeIndexes, populations),
+                UUID::randomUUID,
+                lifecycleGate);
+    }
+
     ManagedCoopRuntimeOperationDispatcher(@Nonnull CaptureGateway captures,
                                           @Nonnull RetirementGateway retirements,
                                           @Nonnull ReleaseClaimGateway releases,
                                           @Nonnull ReleaseProjectionGateway projections,
                                           @Nonnull Supplier<UUID> plannedUuidSource) {
+        this(captures, retirements, releases, projections, plannedUuidSource,
+                new ManagedCoopLifecycleMutationGate());
+    }
+
+    ManagedCoopRuntimeOperationDispatcher(@Nonnull CaptureGateway captures,
+                                          @Nonnull RetirementGateway retirements,
+                                          @Nonnull ReleaseClaimGateway releases,
+                                          @Nonnull ReleaseProjectionGateway projections,
+                                          @Nonnull Supplier<UUID> plannedUuidSource,
+                                          @Nonnull ManagedCoopLifecycleMutationGate lifecycleGate) {
         this.captures = Objects.requireNonNull(captures, "captures");
         this.retirements = Objects.requireNonNull(retirements, "retirements");
         this.releases = Objects.requireNonNull(releases, "releases");
         this.projections = Objects.requireNonNull(projections, "projections");
         this.plannedUuidSource = Objects.requireNonNull(plannedUuidSource, "plannedUuidSource");
+        this.lifecycleGate = Objects.requireNonNull(lifecycleGate, "lifecycleGate");
     }
 
     /** Starts capture on the current owning thread, then retains immutable lifecycle values only. */
@@ -228,6 +259,26 @@ public final class ManagedCoopRuntimeOperationDispatcher {
         Objects.requireNonNull(sourceRef, "sourceRef");
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(candidate, "candidate");
+        if (!lifecycleGate.runtimeReady()) {
+            return completed(DispatchStatus.CAPTURE_DEDUPLICATED, null,
+                    "managed_coop_runtime_authority_not_ready");
+        }
+        ManagedCoopLifecycleMutationGate.Lease lease = lifecycleGate.tryAcquire(
+                "runtime-capture:" + candidate.npcUuid());
+        if (lease == null) {
+            return completed(DispatchStatus.CAPTURE_DEDUPLICATED, null,
+                    "managed_coop_lifecycle_operation_in_flight");
+        }
+        return startCapture(store, sourceRef, context, candidate)
+                .whenComplete((ignored, failure) -> lifecycleGate.release(lease));
+    }
+
+    @Nonnull
+    private CompletableFuture<DispatchOutcome> startCapture(
+            Store<EntityStore> store,
+            Ref<EntityStore> sourceRef,
+            ManagedCoopContext context,
+            ManagedCoopCaptureCandidate candidate) {
         final CompletableFuture<CaptureOutcome> capture;
         try {
             store.assertThread();
@@ -272,6 +323,10 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             long requestedAtMs) {
         Objects.requireNonNull(site, "site");
         Objects.requireNonNull(resident, "resident");
+        if (!lifecycleGate.runtimeReady()) {
+            return completed(DispatchStatus.RELEASE_DEDUPLICATED, null,
+                    "managed_coop_runtime_authority_not_ready");
+        }
         final UUID plannedUuid;
         try {
             if (!resident.authorityKey().equals(site.authorityKey())
@@ -287,10 +342,19 @@ public final class ManagedCoopRuntimeOperationDispatcher {
             return completed(DispatchStatus.RELEASE_DEDUPLICATED, null,
                     "managed_coop_release_profile_already_in_flight");
         }
+        ManagedCoopLifecycleMutationGate.Lease lease = lifecycleGate.tryAcquire(
+                "runtime-release:" + resident.profileId());
+        if (lease == null) {
+            releaseInFlightProfiles.remove(resident.profileId());
+            return completed(DispatchStatus.RELEASE_DEDUPLICATED, null,
+                    "managed_coop_lifecycle_operation_in_flight");
+        }
         CompletableFuture<DispatchOutcome> pipeline = startRelease(
                 site, resident, plannedUuid, requestedAtMs);
-        return pipeline.whenComplete((ignored, failure) ->
-                releaseInFlightProfiles.remove(resident.profileId()));
+        return pipeline.whenComplete((ignored, failure) -> {
+            releaseInFlightProfiles.remove(resident.profileId());
+            lifecycleGate.release(lease);
+        });
     }
 
     /** True while this process owns a release claim or its resulting live projection. */

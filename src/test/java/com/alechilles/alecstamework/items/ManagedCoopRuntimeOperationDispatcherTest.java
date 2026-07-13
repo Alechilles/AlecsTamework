@@ -119,6 +119,71 @@ class ManagedCoopRuntimeOperationDispatcherTest {
     }
 
     @Test
+    void differentCoopReleaseWaitsForCurrentLifecycleProjection() throws Exception {
+        ManagedCoopContext context = context();
+        ResidentRecord firstResident = resident(context);
+        ResidentRecord secondResident = resident(context, "resident-2", "profile-2");
+        CompletableFuture<ManagedCoopReleaseSpawnOrchestrator.Outcome> projection =
+                new CompletableFuture<>();
+        AtomicInteger claims = new AtomicInteger();
+        ManagedCoopLifecycleMutationGate gate = new ManagedCoopLifecycleMutationGate();
+        ManagedCoopRuntimeOperationDispatcher dispatcher = dispatcher(
+                attempt -> {
+                    claims.incrementAndGet();
+                    return CompletableFuture.completedFuture(new ReleaseOutcome(
+                            ManagedCoopReleaseCoordinator.OutcomeStatus.SPAWN_READY,
+                            ready(attempt.resident()), null));
+                },
+                ignored -> projection,
+                gate);
+
+        CompletableFuture<ManagedCoopRuntimeOperationDispatcher.DispatchOutcome> first =
+                dispatcher.release(context, firstResident, 100L);
+        var waiting = dispatcher.release(context, secondResident, 101L).join();
+
+        assertEquals(DispatchStatus.RELEASE_DEDUPLICATED, waiting.status());
+        assertEquals("managed_coop_lifecycle_operation_in_flight", waiting.detail());
+        assertEquals(1, claims.get());
+
+        projection.complete(new ManagedCoopReleaseSpawnOrchestrator.Outcome(
+                ManagedCoopReleaseSpawnOrchestrator.Status.FINALIZED,
+                PLANNED, true, true, null));
+        assertEquals(DispatchStatus.RELEASED, first.join().status());
+    }
+
+    @Test
+    void removedCoopReleaseCannotBypassStartupAuthorityGate() throws Exception {
+        AtomicInteger claims = new AtomicInteger();
+        ManagedCoopContext context = context();
+        ResidentRecord resident = resident(context);
+        ManagedCoopRuntimeOperationDispatcher dispatcher =
+                new ManagedCoopRuntimeOperationDispatcher(
+                        (store, ref, ignoredContext, candidate) ->
+                                CompletableFuture.failedFuture(
+                                        new AssertionError("capture not used")),
+                        ready -> CompletableFuture.failedFuture(
+                                new AssertionError("retirement not used")),
+                        attempt -> {
+                            claims.incrementAndGet();
+                            return CompletableFuture.failedFuture(
+                                    new AssertionError("release claim must stay closed"));
+                        },
+                        command -> CompletableFuture.failedFuture(
+                                new AssertionError("projection must stay closed")),
+                        () -> PLANNED,
+                        new ManagedCoopLifecycleMutationGate(() -> false));
+
+        var outcome = dispatcher.release(
+                ManagedCoopRuntimeOperationDispatcher.ReleaseSite.copyOf(context),
+                resident,
+                100L).join();
+
+        assertEquals(DispatchStatus.RELEASE_DEDUPLICATED, outcome.status());
+        assertEquals("managed_coop_runtime_authority_not_ready", outcome.detail());
+        assertEquals(0, claims.get());
+    }
+
+    @Test
     void captureIsReportedOnlyAfterExactSourceRetirementCompletes() {
         AtomicReference<RetirementReady> retired = new AtomicReference<>();
         ManagedCoopRuntimeOperationDispatcher dispatcher = captureDispatcher(ready -> {
@@ -162,13 +227,21 @@ class ManagedCoopRuntimeOperationDispatcherTest {
     private static ManagedCoopRuntimeOperationDispatcher dispatcher(
             ManagedCoopRuntimeOperationDispatcher.ReleaseClaimGateway releases,
             ManagedCoopRuntimeOperationDispatcher.ReleaseProjectionGateway projections) {
+        return dispatcher(releases, projections, new ManagedCoopLifecycleMutationGate());
+    }
+
+    private static ManagedCoopRuntimeOperationDispatcher dispatcher(
+            ManagedCoopRuntimeOperationDispatcher.ReleaseClaimGateway releases,
+            ManagedCoopRuntimeOperationDispatcher.ReleaseProjectionGateway projections,
+            ManagedCoopLifecycleMutationGate gate) {
         return new ManagedCoopRuntimeOperationDispatcher(
                 (store, ref, context, candidate) -> CompletableFuture.failedFuture(
                         new AssertionError("capture not used")),
                 ready -> CompletableFuture.failedFuture(new AssertionError("retirement not used")),
                 releases,
                 projections,
-                () -> PLANNED);
+                () -> PLANNED,
+                gate);
     }
 
     private static ManagedCoopRuntimeOperationDispatcher captureDispatcher(
@@ -234,9 +307,16 @@ class ManagedCoopRuntimeOperationDispatcherTest {
     }
 
     private static ResidentRecord resident(ManagedCoopContext context) {
+        return resident(context, "resident", "profile");
+    }
+
+    private static ResidentRecord resident(
+            ManagedCoopContext context,
+            String residentId,
+            String profileId) {
         return new ResidentRecord(
-                "resident", context.authorityKey(), context.coopId(), 0,
-                "profile", "hen", SOURCE, SOURCE, null,
+                residentId, context.authorityKey(), context.coopId(), 0,
+                profileId, "hen", SOURCE, SOURCE, null,
                 "{}", "a".repeat(64), 1, ResidentState.HOUSED,
                 1L, true, 1L, 0L, 1L, 1L);
     }

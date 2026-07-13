@@ -224,6 +224,38 @@ class ManagedCoopLifecycleRecoveryServiceTest {
     }
 
     @Test
+    void recoveryWaitsWhileAnotherCoopLifecyclePipelineOwnsCompositeEpoch()
+            throws Exception {
+        Fixture fixture = releaseFixture();
+        AtomicInteger recoveryCalls = new AtomicInteger();
+        ManagedCoopLifecycleMutationGate gate = new ManagedCoopLifecycleMutationGate();
+        ManagedCoopLifecycleMutationGate.Lease runtime = gate.tryAcquire("runtime:other-coop");
+        ManagedCoopLifecycleRecoveryService service = new ManagedCoopLifecycleRecoveryService(
+                fixture.evidence(), unexpectedAdvance(), unexpectedRefresh(),
+                ready -> CompletableFuture.completedFuture(null),
+                (ready, resident) -> CompletableFuture.completedFuture(null),
+                operation -> {
+                    recoveryCalls.incrementAndGet();
+                    return CompletableFuture.failedFuture(
+                            new AssertionError("recovery must wait for the lifecycle gate"));
+                },
+                command -> CompletableFuture.failedFuture(
+                        new AssertionError("waiting recovery must not project")),
+                () -> -50L,
+                ignored -> false,
+                gate);
+
+        ManagedCoopLifecycleRecoveryService.Outcome outcome =
+                service.recover("world", List.of(context())).join();
+        gate.release(runtime);
+
+        assertEquals(ManagedCoopLifecycleRecoveryService.RecoveryStatus.WAITING,
+                outcome.status());
+        assertEquals("lifecycle_recovery_operation_in_flight", outcome.detail());
+        assertEquals(0, recoveryCalls.get());
+    }
+
+    @Test
     void disabledRemovedAuthorityRecoversReleaseWithoutPhysicalContext() {
         Fixture fixture = releaseFixture(AuthorityState.DISABLED);
         AtomicInteger recoveryCalls = new AtomicInteger();

@@ -63,6 +63,7 @@ public final class ManagedCoopLifecycleRecoveryService {
     private final ProjectionGateway projections;
     private final LongSupplier clock;
     private final Predicate<String> processReleaseInFlight;
+    private final ManagedCoopLifecycleMutationGate lifecycleGate;
     private final ConcurrentHashMap<String, CompletableFuture<Outcome>> inFlight =
             new ConcurrentHashMap<>();
 
@@ -92,6 +93,24 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
             @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations,
             @Nonnull Predicate<String> processReleaseInFlight) {
+        this(repository, residentIndex, operationIndex, compositeIndexes,
+                entityRetirements, itemRetirements, releaseRecovery, releaseAdapter,
+                releasePopulations, processReleaseInFlight,
+                new ManagedCoopLifecycleMutationGate());
+    }
+
+    ManagedCoopLifecycleRecoveryService(
+            @Nonnull CoopLifecycleOperationRepository repository,
+            @Nonnull ManagedCoopResidentIndex residentIndex,
+            @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
+            @Nonnull ManagedCoopCompositeIndexRefreshService compositeIndexes,
+            @Nonnull ManagedCoopCaptureSourceRetirementService entityRetirements,
+            @Nonnull ManagedCoopItemCaptureRecoveryService itemRetirements,
+            @Nonnull ManagedCoopReleaseRecoveryService releaseRecovery,
+            @Nonnull ManagedCoopReleaseRuntimeAdapter releaseAdapter,
+            @Nonnull ManagedCoopReleasePopulationCoordinator releasePopulations,
+            @Nonnull Predicate<String> processReleaseInFlight,
+            @Nonnull ManagedCoopLifecycleMutationGate lifecycleGate) {
         this(
                 new ManagedCoopLifecycleRecoveryEvidence(
                         new ManagedCoopLifecycleRecoveryPlanner(),
@@ -107,7 +126,8 @@ public final class ManagedCoopLifecycleRecoveryService {
                         releaseAdapter, residentIndex, compositeIndexes,
                         releasePopulations, releaseRecovery::projectionCurrent)::project,
                 System::currentTimeMillis,
-                processReleaseInFlight
+                processReleaseInFlight,
+                lifecycleGate
         );
     }
 
@@ -121,7 +141,8 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ProjectionGateway projections,
             @Nonnull LongSupplier clock) {
         this(evidence, captureAdvances, refresh, entityRetirements, itemRetirements,
-                releaseRecovery, projections, clock, ignored -> false);
+                releaseRecovery, projections, clock, ignored -> false,
+                new ManagedCoopLifecycleMutationGate());
     }
 
     ManagedCoopLifecycleRecoveryService(
@@ -134,6 +155,22 @@ public final class ManagedCoopLifecycleRecoveryService {
             @Nonnull ProjectionGateway projections,
             @Nonnull LongSupplier clock,
             @Nonnull Predicate<String> processReleaseInFlight) {
+        this(evidence, captureAdvances, refresh, entityRetirements, itemRetirements,
+                releaseRecovery, projections, clock, processReleaseInFlight,
+                new ManagedCoopLifecycleMutationGate());
+    }
+
+    ManagedCoopLifecycleRecoveryService(
+            @Nonnull ManagedCoopLifecycleRecoveryEvidence evidence,
+            @Nonnull CaptureAdvanceGateway captureAdvances,
+            @Nonnull RefreshGateway refresh,
+            @Nonnull EntityRetirementGateway entityRetirements,
+            @Nonnull ItemRetirementGateway itemRetirements,
+            @Nonnull ReleaseRecoveryGateway releaseRecovery,
+            @Nonnull ProjectionGateway projections,
+            @Nonnull LongSupplier clock,
+            @Nonnull Predicate<String> processReleaseInFlight,
+            @Nonnull ManagedCoopLifecycleMutationGate lifecycleGate) {
         this.evidence = Objects.requireNonNull(evidence, "evidence");
         this.captureAdvances = Objects.requireNonNull(captureAdvances, "captureAdvances");
         this.refresh = Objects.requireNonNull(refresh, "refresh");
@@ -144,6 +181,7 @@ public final class ManagedCoopLifecycleRecoveryService {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.processReleaseInFlight = Objects.requireNonNull(
                 processReleaseInFlight, "processReleaseInFlight");
+        this.lifecycleGate = Objects.requireNonNull(lifecycleGate, "lifecycleGate");
     }
 
     /** Selects and resumes at most one deterministic active operation for this loaded world. */
@@ -177,11 +215,20 @@ public final class ManagedCoopLifecycleRecoveryService {
                     command.operation().operationId(),
                     "lifecycle_recovery_already_in_flight");
         }
+        ManagedCoopLifecycleMutationGate.Lease lease = lifecycleGate.tryAcquire(
+                "recovery:" + command.operation().operationId());
+        if (lease == null) {
+            inFlight.remove(command.operation().operationId(), proposed);
+            return completed(
+                    RecoveryStatus.WAITING,
+                    command.operation().operationId(),
+                    "lifecycle_recovery_operation_in_flight");
+        }
         final CompletionStage<Outcome> pipeline;
         try {
             pipeline = Objects.requireNonNull(start(command), "recovery pipeline");
         } catch (RuntimeException exception) {
-            finish(command, proposed, new Outcome(
+            finish(command, proposed, lease, new Outcome(
                     RecoveryStatus.FAILED,
                     command.operation().operationId(),
                     detail("lifecycle_recovery_start", exception)));
@@ -193,7 +240,8 @@ public final class ManagedCoopLifecycleRecoveryService {
                                 RecoveryStatus.FAILED,
                                 command.operation().operationId(),
                                 detail("lifecycle_recovery", unwrap(failure))))
-                .whenComplete((outcome, failure) -> finish(command, proposed, outcome))
+                .whenComplete((outcome, failure) -> finish(
+                        command, proposed, lease, outcome))
                 .toCompletableFuture();
         return proposed;
     }
@@ -430,8 +478,10 @@ public final class ManagedCoopLifecycleRecoveryService {
 
     private void finish(RecoveryCommand command,
                         CompletableFuture<Outcome> completion,
+                        ManagedCoopLifecycleMutationGate.Lease lease,
                         @Nullable Outcome outcome) {
         inFlight.remove(command.operation().operationId(), completion);
+        lifecycleGate.release(lease);
         completion.complete(outcome != null ? outcome : new Outcome(
                 RecoveryStatus.FAILED, command.operation().operationId(),
                 "lifecycle_recovery_outcome_missing"));
