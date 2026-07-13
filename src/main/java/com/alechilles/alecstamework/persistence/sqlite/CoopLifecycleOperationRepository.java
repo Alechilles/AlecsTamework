@@ -239,6 +239,15 @@ public final class CoopLifecycleOperationRepository {
         return transactions.commitPopulationRelease(connection, request);
     }
 
+    MutationResult failPopulationReleaseBeforeProjectionInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull PopulationReleaseCommitRequest request,
+            @Nonnull String error,
+            long nowMs) throws SQLException {
+        return transactions.failPopulationReleaseBeforeProjection(
+                connection, request, error, nowMs);
+    }
+
     @Nullable
     public OperationRecord load(@Nonnull String operationId) throws SQLException {
         try (Connection connection = connectionManager.openConnection()) {

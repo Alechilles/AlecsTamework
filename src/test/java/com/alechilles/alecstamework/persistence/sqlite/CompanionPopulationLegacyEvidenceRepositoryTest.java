@@ -106,6 +106,34 @@ class CompanionPopulationLegacyEvidenceRepositoryTest {
         assertEquals(aliasUuid, evidence.getFirst().npcUuid());
     }
 
+    /** Regression: a claimed managed release must retain explicit dormant source evidence. */
+    @Test
+    void releasingManagedResidentEmitsCoopSnapshotEvidence() throws Exception {
+        SqliteConnectionManager connections = migrated("managed-releasing.sqlite");
+        UUID currentNpcUuid = UUID.randomUUID();
+        UUID residentSourceUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Connection connection = connections.openConnection()) {
+            insertProfile(connection, "profile", currentNpcUuid, ownerUuid);
+            insertManagedReleasingResident(connection, "profile", residentSourceUuid);
+        }
+
+        CompanionPopulationLegacyEvidenceRepository.Batch batch =
+                new CompanionPopulationLegacyEvidenceRepository(connections)
+                        .loadBatch(0, 16, "test");
+
+        assertEquals(Set.of(
+                        CompanionPopulationEvidence.Kind.PROFILE_RECORD,
+                        CompanionPopulationEvidence.Kind.COOP_SNAPSHOT),
+                batch.evidence().stream().map(CompanionPopulationEvidence::kind)
+                        .collect(Collectors.toSet()));
+        CompanionPopulationEvidence coop = batch.evidence().stream()
+                .filter(row -> row.kind() == CompanionPopulationEvidence.Kind.COOP_SNAPSHOT)
+                .findFirst().orElseThrow();
+        assertEquals(residentSourceUuid, coop.npcUuid());
+        assertEquals(ownerUuid, coop.ownerUuid());
+    }
+
     private SqliteConnectionManager migrated(String file) throws Exception {
         SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve(file));
         try (Connection connection = connections.openConnection()) {
@@ -149,6 +177,34 @@ class CompanionPopulationLegacyEvidenceRepositoryTest {
             statement.setInt(4, lost ? 1 : 0);
             statement.setInt(5, coop ? 1 : 0);
             statement.executeUpdate();
+        }
+    }
+
+    private static void insertManagedReleasingResident(
+            Connection connection, String profileId, UUID npcUuid) throws Exception {
+        try (PreparedStatement authority = connection.prepareStatement("""
+                INSERT INTO managed_coop_authority (
+                    authority_id, world_name, coop_id, x, y, z, authority_state,
+                    active, import_version, created_at_ms, updated_at_ms, last_error
+                ) VALUES ('default|1|2|3', 'default', 'coop_chicken', 1, 2, 3,
+                          'TWORK_MANAGED', 1, 0, 1, 1, NULL)
+                """)) {
+            authority.executeUpdate();
+        }
+        try (PreparedStatement resident = connection.prepareStatement("""
+                INSERT INTO managed_coop_residents (
+                    resident_id, authority_id, world_name, coop_id, x, y, z, resident_slot,
+                    profile_id, role_id, resident_uuid, source_npc_uuid, deployed_npc_uuid,
+                    snapshot_json, snapshot_hash, snapshot_version, state, generation, active,
+                    captured_at_ms, released_at_ms, created_at_ms, updated_at_ms
+                ) VALUES ('resident', 'default|1|2|3', 'default', 'coop_chicken', 1, 2, 3, 0,
+                          ?, 'tamed_chicken', ?, ?, NULL, '{}', 'hash', 1, 'RELEASING', 1, 1,
+                          1, 0, 1, 2)
+                """)) {
+            resident.setString(1, profileId);
+            resident.setString(2, npcUuid.toString());
+            resident.setString(3, npcUuid.toString());
+            resident.executeUpdate();
         }
     }
 }

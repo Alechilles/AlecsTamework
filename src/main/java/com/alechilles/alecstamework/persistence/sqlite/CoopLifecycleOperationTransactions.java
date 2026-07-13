@@ -302,6 +302,31 @@ final class CoopLifecycleOperationTransactions {
         return applied(requireOperation(connection, operation.operationId()));
     }
 
+    /** Restores an exact claimed release after its coupled population journal is closed. */
+    MutationResult failPopulationReleaseBeforeProjection(
+            Connection connection,
+            PopulationReleaseCommitRequest request,
+            String error,
+            long nowMs) throws SQLException {
+        Objects.requireNonNull(request, "request");
+        OperationRecord operation = store.load(
+                connection, requireText(request.operationId(), "operationId"));
+        String conflict = populationReleasePrecondition(connection, request, operation);
+        if (conflict != null) {
+            return conflict(operation, conflict);
+        }
+        if (operation.state() != OperationState.SPAWN_CLAIMED
+                || operation.actualTargetUuid() != null) {
+            return conflict(operation, "release_projection_may_exist");
+        }
+        return failReleaseBeforeProjection(
+                connection,
+                request.operationId(),
+                request.expectedOperationGeneration(),
+                error,
+                nowMs);
+    }
+
     /** Missing or exclusively failed population rows are the only durable proof no apply ran. */
     private static boolean populationOperationAllowsPreProjectionRollback(
             Connection connection,

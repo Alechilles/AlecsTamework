@@ -13,7 +13,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
- * Bounded reader for profiles, UUID aliases, active snapshots, and occupied coop slots.
+ * Bounded reader for profiles, UUID aliases, active snapshots, and occupied coop residents.
  */
 public final class CompanionPopulationLegacyEvidenceRepository {
     private final SqliteConnectionManager connectionManager;
@@ -34,7 +34,8 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                          COALESCE((SELECT MAX(created_at_ms) FROM npc_snapshots WHERE is_active = 1), 0),
                          COALESCE((SELECT MAX(updated_at_ms) FROM coop_slots), 0),
                          COALESCE((SELECT MAX(updated_at_ms) FROM profile_states), 0),
-                         COALESCE((SELECT MAX(mapped_at_ms) FROM npc_uuid_aliases), 0)
+                         COALESCE((SELECT MAX(mapped_at_ms) FROM npc_uuid_aliases), 0),
+                         COALESCE((SELECT MAX(updated_at_ms) FROM managed_coop_residents), 0)
                      """);
              ResultSet resultSet = statement.executeQuery()) {
             if (!resultSet.next()) {
@@ -46,7 +47,8 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                     + ":" + resultSet.getLong(3)
                     + ":" + resultSet.getLong(4)
                     + ":" + resultSet.getLong(5)
-                    + ":" + resultSet.getLong(6);
+                    + ":" + resultSet.getLong(6)
+                    + ":" + resultSet.getLong(7);
             return new SnapshotDescriptor(total, generation);
         }
     }
@@ -67,6 +69,10 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                              (SELECT a.npc_uuid FROM npc_uuid_aliases a
                               WHERE a.profile_id = p.profile_id
                               ORDER BY a.is_current DESC, a.mapped_at_ms DESC LIMIT 1),
+                             (SELECT m.resident_uuid FROM managed_coop_residents m
+                              WHERE m.profile_id = p.profile_id AND m.active = 1
+                                AND m.state IN ('HOUSED', 'RELEASING')
+                              ORDER BY m.updated_at_ms DESC LIMIT 1),
                              (SELECT c.housed_npc_uuid FROM coop_slots c
                               WHERE c.profile_id = p.profile_id AND c.housed_npc_uuid IS NOT NULL
                               ORDER BY c.updated_at_ms DESC LIMIT 1),
@@ -74,6 +80,11 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                               WHERE c.profile_id = p.profile_id AND c.last_released_npc_uuid IS NOT NULL
                               ORDER BY c.updated_at_ms DESC LIMIT 1)
                          ) AS evidence_npc_uuid,
+                         (SELECT COALESCE(m.source_npc_uuid, m.resident_uuid)
+                          FROM managed_coop_residents m
+                          WHERE m.profile_id = p.profile_id AND m.active = 1
+                            AND m.state IN ('HOUSED', 'RELEASING')
+                          ORDER BY m.updated_at_ms DESC LIMIT 1) AS managed_coop_npc_uuid,
                          p.owner_uuid,
                          p.last_world_name,
                          CASE WHEN COALESCE(ps.capture_active, 0) = 1 OR EXISTS (
@@ -94,6 +105,10 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                          CASE WHEN COALESCE(ps.in_coop, 0) = 1 OR EXISTS (
                                  SELECT 1 FROM coop_slots c
                                  WHERE c.profile_id = p.profile_id AND c.housed_npc_uuid IS NOT NULL
+                             ) OR EXISTS (
+                                 SELECT 1 FROM managed_coop_residents m
+                                 WHERE m.profile_id = p.profile_id AND m.active = 1
+                                   AND m.state IN ('HOUSED', 'RELEASING')
                              ) THEN 1 ELSE 0 END AS coop_active
                      FROM npc_profiles p
                      LEFT JOIN profile_states ps ON ps.profile_id = p.profile_id
@@ -117,6 +132,9 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                     UUID ownerUuid = CompanionPopulationSqlSupport.parseUuid(
                             resultSet.getString("owner_uuid")
                     );
+                    UUID managedCoopUuid = CompanionPopulationSqlSupport.parseUuid(
+                            resultSet.getString("managed_coop_npc_uuid")
+                    );
                     String worldName = resultSet.getString("last_world_name");
                     evidence.add(evidence(
                             profileId, npcUuid, ownerUuid, worldName,
@@ -139,7 +157,8 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                     );
                     addActiveEvidence(
                             evidence, resultSet.getInt("coop_active") != 0,
-                            profileId, npcUuid, ownerUuid, worldName,
+                            profileId, managedCoopUuid == null ? npcUuid : managedCoopUuid,
+                            ownerUuid, worldName,
                             CompanionPopulationEvidence.Kind.COOP_SNAPSHOT, source
                     );
                 }

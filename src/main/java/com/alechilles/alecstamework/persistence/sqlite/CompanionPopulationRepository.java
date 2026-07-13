@@ -88,6 +88,47 @@ public final class CompanionPopulationRepository {
         );
     }
 
+    /**
+     * Closes an unapplied operation and, when coupled to a managed-coop release, restores the
+     * resident and lifecycle claim in the same transaction.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<Boolean> failOperationAsync(
+            @Nonnull CompanionPopulationOperationRecord operation,
+            @Nonnull String error) {
+        return writeQueue.submitTracked(
+                "companion_population_operation_fail",
+                connection -> failOperationInTransaction(connection, operation, error),
+                null);
+    }
+
+    private boolean failOperationInTransaction(
+            Connection connection,
+            CompanionPopulationOperationRecord operation,
+            String error) throws Exception {
+        ManagedCoopPopulationMutationContext.ParsedMutation mutation =
+                ManagedCoopPopulationMutationContext.parse(operation.targetContextJson());
+        if (!journalStore.advance(
+                connection, operation.operationId(), operation.state(),
+                CompanionPopulationOperationRecord.State.FAILED, error)) {
+            return false;
+        }
+        if (mutation == null || mutation.release() == null) {
+            return true;
+        }
+        CoopLifecycleOperationRepository.MutationResult restored =
+                coopLifecycleRepository.failPopulationReleaseBeforeProjectionInTransaction(
+                        connection, mutation.release(), error, System.currentTimeMillis());
+        if (restored == null || !restored.succeeded()
+                || restored.operation() == null
+                || restored.operation().state()
+                != CoopLifecycleOperationRepository.OperationState.FAILED) {
+            throw new IllegalStateException("Managed-coop release recovery failed: "
+                    + (restored == null ? "result_missing" : restored.detail()));
+        }
+        return true;
+    }
+
     /** Completes an exact source-bearing spawn after its world-thread CAS finalizer succeeds. */
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<Boolean> completeSourceFinalizationAsync(

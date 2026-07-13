@@ -283,12 +283,8 @@ public final class CompanionPopulationOperationRecoveryService {
             @Nonnull String reason,
             @Nonnull CompanionPopulationRecoveryAccumulator result
     ) {
-        PersistenceWriteQueue.WriteSubmission<Boolean> submission = repository.advanceOperationAsync(
-                operation.operationId(),
-                operation.state(),
-                CompanionPopulationOperationRecord.State.FAILED,
-                reason
-        );
+        PersistenceWriteQueue.WriteSubmission<Boolean> submission =
+                repository.failOperationAsync(operation, reason);
         return submission.completion().thenAccept(outcome -> {
             if (outcome.isCommitted() && Boolean.TRUE.equals(outcome.value())) {
                 result.canceled();
