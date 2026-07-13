@@ -9,6 +9,7 @@ import com.hypixel.hytale.math.vector.Rotation3fc;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.components.FailedSpawnComponent;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
 import java.util.Objects;
@@ -31,6 +32,8 @@ final class ManagedCoopReleaseProjectionSpawner {
         SPAWNED,
         INVALID_REQUEST,
         ROLE_NOT_FOUND,
+        PRE_ADD_FAILED,
+        ROLE_BUILD_REJECTED,
         SPAWN_FAILED,
         HOLDER_WRITE_FAILED,
         IDENTITY_MISMATCH
@@ -156,10 +159,21 @@ final class ManagedCoopReleaseProjectionSpawner {
                 return work;
             });
         } catch (RuntimeException exception) {
-            Status status = holderWriteAttempted.get() && !holderWriteSucceeded.get()
-                    ? Status.HOLDER_WRITE_FAILED : Status.SPAWN_FAILED;
+            Status status;
+            Throwable detailFailure = exception;
+            if (holderWriteAttempted.get() && !holderWriteSucceeded.get()) {
+                status = Status.HOLDER_WRITE_FAILED;
+            } else if (exception instanceof PreAddCallbackException preAddFailure) {
+                status = Status.PRE_ADD_FAILED;
+                detailFailure = preAddFailure.getCause() != null
+                        ? preAddFailure.getCause() : preAddFailure;
+            } else {
+                status = Status.SPAWN_FAILED;
+            }
+            String stage = status == Status.PRE_ADD_FAILED
+                    ? "managed_release_pre_add" : "managed_release_spawn";
             return new Result(status, holderWriteSucceeded.get(),
-                    failureDetail("managed_release_spawn", exception));
+                    failureDetail(stage, detailFailure));
         }
         if (gatewayResult == null) {
             return new Result(Status.SPAWN_FAILED, holderWriteSucceeded.get(),
@@ -262,23 +276,30 @@ final class ManagedCoopReleaseProjectionSpawner {
             }
             AtomicReference<CoopResidentStateRestorer.PostAddWork> postAdd =
                     new AtomicReference<>();
-            Pair<Ref<EntityStore>, NPCEntity> result;
-            try {
-                result = plugin.spawnEntity(
-                        request.store(),
-                        roleIndex,
-                        request.position(),
-                        request.rotation(),
-                        null,
-                        (npc, holder, callbackStore) ->
-                                postAdd.set(installer.install(npc, holder)),
-                        null);
-            } catch (RuntimeException exception) {
-                throw exception;
-            }
+            AtomicReference<Holder<EntityStore>> preparedHolder = new AtomicReference<>();
+            AtomicReference<NPCEntity> preparedNpc = new AtomicReference<>();
+            Pair<Ref<EntityStore>, NPCEntity> result = plugin.spawnEntity(
+                    request.store(),
+                    roleIndex,
+                    request.position(),
+                    request.rotation(),
+                    null,
+                    (npc, holder, callbackStore) -> {
+                        preparedNpc.set(npc);
+                        preparedHolder.set(holder);
+                        try {
+                            postAdd.set(installer.install(npc, holder));
+                        } catch (RuntimeException exception) {
+                            throw new PreAddCallbackException(exception);
+                        }
+                    },
+                    null);
             if (result == null || result.first() == null || result.second() == null) {
-                return GatewayResult.failed(Status.SPAWN_FAILED,
-                        "managed_release_spawn_handles_missing");
+                RejectedSpawnEvidence evidence = rejectedEvidence(
+                        preparedHolder.get(), preparedNpc.get(), request);
+                Status status = evidence.failedSpawnComponent() || !evidence.roleBuilt()
+                        ? Status.ROLE_BUILD_REJECTED : Status.SPAWN_FAILED;
+                return GatewayResult.failed(status, rejectionDetail(evidence));
             }
             Ref<EntityStore> reference = result.first();
             NPCEntity npc = result.second();
@@ -308,6 +329,73 @@ final class ManagedCoopReleaseProjectionSpawner {
             ComponentType<EntityStore, TameworkProjectionIdentityComponent> type =
                     TameworkProjectionIdentityComponent.getComponentType();
             return type != null ? store.getComponent(reference, type) : null;
+        }
+
+        private static RejectedSpawnEvidence rejectedEvidence(
+                @Nullable Holder<EntityStore> holder,
+                @Nullable NPCEntity npc,
+                @Nonnull Request request) {
+            FailedSpawnComponent failedSpawn = component(
+                    holder, FailedSpawnComponent.getComponentType());
+            UUIDComponent uuid = component(holder, UUIDComponent.getComponentType());
+            TameworkProjectionIdentityComponent marker = component(
+                    holder, TameworkProjectionIdentityComponent.getComponentType());
+            return new RejectedSpawnEvidence(
+                    failedSpawn != null,
+                    npc != null && npc.getRole() != null,
+                    npc != null && npc.isDespawning(),
+                    uuid != null && request.plannedNpcUuid().equals(uuid.getUuid()),
+                    markersEqual(request.marker(), marker)
+            );
+        }
+
+        @Nullable
+        private static <T extends com.hypixel.hytale.component.Component<EntityStore>> T component(
+                @Nullable Holder<EntityStore> holder,
+                @Nullable ComponentType<EntityStore, T> type) {
+            if (holder == null || type == null) {
+                return null;
+            }
+            try {
+                return holder.getComponent(type);
+            } catch (RuntimeException | LinkageError ignored) {
+                return null;
+            }
+        }
+    }
+
+    record RejectedSpawnEvidence(boolean failedSpawnComponent,
+                                 boolean roleBuilt,
+                                 boolean despawning,
+                                 boolean plannedUuidPresent,
+                                 boolean exactMarkerPresent) {
+    }
+
+    static String rejectionDetail(@Nonnull RejectedSpawnEvidence evidence) {
+        Objects.requireNonNull(evidence, "evidence");
+        if (evidence.failedSpawnComponent()) {
+            return "managed_release_role_build_failed_component";
+        }
+        if (!evidence.roleBuilt()) {
+            return "managed_release_role_build_missing_role";
+        }
+        if (evidence.despawning()) {
+            return evidence.plannedUuidPresent() && evidence.exactMarkerPresent()
+                    ? "managed_release_store_rejected_despawning_with_exact_identity"
+                    : "managed_release_store_rejected_despawning_identity_incomplete";
+        }
+        if (!evidence.plannedUuidPresent()) {
+            return "managed_release_store_rejected_planned_uuid_missing";
+        }
+        if (!evidence.exactMarkerPresent()) {
+            return "managed_release_store_rejected_projection_marker_missing";
+        }
+        return "managed_release_store_rejected_with_exact_identity";
+    }
+
+    private static final class PreAddCallbackException extends RuntimeException {
+        private PreAddCallbackException(@Nonnull RuntimeException cause) {
+            super(cause);
         }
     }
 

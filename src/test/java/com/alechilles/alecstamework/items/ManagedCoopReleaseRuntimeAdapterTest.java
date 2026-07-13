@@ -407,6 +407,104 @@ class ManagedCoopReleaseRuntimeAdapterTest {
         assertEquals(1, presentations.get());
     }
 
+    /**
+     * Regression for the live canary where a source alias loaded while the replacement failed
+     * before Store.addEntity. That stale alias must not turn a proven pre-add failure into global
+     * persistence degradation.
+     */
+    @Test
+    void preAddFailureIsDefiniteWithoutASecondLiveIdentityProbe() throws Exception {
+        Bundle bundle = bundle("coop-a");
+        PopulationBackend backend = new PopulationBackend();
+        ManagedCoopReleasePopulationCoordinator populations =
+                new ManagedCoopReleasePopulationCoordinator(
+                        new CoopResidentStateSnapshotCodec(), backend,
+                        (operationId, generation, reason, nowMs) ->
+                                CompletableFuture.completedFuture(
+                                        new MutationResult(
+                                                MutationStatus.APPLIED, null, null)),
+                        () -> 400L);
+        var prepared = populations.prepareAsync(
+                bundle.claim(), bundle.resident(), "world", 0, 0).join().prepared();
+        AtomicInteger guardCalls = new AtomicInteger();
+        ManagedCoopReleaseProjectionSpawner populationSpawner =
+                new ManagedCoopReleaseProjectionSpawner(
+                        new CoopResidentStateRestorer(),
+                        (request, installer) ->
+                                ManagedCoopReleaseProjectionSpawner.GatewayResult.failed(
+                                        ManagedCoopReleaseProjectionSpawner.Status.PRE_ADD_FAILED,
+                                        "managed_release_pre_add_failed:traits"));
+        ManagedCoopReleaseRuntimeAdapter adapter = new ManagedCoopReleaseRuntimeAdapter(
+                new CoopResidentStateSnapshotCodec(),
+                new PlannedNpcProjectionSpawner(),
+                populationSpawner,
+                rejectingOrchestrator(),
+                (request, owningStore) -> {
+                    guardCalls.incrementAndGet();
+                    return LiveIdentityDecision.clearToSpawn();
+                },
+                owningStore -> true,
+                () -> 500L);
+
+        Outcome outcome = adapter.release(
+                bundle.claim(), bundle.resident(), placement(), store,
+                prepared, populations).get(3, TimeUnit.SECONDS);
+
+        assertEquals(ManagedCoopReleaseSpawnOrchestrator.Status.SPAWN_FAILED,
+                outcome.status());
+        assertTrue(outcome.detail().contains("managed_release_pre_add_failed:traits"));
+        assertEquals(1, guardCalls.get());
+        assertEquals(1, backend.claims.get());
+        assertEquals(0, backend.commits.get());
+        assertEquals(0, backend.degraded.get());
+    }
+
+    @Test
+    void definiteStoreRejectionPersistsItsExactGatewayEvidence() throws Exception {
+        Bundle bundle = bundle("coop-a");
+        PopulationBackend backend = new PopulationBackend();
+        ManagedCoopReleasePopulationCoordinator populations =
+                new ManagedCoopReleasePopulationCoordinator(
+                        new CoopResidentStateSnapshotCodec(), backend,
+                        (operationId, generation, reason, nowMs) ->
+                                CompletableFuture.completedFuture(
+                                        new MutationResult(
+                                                MutationStatus.APPLIED, null, null)),
+                        () -> 400L);
+        var prepared = populations.prepareAsync(
+                bundle.claim(), bundle.resident(), "world", 0, 0).join().prepared();
+        ManagedCoopReleaseProjectionSpawner populationSpawner =
+                new ManagedCoopReleaseProjectionSpawner(
+                        new CoopResidentStateRestorer(),
+                        (request, installer) ->
+                                ManagedCoopReleaseProjectionSpawner.GatewayResult.failed(
+                                        ManagedCoopReleaseProjectionSpawner.Status.SPAWN_FAILED,
+                                        "managed_release_store_rejected_with_exact_identity"));
+        AtomicInteger guardCalls = new AtomicInteger();
+        ManagedCoopReleaseRuntimeAdapter adapter = new ManagedCoopReleaseRuntimeAdapter(
+                new CoopResidentStateSnapshotCodec(),
+                new PlannedNpcProjectionSpawner(),
+                populationSpawner,
+                rejectingOrchestrator(),
+                (request, owningStore) -> {
+                    guardCalls.incrementAndGet();
+                    return LiveIdentityDecision.clearToSpawn();
+                },
+                owningStore -> true,
+                () -> 500L);
+
+        Outcome outcome = adapter.release(
+                bundle.claim(), bundle.resident(), placement(), store,
+                prepared, populations).get(3, TimeUnit.SECONDS);
+
+        assertEquals(ManagedCoopReleaseSpawnOrchestrator.Status.SPAWN_FAILED,
+                outcome.status());
+        assertTrue(outcome.detail().contains(
+                "managed_release_store_rejected_with_exact_identity"));
+        assertEquals(2, guardCalls.get());
+        assertEquals(0, backend.degraded.get());
+    }
+
     @Test
     void alternateMarkerEvidenceRemainsAmbiguousAcrossRestartAndNeverSpawns()
             throws Exception {

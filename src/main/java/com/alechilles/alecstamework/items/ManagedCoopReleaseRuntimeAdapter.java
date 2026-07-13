@@ -388,6 +388,10 @@ public final class ManagedCoopReleaseRuntimeAdapter {
         if (result != null && result.spawned()) {
             return SpawnAttempt.spawned(claim.plannedTargetUuid());
         }
+        String spawnFailure = populationSpawnFailure(result);
+        if (definitelyNotInserted(result)) {
+            return SpawnAttempt.failed(spawnFailure);
+        }
         LiveIdentityDecision probe;
         try {
             probe = requireDecision(liveIdentityGuard.inspect(
@@ -398,8 +402,6 @@ public final class ManagedCoopReleaseRuntimeAdapter {
             return SpawnAttempt.ambiguous(failureDetail(
                     "managed_coop_release_post_spawn_probe", exception));
         }
-        String status = result != null && result.status() != null
-                ? result.status().name().toLowerCase(Locale.ROOT) : "missing_result";
         if (probe.status() == LiveIdentityStatus.MATCHING_MARKED_PROJECTION
                 && claim.plannedTargetUuid().equals(probe.observedTargetUuid())
                 && (result == null
@@ -411,13 +413,43 @@ public final class ManagedCoopReleaseRuntimeAdapter {
                 && result != null
                 && result.status()
                 != ManagedCoopReleaseProjectionSpawner.Status.IDENTITY_MISMATCH) {
-            return SpawnAttempt.failed("managed_population_projection_spawn_" + status);
+            return SpawnAttempt.failed(spawnFailure);
         }
         populations.markReadinessDegraded(
                 "managed_coop_release_post_spawn_identity_ambiguous");
-        String detail = probe.detail() != null ? probe.detail()
-                : "managed_population_projection_spawn_" + status;
+        String detail = probe.detail() != null
+                ? boundedDetail(spawnFailure + ":" + probe.detail())
+                : spawnFailure;
         return SpawnAttempt.ambiguous(detail);
+    }
+
+    private static boolean definitelyNotInserted(
+            @Nullable ManagedCoopReleaseProjectionSpawner.Result result) {
+        if (result == null || result.status() == null) {
+            return false;
+        }
+        return switch (result.status()) {
+            case INVALID_REQUEST, ROLE_NOT_FOUND, PRE_ADD_FAILED,
+                    ROLE_BUILD_REJECTED, HOLDER_WRITE_FAILED -> true;
+            case SPAWNED, SPAWN_FAILED, IDENTITY_MISMATCH -> false;
+        };
+    }
+
+    @Nonnull
+    private static String populationSpawnFailure(
+            @Nullable ManagedCoopReleaseProjectionSpawner.Result result) {
+        String status = result != null && result.status() != null
+                ? result.status().name().toLowerCase(Locale.ROOT) : "missing_result";
+        String prefix = "managed_population_projection_spawn_" + status;
+        String detail = result != null ? result.detail() : null;
+        return detail == null || detail.isBlank()
+                ? prefix : boundedDetail(prefix + ":" + detail);
+    }
+
+    @Nonnull
+    private static String boundedDetail(@Nonnull String detail) {
+        String normalized = detail.replace('\r', ' ').replace('\n', ' ').trim();
+        return normalized.length() <= 240 ? normalized : normalized.substring(0, 240);
     }
 
     @Nonnull
