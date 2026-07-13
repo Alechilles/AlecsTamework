@@ -2,15 +2,19 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadResult;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.HousedResidentClaim;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -123,6 +127,38 @@ class CommandLinkedNpcCoopManagedAssignmentTest {
     }
 
     @Test
+    void persistedDeployedAssignmentIsRecallableButStillSuppressesReplacement() throws Exception {
+        try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            PersistedDeployment fixture = persistDeployedAssignment(runtime);
+
+            var managedServices = runtime.getManagedCoopServices();
+            assertTrue(managedServices.residentIndexRefreshService().refresh().refreshed());
+            CommandLinkedNpcCoopService coopService = facade(
+                    runtime, managedServices.residentIndex(), () -> true);
+            assertNull(coopService.getCoopSnapshotForToolOrOwner(fixture.npcUuid(), "wand-a", null));
+
+            CommandNpcIdentityService identityService = new CommandNpcIdentityService(
+                    runtime.getNpcIdentityRepository()::load,
+                    uuid -> new LoadedNpcIdentityIndex.Probe(
+                            uuid, LoadedNpcIdentityIndex.ProbeStatus.ABSENT, List.of())
+            );
+            CommandNpcIdentityService.IdentityResolution identity =
+                    identityService.resolve(fixture.commandRecord());
+            assertEquals(CommandNpcIdentityService.ResolutionStatus.RESOLVED, identity.status());
+            assertTrue(identity.durableState().managedCoop());
+            assertTrue(identity.durableState().managedCoopProjectionRelocatable());
+            assertTrue(identity.durableState().suppressesReplacement());
+            assertFalse(identity.replacementAllowed());
+
+            CommandNpcProfileActionResolver.ActionTarget target =
+                    new CommandNpcProfileActionResolver(identityService)
+                            .resolveRelocation(fixture.commandRecord());
+            assertTrue(target.isActionable());
+            assertEquals(fixture.npcUuid(), target.targetNpcUuid());
+        }
+    }
+
+    @Test
     void untrustedV5IndexFailsClosedInsteadOfFallingBackOrAcceptingLegacyMutation() {
         try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
             UUID npcUuid = UUID.randomUUID();
@@ -187,5 +223,52 @@ class CommandLinkedNpcCoopManagedAssignmentTest {
                 "resident-" + slot, KEY, "coop_chicken", slot, profileId,
                 "tamed_chicken", residentUuid, sourceUuid, deployedUuid,
                 null, "hash", 1, state, 0L, true, 10L, 0L, 1L, 10L);
+    }
+
+    private PersistedDeployment persistDeployedAssignment(TameworkPersistenceRuntime runtime)
+            throws Exception {
+        UUID npcUuid = UUID.randomUUID();
+        NpcProfileRepository profiles = runtime.getNpcProfileRepository();
+        assertTrue(profiles.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                npcUuid, null, null, "tamed_chicken", "Coop Recall", null, true,
+                null, null, null, new String[] {"wand-a"})));
+        assertTrue(runtime.awaitWriteQueueIdle(5_000L));
+        String profileId = profiles.resolveProfileId(npcUuid);
+        assertNotNull(profileId);
+
+        ManagedCoopResidentRepository residents = runtime.getManagedCoopResidentRepository();
+        assertTrue(await(residents.registerAuthority(
+                KEY, "coop_chicken", AuthorityState.TWORK_MANAGED, 1L)).succeeded());
+        assertTrue(await(residents.claimHoused(new HousedResidentClaim(
+                "resident-recall", KEY, "coop_chicken", 0, profileId,
+                "tamed_chicken", npcUuid, "{\"version\":1}", "a".repeat(64), 1, 2L
+        ))).succeeded());
+        ResidentRecord housed = residents.loadById("resident-recall");
+        assertNotNull(housed);
+        assertTrue(await(residents.beginRelease(
+                housed.residentId(), housed.generation(), npcUuid, 3L)).succeeded());
+        ResidentRecord releasing = residents.loadById(housed.residentId());
+        assertNotNull(releasing);
+        assertTrue(await(residents.finishRelease(
+                releasing.residentId(), releasing.generation(), npcUuid, 4L)).succeeded());
+        ResidentRecord deployed = residents.loadById(housed.residentId());
+        assertNotNull(deployed);
+        assertEquals(ResidentState.DEPLOYED, deployed.state());
+        assertEquals(npcUuid, deployed.residentUuid());
+        assertEquals(npcUuid, deployed.deployedNpcUuid());
+        return new PersistedDeployment(npcUuid, new LinkedNpcRecord(
+                npcUuid, profileId, null, "default", null,
+                "Coop Recall", null, "tamed_chicken", null, true, false, null));
+    }
+
+    private <T> T await(PersistenceWriteQueue.WriteSubmission<T> submission) throws Exception {
+        assertTrue(submission.accepted());
+        PersistenceWriteQueue.WriteOutcome<T> outcome =
+                submission.completion().get(5, TimeUnit.SECONDS);
+        assertTrue(outcome.isCommitted(), outcome.failureReason());
+        return outcome.value();
+    }
+
+    private record PersistedDeployment(UUID npcUuid, LinkedNpcRecord commandRecord) {
     }
 }
