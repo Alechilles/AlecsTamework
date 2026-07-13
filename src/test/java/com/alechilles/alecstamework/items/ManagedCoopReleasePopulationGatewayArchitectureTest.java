@@ -54,6 +54,24 @@ class ManagedCoopReleasePopulationGatewayArchitectureTest {
         assertTrue(spawner.contains("Status.HOLDER_WRITE_FAILED"));
     }
 
+    /** Regression: a durable finalization cannot leave scheduler/command indexes on the claim. */
+    @Test
+    void atomicCommitPublishesThePairedFinalizedIndexEpoch() throws Exception {
+        String population = Files.readString(ITEMS.resolve(
+                "ManagedCoopReleasePopulationCoordinator.java"));
+        String composition = Files.readString(ITEMS.resolve(
+                "ManagedCoopRuntimeComposition.java"));
+        int commit = population.indexOf("backend.commit(prepared.backendHandle)");
+        int publish = population.indexOf("publishFinalizedIndexes(result.reason())", commit);
+
+        assertTrue(commit >= 0 && publish > commit);
+        assertTrue(population.contains("finalizedIndexRefresh.refresh()"));
+        assertTrue(population.contains("!finalizedIndexRefresh.isTrusted()"));
+        assertTrue(composition.contains(
+                "services.lifecycleRepository(),\n"
+                        + "                        services.compositeIndexRefreshService())"));
+    }
+
     @Test
     void releaseReplayRequiresProjectionWideIndexProofWithoutUniverseScans()
             throws Exception {

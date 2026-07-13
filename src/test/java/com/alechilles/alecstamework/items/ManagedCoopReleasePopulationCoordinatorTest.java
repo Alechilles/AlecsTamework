@@ -6,19 +6,26 @@ import com.alechilles.alecstamework.items.ManagedCoopReleasePopulationCoordinato
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
 import com.alechilles.alecstamework.ownership.CoopPopulationReleaseAdmissionService.ReleaseRequest;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationKind;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.OperationState;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationResult;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationStatus;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopReadResult;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityRecord;
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.AuthorityState;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -91,6 +98,67 @@ class ManagedCoopReleasePopulationCoordinatorTest {
         assertEquals(1, backend.claims.get());
         assertEquals(1, backend.commits.get());
         assertTrue(backend.degraded.get() > 0);
+    }
+
+    @Test
+    void committedReleasePublishesDeployedResidentAndClearsActiveOperationEpoch() {
+        Bundle bundle = bundle();
+        AtomicBoolean durableFinalized = new AtomicBoolean();
+        ManagedCoopResidentIndex residents = new ManagedCoopResidentIndex();
+        ManagedCoopLifecycleOperationIndex operations =
+                new ManagedCoopLifecycleOperationIndex();
+        ManagedCoopCompositeIndexRefreshService composite =
+                new ManagedCoopCompositeIndexRefreshService(
+                        residents,
+                        operations,
+                        () -> {
+                            ResidentRecord current = durableFinalized.get()
+                                    ? deployed(bundle.resident())
+                                    : bundle.resident();
+                            residents.rebuild(
+                                    ManagedCoopReadResult.loaded(List.of(authority())),
+                                    ManagedCoopReadResult.loaded(List.of(current)));
+                            return new ManagedCoopCompositeIndexRefreshService.ComponentResult(
+                                    ManagedCoopCompositeIndexRefreshService.ComponentStatus.REFRESHED,
+                                    residents.snapshot().revision(), null);
+                        },
+                        () -> {
+                            List<OperationRecord> current = durableFinalized.get()
+                                    ? List.of()
+                                    : List.of(activeRelease(bundle));
+                            operations.rebuild(ManagedCoopReadResult.loaded(current));
+                            return new ManagedCoopCompositeIndexRefreshService.ComponentResult(
+                                    ManagedCoopCompositeIndexRefreshService.ComponentStatus.REFRESHED,
+                                    operations.snapshot().revision(), null);
+                        });
+        assertTrue(composite.refresh().refreshed());
+        assertEquals(ResidentState.RELEASING,
+                residents.snapshot().residentByProfile("profile-a").state());
+        assertNotNull(operations.snapshot().operationByProfile("profile-a"));
+
+        RecordingBackend backend = new RecordingBackend();
+        ManagedCoopReleasePopulationCoordinator coordinator =
+                new ManagedCoopReleasePopulationCoordinator(
+                        new CoopResidentStateSnapshotCodec(), backend,
+                        new RecordingRollback(), composite, () -> -500L);
+        var prepared = coordinator.prepareAsync(
+                bundle.claim(), bundle.resident(), "world", 1, 2).join().prepared();
+        durableFinalized.set(true);
+
+        var committed = coordinator.commitAsync(
+                prepared, bundle.claim(), PLANNED).join();
+
+        assertEquals(ManagedCoopReleaseSpawnOrchestrator.FinalizationStatus.FINALIZED,
+                committed.status());
+        assertTrue(composite.isTrusted());
+        assertEquals(ResidentState.DEPLOYED,
+                residents.snapshot().residentByProfile("profile-a").state());
+        assertNull(operations.snapshot().operationByProfile("profile-a"));
+        ManagedCoopAssignmentQuery.Lookup commandLookup =
+                new ManagedCoopAssignmentQuery(
+                        residents, composite::isTrusted, null).byUuid(PLANNED);
+        assertTrue(commandLookup.managedAssignment());
+        assertNull(commandLookup.snapshot());
     }
 
     @Test
@@ -226,6 +294,30 @@ class ManagedCoopReleasePopulationCoordinatorTest {
                 "coop-a", 2, SOURCE, PLANNED, null, hash,
                 0L, 1L, 1L, OperationState.SPAWN_CLAIMED, 8L, true);
         return new Bundle(claim, resident);
+    }
+
+    private static AuthorityRecord authority() {
+        return new AuthorityRecord(
+                AUTHORITY.authorityId(), AUTHORITY, "coop-a", AuthorityState.TWORK_MANAGED,
+                true, 1, -100L, -90L, null);
+    }
+
+    private static ResidentRecord deployed(ResidentRecord resident) {
+        return new ResidentRecord(
+                resident.residentId(), resident.authorityKey(), resident.coopId(),
+                resident.residentSlot(), resident.profileId(), resident.roleId(), PLANNED,
+                resident.sourceNpcUuid(), PLANNED, resident.snapshotJson(), resident.snapshotHash(),
+                resident.snapshotVersion(), ResidentState.DEPLOYED, 2L, true,
+                resident.capturedAtMs(), -500L, resident.createdAtMs(), -500L);
+    }
+
+    private static OperationRecord activeRelease(Bundle bundle) {
+        return new OperationRecord(
+                bundle.claim().operationId(), OperationKind.RELEASE,
+                bundle.claim().profileId(), AUTHORITY, "coop-a", 2,
+                null, PLANNED, null, OperationState.SPAWN_CLAIMED,
+                bundle.claim().snapshotHash(), 0L, 1L, 0, true,
+                -100L, -90L, 0L, null);
     }
 
     private record Bundle(SpawnReady claim, ResidentRecord resident) {

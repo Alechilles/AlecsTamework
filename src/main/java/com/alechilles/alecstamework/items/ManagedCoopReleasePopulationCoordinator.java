@@ -2,20 +2,16 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.items.ManagedCoopReleaseCoordinator.SpawnReady;
 import com.alechilles.alecstamework.items.ManagedCoopReleaseSpawnOrchestrator.Finalization;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
 import com.alechilles.alecstamework.ownership.CoopPopulationReleaseAdmissionService;
 import com.alechilles.alecstamework.ownership.CoopPopulationReleaseAdmissionService.ReleaseRequest;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.PopulationReleaseCommitRequest;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CoopLifecycleOperationRepository.MutationResult;
-import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopCaptureClaimValidator;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopPopulationMutationContext;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
-import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -94,30 +90,60 @@ public final class ManagedCoopReleasePopulationCoordinator {
             return destinationChunkZ;
         }
     }
-    private final CoopResidentStateSnapshotCodec snapshotCodec;
+    private final ManagedCoopReleasePopulationInputFactory inputs;
     private final AdmissionBackend backend;
     private final ManagedCoopReleaseLifecycleRollbackService lifecycleRollbacks;
+    @Nullable
+    private final ManagedCoopCompositeIndexRefreshService finalizedIndexRefresh;
     private final LongSupplier clock;
+
     public ManagedCoopReleasePopulationCoordinator(
             @Nonnull CoopPopulationReleaseAdmissionService admissions,
             @Nonnull CoopLifecycleOperationRepository lifecycleRepository) {
         this(new CoopResidentPopulationReleaseAdmissionBackend(admissions),
                 new CoopLifecycleReleaseRollbackGateway(lifecycleRepository),
+                null, System::currentTimeMillis);
+    }
+
+    /**
+     * Creates the live coordinator with the paired index publication required after finalization.
+     */
+    public ManagedCoopReleasePopulationCoordinator(
+            @Nonnull CoopPopulationReleaseAdmissionService admissions,
+            @Nonnull CoopLifecycleOperationRepository lifecycleRepository,
+            @Nonnull ManagedCoopCompositeIndexRefreshService finalizedIndexRefresh) {
+        this(new CoopResidentPopulationReleaseAdmissionBackend(admissions),
+                new CoopLifecycleReleaseRollbackGateway(lifecycleRepository),
+                Objects.requireNonNull(finalizedIndexRefresh, "finalizedIndexRefresh"),
                 System::currentTimeMillis);
     }
+
     private ManagedCoopReleasePopulationCoordinator(
             @Nonnull AdmissionBackend backend,
             @Nonnull LifecycleRollbackGateway lifecycleRollback,
+            @Nullable ManagedCoopCompositeIndexRefreshService finalizedIndexRefresh,
             @Nonnull LongSupplier clock) {
-        this(new CoopResidentStateSnapshotCodec(), backend, lifecycleRollback, clock);
+        this(new CoopResidentStateSnapshotCodec(), backend, lifecycleRollback,
+                finalizedIndexRefresh, clock);
     }
+
     ManagedCoopReleasePopulationCoordinator(
             @Nonnull CoopResidentStateSnapshotCodec snapshotCodec,
             @Nonnull AdmissionBackend backend,
             @Nonnull LifecycleRollbackGateway lifecycleRollback,
             @Nonnull LongSupplier clock) {
-        this.snapshotCodec = Objects.requireNonNull(snapshotCodec, "snapshotCodec");
+        this(snapshotCodec, backend, lifecycleRollback, null, clock);
+    }
+
+    ManagedCoopReleasePopulationCoordinator(
+            @Nonnull CoopResidentStateSnapshotCodec snapshotCodec,
+            @Nonnull AdmissionBackend backend,
+            @Nonnull LifecycleRollbackGateway lifecycleRollback,
+            @Nullable ManagedCoopCompositeIndexRefreshService finalizedIndexRefresh,
+            @Nonnull LongSupplier clock) {
+        this.inputs = new ManagedCoopReleasePopulationInputFactory(snapshotCodec, clock);
         this.backend = Objects.requireNonNull(backend, "backend");
+        this.finalizedIndexRefresh = finalizedIndexRefresh;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.lifecycleRollbacks = new ManagedCoopReleaseLifecycleRollbackService(
                 lifecycleRollback, clock);
@@ -134,7 +160,10 @@ public final class ManagedCoopReleasePopulationCoordinator {
         Objects.requireNonNull(resident, "resident");
         final PreparedInput input;
         try {
-            input = input(claim, resident, worldName, chunkX, chunkZ);
+            ManagedCoopReleasePopulationInputFactory.Input created =
+                    inputs.create(claim, resident, worldName, chunkX, chunkZ);
+            input = new PreparedInput(
+                    created.request(), created.durableRequest(), ReleaseFingerprint.from(claim));
         } catch (RuntimeException exception) {
             return completed(PreparationStatus.DENIED, null,
                     failureDetail("population_release_evidence", exception));
@@ -259,8 +288,37 @@ public final class ManagedCoopReleasePopulationCoordinator {
                         : result != null ? result.reason() : "population_release_commit_missing";
                 return Finalization.failed(detail);
             }
-            return Finalization.finalized(result.reason());
+            return publishFinalizedIndexes(result.reason());
         });
+    }
+
+    /**
+     * Publishes DEPLOYED resident and inactive-operation evidence before consumers may treat the
+     * committed projection as complete. Without this paired refresh, the runtime scheduler keeps
+     * the authority blocked on its stale SPAWN_CLAIMED epoch and command queries keep reporting
+     * the released companion as housed.
+     */
+    @Nonnull
+    private Finalization publishFinalizedIndexes(@Nullable String commitDetail) {
+        if (finalizedIndexRefresh == null) {
+            return Finalization.finalized(commitDetail);
+        }
+        final ManagedCoopCompositeIndexRefreshService.RefreshResult refreshed;
+        try {
+            refreshed = finalizedIndexRefresh.refresh();
+        } catch (RuntimeException exception) {
+            markReadinessDegraded("managed_coop_release_finalized_index_refresh_failed");
+            return Finalization.failed(
+                    failureDetail("population_release_finalized_index_refresh", exception));
+        }
+        if (refreshed == null || !refreshed.refreshed()
+                || !finalizedIndexRefresh.isTrusted()) {
+            markReadinessDegraded("managed_coop_release_finalized_index_refresh_rejected");
+            String detail = refreshed != null ? refreshed.detail() : null;
+            return Finalization.failed("population_release_finalized_index_refresh_rejected"
+                    + (detail == null || detail.isBlank() ? "" : ":" + detail));
+        }
+        return Finalization.finalized(commitDetail);
     }
 
     /** Cancels only a definitively pre-spawn admission. */
@@ -341,80 +399,6 @@ public final class ManagedCoopReleasePopulationCoordinator {
         }
     }
 
-    private PreparedInput input(SpawnReady claim,
-                                ResidentRecord resident,
-                                String worldName,
-                                int chunkX,
-                                int chunkZ) {
-        validateClaimResident(claim, resident);
-        String snapshotJson = requireTextPreserving(resident.snapshotJson(), "snapshotJson");
-        String expectedHash = requireText(resident.snapshotHash(), "snapshotHash");
-        if (!expectedHash.equals(claim.snapshotHash())
-                || !expectedHash.equals(
-                ManagedCoopCaptureClaimValidator.snapshotSha256(snapshotJson))) {
-            throw new IllegalArgumentException("resident snapshot hash is not verified");
-        }
-        CoopResidentStateSnapshotCodec.DecodeResult decoded = snapshotCodec.decode(snapshotJson);
-        if (decoded.status() != CoopResidentStateSnapshotCodec.Status.FOUND
-                || decoded.snapshot() == null) {
-            throw new IllegalArgumentException("resident snapshot cannot be decoded");
-        }
-        var snapshot = decoded.snapshot();
-        if (!claim.sourceNpcUuid().equals(snapshot.npcUuid())
-                || !claim.coopId().equalsIgnoreCase(snapshot.coopId())
-                || claim.residentSlot() != snapshot.residentSlot()) {
-            throw new IllegalArgumentException("resident snapshot metadata does not match claim");
-        }
-        TameworkOwnerComponent owner = snapshot.owner();
-        String exactWorld = requireText(worldName, "worldName").toLowerCase(Locale.ROOT);
-        ReleaseRequest request = new ReleaseRequest(
-                claim.sourceNpcUuid(),
-                claim.plannedTargetUuid(),
-                owner != null ? owner.getOwnerId() : null,
-                owner != null ? owner.getOwnerName() : null,
-                exactWorld,
-                chunkX,
-                chunkZ,
-                claim.operationId());
-        PopulationReleaseCommitRequest durable = new PopulationReleaseCommitRequest(
-                claim.operationId(),
-                claim.residentId(),
-                claim.authorityKey(),
-                claim.coopId(),
-                claim.residentSlot(),
-                claim.profileId(),
-                claim.plannedTargetUuid(),
-                claim.plannedTargetUuid(),
-                claim.snapshotHash(),
-                claim.expectedResidentGeneration(),
-                claim.operationGeneration(),
-                clock.getAsLong());
-        return new PreparedInput(request, durable, ReleaseFingerprint.from(claim));
-    }
-
-    private static void validateClaimResident(SpawnReady claim, ResidentRecord resident) {
-        boolean valid = claim.spawnRequired()
-                && claim.operationGeneration() == 1L
-                && claim.actualTargetUuid() == null
-                && !claim.sourceNpcUuid().equals(claim.plannedTargetUuid())
-                && resident.active()
-                && resident.state() == ResidentState.RELEASING
-                && resident.generation() == claim.releasingResidentGeneration()
-                && claim.releasingResidentGeneration()
-                    == claim.expectedResidentGeneration() + 1L
-                && claim.residentId().equals(resident.residentId())
-                && claim.profileId().equals(resident.profileId())
-                && claim.authorityKey().equals(resident.authorityKey())
-                && claim.coopId().equalsIgnoreCase(resident.coopId())
-                && claim.residentSlot() == resident.residentSlot()
-                && claim.sourceNpcUuid().equals(resident.residentUuid())
-                && claim.sourceNpcUuid().equals(resident.sourceNpcUuid())
-                && resident.deployedNpcUuid() == null;
-        if (!valid) {
-            throw new IllegalArgumentException("release claim and resident do not match");
-        }
-    }
-
     private static boolean matches(PreparedRelease prepared, SpawnReady claim) {
         return prepared != null && claim != null
                 && prepared.fingerprint.equals(ReleaseFingerprint.from(claim));
@@ -442,13 +426,6 @@ public final class ManagedCoopReleasePopulationCoordinator {
             throw new IllegalArgumentException(field + " must not be blank");
         }
         return value.trim();
-    }
-
-    private static String requireTextPreserving(@Nullable String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
     }
 
     private record PreparedInput(ReleaseRequest request, PopulationReleaseCommitRequest durableRequest,
