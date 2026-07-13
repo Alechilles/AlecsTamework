@@ -25,7 +25,9 @@ import javax.annotation.Nullable;
  * <p>Ancillary work receives only copied requests. Production is gated by the one release future
  * selected for that coop, allowing its implementation to re-resolve the world and current v5
  * HOUSED residents after the attempt settles. This orchestrator never attaches a continuation
- * that captures a world, store, reference, context, block container, or NPC.</p>
+ * that captures a world, store, reference, context, block container, or NPC. Eligible normal
+ * work dispatches before restart recovery so one stale operation cannot repeatedly monopolize the
+ * shared lifecycle mutation lease and starve unrelated coops.</p>
  */
 public final class ManagedCoopRuntimeSweepOrchestrator {
     public enum SweepStatus {
@@ -106,10 +108,6 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
         Set<String> physicalCoopKeys = activeCoopKeys(contexts.contexts());
         ImportFilter imported = filterImports(
                 chunkStore, world, contexts.contexts(), nowMs);
-        // Import runs first, but pre-existing capture/release operations must still recover or an
-        // import gate waiting for those operations would deadlock the authority indefinitely.
-        boolean recoveryAttempted = startLifecycleRecovery(world, contexts.contexts());
-
         boolean captureDemand = planner.needsCaptureCandidates(
                 imported.ready(), gameHour, nowMs);
         ManagedCoopRuntimeCandidateScanner.ScanResult candidates = captureDemand
@@ -153,6 +151,10 @@ public final class ManagedCoopRuntimeSweepOrchestrator {
         if (plan.checkRemovedCoops()) {
             removedCoops.reconcile(chunkStore, world, physicalCoopKeys, nowMs);
         }
+        // The per-authority admission guard blocks unsafe same-coop overlap. Recovery runs after
+        // normal dispatch so an unfinished operation cannot reacquire the process-wide lease at
+        // the start of every sweep and permanently starve otherwise independent coops.
+        boolean recoveryAttempted = startLifecycleRecovery(world, contexts.contexts());
         String candidateDetail = candidates.status()
                 == ManagedCoopRuntimeCandidateScanner.ScanStatus.COMPLETE
                 ? null : candidates.detail();

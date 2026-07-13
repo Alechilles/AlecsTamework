@@ -60,20 +60,25 @@ class ManagedCoopRuntimeCutoverArchitectureTest {
     }
 
     @Test
-    void restartRecoveryRunsBeforeNormalCaptureAndReleasePlanning() throws Exception {
+    void normalLifecycleDispatchRunsBeforeRestartRecoveryToPreventGlobalLeaseStarvation()
+            throws Exception {
         String source = Files.readString(MAIN.resolve(
                 "ManagedCoopRuntimeSweepOrchestrator.java"));
         String importing = "ImportFilter imported = filterImports";
-        String recovery = "boolean recoveryAttempted = startLifecycleRecovery";
         String planning = "boolean captureDemand = planner.needsCaptureCandidates";
+        String dispatching = "for (CoopPlan coop : plan.coops())";
+        String recovery = "boolean recoveryAttempted = startLifecycleRecovery";
 
         assertTrue(source.contains("interface ImportBehavior"));
         assertTrue(source.contains("interface LifecycleRecoveryBehavior"));
         assertTrue(source.contains("lifecycleRecovery.recover(worldName, contexts)"));
         assertTrue(source.indexOf(importing) >= 0);
+        assertTrue(source.indexOf(planning) >= 0);
+        assertTrue(source.indexOf(dispatching) >= 0);
         assertTrue(source.indexOf(recovery) >= 0);
-        assertTrue(source.indexOf(importing) < source.indexOf(recovery));
-        assertTrue(source.indexOf(recovery) < source.indexOf(planning));
+        assertTrue(source.indexOf(importing) < source.indexOf(planning));
+        assertTrue(source.indexOf(planning) < source.indexOf(dispatching));
+        assertTrue(source.indexOf(dispatching) < source.indexOf(recovery));
     }
 
     @Test
