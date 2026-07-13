@@ -51,6 +51,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed Recall being shown but rejected as unavailable after a released managed-coop companion's chunk unloaded. Deployed residents remain protected by their coop identity while participating in normal Recall relocation.
 - Fixed linked companions removed by destructive external cleanup becoming unrecoverable Recall entries. A complete last-live snapshot now transitions unexpected removals to Lost recovery, while ordinary chunk unloads continue to relocate the original NPC.
 - Fixed handheld capture items losing or delaying a linked companion's panel status when capture clears ownership. Command links are now frozen before the ownership transition, published only after capture succeeds, and shown as captured immediately even while the retired source projection finishes despawning.
 - Fixed bulk owned-NPC spawning racing the population observer, which could falsely report an identity conflict, degrade persistence, and leave the remaining batch operations pending. Startup recovery no longer leaves ownership behind `owner-population-canonical-reload` while retryable observations wait on intentionally quarantined operations, and `/tw npcspawntamed` retries the brief legitimate reload window before reporting a denial.

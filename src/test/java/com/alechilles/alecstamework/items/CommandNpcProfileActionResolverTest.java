@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository;
+import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository.ManagedAssignment;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -147,6 +149,81 @@ class CommandNpcProfileActionResolverTest {
         assertFalse(target.isActionable());
     }
 
+    /** Regression for Recall unavailable after a released coop NPC's chunk unloaded. */
+    @Test
+    void deployedManagedCoopProjectionCanBeRecalledAfterChunkUnload() {
+        UUID npcUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                identity(
+                        "profile-a",
+                        npcUuid,
+                        List.of(npcUuid),
+                        new ManagedAssignment(
+                                "resident-a", "authority-a", 0,
+                                npcUuid, npcUuid, npcUuid, ResidentState.DEPLOYED, 4L
+                        )
+                ),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget target =
+                resolver.resolveRelocation(record(npcUuid, "profile-a"));
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
+        assertTrue(target.isActionable());
+        assertEquals(npcUuid, target.targetNpcUuid());
+    }
+
+    @Test
+    void housedManagedCoopProjectionStillBlocksRelocation() {
+        UUID npcUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                identity(
+                        "profile-a",
+                        npcUuid,
+                        List.of(npcUuid),
+                        new ManagedAssignment(
+                                "resident-a", "authority-a", 0,
+                                npcUuid, npcUuid, null, ResidentState.HOUSED, 4L
+                        )
+                ),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget target =
+                resolver.resolveRelocation(record(npcUuid, "profile-a"));
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, target.status());
+        assertEquals("profile_is_cooped", target.reason());
+        assertFalse(target.isActionable());
+    }
+
+    @Test
+    void deployedManagedCoopProjectionWithStaleCanonicalUuidStillBlocksRelocation() {
+        UUID staleCurrentUuid = UUID.randomUUID();
+        UUID deployedUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                identity(
+                        "profile-a",
+                        staleCurrentUuid,
+                        List.of(staleCurrentUuid, deployedUuid),
+                        new ManagedAssignment(
+                                "resident-a", "authority-a", 0,
+                                deployedUuid, staleCurrentUuid, deployedUuid,
+                                ResidentState.DEPLOYED, 4L
+                        )
+                ),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget target =
+                resolver.resolveRelocation(record(staleCurrentUuid, "profile-a"));
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, target.status());
+        assertEquals("profile_is_cooped", target.reason());
+        assertFalse(target.isActionable());
+    }
+
     private CommandNpcProfileActionResolver resolver(
             NpcIdentityRepository.ProfileIdentity identity,
             CommandNpcIdentityService.LiveNpcProbe liveProbe) {
@@ -167,13 +244,21 @@ class CommandNpcProfileActionResolverTest {
     private NpcIdentityRepository.ProfileIdentity identity(String profileId,
                                                            UUID currentUuid,
                                                            List<UUID> aliases) {
+        return identity(profileId, currentUuid, aliases, null);
+    }
+
+    private NpcIdentityRepository.ProfileIdentity identity(
+            String profileId,
+            UUID currentUuid,
+            List<UUID> aliases,
+            ManagedAssignment managedAssignment) {
         return new NpcIdentityRepository.ProfileIdentity(
                 profileId,
                 currentUuid,
                 aliases,
                 true,
                 new NpcIdentityRepository.ProfileFlags(false, false, false, false, null, null),
-                null,
+                managedAssignment,
                 null
         );
     }

@@ -154,7 +154,7 @@ final class CommandNpcProfileActionResolver {
         if (durable.dead()) {
             return "profile_is_dead";
         }
-        if (durable.legacyCoop() || durable.managedCoop()) {
+        if (durable.legacyCoop() || durable.managedCoopBlocksRelocation()) {
             return "profile_is_cooped";
         }
         if (durable.activeRecovery()) {

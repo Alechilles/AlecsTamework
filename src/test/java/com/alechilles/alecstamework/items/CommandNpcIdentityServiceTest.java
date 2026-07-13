@@ -292,17 +292,19 @@ class CommandNpcIdentityServiceTest {
         UUID replacement = UUID.randomUUID();
         List<CommandNpcIdentityService.DurableStateFlags> blockers = List.of(
                 new CommandNpcIdentityService.DurableStateFlags(
-                        true, false, true, null, false, false, false),
+                        true, false, true, null, false, false, false, false),
                 new CommandNpcIdentityService.DurableStateFlags(
-                        false, true, true, null, false, false, false),
+                        false, true, true, null, false, false, false, false),
                 new CommandNpcIdentityService.DurableStateFlags(
-                        false, false, true, replacement, false, false, false),
+                        false, false, true, replacement, false, false, false, false),
                 new CommandNpcIdentityService.DurableStateFlags(
-                        false, false, true, null, true, false, false),
+                        false, false, true, null, true, false, false, false),
                 new CommandNpcIdentityService.DurableStateFlags(
-                        false, false, true, null, false, true, false),
+                        false, false, true, null, false, true, false, false),
                 new CommandNpcIdentityService.DurableStateFlags(
-                        false, false, true, null, false, false, true)
+                        false, false, true, null, false, true, true, false),
+                new CommandNpcIdentityService.DurableStateFlags(
+                        false, false, true, null, false, false, false, true)
         );
 
         for (CommandNpcIdentityService.DurableStateFlags blocker : blockers) {

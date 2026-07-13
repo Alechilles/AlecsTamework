@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
 import com.alechilles.alecstamework.persistence.sqlite.NpcIdentityRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -29,9 +30,10 @@ final class CommandNpcIdentityService {
                              @Nullable UUID lostReplacementUuid,
                              boolean legacyCoop,
                              boolean managedCoop,
+                             boolean managedCoopProjectionRelocatable,
                              boolean activeRecovery) {
         private static final DurableStateFlags NONE =
-                new DurableStateFlags(false, false, false, null, false, false, false);
+                new DurableStateFlags(false, false, false, null, false, false, false, false);
 
         boolean lostAwaitingRecovery() {
             return lost && lostReplacementUuid == null;
@@ -40,6 +42,11 @@ final class CommandNpcIdentityService {
         boolean suppressesReplacement() {
             return captured || dead || lostReplacementUuid != null
                     || legacyCoop || managedCoop || activeRecovery;
+        }
+
+        /** A released projection remains managed, but is eligible for normal command relocation. */
+        boolean managedCoopBlocksRelocation() {
+            return managedCoop && !managedCoopProjectionRelocatable;
         }
     }
 
@@ -315,10 +322,16 @@ final class CommandNpcIdentityService {
     @Nonnull
     private DurableStateFlags durableFlags(@Nonnull NpcIdentityRepository.ProfileIdentity identity) {
         NpcIdentityRepository.ProfileFlags flags = identity.flags();
+        NpcIdentityRepository.ManagedAssignment assignment = identity.managedAssignment();
         return new DurableStateFlags(
                 flags.captured(), flags.dead(), flags.lost(), flags.lostReplacementUuid(),
                 flags.legacyInCoop(),
-                identity.managedAssignment() != null, identity.activeRecovery() != null
+                assignment != null,
+                assignment != null
+                        && assignment.state() == ResidentState.DEPLOYED
+                        && Objects.equals(assignment.deployedNpcUuid(), identity.currentNpcUuid())
+                        && Objects.equals(assignment.residentUuid(), identity.currentNpcUuid()),
+                identity.activeRecovery() != null
         );
     }
 
