@@ -62,28 +62,37 @@ public final class SpawnerCaptureFinalizerService {
                                    @Nullable String durableContextJson,
                                    @Nullable CaptureCallbacks callbacks) {
         CaptureCallbacks safeCallbacks = callbacks == null ? CaptureCallbacks.NOOP : callbacks;
+        PreparedCapture prepared = prepare(player, config, targetRef, safeCallbacks);
+        return prepared != null && schedule(prepared, durableContextJson, safeCallbacks);
+    }
+
+    @Nullable
+    private PreparedCapture prepare(Player player,
+                                    ItemFeatureConfig config,
+                                    Ref<EntityStore> targetRef,
+                                    CaptureCallbacks callbacks) {
         if (player == null || config == null || targetRef == null || !targetRef.isValid()) {
-            safeCallbacks.onDenied("capture-owner-target-unavailable");
-            return false;
+            callbacks.onDenied("capture-owner-target-unavailable");
+            return null;
         }
         World world = player.getWorld();
         Store<EntityStore> store = world == null || world.getEntityStore() == null
                 ? null
                 : world.getEntityStore().getStore();
         if (store == null) {
-            safeCallbacks.onDenied("capture-owner-store-unavailable");
-            return false;
+            callbacks.onDenied("capture-owner-store-unavailable");
+            return null;
         }
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         UUID npcUuid = npc == null ? null : npc.getUuid();
         if (npc == null || npcUuid == null) {
-            safeCallbacks.onDenied("capture-owner-npc-unavailable");
-            return false;
+            callbacks.onDenied("capture-owner-npc-unavailable");
+            return null;
         }
         OwnerMutationScheduler scheduler = resolveMutationScheduler();
         if (scheduler == null) {
-            safeCallbacks.onDenied("owner-mutation-scheduler-unavailable");
-            return false;
+            callbacks.onDenied("owner-mutation-scheduler-unavailable");
+            return null;
         }
         TameworkOwnerComponent currentOwner = readOwner(targetRef, store);
         UUID retainedOwnerId = config.isCaptureClearsOwner() || currentOwner == null
@@ -95,21 +104,55 @@ public final class SpawnerCaptureFinalizerService {
         OwnerPopulationOperation operation = config.isCaptureClearsOwner()
                 ? OwnerPopulationOperation.OWNER_CLEAR
                 : OwnerPopulationOperation.LIFECYCLE_CHANGE;
+        return new PreparedCapture(
+                player, config, targetRef, store, npcUuid, scheduler,
+                retainedOwnerId, retainedOwnerName, operation
+        );
+    }
+
+    private boolean schedule(PreparedCapture prepared,
+                             @Nullable String durableContextJson,
+                             CaptureCallbacks callbacks) {
+        OwnerMutationScheduler scheduler = prepared.scheduler();
+        OwnerMutationScheduler.MutationCallbacks mutationCallbacks = callbacks(prepared, callbacks);
+        String idempotencyKey = "spawner-capture:" + prepared.npcUuid()
+                + ":clear-owner=" + prepared.config().isCaptureClearsOwner();
+        if (durableContextJson == null || durableContextJson.isBlank()) {
+            return scheduler.schedule(
+                    prepared.targetRef(), prepared.store(),
+                    prepared.retainedOwnerId(), prepared.retainedOwnerName(),
+                    CompanionLifecycleState.CAPTURED, prepared.operation(), false,
+                    idempotencyKey, mutationCallbacks
+            );
+        }
+        return scheduler.scheduleWithDurableContext(
+                prepared.targetRef(), prepared.store(), null, null,
+                prepared.retainedOwnerId(), prepared.retainedOwnerId(),
+                prepared.retainedOwnerName(), CompanionLifecycleState.CAPTURED,
+                prepared.operation(), false, idempotencyKey, durableContextJson,
+                mutationCallbacks
+        );
+    }
+
+    @Nonnull
+    private OwnerMutationScheduler.MutationCallbacks callbacks(
+            PreparedCapture prepared, CaptureCallbacks callbacks) {
+        Player player = prepared.player();
         OwnerMutationScheduler.MutationCallbacks mutationCallbacks =
                 new OwnerMutationScheduler.MutationCallbacks() {
                     @Override
                     public void onDenied(@Nonnull String reason, @Nullable OwnerPopulationDecision decision) {
-                        safeCallbacks.onDenied(reason);
+                        callbacks.onDenied(reason);
                     }
 
                     @Override
                     public boolean beforeApply(@Nonnull String profileId) {
-                        return safeCallbacks.beforeApply(profileId);
+                        return callbacks.beforeApply(profileId);
                     }
 
                     @Override
                     public void onApplyCompensated(@Nonnull String profileId, @Nonnull String reason) {
-                        safeCallbacks.onApplyCompensated(profileId, reason);
+                        callbacks.onApplyCompensated(profileId, reason);
                     }
 
                     @Override
@@ -120,9 +163,9 @@ public final class SpawnerCaptureFinalizerService {
                                 context.npcRef(), NPCEntity.getComponentType()
                         );
                         try {
-                            safeCallbacks.onApplied(profileId, context);
+                            callbacks.onApplied(profileId, context);
                         } finally {
-                            if (config.isCaptureClearsOwner()
+                            if (prepared.config().isCaptureClearsOwner()
                                     && liveNpc != null
                                     && liveNpc.getRole() != null
                                     && liveNpc.getRole().getMarkedEntitySupport() != null) {
@@ -136,38 +179,15 @@ public final class SpawnerCaptureFinalizerService {
                     @Override
                     public void onPopulationCommitted(
                             @Nonnull CompanionPopulationCommitResult result) {
-                        safeCallbacks.onPopulationCommitted(result);
+                        callbacks.onPopulationCommitted(result);
                     }
 
                     @Override
                     public void onDurabilityDegraded(@Nonnull String reason) {
-                        safeCallbacks.onDurabilityDegraded(reason);
+                        callbacks.onDurabilityDegraded(reason);
                     }
                 };
-        String idempotencyKey = "spawner-capture:" + npcUuid
-                + ":clear-owner=" + config.isCaptureClearsOwner();
-        if (durableContextJson == null || durableContextJson.isBlank()) {
-            return scheduler.schedule(
-                    targetRef, store, retainedOwnerId, retainedOwnerName,
-                    CompanionLifecycleState.CAPTURED, operation, false,
-                    idempotencyKey, mutationCallbacks
-            );
-        }
-        return scheduler.scheduleWithDurableContext(
-                targetRef,
-                store,
-                null,
-                null,
-                retainedOwnerId,
-                retainedOwnerId,
-                retainedOwnerName,
-                CompanionLifecycleState.CAPTURED,
-                operation,
-                false,
-                idempotencyKey,
-                durableContextJson,
-                mutationCallbacks
-        );
+        return mutationCallbacks;
     }
 
     @Nullable
@@ -181,6 +201,18 @@ public final class SpawnerCaptureFinalizerService {
                                                     @Nonnull Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
         return type == null ? null : store.getComponent(targetRef, type);
+    }
+
+    private record PreparedCapture(
+            @Nonnull Player player,
+            @Nonnull ItemFeatureConfig config,
+            @Nonnull Ref<EntityStore> targetRef,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull UUID npcUuid,
+            @Nonnull OwnerMutationScheduler scheduler,
+            @Nullable UUID retainedOwnerId,
+            @Nullable String retainedOwnerName,
+            @Nonnull OwnerPopulationOperation operation) {
     }
 
     public interface CaptureCallbacks {
