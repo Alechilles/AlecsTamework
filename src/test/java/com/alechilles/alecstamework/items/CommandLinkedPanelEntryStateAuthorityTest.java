@@ -17,7 +17,7 @@ class CommandLinkedPanelEntryStateAuthorityTest {
         int dead = source.indexOf("deathService.getDeadSnapshotForTool(");
         int captured = source.indexOf("captureService.getCapturedSnapshotForToolOrOwner(");
         int cooped = source.indexOf("coopService.getCoopSnapshotForToolOrOwner(");
-        int loaded = source.indexOf("loadedSnapshotService.buildLoadedEntry(");
+        int loaded = source.indexOf("LinkedNpcEntry loadedEntry = buildLoadedEntry(");
         int lost = source.indexOf("lostService.getLostSnapshot(");
 
         assertTrue(dead >= 0 && captured > dead);

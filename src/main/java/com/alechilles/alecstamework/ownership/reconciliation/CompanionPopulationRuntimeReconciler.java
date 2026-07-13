@@ -26,14 +26,13 @@ public final class CompanionPopulationRuntimeReconciler
     private final ClaimOccupancyIndex claimIndex;
     private final CompanionIdentityResolver identityResolver;
     private final CoalescedCompanionPopulationWriter writer;
-    private final PersistenceHealthService persistenceHealth;
     private final CompanionPopulationObservationPolicy observationPolicy;
+    private final CompanionPopulationObservationFailureReporter failureReporter;
     private final CompanionPopulationIndexReplayService indexReplay;
     private final CompanionLiveEvidenceRevision liveEvidenceRevision;
     private final Object reloadLock = new Object();
     private final Map<String, CompanionPopulationObservation> observationsDuringReload = new HashMap<>();
     private final Map<String, CompanionPopulationObservation> deferredObservations = new HashMap<>();
-    private volatile WarningSink warningSink;
     private boolean canonicalReloadInProgress;
 
     public CompanionPopulationRuntimeReconciler(
@@ -85,15 +84,16 @@ public final class CompanionPopulationRuntimeReconciler
         this.claimIndex = Objects.requireNonNull(claimIndex, "claimIndex");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
         this.writer = Objects.requireNonNull(writer, "writer");
-        this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
+        Objects.requireNonNull(persistenceHealth, "persistenceHealth");
         this.observationPolicy = Objects.requireNonNull(observationPolicy, "observationPolicy");
+        this.failureReporter = new CompanionPopulationObservationFailureReporter(persistenceHealth);
         this.liveEvidenceRevision = Objects.requireNonNull(
                 liveEvidenceRevision, "liveEvidenceRevision");
         this.indexReplay = new CompanionPopulationIndexReplayService(ownerIndex, claimIndex);
     }
 
     public void setWarningSink(@Nullable WarningSink warningSink) {
-        this.warningSink = warningSink;
+        failureReporter.setWarningSink(warningSink == null ? null : warningSink::warn);
         observationPolicy.setWarningSink(warningSink == null ? null : warningSink::warn);
     }
 
@@ -330,9 +330,12 @@ public final class CompanionPopulationRuntimeReconciler
             queued = false;
         }
         if (!queued) {
-            if (persistenceHealth.markDegraded("population-observation-queue-failed")) {
-                warnTerminalFailure(observation, "QUEUE_REJECTED", "observation-queue-failed");
-            }
+            failureReporter.report(
+                    observation,
+                    "population-observation-queue-failed",
+                    "QUEUE_REJECTED",
+                    "observation-queue-failed"
+            );
             ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
             claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
         }
@@ -375,13 +378,12 @@ public final class CompanionPopulationRuntimeReconciler
                         observation.profileId(), observation.currentNpcUuid()
                 );
             } catch (RuntimeException | LinkageError failure) {
-                if (persistenceHealth.markDegraded("population-observation-identity-conflict")) {
-                    warnTerminalFailure(
-                            observation,
-                            "IDENTITY_CACHE_CONFLICT",
-                            failureDetail(failure)
-                    );
-                }
+                failureReporter.report(
+                        observation,
+                        "population-observation-identity-conflict",
+                        "IDENTITY_CACHE_CONFLICT",
+                        CompanionPopulationObservationFailureReporter.failureDetail(failure)
+                );
                 ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
                 claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
                 return;
@@ -406,43 +408,19 @@ public final class CompanionPopulationRuntimeReconciler
         }
         synchronized (reloadLock) {
             CompanionPopulationObservation deferred = deferredObservations.get(observation.profileId());
-            if (sameState(deferred, observation)) {
+            if (CompanionPopulationObservationStateMatcher.matches(deferred, observation)) {
                 deferredObservations.remove(observation.profileId());
             }
         }
         String reason = result.reason() == null ? result.status().name() : result.reason();
-        if (persistenceHealth.markDegraded("population-observation-failed:" + reason)) {
-            warnTerminalFailure(observation, result.status().name(), reason);
-        }
+        failureReporter.report(
+                observation,
+                "population-observation-failed:" + reason,
+                result.status().name(),
+                reason
+        );
         ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
         claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
-    }
-
-    private void warnTerminalFailure(@Nonnull CompanionPopulationObservation observation,
-                                     @Nonnull String status,
-                                     @Nonnull String reason) {
-        WarningSink sink = warningSink;
-        if (sink == null) {
-            return;
-        }
-        try {
-            sink.warn("Companion population observation failed: profile="
-                    + observation.profileId()
-                    + " npc=" + observation.currentNpcUuid()
-                    + " lifecycle=" + observation.lifecycleState()
-                    + " source=" + observation.source()
-                    + " status=" + status
-                    + " reason=" + reason);
-        } catch (RuntimeException ignored) {
-            // The persistence quarantine must not depend on its diagnostic sink.
-        }
-    }
-
-    @Nonnull
-    private static String failureDetail(@Nonnull Throwable failure) {
-        String message = failure.getMessage();
-        return failure.getClass().getSimpleName()
-                + (message == null || message.isBlank() ? "" : ":" + message);
     }
 
     private boolean applyPersistedDeferredObservation(
@@ -451,7 +429,7 @@ public final class CompanionPopulationRuntimeReconciler
     ) {
         synchronized (reloadLock) {
             CompanionPopulationObservation deferred = deferredObservations.get(observation.profileId());
-            if (!sameState(deferred, observation)) {
+            if (!CompanionPopulationObservationStateMatcher.matches(deferred, observation)) {
                 return false;
             }
             deferredObservations.remove(observation.profileId());
@@ -484,19 +462,6 @@ public final class CompanionPopulationRuntimeReconciler
             ));
             return true;
         }
-    }
-
-    private static boolean sameState(@Nullable CompanionPopulationObservation first,
-                                     @Nonnull CompanionPopulationObservation second) {
-        return first != null
-                && first.profileId().equals(second.profileId())
-                && first.currentNpcUuid().equals(second.currentNpcUuid())
-                && Objects.equals(first.ownerUuid(), second.ownerUuid())
-                && Objects.equals(first.ownershipWorldName(), second.ownershipWorldName())
-                && first.lifecycleState() == second.lifecycleState()
-                && Objects.equals(first.physicalWorldName(), second.physicalWorldName())
-                && Objects.equals(first.physicalChunkX(), second.physicalChunkX())
-                && Objects.equals(first.physicalChunkZ(), second.physicalChunkZ());
     }
 
     @Nullable
