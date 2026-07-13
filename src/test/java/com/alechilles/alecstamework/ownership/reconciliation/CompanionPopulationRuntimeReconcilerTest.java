@@ -348,6 +348,55 @@ class CompanionPopulationRuntimeReconcilerTest {
     }
 
     @Test
+    void preparedReplacementAliasKeepsSpawnObservationOnPendingCanonicalProfile() {
+        UUID previousNpcUuid = UUID.randomUUID();
+        UUID plannedNpcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(previousNpcUuid, ownerUuid)) {
+            assertTrue(harness.identities.retainPreparedAlias(
+                    harness.profileId, plannedNpcUuid));
+            OwnerPopulationEntry before = harness.ownerIndex.entry(
+                    harness.profileId).orElseThrow();
+            OwnerPopulationDecision decision = harness.ownerIndex.reserve(
+                    new OwnerPopulationTransitionRequest(
+                            harness.profileId,
+                            before.revision(),
+                            ownerUuid,
+                            "default",
+                            ownerUuid,
+                            "default",
+                            CompanionLifecycleState.ACTIVE,
+                            OwnerPopulationOperation.RESTORE,
+                            OwnerPopulationLimitScope.GLOBAL,
+                            0,
+                            false
+                    )
+            );
+            assertTrue(decision.allowed());
+            assertTrue(harness.ownerIndex.claimForApply(decision.reservation()));
+
+            CompanionPopulationRuntimeReconciler.ObservationOutcome observed =
+                    harness.reconciler.observePhysical(
+                            plannedNpcUuid, ownerUuid, "default", 0, 0,
+                            CompanionLifecycleState.ACTIVE, "managed-coop-release-spawn"
+                    );
+
+            assertEquals(
+                    CompanionPopulationRuntimeReconciler.ObservationOutcome.SUPPRESSED_IN_FLIGHT,
+                    observed
+            );
+            assertEquals(harness.profileId,
+                    harness.identities.resolveProfileId(plannedNpcUuid).orElseThrow());
+            assertEquals(previousNpcUuid,
+                    harness.identities.currentNpcUuid(harness.profileId).orElseThrow());
+            assertEquals(before, harness.ownerIndex.entry(harness.profileId).orElseThrow());
+            assertTrue(harness.ownerIndex.cancel(decision.reservation()));
+            assertTrue(harness.identities.releasePreparedAlias(
+                    harness.profileId, plannedNpcUuid));
+        }
+    }
+
+    @Test
     void removalDuringPendingMutationPersistsAndReplaysAfterCancellation() throws Exception {
         UUID npcUuid = UUID.randomUUID();
         UUID ownerUuid = UUID.randomUUID();
@@ -505,10 +554,12 @@ class CompanionPopulationRuntimeReconcilerTest {
                 liveEvidence
         );
         writer.setListener(reconciler);
-        return new Harness(profileId, ownerIndex, claimIndex, writer, reconciler, liveEvidence);
+        return new Harness(
+                profileId, identities, ownerIndex, claimIndex, writer, reconciler, liveEvidence);
     }
 
     private record Harness(String profileId,
+                           CompanionIdentityResolver identities,
                            OwnerPopulationIndex ownerIndex,
                            ClaimOccupancyIndex claimIndex,
                            CoalescedCompanionPopulationWriter writer,

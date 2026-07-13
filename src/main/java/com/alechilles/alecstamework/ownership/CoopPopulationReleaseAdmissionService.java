@@ -99,6 +99,11 @@ public final class CoopPopulationReleaseAdmissionService {
     }
 
     public boolean claimForSpawn(@Nonnull PreparedRelease prepared) {
+        if (!identityResolver.retainPreparedAlias(
+                prepared.profileId(), prepared.plannedNpcUuid())) {
+            cancelAfterPreparedAliasFailure(prepared);
+            return false;
+        }
         CompanionAdmissionPolicyResolver.Policy current = policyResolver.resolve(
                 OwnerPopulationOperation.RESTORE,
                 true
@@ -106,9 +111,13 @@ public final class CoopPopulationReleaseAdmissionService {
         ClaimLookupSession session = new ClaimLookupSession(
                 current.claimContext(), current.claimLimitPerChunk() > 0, lookupMetrics
         );
-        return coordinator.claimForApply(
+        boolean claimed = coordinator.claimForApply(
                 prepared.admission(), current.settingsRevision(), session
         );
+        if (!claimed && !releasePreparedAlias(prepared)) {
+            markDegraded("coop_release_prepared_identity_release_failed");
+        }
+        return claimed;
     }
 
     @Nonnull
@@ -241,7 +250,42 @@ public final class CoopPopulationReleaseAdmissionService {
     @Nonnull
     public CompletableFuture<Boolean> cancelAsync(@Nonnull PreparedRelease prepared,
                                                    @Nonnull String reason) {
-        return coordinator.cancelAsync(prepared.admission(), reason);
+        return coordinator.cancelAsync(prepared.admission(), reason)
+                .thenApply(canceled -> {
+                    if (Boolean.TRUE.equals(canceled)
+                            && !releasePreparedAlias(prepared)) {
+                        markDegraded("coop_release_prepared_identity_release_failed");
+                        return false;
+                    }
+                    return canceled;
+                });
+    }
+
+    private void cancelAfterPreparedAliasFailure(@Nonnull PreparedRelease prepared) {
+        try {
+            CompletableFuture<Boolean> cancellation = coordinator.cancelAsync(
+                    prepared.admission(), "coop-release-prepared-identity-conflict");
+            if (cancellation == null) {
+                markDegraded("coop_release_prepared_identity_cancel_stage_missing");
+                return;
+            }
+            cancellation.whenComplete((canceled, failure) -> {
+                if (failure != null || !Boolean.TRUE.equals(canceled)) {
+                    markDegraded("coop_release_prepared_identity_cancel_failed");
+                }
+            });
+        } catch (RuntimeException | LinkageError failure) {
+            markDegraded("coop_release_prepared_identity_cancel_failed");
+        }
+    }
+
+    private boolean releasePreparedAlias(@Nonnull PreparedRelease prepared) {
+        try {
+            return identityResolver.releasePreparedAlias(
+                    prepared.profileId(), prepared.plannedNpcUuid());
+        } catch (RuntimeException | LinkageError failure) {
+            return false;
+        }
     }
 
     @Nonnull

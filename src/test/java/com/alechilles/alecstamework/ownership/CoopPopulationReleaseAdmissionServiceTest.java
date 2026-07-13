@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.ownership;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -11,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for canonical dormant-source validation before coop replacement spawn. */
 class CoopPopulationReleaseAdmissionServiceTest {
@@ -164,6 +167,19 @@ class CoopPopulationReleaseAdmissionServiceTest {
                 CoopPopulationReleaseAdmissionService.PreparationDisposition.AMBIGUOUS,
                 CoopPopulationReleaseAdmissionService.PreparationResult.denied(result)
                         .disposition());
+    }
+
+    /** Regression: coop release must expose the planned alias before ECS entity-add observers. */
+    @Test
+    void claimRetainsPreparedAliasBeforeThePopulationCapabilityIsApplied() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/ownership/CoopPopulationReleaseAdmissionService.java"
+        ));
+        int retain = source.indexOf("identityResolver.retainPreparedAlias(");
+        int claim = source.indexOf("coordinator.claimForApply(");
+
+        assertTrue(retain >= 0);
+        assertTrue(claim > retain);
     }
 
     private static CoopPopulationReleaseAdmissionService.ReleaseRequest request(UUID plannedUuid) {
