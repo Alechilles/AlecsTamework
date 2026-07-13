@@ -141,36 +141,6 @@ final class CommandLinkedPanelEntryService {
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
             boolean talentsActionVisible = false;
             boolean talentsActionEnabled = false;
-            if (world != null) {
-                Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
-                if (npcRef != null && npcRef.isValid()) {
-                    NPCEntity npc = safeGetComponent(store, npcRef, NPCEntity.getComponentType());
-                    if (npc != null) {
-                        LinkedNpcEntry loadedEntry = loadedSnapshotService.buildLoadedEntry(
-                                player,
-                                npcRef,
-                                store,
-                                new CommandLoadedNpcStatusSnapshotService.NpcStatusContext(
-                                        record.npcUuid,
-                                        displayName,
-                                        true,
-                                        active,
-                                        hasHome,
-                                        breedingEnabled,
-                                        groupId,
-                                        groupName,
-                                        groupColor,
-                                        record.cachedRoleId,
-                                        record.cachedNameKey
-                                )
-                        );
-                        if (loadedEntry != null) {
-                            entries.add(loadedEntry);
-                            continue;
-                        }
-                    }
-                }
-            }
             if (!loaded && deathService != null) {
                 CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot = deathService.getDeadSnapshotForTool(
                         record.npcUuid,
@@ -234,6 +204,36 @@ final class CommandLinkedPanelEntryService {
                     );
                     if (coopName != null && !coopName.isBlank()) {
                         displayName = coopName;
+                    }
+                }
+            }
+            if (!dead && !captured && !inCoop && world != null) {
+                Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
+                if (npcRef != null && npcRef.isValid()) {
+                    NPCEntity npc = safeGetComponent(store, npcRef, NPCEntity.getComponentType());
+                    if (npc != null) {
+                        LinkedNpcEntry loadedEntry = loadedSnapshotService.buildLoadedEntry(
+                                player,
+                                npcRef,
+                                store,
+                                new CommandLoadedNpcStatusSnapshotService.NpcStatusContext(
+                                        record.npcUuid,
+                                        displayName,
+                                        true,
+                                        active,
+                                        hasHome,
+                                        breedingEnabled,
+                                        groupId,
+                                        groupName,
+                                        groupColor,
+                                        record.cachedRoleId,
+                                        record.cachedNameKey
+                                )
+                        );
+                        if (loadedEntry != null) {
+                            entries.add(loadedEntry);
+                            continue;
+                        }
                     }
                 }
             }

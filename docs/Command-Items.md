@@ -74,7 +74,7 @@ When a player tames a supported NPC, Tamework attempts to auto-link the new comp
 - linked: the notification names the animal and command item that was linked.
 - not linked: the notification names the animal, applicable command item, and crafting bench type.
 
-When a linked companion is placed in a compatible handheld capture item, its linked-panel row remains available and reports `CAPTURED`, including for capture configurations that clear live ownership. Spawning the companion restores its command links and remaps the panel record to the new projection UUID.
+When a linked companion is placed in a compatible handheld capture item, its linked-panel row remains available and reports `CAPTURED` as soon as capture commits, even while the retired source projection finishes despawning and including capture configurations that clear live ownership. Spawning the companion restores its command links and remaps the panel record to the new projection UUID.
 
 ## Command list and steps
 Each `CommandList` entry supports:
