@@ -36,8 +36,12 @@ Capability: `INTERACTION_EXTENSIONS`
 
 - `tamework:model_supports_attachment` is a custom requirement whose `Param` names an attachment slot. Optional `Values` require at least one supported option.
 - `tamework:set_attachment_from_held_item` is a custom effect whose `Param` names an attachment slot and whose `Values` contain exact `ItemId=AttachmentValue` mappings.
+- `tamework:attachment_exchange_available` is a custom requirement whose `Param` names an attachment slot and whose `Values` contain a one-to-one `ItemId=AttachmentValue` mapping. It gates different-value equips and mapped empty-hand removals while rejecting same-value or non-refundable states.
+- `tamework:exchange_attachment` is the matching rollback-capable effect. It consumes the new item, refunds the old exact mapped item on replacement, or refunds the equipped item into an empty active hand on removal.
 
 The attachment effect owns item consumption. It validates the live held item and current model before changing persisted/live attachment state, and it does not consume an item when the mutation fails or is already applied.
+
+The exchange requirement and effect must use identical bijective mappings. Stacked replacements require room for the refund; single-item replacements swap the active slot directly. Values without a reverse mapping, such as appearance-only dynamic attachment values, are intentionally not exchangeable. The generic inventory effects are not a substitute because they do not share the exchange effect's model/persistence/inventory transaction.
 
 ## Runtime Behavior
 - Requirement handlers return `boolean` pass/fail.

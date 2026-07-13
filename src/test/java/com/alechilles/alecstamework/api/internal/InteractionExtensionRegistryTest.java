@@ -99,10 +99,14 @@ class InteractionExtensionRegistryTest {
     void builtInsUseReservedNamespaceAndCannotBeOverridden() {
         InteractionExtensionRegistry registry = new InteractionExtensionRegistry(null);
         registry.registerBuiltInRequirement("tamework:model_supports_attachment", (context, spec) -> true);
+        registry.registerBuiltInRequirement("tamework:attachment_exchange_available", (context, spec) -> true);
         registry.registerBuiltInEffect("tamework:set_attachment_from_held_item", (context, spec) -> true);
+        registry.registerBuiltInEffect("tamework:exchange_attachment", (context, spec) -> true);
 
         assertTrue(registry.listRequirementIds().contains("tamework:model_supports_attachment"));
+        assertTrue(registry.listRequirementIds().contains("tamework:attachment_exchange_available"));
         assertTrue(registry.listEffectIds().contains("tamework:set_attachment_from_held_item"));
+        assertTrue(registry.listEffectIds().contains("tamework:exchange_attachment"));
         assertThrows(IllegalArgumentException.class, () -> registry.registerRequirement(
                 "tamework:model_supports_attachment",
                 (context, spec) -> false

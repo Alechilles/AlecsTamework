@@ -54,4 +54,36 @@ class HeldItemAttachmentInteractionServiceTest {
                 "Blue"
         ));
     }
+
+    @Test
+    void exchangeCurrentValuePrefersStoredSlotAndOtherwiseUsesLiveSlot() {
+        assertEquals("Blue", HeldItemAttachmentInteractionService.resolveCurrentSelection(
+                Map.of("SaddleBlanket", "Blue"),
+                Map.of("SaddleBlanket", "Canada"),
+                "SaddleBlanket"
+        ));
+        assertEquals("Canada", HeldItemAttachmentInteractionService.resolveCurrentSelection(
+                Map.of("Saddle", "Yes"),
+                Map.of("SaddleBlanket", "Canada"),
+                "SaddleBlanket"
+        ));
+    }
+
+    @Test
+    void exchangeUpdateMergesLiveAndStoredSelectionsBeforeChangingTarget() {
+        assertEquals(
+                Map.of(
+                        "Coat", "Brown",
+                        "Temporary", "Visible",
+                        "Saddle", "None",
+                        "SaddleBlanket", "Red"
+                ),
+                HeldItemAttachmentInteractionService.buildExchangeSelections(
+                        Map.of("Coat", "Brown", "Saddle", "None"),
+                        Map.of("Coat", "Black", "Temporary", "Visible", "SaddleBlanket", "Blue"),
+                        "SaddleBlanket",
+                        "Red"
+                )
+        );
+    }
 }

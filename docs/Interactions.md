@@ -186,8 +186,12 @@ Tamework reserves the `tamework:` extension namespace for implementation-owned r
 
 - Requirement `tamework:model_supports_attachment`: set `Param` to an attachment slot. Optional `Values` require at least one listed option to exist on the current model.
 - Effect `tamework:set_attachment_from_held_item`: set `Param` to an attachment slot and provide exact `ItemId=AttachmentValue` entries in `Values`.
+- Requirement `tamework:attachment_exchange_available`: provide the same `Param` and `ItemId=AttachmentValue` mapping as the exchange effect. It matches an equipped-item change only when the held item maps to a different supported value, or an empty-hand removal only when the current value has an exact reverse mapping and the model supports `None`.
+- Effect `tamework:exchange_attachment`: equips, replaces, or removes one mapped attachment. Replacement consumes the new item and refunds the old mapped item; removal puts the refund in the empty active hotbar slot.
 
 The held-item effect revalidates the live hotbar item, validates the slot and option against the current model, preserves unrelated stored selections, applies the live model, persists the selection, and consumes one item. Failed or already-applied mutations do not consume an item. Do not combine it with `RemoveItemsHand`; consumption is part of the built-in effect.
+
+The exchange effect additionally requires a one-to-one mapping so every attachment value resolves back to exactly one refund item. It settles the model, persisted attachment component, held-item consumption, and refund as one rollback-capable operation. This cannot be safely composed from the generic attachment and inventory effects because those effects do not share a transaction. A stacked held item requires inventory room for the refunded item; a one-item stack is swapped directly in the active slot. Unmapped values, including appearance-only dynamic attachment values, are not removed or replaced by this effect.
 
 ```json
 {
@@ -207,6 +211,32 @@ The held-item effect revalidates the live hotbar item, validates the slot and op
   "Effects": {
     "Custom": [{
       "Id": "tamework:set_attachment_from_held_item",
+      "Param": "Saddle",
+      "Values": ["Example_Saddle=Yes"]
+    }]
+  }
+}
+```
+
+For replacement and empty-hand removal, use the exchange requirement and effect together with identical mappings:
+
+```json
+{
+  "Type": "Custom",
+  "Requires": {
+    "All": {
+      "IsTamed": true,
+      "PlayerIsOwner": true,
+      "Custom": [{
+        "Id": "tamework:attachment_exchange_available",
+        "Param": "Saddle",
+        "Values": ["Example_Saddle=Yes"]
+      }]
+    }
+  },
+  "Effects": {
+    "Custom": [{
+      "Id": "tamework:exchange_attachment",
       "Param": "Saddle",
       "Values": ["Example_Saddle=Yes"]
     }]

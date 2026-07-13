@@ -783,9 +783,17 @@ public class Tamework extends JavaPlugin {
                 HeldItemAttachmentInteractionService.MODEL_SUPPORT_REQUIREMENT_ID,
                 heldItemAttachmentInteractions::modelSupportsAttachment
         );
+        interactionExtensionRegistry.registerBuiltInRequirement(
+                HeldItemAttachmentInteractionService.EXCHANGE_AVAILABLE_REQUIREMENT_ID,
+                heldItemAttachmentInteractions::attachmentExchangeAvailable
+        );
         interactionExtensionRegistry.registerBuiltInEffect(
                 HeldItemAttachmentInteractionService.SET_FROM_HELD_ITEM_EFFECT_ID,
                 heldItemAttachmentInteractions::setAttachmentFromHeldItem
+        );
+        interactionExtensionRegistry.registerBuiltInEffect(
+                HeldItemAttachmentInteractionService.EXCHANGE_ATTACHMENT_EFFECT_ID,
+                heldItemAttachmentInteractions::exchangeAttachment
         );
         traitEffectRegistry = new TraitEffectRegistry(getLogger(), persistenceRuntime.getNpcProfileRepository());
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);

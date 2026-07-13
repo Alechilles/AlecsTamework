@@ -11,6 +11,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -26,9 +27,12 @@ import javax.annotation.Nullable;
 public final class HeldItemAttachmentInteractionService {
     public static final String MODEL_SUPPORT_REQUIREMENT_ID = "tamework:model_supports_attachment";
     public static final String SET_FROM_HELD_ITEM_EFFECT_ID = "tamework:set_attachment_from_held_item";
+    public static final String EXCHANGE_AVAILABLE_REQUIREMENT_ID = "tamework:attachment_exchange_available";
+    public static final String EXCHANGE_ATTACHMENT_EFFECT_ID = "tamework:exchange_attachment";
 
     @Nullable
     private final HytaleLogger logger;
+    private final AttachmentExchangeInventoryService exchangeInventory = new AttachmentExchangeInventoryService();
 
     public HeldItemAttachmentInteractionService(@Nullable HytaleLogger logger) {
         this.logger = logger;
@@ -45,6 +49,22 @@ public final class HeldItemAttachmentInteractionService {
                 CompanionModelAttachmentService.resolveModelAsset(context.npcRef(), context.store())
         );
         return supportsOptions(options, slotId.trim(), spec.values());
+    }
+
+    /** Checks whether the player can equip, replace, or remove one mapped attachment right now. */
+    public boolean attachmentExchangeAvailable(@Nonnull InteractionRequirementContext context,
+                                               @Nonnull InteractionRequirementSpec spec) {
+        HeldItemAttachmentMapping mapping = HeldItemAttachmentMapping.parseExchange(spec);
+        AttachmentExchangePlan plan = mapping != null
+                ? resolveExchangePlan(
+                        context.npcRef(),
+                        context.store(),
+                        context.player(),
+                        context.heldItemId(),
+                        mapping
+                )
+                : null;
+        return plan != null && exchangeInventory.canApply(context.player(), plan);
     }
 
     /** Applies one mapped attachment selection and consumes one matching live held item. */
@@ -67,6 +87,25 @@ public final class HeldItemAttachmentInteractionService {
             return false;
         }
         return applyAtomicMutation(context, mapping.slotId(), attachmentValue, liveItemId);
+    }
+
+    /** Atomically exchanges one mapped attachment and its corresponding player item. */
+    public boolean exchangeAttachment(@Nonnull InteractionEffectContext context,
+                                      @Nonnull InteractionEffectSpec spec) {
+        HeldItemAttachmentMapping mapping = HeldItemAttachmentMapping.parseExchange(spec);
+        AttachmentExchangePlan plan = mapping != null
+                ? resolveExchangePlan(
+                        context.npcRef(),
+                        context.store(),
+                        context.player(),
+                        context.heldItemId(),
+                        mapping
+                )
+                : null;
+        if (plan == null || !exchangeInventory.canApply(context.player(), plan)) {
+            return false;
+        }
+        return applyAtomicExchange(context, plan);
     }
 
     private boolean applyAtomicMutation(@Nonnull InteractionEffectContext context,
@@ -126,6 +165,97 @@ public final class HeldItemAttachmentInteractionService {
         return false;
     }
 
+    private boolean applyAtomicExchange(@Nonnull InteractionEffectContext context,
+                                        @Nonnull AttachmentExchangePlan plan) {
+        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
+                TameworkAttachmentsComponent.getComponentType();
+        if (attachmentsType == null) {
+            return false;
+        }
+
+        TameworkAttachmentsComponent previousStored = context.store().getComponent(context.npcRef(), attachmentsType);
+        Map<String, String> previousLive = CompanionModelAttachmentService.resolveCurrentAttachments(
+                context.npcRef(),
+                context.store()
+        );
+        Map<String, String> updatedSelections = buildExchangeSelections(
+                previousStored != null ? previousStored.getAttachmentIds() : null,
+                previousLive,
+                plan.slotId(),
+                plan.targetValue()
+        );
+        boolean modelApplied = false;
+        try {
+            NPCEntity npc = context.store().getComponent(context.npcRef(), NPCEntity.getComponentType());
+            modelApplied = CompanionModelAttachmentService.applyAttachments(
+                    context.npcRef(),
+                    npc,
+                    context.store(),
+                    updatedSelections
+            );
+            if (!modelApplied) {
+                return false;
+            }
+            context.store().putComponent(
+                    context.npcRef(),
+                    attachmentsType,
+                    new TameworkAttachmentsComponent(
+                            previousStored != null ? previousStored.getConfigId() : null,
+                            updatedSelections
+                    )
+            );
+            if (exchangeInventory.apply(context.player(), plan)) {
+                return true;
+            }
+        } catch (RuntimeException | LinkageError error) {
+            logFailure("Failed to apply attachment exchange mutation.", error);
+        }
+
+        if (modelApplied) {
+            rollback(context.npcRef(), context.store(), attachmentsType, previousStored, previousLive);
+        }
+        return false;
+    }
+
+    @Nullable
+    private AttachmentExchangePlan resolveExchangePlan(@Nonnull Ref<EntityStore> npcRef,
+                                                       @Nonnull Store<EntityStore> store,
+                                                       @Nullable Player player,
+                                                       @Nullable String capturedHeldItemId,
+                                                       @Nonnull HeldItemAttachmentMapping mapping) {
+        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
+                TameworkAttachmentsComponent.getComponentType();
+        if (attachmentsType == null || player == null) {
+            return null;
+        }
+        Map<String, Set<String>> options = CompanionModelAttachmentService.resolveAttachmentOptionIds(
+                CompanionModelAttachmentService.resolveModelAsset(npcRef, store)
+        );
+        Set<String> supportedValues = options.get(mapping.slotId());
+        if (supportedValues == null) {
+            return null;
+        }
+        TameworkAttachmentsComponent stored = store.getComponent(npcRef, attachmentsType);
+        Map<String, String> storedSelections = stored != null ? stored.getAttachmentIds() : Map.of();
+        Map<String, String> liveSelections = CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
+        String currentValue = resolveCurrentSelection(
+                storedSelections,
+                liveSelections,
+                mapping.slotId()
+        );
+        ItemStack liveItem = PlayerInventoryAccess.getActiveHotbarItem(player);
+        String liveItemId = liveItem != null && !liveItem.isEmpty() ? liveItem.getItemId() : null;
+        int liveQuantity = liveItemId != null ? liveItem.getQuantity() : 0;
+        return AttachmentExchangePlan.resolve(
+                mapping,
+                currentValue,
+                liveItemId,
+                liveQuantity,
+                capturedHeldItemId,
+                supportedValues
+        );
+    }
+
     private boolean supports(@Nonnull Ref<EntityStore> npcRef,
                              @Nonnull Store<EntityStore> store,
                              @Nonnull String slotId,
@@ -172,6 +302,32 @@ public final class HeldItemAttachmentInteractionService {
         HashMap<String, String> updated = new HashMap<>();
         if (base != null) {
             updated.putAll(base);
+        }
+        updated.put(slotId, attachmentValue);
+        return Map.copyOf(updated);
+    }
+
+    @Nullable
+    static String resolveCurrentSelection(@Nullable Map<String, String> storedSelections,
+                                          @Nullable Map<String, String> liveSelections,
+                                          @Nonnull String slotId) {
+        if (storedSelections != null && storedSelections.containsKey(slotId)) {
+            return storedSelections.get(slotId);
+        }
+        return liveSelections != null ? liveSelections.get(slotId) : null;
+    }
+
+    @Nonnull
+    static Map<String, String> buildExchangeSelections(@Nullable Map<String, String> storedSelections,
+                                                       @Nullable Map<String, String> liveSelections,
+                                                       @Nonnull String slotId,
+                                                       @Nonnull String attachmentValue) {
+        HashMap<String, String> updated = new HashMap<>();
+        if (liveSelections != null) {
+            updated.putAll(liveSelections);
+        }
+        if (storedSelections != null) {
+            updated.putAll(storedSelections);
         }
         updated.put(slotId, attachmentValue);
         return Map.copyOf(updated);

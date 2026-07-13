@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
+import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -62,5 +63,37 @@ class HeldItemAttachmentMappingTest {
 
         assertEquals(1, mapping.size());
         assertEquals("Yes", mapping.resolve("AH_Saddle"));
+    }
+
+    @Test
+    void reversibleMappingsResolveExactRefundItems() {
+        HeldItemAttachmentMapping mapping = HeldItemAttachmentMapping.parseExchange(
+                new InteractionRequirementSpec(
+                        "tamework:attachment_exchange_available",
+                        "SaddleBlanket",
+                        List.of(
+                                "Cloth_Block_Wool_Blue=Blue",
+                                "Cloth_Block_Wool_Red=Red"
+                        ),
+                        null
+                )
+        );
+
+        assertEquals("Cloth_Block_Wool_Blue", mapping.resolveItemId("Blue"));
+        assertEquals("Cloth_Block_Wool_Red", mapping.resolveItemId("Red"));
+        assertNull(mapping.resolveItemId("Canada"));
+    }
+
+    @Test
+    void exchangeMappingsRejectAmbiguousRefundValues() {
+        assertNull(HeldItemAttachmentMapping.parseExchange(new InteractionEffectSpec(
+                "tamework:exchange_attachment",
+                "SaddleBlanket",
+                List.of(
+                        "Cloth_Block_Wool_Blue=Blue",
+                        "Example_Other_Blue=Blue"
+                ),
+                null
+        )));
     }
 }
