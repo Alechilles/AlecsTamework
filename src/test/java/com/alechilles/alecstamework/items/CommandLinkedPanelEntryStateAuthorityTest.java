@@ -27,5 +27,7 @@ class CommandLinkedPanelEntryStateAuthorityTest {
         assertTrue(lost > loaded,
                 "Lost remains a missing-projection fallback after authoritative stored and live states.");
         assertTrue(source.contains("if (!dead && !captured && !inCoop && world != null)"));
+        assertTrue(source.contains("liveTargetResolver.resolveRedirect(record)"),
+                "A released projection must be retried through its canonical profile UUID.");
     }
 }

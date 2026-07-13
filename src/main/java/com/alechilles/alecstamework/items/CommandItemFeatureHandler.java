@@ -165,6 +165,16 @@ public final class CommandItemFeatureHandler {
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
         this.npcNameResolver = new CommandNpcNameResolver();
         this.linkPolicyService = new CommandLinkPolicyService();
+        this.npcExistenceService = stateSnapshotService != null
+                ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
+                : new CommandNpcExistenceService();
+        CommandNpcIdentityService npcIdentityService = persistenceRuntime != null
+                ? new CommandNpcIdentityService(
+                        persistenceRuntime.getNpcIdentityRepository(), npcExistenceService)
+                : null;
+        this.profileActionResolver = npcIdentityService != null
+                ? new CommandNpcProfileActionResolver(npcIdentityService)
+                : null;
         this.panelEntryService = new CommandLinkedPanelEntryService(
                 linkedNpcRecordStore,
                 deathService,
@@ -174,7 +184,8 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 npcNameResolver,
                 linkPolicyService,
-                this.groupService
+                this.groupService,
+                profileActionResolver
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.panelPreferenceService = new CommandPanelPreferenceService();
@@ -208,17 +219,7 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 npcNameResolver
         );
-        this.npcExistenceService = stateSnapshotService != null
-                ? new CommandNpcExistenceService(stateSnapshotService.getLoadedNpcIdentityIndex())
-                : new CommandNpcExistenceService();
         this.canonicalRecordCommitGate = new CommandCanonicalRecordCommitGate();
-        CommandNpcIdentityService npcIdentityService = persistenceRuntime != null
-                ? new CommandNpcIdentityService(
-                        persistenceRuntime.getNpcIdentityRepository(), npcExistenceService)
-                : null;
-        this.profileActionResolver = npcIdentityService != null
-                ? new CommandNpcProfileActionResolver(npcIdentityService)
-                : null;
         this.inventoryRepairService =
                 new CommandLinkedNpcInventoryRepairService(registry, profileActionResolver);
         this.recipientService = new CommandRecipientService(
