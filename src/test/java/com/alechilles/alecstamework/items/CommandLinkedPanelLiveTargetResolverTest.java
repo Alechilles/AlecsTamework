@@ -52,7 +52,14 @@ class CommandLinkedPanelLiveTargetResolverTest {
                 null
         );
         CommandNpcIdentityService identityService = new CommandNpcIdentityService(
-                (profileId, uuid) -> NpcIdentityRepository.IdentityLoadResult.found(identity),
+                (profileId, uuid) -> new NpcIdentityRepository.IdentityLoadResult(
+                        NpcIdentityRepository.LoadStatus.FOUND,
+                        identity,
+                        null,
+                        null,
+                        null,
+                        null
+                ),
                 probe
         );
         return new CommandLinkedPanelLiveTargetResolver(
