@@ -48,20 +48,45 @@ class ReleaseSample:
     body_gain: float
     body_boost_db: float
     fade_out_s: float
+    impact_strength: float
 
 
 RELEASE_SAMPLES = (
     ReleaseSample(
-        "Tamework_AvatarFlight_Launch_Release_Partial.ogg",
-        0.72, 0.20, 1.06, 120, 0.68, 0.52, 0.5, 0.18,
+        filename="Tamework_AvatarFlight_Launch_Release_Partial.ogg",
+        duration_s=0.72,
+        main_start_s=0.20,
+        pitch=1.06,
+        highpass_hz=120,
+        snap_gain=0.68,
+        body_gain=0.52,
+        body_boost_db=0.5,
+        fade_out_s=0.18,
+        impact_strength=0.55,
     ),
     ReleaseSample(
-        "Tamework_AvatarFlight_Launch_Release_Mid.ogg",
-        0.90, 0.13, 1.00, 80, 0.82, 0.82, 2.0, 0.22,
+        filename="Tamework_AvatarFlight_Launch_Release_Mid.ogg",
+        duration_s=0.90,
+        main_start_s=0.13,
+        pitch=1.00,
+        highpass_hz=80,
+        snap_gain=0.82,
+        body_gain=0.82,
+        body_boost_db=2.0,
+        fade_out_s=0.22,
+        impact_strength=0.78,
     ),
     ReleaseSample(
-        "Tamework_AvatarFlight_Launch_Release_Full.ogg",
-        1.16, 0.04, 0.94, 55, 0.96, 1.16, 4.0, 0.28,
+        filename="Tamework_AvatarFlight_Launch_Release_Full.ogg",
+        duration_s=1.16,
+        main_start_s=0.04,
+        pitch=0.94,
+        highpass_hz=55,
+        snap_gain=0.96,
+        body_gain=1.16,
+        body_boost_db=4.0,
+        fade_out_s=0.28,
+        impact_strength=1.0,
     ),
 )
 
@@ -121,6 +146,42 @@ def cancel_cue(rng: np.random.Generator) -> np.ndarray:
     flutter = 0.72 + 0.28 * np.sin(2.0 * math.pi * (6.0 * time - 2.2 * time * time))
     output = 0.78 * noise * envelope * flutter + 0.09 * falling
     return normalize(fade(output, 0.008, 0.09), -2.0)
+
+
+def release_impact(strength: float, seed_offset: int) -> np.ndarray:
+    duration = 0.24
+    time = np.arange(int(duration * SAMPLE_RATE)) / SAMPLE_RATE
+    rng = np.random.default_rng(SEED + 0xB017 + seed_offset)
+
+    air_noise = rng.normal(0.0, 1.0, len(time))
+    pressure_noise = rng.normal(0.0, 1.0, len(time))
+    attack = np.sin(
+        np.clip(time / 0.0035, 0.0, 1.0) * math.pi / 2.0
+    ) ** 2
+
+    air = bandpass(air_noise, 160.0, 3_200.0)
+    air *= attack * np.exp(-time / (0.040 + 0.014 * strength))
+
+    crack = bandpass(np.roll(air_noise, 173), 600.0, 4_200.0)
+    crack *= attack * np.exp(-time / 0.020)
+
+    pressure = bandpass(pressure_noise, 48.0, 620.0)
+    pressure *= attack * np.exp(-time / (0.080 + 0.025 * strength))
+
+    start_hz = 112.0 - 14.0 * strength
+    end_hz = 46.0
+    frequency = end_hz + (start_hz - end_hz) * np.exp(-13.0 * time)
+    phase = 2.0 * math.pi * np.cumsum(frequency) / SAMPLE_RATE
+    thump_envelope = attack * np.exp(-time / (0.090 + 0.035 * strength))
+    thump = (np.sin(phase) + 0.20 * np.sin(2.0 * phase)) * thump_envelope
+
+    output = (
+        (0.95 + 0.25 * strength) * air
+        + 0.05 * crack
+        + (0.20 + 0.15 * strength) * pressure
+        + (0.28 + 0.22 * strength) * thump
+    )
+    return normalize(fade(output, 0.0015, 0.055), -1.0)
 
 
 def write_wav(path: Path, samples: np.ndarray) -> None:
@@ -240,8 +301,8 @@ def encode_sampled_ready(ffmpeg: str, source_path: Path, ogg_path: Path) -> None
     normalize_ogg_serial(ogg_path, 0xA11EC)
 
 
-def encode_sampled_release(ffmpeg: str, source_path: Path, ogg_path: Path,
-                           sample: ReleaseSample) -> None:
+def encode_sampled_release(ffmpeg: str, source_path: Path, impact_path: Path,
+                           ogg_path: Path, sample: ReleaseSample) -> None:
     pitched_rate = round(SAMPLE_RATE * sample.pitch)
     restore_tempo = 1.0 / sample.pitch
     fade_out_start = sample.duration_s - sample.fade_out_s
@@ -254,19 +315,23 @@ def encode_sampled_release(ffmpeg: str, source_path: Path, ogg_path: Path,
         f"highpass=f={sample.highpass_hz}:p=2,lowpass=f=9500:p=2,"
         "acompressor=threshold=0.10:ratio=2.4:attack=4:release=90:makeup=1.2,"
         "afade=t=in:st=0:d=0.004,"
-        f"afade=t=out:st={fade_out_start}:d={sample.fade_out_s}[main]",
+        f"afade=t=out:st={fade_out_start}:d={sample.fade_out_s},"
+        "adelay=18[main]",
         "[snap_in]atrim=start=0.18:duration=0.24,asetpts=PTS-STARTPTS,"
         "atempo=1.6,highpass=f=650:p=2,lowpass=f=11500:p=2,"
         "acompressor=threshold=0.08:ratio=3.2:attack=1:release=35:makeup=1.35,"
         "afade=t=in:st=0:d=0.002,afade=t=out:st=0.075:d=0.075,"
-        f"volume={sample.snap_gain}[snap]",
+        f"volume={sample.snap_gain},adelay=12[snap]",
         "[body_in]atrim=start=0.14:duration=0.52,asetpts=PTS-STARTPTS,"
         "atempo=1.35,highpass=f=45:p=2,lowpass=f=650:p=2,"
         f"equalizer=f=160:t=q:w=0.85:g={sample.body_boost_db},"
         "afade=t=in:st=0:d=0.004,afade=t=out:st=0.12:d=0.265,"
-        f"volume={sample.body_gain}[body]",
-        "[main][snap][body]amix=inputs=3:duration=longest:normalize=0,"
-        "acompressor=threshold=0.12:ratio=2.5:attack=3:release=80:makeup=1.2,"
+        f"volume={sample.body_gain},adelay=18[body]",
+        "[1:a]atrim=start=0:duration=0.24,asetpts=PTS-STARTPTS,"
+        "highpass=f=35:p=2,lowpass=f=5200:p=2,"
+        f"volume={0.88 + 0.52 * sample.impact_strength:.3f}[impact]",
+        "[main][snap][body][impact]amix=inputs=4:duration=longest:normalize=0,"
+        "acompressor=threshold=0.15:ratio=2.0:attack=14:release=95:makeup=1.1,"
         f"atrim=start=0:duration={sample.duration_s},"
         f"afade=t=out:st={fade_out_start}:d={sample.fade_out_s},"
         "loudnorm=I=-18:TP=-3.5:LRA=4[out]",
@@ -280,6 +345,8 @@ def encode_sampled_release(ffmpeg: str, source_path: Path, ogg_path: Path,
             "-y",
             "-i",
             str(source_path),
+            "-i",
+            str(impact_path),
             "-filter_complex",
             filters,
             "-map",
@@ -364,12 +431,23 @@ def generate(output_root: Path, ffmpeg: str, wind_source: Path,
     ready_output = output_root / "Tamework_AvatarFlight_Launch_Ready.ogg"
     encode_sampled_ready(ffmpeg, ready_source, ready_output)
     print(f"generated {ready_output}")
-    for release_sample in RELEASE_SAMPLES:
-        output_path = output_root / release_sample.filename
-        encode_sampled_release(ffmpeg, release_source, output_path, release_sample)
-        print(f"generated {output_path}")
     with tempfile.TemporaryDirectory(prefix="tamework-launch-audio-") as temporary:
         temporary_root = Path(temporary)
+        for index, release_sample in enumerate(RELEASE_SAMPLES):
+            impact_path = temporary_root / f"release-impact-{index}.wav"
+            write_wav(
+                impact_path,
+                release_impact(release_sample.impact_strength, index),
+            )
+            output_path = output_root / release_sample.filename
+            encode_sampled_release(
+                ffmpeg,
+                release_source,
+                impact_path,
+                output_path,
+                release_sample,
+            )
+            print(f"generated {output_path}")
         for filename, samples in sounds.items():
             wav_path = temporary_root / filename.replace(".ogg", ".wav")
             write_wav(wav_path, samples)
