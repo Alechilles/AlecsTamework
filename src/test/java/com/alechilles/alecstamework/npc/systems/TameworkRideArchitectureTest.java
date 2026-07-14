@@ -71,6 +71,7 @@ class TameworkRideArchitectureTest {
         assertTrue(plugin.contains("MountedRidePacketHandler::new"));
         assertFalse(plugin.contains("MountedRideMountMovementPacketFilter.register()"));
         assertFalse(plugin.contains("PacketAdapters.deregisterInbound(rideMountMovementPacketFilter)"));
+        assertTrue(registrar.contains("BuilderBodyMotionTameworkFlyingOrbit.BUILDER_ID"));
         assertTrue(registrar.contains("BuilderBodyMotionTameworkRide.BUILDER_ID"));
         assertTrue(registrar.contains("BuilderMotionControllerTameworkFly.BUILDER_ID"));
         assertTrue(registrar.contains("BuilderMotionControllerTameworkRideWalk.BUILDER_ID"));

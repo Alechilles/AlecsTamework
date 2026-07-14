@@ -25,6 +25,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkFlyingOrbit;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkMountedGlide;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFly;
@@ -196,6 +197,10 @@ public final class TameworkNpcBuilderRegistrar {
             plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Body motion factory missing.");
         } else {
             plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Body motion factory ready.");
+            bodyMotionFactory.add(
+                    BuilderBodyMotionTameworkFlyingOrbit.BUILDER_ID,
+                    BuilderBodyMotionTameworkFlyingOrbit::new
+            );
             bodyMotionFactory.add(
                     BuilderBodyMotionTameworkMountedGlide.BUILDER_ID,
                     BuilderBodyMotionTameworkMountedGlide::new
