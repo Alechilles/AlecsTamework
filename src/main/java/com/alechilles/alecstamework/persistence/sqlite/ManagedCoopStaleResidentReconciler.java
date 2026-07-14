@@ -14,21 +14,32 @@ import java.util.Objects;
 import javax.annotation.Nonnull;
 
 /**
- * Retires legacy deployed coop rows disproved by canonical companion lifecycle and UUID authority.
+ * Retires legacy coop rows disproved by canonical companion lifecycle and UUID authority.
  *
- * <p>This reconciliation runs before managed-coop indexes are published. It deliberately ignores
- * ambiguous rows, cooped population rows, and any profile or slot with an active coop operation.</p>
+ * <p>This reconciliation runs before managed-coop indexes are published. It repairs deployed rows
+ * whose companion became captured, dead, or lost and housed rows whose canonical companion is
+ * definitely outside the coop. Ambiguous population rows and active coop operations are ignored.</p>
  */
-final class ManagedCoopStaleDeploymentReconciler {
+final class ManagedCoopStaleResidentReconciler {
     private static final String REPAIRABLE_PREDICATE = """
-            r.active = 1 AND r.state = 'DEPLOYED'
-              AND r.deployed_npc_uuid IS NOT NULL
-              AND r.resident_uuid = r.deployed_npc_uuid
+            r.active = 1
               AND p.current_npc_uuid IS NOT NULL
               AND (
-                  s.lifecycle_state = 'CAPTURED'
-                  OR (s.lifecycle_state <> 'COOP'
-                      AND p.current_npc_uuid <> r.deployed_npc_uuid)
+                  (r.state = 'DEPLOYED'
+                      AND r.deployed_npc_uuid IS NOT NULL
+                      AND r.resident_uuid = r.deployed_npc_uuid
+                      AND (
+                          s.lifecycle_state IN ('CAPTURED', 'DEAD_REVIVABLE', 'LOST')
+                          OR (s.lifecycle_state <> 'COOP'
+                              AND p.current_npc_uuid <> r.deployed_npc_uuid)
+                      ))
+                  OR (r.state = 'HOUSED'
+                      AND r.deployed_npc_uuid IS NULL
+                      AND r.source_npc_uuid IS NOT NULL
+                      AND r.resident_uuid = r.source_npc_uuid
+                      AND s.lifecycle_state IN (
+                          'ACTIVE', 'UNLOADED', 'CAPTURED', 'DEAD_REVIVABLE', 'LOST'
+                      ))
               )
               AND NOT EXISTS (
                   SELECT 1 FROM coop_lifecycle_operations o
@@ -43,7 +54,7 @@ final class ManagedCoopStaleDeploymentReconciler {
     private final SqliteConnectionManager connections;
     private final ManagedCoopResidentRepository residents;
 
-    ManagedCoopStaleDeploymentReconciler(
+    ManagedCoopStaleResidentReconciler(
             @Nonnull SqliteConnectionManager connections,
             @Nonnull ManagedCoopResidentRepository residents) {
         this.connections = Objects.requireNonNull(connections, "connections");
@@ -64,7 +75,7 @@ final class ManagedCoopStaleDeploymentReconciler {
                 if (exception instanceof SQLException sqlException) {
                     throw sqlException;
                 }
-                throw new SQLException("managed_coop_stale_deployment_repair_failed", exception);
+                throw new SQLException("managed_coop_stale_resident_repair_failed", exception);
             } finally {
                 connection.setAutoCommit(true);
             }
@@ -82,9 +93,10 @@ final class ManagedCoopStaleDeploymentReconciler {
             }
             ResidentRecord resident = residents.loadByIdInTransaction(connection, residentId);
             requireRepairableResident(resident);
-            MutationResult result = residents.detachDeployedInTransaction(
-                    connection, detachRequest(resident, nowMs)
-            );
+            MutationResult result = resident.state() == ResidentState.DEPLOYED
+                    ? residents.detachDeployedInTransaction(
+                            connection, detachRequest(resident, nowMs))
+                    : residents.retireStaleHousedInTransaction(connection, resident, nowMs);
             requireRetired(result);
             repaired++;
         }
@@ -143,10 +155,17 @@ final class ManagedCoopStaleDeploymentReconciler {
     }
 
     private static void requireRepairableResident(ResidentRecord resident) throws SQLException {
-        if (resident == null || !resident.active() || resident.state() != ResidentState.DEPLOYED
-                || resident.deployedNpcUuid() == null
-                || !resident.deployedNpcUuid().equals(resident.residentUuid())) {
-            throw new SQLException("stale_deployment_candidate_changed");
+        boolean deployed = resident != null
+                && resident.state() == ResidentState.DEPLOYED
+                && resident.deployedNpcUuid() != null
+                && resident.deployedNpcUuid().equals(resident.residentUuid());
+        boolean housed = resident != null
+                && resident.state() == ResidentState.HOUSED
+                && resident.deployedNpcUuid() == null
+                && resident.sourceNpcUuid() != null
+                && resident.sourceNpcUuid().equals(resident.residentUuid());
+        if (resident == null || !resident.active() || !deployed && !housed) {
+            throw new SQLException("stale_resident_candidate_changed");
         }
     }
 
@@ -155,7 +174,7 @@ final class ManagedCoopStaleDeploymentReconciler {
         if (result == null || !result.succeeded() || retired == null || retired.active()
                 || retired.state() != ResidentState.RETIRED) {
             String detail = result == null ? "result_missing" : result.detail();
-            throw new SQLException("stale_deployment_retirement_failed:" + detail);
+            throw new SQLException("stale_resident_retirement_failed:" + detail);
         }
     }
 

@@ -227,7 +227,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
 
         if (health.isHealthy()) {
             runtime.runLegacyDatImport(logger);
-            runtime.reconcileStaleManagedCoopDeployments(logger);
+            runtime.reconcileStaleManagedCoopResidents(logger);
             if (health.isHealthy()) {
                 managedCoopServices.compositeIndexRefreshService().refresh();
                 maintenanceService.start();
@@ -461,21 +461,21 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         }
     }
 
-    /** Repairs pre-fix handheld-capture drift before managed-coop indexes become visible. */
-    private void reconcileStaleManagedCoopDeployments(@Nullable HytaleLogger logger) {
+    /** Repairs canonically disproved managed-coop residents before indexes become visible. */
+    private void reconcileStaleManagedCoopResidents(@Nullable HytaleLogger logger) {
         if (!healthService.isHealthy()) {
             return;
         }
         try {
-            ManagedCoopStaleDeploymentReconciler.RepairResult result =
-                    managedCoopServices.reconcileStaleDeployments();
+            ManagedCoopStaleResidentReconciler.RepairResult result =
+                    managedCoopServices.reconcileStaleResidents();
             if (logger != null && result.repairedCount() > 0) {
                 logger.at(Level.INFO).log(
-                        "Repaired stale managed-coop deployments: " + result.repairedCount()
+                        "Repaired stale managed-coop residents: " + result.repairedCount()
                 );
             }
         } catch (Exception exception) {
-            String reason = "managed_coop_stale_deployment_repair_failed";
+            String reason = "managed_coop_stale_resident_repair_failed";
             healthService.markDegraded(reason);
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     reason,

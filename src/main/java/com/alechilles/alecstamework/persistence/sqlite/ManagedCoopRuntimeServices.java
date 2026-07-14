@@ -23,7 +23,7 @@ public final class ManagedCoopRuntimeServices {
     private final ManagedCoopLifecycleOperationIndexRefreshService lifecycleIndexRefreshService;
     private final ManagedCoopCompositeIndexRefreshService compositeIndexRefreshService;
     private final ManagedCoopOccupancyService occupancyService;
-    private final ManagedCoopStaleDeploymentReconciler staleDeploymentReconciler;
+    private final ManagedCoopStaleResidentReconciler staleResidentReconciler;
 
     ManagedCoopRuntimeServices(@Nonnull SqliteConnectionManager connectionManager,
                                @Nonnull PersistenceWriteQueue writeQueue,
@@ -59,7 +59,7 @@ public final class ManagedCoopRuntimeServices {
                 residentIndex,
                 compositeIndexRefreshService::isTrusted
         );
-        staleDeploymentReconciler = new ManagedCoopStaleDeploymentReconciler(
+        staleResidentReconciler = new ManagedCoopStaleResidentReconciler(
                 connectionManager,
                 residentRepository
         );
@@ -116,8 +116,8 @@ public final class ManagedCoopRuntimeServices {
     }
 
     @Nonnull
-    ManagedCoopStaleDeploymentReconciler.RepairResult reconcileStaleDeployments()
+    ManagedCoopStaleResidentReconciler.RepairResult reconcileStaleResidents()
             throws SQLException {
-        return staleDeploymentReconciler.reconcile();
+        return staleResidentReconciler.reconcile();
     }
 }

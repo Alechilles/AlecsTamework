@@ -30,7 +30,7 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
         Seed mismatch = seed("ACTIVE", true, 0);
         Seed captured = seed("CAPTURED", false, 1);
         Seed current = seed("ACTIVE", false, 2);
-        Seed recovering = seed("ACTIVE", true, 3);
+        Seed recovering = withActiveOperation(seed("ACTIVE", true, 3));
         writeScenario(mismatch, captured, current, recovering);
 
         try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
@@ -46,6 +46,38 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
         assertEquals(0, activeClaims(captured.residentId()));
         assertEquals(1, activeClaims(current.residentId()));
         assertEquals(1, activeClaims(recovering.residentId()));
+    }
+
+    @Test
+    void startupRepairsTerminalDeploymentsAndCanonicallyContradictedHousedRows()
+            throws Exception {
+        initializeSchema();
+        Seed deadDeployment = seed("DEAD_REVIVABLE", false, 0);
+        Seed lostDeployment = seed("LOST", false, 1);
+        Seed activeHoused = housed("ACTIVE", 2);
+        Seed unloadedHoused = housed("UNLOADED", 3);
+        Seed deadHoused = housed("DEAD_REVIVABLE", 4);
+        Seed coopedHoused = housed("COOP", 5);
+        Seed ambiguousHoused = housed("UNKNOWN_DORMANT", 6);
+        writeScenario(
+                deadDeployment, lostDeployment, activeHoused, unloadedHoused, deadHoused,
+                coopedHoused, ambiguousHoused
+        );
+
+        try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            assertRetired(runtime, deadDeployment);
+            assertRetired(runtime, lostDeployment);
+            assertRetired(runtime, activeHoused);
+            assertRetired(runtime, unloadedHoused);
+            assertRetired(runtime, deadHoused);
+            assertHoused(runtime, coopedHoused);
+            assertHoused(runtime, ambiguousHoused);
+            assertTrue(runtime.getHealthService().isHealthy());
+        }
+        assertEquals(0, activeClaims(deadDeployment.residentId()));
+        assertEquals(0, activeClaims(activeHoused.residentId()));
+        assertEquals(1, activeClaims(coopedHoused.residentId()));
+        assertEquals(1, activeClaims(ambiguousHoused.residentId()));
     }
 
     @Test
@@ -80,8 +112,10 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
                 insertResident(connection, seed);
                 insertUuidClaim(connection, seed);
             }
-            if (seeds.length == 4) {
-                insertActiveOperation(connection, seeds[3]);
+            for (Seed seed : seeds) {
+                if (seed.activeOperation()) {
+                    insertActiveOperation(connection, seed);
+                }
             }
             connection.commit();
         }
@@ -91,7 +125,25 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
         UUID deployedUuid = UUID.randomUUID();
         UUID currentUuid = rotateUuid ? UUID.randomUUID() : deployedUuid;
         String profileId = UUID.randomUUID().toString();
-        return new Seed(profileId, "resident:" + profileId, deployedUuid, currentUuid, lifecycle, slot);
+        return new Seed(
+                profileId, "resident:" + profileId, deployedUuid, currentUuid, lifecycle,
+                ResidentState.DEPLOYED, slot, false
+        );
+    }
+
+    private static Seed housed(String lifecycle, int slot) {
+        Seed deployed = seed(lifecycle, false, slot);
+        return new Seed(
+                deployed.profileId(), deployed.residentId(), deployed.deployedUuid(),
+                deployed.currentUuid(), lifecycle, ResidentState.HOUSED, slot, false
+        );
+    }
+
+    private static Seed withActiveOperation(Seed seed) {
+        return new Seed(
+                seed.profileId(), seed.residentId(), seed.deployedUuid(), seed.currentUuid(),
+                seed.lifecycle(), seed.residentState(), seed.slot(), true
+        );
     }
 
     private static void assertRetired(TameworkPersistenceRuntime runtime, Seed seed) throws Exception {
@@ -104,6 +156,13 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
     private static void assertDeployed(TameworkPersistenceRuntime runtime, Seed seed) throws Exception {
         ResidentRecord resident = runtime.getManagedCoopResidentRepository().loadById(seed.residentId());
         assertEquals(ResidentState.DEPLOYED, resident.state());
+        assertTrue(resident.active());
+        assertEquals(1L, resident.generation());
+    }
+
+    private static void assertHoused(TameworkPersistenceRuntime runtime, Seed seed) throws Exception {
+        ResidentRecord resident = runtime.getManagedCoopResidentRepository().loadById(seed.residentId());
+        assertEquals(ResidentState.HOUSED, resident.state());
         assertTrue(resident.active());
         assertEquals(1L, resident.generation());
     }
@@ -169,7 +228,7 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
                     snapshot_json, snapshot_hash, snapshot_version, state, generation, active,
                     captured_at_ms, released_at_ms, created_at_ms, updated_at_ms
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'tamed_chicken', ?, ?, ?, '{}', NULL,
-                    1, 'DEPLOYED', 1, 1, 1, 1, 1, 1)
+                    1, ?, 1, 1, 1, 1, 1, 1)
                 """)) {
             statement.setString(1, seed.residentId());
             statement.setString(2, AUTHORITY.authorityId());
@@ -182,7 +241,12 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
             statement.setString(9, seed.profileId());
             statement.setString(10, seed.deployedUuid().toString());
             statement.setString(11, seed.deployedUuid().toString());
-            statement.setString(12, seed.deployedUuid().toString());
+            if (seed.residentState() == ResidentState.DEPLOYED) {
+                statement.setString(12, seed.deployedUuid().toString());
+            } else {
+                statement.setObject(12, null);
+            }
+            statement.setString(13, seed.residentState().name());
             statement.executeUpdate();
         }
     }
@@ -191,10 +255,12 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO managed_coop_uuid_claims (
                     npc_uuid, resident_id, claim_kind, active, created_at_ms, updated_at_ms
-                ) VALUES (?, ?, 'DEPLOYED', 1, 1, 1)
+                ) VALUES (?, ?, ?, 1, 1, 1)
                 """)) {
             statement.setString(1, seed.deployedUuid().toString());
             statement.setString(2, seed.residentId());
+            statement.setString(3, seed.residentState() == ResidentState.HOUSED
+                    ? "SOURCE" : "DEPLOYED");
             statement.executeUpdate();
         }
     }
@@ -243,6 +309,8 @@ class TameworkPersistenceRuntimeStaleCoopRepairTest {
                         UUID deployedUuid,
                         UUID currentUuid,
                         String lifecycle,
-                        int slot) {
+                        ResidentState residentState,
+                        int slot,
+                        boolean activeOperation) {
     }
 }

@@ -178,6 +178,34 @@ final class ManagedCoopResidentTransactions {
         return result(MutationStatus.APPLIED, loadById(connection, request.residentId()), null);
     }
 
+    /** Retires one exact housed row disproved by committed canonical population state. */
+    MutationResult retireStaleHoused(Connection connection,
+                                     ResidentRecord expected,
+                                     long nowMs) throws SQLException {
+        Objects.requireNonNull(expected, "expected");
+        ResidentRecord resident = loadById(connection, expected.residentId());
+        if (!staleHousedMatches(resident, expected)) {
+            return result(MutationStatus.CONFLICT, resident, "stale_housed_precondition_conflict");
+        }
+        try (PreparedStatement update = connection.prepareStatement("""
+                UPDATE managed_coop_residents
+                SET state = 'RETIRED', active = 0, generation = generation + 1,
+                    updated_at_ms = ?
+                WHERE resident_id = ? AND active = 1 AND state = 'HOUSED'
+                  AND generation = ? AND profile_id = ? AND resident_uuid = ?
+                  AND deployed_npc_uuid IS NULL
+                """)) {
+            update.setLong(1, nowMs);
+            update.setString(2, expected.residentId());
+            update.setLong(3, expected.generation());
+            update.setString(4, expected.profileId());
+            update.setString(5, expected.residentUuid().toString());
+            requireUpdated(update, "stale_housed_generation_changed");
+        }
+        uuidClaims.deactivateAll(connection, expected.residentId(), nowMs);
+        return result(MutationStatus.APPLIED, loadById(connection, expected.residentId()), null);
+    }
+
     /** Restores a release only after the caller has definitive proof no projection was created. */
     MutationResult cancelReleaseBeforeProjection(Connection connection,
                                                   String residentId,
@@ -454,7 +482,7 @@ final class ManagedCoopResidentTransactions {
     }
 
     private boolean retiredDetachMatches(@Nullable ResidentRecord resident,
-                                         PopulationDetachRequest request) {
+                                          PopulationDetachRequest request) {
         return resident != null && !resident.active()
                 && resident.state() == ResidentState.RETIRED
                 && resident.residentId().equals(request.residentId())
@@ -465,6 +493,18 @@ final class ManagedCoopResidentTransactions {
                 && resident.generation() == request.expectedResidentGeneration() + 1L
                 && request.deployedNpcUuid().equals(resident.residentUuid())
                 && request.deployedNpcUuid().equals(resident.deployedNpcUuid());
+    }
+
+    private boolean staleHousedMatches(@Nullable ResidentRecord resident,
+                                       ResidentRecord expected) {
+        return resident != null
+                && resident.active()
+                && resident.state() == ResidentState.HOUSED
+                && resident.deployedNpcUuid() == null
+                && resident.residentId().equals(expected.residentId())
+                && resident.profileId().equals(expected.profileId())
+                && resident.residentUuid().equals(expected.residentUuid())
+                && resident.generation() == expected.generation();
     }
 
     private boolean authorityMatches(Connection connection,

@@ -345,6 +345,13 @@ public final class ManagedCoopResidentRepository {
         return transactions.detachDeployed(connection, request);
     }
 
+    MutationResult retireStaleHousedInTransaction(
+            Connection connection,
+            ResidentRecord expected,
+            long nowMs) throws SQLException {
+        return transactions.retireStaleHoused(connection, expected, nowMs);
+    }
+
     @Nullable
     ResidentRecord loadByIdInTransaction(Connection connection, String residentId) throws SQLException {
         return transactions.loadById(connection, residentId);

@@ -130,7 +130,12 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                         services.lifecycleIndex(),
                         services.compositeIndexRefreshService()::isTrusted);
         ManagedCoopRuntimeSweepPlanner planner = new ManagedCoopRuntimeSweepPlanner(
-                services.occupancyService(), lifecycleAdmission);
+                services.occupancyService(),
+                lifecycleAdmission,
+                new ManagedCoopReleaseEligibility(
+                        population.index(),
+                        population.claimOccupancyIndex(),
+                        population.identityResolver()));
         authorityEligibility = new ManagedCoopAuthorityEligibilityIndex();
         ManagedCoopStaleEntityPolicy stalePolicy = new ManagedCoopStaleEntityPolicy(
                 services.residentIndex(),

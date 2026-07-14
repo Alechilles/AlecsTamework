@@ -293,22 +293,22 @@ public final class CoopPopulationReleaseAdmissionService {
                             @Nullable Function<UUID, String> durableContextFactory) {
         String profileId = identityResolver.resolveProfileId(request.previousNpcUuid()).orElse(null);
         if (profileId == null) {
-            return PlanResult.denied("coop-release-canonical-profile-unavailable");
+            return PlanResult.preAdmissionDenied("coop-release-canonical-profile-unavailable");
         }
         UUID currentUuid = identityResolver.currentNpcUuid(profileId).orElse(null);
         if (currentUuid == null || !currentUuid.equals(request.previousNpcUuid())) {
-            return PlanResult.denied("coop-release-duplicate-active-profile");
+            return PlanResult.preAdmissionDenied("coop-release-duplicate-active-profile");
         }
         OwnerPopulationEntry owner = ownerIndex.entry(profileId).orElse(null);
         ClaimOccupancyEntry claim = claimIndex.entry(profileId).orElse(null);
         if (owner == null || claim == null) {
-            return PlanResult.denied("coop-release-population-profile-unavailable");
+            return PlanResult.preAdmissionDenied("coop-release-population-profile-unavailable");
         }
         String invalidSource = validateDormantSource(
                 request.previousNpcUuid(), currentUuid, request.ownerId(), owner, claim
         );
         if (invalidSource != null) {
-            return PlanResult.denied(invalidSource);
+            return PlanResult.preAdmissionDenied(invalidSource);
         }
         if (claim.revision() == Long.MAX_VALUE) {
             return PlanResult.definitivelyDenied(
@@ -605,8 +605,9 @@ public final class CoopPopulationReleaseAdmissionService {
                     plannedNpcUuid, policy, ownerPlan, claimRequest);
         }
 
-        static PlanResult denied(String reason) {
-            return new PlanResult(false, reason, PreparationDisposition.AMBIGUOUS,
+        /** SQLite rollback independently proves no prior replay reached population apply. */
+        static PlanResult preAdmissionDenied(String reason) {
+            return new PlanResult(false, reason, PreparationDisposition.DEFINITIVE_DENIAL,
                     null, null, null, null, null);
         }
 

@@ -70,21 +70,47 @@ public final class ManagedCoopRuntimeSweepPlanner {
     public ManagedCoopRuntimeSweepPlanner(
             @Nonnull ManagedCoopOccupancyService occupancy,
             @Nonnull ManagedCoopLifecycleAdmissionGuard lifecycle) {
-        this(new OccupancyGateway() {
+        this(occupancy, lifecycle, resident -> true);
+    }
+
+    public ManagedCoopRuntimeSweepPlanner(
+            @Nonnull ManagedCoopOccupancyService occupancy,
+            @Nonnull ManagedCoopLifecycleAdmissionGuard lifecycle,
+            @Nonnull ReleaseEligibilityGateway releaseEligibility) {
+        this(occupancyGateway(occupancy, releaseEligibility), lifecycleGateway(lifecycle));
+    }
+
+    private static OccupancyGateway occupancyGateway(
+            ManagedCoopOccupancyService occupancy,
+            ReleaseEligibilityGateway releaseEligibility
+    ) {
+        ManagedCoopOccupancyService requiredOccupancy =
+                Objects.requireNonNull(occupancy, "occupancy");
+        ReleaseEligibilityGateway requiredEligibility =
+                Objects.requireNonNull(releaseEligibility, "releaseEligibility");
+        return new OccupancyGateway() {
             @Override
             public boolean permitsCapture(ManagedCoopContext context,
                                           ManagedCoopCaptureCandidate candidate) {
-                return occupancy.resolveCapturePlacement(
+                return requiredOccupancy.resolveCapturePlacement(
                         context, candidate.npcUuid(), candidate.stableProfileId()).permitted();
             }
 
             @Nullable
             @Override
             public ResidentRecord firstHoused(ManagedCoopContext context) {
-                int slot = occupancy.firstHousedSlot(context);
-                return slot < 0 ? null : occupancy.residentAt(context, slot);
+                return requiredOccupancy.firstHousedResident(
+                        context, requiredEligibility::permitsRelease);
             }
-        }, context -> lifecycle.inspect(context).allowed());
+        };
+    }
+
+    private static LifecycleGateway lifecycleGateway(
+            ManagedCoopLifecycleAdmissionGuard lifecycle
+    ) {
+        ManagedCoopLifecycleAdmissionGuard required =
+                Objects.requireNonNull(lifecycle, "lifecycle");
+        return context -> required.inspect(context).allowed();
     }
 
     ManagedCoopRuntimeSweepPlanner(@Nonnull OccupancyGateway occupancy) {
@@ -298,5 +324,11 @@ public final class ManagedCoopRuntimeSweepPlanner {
     @FunctionalInterface
     interface LifecycleGateway {
         boolean permitsNormalWork(@Nonnull ManagedCoopContext context);
+    }
+
+    /** Independent canonical lifecycle check applied before a housed release is journaled. */
+    @FunctionalInterface
+    public interface ReleaseEligibilityGateway {
+        boolean permitsRelease(@Nonnull ResidentRecord resident);
     }
 }

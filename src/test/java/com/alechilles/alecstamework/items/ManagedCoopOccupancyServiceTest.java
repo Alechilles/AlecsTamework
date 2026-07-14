@@ -64,6 +64,23 @@ class ManagedCoopOccupancyServiceTest {
     }
 
     @Test
+    void canonicalLifecycleFilterSkipsStaleHousedRowsWithoutStarvingLaterSlots()
+            throws Exception {
+        ManagedCoopContext context = context("coop_chicken", 3);
+        ResidentRecord stale = resident(0, "profile-stale", uuid(1), ResidentState.HOUSED);
+        ResidentRecord eligible = resident(2, "profile-cooped", uuid(2), ResidentState.HOUSED);
+        ManagedCoopOccupancyService service = new ManagedCoopOccupancyService(index(
+                List.of(authority("coop_chicken", AuthorityState.TWORK_MANAGED)),
+                List.of(stale, eligible)
+        ));
+
+        ResidentRecord selected = service.firstHousedResident(
+                context, resident -> resident.profileId().equals("profile-cooped"));
+
+        assertEquals(eligible, selected);
+    }
+
+    @Test
     void exactDeployedUuidRecapturesItsReservedSlotAndGeneration() throws Exception {
         ManagedCoopContext context = context("coop_chicken", 1);
         ResidentRecord deployed = resident(

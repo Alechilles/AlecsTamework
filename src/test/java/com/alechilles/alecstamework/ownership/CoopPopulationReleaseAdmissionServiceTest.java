@@ -169,6 +169,23 @@ class CoopPopulationReleaseAdmissionServiceTest {
                         .disposition());
     }
 
+    @Test
+    void planStageDenialsUseTheDurablyVerifiedPreProjectionRollback() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/ownership/CoopPopulationReleaseAdmissionService.java"
+        ));
+        int planStart = source.indexOf("private PlanResult plan(");
+        int planEnd = source.indexOf("private static CompanionPopulationStateRecord baseline", planStart);
+        String plan = source.substring(planStart, planEnd);
+        int factory = source.indexOf("static PlanResult preAdmissionDenied(String reason)");
+
+        assertTrue(plan.contains("PlanResult.preAdmissionDenied(invalidSource)"));
+        assertFalse(plan.contains("PlanResult.denied("));
+        assertTrue(factory >= 0);
+        assertTrue(source.substring(factory, source.indexOf("static PlanResult definitivelyDenied", factory))
+                .contains("PreparationDisposition.DEFINITIVE_DENIAL"));
+    }
+
     /** Regression: coop release must expose the planned alias before ECS entity-add observers. */
     @Test
     void claimRetainsPreparedAliasBeforeThePopulationCapabilityIsApplied() throws Exception {

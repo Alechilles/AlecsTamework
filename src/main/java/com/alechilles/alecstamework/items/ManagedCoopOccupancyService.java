@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -218,18 +219,31 @@ public final class ManagedCoopOccupancyService {
 
     /** Returns the first strictly housed slot eligible for a new release operation. */
     public int firstHousedSlot(@Nonnull ManagedCoopContext context) {
+        ResidentRecord resident = firstHousedResident(context, ignored -> true);
+        return resident == null ? -1 : resident.residentSlot();
+    }
+
+    /** Returns the first housed resident accepted by an independent lifecycle authority. */
+    @Nullable
+    public ResidentRecord firstHousedResident(
+            @Nonnull ManagedCoopContext context,
+            @Nonnull Predicate<ResidentRecord> eligibility
+    ) {
+        Objects.requireNonNull(eligibility, "eligibility");
         View view = inspect(context);
         if (view.status() != AuthorityStatus.READY) {
-            return -1;
+            return null;
         }
-        int first = Integer.MAX_VALUE;
+        ResidentRecord first = null;
         for (ResidentRecord resident : view.residents()) {
             if (resident.state() == ResidentState.HOUSED
-                    && resident.residentSlot() >= 0) {
-                first = Math.min(first, resident.residentSlot());
+                    && resident.residentSlot() >= 0
+                    && eligibility.test(resident)
+                    && (first == null || resident.residentSlot() < first.residentSlot())) {
+                first = resident;
             }
         }
-        return first == Integer.MAX_VALUE ? -1 : first;
+        return first;
     }
 
     @Nullable
