@@ -97,6 +97,15 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                                  double dt,
                                  @Nonnull Vector3d translation,
                                  @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        TameworkRideMountComponent ride = rideMount(ref, componentAccessor);
+        if (ride == null) {
+            lastRidden = false;
+            lastRiderSprinting = false;
+            resetRiddenBackwardBrake();
+            mountedCollisionRecoveryState.reset();
+            return super.computeMove(ref, role, steering, dt, translation, componentAccessor);
+        }
+
         saveMotionKind();
         setMotionKind(inWater() ? MotionKind.MOVING : MotionKind.FLYING);
         moveProbe.probePosition(ref, collisionBoundingBox, position, collisionResult, componentAccessor);
@@ -129,19 +138,14 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         targetPitch = TameworkFlyVisualState.limitPitch(targetPitch);
 
         translation.set(steering.getTranslation());
-        TameworkRideMountComponent ride = rideMount(ref, componentAccessor);
-        lastRiderSprinting = ride != null && ride.isRiderSprinting();
-        lastRidden = ride != null;
-        if (lastRidden && onGround() && translation.y < 0.0) {
+        lastRiderSprinting = ride.isRiderSprinting();
+        lastRidden = true;
+        if (onGround() && translation.y < 0.0) {
             translation.y = 0.0;
         }
-        if (lastRidden) {
-            targetYaw = approachAngle(getYaw(), targetYaw, maxTurnSpeed * (float) dt);
-            resolveRiddenTranslation(ride, targetYaw, targetPitch, translation);
-            MountedFlightCollisionRecovery.apply(ride, translation, mountedCollisionRecoveryState);
-        } else {
-            mountedCollisionRecoveryState.reset();
-        }
+        targetYaw = approachAngle(getYaw(), targetYaw, maxTurnSpeed * (float) dt);
+        resolveRiddenTranslation(ride, targetYaw, targetPitch, translation);
+        MountedFlightCollisionRecovery.apply(ride, translation, mountedCollisionRecoveryState);
         lastTargetYaw = targetYaw;
         lastTargetPitch = targetPitch;
         lastInputX = translation.x;
@@ -178,13 +182,8 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                 translation.y * (translation.y >= 0.0 ? lastClimbSpeedLimit : lastSinkSpeedLimit),
                 translation.z * lastHorizontalSpeedLimit * horizontalSpeedMultiplier
         );
-        if (lastRidden) {
-            RiddenBackwardBrake.apply(targetVelocity, lastVelocity, riddenBackwardBrakeState, brakingFromBackwardInput, dt);
-            lastRiddenBackwardBraking = riddenBackwardBrakeState.isBraking();
-        } else {
-            resetRiddenBackwardBrake();
-            targetVelocity.mul(effectHorizontalSpeedMultiplier);
-        }
+        RiddenBackwardBrake.apply(targetVelocity, lastVelocity, riddenBackwardBrakeState, brakingFromBackwardInput, dt);
+        lastRiddenBackwardBraking = riddenBackwardBrakeState.isBraking();
         lastTargetVelocityX = targetVelocity.x;
         lastTargetVelocityY = targetVelocity.y;
         lastTargetVelocityZ = targetVelocity.z;

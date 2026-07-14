@@ -346,6 +346,10 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("setMotionKind(MotionKind.FLYING)"));
         assertTrue(content.contains("TameworkFlyAnimationState.resolveFast"));
         assertTrue(content.contains("lastFlightMovementAnimation"));
+        assertTrue(content.contains("if (ride == null)"));
+        assertTrue(content.indexOf("if (ride == null)")
+                < content.indexOf("translation.set(steering.getTranslation())"));
+        assertTrue(content.contains("return super.computeMove(ref, role, steering, dt, translation, componentAccessor)"));
         assertTrue(content.contains("mountedMaxHorizontalSpeed"));
         assertTrue(content.contains("mountedMaxClimbSpeed"));
         assertTrue(content.contains("mountedMaxSinkSpeed"));
@@ -366,8 +370,7 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("lastRiddenBackwardBraking"));
         assertTrue(content.contains("backwardAirbrake=%s"));
         assertTrue(content.contains("collisionRecovery=%s"));
-        assertTrue(content.contains("if (!lastRidden)"));
-        assertTrue(content.contains("targetVelocity.mul(effectHorizontalSpeedMultiplier)"));
+        assertFalse(content.contains("targetVelocity.mul(effectHorizontalSpeedMultiplier)"));
         assertFalse(content.contains("collisionResult.disableCharacterCollisions()"));
         assertFalse(content.contains("collisionResult.enableCharacterCollsions()"));
     }
