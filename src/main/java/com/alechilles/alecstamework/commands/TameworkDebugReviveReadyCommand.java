@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
+import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -39,6 +41,10 @@ public final class TameworkDebugReviveReadyCommand extends AbstractPlayerCommand
             commandContext.sender().sendMessage(Message.raw("Dead linked-NPC tracking is not available."));
             return;
         }
+        TameworkPersistenceRuntime persistence = plugin.getPersistenceRuntime();
+        if (reportPersistenceBlocked(commandContext, persistence)) {
+            return;
+        }
         Player player = store.getComponent(ref, Player.getComponentType());
         UUID playerUuid = player != null ? player.getUuid() : null;
         if (playerUuid == null) {
@@ -48,6 +54,9 @@ public final class TameworkDebugReviveReadyCommand extends AbstractPlayerCommand
         CommandLinkedNpcDeathService.RespawnReadyUpdateResult result =
                 deathService.markOwnerDeadSnapshotsRespawnReady(playerUuid);
         if (result.totalOwned() <= 0) {
+            if (reportPersistenceBlocked(commandContext, persistence)) {
+                return;
+            }
             commandContext.sender().sendMessage(Message.raw("No dead linked NPCs were found for your player."));
             return;
         }
@@ -59,5 +68,21 @@ public final class TameworkDebugReviveReadyCommand extends AbstractPlayerCommand
                         + ", alreadyReady="
                         + result.alreadyReady()
         ));
+    }
+
+    private boolean reportPersistenceBlocked(
+            CommandContext commandContext,
+            TameworkPersistenceRuntime persistence
+    ) {
+        PersistenceHealthService.HealthState health =
+                persistence != null ? persistence.getHealthState() : null;
+        if (health == null || health.status() != PersistenceHealthService.Status.DEGRADED) {
+            return false;
+        }
+        commandContext.sender().sendMessage(Message.raw(
+                "Dead linked NPCs could not be marked revive-ready because persistence is degraded"
+                        + (health.reason() == null ? "." : " (" + health.reason() + ").")
+        ));
+        return true;
     }
 }
