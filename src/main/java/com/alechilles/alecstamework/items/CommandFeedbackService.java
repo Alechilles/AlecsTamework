@@ -42,12 +42,13 @@ final class CommandFeedbackService {
         }
         String commandLabel = resolveCommandLabel(command, commandLabelResolver);
         String defaultMessage = resolveDefaultMessage(player, commandLabel, affected, queued);
+        int accepted = acceptedRecipientCount(affected, queued);
         CommandFeedback feedback = command.getFeedback();
         String hudMessage = resolveFeedbackText(
                 player,
                 feedback != null ? feedback.getHudMessage() : null,
                 commandLabel,
-                affected,
+                accepted,
                 defaultMessage
         );
         if (hudMessage != null && !hudMessage.isBlank()) {
@@ -144,6 +145,10 @@ final class CommandFeedbackService {
                 .replace("%command%", commandLabel)
                 .replace("{count}", Integer.toString(affected))
                 .replace("{command}", commandLabel);
+    }
+
+    static int acceptedRecipientCount(int affected, int queued) {
+        return Math.max(0, affected) + Math.max(0, queued);
     }
 
     private void emitFeedbackSound(String soundEventId,
