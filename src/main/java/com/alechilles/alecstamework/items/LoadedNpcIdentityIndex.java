@@ -116,8 +116,9 @@ public final class LoadedNpcIdentityIndex {
     /**
      * Clears all evidence for an explicitly retired store location.
      *
-     * <p>Callers must only use this after authoritative store retirement; cancellable world-removal
-     * notifications alone are not sufficient evidence.
+     * <p>Callers must only use this after authoritative store retirement, or from an uncancelled
+     * world-removal listener registered at the terminal short priority. Earlier cancellable
+     * world-removal notifications alone are not sufficient evidence.
      */
     public void clearLocation(@Nullable Location location) {
         if (location == null) {

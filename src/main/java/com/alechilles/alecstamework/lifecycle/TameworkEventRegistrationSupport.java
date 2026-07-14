@@ -21,12 +21,35 @@ public final class TameworkEventRegistrationSupport {
             @Nonnull Class<? super EventType> eventClass,
             @Nonnull Consumer<EventType> listener,
             @Nonnull String listenerName) {
+        return registerGlobal(plugin, null, eventClass, listener, listenerName);
+    }
+
+    /** Registers a global listener at one explicit engine event priority. */
+    public static <KeyType, EventType extends IBaseEvent<KeyType>> boolean registerGlobal(
+            @Nonnull JavaPlugin plugin,
+            short priority,
+            @Nonnull Class<? super EventType> eventClass,
+            @Nonnull Consumer<EventType> listener,
+            @Nonnull String listenerName) {
+        return registerGlobal(plugin, Short.valueOf(priority), eventClass, listener, listenerName);
+    }
+
+    private static <KeyType, EventType extends IBaseEvent<KeyType>> boolean registerGlobal(
+            @Nonnull JavaPlugin plugin,
+            @Nullable Short priority,
+            @Nonnull Class<? super EventType> eventClass,
+            @Nonnull Consumer<EventType> listener,
+            @Nonnull String listenerName) {
         if (plugin.getEventRegistry() == null) {
             logUnavailable(plugin, eventClass, listenerName, null);
             return false;
         }
         try {
-            plugin.getEventRegistry().registerGlobal(eventClass, listener);
+            if (priority == null) {
+                plugin.getEventRegistry().registerGlobal(eventClass, listener);
+            } else {
+                plugin.getEventRegistry().registerGlobal(priority, eventClass, listener);
+            }
             return true;
         } catch (IllegalArgumentException ex) {
             if (!isEventRegistryShutdown(ex)) {

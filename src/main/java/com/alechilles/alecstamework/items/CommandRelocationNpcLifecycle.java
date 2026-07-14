@@ -15,9 +15,9 @@ import org.joml.Vector3d;
 /**
  * Coordinates command-relocation work at NPC and world lifecycle boundaries.
  *
- * <p>Generated-world recovery is intentionally split across two callbacks: world removal marks
- * terminal candidates, while NPC removal submits Lost only after the shared live-identity index
- * has withdrawn the entity and before the complete state snapshot is cleared.</p>
+ * <p>Generated-world recovery runs synchronously after the terminal world's exact live-identity
+ * location has been retired. Store shutdown does not dispatch ordinary NPC-removal callbacks, so
+ * the world-removal boundary must submit Lost while complete snapshots are still cached.</p>
  */
 final class CommandRelocationNpcLifecycle {
     private final Map<UUID, PendingRelocation> pendingByNpc;
@@ -71,15 +71,13 @@ final class CommandRelocationNpcLifecycle {
         for (CommandRelocationNpcTracker.WorldRemovalCandidate candidate
                 : npcTracker.markDeleteOnRemoveWorld(world, removedAtMs)) {
             PendingRelocation pending = pendingByNpc.get(candidate.npcUuid());
-            if (pending == null
-                    || pending.isCrossWorldTransferInProgress()
-                    || pending.physicalMutationAttempted()) {
-                continue;
-            }
-            if (pendingRemover.remove(candidate.npcUuid(), pending)) {
+            if (pending != null && !pending.physicalMutationAttempted()
+                    && pendingRemover.remove(candidate.npcUuid(), pending)) {
                 pending.markCrossWorldTransferFinished();
                 admissionCanceller.cancel(pending);
             }
+            dropReporter.reportWorldRemoval(candidate);
+            npcTracker.completeWorldRemoval(candidate.npcUuid());
         }
     }
 

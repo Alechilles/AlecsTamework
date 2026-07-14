@@ -23,9 +23,8 @@ import org.joml.Vector3d;
  * Tracks the last observed world, position, and owner of NPCs used by command relocation.
  *
  * <p>Delete-on-remove worlds are terminal: their saved chunks are deleted after the
- * {@code RemoveWorldEvent}. Owned NPCs still mapped there are marked as recovery candidates, then
- * consumed at their entity-removal boundary after live identity is withdrawn and while their
- * complete in-memory state snapshots are still available.</p>
+ * {@code RemoveWorldEvent}. Owned NPCs still mapped there become recovery candidates after that
+ * world's exact live-identity location has been withdrawn.</p>
  */
 final class CommandRelocationNpcTracker {
     private final Map<UUID, Vector3d> lastKnownByNpc;
@@ -128,6 +127,14 @@ final class CommandRelocationNpcTracker {
 
     boolean isWorldRemovalPending(@Nullable UUID npcUuid) {
         return npcUuid != null && pendingWorldRemovalsByNpc.containsKey(npcUuid);
+    }
+
+    void completeWorldRemoval(@Nullable UUID npcUuid) {
+        if (npcUuid == null) {
+            return;
+        }
+        pendingWorldRemovalsByNpc.remove(npcUuid);
+        knownOwnerByNpc.remove(npcUuid);
     }
 
     private void remember(TrackedNpc tracked) {

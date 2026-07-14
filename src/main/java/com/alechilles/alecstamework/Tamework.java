@@ -1112,6 +1112,7 @@ public class Tamework extends JavaPlugin {
         );
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
+                Short.MAX_VALUE,
                 RemoveWorldEvent.class,
                 this::onWorldRemovedForCompanionRecovery,
                 "delete-on-remove companion recovery"
@@ -1320,8 +1321,13 @@ public class Tamework extends JavaPlugin {
     }
 
     private void onWorldRemovedForCompanionRecovery(@Nonnull RemoveWorldEvent event) {
-        if (event != null && !event.isCancelled() && commandNpcRelocationService != null) {
-            commandNpcRelocationService.onWorldRemoved(event.getWorld());
+        if (event == null || event.isCancelled() || commandNpcRelocationService == null
+                || commandLinkedNpcStateSnapshotService == null) {
+            return;
+        }
+        World world = event.getWorld();
+        if (commandLinkedNpcStateSnapshotService.retireDeleteOnRemoveWorld(world)) {
+            commandNpcRelocationService.onWorldRemoved(world);
         }
     }
 

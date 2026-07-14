@@ -17,38 +17,37 @@ class CommandDeleteOnRemoveWorldRecoveryWiringTest {
     private static final Path ITEMS = ROOT.resolve("items");
 
     @Test
-    void removeWorldEventMarksRecoveryUntilLiveIdentityIsRemoved() throws Exception {
+    void terminalRemoveWorldEventRetiresIdentityAndSubmitsRecoveryBeforeStoreShutdown() throws Exception {
         String plugin = read(ROOT.resolve("Tamework.java"));
+        String snapshots = read(ITEMS.resolve("CommandLinkedNpcStateSnapshotService.java"));
         String relocation = read(ITEMS.resolve("CommandNpcRelocationService.java"));
         String lifecycle = read(ITEMS.resolve("CommandRelocationNpcLifecycle.java"));
         String tracker = read(ITEMS.resolve("CommandRelocationNpcTracker.java"));
         String dispatch = read(ITEMS.resolve("CommandRelocationDispatchService.java"));
-        String removalSystem = read(ROOT.resolve(
-                Path.of("npc", "systems", "CommandNpcRelocationOnLoadSystem.java")));
 
         assertTrue(plugin.contains("this::onWorldRemovedForCompanionRecovery"));
-        assertTrue(plugin.contains("event != null && !event.isCancelled()"));
-        assertTrue(plugin.contains("commandNpcRelocationService.onWorldRemoved(event.getWorld())"));
+        assertTrue(plugin.contains("Short.MAX_VALUE"),
+                "Recovery must observe cancellation after all standard engine priorities.");
+        assertTrue(plugin.contains("event == null || event.isCancelled()"));
+        assertTrue(plugin.contains("retireDeleteOnRemoveWorld(world)"));
+        assertTrue(plugin.contains("commandNpcRelocationService.onWorldRemoved(world)"));
+        assertTrue(plugin.indexOf("retireDeleteOnRemoveWorld(world)")
+                        < plugin.indexOf("commandNpcRelocationService.onWorldRemoved(world)"),
+                "Terminal store identity must be retired before profile-safe Lost resolution.");
+        assertTrue(snapshots.contains("loadedNpcIdentityIndex.clearLocation("));
+        assertTrue(snapshots.contains("LoadedNpcLocationResolver.resolve("));
         assertTrue(tracker.contains("world.getWorldConfig().isDeleteOnRemove()"));
         assertTrue(tracker.contains("pendingWorldRemovalsByNpc"));
         assertTrue(lifecycle.contains("npcTracker.markDeleteOnRemoveWorld(world, removedAtMs)"));
-        assertTrue(lifecycle.contains("npcTracker.onRemoved(reference, reason, store, npcUuidHint)"));
         assertTrue(lifecycle.contains("dropReporter.reportWorldRemoval(candidate)"));
-        int removeLiveIdentity = removalSystem.indexOf("stateSnapshotService.beginNpcRemoval");
-        int submitRecovery = removalSystem.indexOf(
-                "relocationService.onNpcRemoved(reference, reason, store, npcUuid)");
-        int clearSnapshot = removalSystem.indexOf("stateSnapshotService.completeNpcRemoval");
-        assertTrue(removeLiveIdentity >= 0
-                        && removeLiveIdentity < submitRecovery
-                        && submitRecovery < clearSnapshot,
-                "Lost submission must run after live-index removal and before snapshot cleanup.");
         int worldRemovalStart = lifecycle.indexOf("void onWorldRemoved");
         int worldRemovalEnd = lifecycle.indexOf(
                 "boolean isDeleteOnRemoveRecoveryPending", worldRemovalStart);
         assertTrue(worldRemovalStart >= 0 && worldRemovalEnd > worldRemovalStart);
-        assertFalse(lifecycle.substring(worldRemovalStart, worldRemovalEnd).contains(
+        assertTrue(lifecycle.substring(worldRemovalStart, worldRemovalEnd).contains(
                         "dropReporter.reportWorldRemoval"),
-                "The pre-shutdown event must not submit while the profile alias is still live.");
+                "Store shutdown skips NPC removal callbacks, so the terminal event must submit.");
+        assertTrue(lifecycle.contains("npcTracker.completeWorldRemoval(candidate.npcUuid())"));
         assertTrue(dispatch.contains(
                         "relocationService.isDeleteOnRemoveRecoveryPending(record.npcUuid)"),
                 "Relocation dispatch must not race a terminal instance recovery marker.");

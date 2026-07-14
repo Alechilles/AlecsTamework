@@ -302,10 +302,7 @@ public final class CommandNpcRelocationService {
         npcLifecycle.onNpcRemoved(reference, reason, store, npcUuidHint);
     }
 
-    /**
-     * Marks owned NPCs in a delete-on-remove world for strict Lost recovery at their later
-     * entity-removal boundary.
-     */
+    /** Submits strict Lost recovery after a terminal world's live identity has been retired. */
     public void onWorldRemoved(@Nullable World world) {
         npcLifecycle.onWorldRemoved(world, System.currentTimeMillis());
     }

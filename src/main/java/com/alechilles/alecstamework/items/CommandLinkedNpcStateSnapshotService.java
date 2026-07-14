@@ -24,6 +24,7 @@ import com.hypixel.hytale.component.Store;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -129,6 +130,26 @@ public final class CommandLinkedNpcStateSnapshotService {
     @Nonnull
     public LoadedNpcIdentityIndex getLoadedNpcIdentityIndex() {
         return loadedNpcIdentityIndex;
+    }
+
+    /**
+     * Retires only the exact entity-store identity of a terminal generated world.
+     *
+     * <p>The caller must run from an uncancelled, terminal-priority {@code RemoveWorldEvent}.
+     * Full state snapshots intentionally remain available for Lost recovery after the store's
+     * live identity evidence is withdrawn.</p>
+     */
+    public boolean retireDeleteOnRemoveWorld(@Nullable World world) {
+        if (world == null || world.getWorldConfig() == null
+                || !world.getWorldConfig().isDeleteOnRemove()
+                || world.getEntityStore() == null
+                || world.getEntityStore().getStore() == null) {
+            return false;
+        }
+        loadedNpcIdentityIndex.clearLocation(
+                LoadedNpcLocationResolver.resolve(world.getEntityStore().getStore())
+        );
+        return true;
     }
 
     private void indexNpcAdded(@Nonnull Ref<EntityStore> reference,
