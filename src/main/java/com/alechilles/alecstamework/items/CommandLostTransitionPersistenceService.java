@@ -127,6 +127,11 @@ final class CommandLostTransitionPersistenceService {
         }
     }
 
+    /** Returns whether a complete lost transition has been accepted but not yet published. */
+    boolean isPending(@Nullable UUID npcUuid) {
+        return npcUuid != null && pendingTokensByNpc.containsKey(npcUuid);
+    }
+
     @Nullable
     private static Vector3d firstNonNull(@Nullable Vector3d first,
                                          @Nullable Vector3d second,

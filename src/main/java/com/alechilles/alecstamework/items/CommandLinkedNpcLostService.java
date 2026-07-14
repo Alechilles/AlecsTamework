@@ -369,6 +369,16 @@ public final class CommandLinkedNpcLostService {
         return getLostSnapshot(npcUuid) != null;
     }
 
+    /**
+     * Exposes accepted transitions only to entity-removal lifecycle classification.
+     * Player-facing lost state remains gated on {@link #isLost(UUID)} after durable commit.
+     */
+    public boolean isLostOrTransitionPending(UUID npcUuid) {
+        return isLost(npcUuid)
+                || transitionPersistenceService != null
+                && transitionPersistenceService.isPending(npcUuid);
+    }
+
     @Nullable
     public CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot getRecoverySnapshot(UUID npcUuid) {
         if (npcUuid == null) {

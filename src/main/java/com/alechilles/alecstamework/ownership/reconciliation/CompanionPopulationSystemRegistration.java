@@ -50,7 +50,7 @@ public final class CompanionPopulationSystemRegistration {
                 npcUuid -> captureService.getCapturedSnapshot(npcUuid) != null,
                 npcUuid -> coopService.getCoopSnapshot(npcUuid) != null,
                 npcUuid -> deathService.getDeadSnapshot(npcUuid) != null,
-                lostService::isLost,
+                lostService::isLostOrTransitionPending,
                 deathService::isPermanentlyReleasedDeath
         );
         registry.registerSystem(new CompanionPopulationLifecycleSystem(

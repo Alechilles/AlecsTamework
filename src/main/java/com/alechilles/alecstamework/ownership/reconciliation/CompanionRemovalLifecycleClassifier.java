@@ -52,9 +52,6 @@ public final class CompanionRemovalLifecycleClassifier {
         Objects.requireNonNull(npcUuid, "npcUuid");
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(current, "current");
-        if (reason == RemoveReason.UNLOAD) {
-            return CompanionLifecycleState.UNLOADED;
-        }
         if (captured.test(npcUuid)) {
             return CompanionLifecycleState.CAPTURED;
         }
@@ -69,6 +66,14 @@ public final class CompanionRemovalLifecycleClassifier {
         }
         if (confirmedPermanentDeath || permanentlyReleased.test(npcUuid)) {
             return CompanionLifecycleState.RELEASED;
+        }
+        if (reason == RemoveReason.UNLOAD) {
+            if (current != CompanionLifecycleState.ACTIVE
+                    && current != CompanionLifecycleState.UNLOADED
+                    && current != CompanionLifecycleState.RESTORING) {
+                return current;
+            }
+            return CompanionLifecycleState.UNLOADED;
         }
         if (current != CompanionLifecycleState.ACTIVE
                 && current != CompanionLifecycleState.UNLOADED

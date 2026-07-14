@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CompanionRemovalLifecycleClassifierTest {
     @Test
-    void unloadAlwaysRetainsPhysicalOccupancyClassification() {
+    void unloadPreservesDurableDormantLifecycleBeforePhysicalClassification() {
         CompanionRemovalLifecycleClassifier classifier = new CompanionRemovalLifecycleClassifier(
                 ignored -> true,
                 ignored -> true,
@@ -17,6 +17,23 @@ class CompanionRemovalLifecycleClassifierTest {
                 ignored -> true
         );
 
+        assertEquals(CompanionLifecycleState.CAPTURED, classifier.classify(
+                UUID.randomUUID(), RemoveReason.UNLOAD, CompanionLifecycleState.ACTIVE
+        ));
+    }
+
+    @Test
+    void corpseUnloadCannotOverwritePreviouslyObservedRevivableDeath() {
+        CompanionRemovalLifecycleClassifier classifier = new CompanionRemovalLifecycleClassifier(
+                ignored -> false,
+                ignored -> false,
+                ignored -> false,
+                ignored -> false
+        );
+
+        assertEquals(CompanionLifecycleState.DEAD_REVIVABLE, classifier.classify(
+                UUID.randomUUID(), RemoveReason.UNLOAD, CompanionLifecycleState.DEAD_REVIVABLE
+        ));
         assertEquals(CompanionLifecycleState.UNLOADED, classifier.classify(
                 UUID.randomUUID(), RemoveReason.UNLOAD, CompanionLifecycleState.ACTIVE
         ));

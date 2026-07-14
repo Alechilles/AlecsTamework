@@ -30,6 +30,7 @@ import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenc
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.CancelStatus.COMPENSATION_PENDING;
 import static com.alechilles.alecstamework.items.CommandLostTransitionPersistenceService.CancelStatus.COMPENSATION_REJECTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -87,6 +88,7 @@ class CommandLostTransitionPersistenceServiceTest {
         CommandLostTransitionPersistenceService.PersistStatus status = service.persist(lost, published::add);
 
         assertEquals(ACCEPTED_PENDING, status);
+        assertTrue(service.isPending(sourceUuid));
         assertTrue(published.isEmpty(), "lost state must remain invisible before commit");
         assertSame(full, handedOff.get());
         assertNotNull(handedOff.get().commandLinks());
@@ -114,6 +116,7 @@ class CommandLostTransitionPersistenceServiceTest {
         ));
 
         assertEquals(List.of(lost), published);
+        assertFalse(service.isPending(sourceUuid));
     }
 
     @Test
