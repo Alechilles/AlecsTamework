@@ -31,6 +31,21 @@ class BreedingParentLifecycleGateTest {
         )).inspect(identity(PROFILE)).allowed());
     }
 
+    /** Regression: unrelated startup replay work must not reject a known, stable active parent. */
+    @Test
+    void activeCanonicalParentUsesProfileLocalFencesDuringGlobalReconciliation() {
+        OwnerPopulationEntry active = new OwnerPopulationEntry(
+                PROFILE, null, "world", CompanionLifecycleState.ACTIVE, 4L
+        );
+
+        assertTrue(gate(snapshot(
+                OwnerPopulationReadiness.RECONCILING, false, false, active
+        )).inspect(identity(PROFILE)).allowed());
+        assertTrue(gate(snapshot(
+                OwnerPopulationReadiness.DEGRADED, false, false, active
+        )).inspect(identity(PROFILE)).allowed());
+    }
+
     @Test
     void exactSyntheticEntityProfileIsTheOnlyAllowedMissingEntry() {
         BreedingParentLifecycleGate gate = gate(snapshot(
@@ -58,7 +73,7 @@ class BreedingParentLifecycleGateTest {
     }
 
     @Test
-    void transitionReloadAndNonReadyAuthorityFailClosed() {
+    void transitionAndReloadFencesFailClosed() {
         OwnerPopulationEntry active = new OwnerPopulationEntry(
                 PROFILE, null, "world", CompanionLifecycleState.ACTIVE, 4L
         );
@@ -68,11 +83,15 @@ class BreedingParentLifecycleGateTest {
         assertFalse(gate(snapshot(
                 OwnerPopulationReadiness.READY, true, false, active
         )).inspect(identity(PROFILE)).allowed());
+    }
+
+    @Test
+    void missingProfileStillRequiresReadyAuthority() {
         for (OwnerPopulationReadiness readiness : OwnerPopulationReadiness.values()) {
             if (readiness != OwnerPopulationReadiness.READY) {
                 assertFalse(gate(snapshot(
-                        readiness, false, false, active
-                )).inspect(identity(PROFILE)).allowed(), readiness.name());
+                        readiness, false, false, null
+                )).inspect(identity("entity:" + NPC_UUID)).allowed(), readiness.name());
             }
         }
         assertFalse(new BreedingParentLifecycleGate(profile -> null)

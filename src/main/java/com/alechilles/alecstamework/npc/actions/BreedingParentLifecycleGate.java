@@ -35,18 +35,22 @@ final class BreedingParentLifecycleGate {
         if (snapshot == null) {
             return Decision.deny("parent-lifecycle-authority-unavailable");
         }
-        if (snapshot.readiness() != OwnerPopulationReadiness.READY
-                || snapshot.canonicalReloadInProgress()) {
-            return Decision.deny("parent-lifecycle-authority-not-ready");
+        if (snapshot.canonicalReloadInProgress()) {
+            return Decision.deny("parent-lifecycle-authority-reloading");
         }
         if (snapshot.transitionPending()) {
             return Decision.deny("parent-lifecycle-transition-pending");
         }
         OwnerPopulationEntry entry = snapshot.entry().orElse(null);
         if (entry != null) {
+            // Unrelated recovery may hold overall readiness below READY. The exact profile entry
+            // and its transition/reload fences remain authoritative for this parent's lifecycle.
             return entry.lifecycleState() == CompanionLifecycleState.ACTIVE
                     ? Decision.permit()
                     : Decision.deny("parent-lifecycle-not-active");
+        }
+        if (snapshot.readiness() != OwnerPopulationReadiness.READY) {
+            return Decision.deny("parent-lifecycle-authority-not-ready");
         }
         String syntheticProfile = "entity:" + identity.entityUuid();
         return syntheticProfile.equals(identity.profileId())
