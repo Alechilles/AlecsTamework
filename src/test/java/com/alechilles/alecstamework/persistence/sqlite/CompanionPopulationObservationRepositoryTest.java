@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPopulationObservationRepositoryTest {
     @TempDir
@@ -68,5 +69,36 @@ class CompanionPopulationObservationRepositoryTest {
         } finally {
             queue.close();
         }
+    }
+
+    @Test
+    void exhaustedSqliteBusyOutcomeMapsToRetryableObservationFailure() {
+        CompanionPopulationObservation observation = new CompanionPopulationObservation(
+                "profile",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "default",
+                CompanionLifecycleState.ACTIVE,
+                "default",
+                1,
+                2,
+                3L,
+                "test"
+        );
+        PersistenceWriteQueue.WriteOutcome<CompanionPopulationObservationPersistResult> outcome =
+                new PersistenceWriteQueue.WriteOutcome<>(
+                        PersistenceWriteQueue.WriteStatus.FAILED,
+                        null,
+                        "sqlite_write_failed:companion_population_live_observation:SQLiteException",
+                        new IllegalStateException("[SQLITE_BUSY] database is locked")
+                );
+
+        CompanionPopulationObservationPersistResult result =
+                CompanionPopulationObservationRepository.resultFromOutcome(observation, outcome);
+
+        assertEquals(CompanionPopulationObservationPersistResult.Status.TRANSIENT_FAILURE,
+                result.status());
+        assertEquals(3L, result.revision());
+        assertTrue(result.retryable());
     }
 }

@@ -174,6 +174,8 @@ class CompanionPopulationStartupReconcilerTest {
                 "reconciliation-loaded-identity-mutated-during-scan"));
         assertTrue(CompanionPopulationReconciliationRetryPolicy.shouldRetry(
                 "reconciliation-live-evidence-mutated-during-final-reload"));
+        assertTrue(CompanionPopulationReconciliationRetryPolicy.shouldRetry(
+                "reconciliation-stage-transient-sqlite-lock"));
         assertFalse(CompanionPopulationReconciliationRetryPolicy.shouldRetry(
                 "reconciliation-operation-ambiguous"));
         assertFalse(CompanionPopulationReconciliationRetryPolicy.shouldRetry(

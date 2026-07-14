@@ -193,6 +193,35 @@ class CoalescedCompanionPopulationWriterTest {
         }
     }
 
+    /** Regression: exhausted SQLite-busy batches remain queued until a later write succeeds. */
+    @Test
+    void transientPersistenceFailureRetriesWithoutDroppingLatestObservation() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        CompanionPopulationObservationPersistence persistence = observation -> {
+            if (attempts.getAndIncrement() == 0) {
+                return CompletableFuture.completedFuture(
+                        new CompanionPopulationObservationPersistResult(
+                                CompanionPopulationObservationPersistResult.Status.TRANSIENT_FAILURE,
+                                observation.expectedRevision(),
+                                "sqlite_write_failed:companion_population_live_observation:SQLiteException"
+                        )
+                );
+            }
+            return CompletableFuture.completedFuture(committed(observation, 4L));
+        };
+        CoalescedCompanionPopulationWriter writer = writer(persistence);
+        try {
+            writer.record(observation(UUID.randomUUID(), UUID.randomUUID(), 1, 1));
+
+            writer.flushPendingNow().get(2, TimeUnit.SECONDS);
+
+            assertEquals(2, attempts.get());
+            assertEquals(0, writer.metrics().pendingProfiles());
+        } finally {
+            writer.close();
+        }
+    }
+
     @Test
     void currentAttemptFlushCarriesANewerCutoffPastAnOlderInFlightWrite() throws Exception {
         List<CompanionPopulationObservation> submissions = new ArrayList<>();

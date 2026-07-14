@@ -38,17 +38,28 @@ public final class CompanionPopulationObservationRepository
                 "companion_population_live_observation",
                 connection -> persistInTransaction(connection, observation),
                 null
-        ).completion().thenApply(outcome -> {
-            CompanionPopulationObservationPersistResult value = outcome.value();
-            if (outcome.isCommitted() && value != null) {
-                return value;
-            }
-            return new CompanionPopulationObservationPersistResult(
-                    CompanionPopulationObservationPersistResult.Status.FAILED,
-                    observation.expectedRevision(),
-                    outcome.failureReason() == null ? "observation-write-failed" : outcome.failureReason()
-            );
-        });
+        ).completion().thenApply(outcome -> resultFromOutcome(observation, outcome));
+    }
+
+    @Nonnull
+    static CompanionPopulationObservationPersistResult resultFromOutcome(
+            @Nonnull CompanionPopulationObservation observation,
+            @Nonnull PersistenceWriteQueue.WriteOutcome<CompanionPopulationObservationPersistResult> outcome
+    ) {
+        CompanionPopulationObservationPersistResult value = outcome.value();
+        if (outcome.isCommitted() && value != null) {
+            return value;
+        }
+        CompanionPopulationObservationPersistResult.Status status =
+                outcome.isTransientFailure()
+                        ? CompanionPopulationObservationPersistResult.Status.TRANSIENT_FAILURE
+                        : CompanionPopulationObservationPersistResult.Status.FAILED;
+        return new CompanionPopulationObservationPersistResult(
+                status,
+                observation.expectedRevision(),
+                outcome.failureReason() == null
+                        ? "observation-write-failed" : outcome.failureReason()
+        );
     }
 
     @Nonnull

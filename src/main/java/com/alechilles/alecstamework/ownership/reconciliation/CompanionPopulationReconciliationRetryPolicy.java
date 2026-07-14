@@ -14,7 +14,8 @@ final class CompanionPopulationReconciliationRetryPolicy {
         return reason != null
                 && (reason.startsWith("reconciliation-loaded-identity-incomplete")
                 || reason.startsWith("reconciliation-loaded-identity-mutated-")
-                || reason.startsWith("reconciliation-live-evidence-mutated-"));
+                || reason.startsWith("reconciliation-live-evidence-mutated-")
+                || reason.startsWith("reconciliation-stage-transient-sqlite-lock"));
     }
 
     static long delayMs(int priorRetries) {

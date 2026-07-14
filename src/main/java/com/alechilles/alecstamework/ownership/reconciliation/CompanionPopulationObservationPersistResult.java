@@ -15,6 +15,7 @@ public record CompanionPopulationObservationPersistResult(
         IDEMPOTENT,
         PENDING_OPERATION,
         REVISION_CONFLICT,
+        TRANSIENT_FAILURE,
         IDENTITY_CONFLICT,
         FAILED
     }
@@ -24,6 +25,8 @@ public record CompanionPopulationObservationPersistResult(
     }
 
     public boolean retryable() {
-        return status == Status.PENDING_OPERATION || status == Status.REVISION_CONFLICT;
+        return status == Status.PENDING_OPERATION
+                || status == Status.REVISION_CONFLICT
+                || status == Status.TRANSIENT_FAILURE;
     }
 }

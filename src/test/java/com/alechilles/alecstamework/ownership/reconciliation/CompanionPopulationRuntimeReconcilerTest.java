@@ -393,6 +393,37 @@ class CompanionPopulationRuntimeReconcilerTest {
     }
 
     @Test
+    void transientObservationFailurePreservesPopulationReadiness() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+        try (Harness harness = harness(npcUuid, ownerUuid)) {
+            CompanionPopulationObservation observation = CompanionPopulationObservation.fromRuntime(
+                    harness.profileId,
+                    npcUuid,
+                    ownerUuid,
+                    "default",
+                    CompanionLifecycleState.ACTIVE,
+                    new ClaimChunkCoordinate("default", 2, 3),
+                    4L,
+                    "natural-chunk-movement"
+            );
+
+            harness.reconciler.onCompleted(
+                    observation,
+                    new CompanionPopulationObservationPersistResult(
+                            CompanionPopulationObservationPersistResult.Status.TRANSIENT_FAILURE,
+                            4L,
+                            "sqlite_write_failed:companion_population_live_observation:SQLiteException"
+                    )
+            );
+
+            assertEquals(OwnerPopulationReadiness.READY, harness.ownerIndex.readiness());
+            assertEquals(ClaimOccupancyReadiness.READY, harness.claimIndex.readiness());
+            assertTrue(harness.health.isHealthy());
+        }
+    }
+
+    @Test
     void preparedReplacementAliasKeepsSpawnObservationOnPendingCanonicalProfile() {
         UUID previousNpcUuid = UUID.randomUUID();
         UUID plannedNpcUuid = UUID.randomUUID();

@@ -26,6 +26,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private static final long FLUSH_INTERVAL_MS = 10L;
     private static final int MAX_TRANSIENT_RETRIES = 3;
     private static final long RETRY_BACKOFF_MS = 20L;
+    private static final long RECOVERABLE_FAILURE_REPORT_INTERVAL_MS = 30_000L;
     private static final long DEFAULT_CLOSE_JOIN_TIMEOUT_MS = 2_000L;
 
     @FunctionalInterface
@@ -65,6 +66,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private final AtomicInteger activeBatchSize = new AtomicInteger();
     private final AtomicInteger pendingTaskCount = new AtomicInteger();
     private final AtomicBoolean drainTimedOut = new AtomicBoolean();
+    private long lastRecoverableFailureReportAtMs;
 
     public PersistenceWriteQueue(@Nonnull SqliteConnectionManager connectionManager,
                                  @Nonnull PersistenceHealthService healthService,
@@ -349,6 +351,14 @@ public final class PersistenceWriteQueue implements AutoCloseable {
      */
     private void recordRecoverableFailure(@Nonnull String reason, @Nonnull Exception exception) {
         metrics.recordBatchFailure(reason);
+        long now = System.currentTimeMillis();
+        if (lastRecoverableFailureReportAtMs != 0L
+                && now >= lastRecoverableFailureReportAtMs
+                && now - lastRecoverableFailureReportAtMs
+                < RECOVERABLE_FAILURE_REPORT_INTERVAL_MS) {
+            return;
+        }
+        lastRecoverableFailureReportAtMs = now;
         TameworkTelemetryEvents.recordErrorIfAvailable(
                 "persistence_write_busy_exhausted",
                 exception,
@@ -447,6 +457,10 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                                   @Nullable Throwable failure) {
         public boolean isCommitted() {
             return status == WriteStatus.COMMITTED;
+        }
+        public boolean isTransientFailure() {
+            return status == WriteStatus.FAILED && failure != null
+                    && SqliteBusyFailureClassifier.isTransient(failure);
         }
     }
 

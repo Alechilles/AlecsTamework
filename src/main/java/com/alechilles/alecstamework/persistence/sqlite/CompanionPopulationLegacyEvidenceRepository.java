@@ -26,8 +26,47 @@ public final class CompanionPopulationLegacyEvidenceRepository {
 
     @Nonnull
     public SnapshotDescriptor snapshotDescriptor() throws Exception {
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement("""
+        try (Connection connection = connectionManager.openConnection()) {
+            return snapshotDescriptor(connection);
+        }
+    }
+
+    /** Captures profile evidence from one SQLite read transaction for stable bounded paging. */
+    @Nonnull
+    public Snapshot loadSnapshot(@Nonnull String source) throws Exception {
+        Objects.requireNonNull(source, "source");
+        try (Connection connection = connectionManager.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                SnapshotDescriptor descriptor = snapshotDescriptor(connection);
+                if (descriptor.total() > Integer.MAX_VALUE) {
+                    throw new IllegalStateException("Profile evidence snapshot exceeds list capacity.");
+                }
+                ProfileBatch loaded = descriptor.total() == 0L
+                        ? new ProfileBatch(List.of())
+                        : loadProfileBatch(
+                                connection, 0L, (int) descriptor.total(), source
+                        );
+                if (loaded.scannedUnits() != descriptor.total()) {
+                    throw new IllegalStateException(
+                            "Profile evidence snapshot did not contain its declared profile count."
+                    );
+                }
+                connection.commit();
+                return new Snapshot(descriptor, loaded.profiles());
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        }
+    }
+
+    @Nonnull
+    private static SnapshotDescriptor snapshotDescriptor(@Nonnull Connection connection)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
                      SELECT
                          (SELECT COUNT(*) FROM npc_profiles),
                          COALESCE((SELECT MAX(updated_at_ms) FROM npc_profiles), 0),
@@ -58,10 +97,20 @@ public final class CompanionPopulationLegacyEvidenceRepository {
         if (offset < 0L || limit <= 0) {
             throw new IllegalArgumentException("A non-negative offset and positive limit are required.");
         }
-        List<CompanionPopulationEvidence> evidence = new ArrayList<>();
-        int scanned = 0;
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement("""
+        try (Connection connection = connectionManager.openConnection()) {
+            return loadProfileBatch(connection, offset, limit, source).flatten();
+        }
+    }
+
+    @Nonnull
+    private static ProfileBatch loadProfileBatch(
+            @Nonnull Connection connection,
+            long offset,
+            int limit,
+            @Nonnull String source
+    ) throws Exception {
+        List<List<CompanionPopulationEvidence>> profiles = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
                      SELECT
                          p.profile_id,
                          COALESCE(
@@ -119,7 +168,7 @@ public final class CompanionPopulationLegacyEvidenceRepository {
             statement.setLong(2, offset);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
-                    scanned++;
+                    List<CompanionPopulationEvidence> evidence = new ArrayList<>(5);
                     UUID npcUuid = CompanionPopulationSqlSupport.parseUuid(
                             resultSet.getString("evidence_npc_uuid")
                     );
@@ -161,10 +210,11 @@ public final class CompanionPopulationLegacyEvidenceRepository {
                             ownerUuid, worldName,
                             CompanionPopulationEvidence.Kind.COOP_SNAPSHOT, source
                     );
+                    profiles.add(List.copyOf(evidence));
                 }
             }
         }
-        return new Batch(List.copyOf(evidence), scanned);
+        return new ProfileBatch(profiles);
     }
 
     /**
@@ -271,6 +321,63 @@ public final class CompanionPopulationLegacyEvidenceRepository {
             if (scannedUnits < 0) {
                 throw new IllegalArgumentException("scannedUnits must be non-negative.");
             }
+        }
+    }
+
+    /** Immutable evidence view captured before live startup observations can mutate SQLite rows. */
+    public static final class Snapshot {
+        private final SnapshotDescriptor descriptor;
+        private final List<List<CompanionPopulationEvidence>> profiles;
+
+        private Snapshot(
+                @Nonnull SnapshotDescriptor descriptor,
+                @Nonnull List<List<CompanionPopulationEvidence>> profiles
+        ) {
+            this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
+            this.profiles = profiles.stream().map(List::copyOf).toList();
+            if (descriptor.total() != this.profiles.size()) {
+                throw new IllegalArgumentException("Snapshot profile count does not match descriptor.");
+            }
+        }
+
+        @Nonnull
+        public SnapshotDescriptor descriptor() {
+            return descriptor;
+        }
+
+        @Nonnull
+        public Batch batch(long offset, int limit) {
+            if (offset < 0L || offset > profiles.size() || limit <= 0) {
+                throw new IllegalArgumentException(
+                        "A bounded snapshot offset and positive limit are required."
+                );
+            }
+            int start = Math.toIntExact(offset);
+            int end = (int) Math.min((long) profiles.size(), (long) start + limit);
+            List<CompanionPopulationEvidence> evidence = new ArrayList<>();
+            for (int index = start; index < end; index++) {
+                evidence.addAll(profiles.get(index));
+            }
+            return new Batch(List.copyOf(evidence), end - start);
+        }
+    }
+
+    private record ProfileBatch(@Nonnull List<List<CompanionPopulationEvidence>> profiles) {
+        private ProfileBatch {
+            profiles = profiles.stream().map(List::copyOf).toList();
+        }
+
+        private int scannedUnits() {
+            return profiles.size();
+        }
+
+        @Nonnull
+        private Batch flatten() {
+            List<CompanionPopulationEvidence> evidence = new ArrayList<>();
+            for (List<CompanionPopulationEvidence> profile : profiles) {
+                evidence.addAll(profile);
+            }
+            return new Batch(List.copyOf(evidence), profiles.size());
         }
     }
 }

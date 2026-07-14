@@ -260,7 +260,9 @@ public final class CompanionPopulationReconciliationService {
         return submission.completion().thenApply(outcome -> {
             CompanionPopulationReconciliationRepository.StageResult value = outcome.value();
             if (!outcome.isCommitted() || value == null || !value.committed()) {
-                String reason = value != null && value.reason() != null
+                String reason = outcome.isTransientFailure()
+                        ? "reconciliation-stage-transient-sqlite-lock"
+                        : value != null && value.reason() != null
                         ? value.reason()
                         : "reconciliation-stage-failed";
                 return ScanResult.failed(reason);
