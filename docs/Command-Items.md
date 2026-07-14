@@ -134,6 +134,8 @@ Loaded flow:
 - `ReturnHome` can use path + deferred teleport behavior.
 - `Recall` can force-relocate distant companions near the player before follow resumes.
 - `/tw settings` can disable recall/return-home teleporting. When disabled, Recall is hidden from the linked panel and command wheel, loaded companions still receive normal move/home command hooks, and unloaded or distant forced relocation is skipped; use `Locate` to open a copyable current or last recorded world-position page.
+- A linked panel can remain open across a world or generated-instance transfer. Its Recall and Return Home actions resolve the player's current entity/store from the stable player reference at click time, rather than reusing the source-world entity reference captured when the panel opened.
+- Per-row movement actions validate and repair only the selected companion's canonical profile metadata. An unrelated damaged link on the same command item does not make a healthy selected companion unavailable.
 
 Unloaded flow:
 - Relocation commands enqueue pending relocations by NPC uuid.

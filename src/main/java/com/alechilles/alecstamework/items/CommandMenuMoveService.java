@@ -46,6 +46,7 @@ final class CommandMenuMoveService {
     private final double defaultRecallSafeSpawnDistance;
     private final double defaultRecallForceRelocateDistance;
     private final CommandCanonicalRecordCommitGate canonicalRecordCommitGate;
+    private final LinkedNpcRecordCollection linkedRecordCollection;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
 
@@ -112,6 +113,7 @@ final class CommandMenuMoveService {
         this.defaultRecallSafeSpawnDistance = defaultRecallSafeSpawnDistance;
         this.defaultRecallForceRelocateDistance = defaultRecallForceRelocateDistance;
         this.canonicalRecordCommitGate = new CommandCanonicalRecordCommitGate();
+        this.linkedRecordCollection = new LinkedNpcRecordCollection();
         this.profileActionResolver = profileActionResolver;
     }
 
@@ -123,6 +125,20 @@ final class CommandMenuMoveService {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
+        Player capturedPlayer = player;
+        WorldPlayerResolver.ResolvedPlayer livePlayer = WorldPlayerResolver.resolveCurrent(player);
+        if (livePlayer == null) {
+            String unavailableLabel = LocalizedText.resolve(
+                    capturedPlayer,
+                    returnHome
+                            ? "tamework.ui.notifications.command.move.returnHome.actionLabel"
+                            : "tamework.ui.notifications.command.move.recall.actionLabel"
+            );
+            feedbackService.showWarningKey(
+                    capturedPlayer, "tamework.ui.notifications.command.move.unavailable", unavailableLabel);
+            return;
+        }
+        player = livePlayer.player();
         String actionLabel = LocalizedText.resolve(
                 player,
                 returnHome
@@ -134,17 +150,9 @@ final class CommandMenuMoveService {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
             return;
         }
-        World world = player.getWorld();
-        if (world == null) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
-            return;
-        }
+        World world = livePlayer.world();
+        Store<EntityStore> store = livePlayer.store();
+        Ref<EntityStore> playerRef = livePlayer.ref();
 
         ItemContainer hotbar = inventory.getHotbar();
         short capacity = hotbar.getCapacity();
@@ -163,24 +171,24 @@ final class CommandMenuMoveService {
                 feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
             }
-            record = resolveRelocationRecord(record);
-            if (record == null || record.npcUuid == null) {
+            UUID selectedNpcUuid = record.npcUuid;
+            String selectedProfileId = record.profileId;
+            CommandNpcProfileActionResolver.ActionTarget relocationTarget =
+                    resolveRelocationTarget(record);
+            if (relocationTarget == null || !relocationTarget.isActionable()) {
                 feedbackService.showWarningKey(
                         player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
                 return;
             }
+            record = relocationTarget.resolvedRecord();
             npcUuid = record.npcUuid;
-            if (profileActionResolver != null) {
-                CommandNpcProfileActionResolver.CanonicalRecords canonical =
-                        profileActionResolver.canonicalizeRecords(linkedRecords);
-                if (!canonical.safeToPersist()) {
-                    feedbackService.showWarningKey(
-                            player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
-                    return;
-                }
-                if (canonical.identityChanged()) {
-                    ItemStack canonicalStack =
-                            linkMutationService.writeLinkedNpcRecords(stack, canonical.records());
+            if (profileActionResolver != null
+                    && (relocationTarget.redirected()
+                    || !java.util.Objects.equals(record.profileId, selectedProfileId))) {
+                List<LinkedNpcRecord> repairedRecords = linkedRecordCollection.replaceResolvedSelection(
+                        linkedRecords, selectedNpcUuid, record);
+                if (!repairedRecords.equals(linkedRecords)) {
+                    ItemStack canonicalStack = linkMutationService.writeLinkedNpcRecords(stack, repairedRecords);
                     short canonicalSlot = slot;
                     boolean committed = canonicalRecordCommitGate.commitBeforeAction(
                             true,
@@ -196,6 +204,7 @@ final class CommandMenuMoveService {
                         return;
                     }
                     stack = canonicalStack;
+                    linkedRecords = repairedRecords;
                 }
             }
             if (deathService != null
@@ -374,13 +383,21 @@ final class CommandMenuMoveService {
     }
 
     @Nullable
-    private LinkedNpcRecord resolveRelocationRecord(@Nullable LinkedNpcRecord record) {
+    private CommandNpcProfileActionResolver.ActionTarget resolveRelocationTarget(
+            @Nullable LinkedNpcRecord record) {
         if (record == null || record.npcUuid == null || profileActionResolver == null) {
-            return record;
+            return record == null ? null : new CommandNpcProfileActionResolver.ActionTarget(
+                    CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED,
+                    record.profileId,
+                    record.npcUuid,
+                    record.npcUuid,
+                    record,
+                    List.of(record.npcUuid),
+                    List.of(),
+                    null
+            );
         }
-        CommandNpcProfileActionResolver.ActionTarget target =
-                profileActionResolver.resolveRelocation(record);
-        return target.isActionable() ? target.resolvedRecord() : null;
+        return profileActionResolver.resolveRelocation(record);
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {

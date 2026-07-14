@@ -26,8 +26,9 @@ class CommandProfileAwareRelocationWiringTest {
         assertTrue(recipients.contains("resolveRelocationRecord(cachedRecord)"));
         assertTrue(recipients.contains(
                 "linkedNpcRecordStore.write(context.workingItem, canonical.records())"));
-        assertTrue(menu.contains("record = resolveRelocationRecord(record)"));
-        assertTrue(menu.contains("linkMutationService.writeLinkedNpcRecords(stack, canonical.records())"));
+        assertTrue(menu.contains("resolveRelocationTarget(record)"));
+        assertTrue(menu.contains("replaceResolvedSelection("));
+        assertTrue(menu.contains("linkMutationService.writeLinkedNpcRecords(stack, repairedRecords)"));
         assertTrue(handler.contains("transaction != null && transaction.succeeded()"));
         assertTrue(menu.contains("transaction != null && transaction.succeeded()"));
         assertTrue(inventory.contains("transaction != null && transaction.succeeded()"));
@@ -40,6 +41,8 @@ class CommandProfileAwareRelocationWiringTest {
         assertTrue(genericCommit >= 0 && genericCommit < loadedExecution);
         assertTrue(genericCommit < genericQueue);
 
+        assertFalse(menu.contains("profileActionResolver.canonicalizeRecords(linkedRecords)"),
+                "A selected companion action must not be blocked by unrelated damaged links.");
         int menuCommit = menu.indexOf("canonicalRecordCommitGate.commitBeforeAction");
         int menuQueue = menu.indexOf("queueRelocationsForUnloaded", menuCommit);
         assertTrue(menuCommit >= 0 && menuCommit < menuQueue);

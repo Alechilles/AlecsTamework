@@ -119,6 +119,48 @@ final class LinkedNpcRecordCollection {
         return unresolvedFallback;
     }
 
+    /**
+     * Replaces only the record selected for an action and removes stale duplicates of its resolved
+     * profile. Unrelated records are deliberately left untouched so one damaged link cannot block a
+     * valid companion action.
+     */
+    List<LinkedNpcRecord> replaceResolvedSelection(List<LinkedNpcRecord> source,
+                                                   UUID selectedNpcUuid,
+                                                   LinkedNpcRecord resolved) {
+        if (source == null || source.isEmpty() || selectedNpcUuid == null
+                || resolved == null || resolved.npcUuid == null) {
+            return source != null ? List.copyOf(source) : List.of();
+        }
+        int selectedIndex = -1;
+        for (int index = 0; index < source.size(); index++) {
+            LinkedNpcRecord record = source.get(index);
+            if (record != null && selectedNpcUuid.equals(record.npcUuid)) {
+                selectedIndex = index;
+                break;
+            }
+        }
+        if (selectedIndex < 0) {
+            return List.copyOf(source);
+        }
+        String resolvedProfileId = LinkedNpcRecordCodec.normalizeProfileId(resolved.profileId);
+        ArrayList<LinkedNpcRecord> repaired = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            LinkedNpcRecord record = source.get(index);
+            if (index == selectedIndex) {
+                repaired.add(resolved);
+                continue;
+            }
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (resolvedProfileId != null && resolvedProfileId.equals(record.profileId)) {
+                continue;
+            }
+            repaired.add(record);
+        }
+        return List.copyOf(repaired);
+    }
+
     private int findUpsertIndex(List<LinkedNpcRecord> records, String profileId, UUID npcUuid) {
         int unresolvedProfileFallback = -1;
         int soleResolvedUuidMatch = -1;
