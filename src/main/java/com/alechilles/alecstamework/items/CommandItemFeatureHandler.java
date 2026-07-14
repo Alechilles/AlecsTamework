@@ -183,6 +183,7 @@ public final class CommandItemFeatureHandler {
                 lostService,
                 relocationService,
                 npcNameResolver,
+                stateSnapshotService,
                 linkPolicyService,
                 this.groupService,
                 profileActionResolver

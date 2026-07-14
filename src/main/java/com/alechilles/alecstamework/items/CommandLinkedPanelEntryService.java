@@ -38,6 +38,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcLostService lostService;
     private final CommandNpcRelocationService relocationService;
     private final CommandNpcNameResolver npcNameResolver;
+    private final CommandLinkedPanelUnloadedNameService unloadedNameService;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandGroupService groupService;
     private final CommandLinkedPanelProgressionPresentationService progressionPresentationService;
@@ -52,6 +53,7 @@ final class CommandLinkedPanelEntryService {
                                    CommandLinkedNpcLostService lostService,
                                    CommandNpcRelocationService relocationService,
                                    CommandNpcNameResolver npcNameResolver,
+                                   @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandGroupService groupService,
                                    @Nullable CommandNpcProfileActionResolver profileActionResolver) {
@@ -62,6 +64,9 @@ final class CommandLinkedPanelEntryService {
         this.lostService = lostService;
         this.relocationService = relocationService;
         this.npcNameResolver = npcNameResolver;
+        this.unloadedNameService = new CommandLinkedPanelUnloadedNameService(
+                this.npcNameResolver, stateSnapshotService
+        );
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();
         this.progressionPresentationService = new CommandLinkedPanelProgressionPresentationService();
@@ -113,7 +118,7 @@ final class CommandLinkedPanelEntryService {
             String groupColor = resolvedGroup != null
                     ? resolvedGroup.colorHex
                     : null;
-            String displayName = npcNameResolver.resolveCachedUnloadedDisplayName(record);
+            String displayName = unloadedNameService.resolve(record);
             if (displayName == null || displayName.isBlank()) {
                 displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
             }
