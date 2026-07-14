@@ -33,6 +33,9 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private final double approachStopDistance;
     private final double approachSlowDownDistance;
     private final double relativeSpeed;
+    private final double[] desiredAltitudeRange;
+    private final double climbRelativeSpeed;
+    private final double sinkRelativeSpeed;
     private final Vector3d targetPosition = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d facingDirection = new Vector3d();
@@ -56,6 +59,9 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         approachStopDistance = builder.getApproachStopDistance(support);
         approachSlowDownDistance = Math.max(builder.getApproachSlowDownDistance(support), approachStopDistance);
         relativeSpeed = builder.getRelativeSpeed(support);
+        desiredAltitudeRange = builder.getDesiredAltitudeRange(support);
+        climbRelativeSpeed = builder.getClimbRelativeSpeed(support);
+        sinkRelativeSpeed = builder.getSinkRelativeSpeed(support);
         beginOrbit();
     }
 
@@ -68,7 +74,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                                    @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         desiredSteering.clear();
         MotionController active = role.getActiveMotionController();
-        if (active == null || !active.matchesType(MotionControllerFly.class)
+        if (!(active instanceof MotionControllerFly fly)
                 || sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition)) {
             return false;
         }
@@ -83,7 +89,10 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         }
         Vector3d selfPosition = transform.getPosition();
         boolean approaching = usesApproachSteering(mode, phase);
-        if (!approaching) {
+        boolean facingTarget = facesTarget(mode, phase);
+        if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET) {
+            translation.zero();
+        } else if (!approaching) {
             resolveOrbitTranslation(
                     selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
                     orbitRadius, orbitRadiusTolerance, orbitDirection, relativeSpeed, translation);
@@ -93,12 +102,20 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                     approachStopDistance, approachSlowDownDistance, relativeSpeed, translation);
         }
 
+        double altitudeCorrection = resolveAltitudeCorrection(
+                fly.getHeightOverGround(), desiredAltitudeRange[0], desiredAltitudeRange[1],
+                climbRelativeSpeed, sinkRelativeSpeed);
+        translation.y = altitudeCorrection;
         desiredSteering.setTranslation(translation);
-        Vector3d yawDirection = approaching
+        Vector3d yawDirection = facingTarget
                 ? resolveTargetDirection(selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(), facingDirection)
                 : translation;
         if (yawDirection.lengthSquared() > MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
             desiredSteering.setYaw(PhysicsMath.headingFromDirection(yawDirection.x, yawDirection.z));
+        }
+        if (altitudeCorrection != 0.0
+                && translation.x * translation.x + translation.z * translation.z <= MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
+            desiredSteering.setPitch(altitudeCorrection > 0.0 ? fly.getMaxClimbAngle() : -fly.getMaxSinkAngle());
         }
         desiredSteering.setRelativeTurnSpeed(1.0);
         return false;
@@ -131,6 +148,26 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                                         @Nonnull Phase phase) {
         return mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.APPROACH
                 || mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE && phase == Phase.APPROACH;
+    }
+
+    static boolean facesTarget(@Nonnull BuilderBodyMotionTameworkFlyingOrbit.Mode mode,
+                               @Nonnull Phase phase) {
+        return mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET
+                || usesApproachSteering(mode, phase);
+    }
+
+    static double resolveAltitudeCorrection(double heightOverGround,
+                                            double minimumAltitude,
+                                            double maximumAltitude,
+                                            double climbSpeed,
+                                            double sinkSpeed) {
+        if (heightOverGround < minimumAltitude) {
+            return climbSpeed;
+        }
+        if (heightOverGround > maximumAltitude) {
+            return -sinkSpeed;
+        }
+        return 0.0;
     }
 
     static Vector3d resolveTargetDirection(double selfX,

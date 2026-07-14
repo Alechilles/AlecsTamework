@@ -5,7 +5,9 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
 import com.hypixel.hytale.server.npc.asset.builder.holder.EnumHolder;
+import com.hypixel.hytale.server.npc.asset.builder.holder.NumberArrayHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleRangeValidator;
+import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleSequenceValidator;
 import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleSingleValidator;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
 import java.util.function.Supplier;
@@ -25,13 +27,16 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     private final DoubleHolder approachStopDistance = new DoubleHolder();
     private final DoubleHolder approachSlowDownDistance = new DoubleHolder();
     private final DoubleHolder relativeSpeed = new DoubleHolder();
+    private final NumberArrayHolder desiredAltitudeRange = new NumberArrayHolder();
+    private final DoubleHolder climbRelativeSpeed = new DoubleHolder();
+    private final DoubleHolder sinkRelativeSpeed = new DoubleHolder();
 
     @Nonnull
     @Override
     public BuilderBodyMotionTameworkFlyingOrbit readConfig(@Nonnull JsonElement data) {
         super.readConfig(data);
         getEnum(data, "Mode", mode, Mode.class, Mode.CYCLE, BuilderDescriptorState.WorkInProgress,
-                "Steering mode: Cycle, Orbit, or Approach.", null);
+                "Steering mode: Cycle, Orbit, Approach, or FaceTarget.", null);
         getDouble(data, "OrbitRadius", orbitRadius, 18.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress, "Preferred horizontal orbit radius around the target.", null);
         getDouble(data, "OrbitRadiusTolerance", orbitRadiusTolerance, 4.0, DoubleSingleValidator.greater0(),
@@ -52,6 +57,17 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         getDouble(data, "RelativeSpeed", relativeSpeed, 0.5,
                 DoubleRangeValidator.fromExclToIncl(0, 2), BuilderDescriptorState.WorkInProgress,
                 "Relative speed used by orbit and approach steering.", null);
+        getDoubleRange(data, "DesiredAltitudeRange", desiredAltitudeRange,
+                new double[] { 0.0, Double.MAX_VALUE },
+                DoubleSequenceValidator.betweenWeaklyMonotonic(0, Double.MAX_VALUE),
+                BuilderDescriptorState.WorkInProgress,
+                "Height-over-ground range maintained while steering.", null);
+        getDouble(data, "ClimbRelativeSpeed", climbRelativeSpeed, 1.0,
+                DoubleRangeValidator.between(0, 2), BuilderDescriptorState.WorkInProgress,
+                "Upward steering strength while below the desired altitude range.", null);
+        getDouble(data, "SinkRelativeSpeed", sinkRelativeSpeed, 0.5,
+                DoubleRangeValidator.between(0, 2), BuilderDescriptorState.WorkInProgress,
+                "Downward steering strength while above the desired altitude range.", null);
         return this;
     }
 
@@ -119,10 +135,23 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         return relativeSpeed.get(support.getExecutionContext());
     }
 
+    double[] getDesiredAltitudeRange(BuilderSupport support) {
+        return desiredAltitudeRange.get(support.getExecutionContext());
+    }
+
+    double getClimbRelativeSpeed(BuilderSupport support) {
+        return climbRelativeSpeed.get(support.getExecutionContext());
+    }
+
+    double getSinkRelativeSpeed(BuilderSupport support) {
+        return sinkRelativeSpeed.get(support.getExecutionContext());
+    }
+
     enum Mode implements Supplier<String> {
         CYCLE("Cycle"),
         ORBIT("Orbit"),
-        APPROACH("Approach");
+        APPROACH("Approach"),
+        FACE_TARGET("FaceTarget");
 
         private final String name;
 

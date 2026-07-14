@@ -63,6 +63,26 @@ class BodyMotionTameworkFlyingOrbitTest {
     }
 
     @Test
+    void faceTargetModeTurnsWithoutHorizontalMovementMode() {
+        assertTrue(BodyMotionTameworkFlyingOrbit.facesTarget(
+                BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET,
+                BodyMotionTameworkFlyingOrbit.Phase.ORBIT));
+        assertFalse(BodyMotionTameworkFlyingOrbit.usesApproachSteering(
+                BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET,
+                BodyMotionTameworkFlyingOrbit.Phase.ORBIT));
+    }
+
+    @Test
+    void altitudeCorrectionUsesIndependentClimbAndSinkSpeeds() {
+        assertEquals(1.0, BodyMotionTameworkFlyingOrbit.resolveAltitudeCorrection(
+                3.0, 12.0, 18.0, 1.0, 0.4), EPSILON);
+        assertEquals(-0.4, BodyMotionTameworkFlyingOrbit.resolveAltitudeCorrection(
+                20.0, 12.0, 18.0, 1.0, 0.4), EPSILON);
+        assertEquals(0.0, BodyMotionTameworkFlyingOrbit.resolveAltitudeCorrection(
+                15.0, 12.0, 18.0, 1.0, 0.4), EPSILON);
+    }
+
+    @Test
     void approachKeepsFacingTargetAfterTranslationStops() {
         Vector3d stopped = BodyMotionTameworkFlyingOrbit.resolveApproachTranslation(
                 6.0, 0.0, 0.0, 0.0, 6.0, 14.0, 0.72, new Vector3d());
