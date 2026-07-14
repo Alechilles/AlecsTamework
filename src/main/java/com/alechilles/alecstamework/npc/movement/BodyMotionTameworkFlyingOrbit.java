@@ -23,6 +23,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private static final double MIN_APPROACH_SPEED_FACTOR = 0.2;
     private static final double RADIAL_CORRECTION_WEIGHT = 0.85;
 
+    private final BuilderBodyMotionTameworkFlyingOrbit.Mode mode;
     private final double orbitRadius;
     private final double orbitRadiusTolerance;
     private final double orbitDurationMin;
@@ -34,6 +35,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private final double relativeSpeed;
     private final Vector3d targetPosition = new Vector3d();
     private final Vector3d translation = new Vector3d();
+    private final Vector3d facingDirection = new Vector3d();
 
     private Phase phase = Phase.ORBIT;
     private double phaseRemaining;
@@ -42,6 +44,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     BodyMotionTameworkFlyingOrbit(@Nonnull BuilderBodyMotionTameworkFlyingOrbit builder,
                                   @Nonnull BuilderSupport support) {
         super(builder);
+        mode = builder.getMode(support);
         orbitRadius = builder.getOrbitRadius(support);
         orbitRadiusTolerance = builder.getOrbitRadiusTolerance(support);
         orbitDurationMin = Math.min(builder.getOrbitDurationMin(support), builder.getOrbitDurationMax(support));
@@ -75,9 +78,12 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             return false;
         }
 
-        tickPhase(dt);
+        if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
+            tickPhase(dt);
+        }
         Vector3d selfPosition = transform.getPosition();
-        if (phase == Phase.ORBIT) {
+        boolean approaching = usesApproachSteering(mode, phase);
+        if (!approaching) {
             resolveOrbitTranslation(
                     selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(),
                     orbitRadius, orbitRadiusTolerance, orbitDirection, relativeSpeed, translation);
@@ -88,8 +94,11 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         }
 
         desiredSteering.setTranslation(translation);
-        if (translation.lengthSquared() > MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
-            desiredSteering.setYaw(PhysicsMath.headingFromDirection(translation.x, translation.z));
+        Vector3d yawDirection = approaching
+                ? resolveTargetDirection(selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(), facingDirection)
+                : translation;
+        if (yawDirection.lengthSquared() > MIN_DIRECTION_LENGTH * MIN_DIRECTION_LENGTH) {
+            desiredSteering.setYaw(PhysicsMath.headingFromDirection(yawDirection.x, yawDirection.z));
         }
         desiredSteering.setRelativeTurnSpeed(1.0);
         return false;
@@ -116,6 +125,20 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
 
     private static double randomDuration(double min, double max) {
         return max <= min ? min : ThreadLocalRandom.current().nextDouble(min, max);
+    }
+
+    static boolean usesApproachSteering(@Nonnull BuilderBodyMotionTameworkFlyingOrbit.Mode mode,
+                                        @Nonnull Phase phase) {
+        return mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.APPROACH
+                || mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE && phase == Phase.APPROACH;
+    }
+
+    static Vector3d resolveTargetDirection(double selfX,
+                                           double selfZ,
+                                           double targetX,
+                                           double targetZ,
+                                           @Nonnull Vector3d output) {
+        return output.set(targetX - selfX, 0.0, targetZ - selfZ);
     }
 
     static Vector3d resolveOrbitTranslation(double selfX,
@@ -169,7 +192,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         return Math.max(min, Math.min(max, value));
     }
 
-    private enum Phase {
+    enum Phase {
         ORBIT,
         APPROACH
     }

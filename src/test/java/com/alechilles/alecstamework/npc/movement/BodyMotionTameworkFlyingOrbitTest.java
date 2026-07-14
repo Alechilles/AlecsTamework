@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.movement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.joml.Vector3d;
@@ -49,5 +50,27 @@ class BodyMotionTameworkFlyingOrbitTest {
         assertTrue(moving.x < 0.0);
         assertEquals(0.36, moving.length(), EPSILON);
         assertEquals(0.0, stopped.lengthSquared(), EPSILON);
+    }
+
+    @Test
+    void explicitModesDoNotInheritTheCyclePhase() {
+        assertTrue(BodyMotionTameworkFlyingOrbit.usesApproachSteering(
+                BuilderBodyMotionTameworkFlyingOrbit.Mode.APPROACH,
+                BodyMotionTameworkFlyingOrbit.Phase.ORBIT));
+        assertFalse(BodyMotionTameworkFlyingOrbit.usesApproachSteering(
+                BuilderBodyMotionTameworkFlyingOrbit.Mode.ORBIT,
+                BodyMotionTameworkFlyingOrbit.Phase.APPROACH));
+    }
+
+    @Test
+    void approachKeepsFacingTargetAfterTranslationStops() {
+        Vector3d stopped = BodyMotionTameworkFlyingOrbit.resolveApproachTranslation(
+                6.0, 0.0, 0.0, 0.0, 6.0, 14.0, 0.72, new Vector3d());
+        Vector3d facing = BodyMotionTameworkFlyingOrbit.resolveTargetDirection(
+                6.0, 0.0, 0.0, 0.0, new Vector3d());
+
+        assertEquals(0.0, stopped.lengthSquared(), EPSILON);
+        assertTrue(facing.x < 0.0);
+        assertTrue(facing.lengthSquared() > 0.0);
     }
 }

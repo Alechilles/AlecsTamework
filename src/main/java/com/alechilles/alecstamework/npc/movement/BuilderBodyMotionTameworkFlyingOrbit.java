@@ -4,15 +4,18 @@ import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.asset.builder.holder.DoubleHolder;
+import com.hypixel.hytale.server.npc.asset.builder.holder.EnumHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleRangeValidator;
 import com.hypixel.hytale.server.npc.asset.builder.validators.DoubleSingleValidator;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderBodyMotionBase;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /** Builds target-relative orbit and approach steering for flying NPCs. */
 public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotionBase {
     public static final String BUILDER_ID = "TameworkFlyingOrbit";
 
+    private final EnumHolder<Mode> mode = new EnumHolder<>();
     private final DoubleHolder orbitRadius = new DoubleHolder();
     private final DoubleHolder orbitRadiusTolerance = new DoubleHolder();
     private final DoubleHolder orbitDurationMin = new DoubleHolder();
@@ -27,6 +30,8 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     @Override
     public BuilderBodyMotionTameworkFlyingOrbit readConfig(@Nonnull JsonElement data) {
         super.readConfig(data);
+        getEnum(data, "Mode", mode, Mode.class, Mode.CYCLE, BuilderDescriptorState.WorkInProgress,
+                "Steering mode: Cycle, Orbit, or Approach.", null);
         getDouble(data, "OrbitRadius", orbitRadius, 18.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress, "Preferred horizontal orbit radius around the target.", null);
         getDouble(data, "OrbitRadiusTolerance", orbitRadiusTolerance, 4.0, DoubleSingleValidator.greater0(),
@@ -78,6 +83,10 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         return orbitRadius.get(support.getExecutionContext());
     }
 
+    Mode getMode(BuilderSupport support) {
+        return mode.get(support.getExecutionContext());
+    }
+
     double getOrbitRadiusTolerance(BuilderSupport support) {
         return orbitRadiusTolerance.get(support.getExecutionContext());
     }
@@ -108,5 +117,22 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
 
     double getRelativeSpeed(BuilderSupport support) {
         return relativeSpeed.get(support.getExecutionContext());
+    }
+
+    enum Mode implements Supplier<String> {
+        CYCLE("Cycle"),
+        ORBIT("Orbit"),
+        APPROACH("Approach");
+
+        private final String name;
+
+        Mode(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String get() {
+            return name;
+        }
     }
 }
