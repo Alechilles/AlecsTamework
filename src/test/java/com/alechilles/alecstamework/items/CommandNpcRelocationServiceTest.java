@@ -83,6 +83,10 @@ class CommandNpcRelocationServiceTest {
                 "src", "main", "java", "com", "alechilles", "alecstamework", "items",
                 "CommandNpcRelocationService.java"
         ), StandardCharsets.UTF_8);
+        String lifecycle = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "items",
+                "CommandRelocationNpcLifecycle.java"
+        ), StandardCharsets.UTF_8);
         String dispatch = Files.readString(Path.of(
                 "src", "main", "java", "com", "alechilles", "alecstamework", "items",
                 "CommandRelocationDispatchService.java"
@@ -129,8 +133,7 @@ class CommandNpcRelocationServiceTest {
                 "Live-state or provider changes must close the prepared reservation.");
         assertTrue(service.contains("Objects.equals(owner.getOwnerId(), pending.ownerUuid)"),
                 "Final claim must re-resolve and compare the live owner component.");
-        assertTrue(service.contains(
-                        "scheduleTryApply(tracked.world(), tracked.npcUuid(), INITIAL_APPLY_DELAY_MS)"),
+        assertTrue(lifecycle.contains("applyScheduler.schedule(tracked.world(), tracked.npcUuid())"),
                 "NPC-added callbacks must resume after the later population reconciliation system.");
         assertTrue(service.contains("current.hasSameCommandIntent(pending)"),
                 "Repeated recall clicks must coalesce instead of replacing an in-flight request.");

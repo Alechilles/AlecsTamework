@@ -95,7 +95,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                 : resolveNpcUuid(reference, store);
         try {
             if (relocationService != null) {
-                relocationService.onNpcRemoved(reference, reason, store);
+                relocationService.onNpcRemoved(reference, reason, store, npcUuid);
             }
             if (deathService != null) {
                 deathService.onNpcRemoved(reference, reason, store);

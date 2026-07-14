@@ -59,6 +59,9 @@ final class CommandRelocationDispatchService {
             if (record == null || record.npcUuid == null) {
                 continue;
             }
+            if (relocationService.isDeleteOnRemoveRecoveryPending(record.npcUuid)) {
+                continue;
+            }
             if (captureService != null
                     && captureService.getCapturedSnapshotForToolOrOwner(
                     record.npcUuid,

@@ -179,8 +179,9 @@ Role-scoped behavior tuning belongs in `TwCompanionConfig.Command`:
 - `Travel.FollowMasterOnWorldChangeStateFilter`
 
 Generated portal instances are delete-on-remove worlds. If a linked companion remains inside when
-the instance closes, Tamework publishes its complete last-live state to Lost recovery during the
-world-removal event. This happens before Hytale deletes the instance chunks, so a later Recall uses
+the instance closes, Tamework marks it during the world-removal event and publishes its complete
+last-live state to Lost recovery when that world removes the NPC. Publication runs after the live
+identity is withdrawn but before the shutdown observer clears the snapshot, so a later Recall uses
 the strict recovery flow instead of leaving an Active/Unloaded row pointing at a nonexistent world.
 Permanent worlds are not reclassified by this rule.
 - `DeadRespawnCooldownMs` / `DeadRespawnCooldownMins`

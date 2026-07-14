@@ -17,18 +17,42 @@ class CommandDeleteOnRemoveWorldRecoveryWiringTest {
     private static final Path ITEMS = ROOT.resolve("items");
 
     @Test
-    void removeWorldEventSubmitsRecoveryBeforeTemporaryWorldShutdown() throws Exception {
+    void removeWorldEventMarksRecoveryUntilLiveIdentityIsRemoved() throws Exception {
         String plugin = read(ROOT.resolve("Tamework.java"));
         String relocation = read(ITEMS.resolve("CommandNpcRelocationService.java"));
+        String lifecycle = read(ITEMS.resolve("CommandRelocationNpcLifecycle.java"));
         String tracker = read(ITEMS.resolve("CommandRelocationNpcTracker.java"));
+        String dispatch = read(ITEMS.resolve("CommandRelocationDispatchService.java"));
+        String removalSystem = read(ROOT.resolve(
+                Path.of("npc", "systems", "CommandNpcRelocationOnLoadSystem.java")));
 
         assertTrue(plugin.contains("this::onWorldRemovedForCompanionRecovery"));
         assertTrue(plugin.contains("event != null && !event.isCancelled()"));
         assertTrue(plugin.contains("commandNpcRelocationService.onWorldRemoved(event.getWorld())"));
         assertTrue(tracker.contains("world.getWorldConfig().isDeleteOnRemove()"));
-        assertTrue(relocation.contains("npcTracker.detachDeleteOnRemoveWorld(world)"));
-        assertTrue(relocation.contains("dropReporter.reportWorldRemoval(candidate, removedAtMs)"));
-        assertTrue(relocation.contains("private final CommandRelocationNpcTracker npcTracker"),
+        assertTrue(tracker.contains("pendingWorldRemovalsByNpc"));
+        assertTrue(lifecycle.contains("npcTracker.markDeleteOnRemoveWorld(world, removedAtMs)"));
+        assertTrue(lifecycle.contains("npcTracker.onRemoved(reference, reason, store, npcUuidHint)"));
+        assertTrue(lifecycle.contains("dropReporter.reportWorldRemoval(candidate)"));
+        int removeLiveIdentity = removalSystem.indexOf("stateSnapshotService.beginNpcRemoval");
+        int submitRecovery = removalSystem.indexOf(
+                "relocationService.onNpcRemoved(reference, reason, store, npcUuid)");
+        int clearSnapshot = removalSystem.indexOf("stateSnapshotService.completeNpcRemoval");
+        assertTrue(removeLiveIdentity >= 0
+                        && removeLiveIdentity < submitRecovery
+                        && submitRecovery < clearSnapshot,
+                "Lost submission must run after live-index removal and before snapshot cleanup.");
+        int worldRemovalStart = lifecycle.indexOf("void onWorldRemoved");
+        int worldRemovalEnd = lifecycle.indexOf(
+                "boolean isDeleteOnRemoveRecoveryPending", worldRemovalStart);
+        assertTrue(worldRemovalStart >= 0 && worldRemovalEnd > worldRemovalStart);
+        assertFalse(lifecycle.substring(worldRemovalStart, worldRemovalEnd).contains(
+                        "dropReporter.reportWorldRemoval"),
+                "The pre-shutdown event must not submit while the profile alias is still live.");
+        assertTrue(dispatch.contains(
+                        "relocationService.isDeleteOnRemoveRecoveryPending(record.npcUuid)"),
+                "Relocation dispatch must not race a terminal instance recovery marker.");
+        assertTrue(relocation.contains("private final CommandRelocationNpcLifecycle npcLifecycle"),
                 "The oversized relocation orchestrator must delegate NPC lifecycle tracking.");
     }
 

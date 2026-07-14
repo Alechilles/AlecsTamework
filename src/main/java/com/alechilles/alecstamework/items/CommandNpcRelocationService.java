@@ -38,7 +38,7 @@ public final class CommandNpcRelocationService {
     private final ConcurrentHashMap<UUID, PendingRelocation> pendingByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Vector3d> lastKnownByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, World> knownWorldByNpc = new ConcurrentHashMap<>();
-    private final CommandRelocationNpcTracker npcTracker;
+    private final CommandRelocationNpcLifecycle npcLifecycle;
     private final CommandRelocationAdmissionGate admissionGate = new CommandRelocationAdmissionGate();
     private final CommandRelocationPostMoveEffects postMoveEffects =
             new CommandRelocationPostMoveEffects();
@@ -55,9 +55,17 @@ public final class CommandNpcRelocationService {
 
     public CommandNpcRelocationService(@Nullable HytaleLogger logger) {
         this.diagnostics = new CommandRelocationDiagnostics(logger);
-        this.npcTracker = new CommandRelocationNpcTracker(lastKnownByNpc, knownWorldByNpc);
         this.worldAccess = new CommandRelocationWorldAccess(knownWorldByNpc, this::logTravelDiagnostic);
         this.dropReporter = new CommandRelocationDropReporter(logger, this::logTravelDiagnostic);
+        this.npcLifecycle = new CommandRelocationNpcLifecycle(
+                lastKnownByNpc,
+                knownWorldByNpc,
+                pendingByNpc,
+                dropReporter,
+                (world, npcUuid) -> scheduleTryApply(world, npcUuid, INITIAL_APPLY_DELAY_MS),
+                this::removePending,
+                pending -> cancelAdmission(pending, false, null, null)
+        );
         this.retryCoordinator = new CommandRelocationRetryCoordinator(this, timingPolicy);
         this.chunkLeases = new CommandRelocationChunkLeaseService<>(
                 WorldChunk::addKeepLoaded,
@@ -284,42 +292,26 @@ public final class CommandNpcRelocationService {
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
-        CommandRelocationNpcTracker.TrackedNpc tracked = npcTracker.onAdded(reference, store);
-        if (tracked == null || tracked.world() == null) {
-            return;
-        }
-        // Population reconciliation runs after this observer and must publish ACTIVE first.
-        PendingRelocation pending = pendingByNpc.get(tracked.npcUuid());
-        if (pending != null
-                && Objects.equals(pending.destinationWorldName, tracked.world().getName())) {
-            scheduleTryApply(tracked.world(), tracked.npcUuid(), INITIAL_APPLY_DELAY_MS);
-        }
+        npcLifecycle.onNpcAdded(reference, store);
     }
 
-    public void onNpcRemoved(Ref<EntityStore> reference, RemoveReason reason, Store<EntityStore> store) {
-        npcTracker.onRemoved(reference, reason, store);
+    public void onNpcRemoved(Ref<EntityStore> reference,
+                             RemoveReason reason,
+                             Store<EntityStore> store,
+                             @Nullable UUID npcUuidHint) {
+        npcLifecycle.onNpcRemoved(reference, reason, store, npcUuidHint);
     }
 
     /**
-     * Converts owned NPCs in a delete-on-remove world to strict Lost recovery before Hytale clears
-     * their complete state snapshots during world shutdown.
+     * Marks owned NPCs in a delete-on-remove world for strict Lost recovery at their later
+     * entity-removal boundary.
      */
     public void onWorldRemoved(@Nullable World world) {
-        long removedAtMs = System.currentTimeMillis();
-        for (CommandRelocationNpcTracker.WorldRemovalCandidate candidate
-                : npcTracker.detachDeleteOnRemoveWorld(world)) {
-            PendingRelocation pending = pendingByNpc.get(candidate.npcUuid());
-            if (pending != null
-                    && (pending.isCrossWorldTransferInProgress()
-                    || pending.physicalMutationAttempted())) {
-                continue;
-            }
-            if (pending != null && removePending(candidate.npcUuid(), pending)) {
-                pending.markCrossWorldTransferFinished();
-                cancelAdmission(pending, false, null, null);
-            }
-            dropReporter.reportWorldRemoval(candidate, removedAtMs);
-        }
+        npcLifecycle.onWorldRemoved(world, System.currentTimeMillis());
+    }
+
+    public boolean isDeleteOnRemoveRecoveryPending(@Nullable UUID npcUuid) {
+        return npcLifecycle.isDeleteOnRemoveRecoveryPending(npcUuid);
     }
 
     public boolean tryApply(World world, UUID npcUuid) {

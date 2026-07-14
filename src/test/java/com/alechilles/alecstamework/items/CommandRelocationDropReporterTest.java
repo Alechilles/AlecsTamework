@@ -20,7 +20,7 @@ class CommandRelocationDropReporterTest {
                 null, (level, message) -> diagnostics.add(new Diagnostic(level, message)));
         reporter.setListener((npcUuid, ownerUuid, source, home, destination, queued, dropped, retries) -> true);
 
-        reporter.reportWorldRemoval(candidate(), 500L);
+        reporter.reportWorldRemoval(candidate());
 
         assertEquals(1, diagnostics.size());
         assertEquals(Level.INFO, diagnostics.get(0).level());
@@ -34,7 +34,7 @@ class CommandRelocationDropReporterTest {
                 null, (level, message) -> diagnostics.add(new Diagnostic(level, message)));
         reporter.setListener((npcUuid, ownerUuid, source, home, destination, queued, dropped, retries) -> false);
 
-        reporter.reportWorldRemoval(candidate(), 500L);
+        reporter.reportWorldRemoval(candidate());
 
         assertEquals(Level.WARNING, diagnostics.get(0).level());
         assertTrue(diagnostics.get(0).message().contains("lostTransitionSubmitted=false"));
@@ -45,7 +45,8 @@ class CommandRelocationDropReporterTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 new Vector3d(1.0, 2.0, 3.0),
-                "instance-Forgotten_Temple-test"
+                "instance-Forgotten_Temple-test",
+                500L
         );
     }
 

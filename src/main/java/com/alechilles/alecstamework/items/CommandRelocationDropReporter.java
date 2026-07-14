@@ -54,8 +54,8 @@ final class CommandRelocationDropReporter {
         }
     }
 
-    void reportWorldRemoval(CommandRelocationNpcTracker.WorldRemovalCandidate candidate,
-                            long removedAtMs) {
+    void reportWorldRemoval(CommandRelocationNpcTracker.WorldRemovalCandidate candidate) {
+        long removedAtMs = candidate.worldRemovalMarkedAtMs();
         boolean submitted = submit(
                 candidate.npcUuid(),
                 candidate.ownerUuid(),
