@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionRelocationAdmissionService;
@@ -31,16 +30,11 @@ import org.joml.Vector3d;
  * Handles delayed/off-screen NPC relocation requests for command items.
  */
 public final class CommandNpcRelocationService {
-    private static final long SLOW_OPERATION_THRESHOLD_NS = TimeUnit.MILLISECONDS.toNanos(20L);
     private static final long INITIAL_APPLY_DELAY_MS = 250L;
     private static final long CHUNK_REQUEST_COOLDOWN_MS = 1500L;
     private static final long RELOCATION_CONFIRMATION_DELAY_MS = 250L;
     private static final long RELOCATION_CONFIRMATION_TIMEOUT_MS = 5000L;
     private static final double DESTINATION_CONFIRM_TOLERANCE = 4.0;
-    private static final int RETRY_PROGRESS_LOG_STEP = 5;
-
-    @Nullable
-    private final HytaleLogger logger;
     private final ConcurrentHashMap<UUID, PendingRelocation> pendingByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Vector3d> lastKnownByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, World> knownWorldByNpc = new ConcurrentHashMap<>();
@@ -52,13 +46,14 @@ public final class CommandNpcRelocationService {
     private final CommandRelocationTimingPolicy timingPolicy = new CommandRelocationTimingPolicy();
     private final CommandRelocationRetryCoordinator retryCoordinator;
     private final CommandRelocationChunkLeaseService<PendingRelocation, WorldChunk> chunkLeases;
+    private final CommandRelocationDiagnostics diagnostics;
 
     public CommandNpcRelocationService() {
         this(null);
     }
 
     public CommandNpcRelocationService(@Nullable HytaleLogger logger) {
-        this.logger = logger;
+        this.diagnostics = new CommandRelocationDiagnostics(logger);
         this.worldAccess = new CommandRelocationWorldAccess(knownWorldByNpc, this::logTravelDiagnostic);
         this.dropReporter = new CommandRelocationDropReporter(logger, this::logTravelDiagnostic);
         this.retryCoordinator = new CommandRelocationRetryCoordinator(this, timingPolicy);
@@ -221,6 +216,7 @@ public final class CommandNpcRelocationService {
             PendingRelocation pending = new PendingRelocation(
                     npcUuid,
                     new Vector3d(destination),
+                    world.getName(),
                     sourceHintPosition != null ? new Vector3d(sourceHintPosition) : null,
                     alternateSourceHintPosition != null ? new Vector3d(alternateSourceHintPosition) : null,
                     ownerUuid,
@@ -240,6 +236,13 @@ public final class CommandNpcRelocationService {
                 lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(sourceHintPosition));
             } else if (alternateSourceHintPosition != null) {
                 lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(alternateSourceHintPosition));
+            }
+            PendingRelocation current = pendingByNpc.get(npcUuid);
+            if (current != null
+                    && (current.hasSameCommandIntent(pending) || current.physicalMutationAttempted())) {
+                requestChunksForPending(world, current);
+                scheduleTryApply(world, npcUuid, 0L);
+                return;
             }
             chunkLeases.open(pending);
             PendingRelocation replaced = pendingByNpc.put(npcUuid, pending);
@@ -294,7 +297,11 @@ public final class CommandNpcRelocationService {
             return;
         }
         knownWorldByNpc.put(snapshot.npcUuid, world);
-        tryApply(world, snapshot.npcUuid);
+        // Population reconciliation runs after this observer and must publish ACTIVE first.
+        PendingRelocation pending = pendingByNpc.get(snapshot.npcUuid);
+        if (pending != null && Objects.equals(pending.destinationWorldName, world.getName())) {
+            scheduleTryApply(world, snapshot.npcUuid, INITIAL_APPLY_DELAY_MS);
+        }
     }
 
     public void onNpcRemoved(Ref<EntityStore> reference, RemoveReason reason, Store<EntityStore> store) {
@@ -332,9 +339,6 @@ public final class CommandNpcRelocationService {
             long now = System.currentTimeMillis();
             if (now < pending.executeAfterMs) {
                 scheduleTryApply(world, npcUuid, pending.executeAfterMs - now);
-                return false;
-            }
-            if (!ensureAdmission(world, pending)) {
                 return false;
             }
             Ref<EntityStore> ref = world.getEntityRef(npcUuid);
@@ -382,6 +386,9 @@ public final class CommandNpcRelocationService {
             TransformComponent transform = safeGetComponent(store, ref, TransformComponent.getComponentType());
             if (transform == null) {
                 retryCoordinator.afterLiveStateUnavailable(world, npcUuid, pending);
+                return false;
+            }
+            if (!ensureAdmission(world, pending)) {
                 return false;
             }
             if (!pending.relocationIssued) {
@@ -458,6 +465,7 @@ public final class CommandNpcRelocationService {
                 leaseBoundDispatcher(world),
                 () -> pendingByNpc.get(pending.npcUuid) == pending,
                 () -> scheduleTryApply(world, pending.npcUuid, 0L),
+                reason -> retryAdmission(world, pending, reason),
                 reason -> denyAdmission(pending, reason)
         );
     }
@@ -477,8 +485,18 @@ public final class CommandNpcRelocationService {
                 pending,
                 leaseBoundDispatcher(world),
                 () -> pendingByNpc.get(pending.npcUuid) == pending,
+                reason -> retryAdmission(world, pending, reason),
                 reason -> denyAdmission(pending, reason)
         );
+    }
+
+    private void retryAdmission(World world, PendingRelocation pending, String reason) {
+        if (world == null || pendingByNpc.get(pending.npcUuid) != pending) {
+            return;
+        }
+        logTravelDiagnostic(Level.INFO,
+                "Retrying relocation admission for npc=" + pending.npcUuid + ", reason=" + reason);
+        retryCoordinator.keepingAdmission(world, pending.npcUuid, pending, false);
     }
 
     private void cancelPendingAdmissionForDenial(World world,
@@ -568,6 +586,9 @@ public final class CommandNpcRelocationService {
                 );
             }
             return false;
+        }
+        if (!ensureAdmission(destinationWorld, pending)) {
+            return true;
         }
         pending.resetSourceWorldMissingLogged();
         if (!pending.markCrossWorldTransferStarted()) {
@@ -1031,21 +1052,7 @@ public final class CommandNpcRelocationService {
             return;
         }
         requestChunkLoad(world, pending, pending.destination);
-        Vector3d hintedSource = pending.sourceHintPosition;
-        Vector3d alternateSource = pending.alternateSourceHintPosition;
-        Vector3d cachedSource = lastKnownByNpc.get(pending.npcUuid);
-        if (hintedSource != null) {
-            requestChunkLoad(world, pending, hintedSource);
-        }
-        if (alternateSource != null
-                && (hintedSource == null || !worldAccess.isNear(alternateSource, hintedSource, 0.5))) {
-            requestChunkLoad(world, pending, alternateSource);
-        }
-        if (cachedSource != null
-                && (hintedSource == null || !worldAccess.isNear(cachedSource, hintedSource, 0.5))
-                && (alternateSource == null || !worldAccess.isNear(cachedSource, alternateSource, 0.5))) {
-            requestChunkLoad(world, pending, cachedSource);
-        }
+        requestSourceHints(world, pending);
     }
 
     private void requestChunkLoad(World world, PendingRelocation pending, Vector3d position) {
@@ -1065,32 +1072,12 @@ public final class CommandNpcRelocationService {
                 return;
             }
             if (throwable == null && chunk != null) {
-                if (!chunkLeases.retain(pending, chunk) && isLagDebugEnabled() && logger != null) {
-                    logger.at(Level.WARNING).log(
-                            "Tamework lag probe: relocation chunk lease was not retained (npc="
-                                    + pending.npcUuid
-                                    + ", chunkX="
-                                    + chunkX
-                                    + ", chunkZ="
-                                    + chunkZ
-                                    + ")."
-                    );
+                if (!chunkLeases.retain(pending, chunk)) {
+                    diagnostics.chunkLeaseNotRetained(pending.npcUuid, chunkX, chunkZ);
                 }
                 scheduleTryApply(world, pending.npcUuid, INITIAL_APPLY_DELAY_MS);
-            } else if (isLagDebugEnabled() && logger != null) {
-                var event = logger.at(Level.WARNING);
-                if (throwable != null) {
-                    event = event.withCause(throwable);
-                }
-                event.log(
-                        "Tamework lag probe: relocation chunk request failed (npc="
-                                + pending.npcUuid
-                                + ", chunkX="
-                                + chunkX
-                                + ", chunkZ="
-                                + chunkZ
-                                + ")."
-                );
+            } else {
+                diagnostics.chunkRequestFailed(pending.npcUuid, chunkX, chunkZ, throwable);
             }
         });
     }
@@ -1183,55 +1170,19 @@ public final class CommandNpcRelocationService {
     }
 
     private boolean isLagDebugEnabled() {
-        Tamework plugin = Tamework.getInstance();
-        return plugin != null && plugin.isDebugLagEnabled();
+        return diagnostics.isLagDebugEnabled();
     }
 
     private void logTravelDiagnostic(Level level, String message) {
-        if (logger == null || message == null || message.isBlank()) {
-            return;
-        }
-        try {
-            logger.at(level).log("[CompanionTravel] " + message);
-        } catch (RuntimeException | LinkageError ignored) {
-            // Diagnostics must never interrupt relocation terminality.
-        }
+        diagnostics.log(level, message);
     }
 
     private void logSlowOperation(long startedNs, String operation) {
-        if (startedNs <= 0L || logger == null) {
-            return;
-        }
-        long elapsedNs = System.nanoTime() - startedNs;
-        if (elapsedNs < SLOW_OPERATION_THRESHOLD_NS) {
-            return;
-        }
-        double elapsedMs = elapsedNs / 1_000_000.0;
-        logTravelDiagnostic(Level.WARNING,
-                "Tamework lag probe: "
-                        + operation
-                        + " took "
-                        + elapsedMs
-                        + "ms."
-        );
+        diagnostics.logSlowOperation(startedNs, operation);
     }
 
     void logRetryProgress(PendingRelocation pending, long nowMs) {
-        if (pending == null || logger == null || !isLagDebugEnabled()) {
-            return;
-        }
-        if (!pending.markRetryProgressLogged(RETRY_PROGRESS_LOG_STEP)) {
-            return;
-        }
-        logTravelDiagnostic(Level.INFO,
-                "Tamework lag probe: relocation still pending (npc="
-                        + pending.npcUuid
-                        + ", retries="
-                        + pending.retryAttempts
-                        + ", ageMs="
-                        + (nowMs - pending.queuedAtMs)
-                        + ")."
-        );
+        diagnostics.logRetryProgress(pending, nowMs);
     }
 
     private NpcSnapshot resolveSnapshot(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -1281,6 +1232,10 @@ public final class CommandNpcRelocationService {
         if (sourceWorld == null || pending == null) {
             return;
         }
+        requestSourceHints(sourceWorld, pending);
+    }
+
+    private void requestSourceHints(World sourceWorld, PendingRelocation pending) {
         Vector3d hintedSource = pending.sourceHintPosition;
         Vector3d alternateSource = pending.alternateSourceHintPosition;
         Vector3d cachedSource = lastKnownByNpc.get(pending.npcUuid);

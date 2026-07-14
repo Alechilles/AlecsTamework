@@ -15,6 +15,7 @@ import org.joml.Vector3d;
 final class PendingRelocation {
     final UUID npcUuid;
     final Vector3d destination;
+    final String destinationWorldName;
     final Vector3d sourceHintPosition;
     final Vector3d alternateSourceHintPosition;
     final UUID ownerUuid;
@@ -45,6 +46,7 @@ final class PendingRelocation {
 
     PendingRelocation(UUID npcUuid,
                       Vector3d destination,
+                      String destinationWorldName,
                       Vector3d sourceHintPosition,
                       Vector3d alternateSourceHintPosition,
                       UUID ownerUuid,
@@ -60,6 +62,9 @@ final class PendingRelocation {
                       CompanionRelocationAdmissionService.ForcePolicy forcePolicy) {
         this.npcUuid = Objects.requireNonNull(npcUuid, "npcUuid");
         this.destination = Objects.requireNonNull(destination, "destination");
+        this.destinationWorldName = Objects.requireNonNull(
+                destinationWorldName, "destinationWorldName"
+        );
         this.sourceHintPosition = sourceHintPosition;
         this.alternateSourceHintPosition = alternateSourceHintPosition;
         this.ownerUuid = ownerUuid;
@@ -245,7 +250,8 @@ final class PendingRelocation {
 
     synchronized ClaimCompletion finishApplyClaim(
             CompanionRelocationAdmissionService.Admission claimedAdmission,
-            CompanionRelocationAdmissionService.Decision decision
+            CompanionRelocationAdmissionService.Decision decision,
+            boolean retryable
     ) {
         if (admissionPhase != AdmissionPhase.CLAIMING || admission == null
                 || !admission.equals(claimedAdmission)) {
@@ -255,8 +261,9 @@ final class PendingRelocation {
                 || decision.admission() == null
                 || !decision.admission().equals(claimedAdmission)) {
             admission = null;
-            admissionPhase = AdmissionPhase.TERMINAL;
-            return ClaimCompletion.REJECTED;
+            cancellationRequestedDuringClaim = false;
+            admissionPhase = retryable ? AdmissionPhase.NONE : AdmissionPhase.TERMINAL;
+            return retryable ? ClaimCompletion.RETRY_REQUIRED : ClaimCompletion.REJECTED;
         }
         if (cancellationRequestedDuringClaim) {
             admissionPhase = AdmissionPhase.CANCELING;
@@ -324,6 +331,21 @@ final class PendingRelocation {
         return admissionPhase.name();
     }
 
+    /** Treats repeated clicks for the same command as one request even if the player moved. */
+    boolean hasSameCommandIntent(PendingRelocation other) {
+        return other != null
+                && Objects.equals(ownerUuid, other.ownerUuid)
+                && Objects.equals(destinationWorldName, other.destinationWorldName)
+                && assignOwnerAsMasterTarget == other.assignOwnerAsMasterTarget
+                && clearLockedTarget == other.clearLockedTarget
+                && Objects.equals(state, other.state)
+                && Objects.equals(subState, other.subState)
+                && allowCrossWorldTransfer == other.allowCrossWorldTransfer
+                && onTransferFailure == other.onTransferFailure
+                && forcePolicy == other.forcePolicy
+                && requiredStateFilter.equals(other.requiredStateFilter);
+    }
+
     private static Set<String> normalizeStateFilter(@Nullable String[] rawFilter) {
         if (rawFilter == null || rawFilter.length == 0) {
             return Set.of();
@@ -369,6 +391,7 @@ final class PendingRelocation {
     enum ClaimCompletion {
         APPLYING,
         CANCEL_REQUIRED,
+        RETRY_REQUIRED,
         REJECTED
     }
 }

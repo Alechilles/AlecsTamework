@@ -21,6 +21,7 @@ final class CommandRelocationAdmissionGate {
                    Dispatcher dispatcher,
                    BooleanSupplier stillCurrent,
                    Runnable ready,
+                   Consumer<String> retrying,
                    Consumer<String> denied) {
         Objects.requireNonNull(pending, "pending");
         if (pending.admissionPrepared()) {
@@ -40,7 +41,7 @@ final class CommandRelocationAdmissionGate {
                     dispatcher,
                     () -> finishPreparation(
                             pending, service, decision, failure, dispatcher,
-                            stillCurrent, ready, denied
+                            stillCurrent, ready, retrying, denied
                     ),
                     () -> closePreparationAfterDispatchFailure(
                             pending, service, decision, stillCurrent, denied
@@ -60,6 +61,7 @@ final class CommandRelocationAdmissionGate {
     boolean claimForApply(PendingRelocation pending,
                           Dispatcher dispatcher,
                           BooleanSupplier stillCurrent,
+                          Consumer<String> retrying,
                           Consumer<String> denied) {
         if (pending.admissionApplying()) {
             return true;
@@ -89,7 +91,10 @@ final class CommandRelocationAdmissionGate {
             return false;
         }
 
-        PendingRelocation.ClaimCompletion completion = pending.finishApplyClaim(admission, decision);
+        boolean retryable = CommandRelocationAdmissionRetryPolicy.shouldRetry(decision);
+        PendingRelocation.ClaimCompletion completion = pending.finishApplyClaim(
+                admission, decision, retryable
+        );
         if (completion == PendingRelocation.ClaimCompletion.APPLYING) {
             return true;
         }
@@ -98,6 +103,12 @@ final class CommandRelocationAdmissionGate {
                     pending, service, admission, dispatcher, stillCurrent, denied,
                     "relocation-admission-canceled-before-mutation"
             );
+            return false;
+        }
+        if (completion == PendingRelocation.ClaimCompletion.RETRY_REQUIRED) {
+            cancelOrphan(service, admission);
+            safeAccept(retrying, decision == null
+                    ? "relocation-admission-claim-retry" : decision.reason());
             return false;
         }
         cancelOrphan(service, admission);
@@ -184,6 +195,7 @@ final class CommandRelocationAdmissionGate {
             Dispatcher dispatcher,
             BooleanSupplier stillCurrent,
             Runnable ready,
+            Consumer<String> retrying,
             Consumer<String> denied
     ) {
         if (!isStillCurrent(stillCurrent)) {
@@ -194,8 +206,10 @@ final class CommandRelocationAdmissionGate {
         if (failure != null || decision == null
                 || decision.status() != CompanionRelocationAdmissionService.Status.RESERVED
                 || decision.admission() == null) {
-            pending.finishUnclaimedPreparation(false);
-            safeAccept(denied, decision == null
+            boolean retryable = failure == null
+                    && CommandRelocationAdmissionRetryPolicy.shouldRetry(decision);
+            pending.finishUnclaimedPreparation(retryable);
+            safeAccept(retryable ? retrying : denied, decision == null
                     ? "relocation-admission-failed" : decision.reason());
             return;
         }

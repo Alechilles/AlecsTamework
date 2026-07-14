@@ -139,8 +139,10 @@ Unloaded flow:
 - Relocation commands enqueue pending relocations by NPC uuid.
 - Source/destination chunks are requested asynchronously.
 - Every loaded source or destination chunk is retained for the lifetime of the pending relocation and released on success, timeout, replacement, cancellation, or shutdown.
-- Retries run on bounded interval/time windows.
-- On-load relocation retries run via `CommandNpcRelocationOnLoadSystem`.
+- The source NPC is resolved after its chunk loads and its canonical population state reconciles; transient admission revision or claim-profile conflicts retry within the same bounded request.
+- Repeated clicks for the same command reuse that pending request, even if the player moved, while a command targeting another world or state remains distinct.
+- Retries run on bounded interval/time windows, and one click is sufficient while the attempting-recall status is shown.
+- On-load relocation resumes after `CommandNpcRelocationOnLoadSystem` yields to population reconciliation.
 
 Lost flow:
 - If relocation retry windows are exhausted, a linked companion can transition to `LOST`; the shipped default wait budget is 10 seconds.

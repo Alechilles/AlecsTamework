@@ -95,6 +95,9 @@ class CommandNpcRelocationServiceTest {
         assertTrue(service.indexOf("now < pending.executeAfterMs")
                         < service.indexOf("if (!ensureAdmission(world, pending))"),
                 "Queued delay must elapse before claim/provider admission is prepared.");
+        assertTrue(service.indexOf("Ref<EntityStore> ref = world.getEntityRef(npcUuid)")
+                        < service.indexOf("if (!ensureAdmission(world, pending))"),
+                "Same-world recall must load the NPC and publish live population state before admission.");
         assertTrue(service.indexOf("if (!ensureAdmission(world, pending))")
                         < service.indexOf("npc.moveTo(ref, pending.destination.x"),
                 "Every queued same- or cross-world move must prepare population admission first.");
@@ -126,6 +129,12 @@ class CommandNpcRelocationServiceTest {
                 "Live-state or provider changes must close the prepared reservation.");
         assertTrue(service.contains("Objects.equals(owner.getOwnerId(), pending.ownerUuid)"),
                 "Final claim must re-resolve and compare the live owner component.");
+        assertTrue(service.contains("scheduleTryApply(world, snapshot.npcUuid, INITIAL_APPLY_DELAY_MS)"),
+                "NPC-added callbacks must resume after the later population reconciliation system.");
+        assertTrue(service.contains("current.hasSameCommandIntent(pending)"),
+                "Repeated recall clicks must coalesce instead of replacing an in-flight request.");
+        assertTrue(gate.contains("CommandRelocationAdmissionRetryPolicy.shouldRetry(decision)"),
+                "Optimistic admission conflicts must retry within the original request.");
     }
 
     @Test
