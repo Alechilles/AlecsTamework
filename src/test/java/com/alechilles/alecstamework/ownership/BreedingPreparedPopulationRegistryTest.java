@@ -79,6 +79,18 @@ class BreedingPreparedPopulationRegistryTest {
                     harness.service.replayState(batch.attemptKey()).pendingChildKeys()
             );
             assertTrue(registry.claimForSpawn(jobId, 0));
+            PreparedBreedingPopulationBatch.ReservedChild child = batch.child(0);
+            assertEquals(
+                    child.profileId(),
+                    harness.identities.resolveProfileId(child.plannedNpcUuid()).orElseThrow()
+            );
+            assertEquals(
+                    child.profileId(),
+                    harness.identities.resolveOrAllocate(
+                            child.plannedNpcUuid(),
+                            "runtime-observation:" + child.plannedNpcUuid()
+                    ).profileId()
+            );
             assertEquals(
                     List.of(BreedingPreparedPopulationRegistry.UnitState.APPLYING),
                     registry.states(jobId)
@@ -101,6 +113,7 @@ class BreedingPreparedPopulationRegistryTest {
             assertTrue(
                     harness.service.replayState(batch.attemptKey()).pendingChildKeys().isEmpty()
             );
+            assertTrue(harness.identities.resolveProfileId(child.plannedNpcUuid()).isEmpty());
         }
     }
 
@@ -292,15 +305,16 @@ class BreedingPreparedPopulationRegistryTest {
                 absentProbe(ClaimIntegrationProvider.QUESTLINES_CLAIMS, "questlines-claims"),
                 absentProbe(ClaimIntegrationProvider.SIMPLE_CLAIMS, "simpleclaims")
         );
+        CompanionIdentityResolver identities = new CompanionIdentityResolver();
         BreedingPopulationAdmissionService service = new BreedingPopulationAdmissionService(
                 new CompanionPopulationBatchAdmissionCoordinator(combined),
                 ownerIndex,
                 claimIndex,
                 providers,
                 new OwnerComponentMutationService(ownerCoordinator),
-                new CompanionIdentityResolver()
+                identities
         );
-        return new Harness(queue, providers, service);
+        return new Harness(queue, providers, service, identities);
     }
 
     private static BreedingPreparedPopulationRegistry installedRegistry(
@@ -395,17 +409,20 @@ class BreedingPreparedPopulationRegistryTest {
         private final PersistenceWriteQueue queue;
         private final ClaimProviderRegistry providers;
         private final BreedingPopulationAdmissionService service;
+        private final CompanionIdentityResolver identities;
         private final Object scope = new Object();
         private final UUID jobId = UUID.randomUUID();
 
         private Harness(
                 PersistenceWriteQueue queue,
                 ClaimProviderRegistry providers,
-                BreedingPopulationAdmissionService service
+                BreedingPopulationAdmissionService service,
+                CompanionIdentityResolver identities
         ) {
             this.queue = queue;
             this.providers = providers;
             this.service = service;
+            this.identities = identities;
         }
 
         private PreparedBreedingPopulationBatch prepare(int count) throws Exception {

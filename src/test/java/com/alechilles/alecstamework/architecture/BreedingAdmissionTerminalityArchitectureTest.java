@@ -85,9 +85,12 @@ class BreedingAdmissionTerminalityArchitectureTest {
         assertTrue(spawn.contains("BreedingChildProjectionMarker.matches("));
         assertTrue(projectionProbe.contains("PlannedCompanionSpawnProbe.probe("));
         int replayFence = admission.indexOf("replayService.currentForSpawn(");
+        int retainAlias = admission.indexOf(
+                "identityResolver.retainPreparedAlias(", replayFence
+        );
         int claim = admission.indexOf("batchCoordinator.claimForApply(", replayFence);
-        assertTrue(replayFence >= 0 && claim > replayFence,
-                "Restart absence must remain current at the physical child spawn claim.");
+        assertTrue(replayFence >= 0 && retainAlias > replayFence && claim > retainAlias,
+                "Restart evidence and the planned alias must be current before the spawn claim.");
         int holderMethod = admission.indexOf("public OwnerComponentMutationService.WriteResult writeSpawnHolder(");
         int holderReplayFence = admission.indexOf(
                 "replayService.currentForSpawn(", holderMethod

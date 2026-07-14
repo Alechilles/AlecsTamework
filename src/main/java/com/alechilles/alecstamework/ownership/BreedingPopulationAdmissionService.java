@@ -198,6 +198,10 @@ public final class BreedingPopulationAdmissionService {
         if (!replayService.currentForSpawn(batch.attemptKey(), child.childKey())) {
             return false;
         }
+        if (!identityResolver.retainPreparedAlias(
+                child.profileId(), child.plannedNpcUuid())) {
+            return false;
+        }
         CompanionAdmissionPolicyResolver.Policy current = policyResolver.resolve(
                 OwnerPopulationOperation.BREEDING,
                 true
@@ -207,12 +211,17 @@ public final class BreedingPopulationAdmissionService {
                 current.claimLimitPerChunk() > 0,
                 lookupMetrics
         );
-        return batchCoordinator.claimForApply(
+        boolean claimed = batchCoordinator.claimForApply(
                 batch.populationBatch(),
                 unitIndex,
                 current.settingsRevision(),
                 refreshed
         );
+        if (!claimed && !identityResolver.releasePreparedAlias(
+                child.profileId(), child.plannedNpcUuid())) {
+            markDegraded("breeding_prepared_identity_release_failed");
+        }
+        return claimed;
     }
 
     /** Installs the planned identity/owner into the pre-add NPC holder. */
@@ -363,6 +372,11 @@ public final class BreedingPopulationAdmissionService {
                 batch.populationBatch(), unitIndex, reason
         ).thenApply(canceled -> {
             if (Boolean.TRUE.equals(canceled)) {
+                if (!identityResolver.releasePreparedAlias(
+                        child.profileId(), child.plannedNpcUuid())) {
+                    markDegraded("breeding_prepared_identity_release_failed");
+                    return false;
+                }
                 replayService.recordAborted(
                         batch.attemptKey(), child.childKey(), batch.birthPlan()
                 );
