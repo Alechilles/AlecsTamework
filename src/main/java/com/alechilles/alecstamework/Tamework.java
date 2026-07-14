@@ -1248,6 +1248,10 @@ public class Tamework extends JavaPlugin {
             managedCoopRuntime.close();
             managedCoopRuntime = null;
         }
+        if (commandNpcRelocationService != null) {
+            commandNpcRelocationService.close();
+            commandNpcRelocationService = null;
+        }
         TameworkBreedingServices.shutdownShared();
         if (persistenceRuntime != null) {
             persistenceRuntime.getNpcProfileRepository().setChangeObserver(null);

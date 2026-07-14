@@ -15,6 +15,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
@@ -50,6 +51,7 @@ public final class CommandNpcRelocationService {
     private final CommandRelocationDropReporter dropReporter;
     private final CommandRelocationTimingPolicy timingPolicy = new CommandRelocationTimingPolicy();
     private final CommandRelocationRetryCoordinator retryCoordinator;
+    private final CommandRelocationChunkLeaseService<PendingRelocation, WorldChunk> chunkLeases;
 
     public CommandNpcRelocationService() {
         this(null);
@@ -60,6 +62,10 @@ public final class CommandNpcRelocationService {
         this.worldAccess = new CommandRelocationWorldAccess(knownWorldByNpc, this::logTravelDiagnostic);
         this.dropReporter = new CommandRelocationDropReporter(logger, this::logTravelDiagnostic);
         this.retryCoordinator = new CommandRelocationRetryCoordinator(this, timingPolicy);
+        this.chunkLeases = new CommandRelocationChunkLeaseService<>(
+                WorldChunk::addKeepLoaded,
+                WorldChunk::removeKeepLoaded
+        );
     }
 
     public void setRelocationDropListener(@Nullable CommandRelocationDropListener relocationDropListener) {
@@ -86,7 +92,7 @@ public final class CommandNpcRelocationService {
             );
             return;
         }
-        if (pendingByNpc.remove(npcUuid, pending)) {
+        if (removePending(npcUuid, pending)) {
             pending.markCrossWorldTransferFinished();
             cancelAdmission(pending, false, null, null);
             logTravelDiagnostic(Level.INFO, "Cancelled pending relocation for npc=" + npcUuid);
@@ -235,8 +241,10 @@ public final class CommandNpcRelocationService {
             } else if (alternateSourceHintPosition != null) {
                 lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(alternateSourceHintPosition));
             }
+            chunkLeases.open(pending);
             PendingRelocation replaced = pendingByNpc.put(npcUuid, pending);
             if (replaced != null) {
+                chunkLeases.release(replaced);
                 replaced.markCrossWorldTransferFinished();
                 if (replaced.admissionApplying() && replaced.physicalMutationAttempted()) {
                     commitUnconfirmedRelocationAsLost(
@@ -367,7 +375,7 @@ public final class CommandNpcRelocationService {
                                 + pending.describeStateFilter()
                 );
                 pending.markCrossWorldTransferFinished();
-                pendingByNpc.remove(npcUuid, pending);
+                removePending(npcUuid, pending);
                 cancelAdmission(pending, false, null, null);
                 return false;
             }
@@ -500,7 +508,7 @@ public final class CommandNpcRelocationService {
                 return;
             }
             lastKnownByNpc.put(npcUuid, new Vector3d(pending.destination));
-            pendingByNpc.remove(npcUuid, pending);
+            removePending(npcUuid, pending);
             if (failure != null || decision == null
                     || decision.status() != CompanionRelocationAdmissionService.Status.COMMITTED) {
                 logTravelDiagnostic(Level.WARNING,
@@ -523,7 +531,7 @@ public final class CommandNpcRelocationService {
 
     void cancelObservedSameWorldRelocation(
             World world, UUID npcUuid, PendingRelocation pending) {
-        if (!pendingByNpc.remove(npcUuid, pending)) {
+        if (!removePending(npcUuid, pending)) {
             return;
         }
         pending.markPhysicalMutationCompensated();
@@ -537,7 +545,7 @@ public final class CommandNpcRelocationService {
     }
 
     private void denyAdmission(PendingRelocation pending, String reason) {
-        pendingByNpc.remove(pending.npcUuid, pending);
+        removePending(pending.npcUuid, pending);
         logTravelDiagnostic(Level.WARNING,
                 "Relocation admission denied for npc=" + pending.npcUuid + ", reason=" + reason);
     }
@@ -951,7 +959,7 @@ public final class CommandNpcRelocationService {
             );
             return;
         }
-        pendingByNpc.remove(pending.npcUuid, pending);
+        removePending(pending.npcUuid, pending);
         cancelAdmission(pending, false, null, null);
         logTravelDiagnostic(
                 Level.WARNING,
@@ -975,7 +983,7 @@ public final class CommandNpcRelocationService {
                         + policy
         );
         if (policy == TwCompanionConfig.TransferFailurePolicy.Ignore) {
-            pendingByNpc.remove(npcUuid, pending);
+            removePending(npcUuid, pending);
             cancelAdmission(pending, false, null, null);
             return;
         }
@@ -992,7 +1000,7 @@ public final class CommandNpcRelocationService {
             return;
         }
         pending.markCrossWorldTransferFinished();
-        pendingByNpc.remove(npcUuid, pending);
+        removePending(npcUuid, pending);
         cancelAdmission(pending, false, null, null);
         logTravelDiagnostic(
                 Level.INFO,
@@ -1013,7 +1021,7 @@ public final class CommandNpcRelocationService {
             );
             return;
         }
-        pendingByNpc.remove(npcUuid, pending);
+        removePending(npcUuid, pending);
         cancelAdmission(pending, false, null, null);
         dropReporter.report(pending, droppedAtMs);
     }
@@ -1051,15 +1059,30 @@ public final class CommandNpcRelocationService {
         if (!pending.shouldRequestChunk(chunkKey, now, CHUNK_REQUEST_COOLDOWN_MS)) {
             return;
         }
-        CompletableFuture<?> request = world.getChunkAsync(chunkX, chunkZ);
+        CompletableFuture<WorldChunk> request = world.getChunkAsync(chunkX, chunkZ);
         request.whenComplete((chunk, throwable) -> {
             if (pendingByNpc.get(pending.npcUuid) != pending) {
                 return;
             }
-            if (throwable == null) {
+            if (throwable == null && chunk != null) {
+                if (!chunkLeases.retain(pending, chunk) && isLagDebugEnabled() && logger != null) {
+                    logger.at(Level.WARNING).log(
+                            "Tamework lag probe: relocation chunk lease was not retained (npc="
+                                    + pending.npcUuid
+                                    + ", chunkX="
+                                    + chunkX
+                                    + ", chunkZ="
+                                    + chunkZ
+                                    + ")."
+                    );
+                }
                 scheduleTryApply(world, pending.npcUuid, INITIAL_APPLY_DELAY_MS);
             } else if (isLagDebugEnabled() && logger != null) {
-                logger.at(Level.WARNING).withCause(throwable).log(
+                var event = logger.at(Level.WARNING);
+                if (throwable != null) {
+                    event = event.withCause(throwable);
+                }
+                event.log(
                         "Tamework lag probe: relocation chunk request failed (npc="
                                 + pending.npcUuid
                                 + ", chunkX="
@@ -1070,6 +1093,19 @@ public final class CommandNpcRelocationService {
                 );
             }
         });
+    }
+
+    private boolean removePending(UUID npcUuid, PendingRelocation pending) {
+        boolean removed = pendingByNpc.remove(npcUuid, pending);
+        if (removed) {
+            chunkLeases.release(pending);
+        }
+        return removed;
+    }
+
+    /** Releases engine chunk leases when the plugin is disabled between world sessions. */
+    public void close() {
+        chunkLeases.close();
     }
 
     void scheduleTryApply(World world, UUID npcUuid, long delayMs) {
