@@ -158,7 +158,9 @@ class BreedingPersistedProjectionReplayGuardTest {
         assertTrue(retry.usable());
         assertEquals(java.util.Set.of(CHILD), retry.pendingChildKeys());
         assertFalse(unsealed.usable());
-        assertEquals("breeding-replay-journal-unavailable", unsealed.reason());
+        assertEquals(
+                "breeding-replay-projection-evidence-unavailable", unsealed.reason()
+        );
     }
 
     private static void assertBlocked(

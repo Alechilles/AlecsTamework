@@ -45,11 +45,6 @@ final class BreedingReplayJournalLoader {
         }
     }
 
-    /** Keeps replay fail-closed while startup evidence is not yet sealed. */
-    void markUnavailable() {
-        replayService.markUnavailable();
-    }
-
     @Nonnull
     CompletableFuture<Void> refreshAsync() {
         return CompletableFuture.runAsync(this::refresh);

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPersistedProjectionEvidenceRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -19,6 +20,61 @@ class BreedingPopulationReplayServiceTest {
     private static final String SECOND_ATTEMPT = "breeding:second-job";
     private static final String WORLD = "test-world";
     private static final List<String> PARENTS = List.of("profile-parent-a", "profile-parent-z");
+
+    @Test
+    void unsealedProjectionScanStillAllowsFreshCurrentSessionAttempt() {
+        BreedingPopulationReplayService replay = unsealedReplay(List.of());
+        BreedingPopulationAdmissionRequest request = request(
+                plan(), 1, Set.of("child-0")
+        );
+
+        assertTrue(replay.stateForPair(WORLD, PARENTS).usable());
+        assertTrue(replay.accepts(request));
+        assertTrue(replay.recordPrepared(request, List.of(reserved("child-0"))));
+        assertTrue(replay.currentForSpawn(ATTEMPT, "child-0"));
+    }
+
+    @Test
+    void unsealedProjectionScanBlocksOnlyThePersistedPair() {
+        BreedingPopulationReplayService replay = unsealedReplay(List.of(operation(
+                ATTEMPT,
+                "child-0",
+                CompanionPopulationOperationRecord.State.PREPARED,
+                plan(),
+                true,
+                true,
+                WORLD
+        )));
+
+        BreedingPopulationReplayState persisted = replay.stateForPair(WORLD, PARENTS);
+        BreedingPopulationReplayState unrelated = replay.stateForPair(
+                WORLD, List.of("profile-other-a", "profile-other-b")
+        );
+
+        assertFalse(persisted.usable());
+        assertEquals(
+                "breeding-replay-projection-evidence-unavailable", persisted.reason()
+        );
+        assertTrue(unrelated.usable());
+        assertEquals("breeding-replay-pair-empty", unrelated.reason());
+    }
+
+    @Test
+    void journalRefreshCannotDiscardCurrentAttemptMissingFromLoadedSnapshot() {
+        BreedingPopulationReplayService replay = unsealedReplay(List.of());
+        BreedingPopulationAdmissionRequest request = request(
+                plan(), 1, Set.of("child-0")
+        );
+        assertTrue(replay.recordPrepared(request, List.of(reserved("child-0"))));
+
+        replay.replace(List.of());
+
+        assertTrue(replay.currentForSpawn(ATTEMPT, "child-0"));
+        assertEquals(
+                Set.of("child-0"),
+                replay.stateForPair(WORLD, PARENTS).pendingChildKeys()
+        );
+    }
 
     @Test
     void partialCapAdmittedSubsetNeverResurrectsUnadmittedPlanChildren() {
@@ -312,6 +368,18 @@ class BreedingPopulationReplayServiceTest {
                 plan.children().stream().map(
                         BreedingBirthPlanSnapshot.PlannedChild::childKey
                 ).collect(java.util.stream.Collectors.toSet())
+        );
+    }
+
+    private static BreedingPopulationReplayService unsealedReplay(
+            List<CompanionPopulationOperationRecord> operations
+    ) {
+        return new BreedingPopulationReplayService(
+                operations,
+                true,
+                new BreedingPersistedProjectionReplayGuard(
+                        new CompanionPersistedProjectionEvidenceRegistry()
+                )
         );
     }
 

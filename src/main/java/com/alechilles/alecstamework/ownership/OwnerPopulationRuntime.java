@@ -353,7 +353,8 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>> loadedIdentitiesReady
     ) {
-        breedingReplayJournal.markUnavailable();
+        // Keep the successfully loaded journal available for fresh-attempt collision checks.
+        // The projection registry itself revokes only persisted restart replay while rescanning.
         return reconciliationRuntime.start(
                         universe, ownerType, itemFeatures, loadedIdentitiesReady
                 )
