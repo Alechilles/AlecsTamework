@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -32,6 +33,37 @@ class PersistenceWriteQueueTest {
         }
         assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, result.status());
         assertFalse(healthService.isHealthy());
+    }
+
+    /** Protects the July 14 SQLITE_BUSY incident that previously degraded the entire session. */
+    @Test
+    void exhaustedBusyRetriesRejectOnlyAffectedBatchAndLaterWritesRecover() throws Exception {
+        Path sqlitePath = tempDir.resolve("busy-recovery.sqlite");
+        PersistenceHealthService healthService = new PersistenceHealthService();
+        SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
+        try (PersistenceWriteQueue queue = new PersistenceWriteQueue(connectionManager, healthService, null)) {
+            PersistenceWriteQueue.WriteResult busy = queue.submitWithCompletion(
+                    "busy_fixture",
+                    connection -> {
+                        throw new SQLException("[SQLITE_BUSY] The database file is locked");
+                    }
+            ).get(2, TimeUnit.SECONDS);
+
+            assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, busy.status());
+            assertTrue(healthService.isHealthy());
+            assertEquals(PersistenceWriteQueue.QueueState.OPEN, queue.getState());
+
+            PersistenceWriteQueue.WriteResult recovered = queue.submitWithCompletion(
+                    "write_after_busy",
+                    connection -> {
+                        try (Statement statement = connection.createStatement()) {
+                            statement.execute("CREATE TABLE recovered (value INTEGER NOT NULL)");
+                            statement.execute("INSERT INTO recovered (value) VALUES (1)");
+                        }
+                    }
+            ).get(2, TimeUnit.SECONDS);
+            assertTrue(recovered.isCommitted());
+        }
     }
 
     @Test
@@ -118,4 +150,3 @@ class PersistenceWriteQueueTest {
         assertEquals(expected, queue.getState());
     }
 }
-

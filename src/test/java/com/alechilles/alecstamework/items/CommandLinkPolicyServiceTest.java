@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -41,5 +42,18 @@ class CommandLinkPolicyServiceTest {
         assertFalse(CommandLinkPolicyService.isLinkAuthorized(owner, previousOwner, owner, true));
         assertFalse(CommandLinkPolicyService.isLinkAuthorized(owner, owner, previousOwner, true));
         assertFalse(CommandLinkPolicyService.isLinkAuthorized(owner, owner, owner, false));
+    }
+
+    /** Protects nearby-panel cards from showing Link for a live NPC already linked to the tool. */
+    @Test
+    void nearbyLinkStateUsesLiveToolAndCanonicalOwnerAuthority() {
+        UUID owner = UUID.randomUUID();
+        UUID otherOwner = UUID.randomUUID();
+        TameworkCommandLinksComponent links =
+                new TameworkCommandLinksComponent(owner, new String[]{"treat-bag"});
+
+        assertTrue(CommandLinkPolicyService.isLinkedToTool(owner, links, owner, "treat-bag"));
+        assertFalse(CommandLinkPolicyService.isLinkedToTool(owner, links, owner, "other-tool"));
+        assertFalse(CommandLinkPolicyService.isLinkedToTool(otherOwner, links, owner, "treat-bag"));
     }
 }

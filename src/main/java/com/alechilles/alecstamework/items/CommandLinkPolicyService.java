@@ -52,7 +52,7 @@ final class CommandLinkPolicyService {
                               String toolId,
                               Store<EntityStore> store) {
         MembershipMode mode = membershipMode != null ? membershipMode : MembershipMode.LinkedOnly;
-        boolean linked = isLinked(npcRef, playerUuid, toolId, store);
+        boolean linked = isLinkedToTool(npcRef, playerUuid, toolId, store);
         boolean owner = isOwnedByPlayer(npcRef, playerUuid, store);
         boolean master = isMasterTargetedToPlayer(npc, playerRef);
         return switch (mode) {
@@ -161,20 +161,27 @@ final class CommandLinkPolicyService {
         return candidates.toArray(new String[0]);
     }
 
-    private boolean isLinked(Ref<EntityStore> npcRef,
-                             UUID playerUuid,
-                             String toolId,
-                             Store<EntityStore> store) {
+    boolean isLinkedToTool(Ref<EntityStore> npcRef,
+                           UUID playerUuid,
+                           String toolId,
+                           Store<EntityStore> store) {
         TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        if (links == null || toolId == null || toolId.isBlank()) {
-            return false;
-        }
-        return isLinkAuthorized(
-                resolveOwnerId(npcRef, store),
-                links.getOwnerId(),
-                playerUuid,
-                links.containsToolId(toolId)
-        );
+        return isLinkedToTool(resolveOwnerId(npcRef, store), links, playerUuid, toolId);
+    }
+
+    static boolean isLinkedToTool(UUID canonicalOwnerId,
+                                  TameworkCommandLinksComponent links,
+                                  UUID playerUuid,
+                                  String toolId) {
+        return links != null
+                && toolId != null
+                && !toolId.isBlank()
+                && isLinkAuthorized(
+                        canonicalOwnerId,
+                        links.getOwnerId(),
+                        playerUuid,
+                        links.containsToolId(toolId)
+                );
     }
 
     static boolean isLinkAuthorized(UUID canonicalOwnerId,

@@ -237,14 +237,19 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                     completeBatch(batch, WriteStatus.COMMITTED, null, null);
                     return;
                 } catch (Exception exception) {
-                    if (SqliteBusyFailureClassifier.isTransient(exception) && attempt <= MAX_TRANSIENT_RETRIES) {
+                    boolean transientFailure = SqliteBusyFailureClassifier.isTransient(exception);
+                    if (transientFailure && attempt <= MAX_TRANSIENT_RETRIES) {
                         metrics.recordRetry();
                         sleepQuietly(RETRY_BACKOFF_MS * attempt);
                         continue;
                     }
                     String reason = "sqlite_write_failed:" + batch.getFirst().operationName()
                             + ":" + exception.getClass().getSimpleName();
-                    markFailure(reason, exception);
+                    if (transientFailure) {
+                        recordRecoverableFailure(reason, exception);
+                    } else {
+                        markFailure(reason, exception);
+                    }
                     completeBatch(batch, WriteStatus.FAILED, reason, exception);
                     return;
                 }
@@ -335,6 +340,28 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         );
         if (logger != null) {
             logger.at(Level.SEVERE).log("SQLite write failed (" + reason + "): " + exception.getMessage());
+        }
+    }
+
+    /**
+     * Records an exhausted lock retry without quarantining every later write in the world session.
+     * The affected callers still receive a terminal failure and must not publish uncommitted state.
+     */
+    private void recordRecoverableFailure(@Nonnull String reason, @Nonnull Exception exception) {
+        metrics.recordBatchFailure(reason);
+        TameworkTelemetryEvents.recordErrorIfAvailable(
+                "persistence_write_busy_exhausted",
+                exception,
+                TameworkTelemetryContext.persistence(
+                        "write_queue", "write_batch", reason,
+                        "SQLite remained busy after bounded retries; later writes may recover."
+                ).build()
+        );
+        if (logger != null) {
+            logger.at(Level.WARNING).log(
+                    "SQLite write remained busy after retries; rejected affected batch without "
+                            + "degrading later persistence (" + reason + "): " + exception.getMessage()
+            );
         }
     }
 

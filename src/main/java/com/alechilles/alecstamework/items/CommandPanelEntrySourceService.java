@@ -127,6 +127,12 @@ final class CommandPanelEntrySourceService {
                     continue;
                 }
                 String roleId = normalize(linkPolicyService.resolveRoleId(npc));
+                boolean linkedToTool = linkPolicyService.isLinkedToTool(
+                        npcRef,
+                        playerUuid,
+                        toolId,
+                        store
+                );
                 LinkedNpcEntry loadedEntry = loadedSnapshotService.buildLoadedEntry(
                         player,
                         npcRef,
@@ -134,7 +140,7 @@ final class CommandPanelEntrySourceService {
                         new CommandLoadedNpcStatusSnapshotService.NpcStatusContext(
                                 npc.getUuid(),
                                 npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
-                                false,
+                                linkedToTool,
                                 true,
                                 false,
                                 false,
