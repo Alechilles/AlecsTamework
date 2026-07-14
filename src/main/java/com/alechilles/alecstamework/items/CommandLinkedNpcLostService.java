@@ -56,6 +56,7 @@ public final class CommandLinkedNpcLostService {
     private final ConcurrentHashMap<UUID, LostLinkedNpcSnapshot> snapshotsByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> recoverySnapshotsByNpc =
             new ConcurrentHashMap<>();
+    private final CommandRecoveredSourceSuppressionIndex recoveredSourceSuppressions;
     @Nullable
     private final LostRepository repository;
     @Nullable
@@ -177,6 +178,7 @@ public final class CommandLinkedNpcLostService {
         this.repository = repository;
         this.healthService = healthService;
         this.profileActionResolver = profileActionResolver;
+        this.recoveredSourceSuppressions = new CommandRecoveredSourceSuppressionIndex(repository);
         this.transitionPersistenceService = repository != null && stateSnapshotService != null
                 ? new CommandLostTransitionPersistenceService(stateSnapshotService, repository)
                 : null;
@@ -307,20 +309,24 @@ public final class CommandLinkedNpcLostService {
             recoverySnapshotsByNpc.remove(npcUuid);
         }
         LostLinkedNpcSnapshot snapshot = snapshotsByNpc.get(npcUuid);
-        if (snapshot == null) {
-            return;
+        UUID replacementNpcUuid = snapshot != null ? snapshot.replacementNpcUuid() : null;
+        if (replacementNpcUuid == null) {
+            replacementNpcUuid = recoveredSourceSuppressions.replacementFor(npcUuid);
         }
-        if (snapshot.replacementNpcUuid() != null) {
+        if (replacementNpcUuid != null) {
             npc.setToDespawn();
             if (logger != null) {
                 logger.at(Level.WARNING).log(
                         "Suppressed stale linked companion after strict recovery mapping (oldNpc="
                                 + npcUuid
                                 + ", replacementNpc="
-                                + snapshot.replacementNpcUuid()
+                                + replacementNpcUuid
                                 + ")."
                 );
             }
+            return;
+        }
+        if (snapshot == null) {
             return;
         }
         if (snapshotsByNpc.remove(npcUuid, snapshot)) {
@@ -467,6 +473,7 @@ public final class CommandLinkedNpcLostService {
                         now
                 )
         );
+        recoveredSourceSuppressions.record(originalNpcUuid, replacementNpcUuid);
         if (stateSnapshotService != null) {
             stateSnapshotService.clearSnapshot(originalNpcUuid);
         }

@@ -9,6 +9,7 @@ import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
@@ -143,6 +144,7 @@ public final class RoleNameResolver {
         if (!trimmed.contains(".")) {
             addRoleIdNameCandidates(candidates, trimmed);
             addTamedBaseRoleNameCandidates(candidates, trimmed);
+            addNormalizedRoleNameCandidates(candidates, trimmed);
             return candidates;
         }
         if (trimmed.startsWith("server.")) {
@@ -153,6 +155,12 @@ public final class RoleNameResolver {
         addServerVariant(candidates, toSingularNpcRoleKey(trimmed));
         addServerVariant(candidates, toPluralNpcRoleKey(trimmed));
         addTitleNameVariants(candidates);
+        String embeddedRoleId = extractRoleIdFromNameKey(trimmed);
+        if (embeddedRoleId != null) {
+            addRoleIdNameCandidates(candidates, embeddedRoleId);
+            addTamedBaseRoleNameCandidates(candidates, embeddedRoleId);
+            addNormalizedRoleNameCandidates(candidates, embeddedRoleId);
+        }
         return candidates;
     }
 
@@ -207,11 +215,46 @@ public final class RoleNameResolver {
     }
 
     private static void addTamedBaseRoleNameCandidates(List<String> candidates, @Nullable String roleId) {
-        if (roleId == null || roleId.isBlank() || !roleId.startsWith("Tamed_")) {
+        if (roleId == null || roleId.isBlank()
+                || !roleId.regionMatches(true, 0, "Tamed_", 0, "Tamed_".length())) {
             return;
         }
         String baseRoleId = roleId.substring("Tamed_".length());
         addRoleIdNameCandidates(candidates, baseRoleId);
+    }
+
+    private static void addNormalizedRoleNameCandidates(List<String> candidates,
+                                                        @Nullable String roleId) {
+        String normalized = normalizeRoleIdCase(roleId);
+        if (normalized == null || normalized.equals(roleId)) {
+            return;
+        }
+        addRoleIdNameCandidates(candidates, normalized);
+        addTamedBaseRoleNameCandidates(candidates, normalized);
+    }
+
+    @Nullable
+    private static String normalizeRoleIdCase(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        StringBuilder normalized = new StringBuilder(roleId.length());
+        for (String part : roleId.trim().split("_", -1)) {
+            if (part.isEmpty()) {
+                if (!normalized.isEmpty()) {
+                    normalized.append('_');
+                }
+                continue;
+            }
+            if (!normalized.isEmpty()) {
+                normalized.append('_');
+            }
+            normalized.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                normalized.append(part.substring(1).toLowerCase(Locale.ROOT));
+            }
+        }
+        return normalized.isEmpty() ? null : normalized.toString();
     }
 
     private static void addServerVariant(List<String> candidates, @Nullable String key) {

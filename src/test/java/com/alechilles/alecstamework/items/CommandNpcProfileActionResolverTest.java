@@ -197,6 +197,40 @@ class CommandNpcProfileActionResolverTest {
         assertFalse(target.isActionable());
     }
 
+    @Test
+    void recoveredCurrentProjectionCanEnterANewLostCycle() {
+        UUID originalUuid = UUID.randomUUID();
+        UUID currentUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                recoveredIdentity("profile-a", currentUuid, originalUuid),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget target =
+                resolver.resolveLostTransition(currentUuid);
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
+        assertEquals(currentUuid, target.targetNpcUuid());
+        assertTrue(target.isActionable());
+    }
+
+    @Test
+    void recoveredHistoricalSourceCannotStartALostCycleForItsReplacement() {
+        UUID originalUuid = UUID.randomUUID();
+        UUID currentUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                recoveredIdentity("profile-a", currentUuid, originalUuid),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget target =
+                resolver.resolveLostTransition(originalUuid);
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, target.status());
+        assertEquals("profile_already_recovered", target.reason());
+        assertFalse(target.isActionable());
+    }
+
     /** Regression for Recall unavailable after a released coop NPC's chunk unloaded. */
     @Test
     void deployedManagedCoopProjectionCanBeRecalledAfterChunkUnload() {
@@ -307,6 +341,23 @@ class CommandNpcProfileActionResolverTest {
                 true,
                 new NpcIdentityRepository.ProfileFlags(false, false, false, false, null, null),
                 managedAssignment,
+                null
+        );
+    }
+
+    private NpcIdentityRepository.ProfileIdentity recoveredIdentity(
+            String profileId,
+            UUID currentUuid,
+            UUID historicalUuid) {
+        return new NpcIdentityRepository.ProfileIdentity(
+                profileId,
+                currentUuid,
+                List.of(currentUuid, historicalUuid),
+                true,
+                new NpcIdentityRepository.ProfileFlags(
+                        false, false, true, false, null, currentUuid
+                ),
+                null,
                 null
         );
     }

@@ -124,4 +124,17 @@ class CommandNpcNameResolverTest {
                 )
         );
     }
+
+    @Test
+    void resolvesLowercaseTamedRoleIdBeforeFallingBackToRawId() {
+        TranslationRegistry registry = new TranslationRegistry();
+        registry.put("npcRoles.Chicken.name", "Chicken");
+
+        CommandNpcNameResolver resolver = new CommandNpcNameResolver(registry);
+
+        assertEquals(
+                "Chicken",
+                resolver.resolveSnapshotDisplayName(null, null, "tamed_chicken")
+        );
+    }
 }

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.nio.file.Path;
@@ -109,6 +110,34 @@ class NpcRecoveryAtomicFinalizationTest {
         assertEquals(TransitionStatus.REPLAYED, replay.status());
         assertEquals(ActiveOperationsStatus.LOADED, repository.loadAllActive().status());
         assertTrue(repository.loadAllActive().operations().isEmpty());
+    }
+
+    @Test
+    void recoveredProjectionCanReplaceTheConsumedLostEnvelopeOnANewRemoval() throws Exception {
+        claimAndProject("operation-a", "profile-a", SOURCE_A, TARGET_A);
+        clock.set(300L);
+        committed(repository.finalizeRecovery(finalization(
+                "operation-a", "profile-a", SOURCE_A, TARGET_A, 1L, List.of())));
+        LostRepository lostRepository = new LostRepository(connections, writeQueue);
+
+        committed(lostRepository.upsertTracked(
+                new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
+                        TARGET_A, null, null, 400L, 401L, 0, null, 0L
+                )
+        ));
+
+        assertEquals(1, scalarInt("SELECT COUNT(*) FROM npc_snapshots "
+                + "WHERE profile_id = 'profile-a' AND snapshot_type = 'lost' AND is_active = 1"));
+        assertEquals(TARGET_A.toString(), scalarString("SELECT json_extract(payload_json, '$.sourceNpcUuid') "
+                + "FROM npc_snapshots WHERE profile_id = 'profile-a' "
+                + "AND snapshot_type = 'lost' AND is_active = 1"));
+        CommandLinkedNpcLostService.LostLinkedNpcSnapshot repeated = lostRepository.loadAll().stream()
+                .filter(snapshot -> TARGET_A.equals(snapshot.npcUuid()))
+                .findFirst()
+                .orElseThrow();
+        assertNull(repeated.replacementNpcUuid());
+        assertEquals(TARGET_A, lostRepository.loadRecoveredSourceReplacements().get(SOURCE_A));
+        assertNull(lostRepository.loadRecoveredSourceReplacements().get(HISTORICAL_A));
     }
 
     @Test

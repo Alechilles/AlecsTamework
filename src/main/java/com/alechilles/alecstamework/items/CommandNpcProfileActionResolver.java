@@ -96,7 +96,7 @@ final class CommandNpcProfileActionResolver {
         if (identity.status() != CommandNpcIdentityService.ResolutionStatus.RESOLVED) {
             return unresolved(identity, record);
         }
-        String blockedReason = blockedReason(identity, actionKind);
+        String blockedReason = blockedReason(identity, record, actionKind);
         if (blockedReason != null) {
             return result(
                     ResolutionStatus.BLOCKED,
@@ -143,6 +143,7 @@ final class CommandNpcProfileActionResolver {
 
     @Nullable
     private String blockedReason(@Nonnull CommandNpcIdentityService.IdentityResolution identity,
+                                 @Nullable LinkedNpcRecord record,
                                  @Nonnull ActionKind actionKind) {
         CommandNpcIdentityService.DurableStateFlags durable = identity.durableState();
         if (actionKind == ActionKind.LOST_TRANSITION && !identity.liveUuids().isEmpty()) {
@@ -164,10 +165,26 @@ final class CommandNpcProfileActionResolver {
             return "profile_is_lost";
         }
         if (durable.lostReplacementUuid() != null
+                && !isCurrentRecoveredProjectionRemoval(identity, record, actionKind)
                 && (actionKind == ActionKind.LOST_TRANSITION || identity.liveUuids().isEmpty())) {
             return "profile_already_recovered";
         }
         return null;
+    }
+
+    /**
+     * Completed recovery evidence still suppresses the historical source, but the exact recovered
+     * projection that is now canonical must be able to enter a later lost-recovery cycle.
+     */
+    private boolean isCurrentRecoveredProjectionRemoval(
+            @Nonnull CommandNpcIdentityService.IdentityResolution identity,
+            @Nullable LinkedNpcRecord record,
+            @Nonnull ActionKind actionKind) {
+        UUID droppedNpcUuid = record != null ? record.npcUuid : null;
+        return actionKind == ActionKind.LOST_TRANSITION
+                && droppedNpcUuid != null
+                && droppedNpcUuid.equals(identity.currentNpcUuid())
+                && droppedNpcUuid.equals(identity.durableState().lostReplacementUuid());
     }
 
     @Nullable

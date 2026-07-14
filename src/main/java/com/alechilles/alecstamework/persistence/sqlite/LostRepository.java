@@ -9,8 +9,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,6 +82,41 @@ public final class LostRepository {
             return List.of();
         }
         return rows;
+    }
+
+    /**
+     * Loads restart-safe stale-projection mappings from finalized recovery operations.
+     *
+     * <p>This deliberately excludes ordinary historical aliases because one of those can be the
+     * sole live entity eligible for identity repair. A finalized recovery source, by contrast,
+     * must always yield to the profile's current projection.</p>
+     */
+    @Nonnull
+    public Map<UUID, UUID> loadRecoveredSourceReplacements() {
+        LinkedHashMap<UUID, UUID> replacements = new LinkedHashMap<>();
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT o.source_npc_uuid, p.current_npc_uuid
+                     FROM npc_recovery_operations o
+                     INNER JOIN npc_profiles p ON p.profile_id = o.profile_id
+                     WHERE o.state = 'FINALIZED' AND o.active = 0
+                       AND o.source_npc_uuid IS NOT NULL AND p.current_npc_uuid IS NOT NULL
+                       AND o.source_npc_uuid <> p.current_npc_uuid
+                     ORDER BY o.completed_at_ms, o.operation_id
+                     """)) {
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    UUID historicalUuid = SqliteValueCodec.parseUuid(resultSet.getString(1));
+                    UUID currentUuid = SqliteValueCodec.parseUuid(resultSet.getString(2));
+                    if (historicalUuid != null && currentUuid != null) {
+                        replacements.put(historicalUuid, currentUuid);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+        return Map.copyOf(replacements);
     }
 
     public boolean upsertAsync(@Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot) {
