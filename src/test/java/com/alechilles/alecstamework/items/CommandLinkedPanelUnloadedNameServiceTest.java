@@ -41,15 +41,53 @@ class CommandLinkedPanelUnloadedNameServiceTest {
         assertEquals("Kaitlin", service.resolve(record));
     }
 
+    @Test
+    void durableProfileNameSurvivesRestartWithoutALiveSnapshot() {
+        LinkedNpcRecord record = record("Chicken");
+        CommandLinkedPanelUnloadedNameService service = new CommandLinkedPanelUnloadedNameService(
+                resolver(),
+                ignored -> null,
+                ignored -> new CommandLinkedPanelUnloadedNameService.NameSnapshot(
+                        "Kaitlin", "Kaitlin", "Tamed_Chicken"
+                )
+        );
+
+        assertEquals("Kaitlin", service.resolve(record));
+    }
+
+    @Test
+    void durableProfileLookupIsMemoizedAcrossPanelRefreshes() {
+        LinkedNpcRecord record = record("Chicken");
+        int[] lookups = {0};
+        CommandLinkedPanelUnloadedNameService service = new CommandLinkedPanelUnloadedNameService(
+                resolver(),
+                ignored -> null,
+                ignored -> {
+                    lookups[0]++;
+                    return new CommandLinkedPanelUnloadedNameService.NameSnapshot(
+                            "Kaitlin", "Kaitlin", "Tamed_Chicken"
+                    );
+                }
+        );
+
+        assertEquals("Kaitlin", service.resolve(record));
+        assertEquals("Kaitlin", service.resolve(record));
+        assertEquals(1, lookups[0]);
+    }
+
     private static CommandLinkedPanelUnloadedNameService service(
             CommandLinkedPanelUnloadedNameService.NameSnapshot snapshot
     ) {
-        TranslationRegistry translations = new TranslationRegistry();
-        translations.put("npcRoles.Chicken.name", "Chicken");
         return new CommandLinkedPanelUnloadedNameService(
-                new CommandNpcNameResolver(translations),
+                resolver(),
                 ignored -> snapshot
         );
+    }
+
+    private static CommandNpcNameResolver resolver() {
+        TranslationRegistry translations = new TranslationRegistry();
+        translations.put("npcRoles.Chicken.name", "Chicken");
+        return new CommandNpcNameResolver(translations);
     }
 
     private static LinkedNpcRecord record(String cachedDisplayName) {

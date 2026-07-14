@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -54,6 +55,7 @@ final class CommandLinkedPanelEntryService {
                                    CommandNpcRelocationService relocationService,
                                    CommandNpcNameResolver npcNameResolver,
                                    @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                   @Nullable NpcProfileRepository profileRepository,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandGroupService groupService,
                                    @Nullable CommandNpcProfileActionResolver profileActionResolver) {
@@ -65,7 +67,7 @@ final class CommandLinkedPanelEntryService {
         this.relocationService = relocationService;
         this.npcNameResolver = npcNameResolver;
         this.unloadedNameService = new CommandLinkedPanelUnloadedNameService(
-                this.npcNameResolver, stateSnapshotService
+                this.npcNameResolver, stateSnapshotService, profileRepository
         );
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();

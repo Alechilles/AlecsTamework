@@ -117,7 +117,7 @@ Linked panel supports:
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row
 - Group manager flow (create/rename/recolor/delete)
-- Status lanes for loaded/unloaded/dead/lost companions; ordinary unloaded rows keep the latest custom display name captured at the live-to-unloaded boundary
+- Status lanes for loaded/unloaded/dead/lost companions; ordinary unloaded rows keep the latest custom display name from the live snapshot or durable profile, including across restart
 - Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
 - Breeding and harvest cooldown ring/status indicators, plus progression vitals/trait indicators
 - Attempting-recall countdown text for unloaded companions while relocation is still retrying

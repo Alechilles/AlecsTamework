@@ -16,7 +16,7 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - Linked companions for the current tool
 - Active and inactive status
 - Loaded, unloaded, dead, or lost state
-- Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads.
+- Name, species or role label, and often health or cooldown indicators. A custom companion name remains visible after the companion unloads or the world restarts.
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
 - In some mods, happiness details including current and target trend, plus active impulse modifiers

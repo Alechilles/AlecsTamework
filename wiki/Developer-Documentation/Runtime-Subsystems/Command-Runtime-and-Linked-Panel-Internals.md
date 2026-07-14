@@ -35,7 +35,7 @@ When canonical identity is known, a command record also carries the stable profi
 - Nearby and linked modes are separate entry sources
 - `LOST` is not just a label; it is part of the recovery model
 - Dead companion flows depend on persisted snapshots and companion policy
-- Ordinary unloaded presentation resolves the latest live state snapshot before the older display name cached on the command item; committed dead, captured, and managed-coop snapshots remain higher-priority state authorities.
+- Ordinary unloaded presentation resolves the latest live state snapshot, then memoized durable profile metadata, before the older display name cached on the command item. Committed dead, captured, and managed-coop snapshots remain higher-priority state authorities.
 - Managed-coop housing is a profile state, not evidence that the companion vanished. Recovery must not spawn while any alias is live, housed, captured, dead, or already replaced.
 
 ## Related Pages

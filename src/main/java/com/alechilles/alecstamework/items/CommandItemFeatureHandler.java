@@ -184,6 +184,7 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 npcNameResolver,
                 stateSnapshotService,
+                persistenceRuntime != null ? persistenceRuntime.getNpcProfileRepository() : null,
                 linkPolicyService,
                 this.groupService,
                 profileActionResolver
