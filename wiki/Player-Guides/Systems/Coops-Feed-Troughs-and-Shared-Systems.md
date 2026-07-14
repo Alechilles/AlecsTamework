@@ -17,6 +17,7 @@ Some Tamework-powered mods use framework systems beyond basic taming and command
 - Only explicitly enabled/configured coops are managed this way. Other coops keep ordinary vanilla behavior.
 - A companion keeps one stable profile even if its temporary entity UUID changes after release, so command links and progression still refer to the same creature.
 - When an established vanilla coop becomes managed, old residents are audited and imported without spawning replacement copies. If Tamework cannot prove an exact match, it pauses that import for review instead of guessing.
+- On startup, Tamework removes an older managed record only when it can prove the companion no longer belongs to that coop and no coop change is still in progress. Uncertain records remain paused instead of being deleted or released speculatively.
 - Capturing a breeding parent into a managed coop cancels that parent's pending litter.
 
 ## Feed trough support

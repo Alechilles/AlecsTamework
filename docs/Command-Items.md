@@ -138,6 +138,7 @@ Loaded flow:
 Unloaded flow:
 - Relocation commands enqueue pending relocations by NPC uuid.
 - Source/destination chunks are requested asynchronously.
+- Every loaded source or destination chunk is retained for the lifetime of the pending relocation and released on success, timeout, replacement, cancellation, or shutdown.
 - Retries run on bounded interval/time windows.
 - On-load relocation retries run via `CommandNpcRelocationOnLoadSystem`.
 
