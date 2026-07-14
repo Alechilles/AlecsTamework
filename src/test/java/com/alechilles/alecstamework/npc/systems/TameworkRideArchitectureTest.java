@@ -350,6 +350,8 @@ class TameworkRideArchitectureTest {
         assertTrue(content.indexOf("if (ride == null)")
                 < content.indexOf("translation.set(steering.getTranslation())"));
         assertTrue(content.contains("return super.computeMove(ref, role, steering, dt, translation, componentAccessor)"));
+        assertTrue(content.contains("return lastRidden || super.canRestAtPlace()"));
+        assertTrue(content.contains("return lastRidden ? 0.0 : super.getDesiredAltitudeWeight()"));
         assertTrue(content.contains("mountedMaxHorizontalSpeed"));
         assertTrue(content.contains("mountedMaxClimbSpeed"));
         assertTrue(content.contains("mountedMaxSinkSpeed"));

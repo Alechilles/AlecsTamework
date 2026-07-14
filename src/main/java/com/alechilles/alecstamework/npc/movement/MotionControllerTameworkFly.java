@@ -280,12 +280,12 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
 
     @Override
     public boolean canRestAtPlace() {
-        return true;
+        return lastRidden || super.canRestAtPlace();
     }
 
     @Override
     public double getDesiredAltitudeWeight() {
-        return 0.0;
+        return lastRidden ? 0.0 : super.getDesiredAltitudeWeight();
     }
 
     @Override
