@@ -52,6 +52,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed upgraded worlds with legacy saved NPCs aborting population reconciliation before interrupted breeding could recover. Detached saved-entity scans now mirror Hytale's UUID migration by using the NPC's legacy UUID when `UUIDComponent` has not yet been added, while conflicting UUIDs still fail closed; breeding replay warnings now identify the exact parents and safety reason.
 - Fixed `/tw setbreedingready true` and the equivalent Public API mutation clearing Tamework's cooldown fields without clearing Hytale's breeding alarm, which could make the first breeding attempt succeed while later forced-ready attempts silently stopped before pairing admission.
 - Fixed a temporary SQLite database lock permanently disabling Tamework persistence until the world session restarted. The affected operation still fails safely after bounded retries, but later taming, spawning, capture, coop, and recovery writes can proceed as soon as the lock clears.
 - Fixed nearby-panel cards showing a Link action for loaded companions whose live state already links them to the current command tool.

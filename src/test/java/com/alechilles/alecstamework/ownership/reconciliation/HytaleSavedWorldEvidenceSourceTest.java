@@ -275,6 +275,65 @@ class HytaleSavedWorldEvidenceSourceTest {
                         .findFirst().orElseThrow().kind());
     }
 
+    /** Protects old saved NPCs that Hytale's LegacyUUIDSystem migrates only after entity load. */
+    @Test
+    void ownedLegacyNpcWithoutUuidComponentStillProducesPhysicalEvidence() {
+        UUID legacyUuid = new UUID(0L, 61L);
+        ComponentRegistry<EntityStore> entities = new ComponentRegistry<>();
+        ComponentType<EntityStore, UUIDComponent> uuidType = entities.registerComponent(
+                UUIDComponent.class, UUIDComponent::randomUUID
+        );
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = entities.registerComponent(
+                TameworkOwnerComponent.class, TameworkOwnerComponent::new
+        );
+        ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionType =
+                entities.registerComponent(
+                        TameworkProjectionIdentityComponent.class,
+                        TameworkProjectionIdentityComponent::new
+                );
+        ComponentType<EntityStore, NPCEntity> npcType = entities.registerComponent(
+                NPCEntity.class, NPCEntity::new
+        );
+        ComponentType<EntityStore, DeathComponent> deathType = entities.registerComponent(
+                DeathComponent.class, SavedDeathComponent::new
+        );
+        Holder<EntityStore> entity = entities.newHolder();
+        entity.addComponent(ownerType, new TameworkOwnerComponent(new UUID(0L, 62L), "owner"));
+        NPCEntity npc = new NPCEntity();
+        npc.setLegacyUUID(legacyUuid);
+        entity.addComponent(npcType, npc);
+
+        ComponentRegistry<ChunkStore> chunks = new ComponentRegistry<>();
+        ComponentType<ChunkStore, EntityChunk> entityChunkType = chunks.registerComponent(
+                EntityChunk.class, EntityChunk::new
+        );
+        EntityChunk entityChunk = new EntityChunk();
+        entityChunk.addEntityHolder(entity);
+        Holder<ChunkStore> chunk = chunks.newHolder();
+        chunk.addComponent(entityChunkType, entityChunk);
+
+        List<CompanionPopulationEvidence> found = HytaleSavedWorldEvidenceSource.scanEntities(
+                chunk, 9, 10, "alpha", "world-entities:alpha",
+                ownerType, Set.of(),
+                new HytaleSavedWorldEvidenceSource.SavedEntityComponentTypes(
+                        entityChunkType, uuidType, deathType, projectionType, npcType
+                )
+        );
+
+        assertEquals(1, found.size());
+        assertEquals(legacyUuid, found.getFirst().npcUuid());
+        assertEquals(CompanionPopulationEvidence.Kind.PHYSICAL_ENTITY,
+                found.getFirst().kind());
+    }
+
+    @Test
+    void conflictingSavedComponentAndLegacyUuidsFailClosed() {
+        assertThrows(IllegalStateException.class, () ->
+                HytaleSavedWorldEvidenceSource.savedNpcUuid(
+                        new UUID(0L, 71L), new UUID(0L, 72L)
+                ));
+    }
+
     private static CompanionPopulationEvidence evidence(int chunkX, int chunkZ) {
         UUID npcUuid = new UUID(chunkX, chunkZ);
         return new CompanionPopulationEvidence(

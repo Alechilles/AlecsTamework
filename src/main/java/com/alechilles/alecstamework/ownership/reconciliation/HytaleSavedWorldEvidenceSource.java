@@ -240,6 +240,7 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             TameworkOwnerComponent owner = entity.getComponent(ownerType);
             NPCEntity npc = entity.getComponent(types.npcType());
             UUID legacyNpcUuid = npc == null ? null : npc.getUuid();
+            UUID savedNpcUuid = savedNpcUuid(componentUuid, legacyNpcUuid);
             TameworkProjectionIdentityComponent marker = entity.getComponent(types.projectionType());
             boolean deathObserved = entity.getComponent(types.deathType()) != null;
             if (marker != null) {
@@ -249,20 +250,20 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
                         deathObserved
                 ));
             }
-            if (componentUuid == null) {
+            if (savedNpcUuid == null) {
                 if (owner == null) {
                     continue;
                 }
-                throw new IllegalStateException("Owned saved entity is missing UUIDComponent.");
+                throw new IllegalStateException("Owned saved entity has no persisted UUID.");
             }
-            if (owner == null && !knownNpcUuids.contains(componentUuid)) {
+            if (owner == null && !knownNpcUuids.contains(savedNpcUuid)) {
                 continue;
             }
             CompanionPopulationEvidence.Kind kind = entityKind(deathObserved);
             evidence.add(new CompanionPopulationEvidence(
                     "world/" + worldName + "/chunk-" + chunkX + "," + chunkZ
-                            + "/entity-" + componentUuid,
-                    componentUuid,
+                            + "/entity-" + savedNpcUuid,
+                    savedNpcUuid,
                     owner == null ? null : owner.getOwnerId(),
                     kind,
                     worldName,
@@ -273,6 +274,18 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             ));
         }
         return List.copyOf(evidence);
+    }
+
+    /** Mirrors Hytale's LegacyUUIDSystem migration while detached holders have not run systems. */
+    @Nullable
+    static UUID savedNpcUuid(@Nullable UUID componentUuid, @Nullable UUID legacyNpcUuid) {
+        if (componentUuid != null && legacyNpcUuid != null
+                && !componentUuid.equals(legacyNpcUuid)) {
+            throw new IllegalStateException(
+                    "Saved entity UUIDComponent and legacy NPC UUID disagree."
+            );
+        }
+        return componentUuid != null ? componentUuid : legacyNpcUuid;
     }
 
     @Nonnull

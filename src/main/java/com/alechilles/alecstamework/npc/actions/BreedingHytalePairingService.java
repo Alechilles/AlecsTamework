@@ -170,17 +170,19 @@ final class BreedingHytalePairingService {
             logWarning("Breeding pairing blocked because shared population authority is unavailable.");
             return false;
         }
-        BreedingPairingAttempt attempt;
+        BreedingPairingAttemptSelector.Selection selection;
         try {
-            attempt = attemptSelector.select(prepared, populationService);
+            selection = attemptSelector.selectDetailed(prepared, populationService);
         } catch (RuntimeException | LinkageError failure) {
-            logWarning("Breeding pairing blocked because durable pair replay lookup failed.");
+            logWarning("Breeding pairing blocked because durable pair replay lookup failed: "
+                    + replayContext(prepared)
+                    + " reason=" + failure.getClass().getSimpleName() + ".");
             return false;
         }
+        BreedingPairingAttempt attempt = selection.attempt();
         if (attempt == null) {
-            logWarning(
-                    "Breeding pairing blocked because restart replay evidence is unavailable or conflicted."
-            );
+            logWarning("Breeding pairing blocked by restart replay safety: "
+                    + replayContext(prepared) + " reason=" + selection.reason() + ".");
             return false;
         }
         BreedingPairingCoordinator.PairingRequest request = request(
@@ -202,6 +204,15 @@ final class BreedingHytalePairingService {
                 config,
                 store
         );
+    }
+
+    @Nonnull
+    private static String replayContext(@Nonnull BreedingPreparedParents parents) {
+        return "source=" + parents.sourceIdentity().entityUuid()
+                + " sourceProfile=" + parents.sourceIdentity().profileId()
+                + " partner=" + parents.partnerIdentity().entityUuid()
+                + " partnerProfile=" + parents.partnerIdentity().profileId()
+                + " world=" + parents.worldId();
     }
 
     @Nullable

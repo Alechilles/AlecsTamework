@@ -56,6 +56,20 @@ class BreedingPairingAttemptSelectorTest {
     }
 
     @Test
+    void blockedSelectionRetainsTheExactPairReplayReason() {
+        RecordingLookup lookup = new RecordingLookup(
+                state(false, null, Set.of(), "breeding-replay-projection-evidence-unavailable"),
+                state(true, "unused", Set.of(), "unused")
+        );
+
+        BreedingPairingAttemptSelector.Selection selection =
+                new BreedingPairingAttemptSelector().selectDetailed(parents(), lookup);
+
+        assertNull(selection.attempt());
+        assertEquals("breeding-replay-projection-evidence-unavailable", selection.reason());
+    }
+
+    @Test
     void emptyPairIndexUsesTheInjectedNonceForAFreshAttempt() {
         UUID nonce = new UUID(0L, 55L);
         BreedingPreparedParents parents = parents();

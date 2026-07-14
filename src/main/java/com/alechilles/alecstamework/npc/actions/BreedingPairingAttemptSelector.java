@@ -30,7 +30,14 @@ final class BreedingPairingAttemptSelector {
     BreedingPairingAttempt select(
             @Nonnull BreedingPreparedParents parents,
             @Nonnull BreedingPopulationAdmissionService service) {
-        return select(parents, new ReplayLookup() {
+        return selectDetailed(parents, service).attempt();
+    }
+
+    @Nonnull
+    Selection selectDetailed(
+            @Nonnull BreedingPreparedParents parents,
+            @Nonnull BreedingPopulationAdmissionService service) {
+        return selectDetailed(parents, new ReplayLookup() {
             @Override
             public BreedingPopulationReplayState stateForPair(
                     String worldId, List<String> parentProfiles) {
@@ -48,10 +55,17 @@ final class BreedingPairingAttemptSelector {
     BreedingPairingAttempt select(
             @Nonnull BreedingPreparedParents parents,
             @Nonnull ReplayLookup replayLookup) {
+        return selectDetailed(parents, replayLookup).attempt();
+    }
+
+    @Nonnull
+    Selection selectDetailed(
+            @Nonnull BreedingPreparedParents parents,
+            @Nonnull ReplayLookup replayLookup) {
         if (parents.sourceIdentity().profileId().equals(
                 parents.partnerIdentity().profileId()
         )) {
-            return null;
+            return Selection.blocked("breeding-replay-parent-profile-duplicated");
         }
         List<String> parentProfiles = List.of(
                 parents.sourceIdentity().profileId(),
@@ -63,11 +77,18 @@ final class BreedingPairingAttemptSelector {
         if (pairReplay.usable() && pairReplay.hasPendingChildren()) {
             UUID replayId = jobId(pairReplay.attemptKey());
             return replayId == null
-                    ? null
-                    : new BreedingPairingAttempt(replayId, pairReplay, true);
+                    ? Selection.blocked("breeding-replay-attempt-key-invalid")
+                    : Selection.selected(new BreedingPairingAttempt(
+                            replayId, pairReplay, true
+                    ));
         }
         if (!pairReplay.usable()) {
-            return selectLegacyExactReplay(parents, pairReplay, replayLookup);
+            BreedingPairingAttempt legacy = selectLegacyExactReplay(
+                    parents, pairReplay, replayLookup
+            );
+            return legacy == null
+                    ? Selection.blocked(pairReplay.reason())
+                    : Selection.selected(legacy);
         }
 
         UUID newJobId = BreedingAttemptIdentity.forAppliedCooldowns(
@@ -80,9 +101,9 @@ final class BreedingPairingAttemptSelector {
         );
         if (!fresh.usable() || fresh.birthPlan() != null
                 || fresh.hasPendingChildren() || fresh.hasCommittedChildren()) {
-            return null;
+            return Selection.blocked(fresh.reason());
         }
-        return new BreedingPairingAttempt(newJobId, fresh, false);
+        return Selection.selected(new BreedingPairingAttempt(newJobId, fresh, false));
     }
 
     @Nullable
@@ -124,5 +145,25 @@ final class BreedingPairingAttemptSelector {
                 String worldId, List<String> parentProfiles);
 
         BreedingPopulationReplayState state(String attemptKey);
+    }
+
+    /** One attempt selection plus a stable diagnostic when replay safety blocks it. */
+    record Selection(@Nullable BreedingPairingAttempt attempt, @Nonnull String reason) {
+        private static final String SELECTED = "breeding-replay-selected";
+
+        Selection {
+            reason = reason == null || reason.isBlank()
+                    ? "breeding-replay-conflict-unspecified" : reason;
+        }
+
+        @Nonnull
+        static Selection selected(@Nonnull BreedingPairingAttempt attempt) {
+            return new Selection(Objects.requireNonNull(attempt, "attempt"), SELECTED);
+        }
+
+        @Nonnull
+        static Selection blocked(@Nullable String reason) {
+            return new Selection(null, reason);
+        }
     }
 }
