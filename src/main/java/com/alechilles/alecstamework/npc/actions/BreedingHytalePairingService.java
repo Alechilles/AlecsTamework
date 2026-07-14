@@ -234,7 +234,7 @@ final class BreedingHytalePairingService {
             return null;
         }
         try {
-            return parentPreparation.prepare(
+            BreedingPreparedParents prepared = parentPreparation.prepare(
                     sourceRef,
                     sourceNpc,
                     sourceBreeding,
@@ -244,6 +244,23 @@ final class BreedingHytalePairingService {
                     store,
                     config
             );
+            if (prepared == null) {
+                logInfo("Breeding pairing did not reach admission: source="
+                        + sourceNpc.getUuid()
+                        + " partner="
+                        + partnerNpc.getUuid()
+                        + " reason="
+                        + parentPreparation.preparationIssue(
+                                sourceRef,
+                                sourceNpc,
+                                sourceBreeding,
+                                partner.ref,
+                                partnerNpc,
+                                partnerBreeding,
+                                store
+                        ));
+            }
+            return prepared;
         } catch (RuntimeException | LinkageError failure) {
             logWarning("Breeding pairing blocked because canonical parent identity conflicted.");
             return null;

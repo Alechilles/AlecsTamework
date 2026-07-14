@@ -53,6 +53,7 @@ import com.alechilles.alecstamework.damage.TamedDamageDecision;
 import com.alechilles.alecstamework.damage.TamedDamageOwnerPolicy;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.alechilles.alecstamework.npc.actions.BreedingCooldownResetService;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -132,6 +133,8 @@ public final class TameworkApiImpl
     private final PopulationPolicyApiDelegate populationPolicy;
     private final InteractionExtensionApi interactionExtensionApi;
     private final TraitEffectApi traitEffectApi;
+    private final BreedingCooldownResetService breedingCooldownResetService =
+            new BreedingCooldownResetService();
     private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
         @Override
         public Optional<CommandLinkView> getByProfileId(String profileId) {
@@ -1142,13 +1145,19 @@ public final class TameworkApiImpl
             return unsupportedMutation("Breeding state is not available for this NPC.");
         }
 
-        long now = BreedingTimeService.resolveCurrentTimeMs(target.store());
         if (ready) {
-            breeding.setReady(true);
-            breeding.setCooldownUntilMs(0L);
-            breeding.setCooldownStartedAtMs(0L);
-            breeding.setCooldownDurationMs(0L);
-            breeding.setLastPartnerUuid(null);
+            NPCEntity npc = target.store().getComponent(
+                    target.reference(), NPCEntity.getComponentType()
+            );
+            if (!breedingCooldownResetService.forceReady(
+                    target.reference(), npc, breeding, target.store()
+            )) {
+                return new ProgressionMutationResult(
+                        ProgressionMutationStatus.ERROR,
+                        "Breeding cooldown alarm could not be cleared; readiness was not changed.",
+                        null
+                );
+            }
         } else {
             breeding.setReady(false);
         }

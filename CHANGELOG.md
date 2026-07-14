@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Added an optional `aoe [radius]` switch to `/tw setbreedingready`; without an explicit radius it uses the targeted NPC's configured breeding radius.
 - Added read-only managed-coop integrity commands: `/tw coop audit`, `/tw coop import-status`, and an expanded `/tw debugdb integrity` covering SQLite, foreign keys, profile identity, lifecycle operations, and import conflicts.
 - Added fingerprint-bound `/tw coop reconcile` reports and confirmation for legacy residents, plus a read-only `/tw coop rollback-preflight` that reports blockers without claiming an unsafe live database downgrade.
 - `/tw gethappiness` now reports an NPC's active or latest breeding job id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result.
@@ -51,6 +52,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed `/tw setbreedingready true` and the equivalent Public API mutation clearing Tamework's cooldown fields without clearing Hytale's breeding alarm, which could make the first breeding attempt succeed while later forced-ready attempts silently stopped before pairing admission.
 - Fixed a temporary SQLite database lock permanently disabling Tamework persistence until the world session restarted. The affected operation still fails safely after bounded retries, but later taming, spawning, capture, coop, and recovery writes can proceed as soon as the lock clears.
 - Fixed nearby-panel cards showing a Link action for loaded companions whose live state already links them to the current command tool.
 - Fixed pre-existing linked NPCs in upgraded worlds occasionally degrading all companion persistence as soon as they loaded, which could disable coop intake and release. Profiles created by live snapshot canonicalization now reserve and publish their stable identity before the asynchronous database write, preventing the population observer from assigning the same NPC a competing profile.

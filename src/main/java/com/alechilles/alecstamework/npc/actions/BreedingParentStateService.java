@@ -180,6 +180,16 @@ final class BreedingParentStateService {
         );
     }
 
+    @Nullable
+    String snapshotIssue(@Nonnull TameworkBreedingComponent breeding,
+                         @Nonnull NPCEntity npc) {
+        Alarm alarm = breedingAlarm(npc);
+        if (alarm != null && alarm.isSet() && breeding.getCooldownUntilMs() == 0L) {
+            return "cooldown-alarm-set-without-component-deadline";
+        }
+        return null;
+    }
+
     @Nonnull
     AppliedCooldownFingerprint fingerprint(@Nonnull NPCEntity npc,
                                            @Nonnull BreedingCooldownService.CooldownWindow window,

@@ -147,6 +147,30 @@ final class BreedingParentPreparationService {
     }
 
     @Nonnull
+    String preparationIssue(@Nonnull Ref<EntityStore> sourceRef,
+                            @Nonnull NPCEntity sourceNpc,
+                            @Nonnull TameworkBreedingComponent sourceBreeding,
+                            @Nonnull Ref<EntityStore> partnerRef,
+                            @Nonnull NPCEntity partnerNpc,
+                            @Nonnull TameworkBreedingComponent partnerBreeding,
+                            @Nonnull Store<EntityStore> store) {
+        String sourceIssue = parentStateService.snapshotIssue(sourceBreeding, sourceNpc);
+        if (sourceIssue != null) {
+            return "source-" + sourceIssue;
+        }
+        String partnerIssue = parentStateService.snapshotIssue(partnerBreeding, partnerNpc);
+        if (partnerIssue != null) {
+            return "partner-" + partnerIssue;
+        }
+        if (resolveAnchor(sourceRef, partnerRef, store) == null) {
+            return "parent-transform-unavailable";
+        }
+        return resolveWorldId(store) == null
+                ? "world-context-unavailable"
+                : "parent-snapshot-unavailable";
+    }
+
+    @Nonnull
     AppliedCooldownFingerprint persistedFingerprint(@Nonnull ParentBreedingSnapshot snapshot) {
         return parentStateService.fingerprint(snapshot);
     }
