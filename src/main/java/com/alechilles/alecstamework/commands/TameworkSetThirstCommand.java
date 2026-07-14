@@ -8,73 +8,47 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.commands.NPCMultiSelectCommandBase;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import javax.annotation.Nonnull;
 
-/**
- * Command to set thirst for the targeted NPC.
- */
-public final class TameworkSetThirstCommand extends AbstractPlayerCommand {
+import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes.DOUBLE;
+
+/** Sets thirst for NPCs selected with the standard NPC debug selectors. */
+public final class TameworkSetThirstCommand extends NPCMultiSelectCommandBase {
+    private final RequiredArg<Double> valueArg = withRequiredArg("value", "Thirst value to apply.", DOUBLE);
+
     public TameworkSetThirstCommand() {
-        super("setthirst", "Set thirst of the NPC you are looking at.");
-        setAllowsExtraArguments(true);
+        super("thirst", "Set thirst for selected NPCs.");
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        Double requested = TameworkNeedsCommandSupport.parseDoubleArg(commandContext.getInputString(), 2);
-        if (requested == null) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw setthirst <value>"));
-            return;
-        }
-
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
-            return;
-        }
+    protected void execute(@Nonnull CommandContext context, @Nonnull NPCEntity npc, @Nonnull World world,
+                           @Nonnull Store<EntityStore> store, @Nonnull Ref<EntityStore> npcRef) {
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
-        if (needsType == null) {
-            commandContext.sender().sendMessage(Message.raw("Needs component type is not registered."));
+        TameworkNeedsCommandSupport.NeedsContext needsContext =
+                needsType == null ? null : TameworkNeedsCommandSupport.resolveContext(npcRef, store);
+        if (needsContext == null) {
+            context.sendMessage(Message.raw("No enabled needs config resolved for NPC " + npc.getUuid() + "."));
             return;
         }
-        TameworkNeedsCommandSupport.NeedsContext context =
-                TameworkNeedsCommandSupport.resolveContext(candidate.ref, store);
-        if (context == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    "No enabled needs config resolved for this NPC."
-            ));
-            return;
-        }
-
-        TameworkNeedsComponent needs = context.component();
-        TwNeedsConfig.ValueSettings values = context.config() != null ? context.config().getValues() : null;
-        double min = values != null ? values.getThirstMin() : 0.0;
-        double max = values != null ? values.getThirstMax() : 100.0;
-        double applied = TameworkNeedsCommandSupport.clamp(requested, min, max);
+        TwNeedsConfig.ValueSettings values = needsContext.config() != null ? needsContext.config().getValues() : null;
+        double requested = valueArg.get(context);
+        double thirst = TameworkNeedsCommandSupport.clamp(
+                requested, values != null ? values.getThirstMin() : 0.0,
+                values != null ? values.getThirstMax() : 100.0
+        );
+        TameworkNeedsComponent needs = needsContext.component();
         long now = System.currentTimeMillis();
-        needs.setThirst(applied);
+        needs.setThirst(thirst);
         needs.setLastUpdateMs(now);
         needs.setLastPassiveSweepMs(now);
-        store.putComponent(candidate.ref, needsType, needs);
-        CompanionNeedsService.tickNeeds(candidate.ref, store, context.roleId());
-
-        commandContext.sender().sendMessage(Message.raw(
-                "Set thirst for NPC "
-                        + candidate.npcUuid
-                        + ": "
-                        + TameworkNeedsCommandSupport.format(applied)
-                        + " (requested "
-                        + TameworkNeedsCommandSupport.format(requested)
-                        + ")."
-        ));
+        store.putComponent(npcRef, needsType, needs);
+        CompanionNeedsService.tickNeeds(npcRef, store, needsContext.roleId());
+        context.sendMessage(Message.raw("Set thirst for NPC " + npc.getUuid() + ": "
+                + TameworkNeedsCommandSupport.format(thirst) + "."));
     }
 }
-

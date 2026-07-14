@@ -79,11 +79,12 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `/tw reloadconfig`
 - `/tw gethappiness`
 - `/tw sethappiness <value>`
-- `/tw getneeds`
-- `/tw setneeds <hunger> <thirst> [aoe <radius>]`
-- `/tw sethunger <value>`
-- `/tw setthirst <value>`
-- `/tw setbreedingready [true|false|toggle]`
+- `/tw debug get needs [--entity=<uuid>|--ray|--cone|--coneAll|--sphere] [--world=<world>] [--angle=<degrees>] [--range=<blocks>] [--roles=<role,...>] [--nearest]`
+- `/tw debug set needs <hunger> <thirst> [NPC selectors]`
+- `/tw debug set hunger <value> [NPC selectors]`
+- `/tw debug set thirst <value> [NPC selectors]`
+- `/tw debug set breeding ready [--mode=true|false|toggle] [NPC selectors]`
+- `/tw spawntamed <role> [--count=<quantity>] [--radius=<blocks>] [--attachment=<slot:value>]`
 - `/tw gettraits`
 - `/tw settraits <TraitId> <Value> [TraitId Value ...]`
 - `/tw addtrait <TraitId> <Value>`
@@ -100,6 +101,9 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `/tw debuglag [on|off]`
 - `/tw showspawnmarkers [radius|off]`
 - `/tw deletespawnmarker [range]`
+
+`NPC selectors` use Hytale's standard NPC debug selection: `--world`, `--entity`, `--angle`,
+`--range`, `--roles`, `--nearest`, `--ray`, `--cone`, `--coneAll`, and `--sphere`.
 
 ## Notes
 - Components persist across reloads.

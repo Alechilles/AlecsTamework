@@ -25,7 +25,7 @@
 - Validate resolved configs for happiness/needs/breeding/traits on the same NPC.
 - Use:
   - `/tw gethappiness`
-  - `/tw getneeds`
+  - `/tw debug get needs --ray`
   - `/tw gettraits`
   - `/tw getlifestage`
 - For breeding issues, confirm:

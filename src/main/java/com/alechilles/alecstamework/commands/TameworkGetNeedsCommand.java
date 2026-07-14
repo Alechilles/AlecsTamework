@@ -8,10 +8,10 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.commands.NPCMultiSelectCommandBase;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -20,42 +20,37 @@ import javax.annotation.Nullable;
 /**
  * Command to display hunger/thirst needs state for the targeted NPC.
  */
-public final class TameworkGetNeedsCommand extends AbstractPlayerCommand {
+public final class TameworkGetNeedsCommand extends NPCMultiSelectCommandBase {
     public TameworkGetNeedsCommand() {
-        super("getneeds", "Get needs (hunger/thirst) for the NPC you are looking at.");
+        super("needs", "Get hunger and thirst for selected NPCs.");
     }
 
     @Override
     protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull NPCEntity npc,
+                           @Nonnull World world,
                            @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
-        TameworkCommandTargeting.Candidate candidate = TameworkCommandTargeting.findTargetNpc(store, ref);
-        if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("No NPC found in view."));
-            return;
-        }
+                           @Nonnull Ref<EntityStore> ref) {
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         if (needsType == null) {
             commandContext.sender().sendMessage(Message.raw("Needs component type is not registered."));
             return;
         }
-        TameworkNeedsComponent needs = store.getComponent(candidate.ref, needsType);
+        TameworkNeedsComponent needs = store.getComponent(ref, needsType);
         if (needs == null) {
             commandContext.sender().sendMessage(Message.raw(
-                    "NPC " + candidate.npcUuid + " has no tracked needs state."
+                    "NPC " + npc.getUuid() + " has no tracked needs state."
             ));
             return;
         }
-        TwNeedsConfig config = NeedsConfigResolver.resolveConfig(candidate.ref, store, needs);
+        TwNeedsConfig config = NeedsConfigResolver.resolveConfig(ref, store, needs);
         if (!NeedsConfigResolver.isRuntimeEnabled(config)) {
             commandContext.sender().sendMessage(Message.raw(
-                    "NPC " + candidate.npcUuid + " has no tracked needs state."
+                    "NPC " + npc.getUuid() + " has no tracked needs state."
             ));
             return;
         }
-        commandContext.sender().sendMessage(Message.raw(buildMessage(candidate.npcUuid, needs, config)));
+        commandContext.sender().sendMessage(Message.raw(buildMessage(npc.getUuid(), needs, config)));
     }
 
     private static String buildMessage(@Nonnull UUID npcUuid,
@@ -77,10 +72,10 @@ public final class TameworkGetNeedsCommand extends AbstractPlayerCommand {
             message.append(", config=").append(config.getId());
             message.append(", timing=").append(config.getTiming().getTimerBasis().toConfigValue());
         }
-        if (needs.getLastUpdateMs() > 0L) {
+        if (needs.getLastUpdateMs() != 0L) {
             message.append(", lastUpdateMs=").append(needs.getLastUpdateMs());
         }
-        if (needs.getLastPassiveSweepMs() > 0L) {
+        if (needs.getLastPassiveSweepMs() != 0L) {
             message.append(", lastPassiveSweepMs=").append(needs.getLastPassiveSweepMs());
         }
         message.append(".");

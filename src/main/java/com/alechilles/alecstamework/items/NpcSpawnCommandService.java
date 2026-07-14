@@ -58,11 +58,12 @@ public final class NpcSpawnCommandService {
                                      @Nonnull World world,
                                      @Nonnull String roleId,
                                      int quantity,
+                                     @Nullable Double spawnRadius,
                                      @Nullable Map<String, String> attachmentOverrides,
                                      @Nonnull Consumer<SpawnBatchResult> completion) {
         Objects.requireNonNull(completion, "completion");
         batchSpawnService.schedule(
-                player, store, playerRef, world, roleId, quantity,
+                player, store, playerRef, world, roleId, quantity, spawnRadius,
                 attachmentOverrides, completion
         );
     }

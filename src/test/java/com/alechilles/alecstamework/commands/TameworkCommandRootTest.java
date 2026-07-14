@@ -26,6 +26,15 @@ class TameworkCommandRootTest {
                 "tamework.command.tw.setlevel",
                 root.getSubCommands().get("setlevel").getPermission()
         );
+        assertEquals(
+                "tamework.command.tw.debug.set.needs",
+                root.getSubCommands().get("debug").getSubCommands().get("set")
+                        .getSubCommands().get("needs").getPermission()
+        );
+        assertEquals(
+                "tamework.command.tw.spawntamed",
+                root.getSubCommands().get("spawntamed").getPermission()
+        );
     }
 
     private static final class DisplayNameOwner implements CommandOwner {

@@ -3,7 +3,8 @@
 ## Unreleased
 
 ### Added
-- Added an optional `aoe [radius]` switch to `/tw setbreedingready`; without an explicit radius it uses the targeted NPC's configured breeding radius.
+- Added `/tw debug set` and `/tw debug get` command groups for needs and breeding tuning. Their NPC-targeted commands now use Hytale's standard `--world`, `--entity`, cone, ray, sphere, range, role, and nearest selectors.
+- Replaced `/tw npcspawntamed <role> <quantity>` with `/tw spawntamed <role>`, including live role completion and optional `--count`, `--radius`, and `--attachment` switches.
 - Added read-only managed-coop integrity commands: `/tw coop audit`, `/tw coop import-status`, and an expanded `/tw debugdb integrity` covering SQLite, foreign keys, profile identity, lifecycle operations, and import conflicts.
 - Added fingerprint-bound `/tw coop reconcile` reports and confirmation for legacy residents, plus a read-only `/tw coop rollback-preflight` that reports blockers without claiming an unsafe live database downgrade.
 - `/tw gethappiness` now reports an NPC's active or latest breeding job id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result.

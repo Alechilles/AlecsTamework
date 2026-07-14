@@ -53,6 +53,7 @@ final class NpcOwnedBatchSpawnService {
             @Nonnull World world,
             @Nonnull String roleId,
             int quantity,
+            @Nullable Double spawnRadius,
             @Nullable Map<String, String> attachmentOverrides,
             @Nonnull Consumer<NpcSpawnCommandService.SpawnBatchResult> completion
     ) {
@@ -76,7 +77,7 @@ final class NpcOwnedBatchSpawnService {
         NpcSpawnCommandService.BatchTracker tracker = owner.newBatchTracker(
                 quantity, player, completion
         );
-        List<Vector3d> positions = positions(base, quantity);
+        List<Vector3d> positions = positions(base, quantity, spawnRadius);
         List<CompanionSpawnAdmissionRequest> requests = requests(
                 player, world, ownerId, positions
         );
@@ -243,21 +244,23 @@ final class NpcOwnedBatchSpawnService {
     }
 
     @Nonnull
-    private static List<Vector3d> positions(Vector3d base, int quantity) {
+    private static List<Vector3d> positions(Vector3d base, int quantity, @Nullable Double spawnRadius) {
         List<Vector3d> positions = new ArrayList<>(quantity);
         for (int index = 0; index < quantity; index++) {
-            positions.add(offsetSpawnPosition(base, index));
+            positions.add(offsetSpawnPosition(base, index, spawnRadius));
         }
         return List.copyOf(positions);
     }
 
-    private static Vector3d offsetSpawnPosition(Vector3d base, int spawnIndex) {
+    private static Vector3d offsetSpawnPosition(Vector3d base, int spawnIndex, @Nullable Double spawnRadius) {
         if (spawnIndex <= 0) {
             return new Vector3d(base);
         }
         int ring = (spawnIndex - 1) / SPAWN_RING_SIZE + 1;
         int ringSlot = (spawnIndex - 1) % SPAWN_RING_SIZE;
-        double radius = ring * SPAWN_RING_RADIUS_STEP;
+        double radius = spawnRadius != null
+                ? Math.min(spawnRadius, Math.max(SPAWN_RING_RADIUS_STEP, ring * SPAWN_RING_RADIUS_STEP))
+                : ring * SPAWN_RING_RADIUS_STEP;
         double angle = (Math.PI * 2.0 * ringSlot) / SPAWN_RING_SIZE;
         return new Vector3d(
                 base.x + (Math.cos(angle) * radius), base.y,

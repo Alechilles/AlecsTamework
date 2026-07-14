@@ -12,17 +12,13 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         super("tw", "Tamework commands.");
         requirePermission(ROOT_PERMISSION);
         setPermissionGroups(TameworkConfigPermission.adminPermissionGroups());
+        addSubCommand(new TameworkDebugCommand());
         addSubCommand(new TameworkSetOwnerCommand());
         addSubCommand(new TameworkGetOwnerCommand());
         addSubCommand(new TameworkGetHappinessCommand());
-        addSubCommand(new TameworkGetNeedsCommand());
         addSubCommand(new TameworkGetLifeStageCommand());
         addSubCommand(new TameworkSetHappinessCommand());
         addSubCommand(new TameworkSetLevelCommand());
-        addSubCommand(new TameworkSetNeedsCommand());
-        addSubCommand(new TameworkSetHungerCommand());
-        addSubCommand(new TameworkSetThirstCommand());
-        addSubCommand(new TameworkSetBreedingReadyCommand());
         addSubCommand(new TameworkGetTraitsCommand());
         addSubCommand(new TameworkSetTraitsCommand());
         addSubCommand(new TameworkAddTraitCommand());
