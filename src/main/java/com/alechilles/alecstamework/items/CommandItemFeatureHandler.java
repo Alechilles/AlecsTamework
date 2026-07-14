@@ -33,6 +33,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
@@ -142,7 +143,7 @@ public final class CommandItemFeatureHandler {
                                      CommandLinkedNpcLostService lostService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService) {
         this(registry, relocationService, deathService, captureService, coopService, lostService,
-                stateSnapshotService, null);
+                stateSnapshotService, null, null);
     }
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
@@ -153,6 +154,19 @@ public final class CommandItemFeatureHandler {
                                      CommandLinkedNpcLostService lostService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                      @Nullable TameworkPersistenceRuntime persistenceRuntime) {
+        this(registry, relocationService, deathService, captureService, coopService, lostService,
+                stateSnapshotService, persistenceRuntime, null);
+    }
+
+    public CommandItemFeatureHandler(CommandItemRegistry registry,
+                                     CommandNpcRelocationService relocationService,
+                                     CommandLinkedNpcDeathService deathService,
+                                     CommandLinkedNpcCaptureService captureService,
+                                     CommandLinkedNpcCoopService coopService,
+                                     CommandLinkedNpcLostService lostService,
+                                     CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                     @Nullable TameworkPersistenceRuntime persistenceRuntime,
+                                     @Nullable CompanionIdentityResolver populationIdentityResolver) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.deathService = deathService;
@@ -247,7 +261,7 @@ public final class CommandItemFeatureHandler {
                 deathService,
                 stepExecutionService
         );
-        this.lostRecoveryCoordinator = persistenceRuntime != null
+        this.lostRecoveryCoordinator = persistenceRuntime != null && populationIdentityResolver != null
                 ? new CommandLostRecoveryCoordinator(
                     npcIdentityService,
                     persistenceRuntime.getLostRepository(),
@@ -257,7 +271,8 @@ public final class CommandItemFeatureHandler {
                     companionPlacementService,
                     new PlannedNpcProjectionSpawner(),
                     new PlannedNpcProjectionPostAddService(),
-                    stepExecutionService)
+                    stepExecutionService,
+                    populationIdentityResolver)
                 : null;
         this.ownerReleaseService = new CommandOwnerReleaseService(
                 linkPolicyService,

@@ -986,7 +986,8 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcCoopService,
                 commandLinkedNpcLostService,
                 commandLinkedNpcStateSnapshotService,
-                persistenceRuntime
+                persistenceRuntime,
+                ownerPopulationRuntime.identityResolver()
         );
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)

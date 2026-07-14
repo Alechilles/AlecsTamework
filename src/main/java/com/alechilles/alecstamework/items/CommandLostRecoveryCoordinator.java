@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkProjectionIdentityComponent;
+import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.persistence.sqlite.LostRecoveryEnvelope;
 import com.alechilles.alecstamework.persistence.sqlite.LostRecoveryLoadResult;
 import com.alechilles.alecstamework.persistence.sqlite.LostRepository;
@@ -48,6 +49,7 @@ final class CommandLostRecoveryCoordinator {
     private final PlannedNpcProjectionSpawner projectionSpawner;
     private final PlannedNpcProjectionPostAddService postAddService;
     private final CommandStepExecutionService stepExecutionService;
+    private final CompanionIdentityResolver populationIdentityResolver;
     private final Set<String> inFlightOperationIds = ConcurrentHashMap.newKeySet();
 
     CommandLostRecoveryCoordinator(
@@ -59,7 +61,8 @@ final class CommandLostRecoveryCoordinator {
             @Nonnull CommandCompanionPlacementService placementService,
             @Nonnull PlannedNpcProjectionSpawner projectionSpawner,
             @Nonnull PlannedNpcProjectionPostAddService postAddService,
-            @Nonnull CommandStepExecutionService stepExecutionService) {
+            @Nonnull CommandStepExecutionService stepExecutionService,
+            @Nonnull CompanionIdentityResolver populationIdentityResolver) {
         this.identityService = identityService;
         this.lostRepository = lostRepository;
         this.operationRepository = operationRepository;
@@ -69,6 +72,8 @@ final class CommandLostRecoveryCoordinator {
         this.projectionSpawner = projectionSpawner;
         this.postAddService = postAddService;
         this.stepExecutionService = stepExecutionService;
+        this.populationIdentityResolver = java.util.Objects.requireNonNull(
+                populationIdentityResolver, "populationIdentityResolver");
     }
 
     /** Starts an asynchronous recovery request from a world-thread command boundary. */
@@ -324,13 +329,28 @@ final class CommandLostRecoveryCoordinator {
                 operation.profileId(), operation.operationId(),
                 TameworkProjectionIdentityComponent.KIND_RECOVERY, null,
                 operation.sourceNpcUuid(), operation.generation());
-        PlannedNpcProjectionSpawner.SpawnResult spawned = projectionSpawner.spawn(
-                new PlannedNpcProjectionSpawner.SpawnRequest(
-                        envelope.fullSnapshot().roleId(), operation.plannedTargetUuid(),
-                        envelope.fullSnapshot(), marker, destination,
-                        resolveSpawnRotation(player.store(), player.reference(), destination),
-                        player.store()));
+        CommandLostRecoveryAliasLease aliasLease = new CommandLostRecoveryAliasLease(
+                populationIdentityResolver, operation.profileId(), operation.plannedTargetUuid());
+        if (!aliasLease.acquire()) {
+            failOperationRequest(request, operation,
+                    "Recovery projection identity conflicts with another companion.");
+            return;
+        }
+        PlannedNpcProjectionSpawner.SpawnResult spawned;
+        try {
+            spawned = projectionSpawner.spawn(
+                    new PlannedNpcProjectionSpawner.SpawnRequest(
+                            envelope.fullSnapshot().roleId(), operation.plannedTargetUuid(),
+                            envelope.fullSnapshot(), marker, destination,
+                            resolveSpawnRotation(player.store(), player.reference(), destination),
+                            player.store()));
+        } catch (RuntimeException | LinkageError failure) {
+            aliasLease.releaseBeforeVisibility();
+            failOperationRequest(request, operation, "Recovery projection could not be created.");
+            return;
+        }
         if (!spawned.isSuccess()) {
+            aliasLease.releaseBeforeVisibility();
             failOperationRequest(request, operation,
                     "Recovery projection could not be created (" + spawned.status() + ").");
             return;
