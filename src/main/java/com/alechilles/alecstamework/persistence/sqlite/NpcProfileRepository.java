@@ -51,6 +51,8 @@ public final class NpcProfileRepository {
     private final PersistenceWriteQueue writeQueue;
     @Nullable
     private volatile PersistenceChangeObserver changeObserver;
+    @Nullable
+    private volatile NpcProfileIdentityLifecycle identityLifecycle;
 
     public NpcProfileRepository(@Nonnull SqliteConnectionManager connectionManager,
                                 @Nonnull PersistenceWriteQueue writeQueue) {
@@ -65,6 +67,10 @@ public final class NpcProfileRepository {
 
     public void setChangeObserver(@Nullable PersistenceChangeObserver changeObserver) {
         this.changeObserver = changeObserver;
+    }
+
+    public void setIdentityLifecycle(@Nullable NpcProfileIdentityLifecycle identityLifecycle) {
+        this.identityLifecycle = identityLifecycle;
     }
 
     public boolean upsertAsync(@Nonnull ProfileUpdate update) {
@@ -82,18 +88,30 @@ public final class NpcProfileRepository {
     private boolean upsertAsync(@Nonnull ProfileUpdate update,
                                 @Nonnull ProfileOwnerMutation ownerMutation,
                                 @Nonnull String operation) {
+        NpcProfileIdentityWriteLease identityLease =
+                NpcProfileIdentityWriteLease.begin(identityLifecycle, update.npcUuid());
         AtomicReference<ProfileRecord> beforeRef = new AtomicReference<>();
         AtomicReference<ProfileRecord> afterRef = new AtomicReference<>();
-        return writeQueue.submit(
+        PersistenceWriteQueue.WriteSubmission<Void> submission = writeQueue.submitTracked(
                 operation,
                 connection -> {
                     beforeRef.set(loadProfileByNpcUuidInTransaction(connection, update.npcUuid()));
-                    upsertProfileInTransaction(connection, update, ownerMutation);
+                    upsertProfileInTransaction(
+                            connection, update, ownerMutation, identityLease.preferredProfileId());
                     String profileId = resolveProfileIdInTransaction(connection, update.npcUuid());
                     afterRef.set(profileId != null ? loadProfileByIdInTransaction(connection, profileId) : null);
+                    return null;
                 },
-                () -> notifyProfileChanged(beforeRef.get(), afterRef.get())
+                ignored -> {
+                    ProfileRecord after = afterRef.get();
+                    if (after == null || after.currentNpcUuid() == null) {
+                        throw new IllegalStateException("Committed profile identity is missing.");
+                    }
+                    identityLease.committed(after.currentNpcUuid());
+                    notifyProfileChanged(beforeRef.get(), after);
+                }
         );
+        return identityLease.settleWith(submission);
     }
 
     public boolean remapCurrentUuidAsync(@Nonnull UUID previousNpcUuid, @Nonnull UUID currentNpcUuid) {
@@ -219,34 +237,30 @@ public final class NpcProfileRepository {
 
     @Nonnull
     String resolveOrCreateProfileIdInTransaction(@Nonnull Connection connection, @Nonnull UUID npcUuid) throws Exception {
+        return resolveOrCreateProfileIdInTransaction(connection, npcUuid, null);
+    }
+
+    @Nonnull
+    private String resolveOrCreateProfileIdInTransaction(@Nonnull Connection connection,
+                                                         @Nonnull UUID npcUuid,
+                                                         @Nullable String preferredProfileId) throws Exception {
         String resolved = resolveProfileIdInTransaction(connection, npcUuid);
         if (resolved != null && !resolved.isBlank()) {
+            if (preferredProfileId != null && !resolved.equals(preferredProfileId)) {
+                throw new IllegalStateException("Reserved profile identity conflicts with durable alias.");
+            }
             return resolved;
         }
-
-        String profileId = UUID.randomUUID().toString();
-        long nowMs = System.currentTimeMillis();
-        try (PreparedStatement statement = connection.prepareStatement(
-                """
-                INSERT INTO npc_profiles (
-                    profile_id, current_npc_uuid, owner_uuid, display_name, role_id,
-                    state_json, state_hash, last_world_name, created_at_ms, updated_at_ms, last_active_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
-        )) {
-            statement.setString(1, profileId);
-            statement.setString(2, npcUuid.toString());
-            statement.setString(3, null);
-            statement.setString(4, null);
-            statement.setString(5, null);
-            statement.setString(6, null);
-            statement.setString(7, null);
-            statement.setString(8, null);
-            statement.setLong(9, nowMs);
-            statement.setLong(10, nowMs);
-            statement.setLong(11, nowMs);
-            statement.executeUpdate();
+        if (preferredProfileId != null
+                && loadExistingProfileRowInTransaction(connection, preferredProfileId) != null) {
+            return preferredProfileId;
         }
+
+        String profileId = preferredProfileId != null
+                ? preferredProfileId
+                : UUID.randomUUID().toString();
+        long nowMs = System.currentTimeMillis();
+        NpcProfileIdentitySql.insertNewProfile(connection, profileId, npcUuid, nowMs);
         upsertAliasInTransaction(connection, npcUuid.toString(), profileId, true, nowMs);
         return profileId;
     }
@@ -271,9 +285,17 @@ public final class NpcProfileRepository {
     void upsertProfileInTransaction(@Nonnull Connection connection,
                                     @Nonnull ProfileUpdate update,
                                     @Nonnull ProfileOwnerMutation ownerMutation) throws Exception {
+        upsertProfileInTransaction(connection, update, ownerMutation, null);
+    }
+
+    private void upsertProfileInTransaction(@Nonnull Connection connection,
+                                            @Nonnull ProfileUpdate update,
+                                            @Nonnull ProfileOwnerMutation ownerMutation,
+                                            @Nullable String preferredProfileId) throws Exception {
         Objects.requireNonNull(ownerMutation, "ownerMutation");
         String npcUuidString = update.npcUuid().toString();
-        String profileId = resolveOrCreateProfileIdInTransaction(connection, update.npcUuid());
+        String profileId = resolveOrCreateProfileIdInTransaction(
+                connection, update.npcUuid(), preferredProfileId);
         long nowMs = System.currentTimeMillis();
         String currentNpcUuid = resolveEffectiveCurrentUuidForUpsert(connection, profileId, npcUuidString);
         ExistingProfileRow existingRow = loadExistingProfileRowInTransaction(connection, profileId);

@@ -90,6 +90,25 @@ class CompanionIdentityResolverTest {
         assertTrue(resolver.resolveProfileId(npcUuid).isEmpty());
     }
 
+    /** A snapshot writer may persist an identity already reserved by the projection operation. */
+    @Test
+    void profileWriteRetainsAProvisionalIdentityOwnedByAnotherOperation() {
+        UUID npcUuid = UUID.randomUUID();
+        CompanionIdentityResolver resolver = new CompanionIdentityResolver();
+        CompanionIdentityResolver.Resolution spawn =
+                resolver.resolveOrAllocate(npcUuid, "spawn-operation");
+
+        CompanionIdentityResolver.Resolution profileWrite =
+                resolver.resolveOrRetainForProfileWrite(npcUuid, "profile-write");
+
+        assertEquals(spawn.profileId(), profileWrite.profileId());
+        assertTrue(profileWrite.provisional());
+        assertTrue(resolver.releaseProvisional(spawn.profileId(), npcUuid));
+        assertEquals(spawn.profileId(), resolver.resolveProfileId(npcUuid).orElseThrow());
+        assertTrue(resolver.releaseProvisional(profileWrite.profileId(), npcUuid));
+        assertTrue(resolver.resolveProfileId(npcUuid).isEmpty());
+    }
+
     @Test
     void existingAliasWinsWithoutAllocatingAnotherProfile() {
         UUID npcUuid = UUID.randomUUID();

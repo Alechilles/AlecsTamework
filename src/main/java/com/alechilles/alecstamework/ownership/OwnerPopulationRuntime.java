@@ -113,6 +113,9 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         );
         CompanionPopulationBootstrapService.BootstrapResult bootstrap =
                 bootstrapService.loadForReconciliation();
+        persistence.getNpcProfileRepository().setIdentityLifecycle(
+                new CompanionProfileIdentityLifecycle(identityResolver)
+        );
         OwnerPopulationAdmissionCoordinator coordinator = new OwnerPopulationAdmissionCoordinator(
                 index,
                 persistence.getCompanionPopulationRepository(),
