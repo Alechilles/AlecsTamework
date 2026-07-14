@@ -1113,6 +1113,12 @@ public class Tamework extends JavaPlugin {
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
                 RemoveWorldEvent.class,
+                this::onWorldRemovedForCompanionRecovery,
+                "delete-on-remove companion recovery"
+        );
+        TameworkEventRegistrationSupport.registerGlobal(
+                this,
+                RemoveWorldEvent.class,
                 this::onWorldRemovedForProgressionTiming,
                 "progression timing world cleanup"
         );
@@ -1311,6 +1317,12 @@ public class Tamework extends JavaPlugin {
             return;
         }
         crashTelemetryService.captureExceptionalWorldRemoval(event.getWorld(), event.getRemovalReason());
+    }
+
+    private void onWorldRemovedForCompanionRecovery(@Nonnull RemoveWorldEvent event) {
+        if (event != null && !event.isCancelled() && commandNpcRelocationService != null) {
+            commandNpcRelocationService.onWorldRemoved(event.getWorld());
+        }
     }
 
     private void onWorldRemovedForProgressionTiming(@Nonnull RemoveWorldEvent event) {

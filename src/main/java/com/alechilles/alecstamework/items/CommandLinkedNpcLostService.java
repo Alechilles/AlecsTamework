@@ -185,23 +185,23 @@ public final class CommandLinkedNpcLostService {
         loadPersistedSnapshots();
     }
 
-    public void recordLostFromRelocationDrop(UUID npcUuid,
-                                             @Nullable UUID ownerUuid,
-                                             @Nullable Vector3d sourceHintPosition,
-                                             @Nullable Vector3d alternateSourceHintPosition,
-                                             @Nullable Vector3d destination,
-                                             long queuedAtMs,
-                                             long droppedAtMs,
-                                             int retryAttempts) {
+    public boolean recordLostFromRelocationDrop(UUID npcUuid,
+                                                @Nullable UUID ownerUuid,
+                                                @Nullable Vector3d sourceHintPosition,
+                                                @Nullable Vector3d alternateSourceHintPosition,
+                                                @Nullable Vector3d destination,
+                                                long queuedAtMs,
+                                                long droppedAtMs,
+                                                int retryAttempts) {
         if (!canMutate()) {
-            return;
+            return false;
         }
         if (npcUuid == null) {
-            return;
+            return false;
         }
         npcUuid = resolveLostTransitionUuid(npcUuid);
         if (npcUuid == null) {
-            return;
+            return false;
         }
         if (captureService != null && captureService.getCapturedSnapshot(npcUuid) != null) {
             clearLostSnapshot(npcUuid);
@@ -210,7 +210,7 @@ public final class CommandLinkedNpcLostService {
                         "Skipped lost transition for captured companion (npc=" + npcUuid + ")."
                 );
             }
-            return;
+            return false;
         }
         if (coopService != null && coopService.getCoopSnapshot(npcUuid) != null) {
             clearLostSnapshot(npcUuid);
@@ -219,7 +219,7 @@ public final class CommandLinkedNpcLostService {
                         "Skipped lost transition for cooped companion (npc=" + npcUuid + ")."
                 );
             }
-            return;
+            return false;
         }
         LostLinkedNpcSnapshot current = snapshotsByNpc.get(npcUuid);
         long now = System.currentTimeMillis();
@@ -249,11 +249,13 @@ public final class CommandLinkedNpcLostService {
                     && status != CommandLostTransitionPersistenceService.PersistStatus.ALREADY_PENDING) {
                 CommandLostTransitionLogger.rejected(logger, npcUuid, status);
             }
-            return;
+            return status == CommandLostTransitionPersistenceService.PersistStatus.ACCEPTED_PENDING
+                    || status == CommandLostTransitionPersistenceService.PersistStatus.ALREADY_PENDING;
         }
         snapshotsByNpc.put(prepared.npcUuid(), prepared);
         CommandLostTransitionLogger.committed(logger, prepared, ownerUuid);
         persistSnapshots();
+        return true;
     }
 
     @Nullable

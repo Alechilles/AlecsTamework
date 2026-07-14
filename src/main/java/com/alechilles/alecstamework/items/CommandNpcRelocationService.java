@@ -38,6 +38,7 @@ public final class CommandNpcRelocationService {
     private final ConcurrentHashMap<UUID, PendingRelocation> pendingByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Vector3d> lastKnownByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, World> knownWorldByNpc = new ConcurrentHashMap<>();
+    private final CommandRelocationNpcTracker npcTracker;
     private final CommandRelocationAdmissionGate admissionGate = new CommandRelocationAdmissionGate();
     private final CommandRelocationPostMoveEffects postMoveEffects =
             new CommandRelocationPostMoveEffects();
@@ -54,6 +55,7 @@ public final class CommandNpcRelocationService {
 
     public CommandNpcRelocationService(@Nullable HytaleLogger logger) {
         this.diagnostics = new CommandRelocationDiagnostics(logger);
+        this.npcTracker = new CommandRelocationNpcTracker(lastKnownByNpc, knownWorldByNpc);
         this.worldAccess = new CommandRelocationWorldAccess(knownWorldByNpc, this::logTravelDiagnostic);
         this.dropReporter = new CommandRelocationDropReporter(logger, this::logTravelDiagnostic);
         this.retryCoordinator = new CommandRelocationRetryCoordinator(this, timingPolicy);
@@ -282,46 +284,41 @@ public final class CommandNpcRelocationService {
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
-        if (reference == null || !reference.isValid() || store == null) {
+        CommandRelocationNpcTracker.TrackedNpc tracked = npcTracker.onAdded(reference, store);
+        if (tracked == null || tracked.world() == null) {
             return;
         }
-        NpcSnapshot snapshot = resolveSnapshot(reference, store);
-        if (snapshot == null || snapshot.npcUuid == null) {
-            return;
-        }
-        if (snapshot.position != null) {
-            lastKnownByNpc.put(snapshot.npcUuid, snapshot.position);
-        }
-        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
-        if (world == null) {
-            return;
-        }
-        knownWorldByNpc.put(snapshot.npcUuid, world);
         // Population reconciliation runs after this observer and must publish ACTIVE first.
-        PendingRelocation pending = pendingByNpc.get(snapshot.npcUuid);
-        if (pending != null && Objects.equals(pending.destinationWorldName, world.getName())) {
-            scheduleTryApply(world, snapshot.npcUuid, INITIAL_APPLY_DELAY_MS);
+        PendingRelocation pending = pendingByNpc.get(tracked.npcUuid());
+        if (pending != null
+                && Objects.equals(pending.destinationWorldName, tracked.world().getName())) {
+            scheduleTryApply(tracked.world(), tracked.npcUuid(), INITIAL_APPLY_DELAY_MS);
         }
     }
 
     public void onNpcRemoved(Ref<EntityStore> reference, RemoveReason reason, Store<EntityStore> store) {
-        if (reference == null || reason == null || store == null) {
-            return;
-        }
-        NpcSnapshot snapshot = resolveSnapshot(reference, store);
-        if (snapshot == null || snapshot.npcUuid == null) {
-            return;
-        }
-        if (snapshot.position != null) {
-            lastKnownByNpc.put(snapshot.npcUuid, snapshot.position);
-        }
-        if (reason == RemoveReason.REMOVE) {
-            knownWorldByNpc.remove(snapshot.npcUuid);
-            return;
-        }
-        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
-        if (world != null) {
-            knownWorldByNpc.put(snapshot.npcUuid, world);
+        npcTracker.onRemoved(reference, reason, store);
+    }
+
+    /**
+     * Converts owned NPCs in a delete-on-remove world to strict Lost recovery before Hytale clears
+     * their complete state snapshots during world shutdown.
+     */
+    public void onWorldRemoved(@Nullable World world) {
+        long removedAtMs = System.currentTimeMillis();
+        for (CommandRelocationNpcTracker.WorldRemovalCandidate candidate
+                : npcTracker.detachDeleteOnRemoveWorld(world)) {
+            PendingRelocation pending = pendingByNpc.get(candidate.npcUuid());
+            if (pending != null
+                    && (pending.isCrossWorldTransferInProgress()
+                    || pending.physicalMutationAttempted())) {
+                continue;
+            }
+            if (pending != null && removePending(candidate.npcUuid(), pending)) {
+                pending.markCrossWorldTransferFinished();
+                cancelAdmission(pending, false, null, null);
+            }
+            dropReporter.reportWorldRemoval(candidate, removedAtMs);
         }
     }
 
@@ -1185,19 +1182,6 @@ public final class CommandNpcRelocationService {
         diagnostics.logRetryProgress(pending, nowMs);
     }
 
-    private NpcSnapshot resolveSnapshot(Ref<EntityStore> reference, Store<EntityStore> store) {
-        if (reference == null || store == null) {
-            return null;
-        }
-        NPCEntity npc = safeGetComponent(store, reference, NPCEntity.getComponentType());
-        if (npc == null || npc.getUuid() == null) {
-            return null;
-        }
-        TransformComponent transform = safeGetComponent(store, reference, TransformComponent.getComponentType());
-        Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
-        return new NpcSnapshot(npc.getUuid(), position);
-    }
-
     @Nullable
     private <T extends Component<EntityStore>> T safeGetComponent(@Nullable Store<EntityStore> store,
                                                                   @Nullable Ref<EntityStore> reference,
@@ -1209,16 +1193,6 @@ public final class CommandNpcRelocationService {
             return store.getComponent(reference, componentType);
         } catch (IndexOutOfBoundsException | IllegalArgumentException ex) {
             return null;
-        }
-    }
-
-    private static final class NpcSnapshot {
-        private final UUID npcUuid;
-        private final Vector3d position;
-
-        private NpcSnapshot(UUID npcUuid, Vector3d position) {
-            this.npcUuid = npcUuid;
-            this.position = position;
         }
     }
 

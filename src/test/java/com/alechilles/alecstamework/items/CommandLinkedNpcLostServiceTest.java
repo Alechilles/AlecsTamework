@@ -27,7 +27,7 @@ class CommandLinkedNpcLostServiceTest {
         Vector3d home = new Vector3d(40.0, 50.0, 60.0);
         Vector3d destination = new Vector3d(70.0, 80.0, 90.0);
 
-        service.recordLostFromRelocationDrop(
+        assertTrue(service.recordLostFromRelocationDrop(
                 npcUuid,
                 ownerUuid,
                 lastKnown,
@@ -36,7 +36,7 @@ class CommandLinkedNpcLostServiceTest {
                 1234L,
                 5678L,
                 9
-        );
+        ));
 
         assertTrue(service.isLost(npcUuid));
         CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot = service.getLostSnapshot(npcUuid);
@@ -123,7 +123,7 @@ class CommandLinkedNpcLostServiceTest {
                 )
         );
 
-        service.recordLostFromRelocationDrop(
+        assertFalse(service.recordLostFromRelocationDrop(
                 npcUuid,
                 ownerUuid,
                 new Vector3d(10.0, 20.0, 30.0),
@@ -132,7 +132,7 @@ class CommandLinkedNpcLostServiceTest {
                 100L,
                 200L,
                 2
-        );
+        ));
 
         assertFalse(service.isLost(npcUuid));
         assertNull(service.getLostSnapshot(npcUuid));
@@ -165,7 +165,7 @@ class CommandLinkedNpcLostServiceTest {
                 )
         );
 
-        service.recordLostFromRelocationDrop(
+        assertFalse(service.recordLostFromRelocationDrop(
                 npcUuid,
                 ownerUuid,
                 new Vector3d(10.0, 20.0, 30.0),
@@ -174,7 +174,7 @@ class CommandLinkedNpcLostServiceTest {
                 100L,
                 200L,
                 2
-        );
+        ));
 
         assertFalse(service.isLost(npcUuid));
         assertNull(service.getLostSnapshot(npcUuid));

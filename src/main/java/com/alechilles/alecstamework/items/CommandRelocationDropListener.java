@@ -9,12 +9,12 @@ import javax.annotation.Nullable;
  */
 @FunctionalInterface
 public interface CommandRelocationDropListener {
-    void onRelocationDropped(UUID npcUuid,
-                             @Nullable UUID ownerUuid,
-                             @Nullable Vector3d sourceHintPosition,
-                             @Nullable Vector3d alternateSourceHintPosition,
-                             @Nullable Vector3d destination,
-                             long queuedAtMs,
-                             long droppedAtMs,
-                             int retryAttempts);
+    boolean onRelocationDropped(UUID npcUuid,
+                                @Nullable UUID ownerUuid,
+                                @Nullable Vector3d sourceHintPosition,
+                                @Nullable Vector3d alternateSourceHintPosition,
+                                @Nullable Vector3d destination,
+                                long queuedAtMs,
+                                long droppedAtMs,
+                                int retryAttempts);
 }

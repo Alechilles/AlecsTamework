@@ -129,7 +129,8 @@ class CommandNpcRelocationServiceTest {
                 "Live-state or provider changes must close the prepared reservation.");
         assertTrue(service.contains("Objects.equals(owner.getOwnerId(), pending.ownerUuid)"),
                 "Final claim must re-resolve and compare the live owner component.");
-        assertTrue(service.contains("scheduleTryApply(world, snapshot.npcUuid, INITIAL_APPLY_DELAY_MS)"),
+        assertTrue(service.contains(
+                        "scheduleTryApply(tracked.world(), tracked.npcUuid(), INITIAL_APPLY_DELAY_MS)"),
                 "NPC-added callbacks must resume after the later population reconciliation system.");
         assertTrue(service.contains("current.hasSameCommandIntent(pending)"),
                 "Repeated recall clicks must coalesce instead of replacing an in-flight request.");
