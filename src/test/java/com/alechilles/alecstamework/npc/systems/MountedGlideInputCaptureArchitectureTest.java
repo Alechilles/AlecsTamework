@@ -161,6 +161,30 @@ class MountedGlideInputCaptureArchitectureTest {
     }
 
     @Test
+    void mountedGlidePacketCaptureSkipsRidersInvalidatedAfterQueueing() throws IOException {
+        String helper = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/npc/network/MountedGlidePacketInputCapture.java"
+        ));
+        String clientCapture = extractMethodSource(
+                helper,
+                "private void captureOnWorld(@Nonnull ClientMovement packet",
+                "private void captureOnWorld(@Nonnull MountMovement packet"
+        );
+        String mountCapture = extractMethodSource(
+                helper,
+                "private void captureOnWorld(@Nonnull MountMovement packet",
+                "private Ref<EntityStore> resolveMountRef"
+        );
+
+        assertTrue(clientCapture.contains("if (!riderRef.isValid())"));
+        assertTrue(clientCapture.indexOf("if (!riderRef.isValid())")
+                < clientCapture.indexOf("store.getComponent(riderRef, riderType)"));
+        assertTrue(mountCapture.contains("if (!riderRef.isValid())"));
+        assertTrue(mountCapture.indexOf("if (!riderRef.isValid())")
+                < mountCapture.indexOf("store.getComponent(riderRef, riderType)"));
+    }
+
+    @Test
     void mountedGlidePacketCaptureLogsRawInputProbeTransitions() throws IOException {
         String helper = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/npc/network/MountedGlidePacketInputCapture.java"

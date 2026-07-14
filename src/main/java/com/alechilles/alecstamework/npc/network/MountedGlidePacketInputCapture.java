@@ -61,6 +61,10 @@ final class MountedGlidePacketInputCapture {
     private void captureOnWorld(@Nonnull ClientMovement packet,
                                 @Nonnull Ref<EntityStore> riderRef,
                                 @Nonnull Store<EntityStore> store) {
+        // The player may have transferred worlds after the packet callback queued this task.
+        if (!riderRef.isValid()) {
+            return;
+        }
         Tamework instance = Tamework.getInstance();
         ComponentType<EntityStore, TameworkMountedGlideRiderComponent> riderType =
                 instance == null ? null : instance.getMountedGlideRiderComponentType();
@@ -116,6 +120,10 @@ final class MountedGlidePacketInputCapture {
     private void captureOnWorld(@Nonnull MountMovement packet,
                                 @Nonnull Ref<EntityStore> riderRef,
                                 @Nonnull Store<EntityStore> store) {
+        // The player may have transferred worlds after the packet callback queued this task.
+        if (!riderRef.isValid()) {
+            return;
+        }
         Tamework instance = Tamework.getInstance();
         ComponentType<EntityStore, TameworkMountedGlideRiderComponent> riderType =
                 instance == null ? null : instance.getMountedGlideRiderComponentType();
