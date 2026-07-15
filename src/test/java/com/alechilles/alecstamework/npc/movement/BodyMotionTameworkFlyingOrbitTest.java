@@ -105,4 +105,35 @@ class BodyMotionTameworkFlyingOrbitTest {
         assertTrue(facing.x < 0.0);
         assertTrue(facing.lengthSquared() > 0.0);
     }
+
+    @Test
+    void waypointTranslationFliesInThreeDimensionsAtConfiguredSpeed() {
+        Vector3d result = BodyMotionTameworkFlyingOrbit.resolveWaypointTranslation(
+                0.0, 10.0, 0.0, 12.0, 15.0, 0.0, 2.0, 0.65, new Vector3d());
+
+        assertTrue(result.x > 0.0);
+        assertTrue(result.y > 0.0);
+        assertEquals(0.65, result.length(), EPSILON);
+    }
+
+    @Test
+    void waypointTranslationStopsInsideArrivalDistance() {
+        Vector3d result = BodyMotionTameworkFlyingOrbit.resolveWaypointTranslation(
+                0.0, 10.0, 0.0, 1.0, 11.0, 0.0, 2.0, 0.65, new Vector3d());
+
+        assertEquals(0.0, result.lengthSquared(), EPSILON);
+    }
+
+    @Test
+    void targetBandAllowsLoosePositionUntilTargetMovesBeyondBoundary() {
+        double[] radiusRange = { 10.0, 22.0 };
+        double[] altitudeRange = { 8.0, 12.0 };
+
+        assertTrue(BodyMotionTameworkFlyingOrbit.isWithinTargetBand(
+                16.0, 10.0, 0.0, 0.0, 0.0, 0.0, radiusRange, altitudeRange));
+        assertFalse(BodyMotionTameworkFlyingOrbit.isWithinTargetBand(
+                16.0, 10.0, 0.0, 8.0, 0.0, 0.0, radiusRange, altitudeRange));
+        assertFalse(BodyMotionTameworkFlyingOrbit.isWithinTargetBand(
+                16.0, 14.0, 0.0, 0.0, 0.0, 0.0, radiusRange, altitudeRange));
+    }
 }

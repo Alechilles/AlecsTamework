@@ -26,6 +26,9 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     private final DoubleHolder approachDurationMax = new DoubleHolder();
     private final DoubleHolder approachStopDistance = new DoubleHolder();
     private final DoubleHolder approachSlowDownDistance = new DoubleHolder();
+    private final NumberArrayHolder wanderRadiusRange = new NumberArrayHolder();
+    private final NumberArrayHolder wanderRetargetTimeRange = new NumberArrayHolder();
+    private final DoubleHolder wanderStopDistance = new DoubleHolder();
     private final DoubleHolder relativeSpeed = new DoubleHolder();
     private final NumberArrayHolder desiredAltitudeRange = new NumberArrayHolder();
     private final DoubleHolder climbRelativeSpeed = new DoubleHolder();
@@ -36,7 +39,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     public BuilderBodyMotionTameworkFlyingOrbit readConfig(@Nonnull JsonElement data) {
         super.readConfig(data);
         getEnum(data, "Mode", mode, Mode.class, Mode.CYCLE, BuilderDescriptorState.WorkInProgress,
-                "Steering mode: Cycle, Orbit, Approach, or FaceTarget.", null);
+                "Steering mode: Cycle, Orbit, Approach, FaceTarget, or WanderTarget.", null);
         getDouble(data, "OrbitRadius", orbitRadius, 18.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress, "Preferred horizontal orbit radius around the target.", null);
         getDouble(data, "OrbitRadiusTolerance", orbitRadiusTolerance, 4.0, DoubleSingleValidator.greater0(),
@@ -54,14 +57,26 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         getDouble(data, "ApproachSlowDownDistance", approachSlowDownDistance, 14.0,
                 DoubleSingleValidator.greater0(), BuilderDescriptorState.WorkInProgress,
                 "Horizontal distance at which an approach starts slowing down.", null);
+        getDoubleRange(data, "WanderRadiusRange", wanderRadiusRange,
+                new double[] { 8.0, 18.0 },
+                DoubleSequenceValidator.betweenWeaklyMonotonic(0, Double.MAX_VALUE),
+                BuilderDescriptorState.WorkInProgress,
+                "Horizontal distance range used when choosing loose wander destinations around the target.", null);
+        getDoubleRange(data, "WanderRetargetTimeRange", wanderRetargetTimeRange,
+                new double[] { 3.0, 6.0 },
+                DoubleSequenceValidator.betweenWeaklyMonotonic(0, Double.MAX_VALUE),
+                BuilderDescriptorState.WorkInProgress,
+                "Seconds before choosing another loose wander destination.", null);
+        getDouble(data, "WanderStopDistance", wanderStopDistance, 3.0, DoubleSingleValidator.greaterEqual0(),
+                BuilderDescriptorState.WorkInProgress, "Distance at which a loose wander destination is reached.", null);
         getDouble(data, "RelativeSpeed", relativeSpeed, 0.5,
                 DoubleRangeValidator.fromExclToIncl(0, 2), BuilderDescriptorState.WorkInProgress,
-                "Relative speed used by orbit and approach steering.", null);
+                "Relative speed used by orbit, approach, and loose wander steering.", null);
         getDoubleRange(data, "DesiredAltitudeRange", desiredAltitudeRange,
                 new double[] { 0.0, Double.MAX_VALUE },
                 DoubleSequenceValidator.betweenWeaklyMonotonic(0, Double.MAX_VALUE),
                 BuilderDescriptorState.WorkInProgress,
-                "Height-over-ground range maintained while steering.", null);
+                "Vertical offset range maintained relative to the target while steering.", null);
         getDouble(data, "ClimbRelativeSpeed", climbRelativeSpeed, 1.0,
                 DoubleRangeValidator.between(0, 2), BuilderDescriptorState.WorkInProgress,
                 "Upward steering strength while below the desired altitude range.", null);
@@ -80,7 +95,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     @Nonnull
     @Override
     public String getShortDescription() {
-        return "Orbit a target in flight and periodically approach it.";
+        return "Orbit, approach, face, or loosely wander around a target in flight.";
     }
 
     @Nonnull
@@ -131,6 +146,18 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         return approachSlowDownDistance.get(support.getExecutionContext());
     }
 
+    double[] getWanderRadiusRange(BuilderSupport support) {
+        return wanderRadiusRange.get(support.getExecutionContext());
+    }
+
+    double[] getWanderRetargetTimeRange(BuilderSupport support) {
+        return wanderRetargetTimeRange.get(support.getExecutionContext());
+    }
+
+    double getWanderStopDistance(BuilderSupport support) {
+        return wanderStopDistance.get(support.getExecutionContext());
+    }
+
     double getRelativeSpeed(BuilderSupport support) {
         return relativeSpeed.get(support.getExecutionContext());
     }
@@ -151,7 +178,8 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         CYCLE("Cycle"),
         ORBIT("Orbit"),
         APPROACH("Approach"),
-        FACE_TARGET("FaceTarget");
+        FACE_TARGET("FaceTarget"),
+        WANDER_TARGET("WanderTarget");
 
         private final String name;
 

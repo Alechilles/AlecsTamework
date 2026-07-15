@@ -17,7 +17,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
-/** Target-relative flight steering that spends most of its time orbiting and periodically approaches. */
+/** Target-relative orbit, approach, facing, and loose waypoint flight steering. */
 public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private static final double MIN_DIRECTION_LENGTH = 1.0E-6;
     private static final double MIN_APPROACH_SPEED_FACTOR = 0.2;
@@ -32,17 +32,23 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private final double approachDurationMax;
     private final double approachStopDistance;
     private final double approachSlowDownDistance;
+    private final double[] wanderRadiusRange;
+    private final double[] wanderRetargetTimeRange;
+    private final double wanderStopDistance;
     private final double relativeSpeed;
     private final double[] desiredAltitudeRange;
     private final double climbRelativeSpeed;
     private final double sinkRelativeSpeed;
     private final Vector3d targetPosition = new Vector3d();
+    private final Vector3d wanderDestination = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d facingDirection = new Vector3d();
 
     private Phase phase = Phase.ORBIT;
     private double phaseRemaining;
     private int orbitDirection = 1;
+    private boolean hasWanderDestination;
+    private double wanderRetargetRemaining;
 
     BodyMotionTameworkFlyingOrbit(@Nonnull BuilderBodyMotionTameworkFlyingOrbit builder,
                                   @Nonnull BuilderSupport support) {
@@ -58,11 +64,25 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                 builder.getApproachDurationMin(support), builder.getApproachDurationMax(support));
         approachStopDistance = builder.getApproachStopDistance(support);
         approachSlowDownDistance = Math.max(builder.getApproachSlowDownDistance(support), approachStopDistance);
+        wanderRadiusRange = builder.getWanderRadiusRange(support);
+        wanderRetargetTimeRange = builder.getWanderRetargetTimeRange(support);
+        wanderStopDistance = builder.getWanderStopDistance(support);
         relativeSpeed = builder.getRelativeSpeed(support);
         desiredAltitudeRange = builder.getDesiredAltitudeRange(support);
         climbRelativeSpeed = builder.getClimbRelativeSpeed(support);
         sinkRelativeSpeed = builder.getSinkRelativeSpeed(support);
         beginOrbit();
+    }
+
+    @Override
+    public void activate(@Nonnull Ref<EntityStore> ref,
+                         @Nonnull Role role,
+                         @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        hasWanderDestination = false;
+        wanderRetargetRemaining = 0.0;
+        if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
+            beginOrbit();
+        }
     }
 
     @Override
@@ -76,12 +96,12 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         MotionController active = role.getActiveMotionController();
         if (!(active instanceof MotionControllerFly fly)
                 || sensorInfo == null || !sensorInfo.getPositionProvider().providePosition(targetPosition)) {
-            return false;
+            return true;
         }
 
         TransformComponent transform = componentAccessor.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
-            return false;
+            return true;
         }
 
         if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
@@ -90,7 +110,14 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         Vector3d selfPosition = transform.getPosition();
         boolean approaching = usesApproachSteering(mode, phase);
         boolean facingTarget = facesTarget(mode, phase);
-        if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET) {
+        boolean wandering = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.WANDER_TARGET;
+        if (wandering) {
+            updateWanderDestination(selfPosition, targetPosition, dt);
+            resolveWaypointTranslation(
+                    selfPosition.x(), selfPosition.y(), selfPosition.z(),
+                    wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
+                    wanderStopDistance, relativeSpeed, translation);
+        } else if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET) {
             translation.zero();
         } else if (!approaching) {
             resolveOrbitTranslation(
@@ -102,10 +129,12 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                     approachStopDistance, approachSlowDownDistance, relativeSpeed, translation);
         }
 
-        fly.setDesiredAltitudeOverride(desiredAltitudeRange);
-        double altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
-                selfPosition.y(), targetPosition.y(), desiredAltitudeRange, climbRelativeSpeed, sinkRelativeSpeed);
-        translation.y = altitudeCorrection;
+        double altitudeCorrection = 0.0;
+        if (!wandering) {
+            altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
+                    selfPosition.y(), targetPosition.y(), desiredAltitudeRange, climbRelativeSpeed, sinkRelativeSpeed);
+            translation.y = altitudeCorrection;
+        }
         desiredSteering.setTranslation(translation);
         Vector3d yawDirection = facingTarget
                 ? resolveTargetDirection(selfPosition.x(), selfPosition.z(), targetPosition.x(), targetPosition.z(), facingDirection)
@@ -118,7 +147,40 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
             desiredSteering.setPitch(altitudeCorrection > 0.0 ? fly.getMaxClimbAngle() : -fly.getMaxSinkAngle());
         }
         desiredSteering.setRelativeTurnSpeed(1.0);
-        return false;
+        return true;
+    }
+
+    private void updateWanderDestination(@Nonnull Vector3d selfPosition,
+                                         @Nonnull Vector3d currentTargetPosition,
+                                         double dt) {
+        wanderRetargetRemaining -= Math.max(0.0, dt);
+        boolean reachedDestination = selfPosition.distanceSquared(wanderDestination)
+                <= wanderStopDistance * wanderStopDistance;
+        boolean destinationWithinBand = isWithinTargetBand(
+                wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
+                currentTargetPosition.x(), currentTargetPosition.y(), currentTargetPosition.z(),
+                wanderRadiusRange, desiredAltitudeRange);
+        if (!hasWanderDestination || wanderRetargetRemaining <= 0.0
+                || reachedDestination || !destinationWithinBand) {
+            chooseWanderDestination(currentTargetPosition);
+        }
+    }
+
+    private void chooseWanderDestination(@Nonnull Vector3d currentTargetPosition) {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        double minimumRadius = wanderRadiusRange[0];
+        double maximumRadius = wanderRadiusRange[1];
+        double radiusSquared = randomDuration(
+                minimumRadius * minimumRadius, maximumRadius * maximumRadius);
+        double radius = Math.sqrt(radiusSquared);
+        double angle = random.nextDouble(Math.PI * 2.0);
+        double altitude = randomDuration(desiredAltitudeRange[0], desiredAltitudeRange[1]);
+        wanderDestination.set(
+                currentTargetPosition.x() + Math.cos(angle) * radius,
+                currentTargetPosition.y() + altitude,
+                currentTargetPosition.z() + Math.sin(angle) * radius);
+        wanderRetargetRemaining = randomDuration(wanderRetargetTimeRange[0], wanderRetargetTimeRange[1]);
+        hasWanderDestination = true;
     }
 
     private void tickPhase(double dt) {
@@ -185,6 +247,45 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                                            double targetZ,
                                            @Nonnull Vector3d output) {
         return output.set(targetX - selfX, 0.0, targetZ - selfZ);
+    }
+
+    static boolean isWithinTargetBand(double pointX,
+                                      double pointY,
+                                      double pointZ,
+                                      double targetX,
+                                      double targetY,
+                                      double targetZ,
+                                      double[] radiusRange,
+                                      double[] altitudeRange) {
+        double offsetX = pointX - targetX;
+        double offsetZ = pointZ - targetZ;
+        double horizontalDistanceSquared = offsetX * offsetX + offsetZ * offsetZ;
+        double minimumRadiusSquared = radiusRange[0] * radiusRange[0];
+        double maximumRadiusSquared = radiusRange[1] * radiusRange[1];
+        double altitude = pointY - targetY;
+        return horizontalDistanceSquared >= minimumRadiusSquared
+                && horizontalDistanceSquared <= maximumRadiusSquared
+                && altitude >= altitudeRange[0]
+                && altitude <= altitudeRange[1];
+    }
+
+    static Vector3d resolveWaypointTranslation(double selfX,
+                                               double selfY,
+                                               double selfZ,
+                                               double waypointX,
+                                               double waypointY,
+                                               double waypointZ,
+                                               double stopDistance,
+                                               double speed,
+                                               @Nonnull Vector3d output) {
+        double moveX = waypointX - selfX;
+        double moveY = waypointY - selfY;
+        double moveZ = waypointZ - selfZ;
+        double distance = Math.sqrt(moveX * moveX + moveY * moveY + moveZ * moveZ);
+        if (distance <= stopDistance || distance <= MIN_DIRECTION_LENGTH) {
+            return output.zero();
+        }
+        return output.set(moveX / distance * speed, moveY / distance * speed, moveZ / distance * speed);
     }
 
     static Vector3d resolveOrbitTranslation(double selfX,
