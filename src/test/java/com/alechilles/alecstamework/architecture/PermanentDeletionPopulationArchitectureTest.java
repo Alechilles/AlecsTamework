@@ -86,6 +86,13 @@ class PermanentDeletionPopulationArchitectureTest {
         assertTrue(schedule >= 0 && callback > schedule && nativeDeath > callback);
         assertTrue(coordinator.contains("context.addProperty(\"permanentDeath\", true)"));
         assertTrue(coordinator.contains("beforeApply"));
+        assertTrue(coordinator.contains("normalizeLethalDamage(pending.damage(), pending.finalDamage())"));
+        assertTrue(coordinator.contains(
+                "DamageCause.getAssetMap().getAsset(damage.getDamageCauseIndex()) == null"
+        ));
+        assertTrue(coordinator.contains(
+                "new Damage(damage.getSource(), DamageCause.PHYSICAL, finalDamage)"
+        ));
         int durableCallback = coordinator.indexOf("public void onPopulationCommitted", callback);
         int barrierRelease = coordinator.indexOf("pendingByNpc.remove", durableCallback);
         assertTrue(durableCallback > callback && barrierRelease > durableCallback);

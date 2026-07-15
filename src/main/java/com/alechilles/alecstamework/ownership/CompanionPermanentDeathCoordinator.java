@@ -207,8 +207,7 @@ public final class CompanionPermanentDeathCoordinator {
             retainExistingDeathHold(context);
             return;
         }
-        Damage damage = pending.damage();
-        damage.setCancelled(false);
+        Damage damage = normalizeLethalDamage(pending.damage(), pending.finalDamage());
         EntityStatMap stats = context.store().getComponent(
                 context.npcRef(), EntityStatMap.getComponentType()
         );
@@ -228,6 +227,20 @@ public final class CompanionPermanentDeathCoordinator {
         if (!hasDeathComponent(context)) {
             throw new IllegalStateException("Engine did not retain the prepared death component.");
         }
+    }
+
+    /**
+     * Ensures the delayed native-death handoff has a resolvable cause. Some utility damage
+     * events use an unregistered cause index, while {@link DeathComponent} requires one.
+     */
+    @Nonnull
+    static Damage normalizeLethalDamage(@Nonnull Damage damage, float finalDamage) {
+        if (DamageCause.getAssetMap().getAsset(damage.getDamageCauseIndex()) == null) {
+            return new Damage(damage.getSource(), DamageCause.PHYSICAL, finalDamage);
+        }
+        damage.setCancelled(false);
+        damage.setAmount(finalDamage);
+        return damage;
     }
 
     private static void retainExistingDeathHold(@Nonnull OwnerMutationContext context) {
