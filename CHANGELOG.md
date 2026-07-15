@@ -54,6 +54,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed non-revivable companion deaths corrupting the corpse-removal component during chunk unloading, which could crash the game or leave a dead companion stuck in the world.
 - Fixed linked companions being recalled on the player's initial world join. Login now establishes the travel session without treating it as a portal transition, while later world changes in the same connection still allow configured followers to travel.
 - Fixed Hold and other successful state commands retaining the companion's previous cached command state on the linked item until a later refresh, which could make a held companion follow during a subsequent portal transition.
 - Fixed handheld companion releases degrading persistence when the interaction's held slot differed from the player's asynchronously observed active slot or the filled capture item moved during admission. Source finalization now starts from the interaction's exact slot and follows one uniquely matching moved stack without accepting ambiguous duplicates. After restart, an already-applied release can also consume its uniquely fingerprinted retained source and rerun population reconciliation when the planned owned companion is positively live.

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.systems;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeferredCorpseRemoval;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,6 +12,7 @@ class CompanionPermanentDeathHoldTest {
     void markerSurvivesComponentCloningWithoutMatchingVanillaTimers() {
         DeferredCorpseRemoval hold = CompanionPermanentDeathHold.create("Particles_Test");
 
+        assertEquals(DeferredCorpseRemoval.class, hold.getClass());
         assertTrue(CompanionPermanentDeathHold.isHold(hold));
         assertTrue(CompanionPermanentDeathHold.isHold(
                 (DeferredCorpseRemoval) hold.clone()
