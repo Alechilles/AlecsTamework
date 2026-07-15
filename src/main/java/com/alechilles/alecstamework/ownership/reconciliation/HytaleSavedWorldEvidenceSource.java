@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -114,7 +115,7 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             long chunkIndex = indexes[index];
             int chunkX = ChunkUtil.xOfChunkIndex(chunkIndex);
             int chunkZ = ChunkUtil.zOfChunkIndex(chunkIndex);
-            future = future.thenCompose(evidence -> reader.read(chunkX, chunkZ).thenApply(found -> {
+            future = future.thenCompose(evidence -> readChunk(chunkX, chunkZ).thenApply(found -> {
                 evidence.addAll(Objects.requireNonNull(found, "saved chunk evidence"));
                 return evidence;
             }));
@@ -128,6 +129,31 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             }
             return new Batch(evidence, end, end - start, complete);
         });
+    }
+
+    @Nonnull
+    private CompletableFuture<List<CompanionPopulationEvidence>> readChunk(
+            int chunkX, int chunkZ) {
+        CompletableFuture<List<CompanionPopulationEvidence>> loaded;
+        try {
+            loaded = Objects.requireNonNull(
+                    reader.read(chunkX, chunkZ), "saved chunk read future");
+        } catch (Throwable throwable) {
+            return CompletableFuture.failedFuture(chunkFailure(chunkX, chunkZ, throwable));
+        }
+        return loaded.handle((evidence, failure) -> {
+            if (failure != null) {
+                throw new CompletionException(chunkFailure(chunkX, chunkZ, failure));
+            }
+            return Objects.requireNonNull(evidence, "saved chunk evidence");
+        });
+    }
+
+    private IllegalStateException chunkFailure(int chunkX, int chunkZ, Throwable throwable) {
+        return new IllegalStateException(
+                "Saved-world evidence scan failed: source=" + descriptor.coverageKey()
+                        + " world=" + worldName + " chunk=" + chunkX + "," + chunkZ,
+                Objects.requireNonNull(throwable, "throwable"));
     }
 
     private boolean sameIndexes() {

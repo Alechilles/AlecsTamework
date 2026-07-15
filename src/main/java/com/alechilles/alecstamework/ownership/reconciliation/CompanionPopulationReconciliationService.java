@@ -232,7 +232,7 @@ public final class CompanionPopulationReconciliationService {
                         });
                     });
         }).exceptionally(exception -> ScanResult.failed(
-                "reconciliation-resume-failed:" + rootCauseName(exception)
+                "reconciliation-resume-failed:" + ReconciliationFailureReason.describe(exception)
         ));
     }
 
@@ -277,7 +277,8 @@ public final class CompanionPopulationReconciliationService {
             long offset,
             @Nonnull Throwable throwable
     ) {
-        String reason = "reconciliation-source-failed:" + rootCauseName(throwable);
+        String reason = "reconciliation-source-failed:"
+                + ReconciliationFailureReason.describe(throwable);
         return committed(reconciliationRepository.markFailureAsync(
                 source.descriptor(),
                 offset,
@@ -327,7 +328,8 @@ public final class CompanionPopulationReconciliationService {
                     })
             );
         }).exceptionally(exception -> Result.degraded(
-                "reconciliation-finalize-failed:" + rootCauseName(exception)
+                "reconciliation-finalize-failed:"
+                        + ReconciliationFailureReason.describe(exception)
         ));
     }
 
@@ -414,16 +416,6 @@ public final class CompanionPopulationReconciliationService {
             @Nonnull PersistenceWriteQueue.WriteSubmission<?> submission
     ) {
         return submission.completion().thenApply(PersistenceWriteQueue.WriteOutcome::isCommitted);
-    }
-
-    @Nonnull
-    private static String rootCauseName(@Nonnull Throwable throwable) {
-        Throwable current = throwable;
-        while ((current instanceof CompletionException || current.getCause() != null)
-                && current.getCause() != null) {
-            current = current.getCause();
-        }
-        return current.getClass().getSimpleName();
     }
 
     public enum Status {

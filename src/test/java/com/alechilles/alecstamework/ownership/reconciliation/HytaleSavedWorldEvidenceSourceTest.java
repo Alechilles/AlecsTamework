@@ -96,6 +96,26 @@ class HytaleSavedWorldEvidenceSourceTest {
     }
 
     @Test
+    void failedChunkReadRetainsSourceCoordinatesAndRootCause() throws Exception {
+        HytaleSavedWorldEvidenceSource source = new HytaleSavedWorldEvidenceSource(
+                "alpha",
+                HytaleSavedWorldEvidenceSource.Mode.WORLD_ENTITIES,
+                () -> new long[]{ChunkUtil.indexChunk(7, -3)},
+                (chunkX, chunkZ) -> CompletableFuture.failedFuture(
+                        new IllegalStateException("Owned saved entity has no persisted UUID.")),
+                "epoch-failure"
+        );
+
+        CompletionException failure = assertThrows(
+                CompletionException.class, () -> source.scan(0L, 1).join());
+        String reason = ReconciliationFailureReason.describe(failure);
+
+        assertTrue(reason.contains("source=world-entities:alpha"));
+        assertTrue(reason.contains("world=alpha chunk=7,-3"));
+        assertTrue(reason.contains("Owned saved entity has no persisted UUID."));
+    }
+
+    @Test
     void rejectsCompletionWhenTheSavedChunkCatalogChanged() throws Exception {
         long initial = ChunkUtil.indexChunk(1, 1);
         AtomicReference<long[]> indexes = new AtomicReference<>(new long[]{initial});
