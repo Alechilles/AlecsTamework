@@ -135,6 +135,7 @@ Nested `AttachmentInheritance`:
 - `ParentWeight`: weight for inheriting from parent attachment selections.
 - `RandomWeight`: weight for rolling from the available random pool.
 - `MutationChance`: chance to mutate away from parent inheritance.
+- `ExcludedSets`: exact model attachment-set IDs that inheritance must skip. Skipped sets keep the child's model-generated selection. When inherited from a parent config, an explicit array replaces the parent list and `[]` clears it.
 
 ### `OffspringLifecycle`
 Controls growth defaults and optional family-specific role mappings.
@@ -298,7 +299,11 @@ Hytale world-time epoch values can be negative. `Timing` and `PassiveBreeding` s
     "AttachmentInheritance": {
       "ParentWeight": 1.0,
       "RandomWeight": 0.25,
-      "MutationChance": 0.05
+      "MutationChance": 0.05,
+      "ExcludedSets": [
+        "Saddle",
+        "SaddleBlanket"
+      ]
     }
   },
   "OffspringLifecycle": {
@@ -371,7 +376,7 @@ This pattern allows two different adult roles to breed together, produce one sha
 
 ## Gotchas
 - `RoleOverrides` does not inherit. If you need an override in a child asset, author it again.
-- Explicit `Families` or `RoleMaxNearbySameType` arrays replace the parent list.
+- Explicit `Families`, `RoleMaxNearbySameType`, or `AttachmentInheritance.ExcludedSets` arrays replace the parent list.
 - Keep `Timing.Basis` and `PassiveBreeding.Basis` intentional. They solve different timing problems.
 - New content should prefer minute-based keys where they exist, but old second-based keys remain valid.
 - Gender labels appear in linked companion panels and preserved spawner tooltips for companions covered by an enabled gender config.

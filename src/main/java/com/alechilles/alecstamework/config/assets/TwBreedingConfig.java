@@ -200,32 +200,8 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
-    private static final BuilderCodec<AttachmentInheritanceSettings> ATTACHMENT_INHERITANCE_CODEC = BuilderCodec.builder(
-            AttachmentInheritanceSettings.class,
-            AttachmentInheritanceSettings::new
-    )
-        .<Double>append(
-            new KeyedCodec<>("ParentWeight", Codec.DOUBLE),
-            (settings, value) -> settings.parentWeight = value,
-            settings -> settings.parentWeight
-        )
-        .documentation("Relative weight for inheriting attachment traits from parents.")
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
-            (settings, value) -> settings.randomWeight = value,
-            settings -> settings.randomWeight
-        )
-        .documentation("Relative weight for selecting random attachment traits.")
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("MutationChance", Codec.DOUBLE),
-            (settings, value) -> settings.mutationChance = value,
-            settings -> settings.mutationChance
-        )
-        .documentation("Chance for mutation when generating inherited data.")
-        .add()
-        .build();
+    private static final BuilderCodec<AttachmentInheritanceSettings> ATTACHMENT_INHERITANCE_CODEC =
+            BreedingAttachmentInheritanceCodec.settingsCodec();
 
     private static final BuilderCodec<GenderSettings> GENDER_CODEC = BuilderCodec.builder(
             GenderSettings.class,
@@ -1002,32 +978,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .build();
 
     private static final BuilderCodec<AttachmentInheritanceSettingsOverride> ATTACHMENT_INHERITANCE_OVERRIDE_CODEC =
-            BuilderCodec.builder(
-                AttachmentInheritanceSettingsOverride.class,
-                AttachmentInheritanceSettingsOverride::new
-            )
-                .<Double>append(
-                    new KeyedCodec<>("ParentWeight", Codec.DOUBLE),
-                    (settings, value) -> settings.parentWeight = value,
-                    settings -> settings.parentWeight
-                )
-                .documentation("Relative weight for inheriting attachment traits from parents.")
-                .add()
-                .<Double>append(
-                    new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
-                    (settings, value) -> settings.randomWeight = value,
-                    settings -> settings.randomWeight
-                )
-                .documentation("Relative weight for selecting random attachment traits.")
-                .add()
-                .<Double>append(
-                    new KeyedCodec<>("MutationChance", Codec.DOUBLE),
-                    (settings, value) -> settings.mutationChance = value,
-                    settings -> settings.mutationChance
-                )
-                .documentation("Chance for mutation when generating inherited data.")
-                .add()
-                .build();
+            BreedingAttachmentInheritanceCodec.overrideCodec();
 
     private static final BuilderCodec<InheritanceSettingsOverride> INHERITANCE_OVERRIDE_CODEC = BuilderCodec.builder(
             InheritanceSettingsOverride.class,
@@ -1066,7 +1017,8 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.attachmentInheritance = value,
             settings -> settings.attachmentInheritance
         )
-        .documentation("Attachment inheritance weighting and mutation settings.")
+        .documentation("Attachment inheritance weighting, mutation, and excluded-set settings. When inherited, "
+                + "omitted nested fields inherit; an explicit ExcludedSets array replaces the parent list.")
         .add()
         .build();
 
@@ -1822,6 +1774,12 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         if (!nestedExplicitKeys.contains("AttachmentInheritance.MutationChance")) {
             inheritance.attachmentInheritance.mutationChance = parent.inheritance.attachmentInheritance.mutationChance;
         }
+        if (!nestedExplicitKeys.contains("AttachmentInheritance.ExcludedSets")) {
+            String[] parentExcludedSets = parent.inheritance.attachmentInheritance.excludedSets;
+            inheritance.attachmentInheritance.excludedSets = parentExcludedSets == null
+                    ? ArrayUtil.EMPTY_STRING_ARRAY
+                    : parentExcludedSets.clone();
+        }
     }
 
     private void inheritOffspringLifecycleSection(@Nonnull TwBreedingConfig parent,
@@ -2301,6 +2259,9 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         copy.parentWeight = base.parentWeight;
         copy.randomWeight = base.randomWeight;
         copy.mutationChance = base.mutationChance;
+        copy.excludedSets = base.excludedSets == null
+                ? ArrayUtil.EMPTY_STRING_ARRAY
+                : base.excludedSets.clone();
         return copy;
     }
 
@@ -2497,9 +2458,10 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
     /** Partial attachment-inheritance override patch for a single role. */
     public static final class AttachmentInheritanceSettingsOverride {
-        private Double parentWeight;
-        private Double randomWeight;
-        private Double mutationChance;
+        Double parentWeight;
+        Double randomWeight;
+        Double mutationChance;
+        String[] excludedSets;
 
         private void applyTo(@Nonnull AttachmentInheritanceSettings target) {
             if (parentWeight != null) {
@@ -2510,6 +2472,9 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             }
             if (mutationChance != null) {
                 target.mutationChance = mutationChance;
+            }
+            if (excludedSets != null) {
+                target.excludedSets = excludedSets.clone();
             }
         }
     }
@@ -2889,9 +2854,10 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
     /** Attachment inheritance weighting and mutation settings for offspring model selection. */
     public static final class AttachmentInheritanceSettings {
-        private double parentWeight = 1.0;
-        private double randomWeight = 0.25;
-        private double mutationChance = 0.05;
+        double parentWeight = 1.0;
+        double randomWeight = 0.25;
+        double mutationChance = 0.05;
+        String[] excludedSets = ArrayUtil.EMPTY_STRING_ARRAY;
 
         public double getParentWeight() {
             if (!Double.isFinite(parentWeight) || parentWeight < 0.0) {
@@ -2918,6 +2884,11 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 return 1.0;
             }
             return mutationChance;
+        }
+
+        /** Returns exact model attachment-set IDs excluded from offspring inheritance. */
+        public String[] getExcludedSets() {
+            return excludedSets == null ? ArrayUtil.EMPTY_STRING_ARRAY : excludedSets.clone();
         }
     }
 

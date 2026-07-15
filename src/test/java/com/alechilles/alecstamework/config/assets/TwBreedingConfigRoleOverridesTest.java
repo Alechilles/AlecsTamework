@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Tests per-role override patching across breeding config sections. */
@@ -87,6 +88,7 @@ class TwBreedingConfigRoleOverridesTest {
         setField(baseAttachment, "parentWeight", 1.0);
         setField(baseAttachment, "randomWeight", 0.25);
         setField(baseAttachment, "mutationChance", 0.05);
+        setField(baseAttachment, "excludedSets", new String[] { "Saddle", "SaddleBlanket" });
         setField(base, "attachmentInheritance", baseAttachment);
         setField(config, "inheritance", base);
 
@@ -97,6 +99,7 @@ class TwBreedingConfigRoleOverridesTest {
         TwBreedingConfig.AttachmentInheritanceSettingsOverride attachmentOverride =
                 new TwBreedingConfig.AttachmentInheritanceSettingsOverride();
         setField(attachmentOverride, "mutationChance", 0.20);
+        setField(attachmentOverride, "excludedSets", new String[] { "Harness" });
         setField(inheritanceOverride, "attachmentInheritance", attachmentOverride);
         setField(roleOverride, "inheritance", inheritanceOverride);
         setRoleOverride(config, "Tamed_Yeti", roleOverride);
@@ -107,6 +110,7 @@ class TwBreedingConfigRoleOverridesTest {
         assertEquals(1.0, resolved.getAttachmentInheritance().getParentWeight(), 0.0001);
         assertEquals(0.25, resolved.getAttachmentInheritance().getRandomWeight(), 0.0001);
         assertEquals(0.20, resolved.getAttachmentInheritance().getMutationChance(), 0.0001);
+        assertArrayEquals(new String[] { "Harness" }, resolved.getAttachmentInheritance().getExcludedSets());
     }
 
     @Test

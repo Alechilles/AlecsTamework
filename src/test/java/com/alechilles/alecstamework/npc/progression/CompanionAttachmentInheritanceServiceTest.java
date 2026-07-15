@@ -77,6 +77,31 @@ class CompanionAttachmentInheritanceServiceTest {
     }
 
     @Test
+    void excludedEquipmentSetsAreNeverInheritedOrRandomized() {
+        Map<String, String> result = CompanionAttachmentInheritanceService.resolveInheritedSelections(
+                Map.of("Fur", "1", "Saddle", "Yes", "SaddleBlanket", "Red"),
+                Map.of("Fur", "0", "Saddle", "Yes", "SaddleBlanket", "Blue"),
+                Map.of(
+                        "Fur", Set.of("0", "1"),
+                        "Saddle", Set.of("None", "Yes"),
+                        "SaddleBlanket", Set.of("None", "Red", "Blue")
+                ),
+                123L,
+                new AttachmentInheritanceProfile(
+                        true,
+                        1.0,
+                        0.0,
+                        0.0,
+                        Set.of("Saddle", "SaddleBlanket")
+                )
+        );
+
+        assertTrue(result.containsKey("Fur"));
+        assertFalse(result.containsKey("Saddle"));
+        assertFalse(result.containsKey("SaddleBlanket"));
+    }
+
+    @Test
     void mutationChanceMultiplierScalesAndClampsBaseChance() {
         AttachmentInheritanceProfile profile = new AttachmentInheritanceProfile(true, 1.0, 0.25, 0.10);
 

@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -44,7 +45,7 @@ public final class CompanionAttachmentInheritanceService {
 
         LinkedHashMap<String, String> out = new LinkedHashMap<>();
         for (String setId : setIds) {
-            if (setId == null || setId.isBlank()) {
+            if (setId == null || setId.isBlank() || resolvedProfile.excludes(setId)) {
                 continue;
             }
             Set<String> valueSet = attachmentOptions.get(setId);
@@ -176,7 +177,20 @@ public final class CompanionAttachmentInheritanceService {
     public record AttachmentInheritanceProfile(boolean enabled,
                                                double parentWeight,
                                                double randomWeight,
-                                               double mutationChance) {
+                                               double mutationChance,
+                                               @Nonnull Set<String> excludedSetIds) {
+        public AttachmentInheritanceProfile {
+            excludedSetIds = normalizeExcludedSetIds(excludedSetIds);
+        }
+
+        /** Preserves the original four-argument profile constructor for integrations and tests. */
+        public AttachmentInheritanceProfile(boolean enabled,
+                                            double parentWeight,
+                                            double randomWeight,
+                                            double mutationChance) {
+            this(enabled, parentWeight, randomWeight, mutationChance, Collections.emptySet());
+        }
+
         public static AttachmentInheritanceProfile fromConfig(@Nullable TwBreedingConfig.InheritanceSettings settings) {
             if (settings == null || !settings.isInheritAttachments()) {
                 return disabled();
@@ -186,12 +200,13 @@ public final class CompanionAttachmentInheritanceService {
                     true,
                     sanitizeWeight(attachment.getParentWeight(), 1.0),
                     sanitizeWeight(attachment.getRandomWeight(), 0.25),
-                    sanitizeMutationChance(attachment.getMutationChance())
+                    sanitizeMutationChance(attachment.getMutationChance()),
+                    normalizeExcludedSetIds(attachment.getExcludedSets())
             );
         }
 
         public static AttachmentInheritanceProfile disabled() {
-            return new AttachmentInheritanceProfile(false, 0.0, 0.0, 0.0);
+            return new AttachmentInheritanceProfile(false, 0.0, 0.0, 0.0, Collections.emptySet());
         }
 
         public AttachmentInheritanceProfile withMutationChanceMultiplier(double multiplier) {
@@ -203,8 +218,13 @@ public final class CompanionAttachmentInheritanceService {
                     true,
                     parentWeight,
                     randomWeight,
-                    sanitizeMutationChance(mutationChance * safeMultiplier)
+                    sanitizeMutationChance(mutationChance * safeMultiplier),
+                    excludedSetIds
             );
+        }
+
+        public boolean excludes(@Nullable String setId) {
+            return setId != null && excludedSetIds.contains(setId);
         }
 
         private static double sanitizeWeight(double value, double fallback) {
@@ -222,6 +242,32 @@ public final class CompanionAttachmentInheritanceService {
                 return 1.0;
             }
             return value;
+        }
+
+        @Nonnull
+        private static Set<String> normalizeExcludedSetIds(@Nullable Iterable<String> values) {
+            if (values == null) {
+                return Collections.emptySet();
+            }
+            LinkedHashSet<String> normalized = new LinkedHashSet<>();
+            for (String value : values) {
+                if (value != null && !value.isBlank()) {
+                    normalized.add(value.trim());
+                }
+            }
+            return normalized.isEmpty()
+                    ? Collections.emptySet()
+                    : Collections.unmodifiableSet(normalized);
+        }
+
+        @Nonnull
+        private static Set<String> normalizeExcludedSetIds(@Nullable String[] values) {
+            if (values == null || values.length == 0) {
+                return Collections.emptySet();
+            }
+            List<String> configured = new ArrayList<>(values.length);
+            Collections.addAll(configured, values);
+            return normalizeExcludedSetIds(configured);
         }
     }
 }

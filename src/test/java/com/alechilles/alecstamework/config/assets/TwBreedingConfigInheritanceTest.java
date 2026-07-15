@@ -106,6 +106,39 @@ class TwBreedingConfigInheritanceTest {
     }
 
     @Test
+    void attachmentExcludedSetsInheritWhenOmittedFromExplicitSection() throws Exception {
+        TwBreedingConfig parent = breedingConfigWithExcludedSets("Saddle", "SaddleBlanket");
+        TwBreedingConfig child = breedingConfigWithExcludedSets("Collar");
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("Inheritance", Set.of("AttachmentInheritance", "AttachmentInheritance.ParentWeight"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("Inheritance"), nested);
+
+        assertArrayEquals(
+                new String[] { "Saddle", "SaddleBlanket" },
+                child.getInheritance().getAttachmentInheritance().getExcludedSets()
+        );
+    }
+
+    @Test
+    void explicitEmptyAttachmentExcludedSetsReplaceParentList() throws Exception {
+        TwBreedingConfig parent = breedingConfigWithExcludedSets("Saddle", "SaddleBlanket");
+        TwBreedingConfig child = breedingConfigWithExcludedSets();
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put(
+                "Inheritance",
+                Set.of("AttachmentInheritance", "AttachmentInheritance.ExcludedSets")
+        );
+        child.inheritMissingTopLevelFrom(parent, Set.of("Inheritance"), nested);
+
+        assertArrayEquals(
+                new String[0],
+                child.getInheritance().getAttachmentInheritance().getExcludedSets()
+        );
+    }
+
+    @Test
     void offspringLifecycleRoleInheritanceInheritsMissingNestedKeys() throws Exception {
         TwBreedingConfig parent = new TwBreedingConfig();
         TwBreedingConfig child = new TwBreedingConfig();
@@ -156,6 +189,17 @@ class TwBreedingConfigInheritanceTest {
 
         assertTrue(config.resolveGender("Tamed_Deer_Stag").isEnabled());
         assertEquals(4.0, config.resolveGender("Tamed_Deer_Stag").getMaleWeight(), 0.000001);
+    }
+
+    private static TwBreedingConfig breedingConfigWithExcludedSets(String... excludedSets) throws Exception {
+        TwBreedingConfig config = new TwBreedingConfig();
+        TwBreedingConfig.InheritanceSettings inheritance = new TwBreedingConfig.InheritanceSettings();
+        TwBreedingConfig.AttachmentInheritanceSettings attachments =
+                new TwBreedingConfig.AttachmentInheritanceSettings();
+        setField(attachments, "excludedSets", excludedSets);
+        setField(inheritance, "attachmentInheritance", attachments);
+        setField(config, "inheritance", inheritance);
+        return config;
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

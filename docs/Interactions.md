@@ -149,7 +149,7 @@ Behavior:
 - One logical breeding attempt derives a stable pair job from the parents and their persisted cooldown generations, then derives each planned child's profile/NPC identities from that attempt. A restart or duplicate callback therefore retries the same child identities, and every admitted unit ends in commit or cancellation exactly once.
 - Pairing can require the same role, require different adult roles in one lifecycle family, allow any adult in one lifecycle family, or explicitly allow any role through `TwBreedingConfig.Pairing.RoleCompatibility`.
 - If `TwBreedingConfig.Gender.Enabled` and `RequireDifferentGender` are enabled, partner selection also requires one male and one female companion.
-- Offspring flow supports baby-role preference, persisted weighted adult-role selection, life-stage initialization, trait/attachment inheritance, and growth timing.
+- Offspring flow supports baby-role preference, persisted weighted adult-role selection, life-stage initialization, trait/attachment inheritance, and growth timing. `TwBreedingConfig.Inheritance.AttachmentInheritance.ExcludedSets` can leave equipment or other non-genetic attachment sets at the child's model-generated default.
 - World-time deadlines are signed. Negative timestamps are valid; only `0` means unset.
 
 ## Ownership and claim admission rules
