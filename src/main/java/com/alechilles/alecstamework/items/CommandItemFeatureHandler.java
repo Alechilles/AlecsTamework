@@ -42,6 +42,7 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
@@ -56,7 +57,6 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -69,14 +69,14 @@ import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.function.Supplier;
@@ -332,27 +332,6 @@ public final class CommandItemFeatureHandler {
         );
     }
 
-    public void onAddPlayerToWorld(AddPlayerToWorldEvent event) {
-        if (event == null || event.getWorld() == null || event.getHolder() == null) {
-            return;
-        }
-        inventoryRepairService.canonicalize(event.getHolder());
-        PlayerRef playerRef = event.getHolder().getComponent(PlayerRef.getComponentType());
-        if (playerRef == null) {
-            return;
-        }
-        World world = event.getWorld();
-        UUID playerUuid = playerRef.getUuid();
-        if (playerUuid == null) {
-            return;
-        }
-        world.execute(() -> dismountPlayerAfterWorldJoin(world, playerUuid));
-        CompletableFuture.runAsync(
-                () -> world.execute(() -> queueWorldChangeTravelRelocationsForPlayerUuid(world, playerUuid)),
-                CompletableFuture.delayedExecutor(250L, TimeUnit.MILLISECONDS)
-        );
-    }
-
     public void queueWorldChangeTravelRelocationsForPlayerUuid(World destinationWorld, UUID playerUuid) {
         if (destinationWorld == null || playerUuid == null) {
             return;
@@ -400,7 +379,7 @@ public final class CommandItemFeatureHandler {
         }
     }
 
-    private void dismountPlayerAfterWorldJoin(World world, UUID playerUuid) {
+    void dismountPlayerAfterWorldJoin(World world, UUID playerUuid) {
         if (world == null || playerUuid == null) {
             return;
         }
@@ -781,18 +760,30 @@ public final class CommandItemFeatureHandler {
         }
 
         int affected = 0;
+        Map<UUID, String> appliedCommandStates = new HashMap<>();
         if (!recipients.isEmpty()) {
             for (Candidate candidate : recipients) {
                 StepResult stepResult = executeCommand(context, candidate);
                 if (stepResult.applied) {
                     affected++;
                 }
+                if (stepResult.appliedState != null
+                        && candidate != null
+                        && candidate.npc != null
+                        && candidate.npc.getUuid() != null) {
+                    String cachedState = stepResult.appliedState.cachedValue();
+                    if (cachedState != null) {
+                        appliedCommandStates.put(candidate.npc.getUuid(), cachedState);
+                    }
+                }
                 if (stepResult.abortAll) {
                     break;
                 }
             }
         }
-        ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(context.workingItem, recipients, store);
+        ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(
+                context.workingItem, recipients, store, appliedCommandStates
+        );
         if (refreshedLinks != context.workingItem) {
             context.workingItem = refreshedLinks;
             context.itemChanged = true;
@@ -1163,6 +1154,12 @@ public final class CommandItemFeatureHandler {
             return;
         }
         feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
+    }
+
+    void canonicalizePlayerCommandInventory(@Nullable Holder<EntityStore> holder) {
+        if (holder != null) {
+            inventoryRepairService.canonicalize(holder);
+        }
     }
 
     @Nonnull

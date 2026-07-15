@@ -118,6 +118,13 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
         return startupReconciler.progress();
     }
 
+    /** Re-runs startup reconciliation after a quarantined source journal is repaired exactly. */
+    @Nonnull
+    public CompletableFuture<CompanionPopulationReconciliationProgress>
+    restartAfterExternalRepair() {
+        return startupReconciler.restartAfterExternalRepair();
+    }
+
     @Override
     public void close() {
         startupReconciler.close();

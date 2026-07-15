@@ -86,6 +86,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderLifecycleInv
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
@@ -989,6 +990,8 @@ public class Tamework extends JavaPlugin {
                 persistenceRuntime,
                 ownerPopulationRuntime.identityResolver()
         );
+        CommandWorldChangeTravelEventHandler commandWorldChangeTravelEventHandler =
+                new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
         );
@@ -1093,9 +1096,29 @@ public class Tamework extends JavaPlugin {
         if (commandItemFeatureHandler != null) {
             TameworkEventRegistrationSupport.registerGlobal(
                     this,
+                    PlayerConnectEvent.class,
+                    commandWorldChangeTravelEventHandler::onPlayerConnect,
+                    "command item travel session connect tracking"
+            );
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    PlayerDisconnectEvent.class,
+                    commandWorldChangeTravelEventHandler::onPlayerDisconnect,
+                    "command item travel session disconnect cleanup"
+            );
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
                     AddPlayerToWorldEvent.class,
-                    commandItemFeatureHandler::onAddPlayerToWorld,
-                    "command item relocation resume"
+                    commandWorldChangeTravelEventHandler::onAddPlayerToWorld,
+                    "command item world-change relocation"
+            );
+        }
+        if (spawnerFeatureHandler != null) {
+            TameworkEventRegistrationSupport.registerGlobal(
+                    this,
+                    AddPlayerToWorldEvent.class,
+                    spawnerFeatureHandler::onAddPlayerToWorld,
+                    "pending captured-item source recovery"
             );
         }
         TameworkEventRegistrationSupport.registerGlobal(

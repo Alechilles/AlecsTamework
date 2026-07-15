@@ -14,8 +14,10 @@ import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
+import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
@@ -45,6 +47,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCaptureFinalizerService captureFinalizerService;
     private final SpawnerCapturePolicyService capturePolicyService;
     private final SpawnerPreparedSpawnService preparedSpawnService;
+    private final SpawnerPendingSourceRecoveryService pendingSourceRecoveryService;
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
     @Nullable
@@ -122,10 +125,32 @@ public final class SpawnerFeatureHandler {
                 coopService,
                 this::logSpawnerFlowDebug
         );
+        this.pendingSourceRecoveryService = new SpawnerPendingSourceRecoveryService(
+                registry,
+                itemStackMetadataService,
+                linkedNpcSyncService,
+                coopService,
+                logger
+        );
         this.coopService = coopService;
         this.relocationService = relocationService;
         this.lostService = lostService;
         this.managedCoopDetachService = managedCoopDetachService;
+    }
+
+    /** Attempts exact recovery of a pre-restart release whose filled source was retained. */
+    public void recoverPendingSpawnerSources(World world, UUID playerUuid) {
+        pendingSourceRecoveryService.recoverAfterWorldJoin(world, playerUuid);
+    }
+
+    public void onAddPlayerToWorld(AddPlayerToWorldEvent event) {
+        if (event == null || event.getWorld() == null || event.getHolder() == null) {
+            return;
+        }
+        PlayerRef playerRef = event.getHolder().getComponent(PlayerRef.getComponentType());
+        recoverPendingSpawnerSources(
+                event.getWorld(), playerRef == null ? null : playerRef.getUuid()
+        );
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -307,6 +332,7 @@ public final class SpawnerFeatureHandler {
     // Used by TameworkSpawnInteraction: builds a minimal config to spawn from the held item.
     public boolean spawnFromItemInteraction(Player player,
                                             ItemStack itemStack,
+                                            Integer hotbarSlot,
                                             String emptyItemIdOverride,
                                             Boolean spawnAssignsOwnerOverride) {
         ItemFeatureConfig baseConfig = resolveConfigForItem(itemStack);
@@ -317,7 +343,7 @@ public final class SpawnerFeatureHandler {
         if (config == null || !config.isSpawnerEnabled()) {
             return false;
         }
-        return spawnFromItem(player, itemStack, config, null, emptyItemIdOverride);
+        return spawnFromItem(player, itemStack, config, hotbarSlot, emptyItemIdOverride);
     }
 
     private boolean spawnFromItem(Player player, ItemStack itemStack, ItemFeatureConfig config,

@@ -60,6 +60,7 @@ final class CommandStepExecutionService {
             return executeModeMapping(context, candidate);
         }
         boolean applied = false;
+        RelocationState appliedState = null;
         for (CommandStep step : steps) {
             if (step == null) {
                 continue;
@@ -67,6 +68,11 @@ final class CommandStepExecutionService {
             boolean ok = applyStep(step, context, candidate, companionSettings);
             if (ok) {
                 applied = true;
+                if (step instanceof SetStateStep stateStep) {
+                    appliedState = new RelocationState(
+                            stateStep.getState(), stateStep.getSubState()
+                    );
+                }
                 continue;
             }
             if (step.isOptional()) {
@@ -74,13 +80,13 @@ final class CommandStepExecutionService {
             }
             FailurePolicy policy = step.getFailurePolicy() != null ? step.getFailurePolicy() : FailurePolicy.Continue;
             if (policy == FailurePolicy.AbortAll) {
-                return new StepResult(applied, true);
+                return new StepResult(applied, true, appliedState);
             }
             if (policy == FailurePolicy.AbortCommandForNpc) {
-                return new StepResult(applied, false);
+                return new StepResult(applied, false, appliedState);
             }
         }
-        return new StepResult(applied, false);
+        return new StepResult(applied, false, appliedState);
     }
 
     boolean applyState(Ref<EntityStore> npcRef,
@@ -148,7 +154,11 @@ final class CommandStepExecutionService {
             return new StepResult(false, false);
         }
         boolean ok = applyState(candidate.ref, candidate.npc, context.store, mode.getState(), mode.getSubState());
-        return new StepResult(ok, false);
+        return new StepResult(
+                ok,
+                false,
+                ok ? new RelocationState(mode.getState(), mode.getSubState()) : null
+        );
     }
 
     private boolean applyStep(CommandStep step,

@@ -48,6 +48,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private volatile CompletableFuture<CompanionPopulationReconciliationProgress> completion;
+    private volatile StartRequest lastStartRequest;
     public CompanionPopulationStartupReconciler(
             @Nonnull TameworkPersistenceRuntime persistence,
             @Nonnull CompanionPopulationBootstrapService bootstrapService,
@@ -122,6 +123,9 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         if (closed.get()) {
             return CompletableFuture.completedFuture(progress.get());
         }
+        lastStartRequest = new StartRequest(
+                universe, ownerType, itemFeatures, customContainers, loadedIdentitiesReady
+        );
         if (!started.compareAndSet(false, true)) {
             CompletableFuture<CompanionPopulationReconciliationProgress> current = completion;
             return current == null ? CompletableFuture.completedFuture(progress.get()) : current;
@@ -149,6 +153,39 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 .exceptionally(exception -> fail(exception, startedAt));
         completion = future;
         return future;
+    }
+
+    /** Repeats a completed degraded scan after an exact external source repair closes its journal. */
+    @Nonnull
+    public CompletableFuture<CompanionPopulationReconciliationProgress>
+    restartAfterExternalRepair() {
+        StartRequest request;
+        synchronized (this) {
+            request = lastStartRequest;
+            if (closed.get() || request == null) {
+                return CompletableFuture.completedFuture(progress.get());
+            }
+            if (progress.get().status()
+                    != CompanionPopulationReconciliationProgress.Status.DEGRADED) {
+                CompletableFuture<CompanionPopulationReconciliationProgress> current = completion;
+                if (current == null) {
+                    return CompletableFuture.completedFuture(progress.get());
+                }
+                return current.thenCompose(finished -> finished.status()
+                        == CompanionPopulationReconciliationProgress.Status.DEGRADED
+                        ? restartAfterExternalRepair()
+                        : CompletableFuture.completedFuture(finished));
+            }
+            completion = null;
+            started.set(false);
+        }
+        return start(
+                request.universe(),
+                request.ownerType(),
+                request.itemFeatures(),
+                request.customContainers(),
+                request.loadedIdentitiesReady()
+        );
     }
     @Nonnull
     private CompletableFuture<CompanionPopulationReconciliationProgress> reconcileUnderBarrier(
@@ -196,6 +233,15 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     @Nonnull
     public CompanionPopulationReconciliationProgress progress() {
         return progress.get();
+    }
+
+    private record StartRequest(
+            Universe universe,
+            ComponentType<EntityStore, TameworkOwnerComponent> ownerType,
+            ItemFeatureRegistry itemFeatures,
+            CustomContainerReconciliationRegistry customContainers,
+            Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>> loadedIdentitiesReady
+    ) {
     }
 
     @Nonnull

@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import javax.annotation.Nullable;
 
@@ -208,9 +209,18 @@ final class CommandLinkMutationService {
     }
 
     ItemStack refreshLinkedNpcPositions(ItemStack stack, List<Candidate> recipients, Store<EntityStore> store) {
+        return refreshLinkedNpcPositions(stack, recipients, store, Map.of());
+    }
+
+    ItemStack refreshLinkedNpcPositions(ItemStack stack,
+                                        List<Candidate> recipients,
+                                        Store<EntityStore> store,
+                                        Map<UUID, String> commandStateOverrides) {
         if (stack == null || stack.isEmpty() || recipients == null || recipients.isEmpty() || store == null) {
             return stack;
         }
+        Map<UUID, String> stateOverrides = commandStateOverrides != null
+                ? commandStateOverrides : Map.of();
         ItemStack updated = stack;
         for (Candidate candidate : recipients) {
             if (candidate == null || candidate.ref == null || candidate.npc == null || candidate.npc.getUuid() == null) {
@@ -221,6 +231,7 @@ final class CommandLinkMutationService {
             String worldName = resolveWorldName(store, null);
             TameworkCommandLinksComponent links = store.getComponent(candidate.ref, TameworkCommandLinksComponent.getComponentType());
             Vector3d homePosition = links != null && links.hasHome() ? links.getHomePosition() : null;
+            String commandState = stateOverrides.get(candidate.npc.getUuid());
             updated = linkedNpcRecordStore.upsert(
                     updated,
                     candidate.npc.getUuid(),
@@ -231,7 +242,7 @@ final class CommandLinkMutationService {
                     npcNameResolver.resolveNpcNameKey(candidate.npc),
                     resolveCachedRoleId(candidate.npc),
                     null,
-                    resolveCachedCommandState(candidate.npc)
+                    commandState != null ? commandState : resolveCachedCommandState(candidate.npc)
             );
             if (stateSnapshotService != null) {
                 stateSnapshotService.refreshFromEntity(candidate.ref, store);

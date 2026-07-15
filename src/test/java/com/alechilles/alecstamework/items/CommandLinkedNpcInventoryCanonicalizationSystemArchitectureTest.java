@@ -17,6 +17,9 @@ class CommandLinkedNpcInventoryCanonicalizationSystemArchitectureTest {
     private static final Path HANDLER = Path.of(
             "src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"
     );
+    private static final Path WORLD_EVENTS = Path.of(
+            "src/main/java/com/alechilles/alecstamework/items/CommandWorldChangeTravelEventHandler.java"
+    );
     private static final Path PLUGIN = Path.of(
             "src/main/java/com/alechilles/alecstamework/Tamework.java"
     );
@@ -47,13 +50,16 @@ class CommandLinkedNpcInventoryCanonicalizationSystemArchitectureTest {
     }
 
     @Test
-    void loginLoadRepairsHolderAndMovementResolvesPlayerFromWorldStore() throws IOException {
+    void loginLoadRepairsInventoryAndMovementResolvesPlayerFromWorldStore() throws IOException {
         String source = Files.readString(HANDLER);
+        String events = Files.readString(WORLD_EVENTS);
 
-        assertTrue(source.contains("commandItemFeatureHandler::onAddPlayerToWorld")
-                        || source.contains("public void onAddPlayerToWorld("),
-                "The handler must retain its registered AddPlayerToWorld entry point");
-        assertTrue(source.contains("inventoryRepairService.canonicalize(event.getHolder())"));
+        assertTrue(events.contains("public void onAddPlayerToWorld("));
+        assertTrue(events.contains(
+                "commandItems.canonicalizePlayerCommandInventory(event.getHolder())"
+        ));
+        assertTrue(events.contains("if (!sessions.isWorldChange(playerUuid))"),
+                "Initial login must remain distinct from later world-change travel");
         assertTrue(source.contains("world.getEntityRef(playerUuid)"));
         assertTrue(source.contains("store.getComponent(playerRef, Player.getComponentType())"));
         assertTrue(source.contains("inventoryRepairService.canonicalize(player)"));

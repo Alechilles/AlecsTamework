@@ -27,6 +27,8 @@ final class SpawnerSourceItemTransaction {
     private final String flow;
     @Nullable
     private ItemStack applied;
+    @Nullable
+    private Integer appliedSlot;
 
     SpawnerSourceItemTransaction(@Nonnull SpawnerPlayerInventoryService inventory,
                                  @Nonnull Player player,
@@ -73,30 +75,52 @@ final class SpawnerSourceItemTransaction {
 
     void commit() {
         applied = null;
+        appliedSlot = null;
     }
 
     void compensate() {
         ItemStack replacement = applied;
+        Integer replacementSlot = appliedSlot;
         applied = null;
-        if (replacement != null && !replace(replacement, original)) {
+        appliedSlot = null;
+        if (replacement != null && !replace(replacement, original, replacementSlot)) {
             log(Level.SEVERE, flow + ": failed to restore the source item after owner apply failed.");
         }
     }
 
     private boolean replace(@Nonnull ItemStack expected, @Nonnull ItemStack replacement) {
-        if (slot == null) {
-            return false;
-        }
+        return replace(expected, replacement, slot);
+    }
+
+    private boolean replace(@Nonnull ItemStack expected,
+                            @Nonnull ItemStack replacement,
+                            @Nullable Integer preferredSlot) {
         Player resolved = resolvePlayer();
         if (resolved == null) {
             return false;
         }
-        ItemStack current = inventory.getHotbarItem(resolved, slot);
-        if (Objects.equals(current, replacement)) {
+        if (preferredSlot != null
+                && Objects.equals(inventory.getHotbarItem(resolved, preferredSlot), replacement)) {
+            appliedSlot = preferredSlot;
             return true;
         }
-        return Objects.equals(current, expected)
-                && inventory.updateHotbarSlot(resolved, slot, replacement);
+        Integer resolvedSlot = inventory.resolveExactHotbarSlot(
+                resolved, expected, preferredSlot
+        );
+        if (resolvedSlot == null) {
+            return false;
+        }
+        ItemStack current = inventory.getHotbarItem(resolved, resolvedSlot);
+        if (Objects.equals(current, replacement)) {
+            appliedSlot = resolvedSlot;
+            return true;
+        }
+        boolean replaced = Objects.equals(current, expected)
+                && inventory.updateHotbarSlot(resolved, resolvedSlot, replacement);
+        if (replaced) {
+            appliedSlot = resolvedSlot;
+        }
+        return replaced;
     }
 
     @Nullable

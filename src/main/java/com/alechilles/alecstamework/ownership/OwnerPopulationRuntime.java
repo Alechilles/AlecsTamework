@@ -375,6 +375,13 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         return reconciliationRuntime.progress();
     }
 
+    /** Re-runs canonical population reconciliation after an exact retained-source repair. */
+    @Nonnull
+    public CompletableFuture<CompanionPopulationReconciliationProgress>
+    restartReconciliationAfterExternalRepair() {
+        return reconciliationRuntime.restartAfterExternalRepair();
+    }
+
     @Nonnull
     public CompanionPopulationBootstrapService.BootstrapResult bootstrapResult() {
         return bootstrapResult;

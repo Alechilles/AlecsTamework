@@ -138,6 +138,7 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
         commandBuffer.run(store -> handler.spawnFromItemInteraction(
                 player,
                 heldItem,
+                (int) context.getHeldItemSlot(),
                 emptyItemId,
                 spawnAssignsOwner
         ));

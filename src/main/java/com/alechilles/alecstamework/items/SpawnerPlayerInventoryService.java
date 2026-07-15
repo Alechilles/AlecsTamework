@@ -75,4 +75,21 @@ final class SpawnerPlayerInventoryService {
         hotbar.setItemStackForSlot((short) slot, updated);
         return true;
     }
+
+    Integer resolveExactHotbarSlot(Player player, ItemStack expected, Integer preferredSlot) {
+        if (player == null || expected == null) {
+            return null;
+        }
+        Inventory inventory = player.getInventory();
+        ItemContainer hotbar = inventory == null ? null : inventory.getHotbar();
+        if (hotbar == null) {
+            return null;
+        }
+        return SpawnerSourceSlotResolver.resolve(
+                hotbar.getCapacity(),
+                slot -> hotbar.getItemStack((short) slot),
+                expected,
+                preferredSlot
+        );
+    }
 }

@@ -11,4 +11,13 @@ final class RelocationState {
         this.state = state;
         this.subState = subState;
     }
+
+    String cachedValue() {
+        if (state == null || state.isBlank()) {
+            return null;
+        }
+        return subState == null || subState.isBlank()
+                ? state.trim()
+                : state.trim() + "." + subState.trim();
+    }
 }

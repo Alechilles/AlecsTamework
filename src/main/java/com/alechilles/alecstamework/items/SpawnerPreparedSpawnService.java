@@ -132,8 +132,8 @@ final class SpawnerPreparedSpawnService {
                         context.capturedNpcUuid(),
                         playerUuid,
                         sourceSlot,
-                        sourceFingerprint(itemStack),
-                        sourceFingerprint(finalizedItem)
+                        SpawnerSourceFingerprint.of(itemStack),
+                        SpawnerSourceFingerprint.of(finalizedItem)
                 )
         );
         admission.prepareAsync(request).whenComplete((preparation, failure) -> dispatch(
@@ -288,18 +288,6 @@ final class SpawnerPreparedSpawnService {
         effectService.playSpawnEffects(live.world(), ref, config);
         debugLog.accept("spawn success item=" + sourceItem.getItemId()
                 + " player=" + player.getUuid() + " spawnedNpc=" + live.plannedNpcUuid());
-    }
-
-    @Nonnull
-    private static String sourceFingerprint(@Nonnull ItemStack stack) {
-        UUID target = stack.getFromMetadataOrNull(
-                TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING
-        );
-        String profile = stack.getFromMetadataOrNull(
-                TameworkMetadataKeys.COMPANION_PROFILE_ID, Codec.STRING
-        );
-        return stack.getItemId() + "|" + String.valueOf(target) + "|"
-                + String.valueOf(profile) + "|" + Integer.toUnsignedString(stack.hashCode(), 16);
     }
 
     @Nullable
