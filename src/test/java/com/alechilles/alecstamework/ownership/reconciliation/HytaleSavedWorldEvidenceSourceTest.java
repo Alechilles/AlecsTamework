@@ -327,11 +327,14 @@ class HytaleSavedWorldEvidenceSourceTest {
     }
 
     @Test
-    void conflictingSavedComponentAndLegacyUuidsFailClosed() {
-        assertThrows(IllegalStateException.class, () ->
-                HytaleSavedWorldEvidenceSource.savedNpcUuid(
-                        new UUID(0L, 71L), new UUID(0L, 72L)
-                ));
+    void componentUuidWinsOverStaleLegacyUuidLikeHytaleMigration() {
+        UUID componentUuid = new UUID(0L, 71L);
+
+        UUID resolved = HytaleSavedWorldEvidenceSource.savedNpcUuid(
+                componentUuid, new UUID(0L, 72L)
+        );
+
+        assertEquals(componentUuid, resolved);
     }
 
     private static CompanionPopulationEvidence evidence(int chunkX, int chunkZ) {

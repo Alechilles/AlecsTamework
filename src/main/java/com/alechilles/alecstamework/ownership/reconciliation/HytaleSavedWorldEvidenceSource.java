@@ -279,12 +279,8 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
     /** Mirrors Hytale's LegacyUUIDSystem migration while detached holders have not run systems. */
     @Nullable
     static UUID savedNpcUuid(@Nullable UUID componentUuid, @Nullable UUID legacyNpcUuid) {
-        if (componentUuid != null && legacyNpcUuid != null
-                && !componentUuid.equals(legacyNpcUuid)) {
-            throw new IllegalStateException(
-                    "Saved entity UUIDComponent and legacy NPC UUID disagree."
-            );
-        }
+        // LegacyUUIDSystem copies the component UUID back onto the legacy entity when both exist.
+        // Detached holders have not run that migration yet, so an older legacy value is harmless.
         return componentUuid != null ? componentUuid : legacyNpcUuid;
     }
 
