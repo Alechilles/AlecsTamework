@@ -29,6 +29,8 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     private final NumberArrayHolder wanderRadiusRange = new NumberArrayHolder();
     private final NumberArrayHolder wanderRetargetTimeRange = new NumberArrayHolder();
     private final DoubleHolder wanderStopDistance = new DoubleHolder();
+    private final DoubleHolder passThroughDistance = new DoubleHolder();
+    private final DoubleHolder passThroughStopDistance = new DoubleHolder();
     private final DoubleHolder relativeSpeed = new DoubleHolder();
     private final NumberArrayHolder desiredAltitudeRange = new NumberArrayHolder();
     private final DoubleHolder climbRelativeSpeed = new DoubleHolder();
@@ -39,7 +41,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     public BuilderBodyMotionTameworkFlyingOrbit readConfig(@Nonnull JsonElement data) {
         super.readConfig(data);
         getEnum(data, "Mode", mode, Mode.class, Mode.CYCLE, BuilderDescriptorState.WorkInProgress,
-                "Steering mode: Cycle, Orbit, Approach, FaceTarget, or WanderTarget.", null);
+                "Steering mode: Cycle, Orbit, Approach, FaceTarget, WanderTarget, or PassThroughTarget.", null);
         getDouble(data, "OrbitRadius", orbitRadius, 18.0, DoubleSingleValidator.greater0(),
                 BuilderDescriptorState.WorkInProgress, "Preferred horizontal orbit radius around the target.", null);
         getDouble(data, "OrbitRadiusTolerance", orbitRadiusTolerance, 4.0, DoubleSingleValidator.greater0(),
@@ -69,6 +71,12 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
                 "Seconds before choosing another loose wander destination.", null);
         getDouble(data, "WanderStopDistance", wanderStopDistance, 3.0, DoubleSingleValidator.greaterEqual0(),
                 BuilderDescriptorState.WorkInProgress, "Distance at which a loose wander destination is reached.", null);
+        getDouble(data, "PassThroughDistance", passThroughDistance, 18.0, DoubleSingleValidator.greater0(),
+                BuilderDescriptorState.WorkInProgress,
+                "Distance beyond the captured target position used by pass-through flight.", null);
+        getDouble(data, "PassThroughStopDistance", passThroughStopDistance, 2.0,
+                DoubleSingleValidator.greaterEqual0(), BuilderDescriptorState.WorkInProgress,
+                "Distance at which the captured pass-through destination is reached.", null);
         getDouble(data, "RelativeSpeed", relativeSpeed, 0.5,
                 DoubleRangeValidator.fromExclToIncl(0, 2), BuilderDescriptorState.WorkInProgress,
                 "Relative speed used by orbit, approach, and loose wander steering.", null);
@@ -95,7 +103,7 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
     @Nonnull
     @Override
     public String getShortDescription() {
-        return "Orbit, approach, face, or loosely wander around a target in flight.";
+        return "Orbit, approach, face, wander around, or pass through a target in flight.";
     }
 
     @Nonnull
@@ -158,6 +166,14 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         return wanderStopDistance.get(support.getExecutionContext());
     }
 
+    double getPassThroughDistance(BuilderSupport support) {
+        return passThroughDistance.get(support.getExecutionContext());
+    }
+
+    double getPassThroughStopDistance(BuilderSupport support) {
+        return passThroughStopDistance.get(support.getExecutionContext());
+    }
+
     double getRelativeSpeed(BuilderSupport support) {
         return relativeSpeed.get(support.getExecutionContext());
     }
@@ -179,7 +195,8 @@ public final class BuilderBodyMotionTameworkFlyingOrbit extends BuilderBodyMotio
         ORBIT("Orbit"),
         APPROACH("Approach"),
         FACE_TARGET("FaceTarget"),
-        WANDER_TARGET("WanderTarget");
+        WANDER_TARGET("WanderTarget"),
+        PASS_THROUGH_TARGET("PassThroughTarget");
 
         private final String name;
 

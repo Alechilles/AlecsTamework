@@ -60,6 +60,9 @@ class BodyMotionTameworkFlyingOrbitTest {
         assertFalse(BodyMotionTameworkFlyingOrbit.usesApproachSteering(
                 BuilderBodyMotionTameworkFlyingOrbit.Mode.ORBIT,
                 BodyMotionTameworkFlyingOrbit.Phase.APPROACH));
+        assertFalse(BodyMotionTameworkFlyingOrbit.usesApproachSteering(
+                BuilderBodyMotionTameworkFlyingOrbit.Mode.PASS_THROUGH_TARGET,
+                BodyMotionTameworkFlyingOrbit.Phase.APPROACH));
     }
 
     @Test
@@ -135,5 +138,36 @@ class BodyMotionTameworkFlyingOrbitTest {
                 16.0, 10.0, 0.0, 8.0, 0.0, 0.0, radiusRange, altitudeRange));
         assertFalse(BodyMotionTameworkFlyingOrbit.isWithinTargetBand(
                 16.0, 14.0, 0.0, 0.0, 0.0, 0.0, radiusRange, altitudeRange));
+    }
+
+    @Test
+    void wanderSafetyEnvelopeAllowsTargetMovementWithoutImmediateRetargeting() {
+        double[] radiusRange = { 18.0, 36.0 };
+        double[] altitudeRange = { 8.0, 16.0 };
+
+        assertFalse(BodyMotionTameworkFlyingOrbit.isOutsideTargetEnvelope(
+                24.0, 12.0, 0.0, 8.0, 0.0, 0.0, radiusRange, altitudeRange));
+        assertTrue(BodyMotionTameworkFlyingOrbit.isOutsideTargetEnvelope(
+                80.0, 12.0, 0.0, 0.0, 0.0, 0.0, radiusRange, altitudeRange));
+    }
+
+    @Test
+    void passThroughDestinationContinuesBeyondCapturedTarget() {
+        Vector3d destination = BodyMotionTameworkFlyingOrbit.resolvePassThroughDestination(
+                -8.0, 0.0, 0.0, 10.0, 0.0, 18.0, 3.0, new Vector3d());
+
+        assertEquals(18.0, destination.x, EPSILON);
+        assertEquals(13.0, destination.y, EPSILON);
+        assertEquals(0.0, destination.z, EPSILON);
+    }
+
+    @Test
+    void passThroughDestinationHasStableFallbackWhenDirectlyAboveTarget() {
+        Vector3d destination = BodyMotionTameworkFlyingOrbit.resolvePassThroughDestination(
+                4.0, 6.0, 4.0, 10.0, 6.0, 12.0, 2.0, new Vector3d());
+
+        assertEquals(4.0, destination.x, EPSILON);
+        assertEquals(12.0, destination.y, EPSILON);
+        assertEquals(18.0, destination.z, EPSILON);
     }
 }

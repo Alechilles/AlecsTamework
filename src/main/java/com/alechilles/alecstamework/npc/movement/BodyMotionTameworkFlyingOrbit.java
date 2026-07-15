@@ -17,11 +17,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.joml.Vector3d;
 
-/** Target-relative orbit, approach, facing, and loose waypoint flight steering. */
+/** Target-relative orbit, approach, facing, loose waypoint, and pass-through flight steering. */
 public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private static final double MIN_DIRECTION_LENGTH = 1.0E-6;
     private static final double MIN_APPROACH_SPEED_FACTOR = 0.2;
     private static final double RADIAL_CORRECTION_WEIGHT = 0.85;
+    private static final double WANDER_ENVELOPE_RADIUS_MULTIPLIER = 1.75;
+    private static final double WANDER_ENVELOPE_ALTITUDE_MARGIN = 8.0;
 
     private final BuilderBodyMotionTameworkFlyingOrbit.Mode mode;
     private final double orbitRadius;
@@ -35,12 +37,15 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private final double[] wanderRadiusRange;
     private final double[] wanderRetargetTimeRange;
     private final double wanderStopDistance;
+    private final double passThroughDistance;
+    private final double passThroughStopDistance;
     private final double relativeSpeed;
     private final double[] desiredAltitudeRange;
     private final double climbRelativeSpeed;
     private final double sinkRelativeSpeed;
     private final Vector3d targetPosition = new Vector3d();
     private final Vector3d wanderDestination = new Vector3d();
+    private final Vector3d passThroughDestination = new Vector3d();
     private final Vector3d translation = new Vector3d();
     private final Vector3d facingDirection = new Vector3d();
 
@@ -49,6 +54,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
     private int orbitDirection = 1;
     private boolean hasWanderDestination;
     private double wanderRetargetRemaining;
+    private boolean hasPassThroughDestination;
 
     BodyMotionTameworkFlyingOrbit(@Nonnull BuilderBodyMotionTameworkFlyingOrbit builder,
                                   @Nonnull BuilderSupport support) {
@@ -67,6 +73,8 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         wanderRadiusRange = builder.getWanderRadiusRange(support);
         wanderRetargetTimeRange = builder.getWanderRetargetTimeRange(support);
         wanderStopDistance = builder.getWanderStopDistance(support);
+        passThroughDistance = builder.getPassThroughDistance(support);
+        passThroughStopDistance = builder.getPassThroughStopDistance(support);
         relativeSpeed = builder.getRelativeSpeed(support);
         desiredAltitudeRange = builder.getDesiredAltitudeRange(support);
         climbRelativeSpeed = builder.getClimbRelativeSpeed(support);
@@ -80,6 +88,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                          @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         hasWanderDestination = false;
         wanderRetargetRemaining = 0.0;
+        hasPassThroughDestination = false;
         if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.CYCLE) {
             beginOrbit();
         }
@@ -111,12 +120,26 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         boolean approaching = usesApproachSteering(mode, phase);
         boolean facingTarget = facesTarget(mode, phase);
         boolean wandering = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.WANDER_TARGET;
+        boolean passingThrough = mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.PASS_THROUGH_TARGET;
         if (wandering) {
             updateWanderDestination(selfPosition, targetPosition, dt);
             resolveWaypointTranslation(
                     selfPosition.x(), selfPosition.y(), selfPosition.z(),
                     wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
                     wanderStopDistance, relativeSpeed, translation);
+        } else if (passingThrough) {
+            if (!hasPassThroughDestination) {
+                double altitudeOffset = randomDuration(desiredAltitudeRange[0], desiredAltitudeRange[1]);
+                resolvePassThroughDestination(
+                        selfPosition.x(), selfPosition.z(),
+                        targetPosition.x(), targetPosition.y(), targetPosition.z(),
+                        passThroughDistance, altitudeOffset, passThroughDestination);
+                hasPassThroughDestination = true;
+            }
+            resolveWaypointTranslation(
+                    selfPosition.x(), selfPosition.y(), selfPosition.z(),
+                    passThroughDestination.x(), passThroughDestination.y(), passThroughDestination.z(),
+                    passThroughStopDistance, relativeSpeed, translation);
         } else if (mode == BuilderBodyMotionTameworkFlyingOrbit.Mode.FACE_TARGET) {
             translation.zero();
         } else if (!approaching) {
@@ -130,7 +153,7 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         }
 
         double altitudeCorrection = 0.0;
-        if (!wandering) {
+        if (!wandering && !passingThrough) {
             altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
                     selfPosition.y(), targetPosition.y(), desiredAltitudeRange, climbRelativeSpeed, sinkRelativeSpeed);
             translation.y = altitudeCorrection;
@@ -156,12 +179,12 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
         wanderRetargetRemaining -= Math.max(0.0, dt);
         boolean reachedDestination = selfPosition.distanceSquared(wanderDestination)
                 <= wanderStopDistance * wanderStopDistance;
-        boolean destinationWithinBand = isWithinTargetBand(
-                wanderDestination.x(), wanderDestination.y(), wanderDestination.z(),
+        boolean outsideSafetyEnvelope = isOutsideTargetEnvelope(
+                selfPosition.x(), selfPosition.y(), selfPosition.z(),
                 currentTargetPosition.x(), currentTargetPosition.y(), currentTargetPosition.z(),
                 wanderRadiusRange, desiredAltitudeRange);
         if (!hasWanderDestination || wanderRetargetRemaining <= 0.0
-                || reachedDestination || !destinationWithinBand) {
+                || reachedDestination || outsideSafetyEnvelope) {
             chooseWanderDestination(currentTargetPosition);
         }
     }
@@ -267,6 +290,47 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                 && horizontalDistanceSquared <= maximumRadiusSquared
                 && altitude >= altitudeRange[0]
                 && altitude <= altitudeRange[1];
+    }
+
+    static boolean isOutsideTargetEnvelope(double pointX,
+                                           double pointY,
+                                           double pointZ,
+                                           double targetX,
+                                           double targetY,
+                                           double targetZ,
+                                           double[] radiusRange,
+                                           double[] altitudeRange) {
+        double offsetX = pointX - targetX;
+        double offsetZ = pointZ - targetZ;
+        double maximumRadius = radiusRange[1] * WANDER_ENVELOPE_RADIUS_MULTIPLIER;
+        double altitude = pointY - targetY;
+        return offsetX * offsetX + offsetZ * offsetZ > maximumRadius * maximumRadius
+                || altitude < altitudeRange[0] - WANDER_ENVELOPE_ALTITUDE_MARGIN
+                || altitude > altitudeRange[1] + WANDER_ENVELOPE_ALTITUDE_MARGIN;
+    }
+
+    static Vector3d resolvePassThroughDestination(double selfX,
+                                                  double selfZ,
+                                                  double targetX,
+                                                  double targetY,
+                                                  double targetZ,
+                                                  double passThroughDistance,
+                                                  double altitudeOffset,
+                                                  @Nonnull Vector3d output) {
+        double directionX = targetX - selfX;
+        double directionZ = targetZ - selfZ;
+        double directionLength = Math.sqrt(directionX * directionX + directionZ * directionZ);
+        if (directionLength <= MIN_DIRECTION_LENGTH) {
+            directionX = 0.0;
+            directionZ = 1.0;
+        } else {
+            directionX /= directionLength;
+            directionZ /= directionLength;
+        }
+        return output.set(
+                targetX + directionX * passThroughDistance,
+                targetY + altitudeOffset,
+                targetZ + directionZ * passThroughDistance);
     }
 
     static Vector3d resolveWaypointTranslation(double selfX,
