@@ -215,7 +215,6 @@ public final class CompanionPermanentDeathCoordinator {
         if (stats == null || health == null) {
             throw new IllegalStateException("Permanent-death target has no health state.");
         }
-        installDeathHold(context);
         damage.setAmount(pending.finalDamage());
         float remaining = stats.subtractStatValue(
                 DefaultEntityStatTypes.getHealth(), pending.finalDamage()
@@ -227,6 +226,9 @@ public final class CompanionPermanentDeathCoordinator {
         if (!hasDeathComponent(context)) {
             throw new IllegalStateException("Engine did not retain the prepared death component.");
         }
+        // Native NPC death handling adds its own DeferredCorpseRemoval with addComponent.
+        // Replace that completed timer only after the native callbacks have consumed it.
+        installDeathHold(context);
     }
 
     /**

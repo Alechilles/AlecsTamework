@@ -84,6 +84,9 @@ class PermanentDeletionPopulationArchitectureTest {
         int callback = coordinator.indexOf("public void onApplied", schedule);
         int nativeDeath = coordinator.indexOf("DeathComponent.tryAddComponent", callback);
         assertTrue(schedule >= 0 && callback > schedule && nativeDeath > callback);
+        int confirmedDeath = coordinator.indexOf("if (!hasDeathComponent(context))", nativeDeath);
+        int installedHold = coordinator.indexOf("installDeathHold(context);", confirmedDeath);
+        assertTrue(confirmedDeath > nativeDeath && installedHold > confirmedDeath);
         assertTrue(coordinator.contains("context.addProperty(\"permanentDeath\", true)"));
         assertTrue(coordinator.contains("beforeApply"));
         assertTrue(coordinator.contains("normalizeLethalDamage(pending.damage(), pending.finalDamage())"));
