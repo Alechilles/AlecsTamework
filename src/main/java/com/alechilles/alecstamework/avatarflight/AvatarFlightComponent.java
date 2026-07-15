@@ -102,6 +102,18 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setNextSuppressedAnimationAtMs,
                     AvatarFlightComponent::getNextSuppressedAnimationAtMs)
             .add()
+            .<String>append(new KeyedCodec<>("AbilityAnimationId", Codec.STRING),
+                    AvatarFlightComponent::setAbilityAnimationId,
+                    AvatarFlightComponent::getAbilityAnimationId)
+            .add()
+            .<String>append(new KeyedCodec<>("AbilityAnimationKind", Codec.STRING),
+                    AvatarFlightComponent::setAbilityAnimationKind,
+                    AvatarFlightComponent::getAbilityAnimationKind)
+            .add()
+            .<Long>append(new KeyedCodec<>("AbilityAnimationUntilMs", Codec.LONG),
+                    AvatarFlightComponent::setAbilityAnimationUntilMs,
+                    AvatarFlightComponent::getAbilityAnimationUntilMs)
+            .add()
             .<String>append(new KeyedCodec<>("PitchPoseAnimationId", Codec.STRING),
                     AvatarFlightComponent::setPitchPoseAnimationId,
                     AvatarFlightComponent::getPitchPoseAnimationId)
@@ -173,6 +185,9 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private String movementAnimationId = "";
     private long nextMovementAnimationAtMs;
     private long nextSuppressedAnimationAtMs;
+    private String abilityAnimationId = "";
+    private String abilityAnimationKind = "";
+    private long abilityAnimationUntilMs;
     private String pitchPoseAnimationId = "";
     private long nextPitchPoseAnimationAtMs;
     private String rollPoseAnimationId = "";
@@ -403,6 +418,38 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     }
 
     @Nonnull
+    public String getAbilityAnimationId() {
+        return abilityAnimationId == null ? "" : abilityAnimationId;
+    }
+
+    public void setAbilityAnimationId(@Nullable String abilityAnimationId) {
+        this.abilityAnimationId = abilityAnimationId == null ? "" : abilityAnimationId.trim();
+    }
+
+    @Nonnull
+    public String getAbilityAnimationKind() {
+        return abilityAnimationKind == null ? "" : abilityAnimationKind;
+    }
+
+    public void setAbilityAnimationKind(@Nullable String abilityAnimationKind) {
+        this.abilityAnimationKind = abilityAnimationKind == null ? "" : abilityAnimationKind.trim();
+    }
+
+    public long getAbilityAnimationUntilMs() {
+        return abilityAnimationUntilMs;
+    }
+
+    public void setAbilityAnimationUntilMs(@Nullable Long abilityAnimationUntilMs) {
+        this.abilityAnimationUntilMs = abilityAnimationUntilMs == null ? 0L : abilityAnimationUntilMs;
+    }
+
+    public void clearAbilityAnimationState() {
+        abilityAnimationId = "";
+        abilityAnimationKind = "";
+        abilityAnimationUntilMs = 0L;
+    }
+
+    @Nonnull
     public String getPitchPoseAnimationId() {
         return pitchPoseAnimationId == null ? "" : pitchPoseAnimationId;
     }
@@ -503,6 +550,9 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.movementAnimationId = getMovementAnimationId();
         clone.nextMovementAnimationAtMs = nextMovementAnimationAtMs;
         clone.nextSuppressedAnimationAtMs = nextSuppressedAnimationAtMs;
+        clone.abilityAnimationId = getAbilityAnimationId();
+        clone.abilityAnimationKind = getAbilityAnimationKind();
+        clone.abilityAnimationUntilMs = abilityAnimationUntilMs;
         clone.pitchPoseAnimationId = getPitchPoseAnimationId();
         clone.nextPitchPoseAnimationAtMs = nextPitchPoseAnimationAtMs;
         clone.rollPoseAnimationId = getRollPoseAnimationId();

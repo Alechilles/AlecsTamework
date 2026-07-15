@@ -67,9 +67,9 @@ public final class AvatarFlightDebugLogService {
                                                long now) {
         return String.format(
                 "TameworkAvatarFlight debug: ref=%s mode=%s input=%.2f/%.2f/%.2f jump=%s crouch=%s sprint=%s airbrake=%s onGround=%s"
-                        + " output=%.2f/%.2f/%.2f apply=%s applyingVelocity=%s jumpApplied=%s boostApplied=%s launchHold=%d launchApplied=%s"
+                        + " output=%.2f/%.2f/%.2f apply=%s applyingVelocity=%s jumpApplied=%s boostApplied=%s airbrakeApplied=%s launchHold=%d launchApplied=%s"
                         + " loads=%.2f/%.2f animIdle=%s animFast=%s visual=%.1f/%.1f visualOverride=%s suppressOverlays=%s"
-                        + " clientFly=%s movementAnim=%s poseAnim=%s/%s nextSuppressAt=%s"
+                        + " clientFly=%s movementAnim=%s poseAnim=%s/%s abilityAnim=%s/%s/%s nextSuppressAt=%s"
                         + " rawInput=sprint=%s ground=%s forward=%.2f strafe=%.2f rawStale=%s rawAgeMs=%s"
                         + " vigour=%.2f/%d recharge=%s speedRatio=%.2f states=%s",
                 ref,
@@ -89,6 +89,7 @@ public final class AvatarFlightDebugLogService {
                 applyingVelocity,
                 output.jumpApplied(),
                 output.boostApplied(),
+                output.airbrakeApplied(),
                 input.launchHoldMs(),
                 output.launchApplied(),
                 output.diveLoad(),
@@ -103,6 +104,9 @@ public final class AvatarFlightDebugLogService {
                 emptyAsNone(flight.getMovementAnimationId()),
                 emptyAsNone(flight.getPitchPoseAnimationId()),
                 emptyAsNone(flight.getRollPoseAnimationId()),
+                emptyAsNone(flight.getAbilityAnimationKind()),
+                emptyAsNone(flight.getAbilityAnimationId()),
+                flight.getAbilityAnimationUntilMs(),
                 flight.getNextSuppressedAnimationAtMs(),
                 rawInput != null && rawInput.isSprinting(),
                 rawInput != null && rawInput.isOnGround(),

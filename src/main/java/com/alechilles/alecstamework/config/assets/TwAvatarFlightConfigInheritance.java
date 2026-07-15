@@ -30,6 +30,7 @@ final class TwAvatarFlightConfigInheritance {
         inheritAudio(target, parent, nested(nestedByTop, "Audio"), top);
         inheritVigour(target, parent, nested(nestedByTop, "Vigour"), top);
         inheritAnimation(target, parent, nested(nestedByTop, "Animation"), top);
+        inheritAbilityAnimation(target, parent, nested(nestedByTop, "AbilityAnimation"), top);
         inheritRiderVisual(target, parent, nested(nestedByTop, "RiderVisual"), top);
         inheritDebug(target, parent, nested(nestedByTop, "Debug"), top);
     }
@@ -206,6 +207,17 @@ final class TwAvatarFlightConfigInheritance {
             if (!keys.contains("SeatOffsetY")) target.riderVisual.seatOffsetY = parent.riderVisual.seatOffsetY;
             if (!keys.contains("SeatOffsetZ")) target.riderVisual.seatOffsetZ = parent.riderVisual.seatOffsetZ;
             if (!keys.contains("EquipmentResendIntervalMs")) target.riderVisual.equipmentResendIntervalMs = parent.riderVisual.equipmentResendIntervalMs;
+        }
+    }
+
+    private static void inheritAbilityAnimation(TwAvatarFlightConfig target,
+                                                TwAvatarFlightConfig parent,
+                                                @Nullable Set<String> keys,
+                                                Set<String> top) {
+        if (!top.contains("AbilityAnimation")) target.abilityAnimation = parent.abilityAnimation;
+        else if (keys != null && parent.abilityAnimation != null) {
+            if (target.abilityAnimation == null) target.abilityAnimation = parent.abilityAnimation;
+            else target.abilityAnimation.inheritMissingFrom(parent.abilityAnimation, keys);
         }
     }
 

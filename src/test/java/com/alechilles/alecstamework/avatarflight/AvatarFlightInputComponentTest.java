@@ -40,6 +40,32 @@ class AvatarFlightInputComponentTest {
     }
 
     @Test
+    void reinsAirbrakeQueuesOneActivationEdgePerActiveWindow() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.activateReinsAirbrake(1_000L, 350L);
+        input.activateReinsAirbrake(1_200L, 350L);
+
+        assertTrue(input.consumeReinsAirbrakeActivation(1_250L, 1_000L));
+        assertFalse(input.consumeReinsAirbrakeActivation(1_250L, 1_000L),
+                "extending an active brake window must not queue another animation edge");
+
+        input.activateReinsAirbrake(1_551L, 350L);
+        assertTrue(input.consumeReinsAirbrakeActivation(1_600L, 1_000L),
+                "a new brake window may queue a fresh activation edge");
+    }
+
+    @Test
+    void staleAirbrakeActivationIsConsumedWithoutApplying() {
+        AvatarFlightInputComponent input = new AvatarFlightInputComponent();
+
+        input.activateReinsAirbrake(1_000L, 350L);
+
+        assertFalse(input.consumeReinsAirbrakeActivation(2_001L, 1_000L));
+        assertFalse(input.consumeReinsAirbrakeActivation(2_001L, 1_000L));
+    }
+
+    @Test
     void reinsBoostIsConsumedOnceWithinIntentWindow() {
         AvatarFlightInputComponent input = new AvatarFlightInputComponent();
 

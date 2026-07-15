@@ -52,6 +52,13 @@ class TwAvatarFlightConfigTest {
         assertEquals("", config.getAnimation().rollPoseAnimationFor(20.0));
         assertEquals("", config.getAnimation().sharedPoseAnimationFor(80.0, 20.0));
         assertTrue(config.getAnimation().getPoseResendIntervalMs() > 0L);
+        assertTrue(config.getAbilityAnimation().isEnabled());
+        assertEquals("", config.getAbilityAnimation().getUpwardBoostAnimation());
+        assertEquals("", config.getAbilityAnimation().getForwardBoostAnimation());
+        assertEquals("", config.getAbilityAnimation().getAirbrakeAnimation());
+        assertEquals(650L, config.getAbilityAnimation().getUpwardBoostDurationMs());
+        assertEquals(700L, config.getAbilityAnimation().getForwardBoostDurationMs());
+        assertEquals(500L, config.getAbilityAnimation().getAirbrakeDurationMs());
         assertFalse(config.getRiderVisual().isHideOwnerEquipment());
         assertFalse(config.getRiderVisual().isHideOwnerArmor());
         assertFalse(config.getRiderVisual().isHideOwnerHands());
@@ -146,6 +153,7 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "jump", "upwardImpulse", 9.0);
         setNestedField(parent, "vfx", "launchChargeEarlyIntervalMs", 725.0);
         setNestedField(parent, "audio", "launchChargeEarlyIntervalMs", 710.0);
+        setNestedField(parent, "abilityAnimation", "upwardBoostAnimation", "ParentFlap");
 
         child.inheritMissingTopLevelFrom(parent, Set.of());
 
@@ -153,6 +161,47 @@ class TwAvatarFlightConfigTest {
         assertEquals(9.0, child.getJump().getUpwardImpulse(), 0.00001);
         assertEquals(725L, child.getVfx().getLaunchChargeEarlyIntervalMs());
         assertEquals(710L, child.getAudio().getLaunchChargeEarlyIntervalMs());
+        assertEquals("ParentFlap", child.getAbilityAnimation().getUpwardBoostAnimation());
+    }
+
+    @Test
+    void explicitAbilityAnimationSectionInheritsMissingNestedKeys() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "abilityAnimation", "upwardBoostAnimation", "ParentFlap");
+        setNestedField(parent, "abilityAnimation", "forwardBoostAnimation", "ParentBoost");
+        setNestedField(parent, "abilityAnimation", "airbrakeAnimation", "ParentBrake");
+        setNestedField(parent, "abilityAnimation", "airbrakeDurationMs", 900.0);
+        setNestedField(child, "abilityAnimation", "forwardBoostAnimation", "ChildBoost");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("AbilityAnimation"),
+                Map.of("AbilityAnimation", Set.of("ForwardBoostAnimation"))
+        );
+
+        assertEquals("ParentFlap", child.getAbilityAnimation().getUpwardBoostAnimation());
+        assertEquals("ChildBoost", child.getAbilityAnimation().getForwardBoostAnimation());
+        assertEquals("ParentBrake", child.getAbilityAnimation().getAirbrakeAnimation());
+        assertEquals(900L, child.getAbilityAnimation().getAirbrakeDurationMs());
+    }
+
+    @Test
+    void explicitBlankAbilityAnimationDisablesOnlyThatCue() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "abilityAnimation", "upwardBoostAnimation", "ParentFlap");
+        setNestedField(parent, "abilityAnimation", "forwardBoostAnimation", "ParentBoost");
+        setNestedField(child, "abilityAnimation", "upwardBoostAnimation", "");
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("AbilityAnimation"),
+                Map.of("AbilityAnimation", Set.of("UpwardBoostAnimation"))
+        );
+
+        assertEquals("", child.getAbilityAnimation().getUpwardBoostAnimation());
+        assertEquals("ParentBoost", child.getAbilityAnimation().getForwardBoostAnimation());
     }
 
     @Test

@@ -77,6 +77,10 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
                     AvatarFlightInputComponent::setReinsAirbrakeUntilMs,
                     AvatarFlightInputComponent::getReinsAirbrakeUntilMs)
             .add()
+            .<Long>append(new KeyedCodec<>("ReinsAirbrakeActivatedAtMs", Codec.LONG),
+                    AvatarFlightInputComponent::setReinsAirbrakeActivatedAtMs,
+                    AvatarFlightInputComponent::getReinsAirbrakeActivatedAtMs)
+            .add()
             .<Long>append(new KeyedCodec<>("ReinsBoostQueuedAtMs", Codec.LONG),
                     AvatarFlightInputComponent::setReinsBoostQueuedAtMs,
                     AvatarFlightInputComponent::getReinsBoostQueuedAtMs)
@@ -114,6 +118,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     private long reinsFlapQueuedAtMs;
     private long airborneJumpPressQueuedAtMs;
     private long reinsAirbrakeUntilMs;
+    private long reinsAirbrakeActivatedAtMs;
     private long reinsBoostQueuedAtMs;
     private long sprintBoostQueuedAtMs;
     private long launchChargeStartedAtMs;
@@ -294,6 +299,14 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         this.reinsAirbrakeUntilMs = reinsAirbrakeUntilMs == null ? 0L : reinsAirbrakeUntilMs;
     }
 
+    public long getReinsAirbrakeActivatedAtMs() {
+        return reinsAirbrakeActivatedAtMs;
+    }
+
+    public void setReinsAirbrakeActivatedAtMs(@Nullable Long reinsAirbrakeActivatedAtMs) {
+        this.reinsAirbrakeActivatedAtMs = reinsAirbrakeActivatedAtMs == null ? 0L : reinsAirbrakeActivatedAtMs;
+    }
+
     public long getReinsBoostQueuedAtMs() {
         return reinsBoostQueuedAtMs;
     }
@@ -362,7 +375,16 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
     }
 
     public void activateReinsAirbrake(long nowMs, long durationMs) {
+        if (!isReinsAirbrakeActive(nowMs)) {
+            reinsAirbrakeActivatedAtMs = nowMs;
+        }
         reinsAirbrakeUntilMs = Math.max(reinsAirbrakeUntilMs, nowMs + Math.max(0L, durationMs));
+    }
+
+    public boolean consumeReinsAirbrakeActivation(long nowMs, long maxAgeMs) {
+        boolean applies = queuedIntentApplies(reinsAirbrakeActivatedAtMs, nowMs, maxAgeMs);
+        reinsAirbrakeActivatedAtMs = 0L;
+        return applies;
     }
 
     public boolean isReinsAirbrakeActive(long nowMs) {
@@ -442,6 +464,7 @@ public final class AvatarFlightInputComponent implements Component<EntityStore> 
         clone.reinsFlapQueuedAtMs = reinsFlapQueuedAtMs;
         clone.airborneJumpPressQueuedAtMs = airborneJumpPressQueuedAtMs;
         clone.reinsAirbrakeUntilMs = reinsAirbrakeUntilMs;
+        clone.reinsAirbrakeActivatedAtMs = reinsAirbrakeActivatedAtMs;
         clone.reinsBoostQueuedAtMs = reinsBoostQueuedAtMs;
         clone.sprintBoostQueuedAtMs = sprintBoostQueuedAtMs;
         clone.launchChargeStartedAtMs = launchChargeStartedAtMs;

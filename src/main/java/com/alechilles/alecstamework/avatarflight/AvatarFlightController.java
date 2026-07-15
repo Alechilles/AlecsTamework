@@ -57,6 +57,7 @@ public final class AvatarFlightController {
         boolean descendIntent = input.crouch() || input.verticalAxis() < 0.0;
         boolean explicitAirbrakeIntent = input.airbrake();
         boolean activeFlight = state.mode() != AvatarFlightMode.GROUNDED;
+        boolean airbrakeApplied = explicitAirbrakeIntent && input.airbrakeActivated() && activeFlight;
         if (config.getLaunch().isEnabled()
                 && input.launchAllowed()
                 && input.launchHoldMs() >= config.getLaunch().getMinChargeMs()
@@ -274,7 +275,7 @@ public final class AvatarFlightController {
         );
         return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, diveLoad, climbLoad,
                 applyVelocity, jumpApplied, boostApplied, false, 0.0, horizontalIdle, fastFlight, visualPitch,
-                visualRoll, hudTargetSpeedRatio);
+                visualRoll, hudTargetSpeedRatio, airbrakeApplied);
     }
 
     private static double resolveHudTargetSpeedRatio(@Nonnull AvatarFlightMode mode,
@@ -599,7 +600,26 @@ public final class AvatarFlightController {
                         boolean flapAllowed,
                         boolean boostAllowed,
                         boolean launchAllowed,
-                        long launchHoldMs) {
+                        long launchHoldMs,
+                        boolean airbrakeActivated) {
+        public Input(double forwardAxis,
+                     double strafeAxis,
+                     double verticalAxis,
+                     boolean jump,
+                     boolean crouch,
+                     boolean sprint,
+                     boolean airbrake,
+                     boolean onGround,
+                     double yawRadians,
+                     double pitchRadians,
+                     boolean flapAllowed,
+                     boolean boostAllowed,
+                     boolean launchAllowed,
+                     long launchHoldMs) {
+            this(forwardAxis, strafeAxis, verticalAxis, jump, crouch, sprint, airbrake, onGround, yawRadians,
+                    pitchRadians, flapAllowed, boostAllowed, launchAllowed, launchHoldMs, false);
+        }
+
         public Input(double forwardAxis,
                      double strafeAxis,
                      double verticalAxis,
@@ -613,7 +633,7 @@ public final class AvatarFlightController {
                      boolean flapAllowed,
                      boolean boostAllowed) {
             this(forwardAxis, strafeAxis, verticalAxis, jump, crouch, sprint, airbrake, onGround, yawRadians,
-                    pitchRadians, flapAllowed, boostAllowed, true, 0L);
+                    pitchRadians, flapAllowed, boostAllowed, true, 0L, false);
         }
     }
 
@@ -635,9 +655,34 @@ public final class AvatarFlightController {
                          boolean fastFlight,
                          double visualPitchRadians,
                          double visualRollRadians,
-                         double hudTargetSpeedRatio) {
+                         double hudTargetSpeedRatio,
+                         boolean airbrakeApplied) {
         public Output {
             hudTargetSpeedRatio = clamp(hudTargetSpeedRatio, 0.0, 1.0);
+        }
+
+        public Output(@Nonnull AvatarFlightMode mode,
+                      double velocityX,
+                      double velocityY,
+                      double velocityZ,
+                      long nextJumpAtMs,
+                      long nextBoostAtMs,
+                      long nextLaunchAtMs,
+                      double diveLoad,
+                      double climbLoad,
+                      boolean applyVelocity,
+                      boolean jumpApplied,
+                      boolean boostApplied,
+                      boolean launchApplied,
+                      double launchCost,
+                      boolean horizontalIdle,
+                      boolean fastFlight,
+                      double visualPitchRadians,
+                      double visualRollRadians,
+                      double hudTargetSpeedRatio) {
+            this(mode, velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, diveLoad,
+                    climbLoad, applyVelocity, jumpApplied, boostApplied, launchApplied, launchCost, horizontalIdle,
+                    fastFlight, visualPitchRadians, visualRollRadians, hudTargetSpeedRatio, false);
         }
 
         public Output(@Nonnull AvatarFlightMode mode,
@@ -655,7 +700,7 @@ public final class AvatarFlightController {
                       double visualRollRadians) {
             this(mode, velocityX, velocityY, velocityZ, nextJumpAtMs, nextBoostAtMs, 0L, 0.0, 0.0, applyVelocity,
                     jumpApplied, boostApplied, false, 0.0, horizontalIdle, fastFlight, visualPitchRadians,
-                    visualRollRadians, 0.0);
+                    visualRollRadians, 0.0, false);
         }
     }
 }

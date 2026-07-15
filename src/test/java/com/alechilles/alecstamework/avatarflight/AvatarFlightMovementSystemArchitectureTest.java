@@ -19,6 +19,10 @@ class AvatarFlightMovementSystemArchitectureTest {
             "avatarflight",
             "AvatarFlightMovementSystem.java"
     );
+    private static final Path ANIMATION_SOURCE = Path.of(
+            "src", "main", "java", "com", "alechilles", "alecstamework", "avatarflight",
+            "AvatarFlightAnimationService.java"
+    );
 
     @Test
     void controllerStateComesFromAvatarFlightComponent() throws Exception {
@@ -81,11 +85,11 @@ class AvatarFlightMovementSystemArchitectureTest {
     @Test
     void visualPoseAndPoseAnimationsAreGuardedByVelocityApplication() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String animationSource = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
         String tick = methodSlice(source, "public void tick");
 
         int velocityGuardIndex = tick.indexOf("if (applyingVelocity)");
         int poseIndex = tick.indexOf("applyVisualPose(ref, commandBuffer, controllerInput, output)");
-        int poseAnimationIndex = tick.indexOf("applyPoseAnimations(ref, commandBuffer, flight, config, output)");
         String groundedBranch = substringBetween(
                 tick,
                 "} else if (hasFlightVisualOverrides) {",
@@ -93,30 +97,33 @@ class AvatarFlightMovementSystemArchitectureTest {
         );
 
         assertTrue(poseIndex >= 0, "avatar flight must write visual pose while custom velocity is active");
-        assertTrue(poseAnimationIndex >= 0, "avatar flight must drive pose animations while custom velocity is active");
+        assertTrue(tick.contains("animationService.tick("),
+                "avatar flight must delegate pose animations while custom velocity is active");
         assertTrue(velocityGuardIndex >= 0, "test expects the velocity guard to remain present");
         assertTrue(velocityGuardIndex < poseIndex,
                 "grounded transformed mode should not keep rewriting transform pitch/roll");
-        assertTrue(velocityGuardIndex < poseAnimationIndex,
-                "grounded transformed mode should not keep replaying pose animations");
+        assertTrue(animationSource.indexOf("if (!applyingVelocity)")
+                        < animationSource.indexOf("applyPoseAnimations(ref, commandBuffer, flight, config, output, now)"),
+                "grounded transformed mode should clear rather than replay flight pose animations");
         assertFalse(groundedBranch.contains("applyVisualPose("),
                 "grounded transformed mode should leave native grounded visuals alone after cleanup");
-        assertFalse(groundedBranch.contains("applyPoseAnimations("),
-                "grounded transformed mode should not replay flight pose animations");
+        assertFalse(groundedBranch.contains("animationService.tick("),
+                "the animation service should run once before the grounded cleanup branch");
     }
 
     @Test
     void groundedAvatarFlightDoesNotSuppressNativeLocomotionAnimations() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String animationSource = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
         String tick = methodSlice(source, "public void tick");
 
         assertFalse(tick.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config);"),
                 "unconditional slot suppression prevents native grounded sprint/step animations while transformed");
         assertTrue(tick.contains("boolean suppressingOverlays ="),
                 "the suppression decision should be named so diagnostics can report it");
-        assertTrue(tick.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays)"),
-                "overlay suppression should be scoped to custom flight visuals instead of idle grounded mode");
-        assertTrue(source.contains("if (!applyingVelocity && !hasFlightVisualOverrides)"),
+        assertTrue(tick.contains("animationService.tick("),
+                "overlay suppression should be delegated with the custom flight visual state");
+        assertTrue(animationSource.contains("if (!applyingVelocity && !hasFlightVisualOverrides)"),
                 "grounded transformed locomotion should be able to use the same native animation path as a plain model swap");
     }
 
@@ -198,22 +205,20 @@ class AvatarFlightMovementSystemArchitectureTest {
     @Test
     void groundedTransitionOnlyCleansFlightVisualOverrides() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String animationSource = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
         String tick = methodSlice(source, "public void tick");
-        String cleanup = methodSlice(source, "private void clearFlightVisualOverrides");
 
-        assertTrue(tick.contains("boolean hasFlightVisualOverrides = hasFlightVisualOverrides(flight)"),
+        assertTrue(tick.contains("flight.isClientFlyingSynced() || animationService.hasOverrides(flight)"),
                 "grounded cleanup should be driven by avatar-flight-owned visual state");
-        assertTrue(tick.contains("clearFlightVisualOverrides(ref, commandBuffer, flight, config, controllerInput)"),
-                "leaving custom flight should clear forced animation, pose, and movement-state overrides once");
-        assertTrue(cleanup.contains("clearFlightMovementState(ref, commandBuffer, controllerInput)"),
+        assertTrue(tick.contains("animationService.tick("),
+                "leaving custom flight should clear forced animation overrides through their owner");
+        assertTrue(tick.contains("clearFlightMovementState(ref, commandBuffer, controllerInput)"),
                 "forced airborne MovementStates must be cleared once before native grounded locomotion resumes");
-        assertTrue(cleanup.contains("clearMovementAnimation(ref, commandBuffer, flight)"),
+        assertTrue(animationSource.contains("clearMovementAnimation(ref, commandBuffer, flight)"),
                 "forced Movement slot animation must be stopped when returning to native grounded mode");
-        assertTrue(cleanup.contains("clearPoseAnimation(ref, commandBuffer, flight, true, pitchSlot)"),
-                "pitch pose slot should be stopped when returning to native grounded mode");
-        assertTrue(cleanup.contains("clearPoseAnimation(ref, commandBuffer, flight, false, rollSlot)"),
-                "bank pose slot should be stopped when returning to native grounded mode");
-        assertTrue(cleanup.contains("resetVisualPose(ref, commandBuffer)"),
+        assertTrue(animationSource.contains("clearPoseAnimations(ref, commandBuffer, flight, config)"),
+                "pitch and bank pose slots should be stopped when returning to native grounded mode");
+        assertTrue(tick.contains("resetVisualPose(ref, commandBuffer)"),
                 "transform/head pitch and roll should be reset once on the transition out of custom flight");
     }
 
@@ -277,10 +282,11 @@ class AvatarFlightMovementSystemArchitectureTest {
 
     @Test
     void avatarFlightExplicitlyDrivesTransformedPlayerMovementAnimation() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String movementSource = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("applyMovementAnimation(ref, commandBuffer, flight, config, output)"),
-                "movement-state flags alone do not reliably drive the owner client's transformed-player animation");
+        assertTrue(movementSource.contains("animationService.tick("),
+                "the movement orchestrator should delegate transformed-player animation ownership");
         assertTrue(source.contains("AnimationUtils.playAnimation(ref, AnimationSlot.Movement"),
                 "avatar flight must use the generic entity animation packet, not NPC-only helpers");
         assertTrue(source.contains("config.getAnimation().animationFor(output.horizontalIdle(), output.fastFlight())"),
@@ -291,11 +297,11 @@ class AvatarFlightMovementSystemArchitectureTest {
 
     @Test
     void avatarFlightSuppressesPlayerOverlayAnimationSlotsWhileActive() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays)"),
+        assertTrue(source.contains("suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays, now)"),
                 "transformed-player flight should suppress held-item/combat overlay slots only while custom flight visuals are active");
-        assertTrue(source.contains("animation.isSuppressNonMovementAnimations()"),
+        assertTrue(source.contains("config.getAnimation().isSuppressNonMovementAnimations()"),
                 "suppression should be config-driven for unsafe model-swap experiments");
         assertTrue(source.contains("!isPoseSlot(AnimationSlot.Status, pitchSlot, rollSlot)"),
                 "configured pose-animation slots must not be erased by overlay suppression");
@@ -311,9 +317,9 @@ class AvatarFlightMovementSystemArchitectureTest {
 
     @Test
     void avatarFlightCanDriveOwnerSafePoseAnimationSlots() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("applyPoseAnimations(ref, commandBuffer, flight, config, output)"),
+        assertTrue(source.contains("applyPoseAnimations(ref, commandBuffer, flight, config, output, now)"),
                 "owner-visible pitch/bank must use animation packets instead of self TransformUpdate correction");
         assertTrue(source.contains("AvatarFlightPoseAnimationCatalog.pitchPoseAnimationFor("),
                 "pitch pose selection should use the standard/catalog-driven breakpoint grid");
@@ -327,6 +333,25 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "pose animations must be sent to the owner client through the safe animation channel");
         assertTrue(source.contains("AnimationSlot.VALUES"),
                 "pose animation slots should be parsed from config without hardcoding only one slot");
+    }
+
+    @Test
+    void acceptedAbilitiesUseProtectedOwnerVisibleActionAnimations() throws Exception {
+        String movementSource = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
+
+        assertFalse(movementSource.contains("AnimationUtils."),
+                "the movement orchestrator should not regain direct animation ownership");
+        assertTrue(source.contains("AvatarFlightAbilityAnimationSelector.select(output, settings)"),
+                "ability animation cues must come from accepted controller outputs");
+        assertTrue(source.contains("model.getAnimationSetMap().containsKey(cue.animationId())"),
+                "Action-slot animations bypass engine validation and must be checked against the transformed model");
+        assertTrue(source.contains("AnimationUtils.playAnimation(ref, AnimationSlot.Action, cue.animationId(), true"),
+                "ability cues must use the owner-visible Action slot");
+        assertTrue(source.contains("!isAbilityAnimationProtected(flight, now)"),
+                "held-item suppression must yield while a one-shot ability cue owns the Action slot");
+        assertTrue(source.contains("warnedMissingAnimations.add(warningKey)"),
+                "missing configured clips should warn once instead of failing or spamming logs");
     }
 
     @Test

@@ -166,6 +166,29 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void airbrakeAppliedReportsOnlyAcceptedActivationEdge() {
+        AvatarFlightController.State active = new AvatarFlightController.State(
+                0.0, 0.0, -8.0, 0L, 0L, 0.0, 0.0, 0L, AvatarFlightMode.FORWARD_FLIGHT);
+        AvatarFlightController.Output activated = update(
+                active,
+                airbrakeInput(false, true)
+        );
+        AvatarFlightController.Output sustained = update(
+                active,
+                airbrakeInput(false, false)
+        );
+        AvatarFlightController.Output grounded = update(
+                new AvatarFlightController.State(
+                        0.0, 0.0, 0.0, 0L, 0L, 0.0, 0.0, 0L, AvatarFlightMode.GROUNDED),
+                airbrakeInput(true, true)
+        );
+
+        assertTrue(activated.airbrakeApplied());
+        assertFalse(sustained.airbrakeApplied(), "holding airbrake must not replay its activation cue");
+        assertFalse(grounded.airbrakeApplied(), "grounded airbrake input is not an accepted flight action");
+    }
+
+    @Test
     void strafeInputAppliesLateralVelocity() {
         AvatarFlightController.Output output = update(
                 new AvatarFlightController.State(0.0, 0.0, 0.0, 0L, 0L),
@@ -1201,5 +1224,11 @@ class AvatarFlightControllerTest {
                 flapAllowed,
                 boostAllowed
         );
+    }
+
+    private static AvatarFlightController.Input airbrakeInput(boolean onGround, boolean activated) {
+        return new AvatarFlightController.Input(
+                0.0, 0.0, 0.0, false, false, false, true, onGround, 0.0, 0.0,
+                true, true, true, 0L, activated);
     }
 }

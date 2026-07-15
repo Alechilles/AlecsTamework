@@ -560,6 +560,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.animation)
             .documentation("Transformed-player movement animation names. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AvatarFlightAbilityAnimationSettings>append(new KeyedCodec<>("AbilityAnimation", AvatarFlightAbilityAnimationSettings.CODEC),
+                    (asset, value) -> asset.abilityAnimation = value == null ? new AvatarFlightAbilityAnimationSettings() : value,
+                    asset -> asset.abilityAnimation)
+            .documentation("One-shot transformed-model ability animations. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<RiderVisualSettings>append(new KeyedCodec<>("RiderVisual", RIDER_VISUAL_CODEC),
                     (asset, value) -> asset.riderVisual = value == null ? new RiderVisualSettings() : value,
                     asset -> asset.riderVisual)
@@ -587,6 +592,7 @@ public final class TwAvatarFlightConfig implements
     AvatarFlightAudioSettings audio = new AvatarFlightAudioSettings();
     VigourSettings vigour = new VigourSettings();
     AnimationSettings animation = new AnimationSettings();
+    AvatarFlightAbilityAnimationSettings abilityAnimation = new AvatarFlightAbilityAnimationSettings();
     RiderVisualSettings riderVisual = new RiderVisualSettings();
     DebugSettings debug = new DebugSettings();
 
@@ -664,6 +670,9 @@ public final class TwAvatarFlightConfig implements
     public AvatarFlightAudioSettings getAudio() { return audio == null ? new AvatarFlightAudioSettings() : audio; }
     public VigourSettings getVigour() { return vigour == null ? new VigourSettings() : vigour; }
     public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
+    public AvatarFlightAbilityAnimationSettings getAbilityAnimation() {
+        return abilityAnimation == null ? new AvatarFlightAbilityAnimationSettings() : abilityAnimation;
+    }
     public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }
     public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
 

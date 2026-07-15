@@ -149,6 +149,15 @@
     "RollPoseThresholdDegrees": 5.0,
     "PoseResendIntervalMs": 250.0
   },
+  "AbilityAnimation": {
+    "Enabled": true,
+    "UpwardBoostAnimation": "",
+    "UpwardBoostDurationMs": 650.0,
+    "ForwardBoostAnimation": "",
+    "ForwardBoostDurationMs": 700.0,
+    "AirbrakeAnimation": "",
+    "AirbrakeDurationMs": 500.0
+  },
   "RiderVisual": {
     "HideOwnerEquipment": true,
     "HideOwnerArmor": true,
