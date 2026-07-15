@@ -53,6 +53,9 @@ public final class TameworkMetadataKeys {
     public static final String LIFE_STAGE_ADULT_SCALE = "Tamework.LifeStage.AdultScale";
     public static final String LIFE_STAGE_GROWTH_SCALING_ENABLED = "Tamework.LifeStage.GrowthScalingEnabled";
     public static final String LIFE_STAGE_GENDER = "Tamework.LifeStage.Gender";
+    public static final String LIFE_STAGE_ADULT_ROLE_ID = "Tamework.LifeStage.AdultRoleId";
+    public static final String LIFE_STAGE_BABY_ROLE_ID = "Tamework.LifeStage.BabyRoleId";
+    public static final String LIFE_STAGE_ADOLESCENT_ROLE_ID = "Tamework.LifeStage.AdolescentRoleId";
     public static final String NPC_NAME = "Tamework.NpcName";
     public static final String NPC_NAME_OWNER_UUID = "Tamework.NpcNameOwnerUuid";
     public static final String NPC_NAME_UPDATED_MS = "Tamework.NpcNameUpdatedMs";

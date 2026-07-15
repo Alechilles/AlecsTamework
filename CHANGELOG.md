@@ -54,6 +54,8 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed captured growing offspring changing sex-specific or variant roles when released from handheld capture items. Life-stage role lineage now round-trips with the companion, and legacy captured babies retain their captured role instead of falling back to the first role in a current breeding family.
+- Fixed legacy linked companions with unknown command state being treated as followers on login, which could queue the same companions for recall every time an old world was loaded.
 - Fixed active worlds with many companions remaining in degraded population persistence because ordinary NPC/profile activity changed SQLite rows while startup reconciliation was still paging them. Profile evidence now comes from one consistent startup snapshot, and transient SQLite-lock failures retry without degrading owner or claim readiness.
 - Fixed upgraded worlds with legacy saved NPCs aborting population reconciliation before interrupted breeding could recover. Detached saved-entity scans now mirror Hytale's UUID migration: they use the legacy NPC UUID when `UUIDComponent` is absent and treat the component UUID as authoritative when an old legacy value disagrees. Breeding replay warnings now identify the exact parents and safety reason.
 - Fixed `/tw setbreedingready true` and the equivalent Public API mutation clearing Tamework's cooldown fields without clearing Hytale's breeding alarm, which could make the first breeding attempt succeed while later forced-ready attempts silently stopped before pairing admission.

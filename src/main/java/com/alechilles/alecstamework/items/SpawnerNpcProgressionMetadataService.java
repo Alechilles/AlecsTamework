@@ -92,7 +92,7 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
-        return updated;
+        return SpawnerLifeStageRoleMetadataService.clear(updated);
     }
 
     void applyNpcHealthFromItem(@Nullable ItemStack stack,
@@ -564,6 +564,7 @@ final class SpawnerNpcProgressionMetadataService {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
+            updated = SpawnerLifeStageRoleMetadataService.clear(updated);
             return applyCapturedGenderMetadata(
                     updated,
                     resolveCapturedGenderForMetadata(null, CompanionGenderService.resolveGender(npcRef, store, null, null))
@@ -622,7 +623,7 @@ final class SpawnerNpcProgressionMetadataService {
                 updated,
                 resolveCapturedGenderForMetadata(component, CompanionGenderService.resolveGender(npcRef, store, null, null))
         );
-        return updated;
+        return SpawnerLifeStageRoleMetadataService.capture(updated, component);
     }
 
     private ItemStack applyCapturedGenderMetadata(ItemStack stack, @Nullable String gender) {
@@ -673,7 +674,8 @@ final class SpawnerNpcProgressionMetadataService {
                 || adultSwitchScale != null
                 || adultScale != null
                 || growthScaling != null
-                || (gender != null && !gender.isBlank());
+                || (gender != null && !gender.isBlank())
+                || SpawnerLifeStageRoleMetadataService.hasSavedRoleIds(stack);
         if (!hasData) {
             return;
         }
@@ -716,9 +718,7 @@ final class SpawnerNpcProgressionMetadataService {
                         ? growthScaling
                         : existing != null && existing.isGrowthScalingEnabled()
         );
-        restored.setAdultRoleId(existing != null ? existing.getAdultRoleId() : null);
-        restored.setBabyRoleId(existing != null ? existing.getBabyRoleId() : null);
-        restored.setAdolescentRoleId(existing != null ? existing.getAdolescentRoleId() : null);
+        SpawnerLifeStageRoleMetadataService.restore(stack, restored, existing);
         restored.setGender(gender != null && !gender.isBlank()
                 ? gender
                 : existing != null ? existing.getGender() : null);

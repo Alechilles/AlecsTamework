@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class SpawnerNpcProgressionMetadataServiceTest {
@@ -92,6 +93,36 @@ class SpawnerNpcProgressionMetadataServiceTest {
         );
 
         assertEquals("Male", capturedGender);
+    }
+
+    @Test
+    void capturedOffspringRoleLineageSurvivesSpawnerMetadataRoundTrip() {
+        TameworkLifeStageComponent captured = new TameworkLifeStageComponent();
+        captured.setStage("Baby");
+        captured.setAdultRoleId("Tamed_Deer_Stag");
+        captured.setBabyRoleId("Tamed_Deer_Stag");
+        captured.setAdolescentRoleId("Tamed_Deer_Stag");
+        Map<String, String> metadata = SpawnerLifeStageRoleMetadataService.captureRoleIds(captured);
+        TameworkLifeStageComponent restored = new TameworkLifeStageComponent();
+        restored.setStage("Baby");
+
+        SpawnerLifeStageRoleMetadataService.restore(metadata, "Tamed_Deer_Stag", restored, null);
+
+        assertEquals("Tamed_Deer_Stag", restored.getAdultRoleId());
+        assertEquals("Tamed_Deer_Stag", restored.getBabyRoleId());
+        assertEquals("Tamed_Deer_Stag", restored.getAdolescentRoleId());
+    }
+
+    @Test
+    void legacyCapturedBabyKeepsItsCapturedRoleDuringImmediateRefresh() {
+        TameworkLifeStageComponent restored = new TameworkLifeStageComponent();
+        restored.setStage("Baby");
+
+        SpawnerLifeStageRoleMetadataService.restore(Map.of(), "Tamed_Deer_Stag", restored, null);
+
+        assertEquals("Tamed_Deer_Stag", restored.getBabyRoleId());
+        assertNull(restored.getAdultRoleId());
+        assertNull(restored.getAdolescentRoleId());
     }
 
     @Test

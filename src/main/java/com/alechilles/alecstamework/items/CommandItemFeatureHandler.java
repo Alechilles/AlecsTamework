@@ -516,7 +516,7 @@ public final class CommandItemFeatureHandler {
                 if (!settings.isFollowMasterOnWorldChange()) {
                     continue;
                 }
-                if (!isEligibleForWorldChangeTravel(record, settings)) {
+                if (!CommandWorldChangeEligibility.isEligible(record, settings)) {
                     continue;
                 }
                 RelocationState travelState = resolveTravelRelocationState(record);
@@ -564,22 +564,6 @@ public final class CommandItemFeatureHandler {
         CommandNpcProfileActionResolver.ActionTarget target =
                 profileActionResolver.resolveRelocation(record);
         return target.isActionable() ? target.resolvedRecord() : null;
-    }
-
-    private boolean isEligibleForWorldChangeTravel(LinkedNpcRecord record,
-                                                   TwCompanionConfig.EffectiveSettings settings) {
-        if (record == null || settings == null) {
-            return false;
-        }
-        String[] requiredStates = settings.getFollowMasterOnWorldChangeStateFilter();
-        if (requiredStates == null || requiredStates.length == 0) {
-            return true;
-        }
-        if (record.cachedCommandState == null || record.cachedCommandState.isBlank()) {
-            // Preserve backward compatibility for older linked-record metadata that does not cache state yet.
-            return true;
-        }
-        return settings.isWorldChangeStateAllowed(record.cachedCommandState);
     }
 
     private RelocationState resolveTravelRelocationState(LinkedNpcRecord record) {
