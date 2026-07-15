@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.hypixel.hytale.logger.HytaleLogger;
+import java.util.logging.Level;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
@@ -7,6 +9,8 @@ import javax.annotation.Nullable;
 
 /** Keeps owner-mutation cancellation, degradation, and callbacks terminal under failures. */
 final class OwnerMutationTerminality {
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
     private final CompanionPopulationAdmissionCoordinator coordinator;
 
     OwnerMutationTerminality(@Nonnull CompanionPopulationAdmissionCoordinator coordinator) {
@@ -48,6 +52,13 @@ final class OwnerMutationTerminality {
         } catch (RuntimeException | LinkageError ignored) {
             // The APPLYING journal remains the conservative source of truth.
         }
+    }
+
+    void appliedContinuationFailed(@Nonnull Throwable failure) {
+        LOGGER.at(Level.WARNING).withCause(failure).log(
+                "Owner-mutation applied continuation failed; retaining recovery quarantine."
+        );
+        degradeCapability("owner_mutation_applied_continuation_failed");
     }
 
     void denied(@Nonnull OwnerMutationScheduler.MutationCallbacks callbacks,

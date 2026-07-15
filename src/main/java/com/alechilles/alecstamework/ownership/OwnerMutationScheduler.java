@@ -417,7 +417,7 @@ public final class OwnerMutationScheduler {
         try {
             callbacks.onApplied(prepared.ownerAdmission().decision(), profileId, mutationContext);
         } catch (RuntimeException | LinkageError failure) {
-            terminality.degradeCapability("owner_mutation_applied_continuation_failed");
+            terminality.appliedContinuationFailed(failure);
             terminality.durabilityDegraded(
                     callbacks, "owner-mutation-applied-continuation-failed"
             );

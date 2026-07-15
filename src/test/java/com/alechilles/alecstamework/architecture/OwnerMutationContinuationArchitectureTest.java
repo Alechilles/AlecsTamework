@@ -93,15 +93,15 @@ class OwnerMutationContinuationArchitectureTest {
     @Test
     void appliedCallbackFailureQuarantinesInsteadOfCommitting() throws IOException {
         String scheduler = read("ownership", "OwnerMutationScheduler.java");
+        String terminality = read("ownership", "OwnerMutationTerminality.java");
         int callback = scheduler.indexOf("callbacks.onApplied(");
-        int quarantine = scheduler.indexOf(
-                "owner_mutation_applied_continuation_failed", callback
-        );
+        int quarantine = scheduler.indexOf("terminality.appliedContinuationFailed(failure)", callback);
         int commit = scheduler.indexOf("companionCoordinator.commitAsync(prepared)", callback);
 
         assertTrue(callback >= 0);
         assertTrue(quarantine > callback && quarantine < commit);
         assertTrue(scheduler.substring(callback, commit).contains("return;"));
+        assertTrue(terminality.contains("withCause(failure)"));
     }
 
     @Test
