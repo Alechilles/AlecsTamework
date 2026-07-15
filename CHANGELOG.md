@@ -31,7 +31,7 @@
 - Added a compact avatar-flight pitch readout and red target-speed marker above the speed bar to make climb, dive, and boost speed trends easier to tune in game.
 - Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
 - Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.
-- Added configurable one-shot Action-slot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, with per-cue durations and graceful validation against each transformed model.
+- Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.
 - Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `Origin` for injected pitch/bank poses.
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
 

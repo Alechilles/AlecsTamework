@@ -26,39 +26,45 @@ public final class AvatarFlightAbilityAnimationSettings {
                     settings -> settings.enabled)
             .documentation("Whether accepted avatar-flight abilities play configured one-shot animations. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<String>append(new KeyedCodec<>("Slot", Codec.STRING),
+                    (settings, value) -> settings.slot = slotOrDefault(value),
+                    settings -> settings.slot)
+            .documentation("Animation slot used by ability cues. Action preserves the normal movement clip; Movement allows Status-slot pitch/bank poses to layer over full-body ability clips. Inheritance: missing nested key inherits parent value.")
+            .add()
             .<String>append(new KeyedCodec<>("UpwardBoostAnimation", Codec.STRING),
                     (settings, value) -> settings.upwardBoostAnimation = blankOrTrim(value),
                     settings -> settings.upwardBoostAnimation)
-            .documentation("Action-slot animation played after an accepted upward boost. Blank disables the cue. Inheritance: missing nested key inherits parent value.")
+            .documentation("Animation played after an accepted upward boost. Blank disables the cue. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("UpwardBoostDurationMs", Codec.DOUBLE),
                     (settings, value) -> settings.upwardBoostDurationMs = durationOrDefault(value, DEFAULT_UPWARD_BOOST_DURATION_MS),
                     settings -> settings.upwardBoostDurationMs)
-            .documentation("Milliseconds that Action-slot suppression yields to an upward-boost clip. This does not scale the clip. Inheritance: missing nested key inherits parent value.")
+            .documentation("Milliseconds that the configured slot remains reserved for an upward-boost clip. This does not scale the clip. Inheritance: missing nested key inherits parent value.")
             .add()
             .<String>append(new KeyedCodec<>("ForwardBoostAnimation", Codec.STRING),
                     (settings, value) -> settings.forwardBoostAnimation = blankOrTrim(value),
                     settings -> settings.forwardBoostAnimation)
-            .documentation("Action-slot animation played after an accepted forward boost. Blank disables the cue. Inheritance: missing nested key inherits parent value.")
+            .documentation("Animation played after an accepted forward boost. Blank disables the cue. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("ForwardBoostDurationMs", Codec.DOUBLE),
                     (settings, value) -> settings.forwardBoostDurationMs = durationOrDefault(value, DEFAULT_FORWARD_BOOST_DURATION_MS),
                     settings -> settings.forwardBoostDurationMs)
-            .documentation("Milliseconds that Action-slot suppression yields to a forward-boost clip. This does not scale the clip. Inheritance: missing nested key inherits parent value.")
+            .documentation("Milliseconds that the configured slot remains reserved for a forward-boost clip. This does not scale the clip. Inheritance: missing nested key inherits parent value.")
             .add()
             .<String>append(new KeyedCodec<>("AirbrakeAnimation", Codec.STRING),
                     (settings, value) -> settings.airbrakeAnimation = blankOrTrim(value),
                     settings -> settings.airbrakeAnimation)
-            .documentation("Action-slot animation played once when airbrake becomes active. Blank disables the cue. Inheritance: missing nested key inherits parent value.")
+            .documentation("Animation played once when airbrake becomes active. Blank disables the cue. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("AirbrakeDurationMs", Codec.DOUBLE),
                     (settings, value) -> settings.airbrakeDurationMs = durationOrDefault(value, DEFAULT_AIRBRAKE_DURATION_MS),
                     settings -> settings.airbrakeDurationMs)
-            .documentation("Milliseconds that Action-slot suppression yields to an airbrake clip. This does not scale the clip. Inheritance: missing nested key inherits parent value.")
+            .documentation("Milliseconds that the configured slot remains reserved for an airbrake clip. This does not scale the clip. Inheritance: missing nested key inherits parent value.")
             .add()
             .build();
 
     boolean enabled = true;
+    String slot = "Action";
     String upwardBoostAnimation = "";
     double upwardBoostDurationMs = DEFAULT_UPWARD_BOOST_DURATION_MS;
     String forwardBoostAnimation = "";
@@ -70,6 +76,7 @@ public final class AvatarFlightAbilityAnimationSettings {
                                    @Nullable Set<String> keys) {
         if (keys == null) return;
         if (!keys.contains("Enabled")) enabled = parent.enabled;
+        if (!keys.contains("Slot")) slot = parent.slot;
         if (!keys.contains("UpwardBoostAnimation")) upwardBoostAnimation = parent.upwardBoostAnimation;
         if (!keys.contains("UpwardBoostDurationMs")) upwardBoostDurationMs = parent.upwardBoostDurationMs;
         if (!keys.contains("ForwardBoostAnimation")) forwardBoostAnimation = parent.forwardBoostAnimation;
@@ -79,6 +86,7 @@ public final class AvatarFlightAbilityAnimationSettings {
     }
 
     public boolean isEnabled() { return enabled; }
+    public String getSlot() { return slotOrDefault(slot); }
     public String getUpwardBoostAnimation() { return blankOrTrim(upwardBoostAnimation); }
     public long getUpwardBoostDurationMs() {
         return Math.round(durationOrDefault(upwardBoostDurationMs, DEFAULT_UPWARD_BOOST_DURATION_MS));
@@ -100,5 +108,10 @@ public final class AvatarFlightAbilityAnimationSettings {
     private static double durationOrDefault(@Nullable Double value, double fallback) {
         double resolved = value != null && Double.isFinite(value) ? value : fallback;
         return Math.max(MIN_DURATION_MS, Math.min(MAX_DURATION_MS, resolved));
+    }
+
+    @Nonnull
+    private static String slotOrDefault(@Nullable String value) {
+        return value != null && value.trim().equalsIgnoreCase("Movement") ? "Movement" : "Action";
     }
 }

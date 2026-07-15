@@ -62,13 +62,20 @@ final class AvatarFlightAnimationService {
                @Nonnull CommandBuffer<EntityStore> commandBuffer,
                @Nonnull AvatarFlightComponent flight,
                @Nonnull TwAvatarFlightConfig config) {
+        clearAbilityAnimation(ref, commandBuffer, flight);
         clearMovementAnimation(ref, commandBuffer, flight);
         clearPoseAnimations(ref, commandBuffer, flight, config);
-        clearAbilityAnimation(ref, commandBuffer, flight);
     }
 
     static boolean isAbilityAnimationProtected(@Nonnull AvatarFlightComponent flight, long now) {
         return !flight.getAbilityAnimationId().isBlank() && now < flight.getAbilityAnimationUntilMs();
+    }
+
+    static boolean doesAbilityOwnSlot(@Nonnull AvatarFlightComponent flight,
+                                      @Nonnull AnimationSlot slot,
+                                      long now) {
+        return isAbilityAnimationProtected(flight, now)
+                && resolveAnimationSlot(flight.getAbilityAnimationSlot(), AnimationSlot.Action) == slot;
     }
 
     private void applyMovementAnimation(@Nonnull Ref<EntityStore> ref,
@@ -77,6 +84,9 @@ final class AvatarFlightAnimationService {
                                         @Nonnull TwAvatarFlightConfig config,
                                         @Nonnull AvatarFlightController.Output output,
                                         long now) {
+        if (doesAbilityOwnSlot(flight, AnimationSlot.Movement, now)) {
+            return;
+        }
         String animationId = config.getAnimation().animationFor(output.horizontalIdle(), output.fastFlight());
         if (animationId.equals(flight.getMovementAnimationId()) && now < flight.getNextMovementAnimationAtMs()) {
             return;
@@ -113,7 +123,7 @@ final class AvatarFlightAnimationService {
                 ? resolveAnimationSlot(animation.getRollPoseSlot(), AnimationSlot.Emote) : null;
         if (animation.isSuppressActionAnimation()
                 && !isPoseSlot(AnimationSlot.Action, pitchSlot, rollSlot)
-                && !isAbilityAnimationProtected(flight, now)) {
+                && !doesAbilityOwnSlot(flight, AnimationSlot.Action, now)) {
             AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, commandBuffer);
         }
         if (animation.isSuppressStatusAnimation() && !isPoseSlot(AnimationSlot.Status, pitchSlot, rollSlot)) {
@@ -171,7 +181,7 @@ final class AvatarFlightAnimationService {
                                     @Nonnull String animationId,
                                     long now,
                                     long resendIntervalMs) {
-        if (slot == AnimationSlot.Action && isAbilityAnimationProtected(flight, now)) {
+        if (doesAbilityOwnSlot(flight, slot, now)) {
             setPoseAnimationNextAt(flight, pitch, 0L);
             return;
         }
@@ -231,8 +241,10 @@ final class AvatarFlightAnimationService {
             warnMissingAnimation(model, cue);
             return;
         }
-        AnimationUtils.playAnimation(ref, AnimationSlot.Action, cue.animationId(), true, commandBuffer);
+        AnimationSlot slot = resolveAnimationSlot(settings.getSlot(), AnimationSlot.Action);
+        AnimationUtils.playAnimation(ref, slot, cue.animationId(), true, commandBuffer);
         flight.setAbilityAnimationId(cue.animationId());
+        flight.setAbilityAnimationSlot(slot.name());
         flight.setAbilityAnimationKind(cue.ability().name());
         flight.setAbilityAnimationUntilMs(now + cue.durationMs());
         logAbilityEvent(config, cue, true, "played");
@@ -255,7 +267,12 @@ final class AvatarFlightAnimationService {
             flight.clearAbilityAnimationState();
             return;
         }
-        AnimationUtils.stopAnimation(ref, AnimationSlot.Action, true, commandBuffer);
+        AnimationSlot slot = resolveAnimationSlot(flight.getAbilityAnimationSlot(), AnimationSlot.Action);
+        AnimationUtils.stopAnimation(ref, slot, true, commandBuffer);
+        if (slot == AnimationSlot.Movement) {
+            flight.setMovementAnimationId("");
+            flight.setNextMovementAnimationAtMs(0L);
+        }
         flight.clearAbilityAnimationState();
     }
 

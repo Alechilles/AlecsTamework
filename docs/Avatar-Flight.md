@@ -122,14 +122,15 @@ The generator warns when player-style locomotion sets that the native transforme
 ### Ability Animation
 
 - `Enabled`: enables configured one-shot ability animations without changing movement behavior.
-- `UpwardBoostAnimation`: Action-slot animation-set ID played after a successful upward flap. Blank disables this cue.
-- `UpwardBoostDurationMs`: time the Action slot remains reserved for the upward-flap cue.
-- `ForwardBoostAnimation`: Action-slot animation-set ID played after a successful forward boost. Blank disables this cue.
-- `ForwardBoostDurationMs`: time the Action slot remains reserved for the forward-boost cue.
-- `AirbrakeAnimation`: Action-slot animation-set ID played once when an accepted airbrake press becomes active. Holding the brake does not replay it.
-- `AirbrakeDurationMs`: time the Action slot remains reserved for the airbrake cue.
+- `Slot`: slot used for all configured ability cues. `Action` is the compatibility default and preserves the ordinary movement clip. `Movement` temporarily replaces that clip, allowing a Status-slot pitch/bank pose to remain layered over a full-body ability animation.
+- `UpwardBoostAnimation`: animation-set ID played after a successful upward flap. Blank disables this cue.
+- `UpwardBoostDurationMs`: time the configured slot remains reserved for the upward-flap cue.
+- `ForwardBoostAnimation`: animation-set ID played after a successful forward boost. Blank disables this cue.
+- `ForwardBoostDurationMs`: time the configured slot remains reserved for the forward-boost cue.
+- `AirbrakeAnimation`: animation-set ID played once when an accepted airbrake press becomes active. Holding the brake does not replay it.
+- `AirbrakeDurationMs`: time the configured slot remains reserved for the airbrake cue.
 
-Ability animations are presentation hooks, not ability inputs. Cooldown rejection, insufficient Vigour, and inactive airbrake state do not play a cue. Tamework validates each nonblank ID against the transformed model before sending the Action-slot animation; a missing animation warns once and leaves flight behavior unchanged. Tamework does not inject or ship generic ability clips, so each transformed model can supply animations suited to its own rig.
+Ability animations are presentation hooks, not ability inputs. Cooldown rejection, insufficient Vigour, and inactive airbrake state do not play a cue. Tamework validates each nonblank ID against the transformed model before sending the configured-slot animation; a missing animation warns once and leaves flight behavior unchanged. When `Movement` is selected, normal movement animation resumes after the cue duration. Tamework does not inject or ship generic ability clips, so each transformed model can supply animations suited to its own rig.
 
 Omitting `AbilityAnimation` inherits the complete parent section. An explicit `AbilityAnimation` object overrides only its explicit nested keys and inherits the remaining values. An explicitly blank animation ID disables only that inherited cue.
 

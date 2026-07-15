@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
+import com.hypixel.hytale.protocol.AnimationSlot;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,5 +23,20 @@ class AvatarFlightAnimationServiceTest {
         flight.setAbilityAnimationUntilMs(Long.MAX_VALUE);
 
         assertFalse(AvatarFlightAnimationService.isAbilityAnimationProtected(flight, 1000L));
+    }
+
+    @Test
+    void movementCueOwnsOnlyMovementUntilItsDeadline() {
+        AvatarFlightComponent flight = new AvatarFlightComponent();
+        flight.setAbilityAnimationId("Dragon_Boost");
+        flight.setAbilityAnimationSlot("Movement");
+        flight.setAbilityAnimationUntilMs(1500L);
+
+        assertTrue(AvatarFlightAnimationService.doesAbilityOwnSlot(
+                flight, AnimationSlot.Movement, 1499L));
+        assertFalse(AvatarFlightAnimationService.doesAbilityOwnSlot(
+                flight, AnimationSlot.Action, 1499L));
+        assertFalse(AvatarFlightAnimationService.doesAbilityOwnSlot(
+                flight, AnimationSlot.Movement, 1500L));
     }
 }

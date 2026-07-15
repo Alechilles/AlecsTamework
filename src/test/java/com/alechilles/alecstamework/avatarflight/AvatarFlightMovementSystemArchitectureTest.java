@@ -336,7 +336,7 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
-    void acceptedAbilitiesUseProtectedOwnerVisibleActionAnimations() throws Exception {
+    void acceptedAbilitiesUseProtectedConfiguredSlotAnimations() throws Exception {
         String movementSource = Files.readString(SOURCE, StandardCharsets.UTF_8);
         String source = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
 
@@ -345,11 +345,15 @@ class AvatarFlightMovementSystemArchitectureTest {
         assertTrue(source.contains("AvatarFlightAbilityAnimationSelector.select(output, settings)"),
                 "ability animation cues must come from accepted controller outputs");
         assertTrue(source.contains("model.getAnimationSetMap().containsKey(cue.animationId())"),
-                "Action-slot animations bypass engine validation and must be checked against the transformed model");
-        assertTrue(source.contains("AnimationUtils.playAnimation(ref, AnimationSlot.Action, cue.animationId(), true"),
-                "ability cues must use the owner-visible Action slot");
-        assertTrue(source.contains("!isAbilityAnimationProtected(flight, now)"),
+                "ability animations bypass engine validation and must be checked against the transformed model");
+        assertTrue(source.contains("AnimationSlot slot = resolveAnimationSlot(settings.getSlot(), AnimationSlot.Action)"),
+                "ability cues must resolve their configured slot with a compatible Action default");
+        assertTrue(source.contains("AnimationUtils.playAnimation(ref, slot, cue.animationId(), true"),
+                "ability cues must play through their configured owner-visible slot");
+        assertTrue(source.contains("!doesAbilityOwnSlot(flight, AnimationSlot.Action, now)"),
                 "held-item suppression must yield while a one-shot ability cue owns the Action slot");
+        assertTrue(source.contains("doesAbilityOwnSlot(flight, AnimationSlot.Movement, now)"),
+                "normal movement clips must yield while a full-body ability cue owns Movement");
         assertTrue(source.contains("warnedMissingAnimations.add(warningKey)"),
                 "missing configured clips should warn once instead of failing or spamming logs");
     }

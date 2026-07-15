@@ -53,6 +53,7 @@ class TwAvatarFlightConfigTest {
         assertEquals("", config.getAnimation().sharedPoseAnimationFor(80.0, 20.0));
         assertTrue(config.getAnimation().getPoseResendIntervalMs() > 0L);
         assertTrue(config.getAbilityAnimation().isEnabled());
+        assertEquals("Action", config.getAbilityAnimation().getSlot());
         assertEquals("", config.getAbilityAnimation().getUpwardBoostAnimation());
         assertEquals("", config.getAbilityAnimation().getForwardBoostAnimation());
         assertEquals("", config.getAbilityAnimation().getAirbrakeAnimation());
@@ -154,6 +155,7 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "vfx", "launchChargeEarlyIntervalMs", 725.0);
         setNestedField(parent, "audio", "launchChargeEarlyIntervalMs", 710.0);
         setNestedField(parent, "abilityAnimation", "upwardBoostAnimation", "ParentFlap");
+        setNestedField(parent, "abilityAnimation", "slot", "Movement");
 
         child.inheritMissingTopLevelFrom(parent, Set.of());
 
@@ -162,6 +164,7 @@ class TwAvatarFlightConfigTest {
         assertEquals(725L, child.getVfx().getLaunchChargeEarlyIntervalMs());
         assertEquals(710L, child.getAudio().getLaunchChargeEarlyIntervalMs());
         assertEquals("ParentFlap", child.getAbilityAnimation().getUpwardBoostAnimation());
+        assertEquals("Movement", child.getAbilityAnimation().getSlot());
     }
 
     @Test
@@ -172,6 +175,7 @@ class TwAvatarFlightConfigTest {
         setNestedField(parent, "abilityAnimation", "forwardBoostAnimation", "ParentBoost");
         setNestedField(parent, "abilityAnimation", "airbrakeAnimation", "ParentBrake");
         setNestedField(parent, "abilityAnimation", "airbrakeDurationMs", 900.0);
+        setNestedField(parent, "abilityAnimation", "slot", "Movement");
         setNestedField(child, "abilityAnimation", "forwardBoostAnimation", "ChildBoost");
 
         child.inheritMissingTopLevelFrom(
@@ -184,6 +188,7 @@ class TwAvatarFlightConfigTest {
         assertEquals("ChildBoost", child.getAbilityAnimation().getForwardBoostAnimation());
         assertEquals("ParentBrake", child.getAbilityAnimation().getAirbrakeAnimation());
         assertEquals(900L, child.getAbilityAnimation().getAirbrakeDurationMs());
+        assertEquals("Movement", child.getAbilityAnimation().getSlot());
     }
 
     @Test

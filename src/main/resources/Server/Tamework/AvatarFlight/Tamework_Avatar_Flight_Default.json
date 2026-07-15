@@ -151,6 +151,7 @@
   },
   "AbilityAnimation": {
     "Enabled": true,
+    "Slot": "Action",
     "UpwardBoostAnimation": "",
     "UpwardBoostDurationMs": 650.0,
     "ForwardBoostAnimation": "",

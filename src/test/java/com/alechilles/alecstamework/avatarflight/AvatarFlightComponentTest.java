@@ -77,17 +77,20 @@ class AvatarFlightComponentTest {
     void cloneAndClearPreserveAbilityAnimationStateContract() {
         AvatarFlightComponent component = new AvatarFlightComponent("default", 1000L);
         component.setAbilityAnimationId("Dragon_Flap");
+        component.setAbilityAnimationSlot("Movement");
         component.setAbilityAnimationKind("UPWARD_BOOST");
         component.setAbilityAnimationUntilMs(-250L);
 
         AvatarFlightComponent clone = component.clone();
 
         assertEquals("Dragon_Flap", clone.getAbilityAnimationId());
+        assertEquals("Movement", clone.getAbilityAnimationSlot());
         assertEquals("UPWARD_BOOST", clone.getAbilityAnimationKind());
         assertEquals(-250L, clone.getAbilityAnimationUntilMs());
 
         clone.clearAbilityAnimationState();
         assertEquals("", clone.getAbilityAnimationId());
+        assertEquals("Action", clone.getAbilityAnimationSlot());
         assertEquals("", clone.getAbilityAnimationKind());
         assertEquals(0L, clone.getAbilityAnimationUntilMs());
     }

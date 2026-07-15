@@ -106,6 +106,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setAbilityAnimationId,
                     AvatarFlightComponent::getAbilityAnimationId)
             .add()
+            .<String>append(new KeyedCodec<>("AbilityAnimationSlot", Codec.STRING),
+                    AvatarFlightComponent::setAbilityAnimationSlot,
+                    AvatarFlightComponent::getAbilityAnimationSlot)
+            .add()
             .<String>append(new KeyedCodec<>("AbilityAnimationKind", Codec.STRING),
                     AvatarFlightComponent::setAbilityAnimationKind,
                     AvatarFlightComponent::getAbilityAnimationKind)
@@ -186,6 +190,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextMovementAnimationAtMs;
     private long nextSuppressedAnimationAtMs;
     private String abilityAnimationId = "";
+    private String abilityAnimationSlot = "Action";
     private String abilityAnimationKind = "";
     private long abilityAnimationUntilMs;
     private String pitchPoseAnimationId = "";
@@ -427,6 +432,17 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     }
 
     @Nonnull
+    public String getAbilityAnimationSlot() {
+        return abilityAnimationSlot != null && abilityAnimationSlot.equalsIgnoreCase("Movement")
+                ? "Movement" : "Action";
+    }
+
+    public void setAbilityAnimationSlot(@Nullable String abilityAnimationSlot) {
+        this.abilityAnimationSlot = abilityAnimationSlot != null
+                && abilityAnimationSlot.trim().equalsIgnoreCase("Movement") ? "Movement" : "Action";
+    }
+
+    @Nonnull
     public String getAbilityAnimationKind() {
         return abilityAnimationKind == null ? "" : abilityAnimationKind;
     }
@@ -445,6 +461,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
 
     public void clearAbilityAnimationState() {
         abilityAnimationId = "";
+        abilityAnimationSlot = "Action";
         abilityAnimationKind = "";
         abilityAnimationUntilMs = 0L;
     }
@@ -551,6 +568,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.nextMovementAnimationAtMs = nextMovementAnimationAtMs;
         clone.nextSuppressedAnimationAtMs = nextSuppressedAnimationAtMs;
         clone.abilityAnimationId = getAbilityAnimationId();
+        clone.abilityAnimationSlot = getAbilityAnimationSlot();
         clone.abilityAnimationKind = getAbilityAnimationKind();
         clone.abilityAnimationUntilMs = abilityAnimationUntilMs;
         clone.pitchPoseAnimationId = getPitchPoseAnimationId();
