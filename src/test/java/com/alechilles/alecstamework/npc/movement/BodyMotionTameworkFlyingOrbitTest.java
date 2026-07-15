@@ -83,6 +83,18 @@ class BodyMotionTameworkFlyingOrbitTest {
     }
 
     @Test
+    void targetRelativeAltitudeCorrectionTracksTargetElevation() {
+        double[] altitudeRange = { 8.0, 12.0 };
+
+        assertEquals(0.7, BodyMotionTameworkFlyingOrbit.resolveTargetRelativeAltitudeCorrection(
+                17.0, 10.0, altitudeRange, 0.7, 0.5), EPSILON);
+        assertEquals(0.0, BodyMotionTameworkFlyingOrbit.resolveTargetRelativeAltitudeCorrection(
+                20.0, 10.0, altitudeRange, 0.7, 0.5), EPSILON);
+        assertEquals(-0.5, BodyMotionTameworkFlyingOrbit.resolveTargetRelativeAltitudeCorrection(
+                23.0, 10.0, altitudeRange, 0.7, 0.5), EPSILON);
+    }
+
+    @Test
     void approachKeepsFacingTargetAfterTranslationStops() {
         Vector3d stopped = BodyMotionTameworkFlyingOrbit.resolveApproachTranslation(
                 6.0, 0.0, 0.0, 0.0, 6.0, 14.0, 0.72, new Vector3d());

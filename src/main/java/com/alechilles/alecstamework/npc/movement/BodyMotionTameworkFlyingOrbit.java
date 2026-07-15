@@ -102,9 +102,9 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                     approachStopDistance, approachSlowDownDistance, relativeSpeed, translation);
         }
 
-        double altitudeCorrection = resolveAltitudeCorrection(
-                fly.getHeightOverGround(), desiredAltitudeRange[0], desiredAltitudeRange[1],
-                climbRelativeSpeed, sinkRelativeSpeed);
+        fly.setDesiredAltitudeOverride(desiredAltitudeRange);
+        double altitudeCorrection = resolveTargetRelativeAltitudeCorrection(
+                selfPosition.y(), targetPosition.y(), desiredAltitudeRange, climbRelativeSpeed, sinkRelativeSpeed);
         translation.y = altitudeCorrection;
         desiredSteering.setTranslation(translation);
         Vector3d yawDirection = facingTarget
@@ -156,18 +156,27 @@ public final class BodyMotionTameworkFlyingOrbit extends BodyMotionBase {
                 || usesApproachSteering(mode, phase);
     }
 
-    static double resolveAltitudeCorrection(double heightOverGround,
-                                            double minimumAltitude,
-                                            double maximumAltitude,
+    static double resolveAltitudeCorrection(double currentY,
+                                            double minimumY,
+                                            double maximumY,
                                             double climbSpeed,
                                             double sinkSpeed) {
-        if (heightOverGround < minimumAltitude) {
+        if (currentY < minimumY) {
             return climbSpeed;
         }
-        if (heightOverGround > maximumAltitude) {
+        if (currentY > maximumY) {
             return -sinkSpeed;
         }
         return 0.0;
+    }
+
+    static double resolveTargetRelativeAltitudeCorrection(double selfY,
+                                                          double targetY,
+                                                          double[] altitudeRange,
+                                                          double climbSpeed,
+                                                          double sinkSpeed) {
+        return resolveAltitudeCorrection(
+                selfY, targetY + altitudeRange[0], targetY + altitudeRange[1], climbSpeed, sinkSpeed);
     }
 
     static Vector3d resolveTargetDirection(double selfX,
