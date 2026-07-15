@@ -66,6 +66,7 @@ final class ManagedCoopCapturedItemAttemptFactory {
                 snapshotHash,
                 envelope.snapshotVersion(),
                 placement.expectedResidentGeneration(),
+                placement.existingResidentId(),
                 portable.capturedAtMs()
         );
     }

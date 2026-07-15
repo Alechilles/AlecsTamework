@@ -96,6 +96,35 @@ class SqliteSchemaV5MigrationTest {
         }
     }
 
+    /** Regression: old deployed coop rows have a null source UUID but still need a UUID claim. */
+    @Test
+    void reappliedV5BackfillsMissingClaimsForLegacyDeployedResidents() throws Exception {
+        SqliteConnectionManager connections = new SqliteConnectionManager(
+                tempDir.resolve("deployed-claim-backfill.sqlite"));
+        UUID deployedUuid = UUID.randomUUID();
+        try (Connection connection = connections.openConnection()) {
+            createV4Fixture(connection);
+            insertProfile(connection, "profile-a", deployedUuid, "Mob_Chicken");
+            insertCoopRow(connection, 0, "profile-a", null, deployedUuid);
+
+            SqliteSchemaMigrator migrator = new SqliteSchemaMigrator();
+            migrator.migrateThrough(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5);
+            assertEquals("DEPLOYED", scalar(connection,
+                    "SELECT state FROM managed_coop_residents WHERE active = 1"));
+            assertEquals("DEPLOYED", scalar(connection,
+                    "SELECT claim_kind FROM managed_coop_uuid_claims WHERE active = 1"));
+
+            execute(connection, "DELETE FROM managed_coop_uuid_claims");
+            migrator.migrateThrough(connection, SqliteSchemaMigrator.SCHEMA_VERSION_V5);
+
+            assertEquals(1, count(connection, "managed_coop_uuid_claims"));
+            assertEquals(deployedUuid.toString(), scalar(connection,
+                    "SELECT npc_uuid FROM managed_coop_uuid_claims WHERE active = 1"));
+            assertEquals("DEPLOYED", scalar(connection,
+                    "SELECT claim_kind FROM managed_coop_uuid_claims WHERE active = 1"));
+        }
+    }
+
     @Test
     void migrationFailureRollsBackAndLeavesV4DataUsable() throws Exception {
         SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve("rollback.sqlite"));

@@ -122,6 +122,23 @@ class ManagedCoopCaptureCoordinatorTest {
         assertEquals(8L, outcome.retirementReady().indexRevision());
     }
 
+    /** Regression: recapture must target the retained schema-v5 resident row, not a new ID. */
+    @Test
+    void recapturePreservesExactExistingResidentIdInTheDurableRequest() throws Exception {
+        String legacyResidentId = "legacy:world:coop_chicken:10:20:30:0";
+        FakeOperations operations = readyOperations();
+        ManagedCoopCaptureCoordinator coordinator = coordinator(
+                SOURCE_A, "profile-a", operations, () -> refreshed(2L));
+
+        ManagedCoopCaptureCoordinator.CaptureOutcome outcome = coordinator.coordinate(
+                attempt(SOURCE_A, new String[0], legacyResidentId)
+        ).get(3, TimeUnit.SECONDS);
+
+        assertEquals(RETIREMENT_READY, outcome.status());
+        assertEquals(legacyResidentId, operations.lastRequest.get().residentId());
+        assertEquals(legacyResidentId, outcome.retirementReady().residentId());
+    }
+
     @Test
     void deduplicatesAnInFlightSourceBeforeSubmittingAnotherProfileWrite() throws Exception {
         CompletableFuture<PersistenceWriteQueue.WriteOutcome<ProfileIdentity>> profileCommit =
@@ -388,6 +405,12 @@ class ManagedCoopCaptureCoordinatorTest {
     }
 
     private ManagedCoopCaptureCoordinator.CaptureAttempt attempt(UUID sourceUuid, String[] toolIds) {
+        return attempt(sourceUuid, toolIds, null);
+    }
+
+    private ManagedCoopCaptureCoordinator.CaptureAttempt attempt(UUID sourceUuid,
+                                                                  String[] toolIds,
+                                                                  String existingResidentId) {
         String snapshot = "{\"version\":\"1\",\"npcUuid\":\"" + sourceUuid
                 + "\",\"coopId\":\"coop_chicken\",\"residentSlot\":0,"
                 + "\"roleId\":\"mob_chicken\",\"capturedAtMs\":100}";
@@ -407,6 +430,7 @@ class ManagedCoopCaptureCoordinatorTest {
                 ManagedCoopCaptureClaimValidator.snapshotSha256(snapshot),
                 1,
                 0L,
+                existingResidentId,
                 100L
         );
     }

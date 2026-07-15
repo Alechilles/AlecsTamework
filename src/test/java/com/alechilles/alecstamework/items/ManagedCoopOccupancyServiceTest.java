@@ -96,6 +96,7 @@ class ManagedCoopOccupancyServiceTest {
         assertEquals(ManagedCoopOccupancyService.CapturePlacementStatus.RECAPTURE, placement.status());
         assertEquals(0, placement.residentSlot());
         assertEquals(8L, placement.expectedResidentGeneration());
+        assertEquals(deployed.residentId(), placement.existingResidentId());
     }
 
     @Test
@@ -126,6 +127,7 @@ class ManagedCoopOccupancyServiceTest {
                 recapture.status());
         assertEquals(3, recapture.residentSlot());
         assertEquals(5L, recapture.expectedResidentGeneration());
+        assertEquals(overflowDeployed.residentId(), recapture.existingResidentId());
         assertEquals(ManagedCoopOccupancyService.CapturePlacementStatus.REJECTED,
                 intake.status());
         assertEquals("managed_coop_capture_capacity_unavailable", intake.detail());

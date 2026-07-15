@@ -56,6 +56,7 @@ public final class ManagedCoopCaptureCoordinator {
                                  @Nonnull String snapshotHash,
                                  int snapshotVersion,
                                  long expectedResidentGeneration,
+                                 @Nullable String existingResidentId,
                                  long capturedAtMs) {
         public CaptureAttempt {
             Objects.requireNonNull(authorityKey, "authorityKey");
@@ -64,6 +65,7 @@ public final class ManagedCoopCaptureCoordinator {
             roleId = requireText(roleId, "roleId").toLowerCase(Locale.ROOT);
             snapshotJson = requireTextPreserving(snapshotJson, "snapshotJson");
             snapshotHash = requireText(snapshotHash, "snapshotHash");
+            existingResidentId = normalizeOptional(existingResidentId);
             Objects.requireNonNull(sourceKind, "sourceKind");
             if (residentSlot < 0 || snapshotVersion < 1 || expectedResidentGeneration < 0L) {
                 throw new IllegalArgumentException("slot, snapshot version, and generation must be valid");
@@ -80,6 +82,28 @@ public final class ManagedCoopCaptureCoordinator {
                         "only an unowned live source can establish a new population profile");
             }
             toolIds = toolIds == null ? new String[0] : toolIds.clone();
+        }
+
+        public CaptureAttempt(@Nonnull ManagedCoopAuthorityKey authorityKey,
+                              @Nonnull String coopId,
+                              int residentSlot,
+                              @Nonnull UUID sourceNpcUuid,
+                              @Nonnull String roleId,
+                              @Nullable UUID ownerUuid,
+                              @Nullable String displayName,
+                              @Nonnull String[] toolIds,
+                              @Nonnull SourceKind sourceKind,
+                              @Nullable ClaimChunkCoordinate sourceChunk,
+                              boolean newlyEnsuredUnownedProfile,
+                              @Nonnull String snapshotJson,
+                              @Nonnull String snapshotHash,
+                              int snapshotVersion,
+                              long expectedResidentGeneration,
+                              long capturedAtMs) {
+            this(authorityKey, coopId, residentSlot, sourceNpcUuid, roleId, ownerUuid,
+                    displayName, toolIds, sourceKind, sourceChunk, newlyEnsuredUnownedProfile,
+                    snapshotJson, snapshotHash, snapshotVersion, expectedResidentGeneration,
+                    null, capturedAtMs);
         }
 
         @Override
@@ -313,7 +337,9 @@ public final class ManagedCoopCaptureCoordinator {
 
     @Nonnull
     private CaptureRequest buildCaptureRequest(CaptureAttempt attempt, String profileId) {
-        String residentId = ManagedCoopCaptureClaimValidator.residentId(profileId);
+        String residentId = attempt.existingResidentId() != null
+                ? attempt.existingResidentId()
+                : ManagedCoopCaptureClaimValidator.residentId(profileId);
         CaptureRequest provisional = new CaptureRequest(
                 "pending",
                 residentId,
@@ -437,6 +463,11 @@ public final class ManagedCoopCaptureCoordinator {
             throw new IllegalArgumentException(field + " must not be blank");
         }
         return value.trim();
+    }
+
+    @Nullable
+    private static String normalizeOptional(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Nonnull

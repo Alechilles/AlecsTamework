@@ -290,6 +290,7 @@ public final class ManagedCoopCaptureRuntimeAdapter {
                 snapshotHash,
                 Integer.parseInt(CoopResidentStateSnapshotCodec.CURRENT_VERSION),
                 placement.expectedResidentGeneration(),
+                placement.existingResidentId(),
                 snapshot.capturedAtMs()
         );
     }

@@ -21,7 +21,7 @@ public final class ManagedCoopCaptureClaimValidator {
     private ManagedCoopCaptureClaimValidator() {
     }
 
-    /** Returns the only resident ID accepted for a profile by the composite capture boundary. */
+    /** Returns the canonical resident ID used by all newly established capture assignments. */
     @Nonnull
     public static String residentId(@Nonnull String profileId) {
         return RESIDENT_PREFIX + sha256(requireText(profileId, "profileId"));
@@ -65,8 +65,10 @@ public final class ManagedCoopCaptureClaimValidator {
         if (!snapshotHash.equals(snapshotSha256(snapshotJson))) {
             throw new IllegalArgumentException("snapshotHash does not verify snapshotJson");
         }
-        if (!residentId(request.profileId()).equals(request.residentId())) {
-            throw new IllegalArgumentException("residentId is not canonical for profileId");
+        if (!residentId(request.profileId()).equals(request.residentId())
+                && !isLegacyResidentId(request)) {
+            throw new IllegalArgumentException(
+                    "residentId is neither canonical nor the exact legacy assignment");
         }
         if (!operationId(request).equals(request.operationId())) {
             throw new IllegalArgumentException("operationId is not canonical for capture identity");
@@ -76,6 +78,21 @@ public final class ManagedCoopCaptureClaimValidator {
             throw new IllegalArgumentException("snapshot version, slot, and generation must be valid");
         }
         validateSnapshotMetadata(request, snapshotJson);
+    }
+
+    /** True only for the location-derived ID emitted by schema-v5 legacy coop migration. */
+    static boolean isLegacyResidentId(@Nonnull CaptureRequest request) {
+        if (request == null || request.authorityKey() == null) {
+            return false;
+        }
+        String expected = "legacy:"
+                + request.authorityKey().worldName() + ":"
+                + normalizeRequired(request.coopId(), "coopId") + ":"
+                + request.authorityKey().x() + ":"
+                + request.authorityKey().y() + ":"
+                + request.authorityKey().z() + ":"
+                + request.residentSlot();
+        return expected.equalsIgnoreCase(requireText(request.residentId(), "residentId"));
     }
 
     private static void validateSnapshotMetadata(CaptureRequest request, String snapshotJson) {

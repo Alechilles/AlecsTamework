@@ -81,6 +81,32 @@ class CoopLifecycleCompositeCaptureClaimTest {
         assertEquals(1, count("managed_coop_residents"));
     }
 
+    /** Regression: an exact markerless migration row must recapture under its retained ID. */
+    @Test
+    void atomicallyRecapturesExactLegacyDeployedAssignment() throws Exception {
+        String legacyResidentId = "legacy:world:coop_chicken:10:20:30:0";
+        insertLegacyDeployedResident(legacyResidentId, "profile-a", SOURCE_A, 0);
+        CaptureRequest canonical = capture(
+                COOP, "profile-a", SOURCE_A, 0, 0L, "mob_chicken", 100L);
+        CaptureRequest request = copyWithResidentId(canonical, legacyResidentId);
+
+        MutationResult result = committed(operations.claimCapture(request));
+
+        assertEquals(MutationStatus.APPLIED, result.status());
+        assertOperation(result, OperationState.SLOT_COMMITTED, 1L);
+        ManagedCoopResidentRepository.ResidentRecord resident =
+                residents.loadActiveSlot(COOP, 0);
+        assertNotNull(resident);
+        assertEquals(legacyResidentId, resident.residentId());
+        assertEquals(ManagedCoopResidentRepository.ResidentState.HOUSED, resident.state());
+        assertEquals(1L, resident.generation());
+        assertEquals(SOURCE_A, resident.sourceNpcUuid());
+        assertNull(resident.deployedNpcUuid());
+        assertEquals("SOURCE", scalar(
+                "SELECT claim_kind FROM managed_coop_uuid_claims WHERE npc_uuid = '"
+                        + SOURCE_A + "' AND active = 1"));
+    }
+
     @Test
     void resumesCanonicalPreparedReplayWithoutChangingItsBundle() throws Exception {
         CaptureRequest request = capture(COOP, "profile-a", SOURCE_A, 0, 0L, "mob_chicken", 100L);
@@ -253,6 +279,50 @@ class CoopLifecycleCompositeCaptureClaimTest {
              PreparedStatement query = connection.prepareStatement("SELECT COUNT(*) FROM " + table);
              ResultSet resultSet = query.executeQuery()) {
             return resultSet.next() ? resultSet.getInt(1) : 0;
+        }
+    }
+
+    private String scalar(String sql) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement query = connection.prepareStatement(sql);
+             ResultSet resultSet = query.executeQuery()) {
+            return resultSet.next() ? resultSet.getString(1) : null;
+        }
+    }
+
+    private void insertLegacyDeployedResident(String residentId,
+                                               String profileId,
+                                               UUID deployedUuid,
+                                               int slot) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement resident = connection.prepareStatement("""
+                     INSERT INTO managed_coop_residents (
+                         resident_id, authority_id, world_name, coop_id, x, y, z, resident_slot,
+                         profile_id, role_id, resident_uuid, source_npc_uuid, deployed_npc_uuid,
+                         snapshot_json, snapshot_version, state, generation, active,
+                         captured_at_ms, released_at_ms, created_at_ms, updated_at_ms
+                     ) VALUES (?, ?, ?, 'coop_chicken', ?, ?, ?, ?, ?, 'mob_chicken',
+                         ?, NULL, ?, '{}', 1, 'DEPLOYED', 0, 1, 1, 2, 1, 2)
+                     """);
+             PreparedStatement claim = connection.prepareStatement("""
+                     INSERT INTO managed_coop_uuid_claims (
+                         npc_uuid, resident_id, claim_kind, active, created_at_ms, updated_at_ms
+                     ) VALUES (?, ?, 'DEPLOYED', 1, 1, 2)
+                     """)) {
+            resident.setString(1, residentId);
+            resident.setString(2, COOP.authorityId());
+            resident.setString(3, COOP.worldName());
+            resident.setInt(4, COOP.x());
+            resident.setInt(5, COOP.y());
+            resident.setInt(6, COOP.z());
+            resident.setInt(7, slot);
+            resident.setString(8, profileId);
+            resident.setString(9, deployedUuid.toString());
+            resident.setString(10, deployedUuid.toString());
+            resident.executeUpdate();
+            claim.setString(1, deployedUuid.toString());
+            claim.setString(2, residentId);
+            claim.executeUpdate();
         }
     }
 

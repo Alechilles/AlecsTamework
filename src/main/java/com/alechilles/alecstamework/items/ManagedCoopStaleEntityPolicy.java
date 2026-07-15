@@ -28,7 +28,6 @@ public final class ManagedCoopStaleEntityPolicy {
     private final ManagedCoopLifecycleOperationIndex operationIndex;
     private final ManagedCoopAuthorityEligibilityIndex authorityEligibility;
     private final BooleanSupplier compositeTrust;
-
     public ManagedCoopStaleEntityPolicy(
             @Nonnull ManagedCoopResidentIndex residentIndex,
             @Nonnull ManagedCoopLifecycleOperationIndex operationIndex,
@@ -68,7 +67,6 @@ public final class ManagedCoopStaleEntityPolicy {
         }
         return defer(Reason.ORPHAN_MANAGED_MARKER, evidence);
     }
-
     @Nonnull
     private Decision decideActiveOperation(Observation observation, Evidence evidence) {
         OperationRecord operation = evidence.operation();
@@ -151,6 +149,9 @@ public final class ManagedCoopStaleEntityPolicy {
                     observation.marker().operationId(),
                     null,
                     historicalSource(resident, deployedUuid));
+        }
+        if (ManagedCoopLegacyResidentCompatibility.isExactMarkerlessDeployment(observation, resident)) {
+            return residentDecision(Action.ALLOW, Reason.DEPLOYED_LEGACY_MIGRATION, resident);
         }
         if (!ManagedCoopProjectionMarkerPolicy.matchesFinalizedRelease(
                 observation.marker(), resident)) {
@@ -427,6 +428,7 @@ public final class ManagedCoopStaleEntityPolicy {
         HISTORICAL_RESIDENT_ALIAS,
         DEPLOYED_IDENTITY_MISMATCH,
         INVALID_DEPLOYED_MARKER,
+        DEPLOYED_LEGACY_MIGRATION,
         DEPLOYED_IMPORT_ADOPTION,
         DEPLOYED_RELEASE_PROJECTION,
         ORPHAN_MANAGED_MARKER

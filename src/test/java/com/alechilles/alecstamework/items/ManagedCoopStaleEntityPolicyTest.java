@@ -27,6 +27,7 @@ import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Re
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.AUTHORITY_NOT_CURRENTLY_MANAGED;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.CONFLICTING_EVIDENCE;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.DEPLOYED_IMPORT_ADOPTION;
+import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.DEPLOYED_LEGACY_MIGRATION;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.DEPLOYED_RELEASE_PROJECTION;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.DEPLOYED_IDENTITY_MISMATCH;
 import static com.alechilles.alecstamework.items.ManagedCoopStaleEntityPolicy.Reason.HISTORICAL_RESIDENT_ALIAS;
@@ -307,6 +308,39 @@ class ManagedCoopStaleEntityPolicyTest {
                     ManagedCoopStaleEntityPolicy.Observation.of(TARGET, marker)
             ), DEFER, INVALID_DEPLOYED_MARKER);
         }
+    }
+
+    /** Regression: schema-v5 migration residents predate projection markers in old worlds. */
+    @Test
+    void exactMarkerlessLegacyDeploymentCanRecaptureButModernOrMarkedRowsCannot() {
+        String legacyId = "legacy:world:coop_chicken:1:2:3:0";
+        ResidentRecord legacy = new ResidentRecord(
+                legacyId, COOP, COOP_ID, 0, PROFILE, "Mob_Chicken",
+                TARGET, null, TARGET, "{}", HASH, 1,
+                ResidentState.DEPLOYED, 0L, true, -100L, -90L, -100L, -90L);
+        Fixture fixture = fixture(List.of(legacy), List.of(), true);
+
+        assertDecision(fixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, null)
+        ), ALLOW, DEPLOYED_LEGACY_MIGRATION);
+
+        ManagedCoopStaleEntityPolicy.MarkerEvidence unrelatedMarker =
+                new ManagedCoopStaleEntityPolicy.MarkerEvidence(
+                        PROFILE, operationId('e'),
+                        TameworkProjectionIdentityComponent.KIND_RECOVERY,
+                        slotKey(), TARGET, 0L);
+        assertDecision(fixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, unrelatedMarker)
+        ), DEFER, INVALID_DEPLOYED_MARKER);
+
+        ResidentRecord modern = new ResidentRecord(
+                "managed-coop-resident:" + "a".repeat(64), COOP, COOP_ID, 0,
+                PROFILE, "Mob_Chicken", TARGET, null, TARGET, "{}", HASH, 1,
+                ResidentState.DEPLOYED, 0L, true, -100L, -90L, -100L, -90L);
+        Fixture modernFixture = fixture(List.of(modern), List.of(), true);
+        assertDecision(modernFixture.policy().decide(
+                ManagedCoopStaleEntityPolicy.Observation.of(TARGET, null)
+        ), DEFER, INVALID_DEPLOYED_MARKER);
     }
 
     @Test

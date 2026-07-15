@@ -101,12 +101,14 @@ class ManagedCoopCaptureRuntimeAdapterTest {
 
         CaptureAttempt attempt = adapter().buildAttempt(
                 context(),
-                new CapturePlacement(CapturePlacementStatus.RECAPTURE, 0, 8L, null),
+                new CapturePlacement(
+                        CapturePlacementStatus.RECAPTURE, 0, 8L, "legacy-resident", null),
                 candidate,
                 snapshot("coop_chicken", 0, "mob_chicken")
         );
 
         assertEquals(8L, attempt.expectedResidentGeneration());
+        assertEquals("legacy-resident", attempt.existingResidentId());
     }
 
     @Test
@@ -152,7 +154,8 @@ class ManagedCoopCaptureRuntimeAdapterTest {
     }
 
     private CapturePlacement placement(int slot, long generation) {
-        return new CapturePlacement(CapturePlacementStatus.NEW_SLOT, slot, generation, null);
+        return new CapturePlacement(
+                CapturePlacementStatus.NEW_SLOT, slot, generation, null, null);
     }
 
     private ManagedCoopContext context() throws Exception {

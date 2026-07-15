@@ -346,7 +346,7 @@ final class SqliteSchemaV5Migration {
                 SELECT deployed_npc_uuid, resident_id, 'DEPLOYED', 1, created_at_ms, updated_at_ms
                 FROM managed_coop_residents
                 WHERE active = 1 AND deployed_npc_uuid IS NOT NULL
-                  AND deployed_npc_uuid <> source_npc_uuid
+                  AND (source_npc_uuid IS NULL OR deployed_npc_uuid <> source_npc_uuid)
                 """);
     }
 

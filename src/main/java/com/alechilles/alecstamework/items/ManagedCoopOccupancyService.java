@@ -55,6 +55,7 @@ public final class ManagedCoopOccupancyService {
     public record CapturePlacement(@Nonnull CapturePlacementStatus status,
                                    int residentSlot,
                                    long expectedResidentGeneration,
+                                   @Nullable String existingResidentId,
                                    @Nullable String detail) {
         public CapturePlacement {
             Objects.requireNonNull(status, "status");
@@ -62,6 +63,18 @@ public final class ManagedCoopOccupancyService {
                     && (residentSlot < 0 || expectedResidentGeneration < 0L)) {
                 throw new IllegalArgumentException("accepted capture placement must be valid");
             }
+            existingResidentId = normalizeText(existingResidentId);
+            if (status != CapturePlacementStatus.RECAPTURE && existingResidentId != null) {
+                throw new IllegalArgumentException("only recapture placement may name a resident");
+            }
+        }
+
+        /** Retains source compatibility for callers that only handle canonical resident IDs. */
+        public CapturePlacement(@Nonnull CapturePlacementStatus status,
+                                int residentSlot,
+                                long expectedResidentGeneration,
+                                @Nullable String detail) {
+            this(status, residentSlot, expectedResidentGeneration, null, detail);
         }
 
         public boolean permitted() {
@@ -155,6 +168,7 @@ public final class ManagedCoopOccupancyService {
                         CapturePlacementStatus.RECAPTURE,
                         byUuid.residentSlot(),
                         byUuid.generation(),
+                        byUuid.residentId(),
                         null
                 );
             }
@@ -167,7 +181,7 @@ public final class ManagedCoopOccupancyService {
         int slot = firstEmptySlot(context, view);
         return slot < 0
                 ? rejected("managed_coop_capture_capacity_unavailable")
-                : new CapturePlacement(CapturePlacementStatus.NEW_SLOT, slot, 0L, null);
+                : new CapturePlacement(CapturePlacementStatus.NEW_SLOT, slot, 0L, null, null);
     }
 
     /** Returns the first free configured slot, or {@code -1} when full or fail-closed. */
@@ -214,7 +228,7 @@ public final class ManagedCoopOccupancyService {
     }
 
     private CapturePlacement rejected(String detail) {
-        return new CapturePlacement(CapturePlacementStatus.REJECTED, -1, -1L, detail);
+        return new CapturePlacement(CapturePlacementStatus.REJECTED, -1, -1L, null, detail);
     }
 
     /** Returns the first strictly housed slot eligible for a new release operation. */
@@ -303,6 +317,11 @@ public final class ManagedCoopOccupancyService {
     @Nonnull
     private static String normalize(@Nonnull String value) {
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @Nullable
+    private static String normalizeText(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Nullable

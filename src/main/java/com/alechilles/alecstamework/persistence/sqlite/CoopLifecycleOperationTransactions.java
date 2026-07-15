@@ -543,6 +543,10 @@ final class CoopLifecycleOperationTransactions {
         ResidentRecord byProfile = residents.loadActiveByProfileInTransaction(connection, request.profileId());
         ResidentRecord bySlot = residents.loadActiveSlotInTransaction(
                 connection, request.authorityKey(), request.residentSlot());
+        if (ManagedCoopCaptureClaimValidator.isLegacyResidentId(request)
+                && (byId == null || !deployedCaptureMatches(request, byId))) {
+            return "legacy_capture_assignment_not_exact";
+        }
         if (byId == null) {
             if (request.expectedResidentGeneration() != 0L || byProfile != null || bySlot != null) {
                 return "empty_slot_capture_assignment_conflict";

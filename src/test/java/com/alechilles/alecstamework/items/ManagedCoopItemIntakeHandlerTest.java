@@ -200,7 +200,7 @@ class ManagedCoopItemIntakeHandlerTest {
     }
 
     private CapturePlacement placement() {
-        return new CapturePlacement(CapturePlacementStatus.NEW_SLOT, 0, 0L, null);
+        return new CapturePlacement(CapturePlacementStatus.NEW_SLOT, 0, 0L, null, null);
     }
 
     private CoopResidentStateSnapshot portableSnapshot() {
