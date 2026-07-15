@@ -71,6 +71,7 @@ final class BreedingPopulationReplayService {
         if (!journalLoaded) {
             return empty(false, "breeding-replay-journal-unavailable");
         }
+        reconcileLoadedProjections();
         Attempt attempt = attempts.get(key);
         return attempt == null
                 ? empty(true, "breeding-replay-empty")
@@ -91,6 +92,7 @@ final class BreedingPopulationReplayService {
         if (!journalLoaded) {
             return empty(false, "breeding-replay-journal-unavailable");
         }
+        reconcileLoadedProjections();
         if (!pendingAttemptsWithoutPairMetadata.isEmpty()) {
             return empty(false, "breeding-replay-pair-metadata-missing");
         }
@@ -126,6 +128,7 @@ final class BreedingPopulationReplayService {
         if (!journalLoaded) {
             return false;
         }
+        reconcileLoadedProjections();
         String attemptKey = requireText(request.idempotencyKey(), "attemptKey");
         if (request.hasCanonicalParentPair()) {
             ParentPair pair = ParentPair.from(request.parentProfileIds());
@@ -151,6 +154,7 @@ final class BreedingPopulationReplayService {
         if (!journalLoaded) {
             return false;
         }
+        reconcileLoadedProjections();
         Attempt attempt = attempts.get(requireText(attemptKey, "attemptKey"));
         String child = requireText(childKey, "childKey");
         return attempt != null
@@ -168,6 +172,7 @@ final class BreedingPopulationReplayService {
         if (!journalLoaded) {
             return false;
         }
+        reconcileLoadedProjections();
         String attemptKey = requireText(request.idempotencyKey(), "attemptKey");
         Attempt existing = attempts.get(attemptKey);
         if (existing != null && (!existing.replayAuthorityAvailable(projectionGuard)
@@ -289,9 +294,36 @@ final class BreedingPopulationReplayService {
         } else if (operation.state() == CompanionPopulationOperationRecord.State.FAILED) {
             attempt.abort(target.childKey());
         } else {
-            attempt.addJournalPending(target.childKey());
+            attempt.addJournalPending(
+                    target.childKey(), new PersistedChild(operation, target));
         }
         attempt.validateChildren();
+    }
+
+    /** Closes only journaled children proven by one exact unique loaded projection marker. */
+    private void reconcileLoadedProjections() {
+        boolean changed = false;
+        for (Attempt attempt : attempts.values()) {
+            if (!attempt.loadedFromJournal || attempt.conflicted) {
+                continue;
+            }
+            for (String childKey : List.copyOf(attempt.pendingChildren)) {
+                PersistedChild child = attempt.persistedChildren.get(childKey);
+                if (child == null) {
+                    continue;
+                }
+                BreedingPersistedProjectionReplayGuard.Decision decision =
+                        projectionGuard.inspectLoaded(child.operation(), child.target());
+                if (decision.status()
+                        == BreedingPersistedProjectionReplayGuard.Status.COMMITTED_BY_EVIDENCE) {
+                    attempt.commit(childKey);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
+            rebuildPairIndex();
+        }
     }
 
     private void mergePersistedPlan(Attempt attempt,
@@ -400,6 +432,7 @@ final class BreedingPopulationReplayService {
         private final Set<String> abortedChildren = new HashSet<>();
         private final Map<String, BreedingPersistedProjectionReplayGuard.ReplayToken>
                 replayTokens = new HashMap<>();
+        private final Map<String, PersistedChild> persistedChildren = new HashMap<>();
         private boolean requiresProjectionInspection;
         private boolean conflicted;
         @Nullable
@@ -476,10 +509,16 @@ final class BreedingPopulationReplayService {
             return true;
         }
 
-        private void addJournalPending(String childKey) {
+        private void addJournalPending(String childKey, PersistedChild persistedChild) {
             String child = requireText(childKey, "childKey");
             if (!committedChildren.contains(child) && !abortedChildren.contains(child)) {
                 pendingChildren.add(child);
+                PersistedChild current = persistedChildren.putIfAbsent(
+                        child, Objects.requireNonNull(persistedChild, "persistedChild"));
+                if (current != null && !current.equals(persistedChild)) {
+                    conflicted = true;
+                    conflictReason = "breeding-replay-journal-child-conflict";
+                }
             }
         }
 
@@ -519,6 +558,7 @@ final class BreedingPopulationReplayService {
             pendingChildren.remove(child);
             abortedChildren.remove(child);
             replayTokens.remove(child);
+            persistedChildren.remove(child);
             committedChildren.add(child);
         }
 
@@ -529,6 +569,7 @@ final class BreedingPopulationReplayService {
             }
             pendingChildren.remove(child);
             replayTokens.remove(child);
+            persistedChildren.remove(child);
             abortedChildren.add(child);
         }
 
@@ -575,6 +616,15 @@ final class BreedingPopulationReplayService {
                     committedChildren,
                     reason
             );
+        }
+    }
+
+    private record PersistedChild(
+            @Nonnull CompanionPopulationOperationRecord operation,
+            @Nonnull BreedingPopulationReplayTargetCodec.Target target) {
+        private PersistedChild {
+            Objects.requireNonNull(operation, "operation");
+            Objects.requireNonNull(target, "target");
         }
     }
 

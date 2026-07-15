@@ -19,7 +19,7 @@ import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Prevents a terminal RETRYABLE breeding row from respawning a persisted child projection. */
+/** Prevents an incomplete breeding row from respawning an already persisted child projection. */
 final class BreedingPersistedProjectionReplayGuard {
     enum Status {
         CLEAR,
@@ -103,14 +103,7 @@ final class BreedingPersistedProjectionReplayGuard {
             return Decision.blocked("breeding-replay-persisted-evidence-unsealed");
         }
         try {
-            LoadedNpcIdentityIndex.ProjectionKey projectionKey =
-                    new LoadedNpcIdentityIndex.ProjectionKey(
-                            operation.profileId(),
-                            target.attemptKey(),
-                            TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD,
-                            target.childKey(),
-                            target.plannedNpcUuid(),
-                            1L);
+            LoadedNpcIdentityIndex.ProjectionKey projectionKey = projectionKey(operation, target);
             ProjectionCurrentness currentness = registry.projectionCurrentness(projectionKey);
             if (currentness.evidenceRevision() != sealed.revision()
                     || currentness.status() == ProjectionStatus.UNAVAILABLE) {
@@ -157,6 +150,38 @@ final class BreedingPersistedProjectionReplayGuard {
         }
     }
 
+    /**
+     * Treats one exact unique loaded child as committed even when persisted absence is unavailable.
+     * Missing, unknown, mismatched, or duplicate loaded evidence never authorizes a replay.
+     */
+    @Nonnull
+    Decision inspectLoaded(
+            @Nonnull CompanionPopulationOperationRecord operation,
+            @Nonnull BreedingPopulationReplayTargetCodec.Target target) {
+        Objects.requireNonNull(operation, "operation");
+        Objects.requireNonNull(target, "target");
+        if (registry == null) {
+            return Decision.blocked("breeding-replay-loaded-projection-evidence-unavailable");
+        }
+        try {
+            LoadedNpcIdentityIndex.ProjectionKey key = projectionKey(operation, target);
+            LoadedNpcIdentityIndex.ProjectionProbe probe = registry.loadedProjection(key);
+            return switch (probe.status()) {
+                case ONE_MATCH -> loadedObservationAgrees(
+                        probe.matches(), key, target.plannedNpcUuid())
+                        ? Decision.committed()
+                        : Decision.blocked("breeding-replay-loaded-projection-conflict");
+                case MULTIPLE_MATCHES ->
+                        Decision.blocked("breeding-replay-loaded-projection-duplicated");
+                case ABSENT -> Decision.blocked("breeding-replay-loaded-projection-absent");
+                case UNKNOWN ->
+                        Decision.blocked("breeding-replay-loaded-projection-evidence-unavailable");
+            };
+        } catch (RuntimeException exception) {
+            return Decision.blocked("breeding-replay-loaded-projection-invalid");
+        }
+    }
+
     private boolean hasOrdinaryEvidence(
             CompanionPopulationEvidenceSet evidenceSet,
             UUID plannedNpcUuid) {
@@ -176,14 +201,34 @@ final class BreedingPersistedProjectionReplayGuard {
             ProjectionCurrentness currentness,
             LoadedNpcIdentityIndex.ProjectionKey projectionKey,
             UUID plannedNpcUuid) {
-        if (currentness.observations().size() != 1) {
+        return loadedObservationAgrees(
+                currentness.observations(), projectionKey, plannedNpcUuid);
+    }
+
+    private boolean loadedObservationAgrees(
+            List<LoadedNpcIdentityIndex.LoadedNpcObservation> observations,
+            LoadedNpcIdentityIndex.ProjectionKey projectionKey,
+            UUID plannedNpcUuid) {
+        if (observations.size() != 1) {
             return false;
         }
         LoadedNpcIdentityIndex.LoadedNpcObservation observation =
-                currentness.observations().getFirst();
+                observations.getFirst();
         return plannedNpcUuid.equals(observation.componentUuid())
                 && plannedNpcUuid.equals(observation.legacyNpcUuid())
                 && projectionKey.equals(observation.projectionKey());
+    }
+
+    private LoadedNpcIdentityIndex.ProjectionKey projectionKey(
+            CompanionPopulationOperationRecord operation,
+            BreedingPopulationReplayTargetCodec.Target target) {
+        return new LoadedNpcIdentityIndex.ProjectionKey(
+                operation.profileId(),
+                target.attemptKey(),
+                TameworkProjectionIdentityComponent.KIND_BREEDING_CHILD,
+                target.childKey(),
+                target.plannedNpcUuid(),
+                1L);
     }
 
     private Decision validateExact(

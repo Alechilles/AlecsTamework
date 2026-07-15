@@ -245,6 +245,27 @@ public final class CompanionPersistedProjectionEvidenceRegistry {
         );
     }
 
+    /**
+     * Returns current positive loaded evidence for one exact marker without granting absence
+     * authority. This remains useful while the persisted scan is unsealed or degraded because a
+     * unique exact loaded projection can prove that its own journaled spawn already happened.
+     */
+    @Nonnull
+    public LoadedNpcIdentityIndex.ProjectionProbe loadedProjection(
+            @Nonnull LoadedNpcIdentityIndex.ProjectionKey key) {
+        Objects.requireNonNull(key, "key");
+        LoadedNpcIdentityIndex index;
+        synchronized (this) {
+            index = loadedIdentityIndex;
+        }
+        return index == null
+                ? new LoadedNpcIdentityIndex.ProjectionProbe(
+                        key,
+                        LoadedNpcIdentityIndex.ProjectionProbeStatus.UNKNOWN,
+                        List.of())
+                : index.probeProjection(key);
+    }
+
     /** Confirms both persisted evidence and loaded-marker absence remain on the same generation. */
     public boolean current(long evidenceRevision, long loadedIdentityRevision) {
         Snapshot sealed;

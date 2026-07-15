@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulation
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationEvidenceSet;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionProjectionEvidence;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +28,7 @@ class BreedingPersistedProjectionReplayGuardTest {
     private static final String PROFILE = BreedingAdmissionIdentity.profileId(ATTEMPT, CHILD);
     private static final UUID PLANNED = BreedingAdmissionIdentity.npcUuid(ATTEMPT, CHILD);
     private static final UUID ALTERNATE = new UUID(44L, 55L);
+    private static final List<String> PARENTS = List.of("parent-a", "parent-b");
 
     @Test
     void exactPersistedChildWithOrdinaryPhysicalEvidenceConvergesAsCommitted() {
@@ -163,6 +165,43 @@ class BreedingPersistedProjectionReplayGuardTest {
         );
     }
 
+    /** Regression: an APPLYING row must not hold its parents after its exact child is loaded. */
+    @Test
+    void exactUniqueLoadedChildClosesApplyingAttemptWhilePersistedScanIsDegraded() {
+        Fixture fixture = degradedFixture(List.of(loaded(PLANNED, PLANNED, "loaded-store")));
+        BreedingPopulationReplayService replay = replay(
+                fixture.registry(), CompanionPopulationOperationRecord.State.APPLYING);
+
+        BreedingPopulationReplayState pair = replay.stateForPair("world", PARENTS);
+        BreedingPopulationReplayState attempt = replay.state(ATTEMPT);
+
+        assertTrue(pair.usable());
+        assertEquals("breeding-replay-pair-empty", pair.reason());
+        assertTrue(attempt.usable());
+        assertTrue(attempt.pendingChildKeys().isEmpty());
+        assertEquals(java.util.Set.of(CHILD), attempt.committedChildKeys());
+    }
+
+    @Test
+    void absentMismatchedAndDuplicateLoadedChildrenStayBlockedDuringDegradedScan() {
+        assertDegradedLoadedEvidenceBlocked(List.of());
+        assertDegradedLoadedEvidenceBlocked(List.of(
+                loaded(ALTERNATE, ALTERNATE, "alternate-store")));
+        assertDegradedLoadedEvidenceBlocked(List.of(
+                loaded(PLANNED, PLANNED, "duplicate-a"),
+                loaded(PLANNED, PLANNED, "duplicate-b")));
+    }
+
+    private static void assertDegradedLoadedEvidenceBlocked(
+            List<LoadedNpcObservation> observations) {
+        BreedingPopulationReplayState state = replay(
+                degradedFixture(observations).registry(),
+                CompanionPopulationOperationRecord.State.APPLYING).state(ATTEMPT);
+        assertFalse(state.usable());
+        assertEquals(java.util.Set.of(CHILD), state.pendingChildKeys());
+        assertEquals("breeding-replay-projection-evidence-unavailable", state.reason());
+    }
+
     private static void assertBlocked(
             List<CompanionPopulationEvidence> evidence,
             String expectedReason) {
@@ -173,8 +212,14 @@ class BreedingPersistedProjectionReplayGuardTest {
 
     private static BreedingPopulationReplayService replay(
             CompanionPersistedProjectionEvidenceRegistry registry) {
+        return replay(registry, CompanionPopulationOperationRecord.State.RETRYABLE);
+    }
+
+    private static BreedingPopulationReplayService replay(
+            CompanionPersistedProjectionEvidenceRegistry registry,
+            CompanionPopulationOperationRecord.State state) {
         return new BreedingPopulationReplayService(
-                List.of(operation()),
+                List.of(operation(state)),
                 true,
                 new BreedingPersistedProjectionReplayGuard(registry));
     }
@@ -201,6 +246,21 @@ class BreedingPersistedProjectionReplayGuardTest {
         assertTrue(registry.publishSealed(
                 "scan-a", new CompanionPopulationEvidenceSet(evidence),
                 loadedIndex.snapshot().mutationRevision(), liveEvidence.capture()));
+        return new Fixture(registry, loadedIndex);
+    }
+
+    private static Fixture degradedFixture(List<LoadedNpcObservation> loadedObservations) {
+        CompanionPersistedProjectionEvidenceRegistry registry =
+                new CompanionPersistedProjectionEvidenceRegistry();
+        LoadedNpcIdentityIndex loadedIndex = new LoadedNpcIdentityIndex();
+        for (LoadedNpcObservation observation : loadedObservations) {
+            loadedIndex.recordAdded(observation);
+        }
+        loadedIndex.markInitializationComplete();
+        registry.bindLoadedIdentityIndex(loadedIndex);
+        registry.bindLiveEvidenceRevision(new CompanionLiveEvidenceRevision());
+        registry.begin("scan-a");
+        assertTrue(registry.degrade("scan-a", "saved-world-source-failed"));
         return new Fixture(registry, loadedIndex);
     }
 
@@ -291,7 +351,8 @@ class BreedingPersistedProjectionReplayGuardTest {
                 key, fingerprint, component, legacy, dead);
     }
 
-    private static CompanionPopulationOperationRecord operation() {
+    private static CompanionPopulationOperationRecord operation(
+            CompanionPopulationOperationRecord.State state) {
         JsonObject target = new JsonObject();
         target.addProperty("idempotencyKey", ATTEMPT);
         target.addProperty("childKey", CHILD);
@@ -299,6 +360,11 @@ class BreedingPersistedProjectionReplayGuardTest {
         target.addProperty("world", "world");
         target.addProperty("chunkX", 4);
         target.addProperty("chunkZ", 5);
+        JsonArray parents = new JsonArray();
+        for (String parent : PARENTS) {
+            parents.add(parent);
+        }
+        target.add("parentProfileIds", parents);
         BreedingBirthPlanSnapshot plan = new BreedingBirthPlanSnapshot(
                 1.0,
                 1.0,
@@ -321,7 +387,7 @@ class BreedingPersistedProjectionReplayGuardTest {
                 "operation-row",
                 PROFILE,
                 OwnerPopulationOperation.BREEDING.name(),
-                CompanionPopulationOperationRecord.State.RETRYABLE,
+                state,
                 0L,
                 "{\"ownerUuid\":null}",
                 "{\"ownerUuid\":null}",
