@@ -4,7 +4,9 @@ import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static com.hypixel.hytale.server.npc.commands.NPCCommand.NPC_ROLE;
 
 /** Covers the structured debug command tree and its native completion-visible arguments. */
 class TameworkDebugCommandTest {
@@ -34,6 +36,7 @@ class TameworkDebugCommandTest {
         AbstractCommand spawnTamed = root.getSubCommands().get("spawntamed");
 
         assertEquals(1, spawnTamed.getRequiredArguments().size());
+        assertSame(NPC_ROLE, spawnTamed.getRequiredArguments().getFirst().getArgumentType());
         assertTrue(spawnTamed.getOptionalArguments().containsKey("count"));
         assertTrue(spawnTamed.getOptionalArguments().containsKey("radius"));
         assertTrue(spawnTamed.getOptionalArguments().containsKey("attachment"));

@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderInfo;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -23,13 +24,14 @@ import javax.annotation.Nullable;
 import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes.DOUBLE;
 import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes.INTEGER;
 import static com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes.STRING;
+import static com.hypixel.hytale.server.npc.commands.NPCCommand.NPC_ROLE;
 
 /**
  * Spawns owned, tamed NPCs with typed role/count arguments and live role completion.
  */
 public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
-    private final RequiredArg<String> roleArg = withRequiredArg("role", "NPC role to spawn.", STRING)
-            .suggest((sender, entered, parameters, suggestions) -> TameworkNpcRoleResolver.suggestRoles(entered, suggestions));
+    /** Uses Hytale's native role type so tab completion mirrors {@code /npc spawn}. */
+    private final RequiredArg<BuilderInfo> roleArg = withRequiredArg("role", "NPC role to spawn.", NPC_ROLE);
     private final DefaultArg<Integer> countArg = withDefaultArg(
             "count", "Number of NPCs to spawn.", INTEGER, 1, "1"
     );
@@ -68,13 +70,11 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
             return;
         }
 
-        String requestedRole = roleArg.get(commandContext);
-        TameworkNpcRoleResolver.RoleResolution resolution =
-                TameworkNpcRoleResolver.resolveRole(requestedRole, NPCPlugin.get());
-        if (resolution.errorMessage() != null || resolution.roleId() == null) {
-            commandContext.sender().sendMessage(Message.raw(
-                    resolution.errorMessage() != null ? resolution.errorMessage() : "Unable to resolve role id."
-            ));
+        NPCPlugin npcPlugin = NPCPlugin.get();
+        BuilderInfo roleInfo = roleArg.get(commandContext);
+        String roleId = npcPlugin.getName(roleInfo.getIndex());
+        if (roleId == null || roleId.isBlank()) {
+            commandContext.sender().sendMessage(Message.raw("Unable to resolve NPC role id."));
             return;
         }
         Player player = store.getComponent(ref, Player.getComponentType());
@@ -83,7 +83,6 @@ public final class TameworkNpcSpawnTamedCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw(player == null ? "No player context." : "Tamework plugin not available."));
             return;
         }
-        String roleId = resolution.roleId();
         new NpcSpawnCommandService(plugin).spawnTamedOwnedBatch(
                 player, store, ref, world, roleId, count, radius, attachments,
                 result -> sendSpawnResult(commandContext, roleId, result)

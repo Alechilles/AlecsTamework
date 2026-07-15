@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.commands;
 
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.core.command.system.suggestion.SuggestionResult;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -89,29 +88,6 @@ final class TameworkNpcRoleResolver {
                 null,
                 "No role matched '" + requestedRole + "'. Try one of: " + String.join(", ", suggestions) + "."
         );
-    }
-
-    /** Adds live NPC role ids matching the text currently entered in command completion. */
-    static void suggestRoles(@Nonnull String entered, @Nonnull SuggestionResult suggestions) {
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        List<String> roles = npcPlugin != null ? npcPlugin.getRoleTemplateNames(true) : null;
-        if (roles == null || roles.isEmpty()) {
-            return;
-        }
-        String normalized = normalize(entered);
-        int count = 0;
-        for (String role : roles) {
-            if (role == null || role.isBlank()) {
-                continue;
-            }
-            if (normalized.isEmpty() || normalize(role).startsWith(normalized)
-                    || normalize(shortRoleName(role)).startsWith(normalized)) {
-                suggestions.suggest(role);
-                if (++count >= 20) {
-                    return;
-                }
-            }
-        }
     }
 
     @Nonnull
