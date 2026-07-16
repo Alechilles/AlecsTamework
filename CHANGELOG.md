@@ -55,6 +55,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed prefab saving unregistering Tamework's generated asset-patch pack and silently removing bucket-on-trough interactions until the server restarted.
 - Fixed permanent companion deaths being quarantined after Hytale rejected Tamework's corpse hold as a duplicate native death component.
 - Fixed permanent companion deaths from utility or builder damage being left in recovery quarantine when the original damage had no resolvable death cause.
 - Fixed non-revivable companion deaths corrupting the corpse-removal component during chunk unloading, which could crash the game or leave a dead companion stuck in the world.

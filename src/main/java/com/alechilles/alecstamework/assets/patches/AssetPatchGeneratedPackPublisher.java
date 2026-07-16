@@ -23,6 +23,7 @@ import com.hypixel.hytale.common.plugin.PluginManifest;
 import com.hypixel.hytale.common.semver.SemverRange;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import org.bson.json.JsonWriterSettings;
 
 /**
  * Publishes generated patched assets as a transient runtime asset pack.
@@ -30,6 +31,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 public final class AssetPatchGeneratedPackPublisher {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String CACHE_DIRECTORY_NAME = "GeneratedPatches";
+    private static final String MANIFEST_FILE_NAME = "manifest.json";
 
     private final JavaPlugin plugin;
     private final String generatedPackId;
@@ -80,9 +82,18 @@ public final class AssetPatchGeneratedPackPublisher {
                 !generatedAssets.isEmpty(),
                 registrationMode
         );
+        PluginManifest generatedManifest = createGeneratedPatchManifest(
+                plugin.getManifest(),
+                assetModule.getAssetPacks(),
+                generatedPackId,
+                root
+        );
         CacheMutationResult mutation = mutateCacheForPublication(action, root, generatedAssets, status);
         if (!mutation.succeeded()) {
             return new PublicationResult(false, action, existingPackPresent, Set.of(), Set.of());
+        }
+        if (shouldPersistManifest(action, existingPackPresent)) {
+            writeGeneratedPatchManifest(root, generatedManifest);
         }
 
         // Live world commands must not mutate AssetModule pack registration; that can block the world thread.
@@ -104,7 +115,7 @@ public final class AssetPatchGeneratedPackPublisher {
                 assetModule.registerPack(
                         generatedPackId,
                         root,
-                        createGeneratedPatchManifest(plugin.getManifest(), assetModule.getAssetPacks(), generatedPackId, root),
+                        generatedManifest,
                         AssetPack.PackSource.RUNTIME
                 );
                 moveGeneratedPackToLastWinningPriority(assetModule, root);
@@ -154,6 +165,10 @@ public final class AssetPatchGeneratedPackPublisher {
         return action == PublicationAction.REGISTER_PACK;
     }
 
+    static boolean shouldPersistManifest(@Nonnull PublicationAction action, boolean existingPackPresent) {
+        return action != PublicationAction.NO_GENERATED_ASSETS || existingPackPresent;
+    }
+
     @Nonnull
     static PluginManifest createGeneratedPatchManifest(@Nonnull PluginManifest sourceManifest,
                                                        @Nonnull java.util.List<AssetPack> assetPacks,
@@ -176,6 +191,19 @@ public final class AssetPatchGeneratedPackPublisher {
             manifest.injectDependency(PluginIdentifier.fromString(pack.getName()), SemverRange.WILDCARD);
         }
         return manifest;
+    }
+
+    static void writeGeneratedPatchManifest(@Nonnull Path root, @Nonnull PluginManifest manifest)
+            throws IOException {
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        Files.createDirectories(normalizedRoot);
+        Path output = normalizedRoot.resolve(MANIFEST_FILE_NAME);
+        String json = PluginManifest.CODEC.encode(manifest)
+                .asDocument()
+                .toJson(JsonWriterSettings.builder().indent(true).build());
+        if (!isExistingContentSame(output, json)) {
+            Files.writeString(output, json, StandardCharsets.UTF_8);
+        }
     }
 
     static boolean shouldReloadRuntimeTargetsAfterPublication(boolean cacheMutationSucceeded,
@@ -217,10 +245,12 @@ public final class AssetPatchGeneratedPackPublisher {
                 .map(path -> path.toAbsolutePath().normalize())
                 .filter(path -> path.startsWith(normalizedRoot))
                 .collect(Collectors.toUnmodifiableSet());
+        Path manifestPath = normalizedRoot.resolve(MANIFEST_FILE_NAME);
         Set<String> removedTargets = new LinkedHashSet<>();
         try (var stream = Files.walk(normalizedRoot)) {
             for (Path path : stream
                     .filter(Files::isRegularFile)
+                    .filter(path -> !path.toAbsolutePath().normalize().equals(manifestPath))
                     .filter(AssetPatchGeneratedPackPublisher::isGeneratedPatchTargetFile)
                     .sorted(Comparator.reverseOrder())
                     .toList()) {

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.bson.BsonDocument;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Test;
 
@@ -95,10 +96,12 @@ final class AssetPatchGeneratedPackPublisherTest {
     void runtimeRefreshPrunesGeneratedJsonTargetsThatAreNoLongerProduced(@TempDir Path tempDir) throws Exception {
         Path staleTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Stale.json");
         Path currentTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Current.json");
+        Path manifest = tempDir.resolve("manifest.json");
         Path nonJsonArtifact = tempDir.resolve("Server/NPC/Roles/_Core/Templates/readme.txt");
         Files.createDirectories(staleTarget.getParent());
         Files.writeString(staleTarget, "{}");
         Files.writeString(currentTarget, "{}");
+        Files.writeString(manifest, "{}");
         Files.writeString(nonJsonArtifact, "kept");
 
         AssetPatchGeneratedPackPublisher.pruneStaleGeneratedFiles(
@@ -108,7 +111,50 @@ final class AssetPatchGeneratedPackPublisherTest {
 
         assertFalse(Files.exists(staleTarget));
         assertTrue(Files.exists(currentTarget));
+        assertTrue(Files.exists(manifest));
         assertTrue(Files.exists(nonJsonArtifact));
+    }
+
+    @Test
+    void generatedPackWritesCodecValidManifestRequiredByDiskValidation(@TempDir Path tempDir) throws Exception {
+        PluginManifest generatedManifest = manifest("Alechilles:Alec's Tamework!_GeneratedPatches");
+        generatedManifest.injectDependency(
+                PluginIdentifier.fromString("Alechilles:Alec's Tamework!"),
+                SemverRange.WILDCARD
+        );
+
+        // Regression for the 2026-07-16 prefab-save path that unregistered the manifest-less runtime pack.
+        AssetPatchGeneratedPackPublisher.writeGeneratedPatchManifest(tempDir, generatedManifest);
+
+        Path output = tempDir.resolve("manifest.json");
+        assertTrue(Files.isRegularFile(output));
+        PluginManifest decoded = PluginManifest.CODEC.decode(BsonDocument.parse(Files.readString(output)));
+        assertEquals("Alechilles", decoded.getGroup());
+        assertEquals("Alec's Tamework!_GeneratedPatches", decoded.getName());
+        assertEquals("1.0.0", decoded.getVersion().toString());
+        assertTrue(decoded.getDependencies().containsKey(
+                PluginIdentifier.fromString("Alechilles:Alec's Tamework!")
+        ));
+    }
+
+    @Test
+    void activeGeneratedPackAlwaysPersistsManifest() {
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldPersistManifest(
+                AssetPatchGeneratedPackPublisher.PublicationAction.REGISTER_PACK,
+                false
+        ));
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldPersistManifest(
+                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
+                true
+        ));
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldPersistManifest(
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
+                true
+        ));
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldPersistManifest(
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
+                false
+        ));
     }
 
     @Test
