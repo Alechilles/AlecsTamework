@@ -23,6 +23,7 @@ import org.joml.Vector3d;
 /** Emits short, bounded beam segments for active capture channels. */
 public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
     private static final long EMIT_INTERVAL_MS = 350L;
+    private static final long TARGET_LOCK_GRACE_MS = 2_000L;
     private static final float SEGMENT_MAX_DURATION_SECONDS = 0.85F;
     private static final double DEFAULT_NATIVE_BEAM_LENGTH = 50.0D;
     private static final double MIN_DISTANCE = 0.01D;
@@ -47,6 +48,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                 : DEFAULT_NATIVE_BEAM_LENGTH;
         long nowMs = System.currentTimeMillis();
         long durationMs = Math.max(1L, Math.round(channelDurationSeconds * 1000.0D));
+        long visualEndsAtMs = nowMs + durationMs;
         ACTIVE.put(playerUuid, new Session(
                 playerUuid,
                 targetUuid,
@@ -55,7 +57,8 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                 safeNativeLength,
                 maxDistance,
                 auraEffectId,
-                nowMs + durationMs + 250L,
+                visualEndsAtMs,
+                targetLockExpiresAt(visualEndsAtMs),
                 nowMs
         ));
         return true;
@@ -94,10 +97,17 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
             }
             Ref<EntityStore> playerRef = world.getEntityRef(session.playerUuid);
             Ref<EntityStore> targetRef = world.getEntityRef(session.targetUuid);
-            if (nowMs >= session.expiresAtMs
-                    || playerRef == null || !playerRef.isValid()
+            if (playerRef == null || !playerRef.isValid()
                     || targetRef == null || !targetRef.isValid()) {
                 expire(session, targetRef, store);
+                continue;
+            }
+            if (nowMs >= session.expiresAtMs) {
+                expire(session, targetRef, store);
+                continue;
+            }
+            if (nowMs >= session.visualEndsAtMs) {
+                endVisuals(session, targetRef, store);
                 continue;
             }
             if (nowMs < session.nextEmitAtMs) {
@@ -233,16 +243,34 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         return Math.max(0.15D, Math.min(2.5D, eyeHeight * 0.45D));
     }
 
+    static long targetLockExpiresAt(long visualEndsAtMs) {
+        return visualEndsAtMs + TARGET_LOCK_GRACE_MS;
+    }
+
+    static boolean retainsTargetLock(long nowMs, long expiresAtMs) {
+        return nowMs < expiresAtMs;
+    }
+
+    private static void endVisuals(@Nonnull Session session,
+                                   @Nullable Ref<EntityStore> targetRef,
+                                   @Nonnull Store<EntityStore> store) {
+        if (session.visualsEnded) {
+            return;
+        }
+        session.visualsEnded = true;
+        if (targetRef != null && targetRef.isValid()
+                && session.auraEffectId != null && !session.auraEffectId.isBlank()) {
+            TameworkEntityEffectService.removeEffect(targetRef, session.auraEffectId, store);
+        }
+    }
+
     private static void expire(@Nonnull Session session,
                                @Nullable Ref<EntityStore> targetRef,
                                @Nonnull Store<EntityStore> store) {
         if (!ACTIVE.remove(session.playerUuid, session)) {
             return;
         }
-        if (targetRef != null && targetRef.isValid()
-                && session.auraEffectId != null && !session.auraEffectId.isBlank()) {
-            TameworkEntityEffectService.removeEffect(targetRef, session.auraEffectId, store);
-        }
+        endVisuals(session, targetRef, store);
     }
 
     private static final class Session {
@@ -253,7 +281,9 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         private final double nativeBeamLength;
         private final double maxDistance;
         private final String auraEffectId;
+        private final long visualEndsAtMs;
         private final long expiresAtMs;
+        private volatile boolean visualsEnded;
         private volatile long nextEmitAtMs;
 
         private Session(UUID playerUuid,
@@ -263,6 +293,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                         double nativeBeamLength,
                         double maxDistance,
                         String auraEffectId,
+                        long visualEndsAtMs,
                         long expiresAtMs,
                         long nextEmitAtMs) {
             this.playerUuid = playerUuid;
@@ -272,6 +303,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
             this.nativeBeamLength = nativeBeamLength;
             this.maxDistance = maxDistance;
             this.auraEffectId = auraEffectId;
+            this.visualEndsAtMs = visualEndsAtMs;
             this.expiresAtMs = expiresAtMs;
             this.nextEmitAtMs = nextEmitAtMs;
         }

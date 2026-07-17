@@ -6,6 +6,7 @@ import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CaptureChannelVfxSystemTest {
@@ -47,6 +48,17 @@ class CaptureChannelVfxSystemTest {
         assertEquals(0.32D, offset.x, 0.00001D);
         assertEquals(-0.42D, offset.y, 0.00001D);
         assertEquals(-0.38D, offset.z, 0.00001D);
+    }
+
+    @Test
+    void completionRetainsLockedTargetAfterVisualChannelEnds() {
+        long visualEndsAtMs = 10_000L;
+        long targetExpiresAtMs = CaptureChannelVfxSystem.targetLockExpiresAt(visualEndsAtMs);
+
+        assertEquals(12_000L, targetExpiresAtMs);
+        assertTrue(CaptureChannelVfxSystem.retainsTargetLock(visualEndsAtMs + 1_500L, targetExpiresAtMs),
+                "interaction completion may arrive after the three-second visual cutoff");
+        assertFalse(CaptureChannelVfxSystem.retainsTargetLock(targetExpiresAtMs, targetExpiresAtMs));
     }
 
     @Test
