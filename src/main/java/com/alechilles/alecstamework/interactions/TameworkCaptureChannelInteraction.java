@@ -122,7 +122,12 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             return;
         }
 
-        if (parsedPhase != Phase.CANCEL && !handler.canCaptureInteraction(player, targetRef, heldItem)) {
+        boolean captureAllowed = switch (parsedPhase) {
+            case BEGIN -> handler.canBeginCaptureChannelInteraction(player, targetRef, heldItem);
+            case COMPLETE -> handler.canCaptureInteraction(player, targetRef, heldItem);
+            case CANCEL -> true;
+        };
+        if (!captureAllowed) {
             fail(context, time, type, cooldownHandler);
             return;
         }

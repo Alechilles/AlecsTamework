@@ -46,6 +46,21 @@ public final class SpawnerCapturePolicyService {
     }
 
     public boolean canCapture(Player player, Ref<EntityStore> targetRef, ItemFeatureConfig config, ItemStack itemStack) {
+        return canCapture(player, targetRef, config, itemStack, true);
+    }
+
+    public boolean canBeginCaptureChannel(Player player,
+                                          Ref<EntityStore> targetRef,
+                                          ItemFeatureConfig config,
+                                          ItemStack itemStack) {
+        return canCapture(player, targetRef, config, itemStack, false);
+    }
+
+    private boolean canCapture(Player player,
+                               Ref<EntityStore> targetRef,
+                               ItemFeatureConfig config,
+                               ItemStack itemStack,
+                               boolean enforceTerminalRequirements) {
         if (player == null || targetRef == null || config == null || itemStack == null) {
             logCaptureDebug("denied reason=invalid-input player=" + (player != null ? player.getUuid() : null));
             return false;
@@ -91,12 +106,12 @@ public final class SpawnerCapturePolicyService {
                 return false;
             }
         }
-        if (!meetsHealthRequirement(targetRef, config, store)) {
+        if (enforceTerminalRequirements && !meetsHealthRequirement(targetRef, config, store)) {
             logCaptureDebug("denied reason=health-threshold player=" + player.getUuid()
                     + " maxHealthPercent=" + config.getCaptureMaxHealthPercent());
             return false;
         }
-        if (!hasRequiredEffect(targetRef, config, store)) {
+        if (enforceTerminalRequirements && !hasRequiredEffect(targetRef, config, store)) {
             logCaptureDebug("denied reason=required-effect player=" + player.getUuid()
                     + " effect=" + config.getCaptureRequiredEffectId());
             return false;

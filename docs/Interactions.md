@@ -422,11 +422,11 @@ Common effect families:
 
 `TameworkCaptureChannel` coordinates a custom hold-to-capture flow with Hytale's native `Charging` interaction. It requires a targeted NPC and a held item backed by `TwSpawnerConfig`.
 
-- `Phase: Begin` validates capture policy and applies `Capture.ChannelAuraEffectId`.
+- `Phase: Begin` validates the empty spawner, target role/state, ownership, cooldown, and distance, then applies `Capture.ChannelAuraEffectId`. Health and required-effect gates are intentionally deferred until completion so channel feedback can begin before the target is capture-ready.
 - `Phase: Cancel` removes the channel aura without capturing.
 - `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture.
 
-Use `Begin` before `Charging`, route the charge release branch (`0.0`) to `Cancel`, and route the desired duration (for example `3.0`) to `Complete`. Beam particles belong in the `Charging.Effects` block so the client renders them only while the key is held.
+Use `Begin` before `Charging`, route the charge release branch (`0.0`) to `Cancel`, and route the desired duration (for example `3.0`) to `Complete`. Configure `BeamParticleSystem` on `Begin`; Tamework emits bounded world-space segments between the player and the locked target only while that server-tracked channel is active.
 
 ## Action usage in roles
 ```json

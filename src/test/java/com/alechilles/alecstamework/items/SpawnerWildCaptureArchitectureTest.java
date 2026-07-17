@@ -55,4 +55,31 @@ class SpawnerWildCaptureArchitectureTest {
         assertTrue(lockedTarget > nonBegin);
         assertTrue(contextTarget > lockedTarget);
     }
+
+    @Test
+    void channelBeginsBeforeTerminalHealthAndTranquilizerRequirementsPass() throws Exception {
+        String interaction = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
+        ));
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
+        ));
+        String policy = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerCapturePolicyService.java"
+        ));
+
+        assertTrue(interaction.contains(
+                "case BEGIN -> handler.canBeginCaptureChannelInteraction(player, targetRef, heldItem)"
+        ));
+        assertTrue(interaction.contains(
+                "case COMPLETE -> handler.canCaptureInteraction(player, targetRef, heldItem)"
+        ));
+        assertTrue(handler.contains("capturePolicyService.canBeginCaptureChannel("));
+        assertTrue(policy.contains(
+                "enforceTerminalRequirements && !meetsHealthRequirement(targetRef, config, store)"
+        ));
+        assertTrue(policy.contains(
+                "enforceTerminalRequirements && !hasRequiredEffect(targetRef, config, store)"
+        ));
+    }
 }

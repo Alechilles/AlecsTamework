@@ -291,6 +291,22 @@ public final class SpawnerFeatureHandler {
         return capturePolicyService.canCapture(player, targetRef, config, itemStack);
     }
 
+    public boolean canBeginCaptureChannelInteraction(Player player,
+                                                     Ref<EntityStore> targetRef,
+                                                     ItemStack itemStack) {
+        if (player == null || targetRef == null || itemStack == null || itemStack.isEmpty()) {
+            return false;
+        }
+        ItemFeatureConfig config = resolveConfigForItem(itemStack);
+        if (config == null || !config.isSpawnerEnabled()) {
+            return false;
+        }
+        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
+            return false;
+        }
+        return capturePolicyService.canBeginCaptureChannel(player, targetRef, config, itemStack);
+    }
+
     public boolean beginCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
         return beginCaptureChannel(player, targetRef, itemStack, null, 50.0D, 3.0D);
     }
@@ -301,7 +317,7 @@ public final class SpawnerFeatureHandler {
                                        String beamParticleSystem,
                                        double beamNativeLength,
                                        double channelDurationSeconds) {
-        if (!canCaptureInteraction(player, targetRef, itemStack)) {
+        if (!canBeginCaptureChannelInteraction(player, targetRef, itemStack)) {
             return false;
         }
         ItemFeatureConfig config = resolveConfigForItem(itemStack);
