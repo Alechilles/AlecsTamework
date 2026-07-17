@@ -27,7 +27,8 @@ class CaptureChannelVfxSystemTest {
                 "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"
         ));
 
-        assertTrue(source.contains("SEGMENT_MAX_DURATION_SECONDS = 0.18F"));
+        assertTrue(source.contains("EMIT_INTERVAL_MS = 350L"));
+        assertTrue(source.contains("SEGMENT_MAX_DURATION_SECONDS = 0.85F"));
         assertTrue(source.contains("world.getEntityRef(session.playerUuid)"));
         assertTrue(source.contains("world.getEntityRef(session.targetUuid)"));
         assertTrue(source.contains("rotationForPositiveXBeam"));

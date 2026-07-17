@@ -20,8 +20,8 @@ import org.joml.Vector3d;
 
 /** Emits short, bounded beam segments for active capture channels. */
 public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
-    private static final long EMIT_INTERVAL_MS = 100L;
-    private static final float SEGMENT_MAX_DURATION_SECONDS = 0.18F;
+    private static final long EMIT_INTERVAL_MS = 350L;
+    private static final float SEGMENT_MAX_DURATION_SECONDS = 0.85F;
     private static final double DEFAULT_NATIVE_BEAM_LENGTH = 50.0D;
     private static final double MIN_DISTANCE = 0.01D;
     private static final Map<UUID, Session> ACTIVE = new ConcurrentHashMap<>();
