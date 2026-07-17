@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.hypixel.hytale.codec.Codec;
@@ -289,6 +290,44 @@ public final class SpawnerFeatureHandler {
         return capturePolicyService.canCapture(player, targetRef, config, itemStack);
     }
 
+    public boolean beginCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
+        if (!canCaptureInteraction(player, targetRef, itemStack)) {
+            return false;
+        }
+        ItemFeatureConfig config = resolveConfigForItem(itemStack);
+        World world = player.getWorld();
+        if (config == null || world == null || world.getEntityStore() == null) {
+            return false;
+        }
+        String auraEffectId = config.getCaptureChannelAuraEffectId();
+        if (auraEffectId != null && !auraEffectId.isBlank()) {
+            TameworkEntityEffectService.applyEffect(
+                    targetRef,
+                    auraEffectId,
+                    world.getEntityStore().getStore()
+            );
+        }
+        return true;
+    }
+
+    public void endCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
+        ItemFeatureConfig config = resolveConfigForItem(itemStack);
+        World world = player == null ? null : player.getWorld();
+        if (config == null || world == null || world.getEntityStore() == null) {
+            return;
+        }
+        TameworkEntityEffectService.removeEffect(
+                targetRef,
+                config.getCaptureChannelAuraEffectId(),
+                world.getEntityStore().getStore()
+        );
+    }
+
+    public boolean completeCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
+        endCaptureChannel(player, targetRef, itemStack);
+        return captureFromItemInteraction(player, itemStack, targetRef);
+    }
+
     public boolean canSpawnInteraction(ItemStack itemStack) {
         if (itemStack == null || itemStack.isEmpty()) {
             return false;
@@ -457,7 +496,9 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         UUID existingOwner = npcStateService.resolveOwnerFromComponent(targetRef, world);
-        UUID ownerToStore = resolveCapturedOwnerMetadata(existingOwner, config.isCaptureClearsOwner());
+        UUID ownerToStore = config.isCaptureTamesTarget()
+                ? player.getUuid()
+                : resolveCapturedOwnerMetadata(existingOwner, config.isCaptureClearsOwner());
         String snapshotDisplayName = (captureInfo.capturedName() != null
                 && captureInfo.capturedName().name() != null
                 && !captureInfo.capturedName().name().isBlank())
@@ -478,13 +519,16 @@ public final class SpawnerFeatureHandler {
                 }
             }
         }
+        String captureRoleId = config.isCaptureTamesTarget()
+                ? config.resolveCaptureTamedRole(snapshotRoleId)
+                : snapshotRoleId;
         CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot preparedLinkedSnapshot =
                 linkedNpcSyncService.prepareCapturedLinkedNpcSnapshot(
                         targetRef,
                         world,
                         targetUuid,
                         ownerToStore,
-                        snapshotRoleId,
+                        captureRoleId,
                         snapshotDisplayName
                 );
         ItemStack updated = itemStackMetadataService.swapItemId(itemStack, config.getSpawnerFilledItemId())
@@ -493,7 +537,7 @@ public final class SpawnerFeatureHandler {
         if (attachmentsJson != null) {
             updated = updated.withMetadata(TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, attachmentsJson);
         }
-        boolean tamed = npcStateService.resolveTamedState(targetRef, world);
+        boolean tamed = config.isCaptureTamesTarget() || npcStateService.resolveTamedState(targetRef, world);
         if (tamed) {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
@@ -510,8 +554,8 @@ public final class SpawnerFeatureHandler {
                     TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID
             );
         }
-        if (captureInfo.npcNameKey() != null && !captureInfo.npcNameKey().isBlank()) {
-            updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureInfo.npcNameKey());
+        if (captureRoleId != null && !captureRoleId.isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureRoleId);
         } else {
             updated = itemStackMetadataService.clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
         }

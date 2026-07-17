@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,27 @@ class SpawnerFeatureHandlerTest {
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, null);
 
         assertTrue(resolved.isSpawnAssignsOwner());
+    }
+
+    @Test
+    void interactionResolverPreservesWildCaptureContract() throws Exception {
+        ItemFeatureConfig baseConfig = ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .captureRequireTamed(false)
+                .captureTamesTarget(true)
+                .captureMaxHealthPercent(20.0d)
+                .captureRequiredEffectId("Required")
+                .captureChannelAuraEffectId("Aura")
+                .captureTamedRoleOverrides(Map.of("Wild", "Tamed"))
+                .build();
+
+        ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(baseConfig, null);
+
+        assertTrue(resolved.isCaptureTamesTarget());
+        assertEquals(20.0d, resolved.getCaptureMaxHealthPercent());
+        assertEquals("Required", resolved.getCaptureRequiredEffectId());
+        assertEquals("Aura", resolved.getCaptureChannelAuraEffectId());
+        assertEquals("Tamed", resolved.resolveCaptureTamedRole("Wild"));
     }
 
     @Test

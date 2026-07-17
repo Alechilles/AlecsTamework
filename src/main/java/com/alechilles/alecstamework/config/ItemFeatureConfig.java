@@ -52,6 +52,7 @@ public final class ItemFeatureConfig {
     private final boolean whistleEnabled;
     private final boolean captureClearsOwner;
     private final boolean captureRequireTamed;
+    private final boolean captureTamesTarget;
     private final boolean captureOwnerRestricted;
     private final boolean spawnAssignsOwner;
     private final boolean spawnOwnerRestricted;
@@ -64,6 +65,10 @@ public final class ItemFeatureConfig {
     private final String captureParticleSystem;
     private final String spawnParticleSystem;
     private final String captureSoundEvent;
+    private final String captureRequiredEffectId;
+    private final String captureChannelAuraEffectId;
+    private final Double captureMaxHealthPercent;
+    private final Map<String, String> captureTamedRoleOverrides;
     private final String spawnSoundEvent;
     private final int captureCooldownMs;
     private final int spawnCooldownMs;
@@ -81,6 +86,7 @@ public final class ItemFeatureConfig {
         this.whistleEnabled = builder.whistleEnabled;
         this.captureClearsOwner = builder.captureClearsOwner;
         this.captureRequireTamed = builder.captureRequireTamed;
+        this.captureTamesTarget = builder.captureTamesTarget;
         this.captureOwnerRestricted = builder.captureOwnerRestricted;
         this.spawnAssignsOwner = builder.spawnAssignsOwner;
         this.spawnOwnerRestricted = builder.spawnOwnerRestricted;
@@ -93,6 +99,10 @@ public final class ItemFeatureConfig {
         this.captureParticleSystem = builder.captureParticleSystem;
         this.spawnParticleSystem = builder.spawnParticleSystem;
         this.captureSoundEvent = builder.captureSoundEvent;
+        this.captureRequiredEffectId = builder.captureRequiredEffectId;
+        this.captureChannelAuraEffectId = builder.captureChannelAuraEffectId;
+        this.captureMaxHealthPercent = builder.captureMaxHealthPercent;
+        this.captureTamedRoleOverrides = builder.captureTamedRoleOverrides;
         this.spawnSoundEvent = builder.spawnSoundEvent;
         this.captureCooldownMs = builder.captureCooldownMs;
         this.spawnCooldownMs = builder.spawnCooldownMs;
@@ -124,6 +134,10 @@ public final class ItemFeatureConfig {
 
     public boolean isCaptureRequireTamed() {
         return captureRequireTamed;
+    }
+
+    public boolean isCaptureTamesTarget() {
+        return captureTamesTarget;
     }
 
     public boolean isCaptureOwnerRestricted() {
@@ -177,6 +191,30 @@ public final class ItemFeatureConfig {
 
     public String getCaptureSoundEvent() {
         return captureSoundEvent;
+    }
+
+    public String getCaptureRequiredEffectId() {
+        return captureRequiredEffectId;
+    }
+
+    public String getCaptureChannelAuraEffectId() {
+        return captureChannelAuraEffectId;
+    }
+
+    public Double getCaptureMaxHealthPercent() {
+        return captureMaxHealthPercent;
+    }
+
+    public Map<String, String> getCaptureTamedRoleOverrides() {
+        return captureTamedRoleOverrides;
+    }
+
+    public String resolveCaptureTamedRole(String sourceRoleId) {
+        if (sourceRoleId == null || sourceRoleId.isBlank()) {
+            return null;
+        }
+        String mapped = captureTamedRoleOverrides.get(sourceRoleId);
+        return mapped == null || mapped.isBlank() ? null : mapped;
     }
 
     public String getSpawnSoundEvent() {
@@ -290,6 +328,7 @@ public final class ItemFeatureConfig {
         private boolean whistleEnabled;
         private boolean captureClearsOwner = true;
         private boolean captureRequireTamed = true;
+        private boolean captureTamesTarget;
         private boolean captureOwnerRestricted = true;
         private boolean spawnAssignsOwner = true;
         private boolean spawnOwnerRestricted = true;
@@ -302,6 +341,10 @@ public final class ItemFeatureConfig {
         private String captureParticleSystem;
         private String spawnParticleSystem;
         private String captureSoundEvent;
+        private String captureRequiredEffectId;
+        private String captureChannelAuraEffectId;
+        private Double captureMaxHealthPercent;
+        private Map<String, String> captureTamedRoleOverrides = Collections.emptyMap();
         private String spawnSoundEvent;
         private int captureCooldownMs;
         private int spawnCooldownMs;
@@ -334,6 +377,11 @@ public final class ItemFeatureConfig {
 
         public Builder captureRequireTamed(boolean captureRequireTamed) {
             this.captureRequireTamed = captureRequireTamed;
+            return this;
+        }
+
+        public Builder captureTamesTarget(boolean captureTamesTarget) {
+            this.captureTamesTarget = captureTamesTarget;
             return this;
         }
 
@@ -407,6 +455,32 @@ public final class ItemFeatureConfig {
 
         public Builder captureSoundEvent(String captureSoundEvent) {
             this.captureSoundEvent = captureSoundEvent;
+            return this;
+        }
+
+        public Builder captureRequiredEffectId(String captureRequiredEffectId) {
+            this.captureRequiredEffectId = captureRequiredEffectId;
+            return this;
+        }
+
+        public Builder captureChannelAuraEffectId(String captureChannelAuraEffectId) {
+            this.captureChannelAuraEffectId = captureChannelAuraEffectId;
+            return this;
+        }
+
+        public Builder captureMaxHealthPercent(Double captureMaxHealthPercent) {
+            this.captureMaxHealthPercent = captureMaxHealthPercent;
+            return this;
+        }
+
+        public Builder captureTamedRoleOverrides(Map<String, String> captureTamedRoleOverrides) {
+            if (captureTamedRoleOverrides == null || captureTamedRoleOverrides.isEmpty()) {
+                this.captureTamedRoleOverrides = Collections.emptyMap();
+            } else {
+                this.captureTamedRoleOverrides = Collections.unmodifiableMap(
+                        new java.util.LinkedHashMap<>(captureTamedRoleOverrides)
+                );
+            }
             return this;
         }
 
@@ -525,6 +599,7 @@ public final class ItemFeatureConfig {
                 && whistleEnabled == other.whistleEnabled
                 && captureClearsOwner == other.captureClearsOwner
                 && captureRequireTamed == other.captureRequireTamed
+                && captureTamesTarget == other.captureTamesTarget
                 && captureOwnerRestricted == other.captureOwnerRestricted
                 && spawnAssignsOwner == other.spawnAssignsOwner
                 && spawnOwnerRestricted == other.spawnOwnerRestricted
@@ -535,6 +610,10 @@ public final class ItemFeatureConfig {
                 && Objects.equals(captureParticleSystem, other.captureParticleSystem)
                 && Objects.equals(spawnParticleSystem, other.spawnParticleSystem)
                 && Objects.equals(captureSoundEvent, other.captureSoundEvent)
+                && Objects.equals(captureRequiredEffectId, other.captureRequiredEffectId)
+                && Objects.equals(captureChannelAuraEffectId, other.captureChannelAuraEffectId)
+                && Objects.equals(captureMaxHealthPercent, other.captureMaxHealthPercent)
+                && Objects.equals(captureTamedRoleOverrides, other.captureTamedRoleOverrides)
                 && Objects.equals(spawnSoundEvent, other.spawnSoundEvent)
                 && captureCooldownMs == other.captureCooldownMs
                 && spawnCooldownMs == other.spawnCooldownMs
@@ -557,6 +636,7 @@ public final class ItemFeatureConfig {
                 whistleEnabled,
                 captureClearsOwner,
                 captureRequireTamed,
+                captureTamesTarget,
                 captureOwnerRestricted,
                 spawnAssignsOwner,
                 spawnOwnerRestricted,
@@ -567,6 +647,10 @@ public final class ItemFeatureConfig {
                 captureParticleSystem,
                 spawnParticleSystem,
                 captureSoundEvent,
+                captureRequiredEffectId,
+                captureChannelAuraEffectId,
+                captureMaxHealthPercent,
+                captureTamedRoleOverrides,
                 spawnSoundEvent,
                 captureCooldownMs,
                 spawnCooldownMs,

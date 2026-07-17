@@ -83,6 +83,29 @@ public final class TameworkEntityEffectService {
         return activeEffects != null && activeEffects.containsKey(effectIndex);
     }
 
+    public static boolean removeEffect(@Nullable Ref<EntityStore> targetRef,
+                                       @Nullable String effectId,
+                                       @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        if (targetRef == null || !targetRef.isValid() || effectId == null || effectId.isBlank()) {
+            return false;
+        }
+        ComponentType<EntityStore, EffectControllerComponent> effectType = EffectControllerComponent.getComponentType();
+        IndexedLookupTableAssetMap<String, EntityEffect> effectAssetMap = EntityEffect.getAssetMap();
+        if (effectType == null || effectAssetMap == null) {
+            return false;
+        }
+        EffectControllerComponent effectController = componentAccessor.getComponent(targetRef, effectType);
+        int effectIndex = effectAssetMap.getIndex(effectId);
+        if (effectController == null || effectIndex == Integer.MIN_VALUE) {
+            return false;
+        }
+        if (!hasActiveEffect(effectController, effectId)) {
+            return true;
+        }
+        effectController.removeEffect(targetRef, effectIndex, componentAccessor);
+        return true;
+    }
+
     private static void warnMissingEffectAsset(@Nonnull String effectId) {
         if (!MISSING_EFFECT_WARNINGS.add(effectId)) {
             return;

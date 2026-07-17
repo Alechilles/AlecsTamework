@@ -404,6 +404,16 @@ Common effect families:
 - `OffsetParam`
 - `PlayerOnly`
 
+## Channeled spawner capture item interaction
+
+`TameworkCaptureChannel` coordinates a custom hold-to-capture flow with Hytale's native `Charging` interaction. It requires a targeted NPC and a held item backed by `TwSpawnerConfig`.
+
+- `Phase: Begin` validates capture policy and applies `Capture.ChannelAuraEffectId`.
+- `Phase: Cancel` removes the channel aura without capturing.
+- `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture.
+
+Use `Begin` before `Charging`, route the charge release branch (`0.0`) to `Cancel`, and route the desired duration (for example `3.0`) to `Complete`. Beam particles belong in the `Charging.Effects` block so the client renders them only while the key is held.
+
 ## Action usage in roles
 ```json
 "Actions": [

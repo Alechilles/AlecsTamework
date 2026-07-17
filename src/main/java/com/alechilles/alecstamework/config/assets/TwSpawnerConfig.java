@@ -223,6 +223,41 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         .documentation("Require the target NPC to be tamed.")
         .add()
         .<Boolean>append(
+            new KeyedCodec<>("TamesTarget", Codec.BOOLEAN),
+            (settings, value) -> settings.tamesTarget = value,
+            settings -> settings.tamesTarget
+        )
+        .documentation("Capture an eligible wild NPC as a newly owned tamed companion.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MaxHealthPercent", Codec.DOUBLE),
+            (settings, value) -> settings.maxHealthPercent = value,
+            settings -> settings.maxHealthPercent
+        )
+        .documentation("Optional maximum target health percent required for capture.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("RequiredEffectId", Codec.STRING),
+            (settings, value) -> settings.requiredEffectId = value,
+            settings -> settings.requiredEffectId
+        )
+        .documentation("Optional active entity effect required on the target.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("ChannelAuraEffectId", Codec.STRING),
+            (settings, value) -> settings.channelAuraEffectId = value,
+            settings -> settings.channelAuraEffectId
+        )
+        .documentation("Optional temporary entity effect applied while a capture channel is active.")
+        .add()
+        .<Map<String, String>>append(
+            new KeyedCodec<>("TamedRoleOverrides", MapCodec.STRING_HASH_MAP_CODEC),
+            (settings, value) -> settings.tamedRoleOverrides = value == null ? Collections.emptyMap() : value,
+            settings -> settings.tamedRoleOverrides
+        )
+        .documentation("Source-role to tamed-role mappings used when TamesTarget is enabled.")
+        .add()
+        .<Boolean>append(
             new KeyedCodec<>("OwnerRestricted", Codec.BOOLEAN),
             (settings, value) -> settings.ownerRestricted = value,
             settings -> settings.ownerRestricted
@@ -549,6 +584,11 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         }
         if (!nestedExplicitKeys.contains("ClearsOwner")) capture.clearsOwner = parent.capture.clearsOwner;
         if (!nestedExplicitKeys.contains("RequireTamed")) capture.requireTamed = parent.capture.requireTamed;
+        if (!nestedExplicitKeys.contains("TamesTarget")) capture.tamesTarget = parent.capture.tamesTarget;
+        if (!nestedExplicitKeys.contains("MaxHealthPercent")) capture.maxHealthPercent = parent.capture.maxHealthPercent;
+        if (!nestedExplicitKeys.contains("RequiredEffectId")) capture.requiredEffectId = parent.capture.requiredEffectId;
+        if (!nestedExplicitKeys.contains("ChannelAuraEffectId")) capture.channelAuraEffectId = parent.capture.channelAuraEffectId;
+        if (!nestedExplicitKeys.contains("TamedRoleOverrides")) capture.tamedRoleOverrides = parent.capture.tamedRoleOverrides;
         if (!nestedExplicitKeys.contains("OwnerRestricted")) capture.ownerRestricted = parent.capture.ownerRestricted;
         if (!nestedExplicitKeys.contains("RequireOwner")) capture.requireOwner = parent.capture.requireOwner;
         if (!nestedExplicitKeys.contains("ParticleSystem")) capture.particleSystem = parent.capture.particleSystem;
@@ -612,6 +652,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .whistleEnabled(false)
             .captureClearsOwner(captureSettings.clearsOwner)
             .captureRequireTamed(captureSettings.requireTamed)
+            .captureTamesTarget(captureSettings.tamesTarget)
             .captureOwnerRestricted(captureSettings.ownerRestricted)
             .spawnAssignsOwner(spawnSettings.assignsOwner)
             .spawnOwnerRestricted(spawnSettings.ownerRestricted)
@@ -623,6 +664,10 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .captureParticleSystem(captureSettings.particleSystem)
             .spawnParticleSystem(spawnSettings.particleSystem)
             .captureSoundEvent(captureSettings.soundEvent)
+            .captureRequiredEffectId(captureSettings.requiredEffectId)
+            .captureChannelAuraEffectId(captureSettings.channelAuraEffectId)
+            .captureMaxHealthPercent(captureSettings.maxHealthPercent)
+            .captureTamedRoleOverrides(captureSettings.tamedRoleOverrides)
             .spawnSoundEvent(spawnSettings.soundEvent)
             .captureCooldownMs(captureSettings.cooldownMs)
             .spawnCooldownMs(spawnSettings.cooldownMs)
@@ -756,6 +801,11 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     public static final class CaptureSettings {
         private boolean clearsOwner = true;
         private boolean requireTamed = true;
+        private boolean tamesTarget;
+        private Double maxHealthPercent;
+        private String requiredEffectId;
+        private String channelAuraEffectId;
+        private Map<String, String> tamedRoleOverrides = Collections.emptyMap();
         private boolean ownerRestricted = true;
         private Boolean requireOwner;
         private String particleSystem;

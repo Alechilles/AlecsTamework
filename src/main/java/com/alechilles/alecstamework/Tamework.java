@@ -72,6 +72,7 @@ import com.alechilles.alecstamework.debug.CompanionXpEventDebugLogService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.debug.PlayerInputDebugSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
+import com.alechilles.alecstamework.interactions.TameworkCaptureChannelInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightBoostInteraction;
@@ -455,6 +456,11 @@ public class Tamework extends JavaPlugin {
         ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
+        Interaction.CODEC.register(
+                "TameworkCaptureChannel",
+                TameworkCaptureChannelInteraction.class,
+                TameworkCaptureChannelInteraction.CODEC
+        );
         // Register the custom item interaction used by naming items.
         Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class, TameworkNameNpcInteraction.CODEC);
         // Register the custom item interaction used by command items.

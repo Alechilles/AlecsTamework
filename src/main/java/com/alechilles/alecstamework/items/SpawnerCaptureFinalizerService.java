@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult;
 import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.ownership.OwnerMutationContext;
 import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
@@ -95,18 +96,28 @@ public final class SpawnerCaptureFinalizerService {
             return null;
         }
         TameworkOwnerComponent currentOwner = readOwner(targetRef, store);
-        UUID retainedOwnerId = config.isCaptureClearsOwner() || currentOwner == null
-                ? null
-                : currentOwner.getOwnerId();
-        String retainedOwnerName = config.isCaptureClearsOwner() || currentOwner == null
-                ? null
-                : currentOwner.getOwnerName();
-        OwnerPopulationOperation operation = config.isCaptureClearsOwner()
-                ? OwnerPopulationOperation.OWNER_CLEAR
-                : OwnerPopulationOperation.LIFECYCLE_CHANGE;
+        UUID expectedLiveOwnerId = currentOwner == null ? null : currentOwner.getOwnerId();
+        UUID retainedOwnerId;
+        String retainedOwnerName;
+        OwnerPopulationOperation operation;
+        if (config.isCaptureTamesTarget()) {
+            retainedOwnerId = player.getUuid();
+            retainedOwnerName = OwnerNameUtil.resolve(player);
+            operation = OwnerPopulationOperation.NEW_OWNERSHIP;
+        } else {
+            retainedOwnerId = config.isCaptureClearsOwner() || currentOwner == null
+                    ? null
+                    : currentOwner.getOwnerId();
+            retainedOwnerName = config.isCaptureClearsOwner() || currentOwner == null
+                    ? null
+                    : currentOwner.getOwnerName();
+            operation = config.isCaptureClearsOwner()
+                    ? OwnerPopulationOperation.OWNER_CLEAR
+                    : OwnerPopulationOperation.LIFECYCLE_CHANGE;
+        }
         return new PreparedCapture(
                 player, config, targetRef, store, npcUuid, scheduler,
-                retainedOwnerId, retainedOwnerName, operation
+                expectedLiveOwnerId, retainedOwnerId, retainedOwnerName, operation
         );
     }
 
@@ -116,7 +127,8 @@ public final class SpawnerCaptureFinalizerService {
         OwnerMutationScheduler scheduler = prepared.scheduler();
         OwnerMutationScheduler.MutationCallbacks mutationCallbacks = callbacks(prepared, callbacks);
         String idempotencyKey = "spawner-capture:" + prepared.npcUuid()
-                + ":clear-owner=" + prepared.config().isCaptureClearsOwner();
+                + ":clear-owner=" + prepared.config().isCaptureClearsOwner()
+                + ":tames-target=" + prepared.config().isCaptureTamesTarget();
         if (durableContextJson == null || durableContextJson.isBlank()) {
             return scheduler.schedule(
                     prepared.targetRef(), prepared.store(),
@@ -127,7 +139,7 @@ public final class SpawnerCaptureFinalizerService {
         }
         return scheduler.scheduleWithDurableContext(
                 prepared.targetRef(), prepared.store(), null, null,
-                prepared.retainedOwnerId(), prepared.retainedOwnerId(),
+                prepared.expectedLiveOwnerId(), prepared.retainedOwnerId(),
                 prepared.retainedOwnerName(), CompanionLifecycleState.CAPTURED,
                 prepared.operation(), false, idempotencyKey, durableContextJson,
                 mutationCallbacks
@@ -210,6 +222,7 @@ public final class SpawnerCaptureFinalizerService {
             @Nonnull Store<EntityStore> store,
             @Nonnull UUID npcUuid,
             @Nonnull OwnerMutationScheduler scheduler,
+            @Nullable UUID expectedLiveOwnerId,
             @Nullable UUID retainedOwnerId,
             @Nullable String retainedOwnerName,
             @Nonnull OwnerPopulationOperation operation) {

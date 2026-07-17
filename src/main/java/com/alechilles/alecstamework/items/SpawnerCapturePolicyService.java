@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -12,6 +13,10 @@ import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
+import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -76,6 +81,26 @@ public final class SpawnerCapturePolicyService {
             return false;
         }
         UUID ownerUuid = npcStateService.resolveOwnerFromComponent(targetRef, world);
+        if (config.isCaptureTamesTarget()) {
+            if (npcStateService.resolveTamedState(targetRef, world) || ownerUuid != null) {
+                logCaptureDebug("denied reason=wild-capture-target-not-wild player=" + player.getUuid() + " role=" + roleId);
+                return false;
+            }
+            if (config.resolveCaptureTamedRole(roleId) == null) {
+                logCaptureDebug("denied reason=missing-tamed-role-mapping player=" + player.getUuid() + " role=" + roleId);
+                return false;
+            }
+        }
+        if (!meetsHealthRequirement(targetRef, config, store)) {
+            logCaptureDebug("denied reason=health-threshold player=" + player.getUuid()
+                    + " maxHealthPercent=" + config.getCaptureMaxHealthPercent());
+            return false;
+        }
+        if (!hasRequiredEffect(targetRef, config, store)) {
+            logCaptureDebug("denied reason=required-effect player=" + player.getUuid()
+                    + " effect=" + config.getCaptureRequiredEffectId());
+            return false;
+        }
         if (!ownershipPolicyService.isCaptureAllowed(player.getUuid(), ownerUuid, config)) {
             logCaptureDebug(
                     "denied reason=ownership-policy player=" + player.getUuid()
@@ -95,6 +120,52 @@ public final class SpawnerCapturePolicyService {
             logCaptureDebug("denied reason=distance player=" + player.getUuid() + " maxDistance=" + config.getCaptureMaxDistance());
         }
         return inDistance;
+    }
+
+    private boolean meetsHealthRequirement(Ref<EntityStore> targetRef,
+                                           ItemFeatureConfig config,
+                                           Store<EntityStore> store) {
+        Double maximumPercent = config.getCaptureMaxHealthPercent();
+        if (maximumPercent == null) {
+            return true;
+        }
+        if (!Double.isFinite(maximumPercent) || maximumPercent < 0.0 || maximumPercent > 100.0) {
+            return false;
+        }
+        var statType = EntityStatMap.getComponentType();
+        if (statType == null || EntityStatType.getAssetMap() == null) {
+            return false;
+        }
+        EntityStatMap statMap = store.getComponent(targetRef, statType);
+        if (statMap == null) {
+            return false;
+        }
+        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
+        if (healthIndex < 0) {
+            return false;
+        }
+        EntityStatValue health = statMap.get(healthIndex);
+        if (health == null || !Double.isFinite(health.get()) || !Double.isFinite(health.getMax())
+                || health.getMax() <= 0.0) {
+            return false;
+        }
+        double currentPercent = Math.max(0.0, Math.min(100.0, (health.get() / health.getMax()) * 100.0));
+        return currentPercent <= maximumPercent;
+    }
+
+    private boolean hasRequiredEffect(Ref<EntityStore> targetRef,
+                                      ItemFeatureConfig config,
+                                      Store<EntityStore> store) {
+        String requiredEffectId = config.getCaptureRequiredEffectId();
+        if (requiredEffectId == null || requiredEffectId.isBlank()) {
+            return true;
+        }
+        var effectType = EffectControllerComponent.getComponentType();
+        if (effectType == null) {
+            return false;
+        }
+        EffectControllerComponent effectController = store.getComponent(targetRef, effectType);
+        return TameworkEntityEffectService.hasActiveEffect(effectController, requiredEffectId);
     }
 
     private void logCaptureDebug(String message) {

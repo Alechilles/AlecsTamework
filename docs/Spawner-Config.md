@@ -35,6 +35,11 @@ Fields:
 ## Capture settings
 Fields:
 - `RequireTamed` (default true). Only allow capture if NPC is tamed (Tamework tamed component or a role id that starts with `Tamed`).
+- `TamesTarget` (default false). Enables wild capture: the target must be unowned and untamed, and capture atomically assigns the interacting player as owner while moving the companion into the `CAPTURED` lifecycle.
+- `MaxHealthPercent` (optional, `0-100`). Requires target health to be at or below this percentage at both channel start and completion.
+- `RequiredEffectId` (optional). Requires this entity effect to be active at both channel start and completion (for example, `Tw_Status_Tranquilized`).
+- `ChannelAuraEffectId` (optional). Entity effect applied to the target by the `Begin` channel phase and removed by `Cancel` or `Complete`.
+- `TamedRoleOverrides` (optional map). Maps each capturable wild role to the role stored in the filled item. A mapped role is required when `TamesTarget` is enabled.
 - `OwnerRestricted` (default true). If true, only the owner can capture.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
 - `ParticleSystem` (optional). Particle system to play on capture.
@@ -71,6 +76,8 @@ The spawn transition follows all four runtime-setting combinations:
 | `true` | `true` | Spawning player | `+1` | `+1` |
 
 The deltas assume the captured source itself occupies no physical claim. A canonical unowned profile restored to a non-null owner always uses normal cap-checked null-to-owner admission; it is never treated as an existing-owner zero delta. Conversely, a canonical non-null stored owner cannot be silently transferred or cleared by restore.
+
+For a hold-to-capture item, run `TameworkCaptureChannel` with `Phase: Begin`, then chain a native `Charging` interaction. Route its zero-second/release branch to `Phase: Cancel` and its completion branch to `Phase: Complete`. The native charge duration remains an item-asset choice; server policy is rechecked on completion before any ownership, item, or NPC state changes are committed.
 
 ## Icon overrides
 Optional overrides for filled spawner icons based on attachments or role.
