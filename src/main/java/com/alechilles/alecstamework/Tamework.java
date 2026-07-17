@@ -87,6 +87,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimProviderLifecycleInv
 import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
@@ -823,6 +824,7 @@ public class Tamework extends JavaPlugin {
                         commandLinksComponentType
                 )
         );
+        getEntityStoreRegistry().registerSystem(new CaptureChannelVfxSystem());
         SimpleClaimsTamedDamagePolicy damagePolicy = new SimpleClaimsTamedDamagePolicy();
         api = new TameworkApiImpl(
                 persistenceRuntime, apiEventBus,

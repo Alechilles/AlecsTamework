@@ -21,6 +21,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -291,6 +292,15 @@ public final class SpawnerFeatureHandler {
     }
 
     public boolean beginCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
+        return beginCaptureChannel(player, targetRef, itemStack, null, 50.0D, 3.0D);
+    }
+
+    public boolean beginCaptureChannel(Player player,
+                                       Ref<EntityStore> targetRef,
+                                       ItemStack itemStack,
+                                       String beamParticleSystem,
+                                       double beamNativeLength,
+                                       double channelDurationSeconds) {
         if (!canCaptureInteraction(player, targetRef, itemStack)) {
             return false;
         }
@@ -299,12 +309,28 @@ public final class SpawnerFeatureHandler {
         if (config == null || world == null || world.getEntityStore() == null) {
             return false;
         }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        UUIDComponent playerUuid = store.getComponent(player.getReference(), UUIDComponent.getComponentType());
+        UUIDComponent targetUuid = store.getComponent(targetRef, UUIDComponent.getComponentType());
+        if (playerUuid == null || playerUuid.getUuid() == null || targetUuid == null || targetUuid.getUuid() == null
+                || !CaptureChannelVfxSystem.start(
+                        playerUuid.getUuid(),
+                        targetUuid.getUuid(),
+                        world,
+                        beamParticleSystem,
+                        beamNativeLength,
+                        channelDurationSeconds,
+                        config.getCaptureMaxDistance(),
+                        config.getCaptureChannelAuraEffectId()
+                )) {
+            return false;
+        }
         String auraEffectId = config.getCaptureChannelAuraEffectId();
         if (auraEffectId != null && !auraEffectId.isBlank()) {
             TameworkEntityEffectService.applyEffect(
                     targetRef,
                     auraEffectId,
-                    world.getEntityStore().getStore()
+                    store
             );
         }
         return true;
@@ -316,10 +342,20 @@ public final class SpawnerFeatureHandler {
         if (config == null || world == null || world.getEntityStore() == null) {
             return;
         }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        UUIDComponent playerUuid = player.getReference() == null
+                ? null
+                : store.getComponent(player.getReference(), UUIDComponent.getComponentType());
+        Ref<EntityStore> lockedTarget = playerUuid == null || playerUuid.getUuid() == null
+                ? null
+                : CaptureChannelVfxSystem.stop(playerUuid.getUuid(), world);
+        if (targetRef == null) {
+            targetRef = lockedTarget;
+        }
         TameworkEntityEffectService.removeEffect(
                 targetRef,
                 config.getCaptureChannelAuraEffectId(),
-                world.getEntityStore().getStore()
+                store
         );
     }
 

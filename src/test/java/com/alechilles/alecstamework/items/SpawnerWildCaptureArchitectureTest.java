@@ -41,4 +41,18 @@ class SpawnerWildCaptureArchitectureTest {
         assertTrue(removeAura > complete);
         assertTrue(capture > removeAura);
     }
+
+    @Test
+    void channelLocksInitialTargetBeforeCompletionAndCancel() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
+        ));
+        int nonBegin = source.indexOf("phase != Phase.BEGIN");
+        int lockedTarget = source.indexOf("CaptureChannelVfxSystem.resolveTarget", nonBegin);
+        int contextTarget = source.indexOf("context.getTargetEntity()", lockedTarget);
+
+        assertTrue(nonBegin >= 0);
+        assertTrue(lockedTarget > nonBegin);
+        assertTrue(contextTarget > lockedTarget);
+    }
 }

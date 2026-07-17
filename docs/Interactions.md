@@ -244,6 +244,20 @@ For replacement and empty-hand removal, use the exchange requirement and effect 
 }
 ```
 
+### `TameworkCaptureChannel`
+
+Runs one phase of a server-authoritative spawner capture channel. Use it as the first step of a native `Charging` interaction, with `Begin`, `Cancel`, and `Complete` phases.
+
+Optional `Begin` fields:
+
+- `BeamParticleSystem`: world particle system repeatedly emitted from the player's eye/item line to the initially targeted NPC.
+- `BeamNativeLength`: authored forward length of that particle system. Tamework scales each short-lived segment to stop at the target. Defaults to `50`.
+- `ChannelDurationSeconds`: maximum server-side visual session lifetime. Match this to the charging threshold. Defaults to `3`.
+
+The initial target is locked for the session. Short particle segments are capped and renewed only while the channel is active, so cancel, completion, disconnect, invalid targets, and timeout stop new emission without leaving a persistent particle source.
+
+For a left-click channel, place the root under the item's `Interactions.Primary` key. `Use` is the F interaction and can conflict with NPC interaction options.
+
 ### `TameworkLaunchProjectile`
 Launches a projectile using a solved high-angle ballistic arc instead of the source entity's current look pitch.
 

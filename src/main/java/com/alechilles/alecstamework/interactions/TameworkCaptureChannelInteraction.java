@@ -7,15 +7,20 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.WaitForDataFrom;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInteraction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.util.TargetUtil;
+import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 
@@ -34,9 +39,36 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
                     (interaction, parent) -> interaction.phase = parent.phase
             )
             .add()
+            .<String>appendInherited(
+                    new KeyedCodec<>("BeamParticleSystem", Codec.STRING),
+                    (interaction, value) -> interaction.beamParticleSystem = value,
+                    interaction -> interaction.beamParticleSystem,
+                    (interaction, parent) -> interaction.beamParticleSystem = parent.beamParticleSystem
+            )
+            .documentation("Optional world particle system emitted between the player and locked target while channeling.")
+            .add()
+            .<Double>appendInherited(
+                    new KeyedCodec<>("BeamNativeLength", Codec.DOUBLE),
+                    (interaction, value) -> interaction.beamNativeLength = value,
+                    interaction -> interaction.beamNativeLength,
+                    (interaction, parent) -> interaction.beamNativeLength = parent.beamNativeLength
+            )
+            .documentation("Authored forward length of the beam particle system, used to scale it to the target distance.")
+            .add()
+            .<Double>appendInherited(
+                    new KeyedCodec<>("ChannelDurationSeconds", Codec.DOUBLE),
+                    (interaction, value) -> interaction.channelDurationSeconds = value,
+                    interaction -> interaction.channelDurationSeconds,
+                    (interaction, parent) -> interaction.channelDurationSeconds = parent.channelDurationSeconds
+            )
+            .documentation("Maximum lifetime of the server-tracked channel visuals.")
+            .add()
             .build();
 
     private String phase = Phase.COMPLETE.name();
+    private String beamParticleSystem;
+    private double beamNativeLength = 50.0D;
+    private double channelDurationSeconds = 3.0D;
 
     private enum Phase {
         BEGIN,
@@ -70,7 +102,6 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
         }
         CommandBuffer<EntityStore> commandBuffer = context.getCommandBuffer();
         Ref<EntityStore> playerRef = context.getEntity();
-        Ref<EntityStore> targetRef = context.getTargetEntity();
         ItemStack heldItem = context.getHeldItem();
         Player player = commandBuffer == null || playerRef == null
                 ? null
@@ -79,8 +110,14 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
                 ? null
                 : Tamework.getInstance().getSpawnerFeatureHandler();
         Phase parsedPhase = parsePhase(phase);
-        if (commandBuffer == null || player == null || targetRef == null || heldItem == null
+        Ref<EntityStore> targetRef = resolveTarget(parsedPhase, context, playerRef, player);
+        if (commandBuffer == null || player == null || heldItem == null
                 || heldItem.isEmpty() || handler == null || parsedPhase == null) {
+            fail(context, time, type, cooldownHandler);
+            return;
+        }
+
+        if (parsedPhase != Phase.CANCEL && targetRef == null) {
             fail(context, time, type, cooldownHandler);
             return;
         }
@@ -90,12 +127,50 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             return;
         }
         switch (parsedPhase) {
-            case BEGIN -> commandBuffer.run(store -> handler.beginCaptureChannel(player, targetRef, heldItem));
+            case BEGIN -> commandBuffer.run(store -> handler.beginCaptureChannel(
+                    player,
+                    targetRef,
+                    heldItem,
+                    beamParticleSystem,
+                    beamNativeLength,
+                    channelDurationSeconds
+            ));
             case CANCEL -> commandBuffer.run(store -> handler.endCaptureChannel(player, targetRef, heldItem));
             case COMPLETE -> commandBuffer.run(store -> handler.completeCaptureChannel(player, targetRef, heldItem));
         }
         context.setHeldItem(heldItem);
         super.tick0(true, time, type, context, cooldownHandler);
+    }
+
+    private static Ref<EntityStore> resolveTarget(Phase phase,
+                                                   InteractionContext context,
+                                                   Ref<EntityStore> playerRef,
+                                                   Player player) {
+        if (phase == null || player == null) {
+            return null;
+        }
+        World world = player.getWorld();
+        if (phase != Phase.BEGIN && world != null && world.getEntityStore() != null) {
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            UUIDComponent playerUuid = store.getComponent(playerRef, UUIDComponent.getComponentType());
+            if (playerUuid != null && playerUuid.getUuid() != null) {
+                Ref<EntityStore> locked = CaptureChannelVfxSystem.resolveTarget(playerUuid.getUuid(), world);
+                if (locked != null) {
+                    return locked;
+                }
+            }
+        }
+        Ref<EntityStore> explicit = context.getTargetEntity();
+        if (explicit != null && explicit.isValid()) {
+            return explicit;
+        }
+        if (phase == Phase.CANCEL || world == null || world.getEntityStore() == null
+                || playerRef == null || !playerRef.isValid()) {
+            return null;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        Ref<EntityStore> raycast = TargetUtil.getTargetEntity(playerRef, 32.0F, store);
+        return raycast != null && raycast.isValid() ? raycast : null;
     }
 
     @Override
