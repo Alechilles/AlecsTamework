@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.avatarflight;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -68,20 +67,6 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         }
     }
 
-    public static void restoreCurrentEquipment(@Nonnull Ref<EntityStore> ref,
-                                               @Nonnull ComponentAccessor<EntityStore> accessor) {
-        EntityTrackerSystems.Visible visible = accessor.getComponent(
-                ref,
-                EntityTrackerSystems.Visible.getComponentType()
-        );
-        if (visible == null) {
-            return;
-        }
-        EquipmentUpdate update = AvatarFlightEquipmentPacketService.createCurrentEquipmentUpdate(ref, accessor);
-        queueAll(ref, update, visible.visibleTo);
-        queueAll(ref, update, visible.newlyVisibleTo);
-    }
-
     private void queueHiddenOwnerUpdate(
             @Nonnull Ref<EntityStore> ref,
             @Nonnull CommandBuffer<EntityStore> commandBuffer,
@@ -138,14 +123,6 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
             return UUID.fromString(visual.getOwnerUuid());
         } catch (IllegalArgumentException ignored) {
             return null;
-        }
-    }
-
-    private static void queueAll(@Nonnull Ref<EntityStore> ref,
-                                 @Nonnull EquipmentUpdate update,
-                                 @Nonnull Map<Ref<EntityStore>, EntityTrackerSystems.EntityViewer> visibleTo) {
-        for (EntityTrackerSystems.EntityViewer viewer : visibleTo.values()) {
-            viewer.queueUpdate(ref, update);
         }
     }
 

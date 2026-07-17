@@ -83,6 +83,36 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
                 "disconnect cleanup should not manage removed double-jump activation bookkeeping");
     }
 
+    /** Protects armor clothing masks from being overwritten by the post-flight skin refresh. */
+    @Test
+    void disablingAvatarFlightRestoresSkinBeforeBaseEquipmentResync() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String disableBody = methodBody(
+                source,
+                "public Result disable",
+                "private static void markEquipmentPresentationOutdated"
+        );
+        String resyncBody = methodBody(
+                source,
+                "private static void markEquipmentPresentationOutdated",
+                "private void restoreClientFlyingState"
+        );
+
+        int modelRestore = disableBody.indexOf("modelService.restore(store, ref, playerUuid)");
+        int equipmentResync = disableBody.indexOf("markEquipmentPresentationOutdated(store, ref)");
+        assertTrue(modelRestore >= 0, "disable must restore the ordinary player model and skin");
+        assertTrue(equipmentResync > modelRestore,
+                "equipment must resync after the skin refresh so armor can hide clothing last");
+        assertFalse(disableBody.contains("AvatarFlightEquipmentVisualSystem.restoreCurrentEquipment"),
+                "cleanup must not queue equipment before model and skin tracker updates");
+        assertTrue(resyncBody.contains("InventoryComponent.Armor.getComponentType()"));
+        assertTrue(resyncBody.contains("InventoryComponent.Hotbar.getComponentType()"));
+        assertTrue(resyncBody.contains("InventoryComponent.Utility.getComponentType()"));
+        assertTrue(resyncBody.contains("armor.setOutdatedEquipment(true)"));
+        assertTrue(resyncBody.contains("hotbar.setOutdatedEquipment(true)"));
+        assertTrue(resyncBody.contains("utility.setOutdatedEquipment(true)"));
+    }
+
     private static String methodBody(String source, String startNeedle, String endNeedle) {
         int start = source.indexOf(startNeedle);
         int end = source.indexOf(endNeedle, start + startNeedle.length());

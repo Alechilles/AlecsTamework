@@ -16,6 +16,7 @@ Agents should check these notes when a task matches the topic. Keep this index l
 | `Limitations.md` | A request may be blocked by known Hytale or Tamework limitations. |
 | `Persistence.md` | Saved state, profile data, SQLite, or override persistence may be involved. |
 | `UI.md` | Tamework UI, HUD, or interaction presentation needs design/debug context. |
+| `2026-07-15-avatar-flight-mount-session-lifecycle.md` | Avatar-flight session cleanup, player model/skin/equipment presentation ordering, or source-NPC restoration is involved. |
 
 When a new lesson is discovered during work, update the external note first, then update this index if the lesson adds a new file or major topic.
 

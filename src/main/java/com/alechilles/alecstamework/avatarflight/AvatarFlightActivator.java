@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.entity.AnimationUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -86,17 +87,36 @@ public final class AvatarFlightActivator {
         resetVisualPose(store, ref);
         clearForcedAnimations(store, ref);
         riderVisualService.remove(store, ref);
-        if (restoreEquipment) {
-            AvatarFlightEquipmentVisualSystem.restoreCurrentEquipment(ref, store);
-        }
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
         boolean hadSavedModel = modelService.hasSavedModel(playerUuid);
         boolean restored = !hadSavedModel || modelService.restore(store, ref, playerUuid);
+        if (restoreEquipment) {
+            markEquipmentPresentationOutdated(store, ref);
+        }
         return restored
                 ? Result.ok("Avatar flight disabled" + (hadSavedModel
                 ? " and model restored." : "."))
                 : Result.fail("Avatar flight disabled, but no saved model or skin fallback was available.");
+    }
+
+    /**
+     * Lets the base equipment tracker replay armor after the restored player skin reaches the client.
+     */
+    private static void markEquipmentPresentationOutdated(@Nonnull Store<EntityStore> store,
+                                                           @Nonnull Ref<EntityStore> ref) {
+        InventoryComponent.Armor armor = store.getComponent(ref, InventoryComponent.Armor.getComponentType());
+        if (armor != null) {
+            armor.setOutdatedEquipment(true);
+        }
+        InventoryComponent.Hotbar hotbar = store.getComponent(ref, InventoryComponent.Hotbar.getComponentType());
+        if (hotbar != null) {
+            hotbar.setOutdatedEquipment(true);
+        }
+        InventoryComponent.Utility utility = store.getComponent(ref, InventoryComponent.Utility.getComponentType());
+        if (utility != null) {
+            utility.setOutdatedEquipment(true);
+        }
     }
 
     private void restoreClientFlyingState(@Nonnull Store<EntityStore> store,
