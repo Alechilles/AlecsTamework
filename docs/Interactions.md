@@ -254,6 +254,10 @@ Optional `Begin` fields:
 - `BeamNativeLength`: authored forward length of that particle system. Tamework scales each short-lived segment to stop at the target. Defaults to `50`.
 - `ChannelDurationSeconds`: maximum server-side visual session lifetime. Match this to the charging threshold. Defaults to `3`.
 
+Optional `Complete` field:
+
+- `CaptureBurstParticleSystem`: one-shot world particle system emitted at the locked target only after the transactional capture applies successfully.
+
 The initial target is locked for the session. Short particle segments are capped and renewed only while the channel is active, so cancel, completion, disconnect, invalid targets, and timeout stop new emission without leaving a persistent particle source.
 
 For a left-click channel, place the root under the item's `Interactions.Primary` key. `Use` is the F interaction and can conflict with NPC interaction options.
@@ -424,9 +428,9 @@ Common effect families:
 
 - `Phase: Begin` validates the empty spawner, target role/state, ownership, cooldown, and distance, then applies `Capture.ChannelAuraEffectId`. Health and required-effect gates are intentionally deferred until completion so channel feedback can begin before the target is capture-ready.
 - `Phase: Cancel` removes the channel aura without capturing.
-- `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture.
+- `Phase: Complete` removes the aura, revalidates every capture requirement, and schedules the normal transactional spawner capture. If configured, `CaptureBurstParticleSystem` plays only after that capture applies successfully.
 
-Use `Begin` before `Charging`, route the charge release branch (`0.0`) to `Cancel`, and route the desired duration (for example `3.0`) to `Complete`. Configure `BeamParticleSystem` on `Begin`; Tamework emits bounded world-space segments between the player and the locked target only while that server-tracked channel is active.
+Use `Begin` before `Charging`, route the charge release branch (`0.0`) to `Cancel`, and route the desired duration (for example `3.0`) to `Complete`. Configure `BeamParticleSystem` on `Begin` and `CaptureBurstParticleSystem` on `Complete`; Tamework emits bounded world-space segments between the player and the locked target only while that server-tracked channel is active.
 
 ## Action usage in roles
 ```json

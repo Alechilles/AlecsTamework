@@ -116,7 +116,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
             return;
         }
         Vector3d source = resolveEyePosition(playerRef, store);
-        Vector3d target = resolveEyePosition(targetRef, store);
+        Vector3d target = resolveBeamTargetPosition(targetRef, store);
         if (source == null || target == null) {
             return;
         }
@@ -192,6 +192,29 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         }
         Vector3d position = transform.getPosition();
         return new Vector3d(position.x, position.y + eyeHeight, position.z);
+    }
+
+    @Nullable
+    private static Vector3d resolveBeamTargetPosition(@Nonnull Ref<EntityStore> ref,
+                                                      @Nonnull Store<EntityStore> store) {
+        TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+        if (transform == null) {
+            return null;
+        }
+        double eyeHeight = 0.0D;
+        ModelComponent model = store.getComponent(ref, ModelComponent.getComponentType());
+        if (model != null && model.getModel() != null) {
+            eyeHeight = model.getModel().getEyeHeight(ref, store);
+        }
+        Vector3d position = transform.getPosition();
+        return new Vector3d(position.x, position.y + targetAnchorHeight(eyeHeight), position.z);
+    }
+
+    static double targetAnchorHeight(double eyeHeight) {
+        if (!Double.isFinite(eyeHeight) || eyeHeight <= 0.0D) {
+            return 0.15D;
+        }
+        return Math.max(0.15D, Math.min(2.5D, eyeHeight * 0.45D));
     }
 
     private static void expire(@Nonnull Session session,

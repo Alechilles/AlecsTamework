@@ -34,6 +34,13 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
+    void beamTargetsBodyCenterInsteadOfFloatingAtEyeHeight() {
+        assertEquals(0.27D, CaptureChannelVfxSystem.targetAnchorHeight(0.6D), 0.00001D);
+        assertEquals(0.15D, CaptureChannelVfxSystem.targetAnchorHeight(0.0D), 0.00001D);
+        assertEquals(2.5D, CaptureChannelVfxSystem.targetAnchorHeight(12.0D), 0.00001D);
+    }
+
+    @Test
     void channelUsesShortBoundedSegmentsAndTracksBothEndpoints() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"

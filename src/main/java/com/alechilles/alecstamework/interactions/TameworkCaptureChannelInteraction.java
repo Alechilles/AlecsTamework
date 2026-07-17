@@ -55,6 +55,14 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             )
             .documentation("Authored forward length of the beam particle system, used to scale it to the target distance.")
             .add()
+            .<String>appendInherited(
+                    new KeyedCodec<>("CaptureBurstParticleSystem", Codec.STRING),
+                    (interaction, value) -> interaction.captureBurstParticleSystem = value,
+                    interaction -> interaction.captureBurstParticleSystem,
+                    (interaction, parent) -> interaction.captureBurstParticleSystem = parent.captureBurstParticleSystem
+            )
+            .documentation("Optional one-shot world particle system emitted at the target after capture succeeds.")
+            .add()
             .<Double>appendInherited(
                     new KeyedCodec<>("ChannelDurationSeconds", Codec.DOUBLE),
                     (interaction, value) -> interaction.channelDurationSeconds = value,
@@ -68,6 +76,7 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
     private String phase = Phase.COMPLETE.name();
     private String beamParticleSystem;
     private double beamNativeLength = 50.0D;
+    private String captureBurstParticleSystem;
     private double channelDurationSeconds = 3.0D;
 
     private enum Phase {
@@ -141,7 +150,12 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
                     channelDurationSeconds
             ));
             case CANCEL -> commandBuffer.run(store -> handler.endCaptureChannel(player, targetRef, heldItem));
-            case COMPLETE -> commandBuffer.run(store -> handler.completeCaptureChannel(player, targetRef, heldItem));
+            case COMPLETE -> commandBuffer.run(store -> handler.completeCaptureChannel(
+                    player,
+                    targetRef,
+                    heldItem,
+                    captureBurstParticleSystem
+            ));
         }
         context.setHeldItem(heldItem);
         super.tick0(true, time, type, context, cooldownHandler);

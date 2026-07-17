@@ -35,11 +35,39 @@ class SpawnerWildCaptureArchitectureTest {
         ));
         int complete = source.indexOf("boolean completeCaptureChannel(");
         int removeAura = source.indexOf("endCaptureChannel(player, targetRef, itemStack)", complete);
-        int capture = source.indexOf("captureFromItemInteraction(player, itemStack, targetRef)", removeAura);
+        int capture = source.indexOf(
+                "captureFromItemInteraction(player, itemStack, targetRef, captureBurstParticleSystem)",
+                removeAura
+        );
 
         assertTrue(complete >= 0);
         assertTrue(removeAura > complete);
         assertTrue(capture > removeAura);
+    }
+
+    @Test
+    void captureBurstRunsOnlyAfterTransactionalCaptureApplies() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
+        ));
+        int callback = source.indexOf("public void onApplied(String profileId,");
+        int burst = source.indexOf("spawnCaptureSuccessParticle(captureBurstParticleSystem, context)", callback);
+        int denied = source.indexOf("public void onDenied(String reason)", callback);
+
+        assertTrue(callback >= 0);
+        assertTrue(burst > callback);
+        assertTrue(denied > burst);
+    }
+
+    @Test
+    void captureChannelExposesACompletionBurstParticleField() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
+        ));
+
+        assertTrue(source.contains("new KeyedCodec<>(\"CaptureBurstParticleSystem\", Codec.STRING)"));
+        assertTrue(source.contains("captureBurstParticleSystem"));
+        assertTrue(source.contains("case COMPLETE -> commandBuffer.run"));
     }
 
     @Test

@@ -17,6 +17,8 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -376,8 +378,15 @@ public final class SpawnerFeatureHandler {
     }
 
     public boolean completeCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
+        return completeCaptureChannel(player, targetRef, itemStack, null);
+    }
+
+    public boolean completeCaptureChannel(Player player,
+                                          Ref<EntityStore> targetRef,
+                                          ItemStack itemStack,
+                                          @Nullable String captureBurstParticleSystem) {
         endCaptureChannel(player, targetRef, itemStack);
-        return captureFromItemInteraction(player, itemStack, targetRef);
+        return captureFromItemInteraction(player, itemStack, targetRef, captureBurstParticleSystem);
     }
 
     public boolean canSpawnInteraction(ItemStack itemStack) {
@@ -404,6 +413,13 @@ public final class SpawnerFeatureHandler {
 
     // Used by TameworkSpawnInteraction: capture from a targeted NPC using the held spawner item.
     public boolean captureFromItemInteraction(Player player, ItemStack itemStack, Ref<EntityStore> targetRef) {
+        return captureFromItemInteraction(player, itemStack, targetRef, null);
+    }
+
+    private boolean captureFromItemInteraction(Player player,
+                                               ItemStack itemStack,
+                                               Ref<EntityStore> targetRef,
+                                               @Nullable String captureBurstParticleSystem) {
         if (player == null || itemStack == null || itemStack.isEmpty() || targetRef == null) {
             return false;
         }
@@ -417,7 +433,7 @@ public final class SpawnerFeatureHandler {
             );
             return false;
         }
-        return captureFromNpcAction(player, targetRef, itemStack, config);
+        return captureFromNpcAction(player, targetRef, itemStack, config, captureBurstParticleSystem);
     }
 
     // Used by TameworkSpawnInteraction: builds a minimal config to spawn from the held item.
@@ -474,6 +490,14 @@ public final class SpawnerFeatureHandler {
 
     // Called by NPC action chains to capture an NPC into the held spawner item.
     public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
+        return captureFromNpcAction(player, targetRef, itemStack, config, null);
+    }
+
+    private boolean captureFromNpcAction(Player player,
+                                         Ref<EntityStore> targetRef,
+                                         ItemStack itemStack,
+                                         ItemFeatureConfig config,
+                                         @Nullable String captureBurstParticleSystem) {
         if (player == null || targetRef == null || itemStack == null || config == null) {
             return false;
         }
@@ -675,6 +699,7 @@ public final class SpawnerFeatureHandler {
                         if (coopService != null) {
                             coopService.clearCoopSnapshot(liveUuid);
                         }
+                        spawnCaptureSuccessParticle(captureBurstParticleSystem, context);
                         effectService.playCaptureEffects(world, context.npcRef(), finalizedConfig);
                         logger.at(Level.FINE).log(
                                 "Spawner stub: capture request item=" + itemStack.getItemId()
@@ -720,6 +745,22 @@ public final class SpawnerFeatureHandler {
                     }
                 }
         );
+    }
+
+    private static void spawnCaptureSuccessParticle(
+            @Nullable String particleSystem,
+            com.alechilles.alecstamework.ownership.OwnerMutationContext context) {
+        if (particleSystem == null || particleSystem.isBlank()
+                || context == null || context.npcRef() == null || !context.npcRef().isValid()) {
+            return;
+        }
+        TransformComponent transform = context.store().getComponent(
+                context.npcRef(), TransformComponent.getComponentType()
+        );
+        if (transform == null || transform.getPosition() == null) {
+            return;
+        }
+        ParticleUtil.spawnParticleEffect(particleSystem, transform.getPosition(), context.store());
     }
 
     @Nullable
