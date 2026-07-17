@@ -22,6 +22,18 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
+    void tallTargetEyeHeightDoesNotSuppressBeamInsideCaptureRange() {
+        Vector3d playerRoot = new Vector3d(0.0D, 0.0D, 0.0D);
+        Vector3d dragonRoot = new Vector3d(8.0D, 0.0D, 0.0D);
+        Vector3d playerEye = new Vector3d(0.0D, 1.7D, 0.0D);
+        Vector3d dragonEye = new Vector3d(8.0D, 12.0D, 0.0D);
+
+        assertTrue(playerEye.distance(dragonEye) > 12.0D,
+                "the historical eye-distance gate must reproduce the tall-dragon failure");
+        assertTrue(CaptureChannelVfxSystem.isWithinConfiguredRange(playerRoot, dragonRoot, 12.0D));
+    }
+
+    @Test
     void channelUsesShortBoundedSegmentsAndTracksBothEndpoints() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"

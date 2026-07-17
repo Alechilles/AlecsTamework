@@ -110,6 +110,11 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         if (session.particleSystem == null || session.particleSystem.isBlank()) {
             return;
         }
+        Vector3d sourceRoot = resolveRootPosition(playerRef, store);
+        Vector3d targetRoot = resolveRootPosition(targetRef, store);
+        if (!isWithinConfiguredRange(sourceRoot, targetRoot, session.maxDistance)) {
+            return;
+        }
         Vector3d source = resolveEyePosition(playerRef, store);
         Vector3d target = resolveEyePosition(targetRef, store);
         if (source == null || target == null) {
@@ -117,8 +122,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         }
         Vector3d delta = new Vector3d(target).sub(source);
         double distance = delta.length();
-        if (!Double.isFinite(distance) || distance <= MIN_DISTANCE
-                || session.maxDistance > 0.0D && distance > session.maxDistance) {
+        if (!Double.isFinite(distance) || distance <= MIN_DISTANCE) {
             return;
         }
         // Pull the source slightly away from the camera while preserving the exact endpoint scale.
@@ -146,10 +150,31 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         return (float) (distance / nativeBeamLength);
     }
 
+    static boolean isWithinConfiguredRange(@Nullable Vector3d sourceRoot,
+                                           @Nullable Vector3d targetRoot,
+                                           double maxDistance) {
+        if (sourceRoot == null || targetRoot == null) {
+            return false;
+        }
+        double distance = sourceRoot.distance(targetRoot);
+        return Double.isFinite(distance) && (maxDistance <= 0.0D || distance <= maxDistance);
+    }
+
     static Rotation3f rotationForPositiveXBeam(@Nonnull Vector3d direction) {
         Rotation3f look = Rotation3f.lookAt(direction);
         // Hytale look rotations aim local -Z; Beam_Lightning2 is authored along local +X.
         return look.mul(new Quaterniond().rotationY(Math.PI / 2.0D));
+    }
+
+    @Nullable
+    private static Vector3d resolveRootPosition(@Nonnull Ref<EntityStore> ref,
+                                                @Nonnull Store<EntityStore> store) {
+        TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+        if (transform == null) {
+            return null;
+        }
+        Vector3d position = transform.getPosition();
+        return new Vector3d(position.x, position.y, position.z);
     }
 
     @Nullable
