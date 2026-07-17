@@ -16,7 +16,7 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
-    void beamPositiveXAxisRotatesOntoTargetVector() {
+    void beamPacketNegativeXAxisRotatesOntoTargetVector() {
         assertBeamDirection(new Vector3d(8.0D, 3.0D, -5.0D));
         assertBeamDirection(new Vector3d(-4.0D, -2.0D, 7.0D));
     }
@@ -43,13 +43,13 @@ class CaptureChannelVfxSystemTest {
         assertTrue(source.contains("SEGMENT_MAX_DURATION_SECONDS = 0.85F"));
         assertTrue(source.contains("world.getEntityRef(session.playerUuid)"));
         assertTrue(source.contains("world.getEntityRef(session.targetUuid)"));
-        assertTrue(source.contains("rotationForPositiveXBeam"));
+        assertTrue(source.contains("rotationForBeamPacket"));
         assertTrue(source.contains("ACTIVE.remove(session.playerUuid, session)"));
     }
 
     private static void assertBeamDirection(Vector3d targetDirection) {
-        Vector3d actual = CaptureChannelVfxSystem.rotationForPositiveXBeam(targetDirection)
-                .transform(new Vector3d(1.0D, 0.0D, 0.0D))
+        Vector3d actual = CaptureChannelVfxSystem.rotationForBeamPacket(targetDirection)
+                .transform(new Vector3d(-1.0D, 0.0D, 0.0D))
                 .normalize();
         Vector3d expected = new Vector3d(targetDirection).normalize();
         assertTrue(actual.dot(expected) > 0.99999D,

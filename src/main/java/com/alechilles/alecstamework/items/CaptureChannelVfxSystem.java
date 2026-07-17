@@ -128,7 +128,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         // Pull the source slightly away from the camera while preserving the exact endpoint scale.
         Vector3d origin = new Vector3d(source).fma(0.04D, delta);
         double visibleDistance = origin.distance(target);
-        Rotation3f rotation = rotationForPositiveXBeam(new Vector3d(target).sub(origin));
+        Rotation3f rotation = rotationForBeamPacket(new Vector3d(target).sub(origin));
         float scale = scaleForDistance(visibleDistance, session.nativeBeamLength);
         ParticleUtil.spawnParticleEffect(
                 session.particleSystem,
@@ -160,10 +160,11 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         return Double.isFinite(distance) && (maxDistance <= 0.0D || distance <= maxDistance);
     }
 
-    static Rotation3f rotationForPositiveXBeam(@Nonnull Vector3d direction) {
+    static Rotation3f rotationForBeamPacket(@Nonnull Vector3d direction) {
         Rotation3f look = Rotation3f.lookAt(direction);
-        // Hytale look rotations aim local -Z; Beam_Lightning2 is authored along local +X.
-        return look.mul(new Quaterniond().rotationY(Math.PI / 2.0D));
+        // SpawnParticleSystem.Direction uses the inverse particle-space axis at render time.
+        // Align packet-space -X with the target so Beam_Lightning2's rendered +X travels toward it.
+        return look.mul(new Quaterniond().rotationY(-Math.PI / 2.0D));
     }
 
     @Nullable
