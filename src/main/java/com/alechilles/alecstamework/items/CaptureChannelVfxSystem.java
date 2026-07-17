@@ -5,11 +5,13 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.server.core.entity.entities.ProjectileComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.TargetUtil;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,6 +26,9 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
     private static final float SEGMENT_MAX_DURATION_SECONDS = 0.85F;
     private static final double DEFAULT_NATIVE_BEAM_LENGTH = 50.0D;
     private static final double MIN_DISTANCE = 0.01D;
+    private static final double HELD_ITEM_RIGHT_OFFSET = 0.32D;
+    private static final double HELD_ITEM_DOWN_OFFSET = 0.42D;
+    private static final double HELD_ITEM_FORWARD_OFFSET = 0.38D;
     private static final Map<UUID, Session> ACTIVE = new ConcurrentHashMap<>();
 
     public static boolean start(@Nonnull UUID playerUuid,
@@ -115,7 +120,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         if (!isWithinConfiguredRange(sourceRoot, targetRoot, session.maxDistance)) {
             return;
         }
-        Vector3d source = resolveEyePosition(playerRef, store);
+        Vector3d source = resolveHeldItemPosition(playerRef, store);
         Vector3d target = resolveBeamTargetPosition(targetRef, store);
         if (source == null || target == null) {
             return;
@@ -125,8 +130,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         if (!Double.isFinite(distance) || distance <= MIN_DISTANCE) {
             return;
         }
-        // Pull the source slightly away from the camera while preserving the exact endpoint scale.
-        Vector3d origin = new Vector3d(source).fma(0.04D, delta);
+        Vector3d origin = new Vector3d(source);
         double visibleDistance = origin.distance(target);
         Rotation3f rotation = rotationForBeamPacket(new Vector3d(target).sub(origin));
         float scale = scaleForDistance(visibleDistance, session.nativeBeamLength);
@@ -179,19 +183,31 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
     }
 
     @Nullable
-    private static Vector3d resolveEyePosition(@Nonnull Ref<EntityStore> ref,
-                                               @Nonnull Store<EntityStore> store) {
+    private static Vector3d resolveHeldItemPosition(@Nonnull Ref<EntityStore> ref,
+                                                    @Nonnull Store<EntityStore> store) {
         TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
             return null;
         }
-        double eyeHeight = 0.0D;
-        ModelComponent model = store.getComponent(ref, ModelComponent.getComponentType());
-        if (model != null && model.getModel() != null) {
-            eyeHeight = model.getModel().getEyeHeight(ref, store);
-        }
-        Vector3d position = transform.getPosition();
-        return new Vector3d(position.x, position.y + eyeHeight, position.z);
+        var look = TargetUtil.getLook(ref, store);
+        return new Vector3d(look.getPosition()).add(heldItemOffset(
+                look.getRotation().yaw(),
+                look.getRotation().pitch()
+        ));
+    }
+
+    static Vector3d heldItemOffset(float yaw, float pitch) {
+        Vector3d offset = new Vector3d();
+        ProjectileComponent.computeStartOffset(
+                true,
+                HELD_ITEM_DOWN_OFFSET,
+                HELD_ITEM_RIGHT_OFFSET,
+                HELD_ITEM_FORWARD_OFFSET,
+                yaw,
+                pitch,
+                offset
+        );
+        return offset;
     }
 
     @Nullable

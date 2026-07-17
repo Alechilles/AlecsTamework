@@ -250,7 +250,7 @@ Runs one phase of a server-authoritative spawner capture channel. Use it as the 
 
 Optional `Begin` fields:
 
-- `BeamParticleSystem`: world particle system repeatedly emitted from the player's eye/item line to the initially targeted NPC.
+- `BeamParticleSystem`: world particle system repeatedly emitted from a view-relative right-hand item anchor to the initially targeted NPC.
 - `BeamNativeLength`: authored forward length of that particle system. Tamework scales each short-lived segment to stop at the target. Defaults to `50`.
 - `ChannelDurationSeconds`: maximum server-side visual session lifetime. Match this to the charging threshold. Defaults to `3`.
 
@@ -258,7 +258,7 @@ Optional `Complete` field:
 
 - `CaptureBurstParticleSystem`: one-shot world particle system emitted at the locked target only after the transactional capture applies successfully.
 
-The initial target is locked for the session. Short particle segments are capped and renewed only while the channel is active, so cancel, completion, disconnect, invalid targets, and timeout stop new emission without leaving a persistent particle source.
+The initial target is locked for the session. The beam source follows the player's live look rotation with a right/down/forward offset matching the held-item view position. Short particle segments are capped and renewed only while the channel is active, so cancel, completion, disconnect, invalid targets, and timeout stop new emission without leaving a persistent particle source.
 
 For a left-click channel, place the root under the item's `Interactions.Primary` key. `Use` is the F interaction and can conflict with NPC interaction options.
 

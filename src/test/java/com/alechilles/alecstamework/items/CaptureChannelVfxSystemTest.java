@@ -41,6 +41,15 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
+    void beamStartsAtRightHandItemOffsetInsteadOfPlayerEyes() {
+        Vector3d offset = CaptureChannelVfxSystem.heldItemOffset(0.0F, 0.0F);
+
+        assertEquals(0.32D, offset.x, 0.00001D);
+        assertEquals(-0.42D, offset.y, 0.00001D);
+        assertEquals(-0.38D, offset.z, 0.00001D);
+    }
+
+    @Test
     void channelUsesShortBoundedSegmentsAndTracksBothEndpoints() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"
