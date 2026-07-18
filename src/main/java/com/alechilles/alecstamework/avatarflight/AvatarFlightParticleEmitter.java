@@ -34,13 +34,13 @@ public final class AvatarFlightParticleEmitter {
         if (systemId.isBlank()) return false;
         try {
             if (ParticleSystem.getAssetMap().getAsset(systemId) == null) {
-                warnOnce(systemId, "AvatarFlight launch particle system is missing: " + systemId);
+                warnOnce(systemId, "AvatarFlight particle system is missing: " + systemId);
                 return false;
             }
             Vector3d position = new Vector3d(x, y, z);
             List<Ref<EntityStore>> recipients = resolveRecipients(position, ownerRef, componentAccessor);
             if (recipients.isEmpty()) {
-                warnOnce(systemId, "AvatarFlight launch particle system has no packet recipients: " + systemId);
+                warnOnce(systemId, "AvatarFlight particle system has no packet recipients: " + systemId);
                 return false;
             }
             ParticleUtil.spawnParticleEffect(
@@ -60,7 +60,7 @@ public final class AvatarFlightParticleEmitter {
             );
             return true;
         } catch (RuntimeException error) {
-            warnOnce(systemId, "AvatarFlight launch particle emission failed for " + systemId
+            warnOnce(systemId, "AvatarFlight particle emission failed for " + systemId
                     + ": " + error.getMessage());
             return false;
         }

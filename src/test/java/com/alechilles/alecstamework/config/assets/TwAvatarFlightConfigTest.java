@@ -121,6 +121,14 @@ class TwAvatarFlightConfigTest {
         assertEquals(2.0, config.getLaunch().getFullChargeCost(), 0.00001);
         assertEquals(0.6, config.getLaunch().getFullChargeCostThreshold(), 0.00001);
         assertTrue(config.getVfx().isEnabled());
+        assertTrue(config.getVfx().isForwardBoostEnabled());
+        assertEquals(AvatarFlightVfxSettings.DEFAULT_FORWARD_BOOST_SYSTEM,
+                config.getVfx().getForwardBoostParticleSystem());
+        assertEquals(1.0, config.getVfx().getForwardBoostScale(), 0.00001);
+        assertTrue(config.getVfx().isUpwardBoostEnabled());
+        assertEquals(AvatarFlightVfxSettings.DEFAULT_UPWARD_BOOST_SYSTEM,
+                config.getVfx().getUpwardBoostParticleSystem());
+        assertEquals(1.0, config.getVfx().getUpwardBoostScale(), 0.00001);
         assertEquals(AvatarFlightVfxSettings.DEFAULT_CHARGE_SYSTEM,
                 config.getVfx().getLaunchChargeParticleSystem());
         assertEquals(600L, config.getVfx().getLaunchChargeEarlyIntervalMs());
@@ -251,6 +259,8 @@ class TwAvatarFlightConfigTest {
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
         setNestedField(parent, "vfx", "launchChargeEarlyIntervalMs", 800.0);
         setNestedField(parent, "vfx", "launchReleaseFullParticleSystem", "ParentFull");
+        setNestedField(parent, "vfx", "forwardBoostParticleSystem", "ParentForwardBoost");
+        setNestedField(parent, "vfx", "forwardBoostScale", 4.0);
         setNestedField(child, "vfx", "launchChargeEarlyIntervalMs", 300.0);
         setNestedField(child, "vfx", "launchReleaseFullParticleSystem", "ChildFull");
 
@@ -262,6 +272,21 @@ class TwAvatarFlightConfigTest {
 
         assertEquals(300L, child.getVfx().getLaunchChargeEarlyIntervalMs());
         assertEquals("ParentFull", child.getVfx().getLaunchReleaseFullParticleSystem());
+        assertEquals("ParentForwardBoost", child.getVfx().getForwardBoostParticleSystem());
+        assertEquals(4.0, child.getVfx().getForwardBoostScale(), 0.00001);
+    }
+
+    @Test
+    void boostVfxScaleDefaultsToExistingSpeciesLaunchScale() throws Exception {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(config, "vfx", "launchReleaseMidScale", 6.0);
+
+        assertEquals(6.0, config.getVfx().getForwardBoostScale(), 0.00001);
+        assertEquals(6.0, config.getVfx().getUpwardBoostScale(), 0.00001);
+
+        setNestedField(config, "vfx", "forwardBoostScale", 4.5);
+        assertEquals(4.5, config.getVfx().getForwardBoostScale(), 0.00001);
+        assertEquals(6.0, config.getVfx().getUpwardBoostScale(), 0.00001);
     }
 
     @Test
@@ -270,12 +295,14 @@ class TwAvatarFlightConfigTest {
         setNestedField(config, "vfx", "launchChargeEarlyIntervalMs", 100.0);
         setNestedField(config, "vfx", "launchChargeFullIntervalMs", 900.0);
         setNestedField(config, "vfx", "launchChargeMinScale", -1.0);
+        setNestedField(config, "vfx", "upwardBoostScale", -1.0);
         setNestedField(config, "vfx", "launchReleaseMidThreshold", 0.9);
         setNestedField(config, "vfx", "launchReleaseFullThreshold", 0.2);
 
         assertEquals(100L, config.getVfx().getLaunchChargeEarlyIntervalMs());
         assertEquals(100L, config.getVfx().getLaunchChargeFullIntervalMs());
         assertEquals(0.65, config.getVfx().getLaunchChargeMinScale(), 0.00001);
+        assertEquals(1.0, config.getVfx().getUpwardBoostScale(), 0.00001);
         assertEquals(0.9, config.getVfx().getLaunchReleaseMidThreshold(), 0.00001);
         assertEquals(0.9, config.getVfx().getLaunchReleaseFullThreshold(), 0.00001);
     }

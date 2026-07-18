@@ -1,0 +1,12 @@
+{
+  "Spawners": [
+    { "SpawnerId": "TwForwardBoostCompression", "PositionOffset": { "X": -0.1, "Y": 0.55 } },
+    { "SpawnerId": "TwForwardBoostCompression", "PositionOffset": { "X": -0.3, "Y": 0.55 }, "StartDelay": 0.06 },
+    { "SpawnerId": "TwForwardBoostLances", "PositionOffset": { "X": -0.1, "Y": 0.55 } },
+    { "SpawnerId": "TwForwardBoostLances", "PositionOffset": { "X": -0.2, "Y": 0.55 }, "StartDelay": 0.05 }
+  ],
+  "LifeSpan": 0.75,
+  "CullDistance": 75.0,
+  "BoundingRadius": 12.0,
+  "IsImportant": false
+}

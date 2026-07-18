@@ -46,6 +46,7 @@ public final class AvatarFlightMovementSystem
     private final Query<EntityStore> query;
     private final AvatarFlightDebugLogService debugLogService = new AvatarFlightDebugLogService();
     private final AvatarFlightAnimationService animationService = new AvatarFlightAnimationService();
+    private final AvatarFlightBoostVfxService boostVfxService = new AvatarFlightBoostVfxService();
     private final AvatarFlightLaunchVfxService launchVfxService = new AvatarFlightLaunchVfxService();
     private final AvatarFlightLaunchAudioService launchAudioService = new AvatarFlightLaunchAudioService();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
@@ -104,6 +105,14 @@ public final class AvatarFlightMovementSystem
         );
         spendAppliedVigour(flight, config, output, now);
         TransformComponent transform = commandBuffer.getComponent(ref, transformType);
+        boostVfxService.emitApplied(
+                output,
+                config,
+                transform,
+                controllerInput.yawRadians(),
+                ref,
+                commandBuffer
+        );
         launchVfxService.tick(
                 flight,
                 input,

@@ -1,0 +1,12 @@
+{
+  "Spawners": [
+    { "SpawnerId": "TwUpwardBoostDownwash", "PositionOffset": { "Y": 0.45 } },
+    { "SpawnerId": "TwUpwardBoostDownwash", "PositionOffset": { "Y": 0.4 }, "StartDelay": 0.06 },
+    { "SpawnerId": "TwUpwardBoostLiftRibbons", "PositionOffset": { "Y": 0.3 } },
+    { "SpawnerId": "TwUpwardBoostLiftRibbons", "PositionOffset": { "Y": 0.35 }, "StartDelay": 0.08 }
+  ],
+  "LifeSpan": 0.95,
+  "CullDistance": 75.0,
+  "BoundingRadius": 12.0,
+  "IsImportant": false
+}

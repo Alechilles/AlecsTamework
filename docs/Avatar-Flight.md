@@ -168,6 +168,8 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 - `Enabled`: enables avatar-flight particle presentation without changing movement behavior.
 - `GroundOffsetY`: vertical offset from the avatar foot position for launch effects.
 - `MaxDurationSeconds`: defensive client-side lifetime cap for each spawned system.
+- `ForwardBoostEnabled`, `ForwardBoostParticleSystem`, `ForwardBoostScale`: successful forward-boost burst and whole-system scale.
+- `UpwardBoostEnabled`, `UpwardBoostParticleSystem`, `UpwardBoostScale`: successful upward-flap burst and whole-system scale.
 - `LaunchChargeEnabled`: enables grounded charge pulses.
 - `LaunchChargeParticleSystem`: system ID for each charge pulse.
 - `LaunchChargeEarlyIntervalMs` / `LaunchChargeFullIntervalMs`: pulse cadence at the start and end of charging.
@@ -177,6 +179,8 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 - `LaunchReleasePartialParticleSystem`, `LaunchReleaseMidParticleSystem`, `LaunchReleaseFullParticleSystem`: release systems by launch-curve tier.
 - `LaunchReleasePartialScale`, `LaunchReleaseMidScale`, `LaunchReleaseFullScale`: whole-system scale by tier.
 - `LaunchReleaseMidThreshold` / `LaunchReleaseFullThreshold`: launch-curve charge boundaries for mid and full release effects.
+
+Boost particles fire only when the movement controller accepts the corresponding impulse, so cooldown or insufficient-Vigour rejection remains visually silent. A boost scale of `0` follows `LaunchReleaseMidScale`; existing species profiles therefore retain their established avatar-relative sizing unless they explicitly override the boost scale.
 
 Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object overrides only its explicit nested keys and inherits the remaining values.
 

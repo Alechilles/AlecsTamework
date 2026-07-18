@@ -11,6 +11,8 @@ import javax.annotation.Nullable;
  * World-space particle presentation settings for avatar flight.
  */
 public final class AvatarFlightVfxSettings {
+    public static final String DEFAULT_FORWARD_BOOST_SYSTEM = "Tamework_AvatarFlight_Forward_Boost";
+    public static final String DEFAULT_UPWARD_BOOST_SYSTEM = "Tamework_AvatarFlight_Upward_Boost";
     public static final String DEFAULT_CHARGE_SYSTEM = "Tamework_AvatarFlight_Launch_Charge_Pulse";
     public static final String DEFAULT_CANCEL_SYSTEM = "Tamework_AvatarFlight_Launch_Cancel";
     public static final String DEFAULT_PARTIAL_SYSTEM = "Tamework_AvatarFlight_Launch_Release_Partial";
@@ -48,7 +50,37 @@ public final class AvatarFlightVfxSettings {
             .<Double>append(new KeyedCodec<>("MaxDurationSeconds", Codec.DOUBLE),
                     (settings, value) -> settings.maxDurationSeconds = positiveOrDefault(value, DEFAULT_MAX_DURATION_SECONDS),
                     settings -> settings.maxDurationSeconds)
-            .documentation("Defensive client-side duration limit for launch particle systems. Inheritance: missing nested key inherits parent value.")
+            .documentation("Defensive client-side duration limit for avatar-flight particle systems. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("ForwardBoostEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.forwardBoostEnabled = value == null || value,
+                    settings -> settings.forwardBoostEnabled)
+            .documentation("Whether successful forward boosts emit particles. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("ForwardBoostParticleSystem", Codec.STRING),
+                    (settings, value) -> settings.forwardBoostParticleSystem = stringOrDefault(value, DEFAULT_FORWARD_BOOST_SYSTEM),
+                    settings -> settings.forwardBoostParticleSystem)
+            .documentation("Particle system emitted for a successful forward boost. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("ForwardBoostScale", Codec.DOUBLE),
+                    (settings, value) -> settings.forwardBoostScale = nonNegativeOrDefault(value, 0.0),
+                    settings -> settings.forwardBoostScale)
+            .documentation("Whole-system scale for forward boost particles. Zero follows LaunchReleaseMidScale so existing species sizing carries over. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Boolean>append(new KeyedCodec<>("UpwardBoostEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.upwardBoostEnabled = value == null || value,
+                    settings -> settings.upwardBoostEnabled)
+            .documentation("Whether successful upward flap boosts emit particles. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("UpwardBoostParticleSystem", Codec.STRING),
+                    (settings, value) -> settings.upwardBoostParticleSystem = stringOrDefault(value, DEFAULT_UPWARD_BOOST_SYSTEM),
+                    settings -> settings.upwardBoostParticleSystem)
+            .documentation("Particle system emitted for a successful upward flap boost. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("UpwardBoostScale", Codec.DOUBLE),
+                    (settings, value) -> settings.upwardBoostScale = nonNegativeOrDefault(value, 0.0),
+                    settings -> settings.upwardBoostScale)
+            .documentation("Whole-system scale for upward boost particles. Zero follows LaunchReleaseMidScale so existing species sizing carries over. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Boolean>append(new KeyedCodec<>("LaunchChargeEnabled", Codec.BOOLEAN),
                     (settings, value) -> settings.launchChargeEnabled = value == null || value,
@@ -145,6 +177,12 @@ public final class AvatarFlightVfxSettings {
     private boolean enabled = true;
     private double groundOffsetY = DEFAULT_GROUND_OFFSET_Y;
     private double maxDurationSeconds = DEFAULT_MAX_DURATION_SECONDS;
+    private boolean forwardBoostEnabled = true;
+    private String forwardBoostParticleSystem = DEFAULT_FORWARD_BOOST_SYSTEM;
+    private double forwardBoostScale;
+    private boolean upwardBoostEnabled = true;
+    private String upwardBoostParticleSystem = DEFAULT_UPWARD_BOOST_SYSTEM;
+    private double upwardBoostScale;
     private boolean launchChargeEnabled = true;
     private String launchChargeParticleSystem = DEFAULT_CHARGE_SYSTEM;
     private double launchChargeEarlyIntervalMs = DEFAULT_EARLY_INTERVAL_MS;
@@ -169,6 +207,12 @@ public final class AvatarFlightVfxSettings {
         if (!keys.contains("Enabled")) enabled = parent.enabled;
         if (!keys.contains("GroundOffsetY")) groundOffsetY = parent.groundOffsetY;
         if (!keys.contains("MaxDurationSeconds")) maxDurationSeconds = parent.maxDurationSeconds;
+        if (!keys.contains("ForwardBoostEnabled")) forwardBoostEnabled = parent.forwardBoostEnabled;
+        if (!keys.contains("ForwardBoostParticleSystem")) forwardBoostParticleSystem = parent.forwardBoostParticleSystem;
+        if (!keys.contains("ForwardBoostScale")) forwardBoostScale = parent.forwardBoostScale;
+        if (!keys.contains("UpwardBoostEnabled")) upwardBoostEnabled = parent.upwardBoostEnabled;
+        if (!keys.contains("UpwardBoostParticleSystem")) upwardBoostParticleSystem = parent.upwardBoostParticleSystem;
+        if (!keys.contains("UpwardBoostScale")) upwardBoostScale = parent.upwardBoostScale;
         if (!keys.contains("LaunchChargeEnabled")) launchChargeEnabled = parent.launchChargeEnabled;
         if (!keys.contains("LaunchChargeParticleSystem")) launchChargeParticleSystem = parent.launchChargeParticleSystem;
         if (!keys.contains("LaunchChargeEarlyIntervalMs")) launchChargeEarlyIntervalMs = parent.launchChargeEarlyIntervalMs;
@@ -192,6 +236,20 @@ public final class AvatarFlightVfxSettings {
     public boolean isEnabled() { return enabled; }
     public double getGroundOffsetY() { return finiteOrDefault(groundOffsetY, DEFAULT_GROUND_OFFSET_Y); }
     public float getMaxDurationSeconds() { return (float) positiveOrDefault(maxDurationSeconds, DEFAULT_MAX_DURATION_SECONDS); }
+    public boolean isForwardBoostEnabled() { return forwardBoostEnabled; }
+    public String getForwardBoostParticleSystem() {
+        return stringOrDefault(forwardBoostParticleSystem, DEFAULT_FORWARD_BOOST_SYSTEM);
+    }
+    public double getForwardBoostScale() {
+        return positiveOrDefault(forwardBoostScale, getLaunchReleaseMidScale());
+    }
+    public boolean isUpwardBoostEnabled() { return upwardBoostEnabled; }
+    public String getUpwardBoostParticleSystem() {
+        return stringOrDefault(upwardBoostParticleSystem, DEFAULT_UPWARD_BOOST_SYSTEM);
+    }
+    public double getUpwardBoostScale() {
+        return positiveOrDefault(upwardBoostScale, getLaunchReleaseMidScale());
+    }
     public boolean isLaunchChargeEnabled() { return launchChargeEnabled; }
     public String getLaunchChargeParticleSystem() { return stringOrDefault(launchChargeParticleSystem, DEFAULT_CHARGE_SYSTEM); }
     public long getLaunchChargeEarlyIntervalMs() { return Math.round(intervalOrDefault(launchChargeEarlyIntervalMs, DEFAULT_EARLY_INTERVAL_MS)); }
@@ -223,6 +281,10 @@ public final class AvatarFlightVfxSettings {
 
     private static double finiteOrDefault(@Nullable Double value, double fallback) {
         return value != null && Double.isFinite(value) ? value : fallback;
+    }
+
+    private static double nonNegativeOrDefault(@Nullable Double value, double fallback) {
+        return value != null && Double.isFinite(value) && value >= 0.0 ? value : fallback;
     }
 
     private static double intervalOrDefault(@Nullable Double value, double fallback) {

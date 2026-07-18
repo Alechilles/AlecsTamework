@@ -1,0 +1,61 @@
+{
+  "RenderMode": "BlendLinear",
+  "EmitOffset": {
+    "X": { "Min": -0.2, "Max": 0.25 },
+    "Y": { "Min": -0.35, "Max": 0.45 },
+    "Z": { "Min": -0.65, "Max": 0.65 }
+  },
+  "ParticleRotationInfluence": "BillboardVelocity",
+  "LinearFiltering": true,
+  "LightInfluence": 1,
+  "ParticleRotateWithSpawner": true,
+  "TrailSpawnerPositionMultiplier": 1,
+  "TrailSpawnerRotationMultiplier": 1,
+  "MaxConcurrentParticles": 7,
+  "ParticleLifeSpan": { "Min": 0.24, "Max": 0.38 },
+  "SpawnRate": { "Min": 240, "Max": 240 },
+  "TotalParticles": { "Min": 7, "Max": 7 },
+  "InitialVelocity": {
+    "Yaw": { "Min": -96, "Max": -84 },
+    "Pitch": { "Min": -5, "Max": 5 },
+    "Speed": { "Min": 4.5, "Max": 7.0 }
+  },
+  "Attractors": [
+    {
+      "DampingMultiplier": { "X": 0.84, "Y": 0.9, "Z": 0.84 }
+    }
+  ],
+  "Particle": {
+    "Texture": "Particles/Textures/Tamework/AvatarFlight/Boost/Forward_Wind_Lance.png",
+    "FrameSize": { "Width": 64, "Height": 64 },
+    "ScaleRatioConstraint": "None",
+    "UVOption": "RandomFlipU",
+    "Animation": {
+      "0": {
+        "FrameIndex": { "Min": 0, "Max": 0 },
+        "Opacity": 0,
+        "Color": "#d2e0e3",
+        "Scale": { "X": { "Min": 0.65, "Max": 0.95 }, "Y": { "Min": 0.35, "Max": 0.55 } }
+      },
+      "18": { "Opacity": 0.36 },
+      "65": {
+        "Opacity": 0.2,
+        "Color": "#a8c0c6",
+        "Scale": { "X": { "Min": 1.25, "Max": 1.7 }, "Y": { "Min": 0.28, "Max": 0.45 } }
+      },
+      "100": {
+        "Opacity": 0,
+        "Scale": { "X": { "Min": 1.7, "Max": 2.2 }, "Y": { "Min": 0.16, "Max": 0.28 } }
+      }
+    },
+    "InitialAnimationFrame": {
+      "FrameIndex": { "Min": 0, "Max": 0 },
+      "Opacity": 0.3,
+      "Color": "#d2e0e3",
+      "Scale": { "X": { "Min": 0.55, "Max": 0.85 }, "Y": { "Min": 0.3, "Max": 0.5 } },
+      "Rotation": { "Z": { "Min": 170, "Max": 190 } }
+    },
+    "SoftParticles": "Enable"
+  },
+  "SpawnBurst": true
+}
