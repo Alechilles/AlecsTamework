@@ -37,6 +37,7 @@
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
 
 ### Changed
+- Removed Tamework's runtime asset-pack reordering and legacy pack replacement so asset precedence follows the game's manifest load-order configuration.
 - Enabled `TwCoopConfig` assets now keep Tamework as the sole occupancy and lifecycle authority only for their configured managed coops; coops without an enabled config remain purely vanilla. This preserves the post-overhaul model and does not restore the older vanilla-resident/Tamework-observer hybrid.
 - Managed-coop audits now include bounded per-resident and per-operation identity, UUID, slot, generation, retry, and persistence-queue lifecycle details.
 - Managed companion identity now follows one stable profile across changing entity UUID aliases, allowing command items and recovery paths to resolve historical UUIDs without creating a second NPC.

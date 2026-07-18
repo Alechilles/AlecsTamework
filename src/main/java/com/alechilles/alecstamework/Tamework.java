@@ -17,7 +17,7 @@ import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
-import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
+import com.alechilles.alecstamework.assets.TameworkAssetEditorPackService;
 import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightActivator;
@@ -249,7 +249,7 @@ public class Tamework extends JavaPlugin {
     private ItemFeatureRegistry itemFeatureRegistry;
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
-    private TameworkAssetPackCoordinator assetPackCoordinator;
+    private TameworkAssetEditorPackService assetEditorPackService;
     private AssetPatchService assetPatchService;
     private AssetPatchSelfTestPack assetPatchSelfTestPack;
     private TwConfigOverrideManager configOverrideManager;
@@ -444,7 +444,7 @@ public class Tamework extends JavaPlugin {
         itemFeatureRegistry = new ItemFeatureRegistry();
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
-        assetPackCoordinator = new TameworkAssetPackCoordinator(this);
+        assetEditorPackService = new TameworkAssetEditorPackService(this);
         assetPatchSelfTestPack = new AssetPatchSelfTestPack(getDataDirectory(), getManifest(), getLogger());
         assetPatchService = new AssetPatchService(this, assetPatchSelfTestPack);
         configOverrideManager = new TwConfigOverrideManager(this);
@@ -452,7 +452,6 @@ public class Tamework extends JavaPlugin {
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
-        assetPackCoordinator.registerEarlyAssetPackOrderingHook();
         assetPatchService.registerLoadHook();
         ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
@@ -1260,8 +1259,8 @@ public class Tamework extends JavaPlugin {
         if (crashTelemetryService != null) {
             crashTelemetryService.start();
         }
-        if (assetPackCoordinator != null) {
-            assetPackCoordinator.ensureAssetEditorPackVisible();
+        if (assetEditorPackService != null) {
+            assetEditorPackService.ensurePackVisible();
         }
     }
 

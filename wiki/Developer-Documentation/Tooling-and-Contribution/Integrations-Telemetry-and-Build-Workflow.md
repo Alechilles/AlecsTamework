@@ -12,7 +12,7 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - Tooltip bridge loading under `integration/tooltips/`
 - SimpleClaims breeding and damage bridge under `integration/simpleclaims/`
 - Creditor is embedded under `integration/creditor/`; Tamework calls Creditor during plugin setup/start and ships `Server/Credits` metadata for the credits page.
-- Asset pack ordering through `TameworkAssetPackCoordinator`
+- Asset Editor visibility for Tamework's embedded read-only pack through `TameworkAssetEditorPackService`
 
 ## Telemetry
 - `TameworkHStatsIntegration` boots HStats support
@@ -44,7 +44,7 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 
 ## Dev workflow notes
 - Dev runs reference `src/main/resources` directly for faster iteration
-- Runtime ordering removes legacy standalone Tamework asset packs when detected
+- Asset-pack precedence follows manifest load-order configuration; Tamework does not reorder the engine's pack list at runtime
 
 ## Related Pages
 - [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)
