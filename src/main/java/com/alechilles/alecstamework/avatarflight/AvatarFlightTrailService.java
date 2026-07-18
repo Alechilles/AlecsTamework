@@ -18,6 +18,7 @@ import javax.annotation.Nullable;
 /** Starts and cancels interaction-authored trails for avatar-flight movement cues. */
 public final class AvatarFlightTrailService {
     private static final InteractionType TRAIL_INTERACTION_TYPE = InteractionType.EntityStatEffect;
+    private static final int PENDING_CHAIN_ID = 1;
 
     public void tick(@Nonnull AvatarFlightComponent flight,
                      @Nonnull AvatarFlightController.Output output,
@@ -27,7 +28,7 @@ public final class AvatarFlightTrailService {
         AvatarFlightTrailSettings settings = config.getTrails();
         InteractionManager manager = resolveManager(ref, commandBuffer);
         if (!settings.isEnabled() || manager == null) {
-            stopFastGlideTrail(flight, manager);
+            stopFastGlideTrail(flight, manager, settings.getFastGlideRootInteraction());
             return;
         }
 
@@ -41,7 +42,8 @@ public final class AvatarFlightTrailService {
             start(settings.getBoostRootInteraction(), ref, commandBuffer, manager);
         }
 
-        boolean running = isFastGlideTrailRunning(flight, manager);
+        String fastGlideRootInteraction = settings.getFastGlideRootInteraction();
+        boolean running = isFastGlideTrailRunning(flight, manager, fastGlideRootInteraction);
         double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
                 output.velocityX(), output.velocityY(), output.velocityZ());
         boolean desired = output.applyVelocity() && AvatarFlightTrailPolicy.shouldRunFastGlideTrail(
@@ -52,10 +54,10 @@ public final class AvatarFlightTrailService {
         );
         if (desired && !running) {
             InteractionChain chain = start(
-                    settings.getFastGlideRootInteraction(), ref, commandBuffer, manager);
-            flight.setFastGlideTrailChainId(chain == null ? 0 : chain.getChainId());
+                    fastGlideRootInteraction, ref, commandBuffer, manager);
+            flight.setFastGlideTrailChainId(chain == null ? 0 : PENDING_CHAIN_ID);
         } else if (!desired && running) {
-            stopFastGlideTrail(flight, manager);
+            stopFastGlideTrail(flight, manager, fastGlideRootInteraction);
         }
     }
 
@@ -63,27 +65,56 @@ public final class AvatarFlightTrailService {
                                           @Nonnull Ref<EntityStore> ref,
                                           @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         if (flight == null) return;
-        stopFastGlideTrail(flight, resolveManager(ref, componentAccessor));
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
+        stopFastGlideTrail(
+                flight,
+                resolveManager(ref, componentAccessor),
+                config.getTrails().getFastGlideRootInteraction());
     }
 
     private static void stopFastGlideTrail(@Nonnull AvatarFlightComponent flight,
-                                           @Nullable InteractionManager manager) {
+                                           @Nullable InteractionManager manager,
+                                           @Nonnull String rootInteractionId) {
         int chainId = flight.getFastGlideTrailChainId();
-        if (chainId == 0) return;
         if (manager != null) {
-            InteractionChain chain = manager.getChains().get(chainId);
+            InteractionChain chain = chainId < 0 ? manager.getChains().get(chainId) : null;
+            if (chain == null) chain = findChain(manager, rootInteractionId);
             if (chain != null) manager.cancelChains(chain);
         }
         flight.setFastGlideTrailChainId(0);
     }
 
     private static boolean isFastGlideTrailRunning(@Nonnull AvatarFlightComponent flight,
-                                                    @Nonnull InteractionManager manager) {
+                                                    @Nonnull InteractionManager manager,
+                                                    @Nonnull String rootInteractionId) {
         int chainId = flight.getFastGlideTrailChainId();
-        if (chainId == 0) return false;
+        if (chainId == 0) {
+            InteractionChain chain = findChain(manager, rootInteractionId);
+            if (chain == null) return false;
+            flight.setFastGlideTrailChainId(chain.getChainId());
+            return true;
+        }
+        if (chainId == PENDING_CHAIN_ID) {
+            InteractionChain chain = findChain(manager, rootInteractionId);
+            if (chain == null) return true;
+            flight.setFastGlideTrailChainId(chain.getChainId());
+            return true;
+        }
         if (manager.getChains().containsKey(chainId)) return true;
         flight.setFastGlideTrailChainId(0);
         return false;
+    }
+
+    @Nullable
+    private static InteractionChain findChain(@Nonnull InteractionManager manager,
+                                              @Nonnull String rootInteractionId) {
+        if (rootInteractionId.isBlank()) return null;
+        for (InteractionChain chain : manager.getChains().values()) {
+            if (rootInteractionId.equals(chain.getInitialRootInteraction().getId())) {
+                return chain;
+            }
+        }
+        return null;
     }
 
     @Nullable
@@ -98,8 +129,10 @@ public final class AvatarFlightTrailService {
                 manager, ref, TRAIL_INTERACTION_TYPE, commandBuffer);
         InteractionChain chain = manager.initChain(
                 TRAIL_INTERACTION_TYPE, context, root, false);
-        manager.executeChain(ref, commandBuffer, chain);
-        return chain.getChainId() == 0 ? null : chain;
+        // InteractionManager assigns its entity ref only inside its own tick. Queueing avoids
+        // tickChain throwing and removing the world when another ECS system starts a trail.
+        manager.queueExecuteChain(chain);
+        return chain;
     }
 
     @Nullable
