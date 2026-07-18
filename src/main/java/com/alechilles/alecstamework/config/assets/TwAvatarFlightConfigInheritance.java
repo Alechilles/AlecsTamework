@@ -28,6 +28,7 @@ final class TwAvatarFlightConfigInheritance {
         inheritLaunch(target, parent, nested(nestedByTop, "Launch"), top);
         inheritVfx(target, parent, nested(nestedByTop, "Vfx"), top);
         inheritAudio(target, parent, nested(nestedByTop, "Audio"), top);
+        inheritTrails(target, parent, nested(nestedByTop, "Trails"), top);
         inheritVigour(target, parent, nested(nestedByTop, "Vigour"), top);
         inheritAnimation(target, parent, nested(nestedByTop, "Animation"), top);
         inheritAbilityAnimation(target, parent, nested(nestedByTop, "AbilityAnimation"), top);
@@ -142,6 +143,17 @@ final class TwAvatarFlightConfigInheritance {
         else if (keys != null && parent.audio != null) {
             if (target.audio == null) target.audio = parent.audio;
             else target.audio.inheritMissingFrom(parent.audio, keys);
+        }
+    }
+
+    private static void inheritTrails(TwAvatarFlightConfig target,
+                                      TwAvatarFlightConfig parent,
+                                      @Nullable Set<String> keys,
+                                      Set<String> top) {
+        if (!top.contains("Trails")) target.trails = parent.trails;
+        else if (keys != null && parent.trails != null) {
+            if (target.trails == null) target.trails = parent.trails;
+            else target.trails.inheritMissingFrom(parent.trails, keys);
         }
     }
 

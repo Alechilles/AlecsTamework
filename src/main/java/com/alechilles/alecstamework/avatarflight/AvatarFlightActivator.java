@@ -76,6 +76,7 @@ public final class AvatarFlightActivator {
         Player player = store.getComponent(ref, Player.getComponentType());
         boolean restoreEquipment = flight != null
                 && TwAvatarFlightConfig.resolve(flight.getConfigId()).getRiderVisual().isHideOwnerEquipment();
+        AvatarFlightTrailService.stopFastGlideTrail(flight, ref, store);
         if (flightType != null) {
             store.tryRemoveComponent(ref, flightType);
         }

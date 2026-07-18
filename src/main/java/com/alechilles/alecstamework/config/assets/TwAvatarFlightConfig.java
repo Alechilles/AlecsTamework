@@ -550,6 +550,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.audio)
             .documentation("Avatar-flight launch audio presentation. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AvatarFlightTrailSettings>append(new KeyedCodec<>("Trails", AvatarFlightTrailSettings.CODEC),
+                    (asset, value) -> asset.trails = value == null ? new AvatarFlightTrailSettings() : value,
+                    asset -> asset.trails)
+            .documentation("Interaction-authored avatar-flight model trails. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<VigourSettings>append(new KeyedCodec<>("Vigour", VIGOUR_CODEC),
                     (asset, value) -> asset.vigour = value == null ? new VigourSettings() : value,
                     asset -> asset.vigour)
@@ -590,6 +595,7 @@ public final class TwAvatarFlightConfig implements
     AvatarFlightLaunchSettings launch = new AvatarFlightLaunchSettings();
     AvatarFlightVfxSettings vfx = new AvatarFlightVfxSettings();
     AvatarFlightAudioSettings audio = new AvatarFlightAudioSettings();
+    AvatarFlightTrailSettings trails = new AvatarFlightTrailSettings();
     VigourSettings vigour = new VigourSettings();
     AnimationSettings animation = new AnimationSettings();
     AvatarFlightAbilityAnimationSettings abilityAnimation = new AvatarFlightAbilityAnimationSettings();
@@ -668,6 +674,9 @@ public final class TwAvatarFlightConfig implements
     public AvatarFlightLaunchSettings getLaunch() { return launch == null ? new AvatarFlightLaunchSettings() : launch; }
     public AvatarFlightVfxSettings getVfx() { return vfx == null ? new AvatarFlightVfxSettings() : vfx; }
     public AvatarFlightAudioSettings getAudio() { return audio == null ? new AvatarFlightAudioSettings() : audio; }
+    public AvatarFlightTrailSettings getTrails() {
+        return trails == null ? new AvatarFlightTrailSettings() : trails;
+    }
     public VigourSettings getVigour() { return vigour == null ? new VigourSettings() : vigour; }
     public AnimationSettings getAnimation() { return animation == null ? new AnimationSettings() : animation; }
     public AvatarFlightAbilityAnimationSettings getAbilityAnimation() {

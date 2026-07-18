@@ -111,6 +111,15 @@
     "LaunchReleaseMidSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Mid",
     "LaunchReleaseFullSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Full"
   },
+  "Trails": {
+    "Enabled": true,
+    "LaunchRootInteraction": "",
+    "FlapRootInteraction": "",
+    "BoostRootInteraction": "",
+    "FastGlideRootInteraction": "",
+    "FastGlideStartSpeedRatio": 0.92,
+    "FastGlideStopSpeedRatio": 0.86
+  },
   "Vigour": {
     "Enabled": true,
     "MaxCharges": 6.0,

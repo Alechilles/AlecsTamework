@@ -49,6 +49,7 @@ public final class AvatarFlightMovementSystem
     private final AvatarFlightBoostVfxService boostVfxService = new AvatarFlightBoostVfxService();
     private final AvatarFlightLaunchVfxService launchVfxService = new AvatarFlightLaunchVfxService();
     private final AvatarFlightLaunchAudioService launchAudioService = new AvatarFlightLaunchAudioService();
+    private final AvatarFlightTrailService trailService = new AvatarFlightTrailService();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, PlayerSystems.ProcessPlayerInput.class),
             new SystemDependency<>(Order.AFTER, MovementStatesSystems.TickingSystem.class),
@@ -134,6 +135,7 @@ public final class AvatarFlightMovementSystem
                 now,
                 commandBuffer
         );
+        trailService.tick(flight, output, config, ref, commandBuffer);
         flight.setMode(output.mode());
         flight.setVelocity(output.velocityX(), output.velocityY(), output.velocityZ());
         flight.setNextJumpAtMs(output.nextJumpAtMs());

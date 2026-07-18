@@ -166,6 +166,10 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setLaunchFullChargeAudioPlayed,
                     AvatarFlightComponent::isLaunchFullChargeAudioPlayed)
             .add()
+            .<Integer>append(new KeyedCodec<>("FastGlideTrailChainId", Codec.INTEGER),
+                    AvatarFlightComponent::setFastGlideTrailChainId,
+                    AvatarFlightComponent::getFastGlideTrailChainId)
+            .add()
             .build();
 
     private String configId = "";
@@ -205,6 +209,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextLaunchChargeVfxAtMs;
     private long nextLaunchChargeAudioAtMs;
     private boolean launchFullChargeAudioPlayed;
+    private int fastGlideTrailChainId;
 
     public AvatarFlightComponent() {
     }
@@ -516,6 +521,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     public void setNextLaunchChargeAudioAtMs(@Nullable Long value) { nextLaunchChargeAudioAtMs = value == null ? 0L : value; }
     public boolean isLaunchFullChargeAudioPlayed() { return launchFullChargeAudioPlayed; }
     public void setLaunchFullChargeAudioPlayed(@Nullable Boolean value) { launchFullChargeAudioPlayed = value != null && value; }
+    public int getFastGlideTrailChainId() { return fastGlideTrailChainId; }
+    public void setFastGlideTrailChainId(@Nullable Integer value) { fastGlideTrailChainId = value == null ? 0 : value; }
 
     public void captureLaunchVfxOrigin(double x, double y, double z, double yawRadians) {
         launchVfxOriginValid = true;
@@ -583,6 +590,7 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.nextLaunchChargeVfxAtMs = nextLaunchChargeVfxAtMs;
         clone.nextLaunchChargeAudioAtMs = nextLaunchChargeAudioAtMs;
         clone.launchFullChargeAudioPlayed = launchFullChargeAudioPlayed;
+        clone.fastGlideTrailChainId = fastGlideTrailChainId;
         return clone;
     }
 

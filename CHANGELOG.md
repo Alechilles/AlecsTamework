@@ -35,6 +35,7 @@
 - Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.
 - Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `Origin` for injected pitch/bank poses.
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
+- Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
 - Removed Tamework's runtime asset-pack reordering and legacy pack replacement so asset precedence follows the game's manifest load-order configuration.

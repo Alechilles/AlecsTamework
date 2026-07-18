@@ -42,6 +42,12 @@ Default charge timing is `500ms` to `3000ms` with a `0.65` exponent. That front-
 
 Launch presentation uses short world-space particle and positional audio cues. Grounded charging emits increasingly frequent inward pressure pulses paired with varied sampled wind gusts whose volume and pitch rise with charge progress. Reaching full charge plays one ready cue. A release below the minimum or a rejected release emits a small visual and audio fizzle. Successful launches emit partial, mid, or full release effects selected from the configured launch curve. Particle release stays at the last grounded charge origin if the avatar leaves the ground before releasing, while audio follows the avatar's current release position.
 
+## Trails
+
+Avatar-flight trails use Hytale's dedicated model-trail system, not particle systems. A species profile supplies RootInteraction assets whose `Effects.Trails` entries attach trail assets to model nodes such as wingtip or outer-wing joints. Tamework starts the configured one-shot roots only when launch, flap, or boost is accepted, and owns one cancellable sustained root for fast glide.
+
+Fast glide starts at `Trails.FastGlideStartSpeedRatio * Movement.MaxGlideSpeed` and stops at the lower `Trails.FastGlideStopSpeedRatio` threshold. The default `0.92`/`0.86` pair avoids flicker when speed hovers near the boundary. With the default maximum glide speed of `15`, those thresholds are `13.8` and `12.9`.
+
 ## Glide Balance
 
 Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: forward input can seed movement from hover or stall, but flat unpowered flight decays gradually toward the `Movement.GlideStartKickSpeed` floor instead of preserving `Movement.NeutralGlideSpeed` forever. Very shallow downward pitch, currently less than about `8°`, is treated like neutral glide for speed and sink so tiny dive angles cannot preserve max glide speed or carry leftover flap lift indefinitely. This neutral/shallow speed bleed is intentionally gentle, with default `Movement.NeutralGlideDeceleration` set to `0.15`, so it preserves more horizontal momentum than a shallow climb while still losing altitude through glide sink. Higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward past the shallow-dive dead zone can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
@@ -162,6 +168,18 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 - `RechargeDelayAfterSpendSeconds`: delay before recharge resumes after spending.
 - `HudEnabled`: shows the compact speed and Vigour HUD.
 - `HudResendIntervalMs`: throttles unchanged HUD refreshes.
+
+### Trails
+
+- `Enabled`: enables interaction-authored model trails without changing movement behavior.
+- `LaunchRootInteraction`: one-shot root started after a successful charged launch; blank disables this cue.
+- `FlapRootInteraction`: one-shot root started after a successful upward flap; blank disables this cue.
+- `BoostRootInteraction`: one-shot root started after a successful forward boost; blank disables this cue.
+- `FastGlideRootInteraction`: long-running root started while horizontal speed is near the unboosted maximum glide speed.
+- `FastGlideStartSpeedRatio`: ratio of `Movement.MaxGlideSpeed` that starts fast-glide trails.
+- `FastGlideStopSpeedRatio`: lower ratio that stops fast-glide trails and supplies threshold hysteresis.
+
+Omitting `Trails` inherits the complete parent section. An explicit `Trails` object overrides only its explicit nested keys and inherits the remaining values. Explicitly blank root IDs disable only those inherited cues. Trail assets, textures, attachment nodes, offsets, colors, widths, lifetimes, and render modes remain species-owned assets.
 
 ### Vfx
 
