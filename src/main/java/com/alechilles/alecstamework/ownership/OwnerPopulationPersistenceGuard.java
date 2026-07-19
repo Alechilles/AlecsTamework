@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
+import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationContext;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationDelta;
@@ -21,7 +22,8 @@ import javax.annotation.Nonnull;
 /** Applies exact v7 availability and incident containment to owner-population operations. */
 final class OwnerPopulationPersistenceGuard {
     private static final Set<String> REQUIRED_COVERAGE = Set.of(
-            "canonical_profile_catalog", "owner_population_catalog");
+            PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG.key(),
+            PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG.key());
 
     private final PersistenceMutationAvailabilityService availability;
     private final PersistenceIncidentReporter incidents;

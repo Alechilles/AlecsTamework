@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.metrics.TameworkPersistenceTelemetry;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPersistedProjectionEvidenceRegistry;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
+import com.alechilles.alecstamework.persistence.health.PersistenceCoverageRegistry;
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageState;
 import com.alechilles.alecstamework.persistence.diagnostics.CompositePersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.diagnostics.CoalescingPersistenceIncidentSink;
@@ -391,6 +392,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PersistenceScopeFactory getPersistenceScopeFactory() {
         return resilienceRuntime.scopeFactory();
+    }
+
+    @Nonnull
+    public PersistenceCoverageRegistry getPersistenceCoverageRegistry() {
+        return resilienceRuntime.coverage();
     }
 
     @Nonnull

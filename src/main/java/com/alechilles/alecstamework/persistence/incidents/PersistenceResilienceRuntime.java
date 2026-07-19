@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.incidents;
 
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
+import com.alechilles.alecstamework.persistence.health.PersistenceCoverageRegistry;
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
 import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
@@ -20,6 +21,7 @@ public final class PersistenceResilienceRuntime {
     private final PersistenceFeatureCircuitRegistry circuits;
     private final PersistenceIncidentReporter reporter;
     private final PersistenceMutationAvailabilityService availability;
+    private final PersistenceCoverageRegistry coverage;
     private final ScopedPersistenceRecoveryCoordinator scopedRecovery;
     private final PersistenceScopeFactory scopeFactory;
 
@@ -30,6 +32,7 @@ public final class PersistenceResilienceRuntime {
                                          PersistenceFeatureCircuitRegistry circuits,
                                          PersistenceIncidentReporter reporter,
                                          PersistenceMutationAvailabilityService availability,
+                                         PersistenceCoverageRegistry coverage,
                                          ScopedPersistenceRecoveryCoordinator scopedRecovery,
                                          PersistenceScopeFactory scopeFactory) {
         this.incidents = incidents;
@@ -39,6 +42,7 @@ public final class PersistenceResilienceRuntime {
         this.circuits = circuits;
         this.reporter = reporter;
         this.availability = availability;
+        this.coverage = coverage;
         this.scopedRecovery = scopedRecovery;
         this.scopeFactory = scopeFactory;
     }
@@ -76,15 +80,16 @@ public final class PersistenceResilienceRuntime {
                 bootId, new PersistenceFailureClassifier(), incidents, quarantineRepository,
                 quarantines, storageHealth, writeQueue, incidentSink);
         writeQueue.setFailureHandler(new PersistenceIncidentWriteFailureHandler(reporter));
+        PersistenceCoverageRegistry coverage = new PersistenceCoverageRegistry();
         PersistenceMutationAvailabilityService availability =
                 new PersistenceMutationAvailabilityService(
-                        storageHealth, quarantines, circuits, ignored -> true);
+                        storageHealth, quarantines, circuits, coverage);
         ScopedPersistenceRecoveryCoordinator scopedRecovery =
                 new ScopedPersistenceRecoveryCoordinator(
                         incidents, quarantineRepository, quarantines, circuits, writeQueue, incidentSink);
         return new PersistenceResilienceRuntime(
                 incidents, quarantineRepository, quarantines, circuitRepository,
-                circuits, reporter, availability, scopedRecovery, scopeFactory);
+                circuits, reporter, availability, coverage, scopedRecovery, scopeFactory);
     }
 
     private static void loadDurableDenials(
@@ -140,6 +145,11 @@ public final class PersistenceResilienceRuntime {
     @Nonnull
     public PersistenceMutationAvailabilityService availability() {
         return availability;
+    }
+
+    @Nonnull
+    public PersistenceCoverageRegistry coverage() {
+        return coverage;
     }
 
     @Nonnull

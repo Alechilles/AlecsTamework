@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulation
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRuntimeReconciler;
 import com.alechilles.alecstamework.ownership.reconciliation.CustomContainerReconciliationRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -113,6 +114,14 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         );
         CompanionPopulationBootstrapService.BootstrapResult bootstrap =
                 bootstrapService.loadForReconciliation();
+        boolean canonicalReady = bootstrap.globalReadiness() != OwnerPopulationReadiness.DEGRADED;
+        long coverageGeneration = System.currentTimeMillis();
+        persistence.getPersistenceCoverageRegistry().publish(
+                PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG,
+                canonicalReady, bootstrap.reason(), coverageGeneration);
+        persistence.getPersistenceCoverageRegistry().publish(
+                PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG,
+                canonicalReady, bootstrap.reason(), coverageGeneration);
         persistence.getNpcProfileRepository().setIdentityLifecycle(
                 new CompanionProfileIdentityLifecycle(identityResolver)
         );
