@@ -88,6 +88,21 @@ class SpawnerWildCaptureArchitectureTest {
     }
 
     @Test
+    void captureChannelCanReverseParticlesFromTargetToHeldItem() throws Exception {
+        String interaction = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
+        ));
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
+        ));
+
+        assertTrue(interaction.contains("new KeyedCodec<>(\"BeamFromTarget\", Codec.BOOLEAN)"));
+        assertTrue(interaction.contains("beamFromTarget,"));
+        assertTrue(handler.contains("boolean beamFromTarget,"));
+        assertTrue(handler.contains("beamFromTarget,\n                        channelDurationSeconds,"));
+    }
+
+    @Test
     void channelLocksInitialTargetBeforeCompletionAndCancel() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"

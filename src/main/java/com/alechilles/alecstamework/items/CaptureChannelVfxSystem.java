@@ -39,6 +39,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                                 double nativeBeamLength,
                                 double nativeDurationSeconds,
                                 boolean scaleBeamToTarget,
+                                boolean beamFromTarget,
                                 double channelDurationSeconds,
                                 double maxDistance,
                                 @Nullable String auraEffectId) {
@@ -62,6 +63,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                 safeNativeLength,
                 safeNativeDuration,
                 scaleBeamToTarget,
+                beamFromTarget,
                 maxDistance,
                 auraEffectId,
                 visualEndsAtMs,
@@ -137,11 +139,13 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         if (!isWithinConfiguredRange(sourceRoot, targetRoot, session.maxDistance)) {
             return;
         }
-        Vector3d source = resolveHeldItemPosition(playerRef, store);
-        Vector3d target = resolveBeamTargetPosition(targetRef, store);
-        if (source == null || target == null) {
+        Vector3d heldItemPosition = resolveHeldItemPosition(playerRef, store);
+        Vector3d targetPosition = resolveBeamTargetPosition(targetRef, store);
+        if (heldItemPosition == null || targetPosition == null) {
             return;
         }
+        Vector3d source = beamOrigin(heldItemPosition, targetPosition, session.beamFromTarget);
+        Vector3d target = beamDestination(heldItemPosition, targetPosition, session.beamFromTarget);
         Vector3d delta = new Vector3d(target).sub(source);
         double distance = delta.length();
         if (!Double.isFinite(distance) || distance <= MIN_DISTANCE) {
@@ -178,6 +182,18 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
 
     static long emissionIntervalMsForTests() {
         return EMIT_INTERVAL_MS;
+    }
+
+    static Vector3d beamOrigin(@Nonnull Vector3d heldItemPosition,
+                               @Nonnull Vector3d targetPosition,
+                               boolean beamFromTarget) {
+        return new Vector3d(beamFromTarget ? targetPosition : heldItemPosition);
+    }
+
+    static Vector3d beamDestination(@Nonnull Vector3d heldItemPosition,
+                                    @Nonnull Vector3d targetPosition,
+                                    boolean beamFromTarget) {
+        return new Vector3d(beamFromTarget ? heldItemPosition : targetPosition);
     }
 
     static float particleScaleForDistance(double distance,
@@ -329,6 +345,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         private final double nativeBeamLength;
         private final double nativeDurationSeconds;
         private final boolean scaleBeamToTarget;
+        private final boolean beamFromTarget;
         private final double maxDistance;
         private final String auraEffectId;
         private final long visualEndsAtMs;
@@ -343,6 +360,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                         double nativeBeamLength,
                         double nativeDurationSeconds,
                         boolean scaleBeamToTarget,
+                        boolean beamFromTarget,
                         double maxDistance,
                         String auraEffectId,
                         long visualEndsAtMs,
@@ -355,6 +373,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
             this.nativeBeamLength = nativeBeamLength;
             this.nativeDurationSeconds = nativeDurationSeconds;
             this.scaleBeamToTarget = scaleBeamToTarget;
+            this.beamFromTarget = beamFromTarget;
             this.maxDistance = maxDistance;
             this.auraEffectId = auraEffectId;
             this.visualEndsAtMs = visualEndsAtMs;

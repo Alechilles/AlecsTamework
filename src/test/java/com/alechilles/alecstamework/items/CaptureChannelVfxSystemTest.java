@@ -49,6 +49,17 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
+    void reverseBeamTravelsFromNpcAnchorToHeldItem() {
+        Vector3d heldItem = new Vector3d(1.0D, 2.0D, 3.0D);
+        Vector3d npcAnchor = new Vector3d(8.0D, 1.0D, -4.0D);
+
+        assertEquals(npcAnchor, CaptureChannelVfxSystem.beamOrigin(heldItem, npcAnchor, true));
+        assertEquals(heldItem, CaptureChannelVfxSystem.beamDestination(heldItem, npcAnchor, true));
+        assertEquals(heldItem, CaptureChannelVfxSystem.beamOrigin(heldItem, npcAnchor, false));
+        assertEquals(npcAnchor, CaptureChannelVfxSystem.beamDestination(heldItem, npcAnchor, false));
+    }
+
+    @Test
     void beamPacketNegativeXAxisRotatesOntoTargetVector() {
         assertBeamDirection(new Vector3d(8.0D, 3.0D, -5.0D));
         assertBeamDirection(new Vector3d(-4.0D, -2.0D, 7.0D));

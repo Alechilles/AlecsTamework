@@ -254,6 +254,7 @@ Optional `Begin` fields:
 - `BeamNativeLength`: authored forward length of that particle system. Tamework scales each short-lived segment to stop at the target. Defaults to `50`.
 - `BeamNativeDurationSeconds`: authored travel duration corresponding to `BeamNativeLength`. Fixed-size traveling particles use both values to derive their target-distance lifetime. Defaults to `0.5`.
 - `ScaleBeamToTarget`: when `true` (default), uniformly scales the particle system to the target distance. Set to `false` for fixed-size traveling particles; Tamework instead scales the instance lifetime relative to `BeamNativeLength` so it ends at the target.
+- `BeamFromTarget`: when `true`, emits each particle at the locked NPC anchor and aims it toward the player's live held-item anchor. Defaults to `false` for the original item-to-target direction.
 - `ChannelDurationSeconds`: maximum server-side visual session lifetime. Match this to the charging threshold. Defaults to `3`.
 
 Optional `Complete` field:

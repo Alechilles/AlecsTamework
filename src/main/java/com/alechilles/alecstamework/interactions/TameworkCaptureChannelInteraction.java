@@ -71,6 +71,14 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             )
             .documentation("Whether to scale the whole particle system to the target distance. Disable for fixed-size traveling particles.")
             .add()
+            .<Boolean>appendInherited(
+                    new KeyedCodec<>("BeamFromTarget", Codec.BOOLEAN),
+                    (interaction, value) -> interaction.beamFromTarget = value,
+                    interaction -> interaction.beamFromTarget,
+                    (interaction, parent) -> interaction.beamFromTarget = parent.beamFromTarget
+            )
+            .documentation("Whether particles travel from the locked NPC target toward the player's held item instead of toward the NPC.")
+            .add()
             .<String>appendInherited(
                     new KeyedCodec<>("CaptureBurstParticleSystem", Codec.STRING),
                     (interaction, value) -> interaction.captureBurstParticleSystem = value,
@@ -94,6 +102,7 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
     private double beamNativeLength = 50.0D;
     private double beamNativeDurationSeconds = 0.5D;
     private boolean scaleBeamToTarget = true;
+    private boolean beamFromTarget;
     private String captureBurstParticleSystem;
     private double channelDurationSeconds = 3.0D;
 
@@ -167,6 +176,7 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
                     beamNativeLength,
                     beamNativeDurationSeconds,
                     scaleBeamToTarget,
+                    beamFromTarget,
                     channelDurationSeconds
             ));
             case CANCEL -> commandBuffer.run(store -> handler.endCaptureChannel(player, targetRef, heldItem));
