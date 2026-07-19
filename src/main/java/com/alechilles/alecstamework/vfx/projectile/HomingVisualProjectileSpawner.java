@@ -11,10 +11,12 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
+import com.hypixel.hytale.server.core.modules.entity.DespawnComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
+import com.hypixel.hytale.server.core.modules.time.TimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -39,6 +41,7 @@ public final class HomingVisualProjectileSpawner {
         Holder<EntityStore> holder = createHolder(
                 store.getExternalData() == null ? null : store.getExternalData().getWorld().getName(),
                 store.getExternalData() == null ? -1 : store.getExternalData().takeNextNetworkId(),
+                store.getResource(TimeResource.getResourceType()),
                 origin,
                 destinationUuid,
                 spec,
@@ -64,6 +67,7 @@ public final class HomingVisualProjectileSpawner {
         Holder<EntityStore> holder = createHolder(
                 commandBuffer.getExternalData() == null ? null : commandBuffer.getExternalData().getWorld().getName(),
                 commandBuffer.getExternalData() == null ? -1 : commandBuffer.getExternalData().takeNextNetworkId(),
+                commandBuffer.getResource(TimeResource.getResourceType()),
                 origin,
                 destinationUuid,
                 spec,
@@ -114,6 +118,7 @@ public final class HomingVisualProjectileSpawner {
     @Nullable
     private static Holder<EntityStore> createHolder(@Nullable String worldName,
                                                      int networkId,
+                                                     @Nonnull TimeResource timeResource,
                                                      @Nonnull Vector3d origin,
                                                      @Nonnull UUID destinationUuid,
                                                      @Nonnull HomingVisualProjectileSpec spec,
@@ -137,6 +142,10 @@ public final class HomingVisualProjectileSpawner {
         holder.addComponent(TransformComponent.getComponentType(),
                 new TransformComponent(new Vector3d(origin), new Rotation3f()));
         holder.addComponent(ModelComponent.getComponentType(), new ModelComponent(model));
+        holder.addComponent(
+                DespawnComponent.getComponentType(),
+                DespawnComponent.despawnInSeconds(timeResource, (float) spec.lifetimeSeconds())
+        );
         holder.addComponent(type, new HomingVisualProjectileComponent(
                 destinationUuid.toString(),
                 spec,

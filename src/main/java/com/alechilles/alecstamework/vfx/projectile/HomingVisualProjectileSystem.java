@@ -5,11 +5,12 @@ import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
+import com.hypixel.hytale.server.core.modules.entity.DespawnComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.time.TimeResource;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
@@ -46,7 +47,7 @@ public final class HomingVisualProjectileSystem extends TickingSystem<EntityStor
                 if (projectileRef == null || !projectileRef.isValid()
                         || projectile == null || transform == null
                         || shouldRemove(projectile, world)) {
-                    remove(projectileRef, commandBuffer);
+                    markForDespawn(projectileRef, store, commandBuffer);
                     continue;
                 }
 
@@ -68,8 +69,17 @@ public final class HomingVisualProjectileSystem extends TickingSystem<EntityStor
                         dt
                 );
                 double remaining = projectile.getRemainingLifetimeSeconds() - Math.max(0.0D, dt);
-                if (!step.valid() || step.arrived() || !Double.isFinite(remaining) || remaining <= 0.0D) {
-                    remove(projectileRef, commandBuffer);
+                if (!step.valid() || !Double.isFinite(remaining) || remaining <= 0.0D) {
+                    markForDespawn(projectileRef, store, commandBuffer);
+                    continue;
+                }
+                if (step.arrived()) {
+                    commandBuffer.putComponent(
+                            projectileRef,
+                            transformType,
+                            new TransformComponent(step.position(), transform.getRotation())
+                    );
+                    markForDespawn(projectileRef, store, commandBuffer);
                     continue;
                 }
 
@@ -111,10 +121,16 @@ public final class HomingVisualProjectileSystem extends TickingSystem<EntityStor
         }
     }
 
-    private static void remove(@Nullable Ref<EntityStore> ref,
-                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+    private static void markForDespawn(@Nullable Ref<EntityStore> ref,
+                                       @Nonnull Store<EntityStore> store,
+                                       @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         if (ref != null && ref.isValid()) {
-            commandBuffer.removeEntity(ref, RemoveReason.REMOVE);
+            TimeResource time = store.getResource(TimeResource.getResourceType());
+            commandBuffer.putComponent(
+                    ref,
+                    DespawnComponent.getComponentType(),
+                    new DespawnComponent(time.getNow().minusNanos(1L))
+            );
         }
     }
 }
