@@ -20,11 +20,11 @@ import javax.annotation.Nullable;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
-/** Emits short, bounded beam segments for active capture channels. */
+/** Launches independently bounded beam particles for active capture channels. */
 public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
-    private static final long EMIT_INTERVAL_MS = 350L;
+    private static final long EMIT_INTERVAL_MS = 50L;
     private static final long TARGET_LOCK_GRACE_MS = 2_000L;
-    private static final float SEGMENT_MAX_DURATION_SECONDS = 0.85F;
+    private static final float PARTICLE_MAX_DURATION_SECONDS = 0.6F;
     private static final double DEFAULT_NATIVE_BEAM_LENGTH = 50.0D;
     private static final double MIN_DISTANCE = 0.01D;
     private static final double HELD_ITEM_RIGHT_OFFSET = 0.32D;
@@ -151,9 +151,17 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                 rotation.pitch(),
                 rotation.roll(),
                 scale,
-                SEGMENT_MAX_DURATION_SECONDS,
+                PARTICLE_MAX_DURATION_SECONDS,
                 store
         );
+    }
+
+    static long emissionIntervalMsForTests() {
+        return EMIT_INTERVAL_MS;
+    }
+
+    static float particleMaxDurationSecondsForTests() {
+        return PARTICLE_MAX_DURATION_SECONDS;
     }
 
     static float scaleForDistance(double distance, double nativeBeamLength) {

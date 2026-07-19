@@ -62,15 +62,16 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
-    void channelUsesShortBoundedSegmentsAndTracksBothEndpoints() throws Exception {
+    void channelLaunchesIndividuallyBoundedParticlesAtWorldTickCadence() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"
         ));
 
-        assertTrue(source.contains("EMIT_INTERVAL_MS = 350L"));
-        assertTrue(source.contains("SEGMENT_MAX_DURATION_SECONDS = 0.85F"));
+        assertEquals(50L, CaptureChannelVfxSystem.emissionIntervalMsForTests());
+        assertEquals(0.6F, CaptureChannelVfxSystem.particleMaxDurationSecondsForTests());
         assertTrue(source.contains("world.getEntityRef(session.playerUuid)"));
         assertTrue(source.contains("world.getEntityRef(session.targetUuid)"));
+        assertTrue(source.contains("session.nextEmitAtMs = nowMs + EMIT_INTERVAL_MS"));
         assertTrue(source.contains("rotationForBeamPacket"));
         assertTrue(source.contains("ACTIVE.remove(session.playerUuid, session)"));
     }
