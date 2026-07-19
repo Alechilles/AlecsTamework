@@ -299,6 +299,10 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "landing idle should remain tracked until grounded movement begins");
         assertTrue(source.contains("flight.setMovementAnimationId(GROUNDED_IDLE_ANIMATION)"),
                 "the landing-idle packet must remain owned so it can be explicitly stopped");
+        assertTrue(source.contains("maintainGroundedIdle(ref, commandBuffer, flight, config, now)"),
+                "stationary grounded idle should be refreshed like other transformed movement animations");
+        assertTrue(source.contains("now + config.getAnimation().getResendIntervalMs()"),
+                "grounded idle refreshes must use the configured packet throttle");
     }
 
     @Test

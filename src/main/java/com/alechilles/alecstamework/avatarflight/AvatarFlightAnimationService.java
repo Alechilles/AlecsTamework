@@ -56,11 +56,13 @@ final class AvatarFlightAnimationService {
             if (isGroundedIdleHandoffActive(flight)) {
                 if (groundedMovementIntent) {
                     clearMovementAnimation(ref, commandBuffer, flight);
+                } else {
+                    maintainGroundedIdle(ref, commandBuffer, flight, config, now);
                 }
                 return;
             }
             if (needsGroundedIdleHandoff(output.mode(), hadAnimationOverrides)) {
-                handoffToGroundedIdle(ref, commandBuffer, flight, config);
+                handoffToGroundedIdle(ref, commandBuffer, flight, config, now);
             } else {
                 clear(ref, commandBuffer, flight, config);
             }
@@ -103,7 +105,8 @@ final class AvatarFlightAnimationService {
     private void handoffToGroundedIdle(@Nonnull Ref<EntityStore> ref,
                                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                        @Nonnull AvatarFlightComponent flight,
-                                       @Nonnull TwAvatarFlightConfig config) {
+                                       @Nonnull TwAvatarFlightConfig config,
+                                       long now) {
         clearAbilityAnimation(ref, commandBuffer, flight);
         clearPoseAnimations(ref, commandBuffer, flight, config);
         ModelComponent component = commandBuffer.getComponent(ref, ModelComponent.getComponentType());
@@ -118,7 +121,20 @@ final class AvatarFlightAnimationService {
                 ref, AnimationSlot.Movement, GROUNDED_IDLE_ANIMATION, true, commandBuffer);
         // Keep ownership until movement input arrives so the explicit idle can be stopped once.
         flight.setMovementAnimationId(GROUNDED_IDLE_ANIMATION);
-        flight.setNextMovementAnimationAtMs(0L);
+        flight.setNextMovementAnimationAtMs(now + config.getAnimation().getResendIntervalMs());
+    }
+
+    private void maintainGroundedIdle(@Nonnull Ref<EntityStore> ref,
+                                      @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                      @Nonnull AvatarFlightComponent flight,
+                                      @Nonnull TwAvatarFlightConfig config,
+                                      long now) {
+        if (now < flight.getNextMovementAnimationAtMs()) {
+            return;
+        }
+        AnimationUtils.playAnimation(
+                ref, AnimationSlot.Movement, GROUNDED_IDLE_ANIMATION, true, commandBuffer);
+        flight.setNextMovementAnimationAtMs(now + config.getAnimation().getResendIntervalMs());
     }
 
     private void applyMovementAnimation(@Nonnull Ref<EntityStore> ref,
