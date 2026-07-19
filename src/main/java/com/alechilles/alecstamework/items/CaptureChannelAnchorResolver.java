@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileAnchor;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.server.core.entity.entities.ProjectileComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -24,7 +24,7 @@ public final class CaptureChannelAnchorResolver {
     @Nullable
     public static Vector3d resolve(@Nonnull Ref<EntityStore> ref,
                                    @Nonnull HomingVisualProjectileAnchor anchor,
-                                   @Nonnull Store<EntityStore> store) {
+                                   @Nonnull ComponentAccessor<EntityStore> store) {
         return switch (anchor) {
             case ROOT -> resolveRoot(ref, store);
             case BODY -> resolveBody(ref, store);
@@ -34,7 +34,7 @@ public final class CaptureChannelAnchorResolver {
 
     @Nullable
     public static Vector3d resolveRoot(@Nonnull Ref<EntityStore> ref,
-                                       @Nonnull Store<EntityStore> store) {
+                                       @Nonnull ComponentAccessor<EntityStore> store) {
         TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null || transform.getPosition() == null) {
             return null;
@@ -44,7 +44,7 @@ public final class CaptureChannelAnchorResolver {
 
     @Nullable
     public static Vector3d resolveHeldItem(@Nonnull Ref<EntityStore> ref,
-                                           @Nonnull Store<EntityStore> store) {
+                                           @Nonnull ComponentAccessor<EntityStore> store) {
         TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null) {
             return null;
@@ -60,7 +60,7 @@ public final class CaptureChannelAnchorResolver {
 
     @Nullable
     public static Vector3d resolveBody(@Nonnull Ref<EntityStore> ref,
-                                       @Nonnull Store<EntityStore> store) {
+                                       @Nonnull ComponentAccessor<EntityStore> store) {
         TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
         if (transform == null || transform.getPosition() == null) {
             return null;

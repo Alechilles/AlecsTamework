@@ -77,6 +77,7 @@ import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInt
 import com.alechilles.alecstamework.interactions.TameworkFlightAirbrakeInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightBoostInteraction;
 import com.alechilles.alecstamework.interactions.TameworkFlightFlapInteraction;
+import com.alechilles.alecstamework.interactions.TameworkLaunchHomingVisualProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkManagedCoopCaptureCrateInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
@@ -501,6 +502,11 @@ public class Tamework extends JavaPlugin {
                 "TameworkLaunchProjectile",
                 TameworkLaunchProjectileInteraction.class,
                 TameworkLaunchProjectileInteraction.CODEC
+        );
+        Interaction.CODEC.register(
+                "TameworkLaunchHomingVisualProjectile",
+                TameworkLaunchHomingVisualProjectileInteraction.class,
+                TameworkLaunchHomingVisualProjectileInteraction.CODEC
         );
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();

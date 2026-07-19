@@ -265,6 +265,37 @@ The initial target is locked for the session. The beam source follows the player
 
 For a left-click channel, place the root under the item's `Interactions.Primary` key. `Use` is the F interaction and can conflict with NPC interaction options.
 
+### `TameworkLaunchHomingVisualProjectile`
+
+Launches one harmless, non-serialized model entity whose attached particle follows a live entity anchor. It does not use Hytale's combat projectile, collision, damage, hit, or explosion paths.
+
+Fields:
+
+- `ModelId`: required model asset containing the attached particle definition.
+- `Source`: optional `USER`, `OWNER`, or `TARGET`; defaults to `USER`.
+- `Target`: optional `USER`, `OWNER`, or `TARGET`; defaults to `TARGET`.
+- `SourceAnchor`: optional `ROOT`, `BODY`, or `HELD_ITEM`; defaults to `BODY` and is sampled once at launch.
+- `TargetAnchor`: optional `ROOT`, `BODY`, or `HELD_ITEM`; defaults to `BODY` and is recomputed every server tick.
+- `Speed`: positive travel speed in blocks per second; defaults to `8`.
+- `TurnRateDegreesPerSecond`: optional turn limit. `0` directly retargets every tick and is the most reliable setting for moving endpoints.
+- `ArrivalRadius`: positive distance at which the visual entity is removed; defaults to `0.18`.
+- `LifetimeSeconds`: positive hard lifetime; defaults to `2`.
+
+```json
+{
+  "Type": "TameworkLaunchHomingVisualProjectile",
+  "ModelId": "Example_Capture_Mote",
+  "Source": "TARGET",
+  "Target": "USER",
+  "SourceAnchor": "BODY",
+  "TargetAnchor": "HELD_ITEM",
+  "Speed": 8.0,
+  "TurnRateDegreesPerSecond": 0.0,
+  "ArrivalRadius": 0.18,
+  "LifetimeSeconds": 2.0
+}
+```
+
 ### `TameworkLaunchProjectile`
 Launches a projectile using a solved high-angle ballistic arc instead of the source entity's current look pitch.
 
