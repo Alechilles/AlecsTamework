@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.incidents;
 
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
 import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
@@ -46,6 +47,18 @@ public final class PersistenceResilienceRuntime {
             @Nonnull PersistenceWriteQueue writeQueue,
             @Nonnull PersistenceStorageHealthService storageHealth,
             @Nullable HytaleLogger logger) {
+        return initialize(bootId, connections, writeQueue, storageHealth,
+                logger, PersistenceIncidentSink.NO_OP);
+    }
+
+    @Nonnull
+    public static PersistenceResilienceRuntime initialize(
+            @Nonnull String bootId,
+            @Nonnull SqliteConnectionManager connections,
+            @Nonnull PersistenceWriteQueue writeQueue,
+            @Nonnull PersistenceStorageHealthService storageHealth,
+            @Nullable HytaleLogger logger,
+            @Nonnull PersistenceIncidentSink incidentSink) {
         PersistenceIncidentRepository incidents = new PersistenceIncidentRepository(connections);
         PersistenceQuarantineRepository quarantineRepository =
                 new PersistenceQuarantineRepository(connections);
@@ -57,14 +70,14 @@ public final class PersistenceResilienceRuntime {
                 circuitRepository, circuits, logger);
         PersistenceIncidentReporter reporter = new PersistenceIncidentReporter(
                 bootId, new PersistenceFailureClassifier(), incidents, quarantineRepository,
-                quarantines, storageHealth, writeQueue);
+                quarantines, storageHealth, writeQueue, incidentSink);
         writeQueue.setFailureHandler(new PersistenceIncidentWriteFailureHandler(reporter));
         PersistenceMutationAvailabilityService availability =
                 new PersistenceMutationAvailabilityService(
                         storageHealth, quarantines, circuits, ignored -> true);
         ScopedPersistenceRecoveryCoordinator scopedRecovery =
                 new ScopedPersistenceRecoveryCoordinator(
-                        incidents, quarantineRepository, quarantines, circuits, writeQueue);
+                        incidents, quarantineRepository, quarantines, circuits, writeQueue, incidentSink);
         return new PersistenceResilienceRuntime(
                 incidents, quarantineRepository, quarantines, circuitRepository,
                 circuits, reporter, availability, scopedRecovery);

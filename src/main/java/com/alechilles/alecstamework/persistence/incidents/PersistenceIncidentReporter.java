@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.persistence.incidents;
 
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentEvent;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentEventKind;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -21,6 +24,7 @@ public final class PersistenceIncidentReporter {
     private final PersistenceQuarantineRegistry quarantineRegistry;
     private final PersistenceStorageHealthService storageHealth;
     private final PersistenceWriteQueue writeQueue;
+    private final PersistenceIncidentSink incidentSink;
 
     public PersistenceIncidentReporter(@Nonnull String bootId,
                                        @Nonnull PersistenceFailureClassifier classifier,
@@ -29,6 +33,18 @@ public final class PersistenceIncidentReporter {
                                        @Nonnull PersistenceQuarantineRegistry quarantineRegistry,
                                        @Nonnull PersistenceStorageHealthService storageHealth,
                                        @Nonnull PersistenceWriteQueue writeQueue) {
+        this(bootId, classifier, incidents, quarantineRepository, quarantineRegistry,
+                storageHealth, writeQueue, PersistenceIncidentSink.NO_OP);
+    }
+
+    public PersistenceIncidentReporter(@Nonnull String bootId,
+                                       @Nonnull PersistenceFailureClassifier classifier,
+                                       @Nonnull PersistenceIncidentRepository incidents,
+                                       @Nonnull PersistenceQuarantineRepository quarantineRepository,
+                                       @Nonnull PersistenceQuarantineRegistry quarantineRegistry,
+                                       @Nonnull PersistenceStorageHealthService storageHealth,
+                                       @Nonnull PersistenceWriteQueue writeQueue,
+                                       @Nonnull PersistenceIncidentSink incidentSink) {
         this.bootId = requireText(bootId);
         this.classifier = classifier;
         this.incidents = incidents;
@@ -36,6 +52,7 @@ public final class PersistenceIncidentReporter {
         this.quarantineRegistry = quarantineRegistry;
         this.storageHealth = storageHealth;
         this.writeQueue = writeQueue;
+        this.incidentSink = incidentSink;
     }
 
     @Nonnull
@@ -43,16 +60,20 @@ public final class PersistenceIncidentReporter {
         PersistenceFailureClassification classification = classifier.classify(context);
         String fingerprint = fingerprint(context, classification);
         String proposedIncidentId = UUID.randomUUID().toString();
-        String incidentId = resolveExistingIncident(fingerprint, classification.scopes())
-                .orElse(proposedIncidentId);
+        Optional<String> existing = resolveExistingIncident(fingerprint, classification.scopes());
+        String incidentId = existing.orElse(proposedIncidentId);
+        long now = System.currentTimeMillis();
+        PersistenceIncident incident = incident(context, classification, incidentId, fingerprint, now);
+        record(incident, existing.isPresent()
+                ? PersistenceIncidentEventKind.INCIDENT_REPEATED
+                : PersistenceIncidentEventKind.INCIDENT_OPENED,
+                classification.scopes(), null);
         if (classification.storageAuthorityLost()) {
             storageHealth.enterReadOnly(context.reasonCode(), incidentId);
             return new ReportSubmission(incidentId, classification,
                     CompletableFuture.completedFuture(false));
         }
 
-        long now = System.currentTimeMillis();
-        PersistenceIncident incident = incident(context, classification, incidentId, fingerprint, now);
         List<PersistenceQuarantineRecord> quarantines = buildQuarantines(
                 context, classification, incidentId, now);
         quarantines.forEach(quarantineRegistry::openImmediate);
@@ -69,7 +90,13 @@ public final class PersistenceIncidentReporter {
                 ignored -> reloadQuarantinesAfterCommit(incidentId)
         );
         CompletableFuture<Boolean> durable = write.completion().thenApply(outcome -> {
-            if (outcome.isCommitted()) return true;
+            if (outcome.isCommitted()) {
+                record(incident, PersistenceIncidentEventKind.QUARANTINE_DURABLE,
+                        classification.scopes(), "committed");
+                return true;
+            }
+            record(incident, PersistenceIncidentEventKind.QUARANTINE_DURABILITY_FAILED,
+                    classification.scopes(), outcome.failureReason());
             storageHealth.enterReadOnly("persistence_quarantine_durable_write_failed", incidentId);
             return false;
         });
@@ -152,6 +179,15 @@ public final class PersistenceIncidentReporter {
                     .digest(material.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception impossible) {
             throw new IllegalStateException("SHA-256 unavailable", impossible);
+        }
+    }
+
+    private void record(PersistenceIncident incident, PersistenceIncidentEventKind kind,
+                        List<PersistenceScope> scopes, String result) {
+        try {
+            incidentSink.record(PersistenceIncidentEvent.from(incident, kind, scopes, result));
+        } catch (Throwable ignored) {
+            // Diagnostics and telemetry cannot alter containment.
         }
     }
 

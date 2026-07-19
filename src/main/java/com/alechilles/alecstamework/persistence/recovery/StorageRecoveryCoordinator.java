@@ -2,6 +2,14 @@ package com.alechilles.alecstamework.persistence.recovery;
 
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageState;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentEvent;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentEventKind;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentSink;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDisposition;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClass;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -19,6 +27,8 @@ public final class StorageRecoveryCoordinator implements AutoCloseable {
 
     private final PersistenceStorageHealthService storageHealth;
     private final StorageRecoveryProbe probe;
+    private final String bootId;
+    private final PersistenceIncidentSink incidentSink;
     private final ScheduledExecutorService executor;
     private final AtomicBoolean scheduledOrRunning = new AtomicBoolean();
     private final AtomicLong attempts = new AtomicLong();
@@ -27,8 +37,17 @@ public final class StorageRecoveryCoordinator implements AutoCloseable {
 
     public StorageRecoveryCoordinator(@Nonnull PersistenceStorageHealthService storageHealth,
                                       @Nonnull StorageRecoveryProbe probe) {
+        this(storageHealth, probe, "unknown-boot", PersistenceIncidentSink.NO_OP);
+    }
+
+    public StorageRecoveryCoordinator(@Nonnull PersistenceStorageHealthService storageHealth,
+                                      @Nonnull StorageRecoveryProbe probe,
+                                      @Nonnull String bootId,
+                                      @Nonnull PersistenceIncidentSink incidentSink) {
         this.storageHealth = storageHealth;
         this.probe = probe;
+        this.bootId = bootId;
+        this.incidentSink = incidentSink;
         this.executor = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "tamework-storage-recovery");
             thread.setDaemon(true);
@@ -63,8 +82,11 @@ public final class StorageRecoveryCoordinator implements AutoCloseable {
     }
 
     private void onStorageTransition(PersistenceStorageHealthService.State state) {
-        if (state.status() != PersistenceStorageState.READ_ONLY || !autoRecoverable(state.reason())) return;
-        schedule(delayFor(attempts.get()));
+        if (state.status() == PersistenceStorageState.READ_ONLY) {
+            record(PersistenceIncidentEventKind.GLOBAL_READ_ONLY_ENTERED,
+                    state, "read_only");
+            if (autoRecoverable(state.reason())) schedule(delayFor(attempts.get()));
+        }
     }
 
     private void schedule(long delayMs) {
@@ -73,6 +95,7 @@ public final class StorageRecoveryCoordinator implements AutoCloseable {
     }
 
     private void runProbe() {
+        PersistenceStorageHealthService.State initialState = storageHealth.getState();
         StorageRecoveryProbe.ProbeResult result;
         try {
             scheduledFuture = null;
@@ -86,6 +109,12 @@ public final class StorageRecoveryCoordinator implements AutoCloseable {
             scheduledOrRunning.set(false);
         }
         completeActiveRequest(result);
+        PersistenceStorageHealthService.State state = result.recovered()
+                ? initialState : storageHealth.getState();
+        record(result.recovered()
+                        ? PersistenceIncidentEventKind.GLOBAL_READ_ONLY_RECOVERED
+                        : PersistenceIncidentEventKind.RECOVERY_FAILED,
+                state, result.reason());
         if (!result.recovered() && autoRecoverable(storageHealth.getState().reason())) {
             schedule(delayFor(attempts.get()));
         }
@@ -110,6 +139,23 @@ public final class StorageRecoveryCoordinator implements AutoCloseable {
                 && !normalized.contains("schema")
                 && !normalized.contains("migration")
                 && !normalized.contains("invariant");
+    }
+
+    private void record(PersistenceIncidentEventKind kind,
+                        PersistenceStorageHealthService.State state,
+                        String result) {
+        try {
+            String incidentId = state.incidentId() == null
+                    ? "storage-" + bootId : state.incidentId();
+            String reason = state.reason() == null ? result : state.reason();
+            incidentSink.record(new PersistenceIncidentEvent(
+                    PersistenceIncidentEvent.CURRENT_FORMAT_VERSION, System.currentTimeMillis(), kind,
+                    bootId, incidentId, null, null, PersistenceDomain.STORAGE,
+                    PersistenceOperationPhase.RECOVERY, reason, PersistenceFailureClass.STORAGE_UNAVAILABLE,
+                    PersistenceDisposition.GLOBAL_READ_ONLY, List.of(), 1L, attempts.get(), result));
+        } catch (Throwable ignored) {
+            // Diagnostics cannot alter global recovery.
+        }
     }
 
     @Override

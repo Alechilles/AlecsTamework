@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.persistence.recovery;
 
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentEvent;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentEventKind;
+import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRegistry;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncident;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentRepository;
@@ -36,6 +39,7 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
     private final PersistenceFeatureCircuitRegistry circuits;
     private final PersistenceWriteQueue writeQueue;
     private final ScheduledExecutorService executor;
+    private final PersistenceIncidentSink incidentSink;
     private final Map<PersistenceDomain, ScopedPersistenceRecoveryVerifier> verifiers =
             new EnumMap<>(PersistenceDomain.class);
     private final ConcurrentHashMap<String, CompletableFuture<RecoveryResult>> active =
@@ -48,7 +52,19 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
             @Nonnull PersistenceFeatureCircuitRegistry circuits,
             @Nonnull PersistenceWriteQueue writeQueue) {
         this(incidents, quarantineRepository, quarantines, circuits, writeQueue,
-                Executors.newSingleThreadScheduledExecutor(daemonFactory()));
+                Executors.newSingleThreadScheduledExecutor(daemonFactory()),
+                PersistenceIncidentSink.NO_OP);
+    }
+
+    public ScopedPersistenceRecoveryCoordinator(
+            @Nonnull PersistenceIncidentRepository incidents,
+            @Nonnull PersistenceQuarantineRepository quarantineRepository,
+            @Nonnull PersistenceQuarantineRegistry quarantines,
+            @Nonnull PersistenceFeatureCircuitRegistry circuits,
+            @Nonnull PersistenceWriteQueue writeQueue,
+            @Nonnull PersistenceIncidentSink incidentSink) {
+        this(incidents, quarantineRepository, quarantines, circuits, writeQueue,
+                Executors.newSingleThreadScheduledExecutor(daemonFactory()), incidentSink);
     }
 
     ScopedPersistenceRecoveryCoordinator(
@@ -57,13 +73,15 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
             PersistenceQuarantineRegistry quarantines,
             PersistenceFeatureCircuitRegistry circuits,
             PersistenceWriteQueue writeQueue,
-            ScheduledExecutorService executor) {
+            ScheduledExecutorService executor,
+            PersistenceIncidentSink incidentSink) {
         this.incidents = incidents;
         this.quarantineRepository = quarantineRepository;
         this.quarantines = quarantines;
         this.circuits = circuits;
         this.writeQueue = writeQueue;
         this.executor = executor;
+        this.incidentSink = incidentSink;
     }
 
     public synchronized void register(@Nonnull ScopedPersistenceRecoveryVerifier verifier) {
@@ -154,6 +172,8 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
         }
         if (!verification.resolution().isResolved()) {
             retain(incidentId, verification);
+            record(incident, fences, PersistenceIncidentEventKind.RECOVERY_FAILED,
+                    verification.resolutionCode());
             return new RecoveryResult(RecoveryStatus.RETAINED,
                     verification.resolutionCode(), incident.recoveryAttempts() + 1L,
                     verification.failure());
@@ -165,10 +185,16 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
                     ScopedRecoveryResolution.FAILED, "runtime_index_publication_failed",
                     Map.of(), null, publicationFailure);
             retain(incidentId, failed);
+            record(incident, fences, PersistenceIncidentEventKind.RECOVERY_FAILED,
+                    failed.resolutionCode());
             return new RecoveryResult(RecoveryStatus.RETAINED, failed.resolutionCode(),
                     incident.recoveryAttempts() + 1L, publicationFailure);
         }
         clear(incident, fences, verifier, verification);
+        record(incident, fences, PersistenceIncidentEventKind.QUARANTINE_CLEARED,
+                verification.resolutionCode());
+        record(incident, fences, PersistenceIncidentEventKind.RECOVERY_COMPLETED,
+                verification.resolutionCode());
         return new RecoveryResult(RecoveryStatus.RESOLVED,
                 verification.resolutionCode(), incident.recoveryAttempts() + 1L, null);
     }
@@ -248,6 +274,17 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
 
     private void reloadFences() throws Exception {
         quarantines.reload(quarantineRepository.listActive());
+    }
+
+    private void record(PersistenceIncident incident, List<PersistenceQuarantineRecord> fences,
+                        PersistenceIncidentEventKind kind, String result) {
+        try {
+            List<PersistenceScope> scopes = new ArrayList<>();
+            for (PersistenceQuarantineRecord fence : fences) scopes.add(fence.scope());
+            incidentSink.record(PersistenceIncidentEvent.from(incident, kind, scopes, result));
+        } catch (Throwable ignored) {
+            // Diagnostics cannot alter recovery.
+        }
     }
 
     private void requireCommit(PersistenceWriteQueue.WriteOutcome<?> outcome, String reason) {

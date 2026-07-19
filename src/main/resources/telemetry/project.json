@@ -222,11 +222,165 @@
             "operation": { "type": "enum", "values": ["write_batch"] },
             "reason": { "type": "string", "maxLength": 120 }
           }
+        },
+        "persistence_incident_opened": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
+        },
+        "persistence_recovery_failed": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
+        },
+        "persistence_global_read_only_entered": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
         }
       }
     },
     "lifecycle": {
-      "enabled": true
+      "enabled": true,
+      "details": {
+        "persistence_incident_repeated": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
+        },
+        "persistence_quarantine_opened": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
+        },
+        "persistence_recovery_completed": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
+        },
+        "persistence_quarantine_cleared": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
+        },
+        "persistence_global_read_only_recovered": {
+          "allowedFields": {
+            "incidentId": { "type": "string", "maxLength": 120 },
+            "traceId": { "type": "string", "maxLength": 120 },
+            "operationId": { "type": "string", "maxLength": 160 },
+            "bootId": { "type": "string", "maxLength": 120 },
+            "domain": { "type": "string", "maxLength": 80 },
+            "phase": { "type": "string", "maxLength": 80 },
+            "reason": { "type": "string", "maxLength": 120 },
+            "failureClass": { "type": "string", "maxLength": 80 },
+            "disposition": { "type": "string", "maxLength": 80 },
+            "scopeType": { "type": "string", "maxLength": 80 },
+            "scopeCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "retryCountBucket": { "type": "enum", "values": ["0", "1", "2-3", "4-10", "11+"] },
+            "schemaVersion": { "type": "number" },
+            "result": { "type": "string", "maxLength": 160 },
+            "scopeHash": { "type": "string", "maxLength": 128 }
+          }
+        }
+      }
     },
     "breadcrumbs": {
       "enabled": true,

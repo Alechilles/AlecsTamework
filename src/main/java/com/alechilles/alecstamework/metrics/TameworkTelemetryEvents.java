@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -126,6 +127,15 @@ public final class TameworkTelemetryEvents {
     public static void recordUsageIfAvailable(@Nonnull String eventName,
                                               @Nullable String detail) {
         recordUsageIfAvailable(eventName, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public static void recordBreadcrumbIfAvailable(@Nonnull TelemetryBreadcrumbContext context) {
+        try {
+            Tamework plugin = Tamework.getInstance();
+            CrashTelemetryService service = plugin == null ? null : plugin.getCrashTelemetryService();
+            if (service != null) service.recordBreadcrumb(context);
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void recordUsageIfAvailable(@Nonnull String eventName,

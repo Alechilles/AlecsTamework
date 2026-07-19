@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+import com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContext;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryBootstrap;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryDiagnostics;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryService;
@@ -169,6 +170,11 @@ public final class CrashTelemetryService {
             return;
         }
         telemetry.recordBreadcrumb(category, detail);
+    }
+
+    public void recordBreadcrumb(@Nonnull TelemetryBreadcrumbContext context) {
+        if (!isCrashTelemetryEnabled() || !breadcrumbsEnabled.get()) return;
+        telemetry.recordBreadcrumb(context);
     }
 
     public void captureSetupFailure(@Nullable Throwable throwable) {
@@ -549,6 +555,11 @@ public final class CrashTelemetryService {
 
         void recordBreadcrumb(@Nonnull String category, @Nonnull String detail);
 
+        default void recordBreadcrumb(@Nonnull TelemetryBreadcrumbContext context) {
+            TelemetryBreadcrumbContext normalized = context.normalize();
+            recordBreadcrumb(normalized.category(), normalized.detail());
+        }
+
         void clearBreadcrumbs();
 
         boolean setProjectEnabled(boolean enabled);
@@ -600,6 +611,11 @@ public final class CrashTelemetryService {
         @Override
         public void recordBreadcrumb(@Nonnull String category, @Nonnull String detail) {
             service.recordBreadcrumb(category, detail);
+        }
+
+        @Override
+        public void recordBreadcrumb(@Nonnull TelemetryBreadcrumbContext context) {
+            service.recordBreadcrumb(context);
         }
 
         @Override
