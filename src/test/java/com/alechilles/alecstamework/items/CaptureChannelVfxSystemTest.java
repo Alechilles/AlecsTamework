@@ -17,6 +17,25 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
+    void travelingOrbKeepsFixedScaleAndUsesDistanceForLifetime() {
+        assertEquals(1.0F,
+                CaptureChannelVfxSystem.particleScaleForDistance(7.5D, 15.0D, false),
+                0.00001F);
+        assertEquals(0.25F,
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 15.0D, false),
+                0.00001F);
+        assertEquals(0.5F,
+                CaptureChannelVfxSystem.particleScaleForDistance(7.5D, 15.0D, true),
+                0.00001F);
+        assertEquals(0.5F,
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 15.0D, true),
+                0.00001F);
+        assertEquals(0.0F,
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 0.0D, false),
+                0.00001F);
+    }
+
+    @Test
     void beamPacketNegativeXAxisRotatesOntoTargetVector() {
         assertBeamDirection(new Vector3d(8.0D, 3.0D, -5.0D));
         assertBeamDirection(new Vector3d(-4.0D, -2.0D, 7.0D));
@@ -68,7 +87,8 @@ class CaptureChannelVfxSystemTest {
         ));
 
         assertEquals(50L, CaptureChannelVfxSystem.emissionIntervalMsForTests());
-        assertEquals(0.6F, CaptureChannelVfxSystem.particleMaxDurationSecondsForTests());
+        assertEquals(0.5F,
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(15.0D, 15.0D, false));
         assertTrue(source.contains("world.getEntityRef(session.playerUuid)"));
         assertTrue(source.contains("world.getEntityRef(session.targetUuid)"));
         assertTrue(source.contains("session.nextEmitAtMs = nowMs + EMIT_INTERVAL_MS"));

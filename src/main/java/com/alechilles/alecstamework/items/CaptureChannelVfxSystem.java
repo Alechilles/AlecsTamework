@@ -24,7 +24,7 @@ import org.joml.Vector3d;
 public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
     private static final long EMIT_INTERVAL_MS = 50L;
     private static final long TARGET_LOCK_GRACE_MS = 2_000L;
-    private static final float PARTICLE_MAX_DURATION_SECONDS = 0.6F;
+    private static final float PARTICLE_MAX_DURATION_SECONDS = 0.5F;
     private static final double DEFAULT_NATIVE_BEAM_LENGTH = 50.0D;
     private static final double MIN_DISTANCE = 0.01D;
     private static final double HELD_ITEM_RIGHT_OFFSET = 0.32D;
@@ -37,6 +37,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                                 @Nonnull World world,
                                 @Nullable String particleSystem,
                                 double nativeBeamLength,
+                                boolean scaleBeamToTarget,
                                 double channelDurationSeconds,
                                 double maxDistance,
                                 @Nullable String auraEffectId) {
@@ -55,6 +56,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                 world.getName(),
                 particleSystem,
                 safeNativeLength,
+                scaleBeamToTarget,
                 maxDistance,
                 auraEffectId,
                 visualEndsAtMs,
@@ -143,7 +145,19 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         Vector3d origin = new Vector3d(source);
         double visibleDistance = origin.distance(target);
         Rotation3f rotation = rotationForBeamPacket(new Vector3d(target).sub(origin));
-        float scale = scaleForDistance(visibleDistance, session.nativeBeamLength);
+        float scale = particleScaleForDistance(
+                visibleDistance,
+                session.nativeBeamLength,
+                session.scaleBeamToTarget
+        );
+        float maxDuration = particleMaxDurationForDistance(
+                visibleDistance,
+                session.nativeBeamLength,
+                session.scaleBeamToTarget
+        );
+        if (scale <= 0.0F || maxDuration <= 0.0F) {
+            return;
+        }
         ParticleUtil.spawnParticleEffect(
                 session.particleSystem,
                 origin,
@@ -151,7 +165,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                 rotation.pitch(),
                 rotation.roll(),
                 scale,
-                PARTICLE_MAX_DURATION_SECONDS,
+                maxDuration,
                 store
         );
     }
@@ -160,8 +174,26 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         return EMIT_INTERVAL_MS;
     }
 
-    static float particleMaxDurationSecondsForTests() {
-        return PARTICLE_MAX_DURATION_SECONDS;
+    static float particleScaleForDistance(double distance,
+                                          double nativeBeamLength,
+                                          boolean scaleBeamToTarget) {
+        float distanceScale = scaleForDistance(distance, nativeBeamLength);
+        if (distanceScale <= 0.0F) {
+            return 0.0F;
+        }
+        return scaleBeamToTarget ? distanceScale : 1.0F;
+    }
+
+    static float particleMaxDurationForDistance(double distance,
+                                                double nativeBeamLength,
+                                                boolean scaleBeamToTarget) {
+        float distanceScale = scaleForDistance(distance, nativeBeamLength);
+        if (distanceScale <= 0.0F) {
+            return 0.0F;
+        }
+        return scaleBeamToTarget
+                ? PARTICLE_MAX_DURATION_SECONDS
+                : PARTICLE_MAX_DURATION_SECONDS * distanceScale;
     }
 
     static float scaleForDistance(double distance, double nativeBeamLength) {
@@ -287,6 +319,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
         private final String worldName;
         private final String particleSystem;
         private final double nativeBeamLength;
+        private final boolean scaleBeamToTarget;
         private final double maxDistance;
         private final String auraEffectId;
         private final long visualEndsAtMs;
@@ -299,6 +332,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
                         String worldName,
                         String particleSystem,
                         double nativeBeamLength,
+                        boolean scaleBeamToTarget,
                         double maxDistance,
                         String auraEffectId,
                         long visualEndsAtMs,
@@ -309,6 +343,7 @@ public final class CaptureChannelVfxSystem extends TickingSystem<EntityStore> {
             this.worldName = worldName;
             this.particleSystem = particleSystem;
             this.nativeBeamLength = nativeBeamLength;
+            this.scaleBeamToTarget = scaleBeamToTarget;
             this.maxDistance = maxDistance;
             this.auraEffectId = auraEffectId;
             this.visualEndsAtMs = visualEndsAtMs;

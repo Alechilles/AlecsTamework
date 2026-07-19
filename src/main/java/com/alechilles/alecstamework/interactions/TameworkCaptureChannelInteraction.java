@@ -55,6 +55,14 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             )
             .documentation("Authored forward length of the beam particle system, used to scale it to the target distance.")
             .add()
+            .<Boolean>appendInherited(
+                    new KeyedCodec<>("ScaleBeamToTarget", Codec.BOOLEAN),
+                    (interaction, value) -> interaction.scaleBeamToTarget = value,
+                    interaction -> interaction.scaleBeamToTarget,
+                    (interaction, parent) -> interaction.scaleBeamToTarget = parent.scaleBeamToTarget
+            )
+            .documentation("Whether to scale the whole particle system to the target distance. Disable for fixed-size traveling particles.")
+            .add()
             .<String>appendInherited(
                     new KeyedCodec<>("CaptureBurstParticleSystem", Codec.STRING),
                     (interaction, value) -> interaction.captureBurstParticleSystem = value,
@@ -76,6 +84,7 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
     private String phase = Phase.COMPLETE.name();
     private String beamParticleSystem;
     private double beamNativeLength = 50.0D;
+    private boolean scaleBeamToTarget = true;
     private String captureBurstParticleSystem;
     private double channelDurationSeconds = 3.0D;
 
@@ -147,6 +156,7 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
                     heldItem,
                     beamParticleSystem,
                     beamNativeLength,
+                    scaleBeamToTarget,
                     channelDurationSeconds
             ));
             case CANCEL -> commandBuffer.run(store -> handler.endCaptureChannel(player, targetRef, heldItem));

@@ -319,6 +319,24 @@ public final class SpawnerFeatureHandler {
                                        String beamParticleSystem,
                                        double beamNativeLength,
                                        double channelDurationSeconds) {
+        return beginCaptureChannel(
+                player,
+                targetRef,
+                itemStack,
+                beamParticleSystem,
+                beamNativeLength,
+                true,
+                channelDurationSeconds
+        );
+    }
+
+    public boolean beginCaptureChannel(Player player,
+                                       Ref<EntityStore> targetRef,
+                                       ItemStack itemStack,
+                                       String beamParticleSystem,
+                                       double beamNativeLength,
+                                       boolean scaleBeamToTarget,
+                                       double channelDurationSeconds) {
         if (!canBeginCaptureChannelInteraction(player, targetRef, itemStack)) {
             return false;
         }
@@ -337,6 +355,7 @@ public final class SpawnerFeatureHandler {
                         world,
                         beamParticleSystem,
                         beamNativeLength,
+                        scaleBeamToTarget,
                         channelDurationSeconds,
                         config.getCaptureMaxDistance(),
                         config.getCaptureChannelAuraEffectId()
