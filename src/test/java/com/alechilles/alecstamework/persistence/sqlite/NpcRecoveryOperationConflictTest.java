@@ -248,7 +248,7 @@ class NpcRecoveryOperationConflictTest {
         assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, outcome.status());
         assertInstanceOf(NpcRecoveryOperationTransactions.RepositoryIntegrityException.class,
                 outcome.failure());
-        assertFalse(health.isHealthy());
+        assertTrue(health.isHealthy(), "bounded recovery corruption must not poison SQLite authority");
         assertEquals(0, recoveryRowCount());
     }
 

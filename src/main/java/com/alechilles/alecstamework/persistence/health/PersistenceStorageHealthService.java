@@ -68,6 +68,14 @@ public final class PersistenceStorageHealthService {
         return transitionFrom(PersistenceStorageState.RECOVERING, State.healthy());
     }
 
+    public boolean failRecovery(@Nonnull String reason) {
+        State current = state.get();
+        if (current.status() != PersistenceStorageState.RECOVERING) return false;
+        State readOnly = new State(PersistenceStorageState.READ_ONLY, normalize(reason),
+                current.incidentId(), System.currentTimeMillis());
+        return compareAndNotify(current, readOnly);
+    }
+
     public void close() {
         State current = state.get();
         State closed = new State(PersistenceStorageState.CLOSED, "intentional_shutdown", current.incidentId(),
