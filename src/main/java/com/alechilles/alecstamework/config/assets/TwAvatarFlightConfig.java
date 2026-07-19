@@ -52,7 +52,7 @@ public final class TwAvatarFlightConfig implements
             InputSettings::new
     )
             .<Double>append(new KeyedCodec<>("IntentTimeoutMs", Codec.DOUBLE),
-                    (settings, value) -> settings.intentTimeoutMs = positiveOrDefault(value, 250.0),
+                    (settings, value) -> settings.intentTimeoutMs = nonNegativeOrDefault(value, 250.0),
                     settings -> settings.intentTimeoutMs)
             .documentation("Milliseconds before packet-derived movement intent decays to neutral. Inheritance: missing nested key inherits parent value.")
             .add()
@@ -319,7 +319,7 @@ public final class TwAvatarFlightConfig implements
             .<Double>append(new KeyedCodec<>("ResendIntervalMs", Codec.DOUBLE),
                     (settings, value) -> settings.resendIntervalMs = positiveOrDefault(value, 250.0),
                     settings -> settings.resendIntervalMs)
-            .documentation("Minimum milliseconds between forced movement-animation packets while the same animation remains active. Inheritance: missing nested key inherits parent value.")
+            .documentation("Minimum milliseconds between forced movement-animation packets while the same animation remains active. Set to 0 to send only when the animation changes, which preserves model-authored animation sound timing. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Boolean>append(new KeyedCodec<>("SuppressNonMovementAnimations", Codec.BOOLEAN),
                     (settings, value) -> settings.suppressNonMovementAnimations = value == null || value,
@@ -887,7 +887,7 @@ public final class TwAvatarFlightConfig implements
         public String getFastFlightAnimation() {
             return stringOrDefault(fastFlightAnimation, DEFAULT_FAST_FLIGHT_ANIMATION);
         }
-        public long getResendIntervalMs() { return Math.round(Math.max(1.0, resendIntervalMs)); }
+        public long getResendIntervalMs() { return Math.round(Math.max(0.0, resendIntervalMs)); }
         public boolean isSuppressNonMovementAnimations() { return suppressNonMovementAnimations; }
         public boolean isSuppressActionAnimation() { return suppressActionAnimation; }
         public boolean isSuppressStatusAnimation() { return suppressStatusAnimation; }

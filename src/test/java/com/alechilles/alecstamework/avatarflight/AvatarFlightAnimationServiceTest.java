@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.avatarflight;
 import com.hypixel.hytale.protocol.AnimationSlot;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -59,5 +60,18 @@ class AvatarFlightAnimationServiceTest {
         flight.setMovementAnimationId("Idle");
 
         assertTrue(AvatarFlightAnimationService.isGroundedIdleHandoffActive(flight));
+    }
+
+    @Test
+    void zeroResendIntervalLeavesLoopingAnimationAndSoundTimelineUninterrupted() {
+        assertEquals(0L, AvatarFlightAnimationService.nextMovementAnimationAt(1000L, 0L));
+        assertFalse(AvatarFlightAnimationService.isMovementAnimationResendDue(5000L, 0L, 0L));
+    }
+
+    @Test
+    void positiveResendIntervalRetainsDefensiveAnimationRefresh() {
+        assertEquals(1250L, AvatarFlightAnimationService.nextMovementAnimationAt(1000L, 250L));
+        assertFalse(AvatarFlightAnimationService.isMovementAnimationResendDue(1249L, 1250L, 250L));
+        assertTrue(AvatarFlightAnimationService.isMovementAnimationResendDue(1250L, 1250L, 250L));
     }
 }

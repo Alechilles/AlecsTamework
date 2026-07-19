@@ -311,8 +311,10 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "the landing-idle packet must remain owned so it can be explicitly stopped");
         assertTrue(source.contains("maintainGroundedIdle(ref, commandBuffer, flight, config, now)"),
                 "stationary grounded idle should be refreshed like other transformed movement animations");
-        assertTrue(source.contains("now + config.getAnimation().getResendIntervalMs()"),
-                "grounded idle refreshes must use the configured packet throttle");
+        assertTrue(source.contains("nextMovementAnimationAt("),
+                "movement animation refresh scheduling must support disabled resends");
+        assertTrue(source.contains("isMovementAnimationResendDue("),
+                "movement animation refreshes must honor the configured packet throttle");
     }
 
     @Test

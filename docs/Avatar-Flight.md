@@ -84,6 +84,15 @@ The generator warns when player-style locomotion sets that the native transforme
 
 ## Config Fields
 
+### Animation
+
+- `IdleAnimation`: movement-slot animation used while hovering or horizontally idle.
+- `FlightAnimation`: movement-slot animation used during ordinary forward flight.
+- `FastFlightAnimation`: movement-slot animation used while forward boost speed is active.
+- `ResendIntervalMs`: interval for defensively resending an unchanged movement animation. Set this to `0` for models that attach `SoundEventId` and `FootstepIntervals` to looping flight animations; repeated play packets restart those sound events before the model-authored timing can complete.
+
+Omitting `Animation` inherits the complete parent section. An explicit `Animation` object overrides only its explicit nested keys and inherits the remaining values.
+
 ### Input
 
 - `IntentTimeoutMs`: milliseconds before packet-derived movement intent decays to neutral.

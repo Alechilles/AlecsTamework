@@ -67,6 +67,14 @@ class TwAvatarFlightConfigTest {
     }
 
     @Test
+    void animationResendCanBeDisabledForModelAuthoredSoundTiming() throws Exception {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(config, "animation", "resendIntervalMs", 0.0);
+
+        assertEquals(0L, config.getAnimation().getResendIntervalMs());
+    }
+
+    @Test
     void defaultConfigExposesVigourAndGlideBalanceValues() {
         TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
 

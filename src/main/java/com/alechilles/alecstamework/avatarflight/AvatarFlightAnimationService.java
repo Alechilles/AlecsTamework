@@ -121,7 +121,8 @@ final class AvatarFlightAnimationService {
                 ref, AnimationSlot.Movement, GROUNDED_IDLE_ANIMATION, true, commandBuffer);
         // Keep ownership until movement input arrives so the explicit idle can be stopped once.
         flight.setMovementAnimationId(GROUNDED_IDLE_ANIMATION);
-        flight.setNextMovementAnimationAtMs(now + config.getAnimation().getResendIntervalMs());
+        flight.setNextMovementAnimationAtMs(nextMovementAnimationAt(
+                now, config.getAnimation().getResendIntervalMs()));
     }
 
     private void maintainGroundedIdle(@Nonnull Ref<EntityStore> ref,
@@ -129,12 +130,14 @@ final class AvatarFlightAnimationService {
                                       @Nonnull AvatarFlightComponent flight,
                                       @Nonnull TwAvatarFlightConfig config,
                                       long now) {
-        if (now < flight.getNextMovementAnimationAtMs()) {
+        long resendIntervalMs = config.getAnimation().getResendIntervalMs();
+        if (!isMovementAnimationResendDue(
+                now, flight.getNextMovementAnimationAtMs(), resendIntervalMs)) {
             return;
         }
         AnimationUtils.playAnimation(
                 ref, AnimationSlot.Movement, GROUNDED_IDLE_ANIMATION, true, commandBuffer);
-        flight.setNextMovementAnimationAtMs(now + config.getAnimation().getResendIntervalMs());
+        flight.setNextMovementAnimationAtMs(nextMovementAnimationAt(now, resendIntervalMs));
     }
 
     private void applyMovementAnimation(@Nonnull Ref<EntityStore> ref,
@@ -147,12 +150,23 @@ final class AvatarFlightAnimationService {
             return;
         }
         String animationId = config.getAnimation().animationFor(output.horizontalIdle(), output.fastFlight());
-        if (animationId.equals(flight.getMovementAnimationId()) && now < flight.getNextMovementAnimationAtMs()) {
+        long resendIntervalMs = config.getAnimation().getResendIntervalMs();
+        boolean sameAnimation = animationId.equals(flight.getMovementAnimationId());
+        if (sameAnimation && !isMovementAnimationResendDue(
+                now, flight.getNextMovementAnimationAtMs(), resendIntervalMs)) {
             return;
         }
         AnimationUtils.playAnimation(ref, AnimationSlot.Movement, animationId, true, commandBuffer);
         flight.setMovementAnimationId(animationId);
-        flight.setNextMovementAnimationAtMs(now + config.getAnimation().getResendIntervalMs());
+        flight.setNextMovementAnimationAtMs(nextMovementAnimationAt(now, resendIntervalMs));
+    }
+
+    static boolean isMovementAnimationResendDue(long now, long nextAt, long resendIntervalMs) {
+        return resendIntervalMs > 0L && nextAt > 0L && now >= nextAt;
+    }
+
+    static long nextMovementAnimationAt(long now, long resendIntervalMs) {
+        return resendIntervalMs > 0L ? now + resendIntervalMs : 0L;
     }
 
     private void clearMovementAnimation(@Nonnull Ref<EntityStore> ref,
