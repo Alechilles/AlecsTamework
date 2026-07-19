@@ -39,4 +39,14 @@ class AvatarFlightAnimationServiceTest {
         assertFalse(AvatarFlightAnimationService.doesAbilityOwnSlot(
                 flight, AnimationSlot.Movement, 1500L));
     }
+
+    @Test
+    void groundedIdleHandoffRequiresAnOwnedFlightAnimation() {
+        assertTrue(AvatarFlightAnimationService.needsGroundedIdleHandoff(
+                AvatarFlightMode.GROUNDED, true));
+        assertFalse(AvatarFlightAnimationService.needsGroundedIdleHandoff(
+                AvatarFlightMode.GROUNDED, false));
+        assertFalse(AvatarFlightAnimationService.needsGroundedIdleHandoff(
+                AvatarFlightMode.FORWARD_FLIGHT, true));
+    }
 }

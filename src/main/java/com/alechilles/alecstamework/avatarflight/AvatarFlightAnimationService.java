@@ -21,6 +21,7 @@ import javax.annotation.Nullable;
  * Owns movement, pose, suppression, and one-shot ability animations for avatar flight.
  */
 final class AvatarFlightAnimationService {
+    private static final String GROUNDED_IDLE_ANIMATION = "Idle";
     private final Set<String> warnedMissingAnimations = new HashSet<>();
 
     boolean hasOverrides(@Nonnull AvatarFlightComponent flight) {
@@ -47,10 +48,15 @@ final class AvatarFlightAnimationService {
               boolean applyingVelocity,
               boolean suppressingOverlays,
               long now) {
+        boolean hadAnimationOverrides = hasOverrides(flight);
         expireAbilityAnimation(ref, commandBuffer, flight, now);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays, now);
         if (!applyingVelocity) {
-            clear(ref, commandBuffer, flight, config);
+            if (needsGroundedIdleHandoff(output.mode(), hadAnimationOverrides)) {
+                handoffToGroundedIdle(ref, commandBuffer, flight, config);
+            } else {
+                clear(ref, commandBuffer, flight, config);
+            }
             return;
         }
         applyPoseAnimations(ref, commandBuffer, flight, config, output, now);
@@ -76,6 +82,31 @@ final class AvatarFlightAnimationService {
                                       long now) {
         return isAbilityAnimationProtected(flight, now)
                 && resolveAnimationSlot(flight.getAbilityAnimationSlot(), AnimationSlot.Action) == slot;
+    }
+
+    static boolean needsGroundedIdleHandoff(@Nonnull AvatarFlightMode mode,
+                                            boolean hasAnimationOverrides) {
+        return mode == AvatarFlightMode.GROUNDED && hasAnimationOverrides;
+    }
+
+    private void handoffToGroundedIdle(@Nonnull Ref<EntityStore> ref,
+                                       @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                       @Nonnull AvatarFlightComponent flight,
+                                       @Nonnull TwAvatarFlightConfig config) {
+        clearAbilityAnimation(ref, commandBuffer, flight);
+        clearPoseAnimations(ref, commandBuffer, flight, config);
+        ModelComponent component = commandBuffer.getComponent(ref, ModelComponent.getComponentType());
+        Model model = component == null ? null : component.getModel();
+        if (model == null
+                || model.getAnimationSetMap() == null
+                || !model.getAnimationSetMap().containsKey(GROUNDED_IDLE_ANIMATION)) {
+            clearMovementAnimation(ref, commandBuffer, flight);
+            return;
+        }
+        AnimationUtils.playAnimation(
+                ref, AnimationSlot.Movement, GROUNDED_IDLE_ANIMATION, true, commandBuffer);
+        flight.setMovementAnimationId("");
+        flight.setNextMovementAnimationAtMs(0L);
     }
 
     private void applyMovementAnimation(@Nonnull Ref<EntityStore> ref,

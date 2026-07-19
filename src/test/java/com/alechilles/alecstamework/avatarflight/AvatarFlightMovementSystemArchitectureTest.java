@@ -359,6 +359,22 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void landingHandsMovementAnimationDirectlyToGroundedIdle() throws Exception {
+        String source = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("boolean hadAnimationOverrides = hasOverrides(flight)"),
+                "landing must retain pre-expiry animation ownership for a cue ending on the touchdown tick");
+        assertTrue(source.contains("needsGroundedIdleHandoff(output.mode(), hadAnimationOverrides)"),
+                "landing handoff must only run when a flight animation override was owned entering the tick");
+        assertTrue(source.contains("model.getAnimationSetMap().containsKey(GROUNDED_IDLE_ANIMATION)"),
+                "the transformed model must expose Idle before the landing handoff plays it");
+        assertTrue(source.contains("AnimationSlot.Movement, GROUNDED_IDLE_ANIMATION, true"),
+                "landing must explicitly enter Idle instead of leaving Movement stopped");
+        assertTrue(source.contains("flight.setMovementAnimationId(\"\")"),
+                "the idle handoff must release Tamework animation ownership for normal locomotion");
+    }
+
+    @Test
     void debugLogFormatsMovementStateFlags() throws Exception {
         String source = Files.readString(Path.of(
                 "src",

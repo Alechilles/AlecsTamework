@@ -58,6 +58,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed transformed avatar-flight models sometimes freezing on their final flight frame after landing while stationary instead of immediately returning to idle.
 - Fixed AvatarFlight cleanup replaying equipment before restoring the player skin, which could leave clothing visible through equipped armor after dismounting.
 - Fixed prefab saving unregistering Tamework's generated asset-patch pack and silently removing bucket-on-trough interactions until the server restarted.
 - Fixed permanent companion deaths being quarantined after Hytale rejected Tamework's corpse hold as a duplicate native death component.
