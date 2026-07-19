@@ -54,6 +54,7 @@ public final class PersistenceResilienceRuntime {
         PersistenceIncidentReporter reporter = new PersistenceIncidentReporter(
                 bootId, new PersistenceFailureClassifier(), incidents, quarantineRepository,
                 quarantines, storageHealth, writeQueue);
+        writeQueue.setFailureHandler(new PersistenceIncidentWriteFailureHandler(reporter));
         PersistenceMutationAvailabilityService availability =
                 new PersistenceMutationAvailabilityService(
                         storageHealth, quarantines, circuits, ignored -> true);

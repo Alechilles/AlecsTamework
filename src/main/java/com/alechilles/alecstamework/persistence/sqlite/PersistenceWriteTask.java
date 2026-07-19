@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.persistence.operation.PersistenceOperationMetadata;
 import java.sql.Connection;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -8,7 +9,7 @@ import javax.annotation.Nullable;
 
 /** Holds one accepted write operation and its exactly-once terminal completion. */
 final class PersistenceWriteTask<T> {
-    private final String operationName;
+    private final PersistenceOperationMetadata metadata;
     private final PersistenceWriteQueue.SqlWork<T> work;
     @Nullable
     private final Consumer<T> afterCommit;
@@ -16,17 +17,22 @@ final class PersistenceWriteTask<T> {
     @Nullable
     private T result;
 
-    PersistenceWriteTask(@Nonnull String operationName,
+    PersistenceWriteTask(@Nonnull PersistenceOperationMetadata metadata,
                          @Nonnull PersistenceWriteQueue.SqlWork<T> work,
                          @Nullable Consumer<T> afterCommit) {
-        this.operationName = operationName;
+        this.metadata = metadata;
         this.work = work;
         this.afterCommit = afterCommit;
     }
 
     @Nonnull
     String operationName() {
-        return operationName;
+        return metadata.taskName();
+    }
+
+    @Nonnull
+    PersistenceOperationMetadata metadata() {
+        return metadata;
     }
 
     @Nonnull

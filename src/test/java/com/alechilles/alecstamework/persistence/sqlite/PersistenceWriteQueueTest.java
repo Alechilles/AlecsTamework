@@ -21,7 +21,7 @@ class PersistenceWriteQueueTest {
     Path tempDir;
 
     @Test
-    void reportsTerminalWriteFailureWithoutTimingSleeps() throws Exception {
+    void rolledBackDomainFailureDoesNotPoisonStorageAuthority() throws Exception {
         Path sqlitePath = tempDir.resolve("test.sqlite");
         PersistenceHealthService healthService = new PersistenceHealthService();
         SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
@@ -32,7 +32,7 @@ class PersistenceWriteQueueTest {
             }).get(2, TimeUnit.SECONDS);
         }
         assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, result.status());
-        assertFalse(healthService.isHealthy());
+        assertTrue(healthService.isHealthy());
     }
 
     /** Protects the July 14 SQLITE_BUSY incident that previously degraded the entire session. */
@@ -74,6 +74,32 @@ class PersistenceWriteQueueTest {
         try (PersistenceWriteQueue queue = new PersistenceWriteQueue(connectionManager, healthService, null)) {
             assertTrue(queue.submit("slow_write", connection -> Thread.sleep(150L)));
             assertTrue(queue.awaitIdle(2_000L));
+        }
+    }
+
+    @Test
+    void readOnlyPausesAcceptanceWithoutDestroyingWorker() throws Exception {
+        Path sqlitePath = tempDir.resolve("read-only-recovery.sqlite");
+        PersistenceHealthService healthService = new PersistenceHealthService();
+        SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
+        try (PersistenceWriteQueue queue = new PersistenceWriteQueue(connectionManager, healthService, null)) {
+            healthService.markDegraded("injected_storage_failure");
+            PersistenceWriteQueue.WriteResult rejected = queue.submitWithCompletion(
+                    "blocked_while_read_only", connection -> { })
+                    .get(1, TimeUnit.SECONDS);
+
+            assertEquals(PersistenceWriteQueue.WriteStatus.REJECTED, rejected.status());
+            assertEquals(PersistenceWriteQueue.QueueState.OPEN, queue.getState());
+
+            healthService.markHealthy();
+            PersistenceWriteQueue.WriteResult recovered = queue.submitWithCompletion(
+                    "write_after_verified_recovery",
+                    connection -> {
+                        try (Statement statement = connection.createStatement()) {
+                            statement.execute("CREATE TABLE recovered_after_read_only (value INTEGER)");
+                        }
+                    }).get(2, TimeUnit.SECONDS);
+            assertTrue(recovered.isCommitted());
         }
     }
 
