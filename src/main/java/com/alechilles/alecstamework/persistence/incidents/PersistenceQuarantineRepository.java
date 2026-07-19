@@ -68,6 +68,94 @@ public final class PersistenceQuarantineRepository {
         }
     }
 
+    @Nonnull
+    public List<PersistenceQuarantineRecord> listActiveForIncident(@Nonnull String incidentId) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                    SELECT q.*, s.scope_hash, s.authority_dimension
+                    FROM persistence_quarantines q
+                    JOIN persistence_incident_scopes s
+                      ON s.incident_id = q.incident_id
+                     AND s.scope_type = q.scope_type
+                     AND s.scope_key = q.scope_key
+                    WHERE q.incident_id = ? AND q.state IN ('ACTIVE', 'VERIFYING')
+                    ORDER BY q.updated_at_ms ASC
+                    """)) {
+            statement.setString(1, incidentId);
+            try (ResultSet result = statement.executeQuery()) {
+                List<PersistenceQuarantineRecord> records = new ArrayList<>();
+                while (result.next()) records.add(mapRecord(result));
+                return List.copyOf(records);
+            }
+        }
+    }
+
+    public void markVerifying(@Nonnull Connection connection,
+                              @Nonnull List<PersistenceQuarantineRecord> records,
+                              long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE persistence_quarantines SET state = 'VERIFYING', updated_at_ms = ?
+                WHERE quarantine_id = ? AND generation = ? AND evidence_hash = ?
+                  AND state IN ('ACTIVE', 'VERIFYING')
+                """)) {
+            for (PersistenceQuarantineRecord record : records) {
+                statement.setLong(1, nowMs);
+                statement.setString(2, record.quarantineId());
+                statement.setLong(3, record.generation());
+                statement.setString(4, record.evidenceHash());
+                statement.addBatch();
+            }
+            int[] results = statement.executeBatch();
+            for (int result : results) {
+                if (result != 1) throw new IllegalStateException("quarantine_generation_changed");
+            }
+        }
+    }
+
+    public void retainActive(@Nonnull Connection connection,
+                             @Nonnull String incidentId,
+                             long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE persistence_quarantines SET state = 'ACTIVE', updated_at_ms = ?
+                WHERE incident_id = ? AND state = 'VERIFYING'
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, incidentId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void clearVerified(@Nonnull Connection connection,
+                              @Nonnull List<PersistenceQuarantineRecord> records,
+                              @Nonnull java.util.Map<String, String> evidenceHashes,
+                              @Nonnull String verifierId,
+                              long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE persistence_quarantines
+                SET state = 'CLEARED', cleared_at_ms = ?, updated_at_ms = ?, clear_verifier = ?
+                WHERE quarantine_id = ? AND generation = ? AND evidence_hash = ?
+                  AND state = 'VERIFYING'
+                """)) {
+            for (PersistenceQuarantineRecord record : records) {
+                String verifiedHash = evidenceHashes.get(record.quarantineId());
+                if (!record.evidenceHash().equals(verifiedHash)) {
+                    throw new IllegalStateException("quarantine_evidence_changed");
+                }
+                statement.setLong(1, nowMs);
+                statement.setLong(2, nowMs);
+                statement.setString(3, verifierId);
+                statement.setString(4, record.quarantineId());
+                statement.setLong(5, record.generation());
+                statement.setString(6, verifiedHash);
+                statement.addBatch();
+            }
+            int[] results = statement.executeBatch();
+            for (int result : results) {
+                if (result != 1) throw new IllegalStateException("quarantine_clear_conflict");
+            }
+        }
+    }
+
     private PersistenceQuarantineRecord mapRecord(ResultSet result) throws Exception {
         PersistenceScope scope = new PersistenceScope(
                 PersistenceScopeType.valueOf(result.getString("scope_type")),

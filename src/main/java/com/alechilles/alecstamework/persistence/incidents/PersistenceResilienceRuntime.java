@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvaila
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
+import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -18,6 +19,7 @@ public final class PersistenceResilienceRuntime {
     private final PersistenceFeatureCircuitRegistry circuits;
     private final PersistenceIncidentReporter reporter;
     private final PersistenceMutationAvailabilityService availability;
+    private final ScopedPersistenceRecoveryCoordinator scopedRecovery;
 
     private PersistenceResilienceRuntime(PersistenceIncidentRepository incidents,
                                          PersistenceQuarantineRepository quarantineRepository,
@@ -25,7 +27,8 @@ public final class PersistenceResilienceRuntime {
                                          PersistenceFeatureCircuitRepository circuitRepository,
                                          PersistenceFeatureCircuitRegistry circuits,
                                          PersistenceIncidentReporter reporter,
-                                         PersistenceMutationAvailabilityService availability) {
+                                         PersistenceMutationAvailabilityService availability,
+                                         ScopedPersistenceRecoveryCoordinator scopedRecovery) {
         this.incidents = incidents;
         this.quarantineRepository = quarantineRepository;
         this.quarantines = quarantines;
@@ -33,6 +36,7 @@ public final class PersistenceResilienceRuntime {
         this.circuits = circuits;
         this.reporter = reporter;
         this.availability = availability;
+        this.scopedRecovery = scopedRecovery;
     }
 
     @Nonnull
@@ -58,9 +62,12 @@ public final class PersistenceResilienceRuntime {
         PersistenceMutationAvailabilityService availability =
                 new PersistenceMutationAvailabilityService(
                         storageHealth, quarantines, circuits, ignored -> true);
+        ScopedPersistenceRecoveryCoordinator scopedRecovery =
+                new ScopedPersistenceRecoveryCoordinator(
+                        incidents, quarantineRepository, quarantines, circuits, writeQueue);
         return new PersistenceResilienceRuntime(
                 incidents, quarantineRepository, quarantines, circuitRepository,
-                circuits, reporter, availability);
+                circuits, reporter, availability, scopedRecovery);
     }
 
     private static void loadDurableDenials(
@@ -116,5 +123,14 @@ public final class PersistenceResilienceRuntime {
     @Nonnull
     public PersistenceMutationAvailabilityService availability() {
         return availability;
+    }
+
+    @Nonnull
+    public ScopedPersistenceRecoveryCoordinator scopedRecovery() {
+        return scopedRecovery;
+    }
+
+    public void close() {
+        scopedRecovery.close();
     }
 }

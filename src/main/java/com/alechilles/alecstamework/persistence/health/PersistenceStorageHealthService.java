@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.health;
 
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
@@ -8,14 +9,19 @@ import javax.annotation.Nullable;
 /** Owns only global storage authority state and preserves the first read-only cause. */
 public final class PersistenceStorageHealthService {
     private final AtomicReference<State> state = new AtomicReference<>(State.healthy());
-    private final Consumer<State> transitionListener;
+    private final CopyOnWriteArrayList<Consumer<State>> transitionListeners = new CopyOnWriteArrayList<>();
 
     public PersistenceStorageHealthService() {
         this(null);
     }
 
     public PersistenceStorageHealthService(@Nullable Consumer<State> transitionListener) {
-        this.transitionListener = transitionListener == null ? ignored -> { } : transitionListener;
+        if (transitionListener != null) transitionListeners.add(transitionListener);
+    }
+
+    /** Adds a diagnostics/recovery observer that cannot participate in transition authority. */
+    public void addTransitionListener(@Nonnull Consumer<State> transitionListener) {
+        transitionListeners.add(transitionListener);
     }
 
     public boolean acceptsWrites() {
@@ -98,10 +104,12 @@ public final class PersistenceStorageHealthService {
     }
 
     private void notifyListener(State next) {
-        try {
-            transitionListener.accept(next);
-        } catch (RuntimeException ignored) {
-            // Diagnostics cannot alter storage authority.
+        for (Consumer<State> listener : transitionListeners) {
+            try {
+                listener.accept(next);
+            } catch (RuntimeException ignored) {
+                // Diagnostics and recovery scheduling cannot alter storage authority.
+            }
         }
     }
 

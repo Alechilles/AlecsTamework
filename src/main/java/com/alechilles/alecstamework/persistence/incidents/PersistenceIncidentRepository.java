@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** SQLite access for bounded incident reads and atomic open/repeat writes. */
 public final class PersistenceIncidentRepository {
@@ -80,6 +81,76 @@ public final class PersistenceIncidentRepository {
                 List<PersistenceIncident> incidents = new ArrayList<>();
                 while (result.next()) incidents.add(mapIncident(result));
                 return List.copyOf(incidents);
+            }
+        }
+    }
+
+    @Nonnull
+    public Optional<PersistenceIncident> findById(@Nonnull String incidentId) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT * FROM persistence_incidents WHERE incident_id = ?")) {
+            statement.setString(1, incidentId);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? Optional.of(mapIncident(result)) : Optional.empty();
+            }
+        }
+    }
+
+    public boolean beginRecovery(@Nonnull Connection connection,
+                                 @Nonnull String incidentId,
+                                 long expectedAttempts,
+                                 long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE persistence_incidents
+                SET status = 'RECOVERING', recovery_attempts = recovery_attempts + 1,
+                    last_seen_at_ms = ?
+                WHERE incident_id = ? AND status IN ('OPEN', 'RECOVERING')
+                  AND recovery_attempts = ?
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, incidentId);
+            statement.setLong(3, expectedAttempts);
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    public void retainOpen(@Nonnull Connection connection,
+                           @Nonnull String incidentId,
+                           @Nonnull String reason,
+                           @Nullable Throwable failure,
+                           long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE persistence_incidents
+                SET status = 'OPEN', last_seen_at_ms = ?, resolution_code = ?,
+                    last_error_type = ?, last_error_message = ?
+                WHERE incident_id = ? AND status = 'RECOVERING'
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setString(2, reason);
+            statement.setString(3, failure == null ? null : failure.getClass().getName());
+            statement.setString(4, failure == null ? null : bounded(failure.getMessage(), 1_000));
+            statement.setString(5, incidentId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void resolve(@Nonnull Connection connection,
+                        @Nonnull String incidentId,
+                        @Nonnull String resolutionCode,
+                        long nowMs) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE persistence_incidents
+                SET status = 'RESOLVED', resolved_at_ms = ?, last_seen_at_ms = ?,
+                    resolution_code = ?, last_error_type = NULL, last_error_message = NULL
+                WHERE incident_id = ? AND status = 'RECOVERING'
+                """)) {
+            statement.setLong(1, nowMs);
+            statement.setLong(2, nowMs);
+            statement.setString(3, resolutionCode);
+            statement.setString(4, incidentId);
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("incident_recovery_state_changed");
             }
         }
     }
@@ -174,5 +245,11 @@ public final class PersistenceIncidentRepository {
                 result.getString("last_error_message"), result.getString("evidence_json"),
                 result.getString("resolution_code"), result.getString("telemetry_correlation_id")
         );
+    }
+
+    private static String bounded(String value, int maxLength) {
+        if (value == null || value.isBlank()) return null;
+        String trimmed = value.trim();
+        return trimmed.substring(0, Math.min(trimmed.length(), maxLength));
     }
 }

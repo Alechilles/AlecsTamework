@@ -17,6 +17,9 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentRep
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRepository;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceResilienceRuntime;
+import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
+import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryCoordinator;
+import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryProbe;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +30,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
+import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -64,6 +68,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final CompanionPopulationReconciliationPersistence populationReconciliationPersistence;
     private final SqliteSchemaMigrator schemaMigrator;
     private final PersistenceResilienceRuntime resilienceRuntime;
+    private final StorageRecoveryCoordinator storageRecoveryCoordinator;
 
     private TameworkPersistenceRuntime(
             @Nonnull Path runtimeDataDirectory,
@@ -90,7 +95,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull CompanionIdentityRepository companionIdentityRepository,
             @Nonnull CompanionPopulationReconciliationPersistence populationReconciliationPersistence,
             @Nonnull SqliteSchemaMigrator schemaMigrator,
-            @Nonnull PersistenceResilienceRuntime resilienceRuntime) {
+            @Nonnull PersistenceResilienceRuntime resilienceRuntime,
+            @Nonnull StorageRecoveryCoordinator storageRecoveryCoordinator) {
         this.runtimeDataDirectory = runtimeDataDirectory;
         this.sqlitePath = sqlitePath;
         this.bootId = bootId;
@@ -116,6 +122,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.populationReconciliationPersistence = populationReconciliationPersistence;
         this.schemaMigrator = schemaMigrator;
         this.resilienceRuntime = resilienceRuntime;
+        this.storageRecoveryCoordinator = storageRecoveryCoordinator;
     }
 
     @Nonnull
@@ -229,6 +236,13 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new CompanionPopulationReconciliationPersistence(connectionManager, writeQueue);
         SqliteMaintenanceService maintenanceService =
                 new SqliteMaintenanceService(connectionManager, npcProfileRepository, logger);
+        StorageRecoveryProbe storageRecoveryProbe = new StorageRecoveryProbe(
+                bootId, connectionManager, schemaMigrator, integrityService, storageHealth,
+                resilienceRuntime.quarantineRepository(), resilienceRuntime.quarantines(),
+                resilienceRuntime.circuitRepository(), resilienceRuntime.circuits(),
+                List.of(managedCoopServices.compositeIndexRefreshService()::refresh));
+        StorageRecoveryCoordinator storageRecoveryCoordinator =
+                new StorageRecoveryCoordinator(storageHealth, storageRecoveryProbe);
 
         TameworkPersistenceRuntime runtime = new TameworkPersistenceRuntime(
                 normalizedDataDir,
@@ -255,7 +269,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 companionIdentityRepository,
                 populationReconciliationPersistence,
                 schemaMigrator,
-                resilienceRuntime
+                resilienceRuntime,
+                storageRecoveryCoordinator
         );
 
         if (health.isHealthy()) {
@@ -266,6 +281,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 maintenanceService.start();
             }
         }
+        resilienceRuntime.scopedRecovery().scheduleOpenIncidentsAfterStartup();
+        storageRecoveryCoordinator.start();
         return runtime;
     }
 
@@ -327,6 +344,16 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PersistenceMutationAvailabilityService getMutationAvailabilityService() {
         return resilienceRuntime.availability();
+    }
+
+    @Nonnull
+    public ScopedPersistenceRecoveryCoordinator getScopedRecoveryCoordinator() {
+        return resilienceRuntime.scopedRecovery();
+    }
+
+    @Nonnull
+    public StorageRecoveryCoordinator getStorageRecoveryCoordinator() {
+        return storageRecoveryCoordinator;
     }
 
     @Nonnull
@@ -615,6 +642,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Override
     public void close() {
         maintenanceService.close();
+        storageRecoveryCoordinator.close();
+        resilienceRuntime.close();
         writeQueue.close();
         storageHealthService.close();
     }
