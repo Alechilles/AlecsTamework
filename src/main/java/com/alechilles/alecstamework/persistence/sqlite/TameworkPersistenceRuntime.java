@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentRep
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRepository;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceResilienceRuntime;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
 import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryProbe;
@@ -210,9 +211,20 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         PersistenceIncidentSink incidentSink = new CoalescingPersistenceIncidentSink(
                 new CompositePersistenceIncidentSink(List.of(
                         incidentJournal, new TameworkPersistenceTelemetry())));
+        PersistenceScopeFactory scopeFactory;
+        try {
+            scopeFactory = PersistenceScopeFactory.loadOrCreate(
+                    incidentJournal.directory().resolve("identity-salt.bin"));
+        } catch (Exception failure) {
+            scopeFactory = PersistenceScopeFactory.ephemeral();
+            if (logger != null) {
+                logger.at(Level.WARNING).log(
+                        "Persistence diagnostic identity salt is unavailable; using a boot-local salt.");
+            }
+        }
         PersistenceResilienceRuntime resilienceRuntime = PersistenceResilienceRuntime.initialize(
                 bootId, connectionManager, writeQueue, storageHealth, logger,
-                incidentSink);
+                incidentSink, scopeFactory);
         NpcProfileRepository npcProfileRepository = new NpcProfileRepository(connectionManager, writeQueue);
         ApiProfileDataRepository apiProfileDataRepository =
                 new ApiProfileDataRepository(connectionManager, writeQueue);
@@ -374,6 +386,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public PersistenceIncidentJournal getIncidentJournal() {
         return incidentJournal;
+    }
+
+    @Nonnull
+    public PersistenceScopeFactory getPersistenceScopeFactory() {
+        return resilienceRuntime.scopeFactory();
     }
 
     @Nonnull

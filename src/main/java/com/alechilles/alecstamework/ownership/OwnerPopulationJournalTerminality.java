@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
@@ -9,16 +11,30 @@ import javax.annotation.Nonnull;
 final class OwnerPopulationJournalTerminality {
     private final OwnerPopulationIndex index;
     private final PersistenceHealthService health;
+    private final OwnerPopulationPersistenceGuard persistenceGuard;
 
     OwnerPopulationJournalTerminality(@Nonnull OwnerPopulationIndex index,
                                       @Nonnull PersistenceHealthService health) {
         this.index = Objects.requireNonNull(index, "index");
         this.health = Objects.requireNonNull(health, "health");
+        this.persistenceGuard = null;
+    }
+
+    OwnerPopulationJournalTerminality(@Nonnull OwnerPopulationIndex index,
+                                      @Nonnull PersistenceHealthService health,
+                                      @Nonnull OwnerPopulationPersistenceGuard persistenceGuard) {
+        this.index = Objects.requireNonNull(index, "index");
+        this.health = Objects.requireNonNull(health, "health");
+        this.persistenceGuard = Objects.requireNonNull(persistenceGuard, "persistenceGuard");
     }
 
     void degrade(@Nonnull String reason) {
-        index.setReadiness(OwnerPopulationReadiness.DEGRADED);
-        health.markDegraded(Objects.requireNonNull(reason, "reason"));
+        if (persistenceGuard == null) {
+            index.setReadiness(OwnerPopulationReadiness.DEGRADED);
+            health.markDegraded(Objects.requireNonNull(reason, "reason"));
+            return;
+        }
+        persistenceGuard.reportFeatureAmbiguity(Objects.requireNonNull(reason, "reason"));
     }
 
     /** Blocks new admissions after a rolled-back domain CAS without poisoning healthy storage. */
@@ -28,11 +44,19 @@ final class OwnerPopulationJournalTerminality {
 
     @Nonnull
     CompletableFuture<OwnerPopulationPreparationResult> preparationStartFailed(
+            @Nonnull OwnerPopulationAdmissionPlan plan,
             @Nonnull OwnerPopulationDecision decision,
             @Nonnull String reason
     ) {
         index.cancel(decision.reservation());
-        degrade(reason.replace('-', '_'));
+        if (persistenceGuard == null) {
+            degrade(reason.replace('-', '_'));
+        } else {
+            persistenceGuard.reportAmbiguity(
+                    plan, decision.reservation().tokenId().toString(), reason,
+                    PersistenceOperationPhase.PREPARED, PersistenceTransactionOutcome.NOT_STARTED,
+                    false, null);
+        }
         return CompletableFuture.completedFuture(deniedPreparation(decision, reason));
     }
 
@@ -70,7 +94,14 @@ final class OwnerPopulationJournalTerminality {
             @Nonnull String reason
     ) {
         prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
-        degrade(reason.replace('-', '_'));
+        if (persistenceGuard == null) {
+            degrade(reason.replace('-', '_'));
+        } else {
+            persistenceGuard.reportAmbiguity(
+                    prepared.plan(), prepared.operationId().toString(), reason,
+                    PersistenceOperationPhase.COMMIT, PersistenceTransactionOutcome.NOT_STARTED,
+                    true, null);
+        }
         return new OwnerPopulationCommitResult(
                 OwnerPopulationCommitResult.Status.PERSISTENCE_DEGRADED,
                 reason,

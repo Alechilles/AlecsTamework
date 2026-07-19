@@ -7,6 +7,10 @@ import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
 import com.alechilles.alecstamework.persistence.sqlite.ProfileOwnerMutation;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentReporter;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -29,6 +33,7 @@ public final class OwnerPopulationAdmissionCoordinator {
     private final OwnerPopulationJournalTerminality terminality;
     private final OwnerPopulationJournalCloseCoordinator journalCloseCoordinator;
     private final OwnerPopulationCompensationCoordinator compensationCoordinator;
+    private final OwnerPopulationPersistenceGuard persistenceGuard;
 
     public OwnerPopulationAdmissionCoordinator(@Nonnull OwnerPopulationIndex index,
                                                @Nonnull CompanionPopulationRepository repository,
@@ -36,6 +41,7 @@ public final class OwnerPopulationAdmissionCoordinator {
         this.index = Objects.requireNonNull(index, "index");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
+        this.persistenceGuard = null;
         this.terminality = new OwnerPopulationJournalTerminality(index, persistenceHealth);
         this.journalCloseCoordinator = new OwnerPopulationJournalCloseCoordinator(
                 index, repository, terminality
@@ -43,6 +49,24 @@ public final class OwnerPopulationAdmissionCoordinator {
         this.compensationCoordinator = new OwnerPopulationCompensationCoordinator(
                 index, repository, terminality
         );
+    }
+
+    public OwnerPopulationAdmissionCoordinator(
+            @Nonnull OwnerPopulationIndex index,
+            @Nonnull CompanionPopulationRepository repository,
+            @Nonnull PersistenceHealthService persistenceHealth,
+            @Nonnull PersistenceMutationAvailabilityService availability,
+            @Nonnull PersistenceIncidentReporter incidents,
+            @Nonnull PersistenceScopeFactory scopes) {
+        this.index = Objects.requireNonNull(index, "index");
+        this.repository = Objects.requireNonNull(repository, "repository");
+        this.persistenceHealth = Objects.requireNonNull(persistenceHealth, "persistenceHealth");
+        this.persistenceGuard = new OwnerPopulationPersistenceGuard(availability, incidents, scopes);
+        this.terminality = new OwnerPopulationJournalTerminality(index, persistenceHealth, persistenceGuard);
+        this.journalCloseCoordinator = new OwnerPopulationJournalCloseCoordinator(
+                index, repository, terminality);
+        this.compensationCoordinator = new OwnerPopulationCompensationCoordinator(
+                index, repository, terminality);
     }
 
     @Nonnull
@@ -59,15 +83,18 @@ public final class OwnerPopulationAdmissionCoordinator {
             @Nonnull OwnerPopulationAdmissionPlan plan
     ) {
         Objects.requireNonNull(plan, "plan");
-        if (!persistenceHealth.isHealthy()) {
-            OwnerPopulationDecision original = index.reserve(plan.transition());
-            if (original.reservation() != null) {
-                index.cancel(original.reservation());
+        if (persistenceGuard != null) {
+            PersistenceMutationAvailabilityDecision availability = persistenceGuard.decide(plan);
+            if (!availability.allowed()) {
+                OwnerPopulationDecision denied = index.denyBeforeReservation(
+                        plan.transition(), availability.reasonCode());
+                return new OwnerPopulationReservationPreparation(
+                        false, denied.reason(), plan, denied);
             }
-            OwnerPopulationDecision denied = deniedWithoutReservation(
-                    original,
-                    "owner-population-persistence-degraded"
-            );
+        }
+        if (!persistenceHealth.isHealthy()) {
+            OwnerPopulationDecision denied = index.denyBeforeReservation(
+                    plan.transition(), "owner-population-persistence-degraded");
             return new OwnerPopulationReservationPreparation(
                     false,
                     denied.reason(),
@@ -115,20 +142,20 @@ public final class OwnerPopulationAdmissionCoordinator {
                     repository.prepareAsync(persistencePrepare);
             if (submission == null || submission.completion() == null) {
                 return terminality.preparationStartFailed(
-                        decision, "owner-population-prepare-stage-missing"
+                        plan, decision, "owner-population-prepare-stage-missing"
                 );
             }
             return submission.completion().handle((outcome, failure) -> {
                 if (failure != null || outcome == null) {
                     return terminality.preparationStartFailed(
-                            decision, "owner-population-prepare-completion-failed"
+                            plan, decision, "owner-population-prepare-completion-failed"
                     );
                 }
                 return finishPreparation(plan, decision, operationId, outcome);
             }).thenCompose(result -> result);
         } catch (RuntimeException | LinkageError failure) {
             return terminality.preparationStartFailed(
-                    decision, "owner-population-prepare-start-failed"
+                    plan, decision, "owner-population-prepare-start-failed"
             );
         }
     }

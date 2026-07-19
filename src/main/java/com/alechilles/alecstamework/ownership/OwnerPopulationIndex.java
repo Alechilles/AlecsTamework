@@ -131,6 +131,31 @@ public final class OwnerPopulationIndex {
         }
     }
 
+    /** Returns a side-effect-free denial snapshot for gates that run before reservation. */
+    OwnerPopulationDecision denyBeforeReservation(OwnerPopulationTransitionRequest request,
+                                                   String reason) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(reason, "reason");
+        lock.lock();
+        try {
+            OwnerPopulationEntry current = entriesByProfile.get(request.profileId());
+            UUID ownerId = request.newOwnerId() == null
+                    ? request.expectedOwnerId() : request.newOwnerId();
+            OwnerPopulationCounts counts = ownerId == null
+                    ? new OwnerPopulationCounts(0L, 0L, 0L, 0L)
+                    : queries.counts(ownerId, request.destinationWorldName());
+            boolean positive = request.newOwnerId() != null
+                    && !request.newOwnerId().equals(request.expectedOwnerId());
+            long committed = request.limitScope() == OwnerPopulationLimitScope.GLOBAL
+                    ? counts.globalCommitted() : counts.worldCommitted();
+            long pending = request.limitScope() == OwnerPopulationLimitScope.GLOBAL
+                    ? counts.globalPending() : counts.worldPending();
+            return denied(request, reason, current, committed, pending, positive);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     private OwnerPopulationDecision reserveLocked(OwnerPopulationTransitionRequest request,
                                                   long nowNanos) {
         reservations.expireReserved(nowNanos);

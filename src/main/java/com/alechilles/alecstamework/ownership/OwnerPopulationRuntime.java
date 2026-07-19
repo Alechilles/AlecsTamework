@@ -119,7 +119,10 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         OwnerPopulationAdmissionCoordinator coordinator = new OwnerPopulationAdmissionCoordinator(
                 index,
                 persistence.getCompanionPopulationRepository(),
-                persistence.getHealthService()
+                persistence.getHealthService(),
+                persistence.getMutationAvailabilityService(),
+                persistence.getIncidentReporter(),
+                persistence.getPersistenceScopeFactory()
         );
         ClaimAdmissionService claimAdmissionService = new ClaimAdmissionService(claimOccupancyIndex);
         ClaimProviderRegistry claimProviderRegistry = new ClaimProviderRegistry(

@@ -21,6 +21,7 @@ public final class PersistenceResilienceRuntime {
     private final PersistenceIncidentReporter reporter;
     private final PersistenceMutationAvailabilityService availability;
     private final ScopedPersistenceRecoveryCoordinator scopedRecovery;
+    private final PersistenceScopeFactory scopeFactory;
 
     private PersistenceResilienceRuntime(PersistenceIncidentRepository incidents,
                                          PersistenceQuarantineRepository quarantineRepository,
@@ -29,7 +30,8 @@ public final class PersistenceResilienceRuntime {
                                          PersistenceFeatureCircuitRegistry circuits,
                                          PersistenceIncidentReporter reporter,
                                          PersistenceMutationAvailabilityService availability,
-                                         ScopedPersistenceRecoveryCoordinator scopedRecovery) {
+                                         ScopedPersistenceRecoveryCoordinator scopedRecovery,
+                                         PersistenceScopeFactory scopeFactory) {
         this.incidents = incidents;
         this.quarantineRepository = quarantineRepository;
         this.quarantines = quarantines;
@@ -38,6 +40,7 @@ public final class PersistenceResilienceRuntime {
         this.reporter = reporter;
         this.availability = availability;
         this.scopedRecovery = scopedRecovery;
+        this.scopeFactory = scopeFactory;
     }
 
     @Nonnull
@@ -48,7 +51,7 @@ public final class PersistenceResilienceRuntime {
             @Nonnull PersistenceStorageHealthService storageHealth,
             @Nullable HytaleLogger logger) {
         return initialize(bootId, connections, writeQueue, storageHealth,
-                logger, PersistenceIncidentSink.NO_OP);
+                logger, PersistenceIncidentSink.NO_OP, PersistenceScopeFactory.ephemeral());
     }
 
     @Nonnull
@@ -58,7 +61,8 @@ public final class PersistenceResilienceRuntime {
             @Nonnull PersistenceWriteQueue writeQueue,
             @Nonnull PersistenceStorageHealthService storageHealth,
             @Nullable HytaleLogger logger,
-            @Nonnull PersistenceIncidentSink incidentSink) {
+            @Nonnull PersistenceIncidentSink incidentSink,
+            @Nonnull PersistenceScopeFactory scopeFactory) {
         PersistenceIncidentRepository incidents = new PersistenceIncidentRepository(connections);
         PersistenceQuarantineRepository quarantineRepository =
                 new PersistenceQuarantineRepository(connections);
@@ -80,7 +84,7 @@ public final class PersistenceResilienceRuntime {
                         incidents, quarantineRepository, quarantines, circuits, writeQueue, incidentSink);
         return new PersistenceResilienceRuntime(
                 incidents, quarantineRepository, quarantines, circuitRepository,
-                circuits, reporter, availability, scopedRecovery);
+                circuits, reporter, availability, scopedRecovery, scopeFactory);
     }
 
     private static void loadDurableDenials(
@@ -141,6 +145,11 @@ public final class PersistenceResilienceRuntime {
     @Nonnull
     public ScopedPersistenceRecoveryCoordinator scopedRecovery() {
         return scopedRecovery;
+    }
+
+    @Nonnull
+    public PersistenceScopeFactory scopeFactory() {
+        return scopeFactory;
     }
 
     public void close() {
