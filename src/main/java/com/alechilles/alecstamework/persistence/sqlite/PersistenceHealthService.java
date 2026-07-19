@@ -1,12 +1,14 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
-import java.util.concurrent.atomic.AtomicReference;
+import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
+import com.alechilles.alecstamework.persistence.health.PersistenceStorageState;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Tracks persistence runtime health so mutating operations can fail closed when storage is unhealthy.
+ * Compatibility facade for callers that still consume the historical healthy/degraded view.
+ * New persistence authority code must use {@link PersistenceStorageHealthService} directly.
  */
 public final class PersistenceHealthService {
     public enum Status {
@@ -14,57 +16,75 @@ public final class PersistenceHealthService {
         DEGRADED
     }
 
-    private final AtomicReference<HealthState> state =
-            new AtomicReference<>(new HealthState(Status.HEALTHY, null, 0L));
+    private final PersistenceStorageHealthService storageHealth;
     private final Consumer<HealthState> degradationListener;
 
     public PersistenceHealthService() {
-        this(null);
+        this(new PersistenceStorageHealthService(), null);
     }
 
     public PersistenceHealthService(@Nullable Consumer<HealthState> degradationListener) {
+        this(new PersistenceStorageHealthService(), degradationListener);
+    }
+
+    public PersistenceHealthService(@Nonnull PersistenceStorageHealthService storageHealth) {
+        this(storageHealth, null);
+    }
+
+    public PersistenceHealthService(@Nonnull PersistenceStorageHealthService storageHealth,
+                                    @Nullable Consumer<HealthState> degradationListener) {
+        this.storageHealth = storageHealth;
         this.degradationListener = degradationListener == null ? ignored -> { } : degradationListener;
     }
 
     public boolean isHealthy() {
-        return state.get().status() == Status.HEALTHY;
+        return storageHealth.acceptsWrites();
     }
 
     @Nonnull
     public HealthState getState() {
-        return state.get();
+        PersistenceStorageHealthService.State state = storageHealth.getState();
+        Status status = state.status() == PersistenceStorageState.HEALTHY
+                || state.status() == PersistenceStorageState.RETRYING
+                ? Status.HEALTHY : Status.DEGRADED;
+        return new HealthState(status, state.reason(), state.changedAtMs());
     }
 
+    /** Retained for compatibility; verified recovery should use the storage recovery coordinator. */
     public void markHealthy() {
-        state.set(new HealthState(Status.HEALTHY, null, 0L));
+        PersistenceStorageState state = storageHealth.getState().status();
+        if (state == PersistenceStorageState.RETRYING) {
+            storageHealth.finishRetry();
+        } else if (state == PersistenceStorageState.READ_ONLY) {
+            storageHealth.beginRecovery();
+            storageHealth.completeRecovery();
+        } else if (state == PersistenceStorageState.RECOVERING) {
+            storageHealth.completeRecovery();
+        }
     }
 
     /**
-     * Retains the initiating failure until an explicit recovery marks the service healthy.
+     * Retains the initiating failure until verified recovery marks storage healthy.
      *
-     * @return {@code true} only when this call performed the healthy-to-degraded transition
+     * @return {@code true} only when this call performed the transition to read-only
      */
     public boolean markDegraded(@Nonnull String reason) {
-        String normalizedReason = reason == null || reason.isBlank() ? "unknown" : reason.trim();
-        HealthState degraded = new HealthState(
-                Status.DEGRADED, normalizedReason, System.currentTimeMillis());
-        while (true) {
-            HealthState current = state.get();
-            if (current.status() == Status.DEGRADED) {
-                return false;
-            }
-            if (state.compareAndSet(current, degraded)) {
-                break;
+        boolean transitioned = storageHealth.enterReadOnly(reason, null);
+        if (transitioned) {
+            try {
+                degradationListener.accept(getState());
+            } catch (RuntimeException ignored) {
+                // Storage quarantine must remain effective even if diagnostics fail.
             }
         }
-        try {
-            degradationListener.accept(degraded);
-        } catch (RuntimeException ignored) {
-            // Health quarantine must remain effective even if its diagnostic sink fails.
-        }
-        return true;
+        return transitioned;
     }
 
-    public record HealthState(Status status, @Nullable String reason, long lastFailureAtMs) {
+    @Nonnull
+    public PersistenceStorageHealthService getStorageHealthService() {
+        return storageHealth;
+    }
+
+    public record HealthState(@Nonnull Status status, @Nullable String reason, long lastFailureAtMs) {
     }
 }

@@ -7,6 +7,16 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPersistedProjectionEvidenceRegistry;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
+import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
+import com.alechilles.alecstamework.persistence.health.PersistenceStorageState;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRegistry;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRepository;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentReporter;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentRepository;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRepository;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceResilienceRuntime;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +27,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.logging.Level;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -30,6 +41,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
 
     private final Path runtimeDataDirectory;
     private final Path sqlitePath;
+    private final String bootId;
+    private final PersistenceStorageHealthService storageHealthService;
     private final PersistenceHealthService healthService;
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
@@ -50,10 +63,13 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final CompanionIdentityRepository companionIdentityRepository;
     private final CompanionPopulationReconciliationPersistence populationReconciliationPersistence;
     private final SqliteSchemaMigrator schemaMigrator;
+    private final PersistenceResilienceRuntime resilienceRuntime;
 
     private TameworkPersistenceRuntime(
             @Nonnull Path runtimeDataDirectory,
             @Nonnull Path sqlitePath,
+            @Nonnull String bootId,
+            @Nonnull PersistenceStorageHealthService storageHealthService,
             @Nonnull PersistenceHealthService healthService,
             @Nonnull SqliteConnectionManager connectionManager,
             @Nonnull PersistenceWriteQueue writeQueue,
@@ -73,9 +89,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull CompanionPopulationCoverageRepository companionPopulationCoverageRepository,
             @Nonnull CompanionIdentityRepository companionIdentityRepository,
             @Nonnull CompanionPopulationReconciliationPersistence populationReconciliationPersistence,
-            @Nonnull SqliteSchemaMigrator schemaMigrator) {
+            @Nonnull SqliteSchemaMigrator schemaMigrator,
+            @Nonnull PersistenceResilienceRuntime resilienceRuntime) {
         this.runtimeDataDirectory = runtimeDataDirectory;
         this.sqlitePath = sqlitePath;
+        this.bootId = bootId;
+        this.storageHealthService = storageHealthService;
         this.healthService = healthService;
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
@@ -96,6 +115,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.companionIdentityRepository = companionIdentityRepository;
         this.populationReconciliationPersistence = populationReconciliationPersistence;
         this.schemaMigrator = schemaMigrator;
+        this.resilienceRuntime = resilienceRuntime;
     }
 
     @Nonnull
@@ -103,13 +123,15 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                                         @Nullable HytaleLogger logger) {
         Path normalizedDataDir = runtimeDataDirectory.toAbsolutePath().normalize();
         Path sqlitePath = normalizedDataDir.resolve(SQLITE_FILENAME);
-        PersistenceHealthService health = new PersistenceHealthService(state -> {
-            if (logger != null) {
+        String bootId = UUID.randomUUID().toString();
+        PersistenceStorageHealthService storageHealth = new PersistenceStorageHealthService(state -> {
+            if (logger != null && state.status() == PersistenceStorageState.READ_ONLY) {
                 logger.at(Level.WARNING).log(
-                        "Tamework persistence entered degraded state: " + state.reason()
+                        "Tamework persistence entered read-only state: " + state.reason()
                 );
             }
         });
+        PersistenceHealthService health = new PersistenceHealthService(storageHealth);
         SqliteConnectionManager connectionManager = new SqliteConnectionManager(sqlitePath);
         SqliteSchemaMigrator schemaMigrator = new SqliteSchemaMigrator();
         SqliteMigrationBackupService backupService = new SqliteMigrationBackupService();
@@ -149,7 +171,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             String healthReason = isSqliteDriverUnavailable(exception)
                     ? "sqlite_native_unavailable"
                     : "sqlite_schema_bootstrap_failed";
-            health.markDegraded(healthReason);
+            storageHealth.enterReadOnly(healthReason, null);
             TameworkTelemetryEvents.recordErrorIfAvailable(
                     "persistence_schema_bootstrap_failed",
                     exception,
@@ -168,6 +190,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         }
 
         PersistenceWriteQueue writeQueue = new PersistenceWriteQueue(connectionManager, health, logger);
+        PersistenceResilienceRuntime resilienceRuntime = PersistenceResilienceRuntime.initialize(
+                bootId, connectionManager, writeQueue, storageHealth, logger);
         NpcProfileRepository npcProfileRepository = new NpcProfileRepository(connectionManager, writeQueue);
         ApiProfileDataRepository apiProfileDataRepository =
                 new ApiProfileDataRepository(connectionManager, writeQueue);
@@ -209,6 +233,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         TameworkPersistenceRuntime runtime = new TameworkPersistenceRuntime(
                 normalizedDataDir,
                 sqlitePath,
+                bootId,
+                storageHealth,
                 health,
                 connectionManager,
                 writeQueue,
@@ -228,7 +254,8 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 companionPopulationCoverageRepository,
                 companionIdentityRepository,
                 populationReconciliationPersistence,
-                schemaMigrator
+                schemaMigrator,
+                resilienceRuntime
         );
 
         if (health.isHealthy()) {
@@ -253,8 +280,53 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     @Nonnull
+    public String getBootId() {
+        return bootId;
+    }
+
+    @Nonnull
+    public PersistenceStorageHealthService getStorageHealthService() {
+        return storageHealthService;
+    }
+
+    @Nonnull
     public PersistenceHealthService getHealthService() {
         return healthService;
+    }
+
+    @Nonnull
+    public PersistenceIncidentRepository getIncidentRepository() {
+        return resilienceRuntime.incidents();
+    }
+
+    @Nonnull
+    public PersistenceQuarantineRepository getQuarantineRepository() {
+        return resilienceRuntime.quarantineRepository();
+    }
+
+    @Nonnull
+    public PersistenceQuarantineRegistry getQuarantineRegistry() {
+        return resilienceRuntime.quarantines();
+    }
+
+    @Nonnull
+    public PersistenceFeatureCircuitRepository getFeatureCircuitRepository() {
+        return resilienceRuntime.circuitRepository();
+    }
+
+    @Nonnull
+    public PersistenceFeatureCircuitRegistry getFeatureCircuitRegistry() {
+        return resilienceRuntime.circuits();
+    }
+
+    @Nonnull
+    public PersistenceIncidentReporter getIncidentReporter() {
+        return resilienceRuntime.reporter();
+    }
+
+    @Nonnull
+    public PersistenceMutationAvailabilityService getMutationAvailabilityService() {
+        return resilienceRuntime.availability();
     }
 
     @Nonnull
@@ -544,6 +616,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     public void close() {
         maintenanceService.close();
         writeQueue.close();
+        storageHealthService.close();
     }
 
     public record PersistenceDiagnostics(

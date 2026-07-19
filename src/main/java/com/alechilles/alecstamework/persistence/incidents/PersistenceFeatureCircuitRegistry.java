@@ -27,6 +27,15 @@ public final class PersistenceFeatureCircuitRegistry {
         return (global == null || global.enabled()) && (specific == null || specific.enabled());
     }
 
+    public synchronized void reload(
+            @Nonnull Map<PersistenceDomain, CircuitState> persistedStates) {
+        states.clear();
+        for (PersistenceDomain domain : PersistenceDomain.values()) {
+            states.put(domain, persistedStates.getOrDefault(
+                    domain, new CircuitState(true, null, 0L, null)));
+        }
+    }
+
     @Nonnull
     public synchronized Map<PersistenceDomain, CircuitState> snapshot() {
         return Map.copyOf(states);
