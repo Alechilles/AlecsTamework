@@ -31,6 +31,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
+import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -146,6 +147,12 @@ final class TameworkComponentRegistrar {
                         "TameworkProjectionIdentity",
                         TameworkProjectionIdentityComponent.CODEC
                 );
+        ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        HomingVisualProjectileComponent.class,
+                        "TameworkHomingVisualProjectile",
+                        HomingVisualProjectileComponent.CODEC
+                );
         ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterCharges =
                 plugin.getChunkStoreRegistry().registerComponent(
                         TameworkFeedTroughWaterChargesComponent.class,
@@ -158,7 +165,7 @@ final class TameworkComponentRegistrar {
                 mountedGlideRider, avatarFlight, avatarFlightInput, avatarFlightRiderVisual,
                 leveling, traits, talents, tranquilizerPeak, attachments, dynamicAttachments,
                 lifeStage, projectileImpactEffect, lingeringHazardProjectile, lingeringHazard,
-                apiSelfTestFixtureMarker, projectionIdentity, feedTroughWaterCharges
+                apiSelfTestFixtureMarker, projectionIdentity, homingVisualProjectile, feedTroughWaterCharges
         );
     }
 
@@ -193,6 +200,7 @@ final class TameworkComponentRegistrar {
             ComponentType<EntityStore, TameworkLingeringHazardComponent> lingeringHazard,
             ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> apiSelfTestFixtureMarker,
             ComponentType<EntityStore, TameworkProjectionIdentityComponent> projectionIdentity,
+            ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectile,
             ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterCharges) {
     }
 }

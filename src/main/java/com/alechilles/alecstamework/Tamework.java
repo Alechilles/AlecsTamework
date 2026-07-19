@@ -160,6 +160,8 @@ import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
 import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
+import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
+import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
@@ -344,6 +346,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkLingeringHazardProjectileComponent> lingeringHazardProjectileComponentType;
     private ComponentType<EntityStore, TameworkLingeringHazardComponent> lingeringHazardComponentType;
     private ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> apiSelfTestFixtureMarkerComponentType;
+    private ComponentType<EntityStore, HomingVisualProjectileComponent> homingVisualProjectileComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -562,6 +565,7 @@ public class Tamework extends JavaPlugin {
         lingeringHazardProjectileComponentType = components.lingeringHazardProjectile();
         lingeringHazardComponentType = components.lingeringHazard();
         apiSelfTestFixtureMarkerComponentType = components.apiSelfTestFixtureMarker();
+        homingVisualProjectileComponentType = components.homingVisualProjectile();
         feedTroughWaterChargesComponentType = components.feedTroughWaterCharges();
 
         getEntityStoreRegistry().registerSystem(
@@ -957,6 +961,10 @@ public class Tamework extends JavaPlugin {
                         com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
                 )
         );
+        getEntityStoreRegistry().registerSystem(new HomingVisualProjectileSystem(
+                homingVisualProjectileComponentType,
+                TransformComponent.getComponentType()
+        ));
 
         // Load item feature configs from bundled defaults and mod overrides.
         int loadedSpawner = loadSpawnerItemAssets();
@@ -2772,6 +2780,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> getApiSelfTestFixtureMarkerComponentType() {
         return apiSelfTestFixtureMarkerComponentType;
+    }
+
+    public ComponentType<EntityStore, HomingVisualProjectileComponent> getHomingVisualProjectileComponentType() {
+        return homingVisualProjectileComponentType;
     }
 
     public ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> getFeedTroughWaterChargesComponentType() {
