@@ -1,0 +1,25 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/AvatarFlight/Flight/Footsteps/Tamework_AvatarFlight_Wing_Flap_01.ogg",
+        "Sounds/Tamework/AvatarFlight/Flight/Footsteps/Tamework_AvatarFlight_Wing_Flap_02.ogg",
+        "Sounds/Tamework/AvatarFlight/Flight/Footsteps/Tamework_AvatarFlight_Wing_Flap_03.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -0.35,
+        "MaxPitch": 0.35,
+        "MinVolume": -1.0,
+        "MaxVolume": 0.0
+      },
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 6,
+  "Volume": -1.0,
+  "PreventSoundInterruption": false,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 2.0,
+  "MaxDistance": 28.0
+}
