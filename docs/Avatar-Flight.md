@@ -223,7 +223,7 @@ Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object ov
 - `LaunchReleasePartialSoundEvent`, `LaunchReleaseMidSoundEvent`, `LaunchReleaseFullSoundEvent`: one-shot release cues selected with the same launch-curve tiers as release VFX. Blank disables an individual tier.
 - `UpwardFlapSoundEvent`: one-shot wing displacement cue after an accepted upward flap. Blank disables it.
 - `ForwardBoostSoundEvent`: one-shot accelerating wind burst after an accepted forward boost. Blank disables it.
-- `AirbrakeSoundEvent`: one-shot catching-wind cue when an accepted airbrake press first becomes active. Holding airbrake does not replay it.
+- `AirbrakeSoundEvent`: one-shot wing-displacement cue when an accepted airbrake press first becomes active. Holding airbrake does not replay it; the default reuses `UpwardFlapSoundEvent`'s sound asset.
 - `IdleFlightFlapSoundEvent` / `IdleFlightFlapIntervalMs`: one-shot wing cue and cadence while hovering. Blank or zero disables it.
 - `FlightFlapSoundEvent` / `FlightFlapIntervalMs`: one-shot wing cue and cadence during normal forward flight. Blank or zero disables it; fast flight is excluded.
 

@@ -40,6 +40,7 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Avatar-flight airbraking now uses the upward-flap wing-displacement sound by default.
 - Removed Tamework's runtime asset-pack reordering and legacy pack replacement so asset precedence follows the game's manifest load-order configuration.
 - Enabled `TwCoopConfig` assets now keep Tamework as the sole occupancy and lifecycle authority only for their configured managed coops; coops without an enabled config remain purely vanilla. This preserves the post-overhaul model and does not restore the older vanilla-resident/Tamework-observer hybrid.
 - Managed-coop audits now include bounded per-resident and per-operation identity, UUID, slot, generation, retry, and persistence-queue lifecycle details.
