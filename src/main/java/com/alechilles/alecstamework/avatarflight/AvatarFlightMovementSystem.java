@@ -150,9 +150,11 @@ public final class AvatarFlightMovementSystem
         boolean suppressingOverlays =
                 AvatarFlightAnimationService.shouldSuppressPlayerOverlayAnimations(
                         config, applyingVelocity, hasFlightVisualOverrides);
+        boolean groundedMovementIntent = hasGroundedMovementIntent(controllerInput, config);
         syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity);
         animationService.tick(
-                ref, commandBuffer, flight, config, output, applyingVelocity, suppressingOverlays, now);
+                ref, commandBuffer, flight, config, output, applyingVelocity, suppressingOverlays,
+                groundedMovementIntent, now);
         if (applyingVelocity) {
             applyVisualPose(ref, commandBuffer, controllerInput, output);
             velocity.addInstruction(
@@ -202,6 +204,13 @@ public final class AvatarFlightMovementSystem
         );
         applyVigourState(flight, recharge.state());
         flight.setVigourRechargeMode(recharge.mode().name());
+    }
+
+    static boolean hasGroundedMovementIntent(@Nonnull AvatarFlightController.Input input,
+                                               @Nonnull TwAvatarFlightConfig config) {
+        return input.onGround()
+                && (Math.abs(input.forwardAxis()) > config.getInput().getForwardDeadzone()
+                || Math.abs(input.strafeAxis()) > config.getInput().getStrafeDeadzone());
     }
 
     @Nonnull

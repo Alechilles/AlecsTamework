@@ -49,4 +49,15 @@ class AvatarFlightAnimationServiceTest {
         assertFalse(AvatarFlightAnimationService.needsGroundedIdleHandoff(
                 AvatarFlightMode.FORWARD_FLIGHT, true));
     }
+
+    @Test
+    void groundedIdleHandoffRemainsTrackedUntilMovementReleasesIt() {
+        AvatarFlightComponent flight = new AvatarFlightComponent();
+
+        assertFalse(AvatarFlightAnimationService.isGroundedIdleHandoffActive(flight));
+
+        flight.setMovementAnimationId("Idle");
+
+        assertTrue(AvatarFlightAnimationService.isGroundedIdleHandoffActive(flight));
+    }
 }

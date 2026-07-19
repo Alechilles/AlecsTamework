@@ -121,6 +121,22 @@ class AvatarFlightMovementSystemTest {
         assertFalse(authorized.launchAllowed());
     }
 
+    @Test
+    void groundedMovementIntentRequiresGroundedInputBeyondDeadzone() {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.defaultConfig();
+
+        assertFalse(AvatarFlightMovementSystem.hasGroundedMovementIntent(
+                movementInput(0.0, 0.0, true), config));
+        assertFalse(AvatarFlightMovementSystem.hasGroundedMovementIntent(
+                movementInput(config.getInput().getForwardDeadzone(), 0.0, true), config));
+        assertTrue(AvatarFlightMovementSystem.hasGroundedMovementIntent(
+                movementInput(config.getInput().getForwardDeadzone() + 0.01, 0.0, true), config));
+        assertTrue(AvatarFlightMovementSystem.hasGroundedMovementIntent(
+                movementInput(0.0, -config.getInput().getStrafeDeadzone() - 0.01, true), config));
+        assertFalse(AvatarFlightMovementSystem.hasGroundedMovementIntent(
+                movementInput(1.0, 0.0, false), config));
+    }
+
     private static AvatarFlightController.Input authorizeVigour(AvatarFlightController.Input input,
                                                                AvatarFlightComponent flight,
                                                                TwAvatarFlightConfig config,
@@ -161,6 +177,25 @@ class AvatarFlightMovementSystemTest {
                 sprint,
                 airbrake,
                 false,
+                0.0,
+                0.0,
+                true,
+                true
+        );
+    }
+
+    private static AvatarFlightController.Input movementInput(double forwardAxis,
+                                                               double strafeAxis,
+                                                               boolean onGround) {
+        return new AvatarFlightController.Input(
+                forwardAxis,
+                strafeAxis,
+                0.0,
+                false,
+                false,
+                false,
+                false,
+                onGround,
                 0.0,
                 0.0,
                 true,

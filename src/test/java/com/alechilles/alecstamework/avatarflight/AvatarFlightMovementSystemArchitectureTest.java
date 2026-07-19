@@ -293,6 +293,12 @@ class AvatarFlightMovementSystemArchitectureTest {
                 "animation names should stay config-driven instead of hardcoded in the system");
         assertTrue(source.contains("flight.setMovementAnimationId(animationId)"),
                 "repeated movement animation packets should be gated by tracked avatar-flight state");
+        assertTrue(movementSource.contains("hasGroundedMovementIntent(controllerInput, config)"),
+                "grounded movement input should release the temporary landing-idle override");
+        assertTrue(source.contains("if (isGroundedIdleHandoffActive(flight))"),
+                "landing idle should remain tracked until grounded movement begins");
+        assertTrue(source.contains("flight.setMovementAnimationId(GROUNDED_IDLE_ANIMATION)"),
+                "the landing-idle packet must remain owned so it can be explicitly stopped");
     }
 
     @Test

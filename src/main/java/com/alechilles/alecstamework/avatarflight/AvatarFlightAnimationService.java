@@ -47,11 +47,18 @@ final class AvatarFlightAnimationService {
               @Nonnull AvatarFlightController.Output output,
               boolean applyingVelocity,
               boolean suppressingOverlays,
+              boolean groundedMovementIntent,
               long now) {
         boolean hadAnimationOverrides = hasOverrides(flight);
         expireAbilityAnimation(ref, commandBuffer, flight, now);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays, now);
         if (!applyingVelocity) {
+            if (isGroundedIdleHandoffActive(flight)) {
+                if (groundedMovementIntent) {
+                    clearMovementAnimation(ref, commandBuffer, flight);
+                }
+                return;
+            }
             if (needsGroundedIdleHandoff(output.mode(), hadAnimationOverrides)) {
                 handoffToGroundedIdle(ref, commandBuffer, flight, config);
             } else {
@@ -89,6 +96,10 @@ final class AvatarFlightAnimationService {
         return mode == AvatarFlightMode.GROUNDED && hasAnimationOverrides;
     }
 
+    static boolean isGroundedIdleHandoffActive(@Nonnull AvatarFlightComponent flight) {
+        return GROUNDED_IDLE_ANIMATION.equals(flight.getMovementAnimationId());
+    }
+
     private void handoffToGroundedIdle(@Nonnull Ref<EntityStore> ref,
                                        @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                        @Nonnull AvatarFlightComponent flight,
@@ -105,7 +116,8 @@ final class AvatarFlightAnimationService {
         }
         AnimationUtils.playAnimation(
                 ref, AnimationSlot.Movement, GROUNDED_IDLE_ANIMATION, true, commandBuffer);
-        flight.setMovementAnimationId("");
+        // Keep ownership until movement input arrives so the explicit idle can be stopped once.
+        flight.setMovementAnimationId(GROUNDED_IDLE_ANIMATION);
         flight.setNextMovementAnimationAtMs(0L);
     }
 
