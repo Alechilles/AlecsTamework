@@ -170,6 +170,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setFastGlideTrailChainId,
                     AvatarFlightComponent::getFastGlideTrailChainId)
             .add()
+            .<String>append(new KeyedCodec<>("ActiveTrailRootInteraction", Codec.STRING),
+                    AvatarFlightComponent::setActiveTrailRootInteraction,
+                    AvatarFlightComponent::getActiveTrailRootInteraction)
+            .add()
+            .<Long>append(new KeyedCodec<>("BurstTrailUntilMs", Codec.LONG),
+                    AvatarFlightComponent::setBurstTrailUntilMs,
+                    AvatarFlightComponent::getBurstTrailUntilMs)
+            .add()
             .build();
 
     private String configId = "";
@@ -210,6 +218,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private long nextLaunchChargeAudioAtMs;
     private boolean launchFullChargeAudioPlayed;
     private int fastGlideTrailChainId;
+    private String activeTrailRootInteraction = "";
+    private long burstTrailUntilMs;
 
     public AvatarFlightComponent() {
     }
@@ -523,6 +533,15 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     public void setLaunchFullChargeAudioPlayed(@Nullable Boolean value) { launchFullChargeAudioPlayed = value != null && value; }
     public int getFastGlideTrailChainId() { return fastGlideTrailChainId; }
     public void setFastGlideTrailChainId(@Nullable Integer value) { fastGlideTrailChainId = value == null ? 0 : value; }
+    @Nonnull
+    public String getActiveTrailRootInteraction() {
+        return activeTrailRootInteraction == null ? "" : activeTrailRootInteraction;
+    }
+    public void setActiveTrailRootInteraction(@Nullable String value) {
+        activeTrailRootInteraction = value == null ? "" : value.trim();
+    }
+    public long getBurstTrailUntilMs() { return burstTrailUntilMs; }
+    public void setBurstTrailUntilMs(@Nullable Long value) { burstTrailUntilMs = value == null ? 0L : value; }
 
     public void captureLaunchVfxOrigin(double x, double y, double z, double yawRadians) {
         launchVfxOriginValid = true;
@@ -591,6 +610,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.nextLaunchChargeAudioAtMs = nextLaunchChargeAudioAtMs;
         clone.launchFullChargeAudioPlayed = launchFullChargeAudioPlayed;
         clone.fastGlideTrailChainId = fastGlideTrailChainId;
+        clone.activeTrailRootInteraction = getActiveTrailRootInteraction();
+        clone.burstTrailUntilMs = burstTrailUntilMs;
         return clone;
     }
 

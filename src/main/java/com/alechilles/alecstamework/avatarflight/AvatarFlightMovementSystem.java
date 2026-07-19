@@ -135,7 +135,7 @@ public final class AvatarFlightMovementSystem
                 now,
                 commandBuffer
         );
-        trailService.tick(flight, output, config, ref, commandBuffer);
+        trailService.tick(flight, output, config, now, ref, commandBuffer);
         flight.setMode(output.mode());
         flight.setVelocity(output.velocityX(), output.velocityY(), output.velocityZ());
         flight.setNextJumpAtMs(output.nextJumpAtMs());

@@ -3,147 +3,216 @@ package com.alechilles.alecstamework.avatarflight;
 import com.alechilles.alecstamework.config.assets.AvatarFlightTrailSettings;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.protocol.InteractionType;
-import com.hypixel.hytale.server.core.entity.InteractionChain;
-import com.hypixel.hytale.server.core.entity.InteractionContext;
-import com.hypixel.hytale.server.core.entity.InteractionManager;
-import com.hypixel.hytale.server.core.modules.interaction.InteractionModule;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.ModelTrail;
+import com.hypixel.hytale.server.core.asset.type.model.config.Model;
+import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.InteractionEffects;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Starts and cancels interaction-authored trails for avatar-flight movement cues. */
+/**
+ * Applies interaction-authored trail definitions directly to the synchronized avatar model.
+ *
+ * <p>Interaction execution does not reliably clear trails rendered on a transformed player
+ * model. Replacing {@link ModelComponent} gives every trail condition an explicit model-state
+ * start and stop transition while keeping the trail assets configurable.</p>
+ */
 public final class AvatarFlightTrailService {
-    private static final InteractionType TRAIL_INTERACTION_TYPE = InteractionType.EntityStatEffect;
-    private static final boolean FORCE_REMOTE_SYNC = true;
-    private static final int PENDING_CHAIN_ID = 1;
+    private static final int FAST_GLIDE_ACTIVE = 1;
+    private static final long MINIMUM_BURST_DURATION_MS = 50L;
+
+    private final Map<String, CachedDefinition> definitionCache = new HashMap<>();
 
     public void tick(@Nonnull AvatarFlightComponent flight,
                      @Nonnull AvatarFlightController.Output output,
                      @Nonnull TwAvatarFlightConfig config,
+                     long now,
                      @Nonnull Ref<EntityStore> ref,
                      @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         AvatarFlightTrailSettings settings = config.getTrails();
-        InteractionManager manager = resolveManager(ref, commandBuffer);
-        if (!settings.isEnabled() || manager == null) {
-            stopFastGlideTrail(flight, manager, settings.getFastGlideRootInteraction());
+        TrailDefinitions definitions = resolveDefinitions(settings);
+        if (!settings.isEnabled()) {
+            flight.setFastGlideTrailChainId(0);
+            flight.setBurstTrailUntilMs(0L);
+            render(flight, definitions, Definition.EMPTY, ref, commandBuffer);
             return;
         }
 
-        if (output.launchApplied()) {
-            start(settings.getLaunchRootInteraction(), ref, commandBuffer, manager);
-        }
-        if (output.jumpApplied()) {
-            start(settings.getFlapRootInteraction(), ref, commandBuffer, manager);
-        }
-        if (output.boostApplied()) {
-            start(settings.getBoostRootInteraction(), ref, commandBuffer, manager);
+        Definition burst = triggeredBurst(output, definitions);
+        if (burst.hasTrails()) {
+            flight.setBurstTrailUntilMs(now + burst.durationMs());
         }
 
-        String fastGlideRootInteraction = settings.getFastGlideRootInteraction();
-        boolean running = isFastGlideTrailRunning(flight, manager, fastGlideRootInteraction);
+        boolean fastGlideRunning = flight.getFastGlideTrailChainId() != 0;
         double horizontalSpeed = AvatarFlightSpeedMetrics.horizontalSpeed(
                 output.velocityX(), output.velocityY(), output.velocityZ());
-        boolean desired = output.applyVelocity() && AvatarFlightTrailPolicy.shouldRunFastGlideTrail(
-                running,
-                horizontalSpeed,
-                AvatarFlightSpeedMetrics.glideHorizontalCap(config),
-                settings
-        );
-        if (desired && !running) {
-            InteractionChain chain = start(
-                    fastGlideRootInteraction, ref, commandBuffer, manager);
-            flight.setFastGlideTrailChainId(chain == null ? 0 : PENDING_CHAIN_ID);
-        } else if (!desired && running) {
-            stopFastGlideTrail(flight, manager, fastGlideRootInteraction);
-        }
+        boolean fastGlideDesired = output.applyVelocity()
+                && definitions.fastGlide().hasTrails()
+                && AvatarFlightTrailPolicy.shouldRunFastGlideTrail(
+                        fastGlideRunning,
+                        horizontalSpeed,
+                        AvatarFlightSpeedMetrics.glideHorizontalCap(config),
+                        settings
+                );
+        flight.setFastGlideTrailChainId(fastGlideDesired ? FAST_GLIDE_ACTIVE : 0);
+
+        Definition desired = desiredDefinition(flight, burst, definitions, now, fastGlideDesired);
+        render(flight, definitions, desired, ref, commandBuffer);
     }
 
+    /** Removes every avatar-flight trail before the flight model is restored. */
     public static void stopFastGlideTrail(@Nullable AvatarFlightComponent flight,
                                           @Nonnull Ref<EntityStore> ref,
-                                          @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+                                          @Nonnull Store<EntityStore> store) {
         if (flight == null) return;
         TwAvatarFlightConfig config = TwAvatarFlightConfig.resolve(flight.getConfigId());
-        stopFastGlideTrail(
-                flight,
-                resolveManager(ref, componentAccessor),
-                config.getTrails().getFastGlideRootInteraction());
-    }
-
-    private static void stopFastGlideTrail(@Nonnull AvatarFlightComponent flight,
-                                           @Nullable InteractionManager manager,
-                                           @Nonnull String rootInteractionId) {
-        int chainId = flight.getFastGlideTrailChainId();
-        if (manager != null) {
-            InteractionChain chain = chainId < 0 ? manager.getChains().get(chainId) : null;
-            if (chain == null) chain = findChain(manager, rootInteractionId);
-            if (chain != null) manager.cancelChains(chain);
+        AvatarFlightTrailService service = new AvatarFlightTrailService();
+        TrailDefinitions definitions = service.resolveDefinitions(config.getTrails());
+        ModelComponent modelComponent = store.getComponent(ref, ModelComponent.getComponentType());
+        if (modelComponent != null && modelComponent.getModel() != null) {
+            Model updated = AvatarFlightModelTrailComposer.withTrails(
+                    modelComponent.getModel(), definitions.managedGroups(), null);
+            store.putComponent(ref, ModelComponent.getComponentType(), new ModelComponent(updated));
         }
         flight.setFastGlideTrailChainId(0);
+        flight.setBurstTrailUntilMs(0L);
+        flight.setActiveTrailRootInteraction("");
     }
 
-    private static boolean isFastGlideTrailRunning(@Nonnull AvatarFlightComponent flight,
-                                                    @Nonnull InteractionManager manager,
-                                                    @Nonnull String rootInteractionId) {
-        int chainId = flight.getFastGlideTrailChainId();
-        if (chainId == 0) {
-            InteractionChain chain = findChain(manager, rootInteractionId);
-            if (chain == null) return false;
-            flight.setFastGlideTrailChainId(chain.getChainId());
-            return true;
-        }
-        if (chainId == PENDING_CHAIN_ID) {
-            InteractionChain chain = findChain(manager, rootInteractionId);
-            if (chain == null) return true;
-            flight.setFastGlideTrailChainId(chain.getChainId());
-            return true;
-        }
-        if (manager.getChains().containsKey(chainId)) return true;
-        flight.setFastGlideTrailChainId(0);
-        return false;
+    @Nonnull
+    private static Definition triggeredBurst(@Nonnull AvatarFlightController.Output output,
+                                               @Nonnull TrailDefinitions definitions) {
+        Definition triggered = Definition.EMPTY;
+        if (output.launchApplied()) triggered = definitions.launch();
+        if (output.jumpApplied()) triggered = definitions.flap();
+        if (output.boostApplied()) triggered = definitions.boost();
+        return triggered;
     }
 
-    @Nullable
-    private static InteractionChain findChain(@Nonnull InteractionManager manager,
-                                              @Nonnull String rootInteractionId) {
-        if (rootInteractionId.isBlank()) return null;
-        for (InteractionChain chain : manager.getChains().values()) {
-            if (rootInteractionId.equals(chain.getInitialRootInteraction().getId())) {
-                return chain;
+    @Nonnull
+    private Definition desiredDefinition(@Nonnull AvatarFlightComponent flight,
+                                         @Nonnull Definition triggeredBurst,
+                                         @Nonnull TrailDefinitions definitions,
+                                         long now,
+                                         boolean fastGlideDesired) {
+        if (triggeredBurst.hasTrails()) return triggeredBurst;
+
+        long burstUntil = flight.getBurstTrailUntilMs();
+        if (burstUntil != 0L && now < burstUntil) {
+            Definition activeBurst = definitions.byRootId(flight.getActiveTrailRootInteraction());
+            if (activeBurst.hasTrails() && !activeBurst.equals(definitions.fastGlide())) {
+                return activeBurst;
             }
         }
-        return null;
+
+        flight.setBurstTrailUntilMs(0L);
+        return fastGlideDesired ? definitions.fastGlide() : Definition.EMPTY;
     }
 
-    @Nullable
-    private static InteractionChain start(@Nonnull String rootInteractionId,
-                                          @Nonnull Ref<EntityStore> ref,
-                                          @Nonnull CommandBuffer<EntityStore> commandBuffer,
-                                          @Nonnull InteractionManager manager) {
-        if (rootInteractionId.isBlank()) return null;
-        RootInteraction root = RootInteraction.getAssetMap().getAsset(rootInteractionId);
-        if (root == null) return null;
-        InteractionContext context = InteractionContext.forInteraction(
-                manager, ref, TRAIL_INTERACTION_TYPE, commandBuffer);
-        InteractionChain chain = manager.initChain(
-                TRAIL_INTERACTION_TYPE, context, root, FORCE_REMOTE_SYNC);
-        // Model trails are client-owned render state. Force the owning client to execute
-        // the interaction so its local interaction VM also owns the matching finish/cancel.
-        // InteractionManager assigns its entity ref only inside its own tick. Queueing avoids
-        // tickChain throwing and removing the world when another ECS system starts a trail.
-        manager.queueExecuteChain(chain);
-        return chain;
+    private static void render(@Nonnull AvatarFlightComponent flight,
+                               @Nonnull TrailDefinitions definitions,
+                               @Nonnull Definition desired,
+                               @Nonnull Ref<EntityStore> ref,
+                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        if (desired.rootId().equals(flight.getActiveTrailRootInteraction())) return;
+
+        ModelComponent modelComponent = commandBuffer.getComponent(
+                ref, ModelComponent.getComponentType());
+        if (modelComponent == null || modelComponent.getModel() == null) {
+            flight.setActiveTrailRootInteraction("");
+            return;
+        }
+
+        Model updated = AvatarFlightModelTrailComposer.withTrails(
+                modelComponent.getModel(), definitions.managedGroups(), desired.trails());
+        commandBuffer.putComponent(ref, ModelComponent.getComponentType(), new ModelComponent(updated));
+        flight.setActiveTrailRootInteraction(desired.rootId());
     }
 
-    @Nullable
-    private static InteractionManager resolveManager(
-            @Nonnull Ref<EntityStore> ref,
-            @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
-        InteractionModule module = InteractionModule.get();
-        return module == null ? null : componentAccessor.getComponent(
-                ref, module.getInteractionManagerComponent());
+    @Nonnull
+    private TrailDefinitions resolveDefinitions(@Nonnull AvatarFlightTrailSettings settings) {
+        return new TrailDefinitions(
+                resolve(settings.getLaunchRootInteraction()),
+                resolve(settings.getFlapRootInteraction()),
+                resolve(settings.getBoostRootInteraction()),
+                resolve(settings.getFastGlideRootInteraction())
+        );
+    }
+
+    @Nonnull
+    private Definition resolve(@Nonnull String rootId) {
+        if (rootId.isBlank()) return Definition.EMPTY;
+        RootInteraction root = RootInteraction.getAssetMap().getAsset(rootId);
+        if (root == null) return Definition.EMPTY;
+
+        CachedDefinition cached = definitionCache.get(rootId);
+        if (cached != null && cached.root() == root) return cached.definition();
+
+        List<ModelTrail> trails = new ArrayList<>();
+        float durationSeconds = 0.0F;
+        String[] interactionIds = root.getInteractionIds();
+        if (interactionIds != null) {
+            for (String interactionId : interactionIds) {
+                Interaction interaction = Interaction.getAssetMap().getAsset(interactionId);
+                if (interaction == null) continue;
+                durationSeconds = Math.max(durationSeconds, interaction.getRunTime());
+                InteractionEffects effects = interaction.getEffects();
+                if (effects == null || effects.getTrails() == null) continue;
+                for (ModelTrail trail : effects.getTrails()) {
+                    if (trail != null) trails.add(new ModelTrail(trail));
+                }
+            }
+        }
+
+        long durationMs = Math.max(
+                MINIMUM_BURST_DURATION_MS, Math.round(durationSeconds * 1000.0F));
+        Definition definition = new Definition(
+                rootId, trails.toArray(ModelTrail[]::new), durationMs);
+        definitionCache.put(rootId, new CachedDefinition(root, definition));
+        return definition;
+    }
+
+    private record CachedDefinition(@Nonnull RootInteraction root,
+                                    @Nonnull Definition definition) {
+    }
+
+    private record Definition(@Nonnull String rootId,
+                              @Nonnull ModelTrail[] trails,
+                              long durationMs) {
+        private static final Definition EMPTY = new Definition("", new ModelTrail[0], 0L);
+
+        boolean hasTrails() {
+            return trails.length > 0;
+        }
+    }
+
+    private record TrailDefinitions(@Nonnull Definition launch,
+                                    @Nonnull Definition flap,
+                                    @Nonnull Definition boost,
+                                    @Nonnull Definition fastGlide) {
+        @Nonnull
+        ModelTrail[][] managedGroups() {
+            return new ModelTrail[][]{
+                    launch.trails(), flap.trails(), boost.trails(), fastGlide.trails()
+            };
+        }
+
+        @Nonnull
+        Definition byRootId(@Nonnull String rootId) {
+            if (launch.rootId().equals(rootId)) return launch;
+            if (flap.rootId().equals(rootId)) return flap;
+            if (boost.rootId().equals(rootId)) return boost;
+            if (fastGlide.rootId().equals(rootId)) return fastGlide;
+            return Definition.EMPTY;
+        }
     }
 }

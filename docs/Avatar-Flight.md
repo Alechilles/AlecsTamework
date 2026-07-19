@@ -44,7 +44,7 @@ Launch presentation uses short world-space particle and positional audio cues. G
 
 ## Trails
 
-Avatar-flight trails use Hytale's dedicated model-trail system, not particle systems. A species profile supplies RootInteraction assets whose `Effects.Trails` entries attach trail assets to model nodes such as wingtip or outer-wing joints. Tamework starts the configured one-shot roots only when launch, flap, or boost is accepted, and owns one cancellable sustained root for fast glide.
+Avatar-flight trails use Hytale's dedicated model-trail system, not particle systems. A species profile supplies RootInteraction assets whose `Effects.Trails` entries attach trail assets to model nodes such as wingtip or outer-wing joints. Tamework reads those trail definitions and synchronizes them onto the transformed player model only while their movement condition is active. Launch, flap, and boost trails remain for the authored interaction runtime; fast-glide trails remain until speed falls below their stop threshold. Replacing the model state at each transition gives both one-shot and sustained trails an explicit cleanup path.
 
 Fast glide starts at `Trails.FastGlideStartSpeedRatio * Movement.MaxGlideSpeed` and stops at the lower `Trails.FastGlideStopSpeedRatio` threshold. The default `0.92`/`0.86` pair avoids flicker when speed hovers near the boundary. With the default maximum glide speed of `15`, those thresholds are `13.8` and `12.9`.
 
