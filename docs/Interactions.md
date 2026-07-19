@@ -255,13 +255,21 @@ Optional `Begin` fields:
 - `BeamNativeDurationSeconds`: authored travel duration corresponding to `BeamNativeLength`. Fixed-size traveling particles use both values to derive their target-distance lifetime. Defaults to `0.5`.
 - `ScaleBeamToTarget`: when `true` (default), uniformly scales the particle system to the target distance. Set to `false` for fixed-size traveling particles; Tamework instead scales the instance lifetime relative to `BeamNativeLength` so it ends at the target.
 - `BeamFromTarget`: when `true`, emits each particle at the locked NPC anchor and aims it toward the player's live held-item anchor. Defaults to `false` for the original item-to-target direction.
+- `HomingProjectileEnabled`: when `true`, replaces the rigid world-particle stream with independently homing visual entities. Defaults to `false` for compatibility.
+- `HomingProjectileModelId`: model asset containing the mote's attached model particle.
+- `HomingProjectileSpawnIntervalSeconds`: seconds between motes. Defaults to `0.12`.
+- `HomingProjectileSpeed`: travel speed in blocks per second. Defaults to `8`.
+- `HomingProjectileTurnRateDegreesPerSecond`: optional turning limit. Use `0` for direct per-tick retargeting to the held stone.
+- `HomingProjectileArrivalRadius`: removal distance around the live held-item anchor. Defaults to `0.18`.
+- `HomingProjectileLifetimeSeconds`: hard non-persistent mote lifetime. Defaults to `2`.
+- `HomingProjectileMaxConcurrent`: per-capture active mote cap. Defaults to `16` and is clamped to `64`.
 - `ChannelDurationSeconds`: maximum server-side visual session lifetime. Match this to the charging threshold. Defaults to `3`.
 
 Optional `Complete` field:
 
 - `CaptureBurstParticleSystem`: one-shot world particle system emitted at the locked target only after the transactional capture applies successfully.
 
-The initial target is locked for the session. The beam source follows the player's live look rotation with a right/down/forward offset matching the held-item view position. Short particle segments are capped and renewed only while the channel is active, so cancel, completion, disconnect, invalid targets, and timeout stop new emission without leaving a persistent particle source.
+The initial target is locked for the session. When homing is enabled, each mote starts at the locked NPC's body anchor and recomputes the player's view-relative held-item anchor every server tick. Every mote carries the capture generation, is non-serialized, and is removed on arrival, TTL, cancel, completion, disconnect, invalid target, world change, or session replacement. If the configured homing model cannot be loaded, Tamework logs once and uses `BeamParticleSystem` as the compatibility fallback without failing gameplay capture.
 
 For a left-click channel, place the root under the item's `Interactions.Primary` key. `Use` is the F interaction and can conflict with NPC interaction options.
 
