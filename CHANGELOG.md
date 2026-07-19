@@ -60,7 +60,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
-- Fixed model-authored avatar-flight wing sounds being retriggered by forced movement-animation refresh packets, causing rapid flap audio regardless of `FootstepIntervals`.
+- Fixed avatar-flight wing-flap sounds either being rapidly retriggered or stopping after the first visual animation cycle. Dedicated cadence loops now continue without restarting the flight animation.
 - Fixed transformed avatar-flight models sometimes freezing on their final flight frame after landing while stationary instead of immediately returning to idle.
 - Fixed AvatarFlight cleanup replaying equipment before restoring the player skin, which could leave clothing visible through equipped armor after dismounting.
 - Fixed prefab saving unregistering Tamework's generated asset-patch pack and silently removing bucket-on-trough interactions until the server restarted.

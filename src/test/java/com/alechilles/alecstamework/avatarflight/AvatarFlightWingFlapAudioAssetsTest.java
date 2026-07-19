@@ -17,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AvatarFlightWingFlapAudioAssetsTest {
     private static final Path RESOURCE_ROOT = Path.of("src", "main", "resources");
+    private static final Path EVENT_DIRECTORY = RESOURCE_ROOT.resolve(Path.of(
+            "Server", "Audio", "SoundEvents", "SFX", "Tamework", "AvatarFlight"
+    ));
     private static final Path EVENT_PATH = RESOURCE_ROOT.resolve(Path.of(
             "Server", "Audio", "SoundEvents", "SFX", "Tamework", "AvatarFlight",
             "SFX_Tamework_AvatarFlight_Wing_Flap_Footstep.json"
@@ -25,6 +28,10 @@ class AvatarFlightWingFlapAudioAssetsTest {
             "Sounds/Tamework/AvatarFlight/Flight/Footsteps/Tamework_AvatarFlight_Wing_Flap_01.ogg",
             "Sounds/Tamework/AvatarFlight/Flight/Footsteps/Tamework_AvatarFlight_Wing_Flap_02.ogg",
             "Sounds/Tamework/AvatarFlight/Flight/Footsteps/Tamework_AvatarFlight_Wing_Flap_03.ogg"
+    );
+    private static final List<String> LOOP_EVENT_IDS = List.of(
+            "SFX_Tamework_AvatarFlight_Wing_Flap_Fly_Loop",
+            "SFX_Tamework_AvatarFlight_Wing_Flap_Idle_Loop"
     );
 
     @Test
@@ -41,6 +48,27 @@ class AvatarFlightWingFlapAudioAssetsTest {
 
         for (String soundFile : EXPECTED_FILES) {
             Path oggPath = RESOURCE_ROOT.resolve("Common").resolve(soundFile);
+            assertTrue(Files.isRegularFile(oggPath), oggPath.toString());
+            byte[] oggBytes = Files.readAllBytes(oggPath);
+            assertArrayEquals(
+                    "OggS".getBytes(StandardCharsets.US_ASCII),
+                    oggBytes.length >= 4 ? Arrays.copyOf(oggBytes, 4) : new byte[0],
+                    oggPath.toString()
+            );
+        }
+    }
+
+    @Test
+    void wingFlapCadenceEventsUseBundledLoopingOggAssets() throws Exception {
+        for (String eventId : LOOP_EVENT_IDS) {
+            Path eventPath = EVENT_DIRECTORY.resolve(eventId + ".json");
+            JsonObject event = JsonParser.parseString(Files.readString(eventPath)).getAsJsonObject();
+            JsonObject layer = event.getAsJsonArray("Layers").get(0).getAsJsonObject();
+
+            assertTrue(layer.get("Looping").getAsBoolean(), eventId);
+            assertEquals(1, layer.getAsJsonArray("Files").size(), eventId);
+            Path oggPath = RESOURCE_ROOT.resolve("Common")
+                    .resolve(layer.getAsJsonArray("Files").get(0).getAsString());
             assertTrue(Files.isRegularFile(oggPath), oggPath.toString());
             byte[] oggBytes = Files.readAllBytes(oggPath);
             assertArrayEquals(
