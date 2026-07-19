@@ -114,6 +114,26 @@ public final class AvatarFlightAudioSettings {
                     settings -> settings.airbrakeSoundEvent)
             .documentation("One-shot positional cue when airbrake first becomes active. Blank disables this cue. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<String>append(new KeyedCodec<>("IdleFlightFlapSoundEvent", Codec.STRING),
+                    (settings, value) -> settings.idleFlightFlapSoundEvent = blankOrTrim(value),
+                    settings -> settings.idleFlightFlapSoundEvent)
+            .documentation("One-shot positional wing cue scheduled while hovering. Blank disables hover cadence. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("IdleFlightFlapIntervalMs", Codec.DOUBLE),
+                    (settings, value) -> settings.idleFlightFlapIntervalMs = intervalOrDisabled(value),
+                    settings -> settings.idleFlightFlapIntervalMs)
+            .documentation("Milliseconds between hover wing cues. Zero disables hover cadence. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("FlightFlapSoundEvent", Codec.STRING),
+                    (settings, value) -> settings.flightFlapSoundEvent = blankOrTrim(value),
+                    settings -> settings.flightFlapSoundEvent)
+            .documentation("One-shot positional wing cue scheduled during normal forward flight. Blank disables forward-flight cadence. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("FlightFlapIntervalMs", Codec.DOUBLE),
+                    (settings, value) -> settings.flightFlapIntervalMs = intervalOrDisabled(value),
+                    settings -> settings.flightFlapIntervalMs)
+            .documentation("Milliseconds between normal forward-flight wing cues. Zero disables forward-flight cadence. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private boolean enabled = true;
@@ -132,6 +152,10 @@ public final class AvatarFlightAudioSettings {
     private String upwardFlapSoundEvent = DEFAULT_UPWARD_FLAP_SOUND;
     private String forwardBoostSoundEvent = DEFAULT_FORWARD_BOOST_SOUND;
     private String airbrakeSoundEvent = DEFAULT_AIRBRAKE_SOUND;
+    private String idleFlightFlapSoundEvent = "";
+    private double idleFlightFlapIntervalMs;
+    private String flightFlapSoundEvent = "";
+    private double flightFlapIntervalMs;
 
     public void inheritMissingFrom(@Nonnull AvatarFlightAudioSettings parent, @Nullable Set<String> keys) {
         if (keys == null) return;
@@ -151,6 +175,10 @@ public final class AvatarFlightAudioSettings {
         if (!keys.contains("UpwardFlapSoundEvent")) upwardFlapSoundEvent = parent.upwardFlapSoundEvent;
         if (!keys.contains("ForwardBoostSoundEvent")) forwardBoostSoundEvent = parent.forwardBoostSoundEvent;
         if (!keys.contains("AirbrakeSoundEvent")) airbrakeSoundEvent = parent.airbrakeSoundEvent;
+        if (!keys.contains("IdleFlightFlapSoundEvent")) idleFlightFlapSoundEvent = parent.idleFlightFlapSoundEvent;
+        if (!keys.contains("IdleFlightFlapIntervalMs")) idleFlightFlapIntervalMs = parent.idleFlightFlapIntervalMs;
+        if (!keys.contains("FlightFlapSoundEvent")) flightFlapSoundEvent = parent.flightFlapSoundEvent;
+        if (!keys.contains("FlightFlapIntervalMs")) flightFlapIntervalMs = parent.flightFlapIntervalMs;
     }
 
     public boolean isEnabled() { return enabled; }
@@ -171,6 +199,10 @@ public final class AvatarFlightAudioSettings {
     public String getUpwardFlapSoundEvent() { return blankOrTrim(upwardFlapSoundEvent); }
     public String getForwardBoostSoundEvent() { return blankOrTrim(forwardBoostSoundEvent); }
     public String getAirbrakeSoundEvent() { return blankOrTrim(airbrakeSoundEvent); }
+    public String getIdleFlightFlapSoundEvent() { return blankOrTrim(idleFlightFlapSoundEvent); }
+    public long getIdleFlightFlapIntervalMs() { return Math.round(intervalOrDisabled(idleFlightFlapIntervalMs)); }
+    public String getFlightFlapSoundEvent() { return blankOrTrim(flightFlapSoundEvent); }
+    public long getFlightFlapIntervalMs() { return Math.round(intervalOrDisabled(flightFlapIntervalMs)); }
 
     private static String blankOrTrim(@Nullable String value) {
         return value == null ? "" : value.trim();
@@ -179,6 +211,11 @@ public final class AvatarFlightAudioSettings {
     private static double intervalOrDefault(@Nullable Double value, double fallback) {
         double resolved = value != null && Double.isFinite(value) ? value : fallback;
         return Math.max(MIN_INTERVAL_MS, resolved);
+    }
+
+    private static double intervalOrDisabled(@Nullable Double value) {
+        if (value == null || !Double.isFinite(value) || value <= 0.0) return 0.0;
+        return Math.max(MIN_INTERVAL_MS, value);
     }
 
     private static double modifierOrDefault(@Nullable Double value, double fallback) {

@@ -224,5 +224,7 @@ Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object ov
 - `UpwardFlapSoundEvent`: one-shot wing displacement cue after an accepted upward flap. Blank disables it.
 - `ForwardBoostSoundEvent`: one-shot accelerating wind burst after an accepted forward boost. Blank disables it.
 - `AirbrakeSoundEvent`: one-shot catching-wind cue when an accepted airbrake press first becomes active. Holding airbrake does not replay it.
+- `IdleFlightFlapSoundEvent` / `IdleFlightFlapIntervalMs`: one-shot wing cue and cadence while hovering. Blank or zero disables it.
+- `FlightFlapSoundEvent` / `FlightFlapIntervalMs`: one-shot wing cue and cadence during normal forward flight. Blank or zero disables it; fast flight is excluded.
 
 Omitting `Audio` inherits the complete parent section. An explicit `Audio` object overrides only its explicit nested keys and inherits the remaining values. Avatar-flight sounds are positional mono events routed through Hytale's dragon NPC audio category.

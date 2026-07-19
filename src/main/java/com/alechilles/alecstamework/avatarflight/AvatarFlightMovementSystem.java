@@ -48,6 +48,7 @@ public final class AvatarFlightMovementSystem
     private final AvatarFlightAnimationService animationService = new AvatarFlightAnimationService();
     private final AvatarFlightBoostVfxService boostVfxService = new AvatarFlightBoostVfxService();
     private final AvatarFlightAbilityAudioService abilityAudioService = new AvatarFlightAbilityAudioService();
+    private final AvatarFlightFlapAudioService flapAudioService = new AvatarFlightFlapAudioService();
     private final AvatarFlightLaunchVfxService launchVfxService = new AvatarFlightLaunchVfxService();
     private final AvatarFlightLaunchAudioService launchAudioService = new AvatarFlightLaunchAudioService();
     private final AvatarFlightTrailService trailService = new AvatarFlightTrailService();
@@ -116,6 +117,7 @@ public final class AvatarFlightMovementSystem
                 commandBuffer
         );
         abilityAudioService.emitApplied(output, config, transform, commandBuffer);
+        flapAudioService.tick(flight, output, config, transform, now, commandBuffer);
         launchVfxService.tick(
                 flight,
                 input,

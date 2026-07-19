@@ -67,6 +67,16 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void movementSystemSchedulesSustainedFlapsFromFlightState() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("private final AvatarFlightFlapAudioService flapAudioService"),
+                "sustained flap cadence should remain separate from movement and animation orchestration");
+        assertTrue(source.contains("flapAudioService.tick(flight, output, config, transform, now, commandBuffer)"),
+                "flap cadence must use authoritative idle, normal-flight, and fast-flight controller state");
+    }
+
+    @Test
     void freshPacketInputOwnsGroundedState() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

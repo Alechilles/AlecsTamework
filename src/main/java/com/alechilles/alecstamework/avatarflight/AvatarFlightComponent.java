@@ -98,6 +98,14 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
                     AvatarFlightComponent::setNextMovementAnimationAtMs,
                     AvatarFlightComponent::getNextMovementAnimationAtMs)
             .add()
+            .<String>append(new KeyedCodec<>("FlightFlapAudioMode", Codec.STRING),
+                    AvatarFlightComponent::setFlightFlapAudioMode,
+                    AvatarFlightComponent::getFlightFlapAudioMode)
+            .add()
+            .<Long>append(new KeyedCodec<>("NextFlightFlapAudioAtMs", Codec.LONG),
+                    AvatarFlightComponent::setNextFlightFlapAudioAtMs,
+                    AvatarFlightComponent::getNextFlightFlapAudioAtMs)
+            .add()
             .<Long>append(new KeyedCodec<>("NextSuppressedAnimationAtMs", Codec.LONG),
                     AvatarFlightComponent::setNextSuppressedAnimationAtMs,
                     AvatarFlightComponent::getNextSuppressedAnimationAtMs)
@@ -200,6 +208,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
     private boolean clientFlyingSynced;
     private String movementAnimationId = "";
     private long nextMovementAnimationAtMs;
+    private String flightFlapAudioMode = "";
+    private long nextFlightFlapAudioAtMs;
     private long nextSuppressedAnimationAtMs;
     private String abilityAnimationId = "";
     private String abilityAnimationSlot = "Action";
@@ -429,6 +439,23 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         this.nextMovementAnimationAtMs = nextMovementAnimationAtMs == null ? 0L : nextMovementAnimationAtMs;
     }
 
+    @Nonnull
+    public String getFlightFlapAudioMode() {
+        return flightFlapAudioMode == null ? "" : flightFlapAudioMode;
+    }
+
+    public void setFlightFlapAudioMode(@Nullable String flightFlapAudioMode) {
+        this.flightFlapAudioMode = flightFlapAudioMode == null ? "" : flightFlapAudioMode.trim();
+    }
+
+    public long getNextFlightFlapAudioAtMs() {
+        return nextFlightFlapAudioAtMs;
+    }
+
+    public void setNextFlightFlapAudioAtMs(@Nullable Long nextFlightFlapAudioAtMs) {
+        this.nextFlightFlapAudioAtMs = nextFlightFlapAudioAtMs == null ? 0L : nextFlightFlapAudioAtMs;
+    }
+
     public long getNextSuppressedAnimationAtMs() {
         return nextSuppressedAnimationAtMs;
     }
@@ -592,6 +619,8 @@ public final class AvatarFlightComponent implements Component<EntityStore> {
         clone.clientFlyingSynced = clientFlyingSynced;
         clone.movementAnimationId = getMovementAnimationId();
         clone.nextMovementAnimationAtMs = nextMovementAnimationAtMs;
+        clone.flightFlapAudioMode = getFlightFlapAudioMode();
+        clone.nextFlightFlapAudioAtMs = nextFlightFlapAudioAtMs;
         clone.nextSuppressedAnimationAtMs = nextSuppressedAnimationAtMs;
         clone.abilityAnimationId = getAbilityAnimationId();
         clone.abilityAnimationSlot = getAbilityAnimationSlot();
