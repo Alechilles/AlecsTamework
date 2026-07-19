@@ -23,5 +23,9 @@ class AvatarFlightTrailInteractionSafetyTest {
                 "direct execution can crash the world when InteractionManager's internal ref is unset");
         assertTrue(source.contains("PENDING_CHAIN_ID"),
                 "queued sustained trails must remain tracked before Hytale assigns a server chain id");
+        assertTrue(source.contains("FORCE_REMOTE_SYNC = true"),
+                "the owning client must execute trail chains so it also owns their cleanup lifecycle");
+        assertFalse(source.contains("TRAIL_INTERACTION_TYPE, context, root, false"),
+                "server-only trail chains can leave local client render state without matched cleanup");
     }
 }

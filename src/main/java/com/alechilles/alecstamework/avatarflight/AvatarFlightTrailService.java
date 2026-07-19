@@ -18,6 +18,7 @@ import javax.annotation.Nullable;
 /** Starts and cancels interaction-authored trails for avatar-flight movement cues. */
 public final class AvatarFlightTrailService {
     private static final InteractionType TRAIL_INTERACTION_TYPE = InteractionType.EntityStatEffect;
+    private static final boolean FORCE_REMOTE_SYNC = true;
     private static final int PENDING_CHAIN_ID = 1;
 
     public void tick(@Nonnull AvatarFlightComponent flight,
@@ -128,7 +129,9 @@ public final class AvatarFlightTrailService {
         InteractionContext context = InteractionContext.forInteraction(
                 manager, ref, TRAIL_INTERACTION_TYPE, commandBuffer);
         InteractionChain chain = manager.initChain(
-                TRAIL_INTERACTION_TYPE, context, root, false);
+                TRAIL_INTERACTION_TYPE, context, root, FORCE_REMOTE_SYNC);
+        // Model trails are client-owned render state. Force the owning client to execute
+        // the interaction so its local interaction VM also owns the matching finish/cancel.
         // InteractionManager assigns its entity ref only inside its own tick. Queueing avoids
         // tickChain throwing and removing the world when another ECS system starts a trail.
         manager.queueExecuteChain(chain);
