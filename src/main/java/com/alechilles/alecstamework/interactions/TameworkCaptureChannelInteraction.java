@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.items.CaptureHomingProjectileSettings;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -80,70 +79,6 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
             )
             .documentation("Whether particles travel from the locked NPC target toward the player's held item instead of toward the NPC.")
             .add()
-            .<Boolean>appendInherited(
-                    new KeyedCodec<>("HomingProjectileEnabled", Codec.BOOLEAN),
-                    (interaction, value) -> interaction.homingProjectileEnabled = value,
-                    interaction -> interaction.homingProjectileEnabled,
-                    (interaction, parent) -> interaction.homingProjectileEnabled = parent.homingProjectileEnabled
-            )
-            .documentation("Use harmless model-particle carrier entities that retarget the held-item anchor each tick.")
-            .add()
-            .<String>appendInherited(
-                    new KeyedCodec<>("HomingProjectileModelId", Codec.STRING),
-                    (interaction, value) -> interaction.homingProjectileModelId = value,
-                    interaction -> interaction.homingProjectileModelId,
-                    (interaction, parent) -> interaction.homingProjectileModelId = parent.homingProjectileModelId
-            )
-            .documentation("Model asset whose attached particles render each capture mote.")
-            .add()
-            .<Double>appendInherited(
-                    new KeyedCodec<>("HomingProjectileSpawnIntervalSeconds", Codec.DOUBLE),
-                    (interaction, value) -> interaction.homingProjectileSpawnIntervalSeconds = value,
-                    interaction -> interaction.homingProjectileSpawnIntervalSeconds,
-                    (interaction, parent) -> interaction.homingProjectileSpawnIntervalSeconds = parent.homingProjectileSpawnIntervalSeconds
-            )
-            .documentation("Seconds between independently homing capture motes.")
-            .add()
-            .<Double>appendInherited(
-                    new KeyedCodec<>("HomingProjectileSpeed", Codec.DOUBLE),
-                    (interaction, value) -> interaction.homingProjectileSpeed = value,
-                    interaction -> interaction.homingProjectileSpeed,
-                    (interaction, parent) -> interaction.homingProjectileSpeed = parent.homingProjectileSpeed
-            )
-            .documentation("Capture mote travel speed in blocks per second.")
-            .add()
-            .<Double>appendInherited(
-                    new KeyedCodec<>("HomingProjectileTurnRateDegreesPerSecond", Codec.DOUBLE),
-                    (interaction, value) -> interaction.homingProjectileTurnRateDegreesPerSecond = value,
-                    interaction -> interaction.homingProjectileTurnRateDegreesPerSecond,
-                    (interaction, parent) -> interaction.homingProjectileTurnRateDegreesPerSecond = parent.homingProjectileTurnRateDegreesPerSecond
-            )
-            .documentation("Optional turn limit. Zero directly retargets the live held-item anchor.")
-            .add()
-            .<Double>appendInherited(
-                    new KeyedCodec<>("HomingProjectileArrivalRadius", Codec.DOUBLE),
-                    (interaction, value) -> interaction.homingProjectileArrivalRadius = value,
-                    interaction -> interaction.homingProjectileArrivalRadius,
-                    (interaction, parent) -> interaction.homingProjectileArrivalRadius = parent.homingProjectileArrivalRadius
-            )
-            .documentation("Distance from the held-item anchor at which a mote is removed.")
-            .add()
-            .<Double>appendInherited(
-                    new KeyedCodec<>("HomingProjectileLifetimeSeconds", Codec.DOUBLE),
-                    (interaction, value) -> interaction.homingProjectileLifetimeSeconds = value,
-                    interaction -> interaction.homingProjectileLifetimeSeconds,
-                    (interaction, parent) -> interaction.homingProjectileLifetimeSeconds = parent.homingProjectileLifetimeSeconds
-            )
-            .documentation("Hard lifetime for each non-serialized capture mote.")
-            .add()
-            .<Integer>appendInherited(
-                    new KeyedCodec<>("HomingProjectileMaxConcurrent", Codec.INTEGER),
-                    (interaction, value) -> interaction.homingProjectileMaxConcurrent = value,
-                    interaction -> interaction.homingProjectileMaxConcurrent,
-                    (interaction, parent) -> interaction.homingProjectileMaxConcurrent = parent.homingProjectileMaxConcurrent
-            )
-            .documentation("Maximum active homing motes owned by one capture session.")
-            .add()
             .<String>appendInherited(
                     new KeyedCodec<>("CaptureBurstParticleSystem", Codec.STRING),
                     (interaction, value) -> interaction.captureBurstParticleSystem = value,
@@ -168,14 +103,6 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
     private double beamNativeDurationSeconds = 0.5D;
     private boolean scaleBeamToTarget = true;
     private boolean beamFromTarget;
-    private boolean homingProjectileEnabled;
-    private String homingProjectileModelId;
-    private double homingProjectileSpawnIntervalSeconds = 0.12D;
-    private double homingProjectileSpeed = 8.0D;
-    private double homingProjectileTurnRateDegreesPerSecond;
-    private double homingProjectileArrivalRadius = 0.18D;
-    private double homingProjectileLifetimeSeconds = 2.0D;
-    private int homingProjectileMaxConcurrent = 16;
     private String captureBurstParticleSystem;
     private double channelDurationSeconds = 3.0D;
 
@@ -250,17 +177,7 @@ public final class TameworkCaptureChannelInteraction extends SimpleInteraction {
                     beamNativeDurationSeconds,
                     scaleBeamToTarget,
                     beamFromTarget,
-                    channelDurationSeconds,
-                    new CaptureHomingProjectileSettings(
-                            homingProjectileEnabled,
-                            homingProjectileModelId,
-                            homingProjectileSpawnIntervalSeconds,
-                            homingProjectileSpeed,
-                            homingProjectileTurnRateDegreesPerSecond,
-                            homingProjectileArrivalRadius,
-                            homingProjectileLifetimeSeconds,
-                            homingProjectileMaxConcurrent
-                    )
+                    channelDurationSeconds
             ));
             case CANCEL -> commandBuffer.run(store -> handler.endCaptureChannel(player, targetRef, heldItem));
             case COMPLETE -> commandBuffer.run(store -> handler.completeCaptureChannel(

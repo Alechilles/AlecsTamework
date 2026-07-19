@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Configures positional launch-charge and launch-release sound presentation.
+ * Configures positional avatar-flight sound presentation.
  */
 public final class AvatarFlightAudioSettings {
     public static final String DEFAULT_CHARGE_SOUND = "SFX_Tamework_AvatarFlight_Launch_Charge_Pulse";
@@ -17,6 +17,9 @@ public final class AvatarFlightAudioSettings {
     public static final String DEFAULT_PARTIAL_SOUND = "SFX_Tamework_AvatarFlight_Launch_Release_Partial";
     public static final String DEFAULT_MID_SOUND = "SFX_Tamework_AvatarFlight_Launch_Release_Mid";
     public static final String DEFAULT_FULL_SOUND = "SFX_Tamework_AvatarFlight_Launch_Release_Full";
+    public static final String DEFAULT_UPWARD_FLAP_SOUND = "SFX_Tamework_AvatarFlight_Flap";
+    public static final String DEFAULT_FORWARD_BOOST_SOUND = "SFX_Tamework_AvatarFlight_Forward_Boost";
+    public static final String DEFAULT_AIRBRAKE_SOUND = "SFX_Tamework_AvatarFlight_Airbrake";
     public static final double DEFAULT_EARLY_INTERVAL_MS = 600.0;
     public static final double DEFAULT_FULL_INTERVAL_MS = 180.0;
     public static final double DEFAULT_MIN_VOLUME = 0.32;
@@ -34,7 +37,7 @@ public final class AvatarFlightAudioSettings {
             .<Boolean>append(new KeyedCodec<>("Enabled", Codec.BOOLEAN),
                     (settings, value) -> settings.enabled = value == null || value,
                     settings -> settings.enabled)
-            .documentation("Whether avatar-flight launch audio is enabled. Inheritance: missing nested key inherits parent value.")
+            .documentation("Whether avatar-flight audio is enabled. Inheritance: missing nested key inherits parent value.")
             .add()
             .<String>append(new KeyedCodec<>("LaunchChargeSoundEvent", Codec.STRING),
                     (settings, value) -> settings.launchChargeSoundEvent = blankOrTrim(value),
@@ -96,6 +99,21 @@ public final class AvatarFlightAudioSettings {
                     settings -> settings.launchReleaseFullSoundEvent)
             .documentation("One-shot positional cue for a full launch release. Blank disables this cue. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<String>append(new KeyedCodec<>("UpwardFlapSoundEvent", Codec.STRING),
+                    (settings, value) -> settings.upwardFlapSoundEvent = blankOrTrim(value),
+                    settings -> settings.upwardFlapSoundEvent)
+            .documentation("One-shot positional cue for an accepted upward flap. Blank disables this cue. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("ForwardBoostSoundEvent", Codec.STRING),
+                    (settings, value) -> settings.forwardBoostSoundEvent = blankOrTrim(value),
+                    settings -> settings.forwardBoostSoundEvent)
+            .documentation("One-shot positional cue for an accepted forward boost. Blank disables this cue. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<String>append(new KeyedCodec<>("AirbrakeSoundEvent", Codec.STRING),
+                    (settings, value) -> settings.airbrakeSoundEvent = blankOrTrim(value),
+                    settings -> settings.airbrakeSoundEvent)
+            .documentation("One-shot positional cue when airbrake first becomes active. Blank disables this cue. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private boolean enabled = true;
@@ -111,6 +129,9 @@ public final class AvatarFlightAudioSettings {
     private String launchReleasePartialSoundEvent = DEFAULT_PARTIAL_SOUND;
     private String launchReleaseMidSoundEvent = DEFAULT_MID_SOUND;
     private String launchReleaseFullSoundEvent = DEFAULT_FULL_SOUND;
+    private String upwardFlapSoundEvent = DEFAULT_UPWARD_FLAP_SOUND;
+    private String forwardBoostSoundEvent = DEFAULT_FORWARD_BOOST_SOUND;
+    private String airbrakeSoundEvent = DEFAULT_AIRBRAKE_SOUND;
 
     public void inheritMissingFrom(@Nonnull AvatarFlightAudioSettings parent, @Nullable Set<String> keys) {
         if (keys == null) return;
@@ -127,6 +148,9 @@ public final class AvatarFlightAudioSettings {
         if (!keys.contains("LaunchReleasePartialSoundEvent")) launchReleasePartialSoundEvent = parent.launchReleasePartialSoundEvent;
         if (!keys.contains("LaunchReleaseMidSoundEvent")) launchReleaseMidSoundEvent = parent.launchReleaseMidSoundEvent;
         if (!keys.contains("LaunchReleaseFullSoundEvent")) launchReleaseFullSoundEvent = parent.launchReleaseFullSoundEvent;
+        if (!keys.contains("UpwardFlapSoundEvent")) upwardFlapSoundEvent = parent.upwardFlapSoundEvent;
+        if (!keys.contains("ForwardBoostSoundEvent")) forwardBoostSoundEvent = parent.forwardBoostSoundEvent;
+        if (!keys.contains("AirbrakeSoundEvent")) airbrakeSoundEvent = parent.airbrakeSoundEvent;
     }
 
     public boolean isEnabled() { return enabled; }
@@ -144,6 +168,9 @@ public final class AvatarFlightAudioSettings {
     public String getLaunchReleasePartialSoundEvent() { return blankOrTrim(launchReleasePartialSoundEvent); }
     public String getLaunchReleaseMidSoundEvent() { return blankOrTrim(launchReleaseMidSoundEvent); }
     public String getLaunchReleaseFullSoundEvent() { return blankOrTrim(launchReleaseFullSoundEvent); }
+    public String getUpwardFlapSoundEvent() { return blankOrTrim(upwardFlapSoundEvent); }
+    public String getForwardBoostSoundEvent() { return blankOrTrim(forwardBoostSoundEvent); }
+    public String getAirbrakeSoundEvent() { return blankOrTrim(airbrakeSoundEvent); }
 
     private static String blankOrTrim(@Nullable String value) {
         return value == null ? "" : value.trim();

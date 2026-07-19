@@ -23,8 +23,5 @@ class HomingVisualProjectileArchitectureTest {
         assertFalse(spawner.contains("DamageSystems"));
         assertFalse(system.contains("server.core.entity.entities.ProjectileComponent"));
         assertFalse(system.contains("DamageSystems"));
-        assertTrue(system.contains("world.getEntityRef(UUID.fromString"));
-        assertTrue(system.contains("HomingVisualProjectileSessionRegistry.isActive("));
-        assertTrue(system.contains("commandBuffer.removeEntity(ref, RemoveReason.REMOVE)"));
     }
 }

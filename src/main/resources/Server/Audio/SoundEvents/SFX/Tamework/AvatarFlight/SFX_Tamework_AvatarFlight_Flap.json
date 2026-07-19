@@ -1,0 +1,21 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/AvatarFlight/Abilities/Tamework_AvatarFlight_Flap.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -0.5,
+        "MaxPitch": 0.5
+      },
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 4,
+  "Volume": -3.0,
+  "PreventSoundInterruption": false,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 2.0,
+  "MaxDistance": 28.0
+}

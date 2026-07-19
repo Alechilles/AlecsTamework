@@ -105,25 +105,17 @@ class CaptureChannelVfxSystemTest {
     }
 
     @Test
-    void channelSupportsLegacyParticlesAndHomingMoteCadence() throws Exception {
+    void channelLaunchesIndividuallyBoundedParticlesAtWorldTickCadence() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CaptureChannelVfxSystem.java"
         ));
 
         assertEquals(50L, CaptureChannelVfxSystem.emissionIntervalMsForTests());
-        assertEquals(120L, CaptureChannelVfxSystem.homingEmissionIntervalMsForTests(
-                new CaptureHomingProjectileSettings(
-                        true, "Capture_Mote", 0.12D, 8.0D, 0.0D, 0.18D, 2.0D, 16
-                )
-        ));
         assertEquals(0.5F,
                 CaptureChannelVfxSystem.particleMaxDurationForDistance(15.0D, 15.0D, 0.5D, false));
         assertTrue(source.contains("world.getEntityRef(session.playerUuid)"));
         assertTrue(source.contains("world.getEntityRef(session.targetUuid)"));
-        assertTrue(source.contains("session.nextEmitAtMs = nowMs + session.emissionIntervalMs()"));
-        assertTrue(source.contains("HomingVisualProjectileSpawner.spawn("));
-        assertTrue(source.contains("HomingVisualProjectileSessionRegistry.activate("));
-        assertTrue(source.contains("HomingVisualProjectileSessionRegistry.deactivate("));
+        assertTrue(source.contains("session.nextEmitAtMs = nowMs + EMIT_INTERVAL_MS"));
         assertTrue(source.contains("rotationForBeamPacket"));
         assertTrue(source.contains("ACTIVE.remove(session.playerUuid, session)"));
     }

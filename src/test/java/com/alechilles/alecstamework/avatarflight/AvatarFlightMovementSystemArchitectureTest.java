@@ -57,6 +57,16 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void movementSystemDrivesAbilityAudioFromAcceptedControllerOutput() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("private final AvatarFlightAbilityAudioService abilityAudioService"),
+                "ability audio should remain separate from launch-charge state management");
+        assertTrue(source.contains("abilityAudioService.emitApplied(output, config, transform, commandBuffer)"),
+                "flap, boost, and airbrake sounds must consume accepted one-tick controller results");
+    }
+
+    @Test
     void freshPacketInputOwnsGroundedState() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

@@ -29,6 +29,7 @@
 - Added configurable launch particles for grounded charge pulses, canceled or rejected releases, and staged partial, mid, or full charged takeoffs.
 - Added configurable scene-lit wind bursts for successful avatar-flight forward and upward boosts, with inherited per-species scaling.
 - Added configurable positional launch audio with varied sampled wind-charge gusts, a full-charge cue, a cancellation fizzle, and partial, mid, or full takeoff bursts.
+- Added configurable positional wind cues for successful avatar-flight upward flaps, forward boosts, and airbrake activation.
 - Added a compact avatar-flight pitch readout and red target-speed marker above the speed bar to make climb, dive, and boost speed trends easier to tune in game.
 - Added `/tw debugdragonflight inputprobe` for avatar-flight input logging without enabling the separate client-flight capability probe.
 - Added expanded avatar-flight controller diagnostics for raw sprint input, stale input age, client flying sync, visual override ownership, overlay suppression, and forced animation IDs.

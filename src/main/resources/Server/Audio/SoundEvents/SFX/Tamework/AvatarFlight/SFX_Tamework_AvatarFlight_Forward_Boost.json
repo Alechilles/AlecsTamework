@@ -1,0 +1,17 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/AvatarFlight/Abilities/Tamework_AvatarFlight_Forward_Boost.ogg"
+      ],
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 4,
+  "Volume": -1.0,
+  "PreventSoundInterruption": true,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 3.0,
+  "MaxDistance": 38.0
+}

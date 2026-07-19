@@ -204,7 +204,7 @@ Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object ov
 
 ### Audio
 
-- `Enabled`: enables positional launch audio without changing movement behavior.
+- `Enabled`: enables positional avatar-flight audio without changing movement behavior.
 - `LaunchChargeSoundEvent`: short wind cue emitted repeatedly while grounded charge builds. Blank disables charge pulses.
 - `LaunchChargeEarlyIntervalMs` / `LaunchChargeFullIntervalMs`: sound-pulse cadence at the start and end of charging.
 - `LaunchChargeMinVolume` / `LaunchChargeMaxVolume`: linear volume modifiers interpolated across charge progress.
@@ -212,5 +212,8 @@ Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object ov
 - `LaunchReadySoundEvent`: one-shot cue emitted once when charge first reaches `Launch.MaxChargeMs`. Blank disables it.
 - `LaunchCancelSoundEvent`: one-shot cue for a canceled or rejected release. Blank disables it.
 - `LaunchReleasePartialSoundEvent`, `LaunchReleaseMidSoundEvent`, `LaunchReleaseFullSoundEvent`: one-shot release cues selected with the same launch-curve tiers as release VFX. Blank disables an individual tier.
+- `UpwardFlapSoundEvent`: one-shot wing displacement cue after an accepted upward flap. Blank disables it.
+- `ForwardBoostSoundEvent`: one-shot accelerating wind burst after an accepted forward boost. Blank disables it.
+- `AirbrakeSoundEvent`: one-shot catching-wind cue when an accepted airbrake press first becomes active. Holding airbrake does not replay it.
 
-Omitting `Audio` inherits the complete parent section. An explicit `Audio` object overrides only its explicit nested keys and inherits the remaining values. Launch sounds are positional mono events routed through Hytale's dragon NPC audio category.
+Omitting `Audio` inherits the complete parent section. An explicit `Audio` object overrides only its explicit nested keys and inherits the remaining values. Avatar-flight sounds are positional mono events routed through Hytale's dragon NPC audio category.

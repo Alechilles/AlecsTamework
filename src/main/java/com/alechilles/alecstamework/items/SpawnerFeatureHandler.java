@@ -361,30 +361,6 @@ public final class SpawnerFeatureHandler {
                                        boolean scaleBeamToTarget,
                                        boolean beamFromTarget,
                                        double channelDurationSeconds) {
-        return beginCaptureChannel(
-                player,
-                targetRef,
-                itemStack,
-                beamParticleSystem,
-                beamNativeLength,
-                beamNativeDurationSeconds,
-                scaleBeamToTarget,
-                beamFromTarget,
-                channelDurationSeconds,
-                CaptureHomingProjectileSettings.disabled()
-        );
-    }
-
-    public boolean beginCaptureChannel(Player player,
-                                       Ref<EntityStore> targetRef,
-                                       ItemStack itemStack,
-                                       String beamParticleSystem,
-                                       double beamNativeLength,
-                                       double beamNativeDurationSeconds,
-                                       boolean scaleBeamToTarget,
-                                       boolean beamFromTarget,
-                                       double channelDurationSeconds,
-                                       CaptureHomingProjectileSettings homingProjectileSettings) {
         if (!canBeginCaptureChannelInteraction(player, targetRef, itemStack)) {
             return false;
         }
@@ -408,8 +384,7 @@ public final class SpawnerFeatureHandler {
                         beamFromTarget,
                         channelDurationSeconds,
                         config.getCaptureMaxDistance(),
-                        config.getCaptureChannelAuraEffectId(),
-                        homingProjectileSettings
+                        config.getCaptureChannelAuraEffectId()
                 )) {
             return false;
         }

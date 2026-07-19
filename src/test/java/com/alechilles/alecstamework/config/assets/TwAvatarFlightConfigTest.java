@@ -152,6 +152,12 @@ class TwAvatarFlightConfigTest {
         assertEquals(1.12, config.getAudio().getLaunchChargeMaxPitch(), 0.00001);
         assertEquals(AvatarFlightAudioSettings.DEFAULT_FULL_SOUND,
                 config.getAudio().getLaunchReleaseFullSoundEvent());
+        assertEquals(AvatarFlightAudioSettings.DEFAULT_UPWARD_FLAP_SOUND,
+                config.getAudio().getUpwardFlapSoundEvent());
+        assertEquals(AvatarFlightAudioSettings.DEFAULT_FORWARD_BOOST_SOUND,
+                config.getAudio().getForwardBoostSoundEvent());
+        assertEquals(AvatarFlightAudioSettings.DEFAULT_AIRBRAKE_SOUND,
+                config.getAudio().getAirbrakeSoundEvent());
     }
 
     @Test
@@ -223,6 +229,7 @@ class TwAvatarFlightConfigTest {
         TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
         setNestedField(parent, "audio", "launchChargeEarlyIntervalMs", 800.0);
         setNestedField(parent, "audio", "launchReleaseFullSoundEvent", "ParentFull");
+        setNestedField(parent, "audio", "forwardBoostSoundEvent", "ParentBoostSound");
         setNestedField(child, "audio", "launchChargeEarlyIntervalMs", 300.0);
         setNestedField(child, "audio", "launchReleaseFullSoundEvent", "ChildFull");
 
@@ -234,6 +241,7 @@ class TwAvatarFlightConfigTest {
 
         assertEquals(300L, child.getAudio().getLaunchChargeEarlyIntervalMs());
         assertEquals("ParentFull", child.getAudio().getLaunchReleaseFullSoundEvent());
+        assertEquals("ParentBoostSound", child.getAudio().getForwardBoostSoundEvent());
     }
 
     @Test

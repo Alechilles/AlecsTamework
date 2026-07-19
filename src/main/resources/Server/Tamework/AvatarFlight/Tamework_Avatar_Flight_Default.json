@@ -109,7 +109,10 @@
     "LaunchCancelSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Cancel",
     "LaunchReleasePartialSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Partial",
     "LaunchReleaseMidSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Mid",
-    "LaunchReleaseFullSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Full"
+    "LaunchReleaseFullSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Full",
+    "UpwardFlapSoundEvent": "SFX_Tamework_AvatarFlight_Flap",
+    "ForwardBoostSoundEvent": "SFX_Tamework_AvatarFlight_Forward_Boost",
+    "AirbrakeSoundEvent": "SFX_Tamework_AvatarFlight_Airbrake"
   },
   "Trails": {
     "Enabled": true,

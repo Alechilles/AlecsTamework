@@ -1,0 +1,17 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/AvatarFlight/Abilities/Tamework_AvatarFlight_Airbrake.ogg"
+      ],
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 4,
+  "Volume": -3.0,
+  "PreventSoundInterruption": false,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 2.0,
+  "MaxDistance": 30.0
+}

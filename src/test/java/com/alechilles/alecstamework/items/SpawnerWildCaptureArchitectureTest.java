@@ -103,22 +103,6 @@ class SpawnerWildCaptureArchitectureTest {
     }
 
     @Test
-    void captureChannelPropagatesHomingMoteSettingsWithoutChangingTerminalGates() throws Exception {
-        String interaction = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
-        ));
-        String handler = Files.readString(Path.of(
-                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
-        ));
-
-        assertTrue(interaction.contains("new KeyedCodec<>(\"HomingProjectileEnabled\", Codec.BOOLEAN)"));
-        assertTrue(interaction.contains("new KeyedCodec<>(\"HomingProjectileModelId\", Codec.STRING)"));
-        assertTrue(interaction.contains("new CaptureHomingProjectileSettings("));
-        assertTrue(handler.contains("CaptureHomingProjectileSettings homingProjectileSettings"));
-        assertTrue(handler.contains("config.getCaptureChannelAuraEffectId(),\n                        homingProjectileSettings"));
-    }
-
-    @Test
     void channelLocksInitialTargetBeforeCompletionAndCancel() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
