@@ -1,0 +1,17 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Tamework/AvatarFlight/Flight/Tamework_AvatarFlight_Fast_Flight_Loop.ogg"
+      ],
+      "Looping": true
+    }
+  ],
+  "MaxInstance": 4,
+  "Volume": -4.0,
+  "PreventSoundInterruption": false,
+  "AudioCategory": "AudioCat_NPC_Dragon",
+  "Parent": "SFX_Attn_Moderate",
+  "StartAttenuationDistance": 2.0,
+  "MaxDistance": 30.0
+}
