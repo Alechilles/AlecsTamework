@@ -71,6 +71,23 @@ class SpawnerWildCaptureArchitectureTest {
     }
 
     @Test
+    void captureChannelPropagatesAuthoredParticleTravelDuration() throws Exception {
+        String interaction = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
+        ));
+        String handler = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
+        ));
+
+        assertTrue(interaction.contains(
+                "new KeyedCodec<>(\"BeamNativeDurationSeconds\", Codec.DOUBLE)"
+        ));
+        assertTrue(interaction.contains("beamNativeDurationSeconds,"));
+        assertTrue(handler.contains("double beamNativeDurationSeconds,"));
+        assertTrue(handler.contains("beamNativeDurationSeconds,\n                        scaleBeamToTarget,"));
+    }
+
+    @Test
     void channelLocksInitialTargetBeforeCompletionAndCancel() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"

@@ -22,16 +22,29 @@ class CaptureChannelVfxSystemTest {
                 CaptureChannelVfxSystem.particleScaleForDistance(7.5D, 15.0D, false),
                 0.00001F);
         assertEquals(0.25F,
-                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 15.0D, false),
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 15.0D, 0.5D, false),
                 0.00001F);
         assertEquals(0.5F,
                 CaptureChannelVfxSystem.particleScaleForDistance(7.5D, 15.0D, true),
                 0.00001F);
         assertEquals(0.5F,
-                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 15.0D, true),
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 15.0D, 0.5D, true),
                 0.00001F);
         assertEquals(0.0F,
-                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 0.0D, false),
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 0.0D, 0.5D, false),
+                0.00001F);
+        assertEquals(0.0F,
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(7.5D, 15.0D, 0.0D, false),
+                0.00001F);
+    }
+
+    @Test
+    void slowTravelingOrbUsesAuthoredSpeedAcrossCaptureRange() {
+        assertEquals(1.0F,
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(8.0D, 12.0D, 1.5D, false),
+                0.00001F);
+        assertEquals(1.5F,
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(12.0D, 12.0D, 1.5D, false),
                 0.00001F);
     }
 
@@ -66,7 +79,7 @@ class CaptureChannelVfxSystemTest {
 
         assertEquals(0.32D, offset.x, 0.00001D);
         assertEquals(-0.42D, offset.y, 0.00001D);
-        assertEquals(-0.38D, offset.z, 0.00001D);
+        assertEquals(-0.28D, offset.z, 0.00001D);
     }
 
     @Test
@@ -88,7 +101,7 @@ class CaptureChannelVfxSystemTest {
 
         assertEquals(50L, CaptureChannelVfxSystem.emissionIntervalMsForTests());
         assertEquals(0.5F,
-                CaptureChannelVfxSystem.particleMaxDurationForDistance(15.0D, 15.0D, false));
+                CaptureChannelVfxSystem.particleMaxDurationForDistance(15.0D, 15.0D, 0.5D, false));
         assertTrue(source.contains("world.getEntityRef(session.playerUuid)"));
         assertTrue(source.contains("world.getEntityRef(session.targetUuid)"));
         assertTrue(source.contains("session.nextEmitAtMs = nowMs + EMIT_INTERVAL_MS"));
