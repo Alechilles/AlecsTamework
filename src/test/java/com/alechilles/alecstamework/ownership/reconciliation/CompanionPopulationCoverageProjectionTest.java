@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Regression coverage for the nine startup-placeholder dimensions seen in live diagnostics. */
+/** Regression coverage for population evidence publication seen in live startup diagnostics. */
 class CompanionPopulationCoverageProjectionTest {
     @Test
     void completedReconciliationPublishesEveryPopulationEvidenceDimension() {
@@ -28,6 +28,8 @@ class CompanionPopulationCoverageProjectionTest {
         projection.publish(readyRecords(), sealedProjection(), 20L);
 
         Set<PersistenceEvidenceDimension> expected = Set.of(
+                PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG,
+                PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG,
                 PersistenceEvidenceDimension.GLOBAL_OWNER_COUNTS,
                 PersistenceEvidenceDimension.PER_WORLD_OWNER_COUNTS,
                 PersistenceEvidenceDimension.PHYSICAL_CLAIM_OCCUPANCY,
@@ -43,6 +45,47 @@ class CompanionPopulationCoverageProjectionTest {
                     coverage.snapshot().get(dimension.key());
             assertEquals(PersistenceCoverageStatus.READY, state.status(), dimension.name());
             assertTrue(state.absenceAuthoritative(), dimension.name());
+        }
+    }
+
+    /** Protects immediate-login admission while a healthy background scan starts. */
+    @Test
+    void beginningBackgroundScanPreservesBootstrapAdmissionCatalogs() {
+        PersistenceCoverageRegistry coverage = new PersistenceCoverageRegistry();
+        CompanionPopulationCoverageProjection projection = new CompanionPopulationCoverageProjection(
+                coverage, PersistenceScopeFactory.ephemeral()
+        );
+        coverage.publish(PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG,
+                true, "population-loaded", 10L);
+        coverage.publish(PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG,
+                true, "population-loaded", 10L);
+
+        projection.begin();
+
+        assertEquals(PersistenceCoverageStatus.READY,
+                state(coverage, PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG).status());
+        assertEquals(PersistenceCoverageStatus.READY,
+                state(coverage, PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG).status());
+        assertEquals(PersistenceCoverageStatus.LOADING,
+                state(coverage, PersistenceEvidenceDimension.GLOBAL_OWNER_COUNTS).status());
+    }
+
+    /** Protects against retaining stale admission authority after terminal scan failure. */
+    @Test
+    void terminalFailureInvalidatesAdmissionCatalogsAndScanEvidence() {
+        PersistenceCoverageRegistry coverage = new PersistenceCoverageRegistry();
+        CompanionPopulationCoverageProjection projection = new CompanionPopulationCoverageProjection(
+                coverage, PersistenceScopeFactory.ephemeral()
+        );
+        projection.publish(readyRecords(), sealedProjection(), 20L);
+
+        projection.publishUnavailable("terminal-scan-failed", 21L);
+
+        for (PersistenceEvidenceDimension dimension : populationDimensions()) {
+            PersistenceCoverageRegistry.CoverageState state = state(coverage, dimension);
+            assertEquals(PersistenceCoverageStatus.UNAVAILABLE, state.status(), dimension.name());
+            assertEquals("terminal-scan-failed", state.reason(), dimension.name());
+            assertFalse(state.absenceAuthoritative(), dimension.name());
         }
     }
 
@@ -107,6 +150,9 @@ class CompanionPopulationCoverageProjectionTest {
 
     private static List<CompanionPopulationCoverageRecord> readyRecords() {
         return List.of(
+                record("profile-state:sqlite",
+                        CompanionPopulationCoverageRecord.Dimension.PROFILE_STATE,
+                        "canonical", CompanionPopulationCoverageRecord.State.READY, null),
                 record("owner-population:global",
                         CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER,
                         "canonical", CompanionPopulationCoverageRecord.State.READY, null),
@@ -129,6 +175,29 @@ class CompanionPopulationCoverageProjectionTest {
                         CompanionPopulationCoverageRecord.Dimension.CUSTOM_CONTAINERS,
                         "catalog", CompanionPopulationCoverageRecord.State.READY, null)
         );
+    }
+
+    private static Set<PersistenceEvidenceDimension> populationDimensions() {
+        return Set.of(
+                PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG,
+                PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG,
+                PersistenceEvidenceDimension.GLOBAL_OWNER_COUNTS,
+                PersistenceEvidenceDimension.PER_WORLD_OWNER_COUNTS,
+                PersistenceEvidenceDimension.PHYSICAL_CLAIM_OCCUPANCY,
+                PersistenceEvidenceDimension.SAVED_WORLD_ENTITIES,
+                PersistenceEvidenceDimension.BASE_CONTAINER_EVIDENCE,
+                PersistenceEvidenceDimension.PERSISTED_PLAYER_INVENTORIES,
+                PersistenceEvidenceDimension.LIVE_PLAYER_OVERLAY,
+                PersistenceEvidenceDimension.CUSTOM_CONTAINER_EVIDENCE,
+                PersistenceEvidenceDimension.LOADED_PROJECTION_IDENTITIES
+        );
+    }
+
+    private static PersistenceCoverageRegistry.CoverageState state(
+            PersistenceCoverageRegistry coverage,
+            PersistenceEvidenceDimension dimension
+    ) {
+        return coverage.snapshot().get(dimension.key());
     }
 
     private static CompanionPopulationCoverageRecord record(

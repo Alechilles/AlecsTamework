@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
 
 /** Projects durable population-scan coverage into the named persistence health dimensions. */
 final class CompanionPopulationCoverageProjection {
-    private static final EnumSet<PersistenceEvidenceDimension> PROJECTED_DIMENSIONS = EnumSet.of(
+    private static final EnumSet<PersistenceEvidenceDimension> BACKGROUND_SCAN_DIMENSIONS = EnumSet.of(
             PersistenceEvidenceDimension.GLOBAL_OWNER_COUNTS,
             PersistenceEvidenceDimension.PER_WORLD_OWNER_COUNTS,
             PersistenceEvidenceDimension.PHYSICAL_CLAIM_OCCUPANCY,
@@ -29,6 +29,7 @@ final class CompanionPopulationCoverageProjection {
             PersistenceEvidenceDimension.CUSTOM_CONTAINER_EVIDENCE,
             PersistenceEvidenceDimension.LOADED_PROJECTION_IDENTITIES
     );
+    private static final EnumSet<PersistenceEvidenceDimension> TERMINAL_DIMENSIONS = terminalDimensions();
     private static final String STORED_PLAYER_COVERAGE = "player-saves:stored";
     private static final String ONLINE_PLAYER_COVERAGE = "player-saves:online";
 
@@ -43,10 +44,14 @@ final class CompanionPopulationCoverageProjection {
         this.scopes = Objects.requireNonNull(scopes, "scopes");
     }
 
-    /** Revokes the previous scan generation before a new reconciliation pass starts. */
+    /**
+     * Revokes scan-derived evidence before a reconciliation pass starts. Canonical admission
+     * catalogs intentionally retain their bootstrap result so healthy scopes remain immediately
+     * usable while the background scan runs.
+     */
     void begin() {
         long generation = System.currentTimeMillis();
-        for (PersistenceEvidenceDimension dimension : PROJECTED_DIMENSIONS) {
+        for (PersistenceEvidenceDimension dimension : BACKGROUND_SCAN_DIMENSIONS) {
             coverage.publish(
                     dimension.key(), PersistenceCoverageStatus.LOADING,
                     "reconciliation-scan-in-progress", generation,
@@ -87,6 +92,10 @@ final class CompanionPopulationCoverageProjection {
             long generation
     ) {
         List<CompanionPopulationCoverageRecord> snapshot = List.copyOf(records);
+        publishRows(PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG, snapshot,
+                dimension(CompanionPopulationCoverageRecord.Dimension.PROFILE_STATE), generation);
+        publishRows(PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG, snapshot,
+                dimension(CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER), generation);
         publishRows(PersistenceEvidenceDimension.GLOBAL_OWNER_COUNTS, snapshot,
                 dimension(CompanionPopulationCoverageRecord.Dimension.GLOBAL_OWNER), generation);
         publishRows(PersistenceEvidenceDimension.PER_WORLD_OWNER_COUNTS, snapshot,
@@ -184,8 +193,9 @@ final class CompanionPopulationCoverageProjection {
                 && !"tamework.sqlite".equals(value);
     }
 
-    private void publishUnavailable(@Nullable String reason, long generation) {
-        for (PersistenceEvidenceDimension dimension : PROJECTED_DIMENSIONS) {
+    /** Invalidates every population authority dimension after a terminal reconciliation failure. */
+    void publishUnavailable(@Nullable String reason, long generation) {
+        for (PersistenceEvidenceDimension dimension : TERMINAL_DIMENSIONS) {
             publishState(
                     dimension, PersistenceCoverageStatus.UNAVAILABLE,
                     reason == null ? "reconciliation-unavailable" : reason,
@@ -217,6 +227,13 @@ final class CompanionPopulationCoverageProjection {
 
     private static boolean ready(CompanionPopulationCoverageRecord record) {
         return record.state() == CompanionPopulationCoverageRecord.State.READY;
+    }
+
+    private static EnumSet<PersistenceEvidenceDimension> terminalDimensions() {
+        EnumSet<PersistenceEvidenceDimension> dimensions = BACKGROUND_SCAN_DIMENSIONS.clone();
+        dimensions.add(PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG);
+        dimensions.add(PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG);
+        return dimensions;
     }
 
     @Nullable
