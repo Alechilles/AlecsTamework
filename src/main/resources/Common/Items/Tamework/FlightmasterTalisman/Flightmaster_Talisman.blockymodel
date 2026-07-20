@@ -11,8 +11,8 @@
       "orientation": {
         "x": 0,
         "y": 0,
-        "z": 0,
-        "w": 1
+        "z": 0.38268,
+        "w": 0.92388
       },
       "shape": {
         "type": "box",
@@ -29,16 +29,16 @@
         "settings": {
           "isPiece": false,
           "size": {
-            "x": 5,
+            "x": 24,
             "y": 24,
-            "z": 3
+            "z": 4
           }
         },
         "textureLayout": {
           "back": {
             "offset": {
-              "x": 5,
-              "y": 32
+              "x": 32,
+              "y": 0
             },
             "mirror": {
               "x": false,
@@ -48,8 +48,8 @@
           },
           "right": {
             "offset": {
-              "x": 11,
-              "y": 32
+              "x": 60,
+              "y": 0
             },
             "mirror": {
               "x": false,
@@ -59,8 +59,8 @@
           },
           "front": {
             "offset": {
-              "x": 5,
-              "y": 32
+              "x": 28,
+              "y": 0
             },
             "mirror": {
               "x": false,
@@ -70,8 +70,8 @@
           },
           "left": {
             "offset": {
-              "x": 11,
-              "y": 32
+              "x": 52,
+              "y": 0
             },
             "mirror": {
               "x": false,
@@ -110,126 +110,17 @@
       "children": [
         {
           "id": "2",
-          "name": "Central Gold Diamond--C1",
+          "name": "Zephyr Gem--C1",
           "position": {
-            "x": 4.5,
-            "y": -1,
+            "x": 0,
+            "y": 0,
             "z": 3
           },
           "orientation": {
             "x": 0,
             "y": 0,
-            "z": 0.38268,
-            "w": 0.92388
-          },
-          "shape": {
-            "type": "box",
-            "offset": {
-              "x": 0,
-              "y": 0,
-              "z": 0
-            },
-            "stretch": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "settings": {
-              "isPiece": false,
-              "size": {
-                "x": 24,
-                "y": 24,
-                "z": 4
-              },
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {
-                  "x": 32,
-                  "y": 0
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "right": {
-                "offset": {
-                  "x": 60,
-                  "y": 0
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "front": {
-                "offset": {
-                  "x": 28,
-                  "y": 0
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "left": {
-                "offset": {
-                  "x": 52,
-                  "y": 0
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "top": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "3",
-          "name": "Zephyr Gem--C2",
-          "position": {
-            "x": 4.5,
-            "y": -1,
-            "z": 6
-          },
-          "orientation": {
-            "x": 0,
-            "y": 0,
-            "z": 0.38268,
-            "w": 0.92388
+            "z": 0,
+            "w": 1
           },
           "shape": {
             "type": "box",
@@ -327,18 +218,18 @@
           }
         },
         {
-          "id": "4",
-          "name": "Zephyr Gem Highlight--C3",
+          "id": "3",
+          "name": "Zephyr Gem Highlight--C2",
           "position": {
-            "x": 2.5,
-            "y": 2,
-            "z": 7.75
+            "x": 0.70711,
+            "y": 3.53553,
+            "z": 4.75
           },
           "orientation": {
             "x": 0,
             "y": 0,
-            "z": 0.38268,
-            "w": 0.92388
+            "z": 0,
+            "w": 1
           },
           "shape": {
             "type": "box",
@@ -436,563 +327,18 @@
           }
         },
         {
-          "id": "5",
-          "name": "Loop Left--C4",
+          "id": "4",
+          "name": "Wings-R--C3",
           "position": {
-            "x": -0.5,
-            "y": 19,
-            "z": 0
+            "x": 0,
+            "y": 0,
+            "z": -1
           },
           "orientation": {
             "x": 0,
             "y": 0,
-            "z": 0,
-            "w": 1
-          },
-          "shape": {
-            "type": "box",
-            "offset": {
-              "x": 0,
-              "y": 1.5,
-              "z": 0
-            },
-            "stretch": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "settings": {
-              "isPiece": false,
-              "size": {
-                "x": 4,
-                "y": 9,
-                "z": 3
-              },
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {
-                  "x": 0,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "right": {
-                "offset": {
-                  "x": 56,
-                  "y": 40
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "front": {
-                "offset": {
-                  "x": 0,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "left": {
-                "offset": {
-                  "x": 56,
-                  "y": 40
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "top": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "6",
-          "name": "Loop Right--C5",
-          "position": {
-            "x": 9.5,
-            "y": 19,
-            "z": 0
-          },
-          "orientation": {
-            "x": 0,
-            "y": 0,
-            "z": 0,
-            "w": 1
-          },
-          "shape": {
-            "type": "box",
-            "offset": {
-              "x": 0,
-              "y": 1.5,
-              "z": 0
-            },
-            "stretch": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "settings": {
-              "isPiece": false,
-              "size": {
-                "x": 4,
-                "y": 9,
-                "z": 3
-              },
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {
-                  "x": 0,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "right": {
-                "offset": {
-                  "x": 56,
-                  "y": 40
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "front": {
-                "offset": {
-                  "x": 0,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "left": {
-                "offset": {
-                  "x": 52,
-                  "y": 40
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "top": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "7",
-          "name": "Loop Top--C6",
-          "position": {
-            "x": 4.5,
-            "y": 23,
-            "z": 0
-          },
-          "orientation": {
-            "x": 0,
-            "y": 0,
-            "z": 0,
-            "w": 1
-          },
-          "shape": {
-            "type": "box",
-            "offset": {
-              "x": 0,
-              "y": 0,
-              "z": 0
-            },
-            "stretch": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "settings": {
-              "isPiece": false,
-              "size": {
-                "x": 6,
-                "y": 4,
-                "z": 3
-              },
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {
-                  "x": 4,
-                  "y": 28
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "right": {
-                "offset": {
-                  "x": 24,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "front": {
-                "offset": {
-                  "x": 4,
-                  "y": 28
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "left": {
-                "offset": {
-                  "x": 24,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "top": {
-                "offset": {
-                  "x": 4,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {
-                  "x": 4,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "8",
-          "name": "Loop Bottom--C7",
-          "position": {
-            "x": 4.5,
-            "y": 14,
-            "z": 0
-          },
-          "orientation": {
-            "x": 0,
-            "y": 0,
-            "z": 0,
-            "w": 1
-          },
-          "shape": {
-            "type": "box",
-            "offset": {
-              "x": 0,
-              "y": 0,
-              "z": 0
-            },
-            "stretch": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "settings": {
-              "isPiece": false,
-              "size": {
-                "x": 14,
-                "y": 4,
-                "z": 3
-              },
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {
-                  "x": 0,
-                  "y": 28
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "right": {
-                "offset": {
-                  "x": 24,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "front": {
-                "offset": {
-                  "x": 0,
-                  "y": 28
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "left": {
-                "offset": {
-                  "x": 24,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "top": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "9",
-          "name": "Right Wing Root--C8",
-          "position": {
-            "x": 9,
-            "y": 0,
-            "z": 0
-          },
-          "orientation": {
-            "x": 0,
-            "y": 0,
-            "z": 0,
-            "w": 1
-          },
-          "shape": {
-            "type": "box",
-            "offset": {
-              "x": 0,
-              "y": 0,
-              "z": 0
-            },
-            "stretch": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "settings": {
-              "isPiece": false,
-              "size": {
-                "x": 5,
-                "y": 24,
-                "z": 3
-              },
-              "isStaticBox": true
-            },
-            "textureLayout": {
-              "back": {
-                "offset": {
-                  "x": 5,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "right": {
-                "offset": {
-                  "x": 11,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "front": {
-                "offset": {
-                  "x": 5,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "left": {
-                "offset": {
-                  "x": 11,
-                  "y": 32
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "top": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              },
-              "bottom": {
-                "offset": {
-                  "x": 0,
-                  "y": 24
-                },
-                "mirror": {
-                  "x": false,
-                  "y": false
-                },
-                "angle": 0
-              }
-            },
-            "unwrapMode": "custom",
-            "visible": true,
-            "doubleSided": false,
-            "shadingMode": "flat"
-          }
-        },
-        {
-          "id": "10",
-          "name": "Wings--C9",
-          "position": {
-            "x": 4.5,
-            "y": -1,
-            "z": 2
-          },
-          "orientation": {
-            "x": 0,
-            "y": 0,
-            "z": 0,
-            "w": 1
+            "z": -0.38268,
+            "w": 0.92388
           },
           "shape": {
             "type": "quad",
@@ -1035,16 +381,16 @@
           }
         },
         {
-          "id": "11",
-          "name": "Wings--C10",
+          "id": "5",
+          "name": "Wings-L--C4",
           "position": {
-            "x": 4.5,
-            "y": -1,
-            "z": 2
+            "x": 0,
+            "y": 0,
+            "z": -1
           },
           "orientation": {
-            "x": 0,
-            "y": -1,
+            "x": -0.38268,
+            "y": -0.92388,
             "z": 0,
             "w": 0
           },
@@ -1073,6 +419,60 @@
               "front": {
                 "offset": {
                   "x": 64,
+                  "y": 0
+                },
+                "mirror": {
+                  "x": false,
+                  "y": false
+                },
+                "angle": 0
+              }
+            },
+            "unwrapMode": "custom",
+            "visible": true,
+            "doubleSided": true,
+            "shadingMode": "flat"
+          }
+        },
+        {
+          "id": "6",
+          "name": "Loop--C5",
+          "position": {
+            "x": 13.43503,
+            "y": 13.43503,
+            "z": 1
+          },
+          "orientation": {
+            "x": 0,
+            "y": 0,
+            "z": -0.38268,
+            "w": 0.92388
+          },
+          "shape": {
+            "type": "quad",
+            "offset": {
+              "x": 0,
+              "y": 3,
+              "z": 0
+            },
+            "stretch": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "settings": {
+              "isPiece": false,
+              "size": {
+                "x": 18,
+                "y": 16
+              },
+              "normal": "+Z",
+              "isStaticBox": true
+            },
+            "textureLayout": {
+              "front": {
+                "offset": {
+                  "x": 99,
                   "y": 0
                 },
                 "mirror": {
