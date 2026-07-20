@@ -30,6 +30,8 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
     private final CoalescedCompanionPopulationWriter writer;
     private final CompanionPopulationRuntimeReconciler runtimeReconciler;
     private final CompanionPopulationStartupReconciler startupReconciler;
+    private final CompanionPopulationCoverageProjection coverageProjection;
+    private final TameworkPersistenceRuntime persistence;
 
     public CompanionPopulationReconciliationRuntime(
             @Nonnull TameworkPersistenceRuntime persistence,
@@ -43,6 +45,7 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
         Objects.requireNonNull(ownerIndex, "ownerIndex");
         Objects.requireNonNull(identityResolver, "identityResolver");
         Objects.requireNonNull(claimIndex, "claimIndex");
+        this.persistence = persistence;
         this.customContainers = new CustomContainerReconciliationRegistry();
         this.loadedNpcIdentityIndex = new LoadedNpcIdentityIndex();
         persistence.getCompanionPersistedProjectionEvidenceRegistry()
@@ -74,6 +77,10 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
                 claimIndex,
                 loadedNpcIdentityIndex,
                 liveEvidenceRevision
+        );
+        this.coverageProjection = new CompanionPopulationCoverageProjection(
+                persistence.getPersistenceCoverageRegistry(),
+                persistence.getPersistenceScopeFactory()
         );
         if (persistence.getHealthService().isHealthy()) {
             ownerIndex.setReadiness(OwnerPopulationReadiness.RECONCILING);
@@ -110,9 +117,11 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
             @Nonnull ItemFeatureRegistry itemFeatures,
             @Nonnull Supplier<CompletableFuture<LoadedNpcIdentitySnapshot>> loadedIdentitiesReady
     ) {
+        coverageProjection.begin();
         return startupReconciler.start(
-                universe, ownerType, itemFeatures, customContainers, loadedIdentitiesReady
-        );
+                        universe, ownerType, itemFeatures, customContainers, loadedIdentitiesReady
+                )
+                .thenApply(this::publishCoverage);
     }
 
     @Nonnull
@@ -124,7 +133,20 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
     @Nonnull
     public CompletableFuture<CompanionPopulationReconciliationProgress>
     restartAfterExternalRepair() {
-        return startupReconciler.restartAfterExternalRepair();
+        coverageProjection.begin();
+        return startupReconciler.restartAfterExternalRepair()
+                .thenApply(this::publishCoverage);
+    }
+
+    private CompanionPopulationReconciliationProgress publishCoverage(
+            CompanionPopulationReconciliationProgress progress
+    ) {
+        coverageProjection.refresh(
+                persistence.getCompanionPopulationCoverageRepository(),
+                persistence.getCompanionPersistedProjectionEvidenceRegistry(),
+                progress
+        );
+        return progress;
     }
 
     @Override
