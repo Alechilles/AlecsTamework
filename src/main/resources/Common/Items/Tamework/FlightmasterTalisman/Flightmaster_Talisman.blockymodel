@@ -37,8 +37,8 @@
         "textureLayout": {
           "back": {
             "offset": {
-              "x": 32,
-              "y": 0
+              "x": 0,
+              "y": 30
             },
             "mirror": {
               "x": false,
@@ -48,7 +48,7 @@
           },
           "right": {
             "offset": {
-              "x": 60,
+              "x": 25,
               "y": 0
             },
             "mirror": {
@@ -59,7 +59,7 @@
           },
           "front": {
             "offset": {
-              "x": 28,
+              "x": 0,
               "y": 0
             },
             "mirror": {
@@ -70,7 +70,7 @@
           },
           "left": {
             "offset": {
-              "x": 52,
+              "x": 30,
               "y": 0
             },
             "mirror": {
@@ -82,7 +82,7 @@
           "top": {
             "offset": {
               "x": 0,
-              "y": 24
+              "y": 25
             },
             "mirror": {
               "x": false,
@@ -92,8 +92,8 @@
           },
           "bottom": {
             "offset": {
-              "x": 0,
-              "y": 24
+              "x": 25,
+              "y": 25
             },
             "mirror": {
               "x": false,
@@ -328,7 +328,7 @@
         },
         {
           "id": "4",
-          "name": "Wings-R--C3",
+          "name": "Wing-R--C3",
           "position": {
             "x": 0,
             "y": 0,
@@ -382,7 +382,7 @@
         },
         {
           "id": "5",
-          "name": "Wings-L--C4",
+          "name": "Wing-L--C4",
           "position": {
             "x": 0,
             "y": 0,
@@ -438,9 +438,9 @@
           "id": "6",
           "name": "Loop--C5",
           "position": {
-            "x": 13.43503,
-            "y": 13.43503,
-            "z": 1
+            "x": 12.72792,
+            "y": 12.72792,
+            "z": -1
           },
           "orientation": {
             "x": 0,
