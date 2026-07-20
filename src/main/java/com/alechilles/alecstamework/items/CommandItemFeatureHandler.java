@@ -251,7 +251,13 @@ public final class CommandItemFeatureHandler {
                 coopService,
                 resolutionService,
                 stepExecutionService,
-                companionPlacementService
+                companionPlacementService,
+                persistenceRuntime != null
+                        ? new CommandRelocationPersistenceGate(
+                        persistenceRuntime.getMutationAvailabilityService(),
+                        persistenceRuntime.getPersistenceScopeFactory(),
+                        persistenceRuntime.getNpcProfileRepository())
+                        : null
         );
         this.respawnService = new CommandRespawnService(
                 companionPlacementService,

@@ -128,7 +128,9 @@ final class CommandRecipientService {
                 } else if (radiusSq >= 0) {
                     continue;
                 }
-                out.add(new Candidate(npcRef, npc, distSq));
+                LinkedNpcRecord linkedRecord = linkedRecordByUuid.get(npcUuid);
+                out.add(new Candidate(
+                        npcRef, npc, distSq, linkedRecord != null ? linkedRecord.profileId : null));
             }
         });
         out.sort(Comparator.comparingDouble(value -> value.distSq));

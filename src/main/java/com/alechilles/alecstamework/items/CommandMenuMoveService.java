@@ -334,7 +334,7 @@ final class CommandMenuMoveService {
                     double dz = npcPos.z - playerPos.z;
                     distSq = dx * dx + dy * dy + dz * dz;
                 }
-                loadedRecipients.add(new Candidate(npcRef, npc, distSq));
+                loadedRecipients.add(new Candidate(npcRef, npc, distSq, record.profileId));
             }
             List<LinkedNpcRecord> unloadedRecipients = loadedRecipients.isEmpty()
                     ? List.of(record)

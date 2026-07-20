@@ -19,6 +19,7 @@ final class CommandRelocationDispatchService {
     private final CommandResolutionService resolutionService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandCompanionPlacementService companionPlacementService;
+    private final CommandRelocationPersistenceGate persistenceGate;
 
     CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcDeathService deathService,
@@ -27,6 +28,18 @@ final class CommandRelocationDispatchService {
                                      CommandResolutionService resolutionService,
                                      CommandStepExecutionService stepExecutionService,
                                      CommandCompanionPlacementService companionPlacementService) {
+        this(relocationService, deathService, captureService, coopService, resolutionService,
+                stepExecutionService, companionPlacementService, null);
+    }
+
+    CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
+                                     CommandLinkedNpcDeathService deathService,
+                                     CommandLinkedNpcCaptureService captureService,
+                                     CommandLinkedNpcCoopService coopService,
+                                     CommandResolutionService resolutionService,
+                                     CommandStepExecutionService stepExecutionService,
+                                     CommandCompanionPlacementService companionPlacementService,
+                                     CommandRelocationPersistenceGate persistenceGate) {
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
@@ -34,6 +47,7 @@ final class CommandRelocationDispatchService {
         this.resolutionService = resolutionService;
         this.stepExecutionService = stepExecutionService;
         this.companionPlacementService = companionPlacementService;
+        this.persistenceGate = persistenceGate;
     }
 
     int queueRelocationsForUnloaded(Context context, List<LinkedNpcRecord> unloadedLinked) {
@@ -80,6 +94,10 @@ final class CommandRelocationDispatchService {
             }
             if (deathService != null
                     && deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid) != null) {
+                continue;
+            }
+            if (!canRelocate(record.npcUuid, record.profileId, ownerUuid, world.getName(),
+                    record.lastKnownWorldName, returnHome ? "return_home" : "recall", false)) {
                 continue;
             }
             if (returnHome) {
@@ -191,6 +209,10 @@ final class CommandRelocationDispatchService {
         World world = context.player == null ? null : context.player.getWorld();
         UUID ownerUuid = context.player == null ? null : context.player.getUuid();
         if (world != null && ownerUuid != null && candidate.npc.getUuid() != null) {
+            if (!canRelocate(candidate.npc.getUuid(), candidate.profileId, ownerUuid,
+                    world.getName(), world.getName(), "loaded_recall", true)) {
+                return;
+            }
             relocationService.queueRelocation(
                     world, candidate.npc.getUuid(), safePosition, ownerUuid,
                     true, true, null, null, 0L, new Vector3d(npcPos), null
@@ -200,5 +222,17 @@ final class CommandRelocationDispatchService {
 
     private double resolvePositiveDouble(double configured, double fallback) {
         return configured > 0.0 ? configured : fallback;
+    }
+
+    private boolean canRelocate(UUID npcUuid,
+                                String profileId,
+                                UUID ownerUuid,
+                                String destinationWorld,
+                                String sourceWorld,
+                                String operationKind,
+                                boolean liveProjectionExists) {
+        return persistenceGate == null || persistenceGate.decide(
+                npcUuid, profileId, ownerUuid, destinationWorld, sourceWorld,
+                operationKind, liveProjectionExists).allowed();
     }
 }
