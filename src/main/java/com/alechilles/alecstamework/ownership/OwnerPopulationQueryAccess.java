@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 
 /** Lock-consistent read and diagnostics facade over owner population index state. */
 final class OwnerPopulationQueryAccess {
@@ -13,23 +14,32 @@ final class OwnerPopulationQueryAccess {
     private final Map<OwnerPopulationScopeKey, Long> committed;
     private final Map<OwnerPopulationScopeKey, Long> pending;
     private final Map<UUID, OwnerPopulationPendingTransition> pendingByToken;
+    private final Map<String, UUID> pendingTokenByProfile;
     private final OwnerPopulationReadinessState readiness;
     private final OwnerPopulationMetrics metrics;
+    private final BooleanSupplier canonicalReloadInProgress;
+    private final OwnerPopulationReservationBook reservations;
 
     OwnerPopulationQueryAccess(ReentrantLock lock,
                                Map<String, OwnerPopulationEntry> entries,
                                Map<OwnerPopulationScopeKey, Long> committed,
                                Map<OwnerPopulationScopeKey, Long> pending,
                                Map<UUID, OwnerPopulationPendingTransition> pendingByToken,
+                               Map<String, UUID> pendingTokenByProfile,
                                OwnerPopulationReadinessState readiness,
-                               OwnerPopulationMetrics metrics) {
+                               OwnerPopulationMetrics metrics,
+                               BooleanSupplier canonicalReloadInProgress,
+                               OwnerPopulationReservationBook reservations) {
         this.lock = lock;
         this.entries = entries;
         this.committed = committed;
         this.pending = pending;
         this.pendingByToken = pendingByToken;
+        this.pendingTokenByProfile = pendingTokenByProfile;
         this.readiness = readiness;
         this.metrics = metrics;
+        this.canonicalReloadInProgress = canonicalReloadInProgress;
+        this.reservations = reservations;
     }
 
     Optional<OwnerPopulationEntry> entry(String profileId) {
@@ -37,6 +47,29 @@ final class OwnerPopulationQueryAccess {
         lock.lock();
         try {
             return Optional.ofNullable(entries.get(normalized));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    OwnerPopulationProfileStateSnapshot profileStateSnapshot(String profileId) {
+        String normalized = OwnerPopulationEntry.normalizeProfileId(profileId);
+        lock.lock();
+        try {
+            return new OwnerPopulationProfileStateSnapshot(
+                    readiness.overall(), canonicalReloadInProgress.getAsBoolean(),
+                    pendingTokenByProfile.containsKey(normalized),
+                    Optional.ofNullable(entries.get(normalized)));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    boolean hasApplyingOwnerClear(String profileId, UUID observedOwnerId) {
+        String normalized = OwnerPopulationEntry.normalizeProfileId(profileId);
+        lock.lock();
+        try {
+            return reservations.hasApplyingOwnerClear(normalized, observedOwnerId);
         } finally {
             lock.unlock();
         }

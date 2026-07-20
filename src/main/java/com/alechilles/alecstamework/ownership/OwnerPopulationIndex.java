@@ -30,10 +30,8 @@ public final class OwnerPopulationIndex {
     private final OwnerPopulationReadinessState readiness = new OwnerPopulationReadinessState();
     private final OwnerPopulationMetrics metrics = new OwnerPopulationMetrics();
     private final OwnerPopulationReservationBook reservations;
-    private final OwnerPopulationQueryAccess queries = new OwnerPopulationQueryAccess(
-            lock, entriesByProfile, committedCounts, pendingCounts, pendingByToken, readiness, metrics
-    );
     private boolean canonicalReloadInProgress;
+    private final OwnerPopulationQueryAccess queries;
     private final OwnerPopulationStateReplacementAccess replacement =
             new OwnerPopulationStateReplacementAccess(
                     lock, entriesByProfile, committedCounts, pendingCounts,
@@ -55,6 +53,10 @@ public final class OwnerPopulationIndex {
                 pendingTokenByProfile,
                 metrics
         );
+        this.queries = new OwnerPopulationQueryAccess(
+                lock, entriesByProfile, committedCounts, pendingCounts, pendingByToken,
+                pendingTokenByProfile, readiness, metrics,
+                () -> canonicalReloadInProgress, reservations);
     }
 
     /** Replaces startup state. Active reservations are rejected to avoid invalidating live leases. */
@@ -381,21 +383,9 @@ public final class OwnerPopulationIndex {
 
     /** Captures readiness, reload, transition, and lifecycle state under the index's single lock. */
     public OwnerPopulationProfileStateSnapshot profileStateSnapshot(String profileId) {
-        String normalized = OwnerPopulationEntry.normalizeProfileId(profileId);
-        lock.lock();
-        try {
-            return new OwnerPopulationProfileStateSnapshot(
-                    readiness.overall(),
-                    canonicalReloadInProgress,
-                    pendingTokenByProfile.containsKey(normalized),
-                    Optional.ofNullable(entriesByProfile.get(normalized))
-            );
-        } finally {
-            lock.unlock();
-        }
+        return queries.profileStateSnapshot(profileId);
     }
 
-    /** Returns whether a prepared/applying transition currently suppresses observer reconciliation. */
     public boolean hasPendingTransition(String profileId) {
         return reconciliation.hasPending(profileId);
     }
@@ -405,21 +395,13 @@ public final class OwnerPopulationIndex {
      * owner. A merely reserved transition cannot authorize an ECS component removal.
      */
     public boolean hasApplyingOwnerClearTransition(String profileId, UUID observedOwnerId) {
-        String normalized = OwnerPopulationEntry.normalizeProfileId(profileId);
-        lock.lock();
-        try {
-            return reservations.hasApplyingOwnerClear(normalized, observedOwnerId);
-        } finally {
-            lock.unlock();
-        }
+        return queries.hasApplyingOwnerClear(profileId, observedOwnerId);
     }
 
-    /** Advances only the durable revision of an otherwise unchanged externally reconciled entry. */
     public boolean advanceReconciledRevision(String profileId, long expectedRevision, long newRevision) {
         return reconciliation.advanceRevision(profileId, expectedRevision, newRevision);
     }
 
-    /** Returns global counts plus per-world counts, or zero world counts when the world is null. */
     public OwnerPopulationCounts counts(UUID ownerId, String worldName) {
         return queries.counts(ownerId, worldName);
     }

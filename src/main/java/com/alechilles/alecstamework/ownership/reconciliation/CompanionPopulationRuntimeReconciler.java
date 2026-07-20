@@ -35,6 +35,7 @@ public final class CompanionPopulationRuntimeReconciler
     private final Object reloadLock = new Object();
     private final Map<String, CompanionPopulationObservation> observationsDuringReload = new HashMap<>();
     private final Map<String, CompanionPopulationObservation> deferredObservations = new HashMap<>();
+    private final DeferredPopulationObservationApplier deferredObservationApplier;
     private boolean canonicalReloadInProgress;
 
     public CompanionPopulationRuntimeReconciler(
@@ -81,6 +82,8 @@ public final class CompanionPopulationRuntimeReconciler
         this.liveEvidenceRevision = Objects.requireNonNull(
                 liveEvidenceRevision, "liveEvidenceRevision");
         this.indexReplay = new CompanionPopulationIndexReplayService(ownerIndex, claimIndex);
+        this.deferredObservationApplier = new DeferredPopulationObservationApplier(
+                reloadLock, deferredObservations, ownerIndex, claimIndex);
     }
 
     CompanionPopulationRuntimeReconciler(
@@ -114,6 +117,8 @@ public final class CompanionPopulationRuntimeReconciler
         this.liveEvidenceRevision = Objects.requireNonNull(
                 liveEvidenceRevision, "liveEvidenceRevision");
         this.indexReplay = new CompanionPopulationIndexReplayService(ownerIndex, claimIndex);
+        this.deferredObservationApplier = new DeferredPopulationObservationApplier(
+                reloadLock, deferredObservations, ownerIndex, claimIndex);
     }
 
     public void setWarningSink(@Nullable WarningSink warningSink) {
@@ -410,7 +415,7 @@ public final class CompanionPopulationRuntimeReconciler
                 degradeLegacyIndexes(scoped);
                 return;
             }
-            if (applyPersistedDeferredObservation(observation, result.revision())) {
+            if (deferredObservationApplier.apply(observation, result.revision())) {
                 return;
             }
             boolean ownerAdvanced = ownerIndex.advanceReconciledRevision(
@@ -448,47 +453,6 @@ public final class CompanionPopulationRuntimeReconciler
         if (scopedContainment) return;
         ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
         claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
-    }
-
-    private boolean applyPersistedDeferredObservation(
-            @Nonnull CompanionPopulationObservation observation,
-            long revision
-    ) {
-        synchronized (reloadLock) {
-            CompanionPopulationObservation deferred = deferredObservations.get(observation.profileId());
-            if (!CompanionPopulationObservationStateMatcher.matches(deferred, observation)) {
-                return false;
-            }
-            deferredObservations.remove(observation.profileId());
-            if (ownerIndex.hasPendingTransition(observation.profileId())) {
-                return true;
-            }
-            OwnerPopulationEntry owner = new OwnerPopulationEntry(
-                    observation.profileId(),
-                    observation.ownerUuid(),
-                    observation.ownershipWorldName(),
-                    observation.lifecycleState(),
-                    revision
-            );
-            if (!ownerIndex.tryReconcileCommittedEntry(owner)) {
-                return true;
-            }
-            ClaimChunkCoordinate physical = observation.physicalWorldName() == null
-                    ? null
-                    : new ClaimChunkCoordinate(
-                    observation.physicalWorldName(),
-                    Objects.requireNonNull(observation.physicalChunkX(), "physicalChunkX"),
-                    Objects.requireNonNull(observation.physicalChunkZ(), "physicalChunkZ")
-            );
-            claimIndex.observeMovement(new ClaimOccupancyEntry(
-                    observation.profileId(),
-                    observation.ownerUuid(),
-                    observation.lifecycleState(),
-                    physical,
-                    revision
-            ));
-            return true;
-        }
     }
 
     @Nullable
