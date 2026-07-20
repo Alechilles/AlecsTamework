@@ -77,6 +77,91 @@ function Get-FileEvidence {
     }
 }
 
+function Get-TrackedFileEvidence {
+    param([string] $Repository, [string] $Root, [string] $RelativePath)
+    $path = Join-Path $Root $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Required $Repository evidence file is missing: $RelativePath"
+    }
+    $file = Get-FileEvidence $path
+    return [ordered]@{
+        repository = $Repository
+        path = $RelativePath.Replace("\", "/")
+        bytes = $file.bytes
+        sha256 = $file.sha256
+    }
+}
+
+function Get-RequiredSurefireReportEvidence {
+    param([string] $Root, [string[]] $ClassNames)
+    $evidence = @()
+    foreach ($className in $ClassNames) {
+        $path = Join-Path $Root "target/surefire-reports/TEST-$className.xml"
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Required Surefire report is missing: $className"
+        }
+        [xml] $xml = Get-Content -LiteralPath $path -Raw
+        $suite = $xml.testsuite
+        $failures = [long]$suite.failures
+        $errors = [long]$suite.errors
+        if ($failures -ne 0 -or $errors -ne 0) {
+            throw "Required Surefire report failed: $className failures=$failures errors=$errors"
+        }
+        $file = Get-FileEvidence $path
+        $evidence += [ordered]@{
+            className = $className
+            tests = [long]$suite.tests
+            failures = $failures
+            errors = $errors
+            skipped = [long]$suite.skipped
+            reportSha256 = $file.sha256
+        }
+    }
+    return @($evidence)
+}
+
+function Get-RequiredVitestFileEvidence {
+    param([string] $ReportPath, [string[]] $RequiredSuffixes)
+    $report = Get-Content -LiteralPath $ReportPath -Raw | ConvertFrom-Json
+    $testFiles = @($report.testResults | ForEach-Object { $_.name.Replace("\", "/") })
+    $evidence = @()
+    foreach ($suffix in $RequiredSuffixes) {
+        $normalizedSuffix = $suffix.Replace("\", "/")
+        $matches = @($testFiles | Where-Object {
+            $_.EndsWith($normalizedSuffix, [StringComparison]::OrdinalIgnoreCase)
+        })
+        if ($matches.Count -ne 1) {
+            throw "Required Vitest file must appear exactly once: $normalizedSuffix (found $($matches.Count))"
+        }
+        $evidence += [ordered]@{ path = $normalizedSuffix; status = "passed" }
+    }
+    return @($evidence)
+}
+
+function Get-UnsafePlayerAccessScanEvidence {
+    param([string] $Root)
+    $sourceRoot = Join-Path $Root "src/main/java"
+    $files = @(Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Filter "*.java")
+    $patterns = @(
+        'PlayerRef\.getComponent\(Player',
+        'getComponent\(Player\.getComponentType\(\)\)',
+        'Universe\.get\(\).*getPlayers'
+    )
+    $matches = @($files | Select-String -Pattern $patterns)
+    if ($matches.Count -ne 0) {
+        $locations = $matches | ForEach-Object {
+            "$($_.Path.Substring($sourceRoot.Length + 1)):$($_.LineNumber)"
+        }
+        throw "Unsafe player-access scan found $($matches.Count) match(es): $($locations -join ', ')"
+    }
+    return [ordered]@{
+        status = "passed"
+        filesScanned = $files.Count
+        patterns = $patterns
+        matchCount = 0
+    }
+}
+
 function Get-SurefireEvidence {
     param([string] $Root)
     $reports = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter "TEST-*.xml" |
@@ -238,6 +323,76 @@ $npmVersion = (& npm.cmd --version).Trim()
 $schemaSource = Join-Path $tameworkRoot `
     "src/main/java/com/alechilles/alecstamework/persistence/sqlite/SqliteSchemaV7Migration.java"
 $telemetryDescriptor = Join-Path $tameworkRoot "src/main/resources/telemetry/project.json"
+$requiredTameworkReports = Get-RequiredSurefireReportEvidence $tameworkRoot @(
+    "com.alechilles.alecstamework.architecture.AsyncThreadSafetyGuardTest",
+    "com.alechilles.alecstamework.architecture.EcsWriteSafetyGuardTest",
+    "com.alechilles.alecstamework.architecture.PersistenceDegradationArchitectureTest",
+    "com.alechilles.alecstamework.architecture.PersistenceFaultInjectionArchitectureTest",
+    "com.alechilles.alecstamework.performance.PersistenceResiliencePerformanceGateTest",
+    "com.alechilles.alecstamework.persistence.diagnostics.PersistenceDiagnosticsServiceTest",
+    "com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityServiceTest",
+    "com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthServiceTest",
+    "com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClassifierTest",
+    "com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRegistryTest",
+    "com.alechilles.alecstamework.persistence.incidents.PersistenceHistoricalCorpusManifestTest",
+    "com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistryTest",
+    "com.alechilles.alecstamework.persistence.incidents.PersistenceScopeDurabilityTest",
+    "com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinatorTest",
+    "com.alechilles.alecstamework.persistence.recovery.StorageRecoveryCoordinatorTest",
+    "com.alechilles.alecstamework.persistence.sqlite.HistoricalSchemaPrerequisiteRepairTest",
+    "com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueueIsolationTest",
+    "com.alechilles.alecstamework.persistence.sqlite.SqliteMigrationBackupServiceTest",
+    "com.alechilles.alecstamework.persistence.sqlite.SqliteSchemaV7MigrationTest",
+    "com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntimeMigrationTest",
+    "com.alechilles.alecstamework.metrics.PersistenceTelemetryDescriptorTest",
+    "com.alechilles.alecstamework.metrics.PersistenceTelemetryPrivacyTest",
+    "com.alechilles.alecstamework.items.CommandLinkedNpcCaptureServiceTest",
+    "com.alechilles.alecstamework.items.CommandLinkedPanelUnloadedNameServiceTest",
+    "com.alechilles.alecstamework.items.CommandLostRecoveryCoordinatorTest",
+    "com.alechilles.alecstamework.items.CommandWorldChangeEligibilityTest",
+    "com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryServiceTest",
+    "com.alechilles.alecstamework.npc.breeding.BreedingPairingCoordinatorTest",
+    "com.alechilles.alecstamework.ownership.CompanionPermanentDeathCoordinatorTest",
+    "com.alechilles.alecstamework.ownership.CompanionSpawnPopulationAdmissionServiceTest"
+)
+$requiredTelemetryReports = Get-RequiredSurefireReportEvidence $telemetryRoot @(
+    "com.alechilles.alecstelemetry.api.TelemetryBreadcrumbContextTest",
+    "com.alechilles.alecstelemetry.report.ManualReportRedactorTest",
+    "com.alechilles.alecstelemetry.runtime.TelemetryBreadcrumbBridgePayloadTest",
+    "com.alechilles.alecstelemetry.runtime.TelemetryBreadcrumbBufferTest",
+    "com.alechilles.alecstelemetry.runtime.host.TelemetryRuntimeProviderParityTest"
+)
+$requiredPlatformTests = Get-RequiredVitestFileEvidence $platformTestReport @(
+    "tests/persistence-correlation-migration.test.ts",
+    "tests/persistence-correlation.test.ts",
+    "tests/persistence-incident-timeline.test.ts",
+    "tests/privacy-docs.test.ts",
+    "tests/privacy-retention-repo.test.ts",
+    "tests/telemetry-breadcrumb-contract.test.ts",
+    "portal-ui/src/features/issues/persistence-correlation-view-model.test.ts",
+    "portal-ui/src/features/issues/persistence-incident-timeline.test.tsx"
+)
+$dependencyEvidence = @(
+    Get-TrackedFileEvidence "tamework" $tameworkRoot "pom.xml"
+    Get-TrackedFileEvidence "alecs-telemetry" $telemetryRoot "pom.xml"
+    Get-TrackedFileEvidence "alecs-telemetry" $telemetryRoot "runtime/pom.xml"
+    Get-TrackedFileEvidence "telemetry-platform" $platformRoot "package-lock.json"
+)
+$documentationEvidence = @(
+    Get-TrackedFileEvidence "tamework" $tameworkRoot "CHANGELOG.md"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot "docs/Persistence-Failure-Classification-Catalog.md"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot "docs/Persistence-Performance-Budgets.md"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot `
+        "wiki/Developer-Documentation/Data-and-Persistence/Persistence-Sqlite-and-Data-Paths.md"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot `
+        "wiki/Developer-Documentation/Tooling-and-Contribution/Integrations-Telemetry-and-Build-Workflow.md"
+    Get-TrackedFileEvidence "alecs-telemetry" $telemetryRoot "docs/privacy-policy.md"
+    Get-TrackedFileEvidence "alecs-telemetry" $telemetryRoot "wiki/Integration-Guides/Breadcrumbs.md"
+    Get-TrackedFileEvidence "alecs-telemetry" $telemetryRoot "wiki/Integration-Guides/Consent-And-Privacy.md"
+    Get-TrackedFileEvidence "telemetry-platform" $platformRoot "docs/persistence-correlation.md"
+    Get-TrackedFileEvidence "telemetry-platform" $platformRoot "docs/privacy/data-map.md"
+    Get-TrackedFileEvidence "telemetry-platform" $platformRoot "docs/privacy/retention-schedule.md"
+)
 $evidence = [ordered]@{
     evidenceSchemaVersion = 1
     generatedAtUtc = [DateTime]::UtcNow.ToString("o")
@@ -254,10 +409,20 @@ $evidence = [ordered]@{
         tamework = Get-SurefireEvidence $tameworkRoot
         telemetry = Get-SurefireEvidence $telemetryRoot
         platform = Get-VitestEvidence $platformTestReport
+        requiredTameworkReports = $requiredTameworkReports
+        requiredTelemetryReports = $requiredTelemetryReports
+        requiredPlatformFiles = $requiredPlatformTests
         platformTypecheck = "passed"
         platformLint = "passed"
         platformBuild = "passed"
     }
+    staticAnalysis = [ordered]@{
+        unsafePlayerAccess = Get-UnsafePlayerAccessScanEvidence $tameworkRoot
+        ecsWriteGuard = "passed-required-report"
+        asyncThreadGuard = "passed-required-report"
+    }
+    dependencies = $dependencyEvidence
+    documentation = $documentationEvidence
     performance = Get-PersistencePerformanceEvidence $tameworkRoot
     package = [ordered]@{
         tameworkVersion = $pluginManifest.Version
@@ -277,9 +442,19 @@ $evidence = [ordered]@{
         }
     }
     releaseRehearsal = [ordered]@{
+        exactRepositoryAndPackageGates = "passed"
+        isolatedRuntimeHarnessStatus = "required-after-candidate-build"
+        sameUniverseSecondBootStatus = "required-after-isolated-upgrade"
         liveWorldStatus = "pending-user-run"
+        rollbackStatus = "pending-operator-selected-hytale-backup"
+        platformDeploymentVerification = "pending-deployment-authorization"
         publicCutoverStatus = "not-authorized"
     }
+    knownLimitations = @(
+        "Candidate evidence does not replace representative copied-player-world gameplay rehearsal.",
+        "Platform deployment and public download verification require explicit deployment authorization.",
+        "Rollback proof requires an operator-selected Hytale backup paired with its matching pre-v7 Tamework SQLite state."
+    )
 }
 
 $outputParent = Split-Path -Path $OutputPath -Parent

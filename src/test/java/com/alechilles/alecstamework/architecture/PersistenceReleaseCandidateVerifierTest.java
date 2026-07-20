@@ -22,12 +22,39 @@ class PersistenceReleaseCandidateVerifierTest {
                 "platform-tests", "--pool=threads", "--maxWorkers=4",
                 "platform-build", "tamework-package",
                 "Get-SurefireEvidence", "Get-VitestEvidence", "Get-PersistencePerformanceEvidence",
-                "PersistenceResiliencePerformanceGateTest.xml", "requiredEntries")) {
+                "Get-RequiredSurefireReportEvidence", "Get-RequiredVitestFileEvidence",
+                "Get-UnsafePlayerAccessScanEvidence", "PersistenceResiliencePerformanceGateTest.xml",
+                "requiredTameworkReports", "requiredTelemetryReports", "requiredPlatformFiles",
+                "dependencies", "documentation", "knownLimitations", "requiredEntries")) {
             assertTrue(source.contains(required), "missing candidate gate: " + required);
         }
         assertTrue(source.indexOf("tamework-tests") < source.indexOf("tamework-package"));
         assertTrue(source.contains("worktree is dirty"));
         assertTrue(source.contains("commit changed while gates were running"));
+    }
+
+    @Test
+    void verifierRequiresNamedSafetyMigrationPrivacyAndPortalEvidence() throws Exception {
+        String source = Files.readString(SCRIPT);
+
+        for (String required : List.of(
+                "EcsWriteSafetyGuardTest",
+                "AsyncThreadSafetyGuardTest",
+                "HistoricalSchemaPrerequisiteRepairTest",
+                "SqliteMigrationBackupServiceTest",
+                "PersistenceHistoricalCorpusManifestTest",
+                "PersistenceTelemetryPrivacyTest",
+                "TelemetryBreadcrumbContextTest",
+                "ManualReportRedactorTest",
+                "persistence-correlation-migration.test.ts",
+                "persistence-incident-timeline.test.tsx",
+                "privacy-retention-repo.test.ts",
+                "package-lock.json")) {
+            assertTrue(source.contains(required), "missing named release evidence: " + required);
+        }
+        assertTrue(source.contains("matchCount = 0"));
+        assertTrue(source.contains("pending-user-run"));
+        assertTrue(source.contains("pending-deployment-authorization"));
     }
 
     @Test

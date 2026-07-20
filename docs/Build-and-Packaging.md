@@ -179,7 +179,12 @@ The verifier reruns the complete Tamework and Alec's Telemetry Maven suites, the
 type, lint, bounded-worker Vitest, and production-build gates, then packages Tamework once. It refuses
 dirty or changing worktrees, validates required nested classes/resources and embedded telemetry runtime
 `1.0.4`, and writes `target/persistence-release-evidence/candidate.json` with all three commits, test
-totals, source/descriptor hashes, and the final JAR hash.
+totals, source/descriptor hashes, and the final JAR hash. The manifest also requires named reports for
+the persistence safety, migration, historical-corpus, domain-recovery, telemetry privacy, correlation,
+and portal timeline suites. It records dependency-lock and persistence-document hashes, runs the
+unsafe player-access source scan, and distinguishes passed build gates from operator-only rehearsal,
+deployment, rollback, and public-download gates. A missing named report fails the candidate verifier
+even when the aggregate test count is otherwise green.
 
 The verifier never opens or copies a Hytale world. Its backup section always records that Tamework did
 not create a whole-save backup. An operator may pass `-ExternalHytaleBackupReference` to record an
