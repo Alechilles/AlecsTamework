@@ -185,3 +185,8 @@ The verifier never opens or copies a Hytale world. Its backup section always rec
 not create a whole-save backup. An operator may pass `-ExternalHytaleBackupReference` to record an
 already-created Hytale-owned rehearsal backup reference; the verifier does not create or validate that
 backup itself.
+
+Numeric and live persistence budgets are defined in
+[`Persistence-Performance-Budgets.md`](Persistence-Performance-Budgets.md). The automated indexed
+admission/reload gates run inside the full Maven suite; copied-world startup and tick deltas are recorded
+during the live rehearsal because a wall-clock unit test cannot represent Hytale world load behavior.
