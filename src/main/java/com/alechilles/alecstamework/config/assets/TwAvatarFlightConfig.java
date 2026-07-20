@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3f;
 
 /**
  * Asset-backed tuning for transformed-player avatar flight.
@@ -25,6 +26,24 @@ public final class TwAvatarFlightConfig implements
     private static final String DEFAULT_IDLE_ANIMATION = "FlyIdle";
     private static final String DEFAULT_FLIGHT_ANIMATION = "Fly";
     private static final String DEFAULT_FAST_FLIGHT_ANIMATION = "FlyFast";
+
+    private static final BuilderCodec<Vector3f> CAMERA_POSITION_OFFSET_CODEC = BuilderCodec.builder(
+            Vector3f.class,
+            Vector3f::new
+    )
+            .<Double>append(new KeyedCodec<>("X", Codec.DOUBLE),
+                    (vector, value) -> vector.x = value.floatValue(),
+                    vector -> (double) vector.x)
+            .add()
+            .<Double>append(new KeyedCodec<>("Y", Codec.DOUBLE),
+                    (vector, value) -> vector.y = value.floatValue(),
+                    vector -> (double) vector.y)
+            .add()
+            .<Double>append(new KeyedCodec<>("Z", Codec.DOUBLE),
+                    (vector, value) -> vector.z = value.floatValue(),
+                    vector -> (double) vector.z)
+            .add()
+            .build();
 
     private static final BuilderCodec<ModelSettings> MODEL_CODEC = BuilderCodec.builder(
             ModelSettings.class,
@@ -44,6 +63,16 @@ public final class TwAvatarFlightConfig implements
                     (settings, value) -> settings.scale = positiveOrDefault(value, 1.0),
                     settings -> settings.scale)
             .documentation("Requested model scale before model-asset min/max clamping. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Vector3f>append(new KeyedCodec<>("CameraPositionOffset", CAMERA_POSITION_OFFSET_CODEC),
+                    (settings, value) -> settings.cameraPositionOffset = finiteVectorOrNull(value),
+                    settings -> settings.cameraPositionOffset)
+            .documentation("Optional runtime camera position offset. Omit to preserve the transformed ModelAsset camera offset. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("EyeHeight", Codec.DOUBLE),
+                    (settings, value) -> settings.eyeHeight = positiveOrNull(value),
+                    settings -> settings.eyeHeight)
+            .documentation("Optional runtime eye-height override used by first-person camera and other eye-height consumers. Omit to preserve the transformed ModelAsset value. Inheritance: missing nested key inherits parent value.")
             .add()
             .build();
 
@@ -711,14 +740,33 @@ public final class TwAvatarFlightConfig implements
         return Math.max(0.0, Math.min(1.0, resolved));
     }
 
+    @Nullable
+    private static Double positiveOrNull(@Nullable Double value) {
+        return value != null && Double.isFinite(value) && value > 0.0 ? value : null;
+    }
+
+    @Nullable
+    private static Vector3f finiteVectorOrNull(@Nullable Vector3f value) {
+        if (value == null || !Float.isFinite(value.x) || !Float.isFinite(value.y) || !Float.isFinite(value.z)) {
+            return null;
+        }
+        return new Vector3f(value);
+    }
+
     public static final class ModelSettings {
         boolean applyModel;
         String modelId = DEFAULT_MODEL_ID;
         double scale = 1.0;
+        Vector3f cameraPositionOffset;
+        Double eyeHeight;
 
         public boolean isApplyModel() { return applyModel; }
         public String getModelId() { return modelId; }
         public double getScale() { return scale; }
+        @Nullable public Vector3f getCameraPositionOffset() {
+            return cameraPositionOffset == null ? null : new Vector3f(cameraPositionOffset);
+        }
+        @Nullable public Double getEyeHeight() { return eyeHeight; }
     }
 
     public static final class InputSettings {

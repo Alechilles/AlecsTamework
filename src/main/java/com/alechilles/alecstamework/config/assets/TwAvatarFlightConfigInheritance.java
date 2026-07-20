@@ -43,6 +43,10 @@ final class TwAvatarFlightConfigInheritance {
             if (!keys.contains("ApplyModel")) target.model.applyModel = parent.model.applyModel;
             if (!keys.contains("ModelId")) target.model.modelId = parent.model.modelId;
             if (!keys.contains("Scale")) target.model.scale = parent.model.scale;
+            if (!keys.contains("CameraPositionOffset")) {
+                target.model.cameraPositionOffset = parent.model.cameraPositionOffset;
+            }
+            if (!keys.contains("EyeHeight")) target.model.eyeHeight = parent.model.eyeHeight;
         }
     }
 

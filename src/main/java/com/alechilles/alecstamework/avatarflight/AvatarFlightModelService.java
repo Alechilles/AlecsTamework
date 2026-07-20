@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
+import com.hypixel.hytale.server.core.asset.type.model.config.camera.CameraSettings;
 import com.hypixel.hytale.server.core.cosmetics.CosmeticsModule;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSkinComponent;
@@ -41,7 +42,7 @@ public final class AvatarFlightModelService {
         }
         float scale = clampScale(modelAsset, (float) modelSettings.getScale());
         store.putComponent(ref, ModelComponent.getComponentType(),
-                new ModelComponent(createAvatarFlightModel(modelAsset, scale, config.getAnimation())));
+                new ModelComponent(createAvatarFlightModel(modelAsset, scale, modelSettings, config.getAnimation())));
         return true;
     }
 
@@ -93,12 +94,21 @@ public final class AvatarFlightModelService {
     @Nonnull
     private static Model createAvatarFlightModel(@Nonnull ModelAsset modelAsset,
                                                  float scale,
+                                                 @Nonnull TwAvatarFlightConfig.ModelSettings modelSettings,
                                                  @Nonnull TwAvatarFlightConfig.AnimationSettings animation) {
         Model baseModel = Model.createScaledModel(modelAsset, scale);
-        if (!animation.isPoseAnimationsEnabled()) {
+        boolean hasCameraOverride = modelSettings.getCameraPositionOffset() != null;
+        boolean hasEyeHeightOverride = modelSettings.getEyeHeight() != null;
+        if (!animation.isPoseAnimationsEnabled() && !hasCameraOverride && !hasEyeHeightOverride) {
             return baseModel;
         }
-        Map<String, ModelAsset.AnimationSet> enrichedAnimations = injectedPoseAnimationSets(baseModel, animation);
+        Map<String, ModelAsset.AnimationSet> animations = animation.isPoseAnimationsEnabled()
+                ? injectedPoseAnimationSets(baseModel, animation)
+                : baseModel.getAnimationSetMap();
+        CameraSettings camera = cameraWithPositionOverride(baseModel.getCamera(), modelSettings);
+        float eyeHeight = modelSettings.getEyeHeight() == null
+                ? baseModel.getEyeHeight()
+                : modelSettings.getEyeHeight().floatValue();
         return new Model(
                 baseModel.getModelAssetId(),
                 baseModel.getScale(),
@@ -109,12 +119,12 @@ public final class AvatarFlightModelService {
                 baseModel.getTexture(),
                 baseModel.getGradientSet(),
                 baseModel.getGradientId(),
-                baseModel.getEyeHeight(),
+                eyeHeight,
                 baseModel.getCrouchOffset(),
                 baseModel.getSittingOffset(),
                 baseModel.getSleepingOffset(),
-                enrichedAnimations,
-                baseModel.getCamera(),
+                animations,
+                camera,
                 baseModel.getLight(),
                 baseModel.getParticles(),
                 baseModel.getTrails(),
@@ -122,6 +132,21 @@ public final class AvatarFlightModelService {
                 baseModel.getDetailBoxes(),
                 baseModel.getPhobia(),
                 baseModel.getPhobiaModelAssetId()
+        );
+    }
+
+    @Nullable
+    private static CameraSettings cameraWithPositionOverride(
+            @Nullable CameraSettings baseCamera,
+            @Nonnull TwAvatarFlightConfig.ModelSettings modelSettings) {
+        var positionOffset = modelSettings.getCameraPositionOffset();
+        if (positionOffset == null) {
+            return baseCamera;
+        }
+        return new CameraSettings(
+                positionOffset,
+                baseCamera == null ? null : baseCamera.getYaw(),
+                baseCamera == null ? null : baseCamera.getPitch()
         );
     }
 

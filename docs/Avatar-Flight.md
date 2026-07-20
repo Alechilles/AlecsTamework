@@ -85,6 +85,13 @@ The generator warns when player-style locomotion sets that the native transforme
 
 ## Config Fields
 
+### Model Camera
+
+- `Model.CameraPositionOffset`: optional runtime `X`/`Y`/`Z` camera offset. Omit it to use the transformed ModelAsset's camera offset. This is the primary per-config third-person framing control.
+- `Model.EyeHeight`: optional runtime eye-height override. It positions the first-person viewpoint vertically relative to the transformed player's entity root and also affects other engine eye-height consumers.
+
+The camera override preserves the ModelAsset's existing yaw and pitch target settings. The current client camera contract cannot anchor directly to an arbitrary model-attachment node such as the fake rider's `Head`, so `EyeHeight` provides the closest stable first-person alignment.
+
 ### Animation
 
 - `IdleAnimation`: movement-slot animation used while hovering or horizontally idle.

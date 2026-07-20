@@ -40,6 +40,7 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Avatar-flight configs can now override transformed-model camera position and eye height per species while preserving the model's authored look yaw and pitch behavior.
 - Avatar-flight `FlyFast` animation and airborne Vigour recharge now remain active while horizontal speed is at or above 80% of sustainable glide speed, allowing strong ordinary flight and dives to maintain the state after a boost ends.
 - Avatar-flight airbraking now uses the upward-flap wing-displacement sound by default.
 - Removed Tamework's runtime asset-pack reordering and legacy pack replacement so asset precedence follows the game's manifest load-order configuration.
