@@ -162,3 +162,26 @@ universe, bind, offline-auth, Sentry, and file-watcher flags; the working direct
 `mods` directory; `HytaleServer.boot` emits `Hytale Server Booted!`; console `StopCommand` invokes the
 graceful shutdown path; `HytaleServer.shutdown0` emits `Shutdown completed!`; and `PluginManager.start`
 emits `Enabled plugin <id>`. Re-check these anchors when updating the Hytale server version.
+
+### Persistence single-cutover candidate evidence
+
+After all three persistence-resilience branches are clean, generate the exact candidate and evidence
+record with:
+
+```powershell
+.\scripts\tools\verify-persistence-release-candidate.ps1 `
+  -TelemetryRoot "C:\worktrees\AlecsTelemetry" `
+  -PlatformRoot "C:\worktrees\AlecsTelemetryPlatform" `
+  -HytaleVersion "0.5.6"
+```
+
+The verifier reruns the complete Tamework and Alec's Telemetry Maven suites, the telemetry platform
+type, lint, bounded-worker Vitest, and production-build gates, then packages Tamework once. It refuses
+dirty or changing worktrees, validates required nested classes/resources and embedded telemetry runtime
+`1.0.4`, and writes `target/persistence-release-evidence/candidate.json` with all three commits, test
+totals, source/descriptor hashes, and the final JAR hash.
+
+The verifier never opens or copies a Hytale world. Its backup section always records that Tamework did
+not create a whole-save backup. An operator may pass `-ExternalHytaleBackupReference` to record an
+already-created Hytale-owned rehearsal backup reference; the verifier does not create or validate that
+backup itself.

@@ -1,0 +1,263 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)][string] $TelemetryRoot,
+    [Parameter(Mandatory = $true)][string] $PlatformRoot,
+    [string] $HytaleVersion = "0.5.6",
+    [string] $ExternalHytaleBackupReference,
+    [string] $OutputPath
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$tameworkRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+$telemetryRoot = [IO.Path]::GetFullPath($TelemetryRoot)
+$platformRoot = [IO.Path]::GetFullPath($PlatformRoot)
+$evidenceRoot = Join-Path $tameworkRoot "target/persistence-release-evidence"
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $OutputPath = Join-Path $evidenceRoot "candidate.json"
+} else {
+    $OutputPath = [IO.Path]::GetFullPath($OutputPath)
+}
+
+function Invoke-CandidateCommand {
+    param(
+        [string] $Label,
+        [string] $WorkingDirectory,
+        [string] $Executable,
+        [string[]] $Arguments,
+        [string] $LogPath
+    )
+    Write-Host "[$Label] $Executable $($Arguments -join ' ')"
+    Push-Location $WorkingDirectory
+    try {
+        $lines = @(& $Executable @Arguments 2>&1 | ForEach-Object { $_.ToString() })
+        $exitCode = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+    [IO.File]::WriteAllLines($LogPath, $lines, [Text.UTF8Encoding]::new($false))
+    if ($exitCode -ne 0) {
+        throw "$Label failed with exit code $exitCode. See $LogPath"
+    }
+}
+
+function Invoke-GitText {
+    param([string] $Root, [string[]] $Arguments)
+    $result = @(& git -C $Root @Arguments 2>&1 | ForEach-Object { $_.ToString() })
+    if ($LASTEXITCODE -ne 0) {
+        throw "git -C $Root $($Arguments -join ' ') failed: $($result -join [Environment]::NewLine)"
+    }
+    return ($result -join "`n").Trim()
+}
+
+function Get-RepositoryEvidence {
+    param([string] $Name, [string] $Root)
+    $status = Invoke-GitText $Root @("status", "--porcelain")
+    if (-not [string]::IsNullOrWhiteSpace($status)) {
+        throw "$Name worktree is dirty; release evidence requires an exact clean commit.`n$status"
+    }
+    return [ordered]@{
+        name = $Name
+        rootLabel = Split-Path $Root -Leaf
+        branch = Invoke-GitText $Root @("branch", "--show-current")
+        commit = Invoke-GitText $Root @("rev-parse", "HEAD")
+        clean = $true
+    }
+}
+
+function Get-FileEvidence {
+    param([string] $Path)
+    $item = Get-Item -LiteralPath $Path
+    return [ordered]@{
+        fileName = $item.Name
+        bytes = $item.Length
+        sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        modifiedAtUtc = $item.LastWriteTimeUtc.ToString("o")
+    }
+}
+
+function Get-SurefireEvidence {
+    param([string] $Root)
+    $reports = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter "TEST-*.xml" |
+        Where-Object { $_.FullName -match "[\\/]target[\\/]surefire-reports[\\/]" })
+    if ($reports.Count -eq 0) { throw "No Surefire reports found under $Root" }
+    $tests = 0L; $failures = 0L; $errors = 0L; $skipped = 0L
+    foreach ($report in $reports) {
+        [xml] $xml = Get-Content -LiteralPath $report.FullName -Raw
+        $suite = $xml.testsuite
+        $tests += [long]$suite.tests
+        $failures += [long]$suite.failures
+        $errors += [long]$suite.errors
+        $skipped += [long]$suite.skipped
+    }
+    if ($failures -ne 0 -or $errors -ne 0) {
+        throw "Surefire reports under $Root contain failures=$failures errors=$errors"
+    }
+    return [ordered]@{
+        suites = $reports.Count
+        tests = $tests
+        failures = $failures
+        errors = $errors
+        skipped = $skipped
+        newestReportUtc = ($reports | Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -First 1).LastWriteTimeUtc.ToString("o")
+    }
+}
+
+function Get-VitestEvidence {
+    param([string] $Path)
+    $report = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    if (-not $report.success) { throw "Vitest JSON report is not successful: $Path" }
+    return [ordered]@{
+        suites = [long]$report.numTotalTestSuites
+        tests = [long]$report.numTotalTests
+        passed = [long]$report.numPassedTests
+        failed = [long]$report.numFailedTests
+        pending = [long]$report.numPendingTests
+    }
+}
+
+function Read-ZipText {
+    param([IO.Compression.ZipArchive] $Archive, [string] $EntryName)
+    $entry = $Archive.GetEntry($EntryName)
+    if ($null -eq $entry) { throw "Required JAR entry is missing: $EntryName" }
+    $reader = [IO.StreamReader]::new($entry.Open(), [Text.Encoding]::UTF8)
+    try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+}
+
+foreach ($root in @($tameworkRoot, $telemetryRoot, $platformRoot)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $root ".git"))) {
+        # Linked worktrees use a .git file, which Test-Path accepts without a container qualifier.
+        if (-not (Test-Path -LiteralPath (Join-Path $root ".git"))) {
+            throw "Not a Git worktree: $root"
+        }
+    }
+}
+New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
+$sourceBefore = @(
+    Get-RepositoryEvidence "tamework" $tameworkRoot
+    Get-RepositoryEvidence "alecs-telemetry" $telemetryRoot
+    Get-RepositoryEvidence "telemetry-platform" $platformRoot
+)
+
+$platformTestReport = Join-Path $evidenceRoot "platform-vitest.json"
+Invoke-CandidateCommand "tamework-tests" $tameworkRoot (Join-Path $tameworkRoot "mvnw.cmd") `
+    @("-q", "test") (Join-Path $evidenceRoot "tamework-tests.log")
+Invoke-CandidateCommand "telemetry-tests" $telemetryRoot (Join-Path $telemetryRoot "mvnw.cmd") `
+    @("-q", "test") (Join-Path $evidenceRoot "telemetry-tests.log")
+Invoke-CandidateCommand "platform-typecheck" $platformRoot "npm.cmd" `
+    @("run", "check") (Join-Path $evidenceRoot "platform-typecheck.log")
+Invoke-CandidateCommand "platform-lint" $platformRoot "npm.cmd" `
+    @("run", "lint") (Join-Path $evidenceRoot "platform-lint.log")
+Invoke-CandidateCommand "platform-tests" $platformRoot "npm.cmd" `
+    @("exec", "--", "vitest", "run", "--maxWorkers=4", "--reporter=json", "--outputFile=$platformTestReport") `
+    (Join-Path $evidenceRoot "platform-tests.log")
+Invoke-CandidateCommand "platform-build" $platformRoot "npm.cmd" `
+    @("run", "build") (Join-Path $evidenceRoot "platform-build.log")
+Invoke-CandidateCommand "tamework-package" $tameworkRoot (Join-Path $tameworkRoot "mvnw.cmd") `
+    @("-q", "-DskipTests", "package") (Join-Path $evidenceRoot "tamework-package.log")
+
+$sourceAfter = @(
+    Get-RepositoryEvidence "tamework" $tameworkRoot
+    Get-RepositoryEvidence "alecs-telemetry" $telemetryRoot
+    Get-RepositoryEvidence "telemetry-platform" $platformRoot
+)
+for ($index = 0; $index -lt $sourceBefore.Count; $index++) {
+    if ($sourceBefore[$index].commit -cne $sourceAfter[$index].commit) {
+        throw "$($sourceBefore[$index].name) commit changed while gates were running"
+    }
+}
+
+$artifact = Get-ChildItem -LiteralPath (Join-Path $tameworkRoot "target") -File -Filter "*.jar" |
+    Where-Object { $_.Name -notlike "original-*" } |
+    Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+if ($null -eq $artifact) { throw "Packaged Tamework JAR was not found" }
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$requiredEntries = @(
+    'com/alechilles/alecstamework/ui/TameworkCommandSelectionPage$CommandSelectionEventData.class',
+    'com/alechilles/alecstamework/persistence/sqlite/SqliteSchemaV7Migration.class',
+    'com/alechilles/alecstamework/persistence/sqlite/SqliteMigrationBackupService.class',
+    'com/alechilles/alecstamework/persistence/incidents/PersistenceResilienceRuntime.class',
+    'com/alechilles/alecstamework/persistence/diagnostics/PersistenceDiagnosticsService.class',
+    'com/alechilles/alecstamework/metrics/TameworkPersistenceTelemetry.class',
+    'com/alechilles/alecstelemetry/api/TelemetryBreadcrumbContext.class',
+    'META-INF/services/java.sql.Driver',
+    'META-INF/maven/com.alechilles/alecstelemetry-runtime/pom.properties',
+    'telemetry/project.json',
+    'manifest.json'
+)
+$archive = [IO.Compression.ZipFile]::OpenRead($artifact.FullName)
+try {
+    foreach ($entryName in $requiredEntries) {
+        if ($null -eq $archive.GetEntry($entryName)) { throw "Required JAR entry is missing: $entryName" }
+    }
+    $embeddedRuntimeProperties = Read-ZipText $archive `
+        'META-INF/maven/com.alechilles/alecstelemetry-runtime/pom.properties'
+    $runtimeVersionMatch = [regex]::Match($embeddedRuntimeProperties, '(?m)^version=(.+)$')
+    if (-not $runtimeVersionMatch.Success) { throw "Embedded telemetry runtime version is missing" }
+    $embeddedRuntimeVersion = $runtimeVersionMatch.Groups[1].Value.Trim()
+    $pluginManifest = Read-ZipText $archive 'manifest.json' | ConvertFrom-Json
+} finally {
+    $archive.Dispose()
+}
+if ($embeddedRuntimeVersion -cne "1.0.4") {
+    throw "Expected embedded telemetry runtime 1.0.4, found $embeddedRuntimeVersion"
+}
+
+$javaVersion = (& java -version 2>&1 | Select-Object -First 1).ToString()
+$nodeVersion = (& node --version).Trim()
+$npmVersion = (& npm.cmd --version).Trim()
+$schemaSource = Join-Path $tameworkRoot `
+    "src/main/java/com/alechilles/alecstamework/persistence/sqlite/SqliteSchemaV7Migration.java"
+$telemetryDescriptor = Join-Path $tameworkRoot "src/main/resources/telemetry/project.json"
+$evidence = [ordered]@{
+    evidenceSchemaVersion = 1
+    generatedAtUtc = [DateTime]::UtcNow.ToString("o")
+    sources = $sourceAfter
+    runtime = [ordered]@{
+        hytaleVersion = $HytaleVersion
+        java = $javaVersion
+        node = $nodeVersion
+        npm = $npmVersion
+        persistenceSchema = 7
+        embeddedTelemetryRuntime = $embeddedRuntimeVersion
+    }
+    tests = [ordered]@{
+        tamework = Get-SurefireEvidence $tameworkRoot
+        telemetry = Get-SurefireEvidence $telemetryRoot
+        platform = Get-VitestEvidence $platformTestReport
+        platformTypecheck = "passed"
+        platformLint = "passed"
+        platformBuild = "passed"
+    }
+    package = [ordered]@{
+        tameworkVersion = $pluginManifest.Version
+        artifact = Get-FileEvidence $artifact.FullName
+        requiredEntries = $requiredEntries
+        schemaV7Source = Get-FileEvidence $schemaSource
+        telemetryDescriptor = Get-FileEvidence $telemetryDescriptor
+    }
+    backupBoundary = [ordered]@{
+        wholeSaveBackupCreatedByTamework = $false
+        migrationProtection = "verified-transactional-tamework-sqlite-snapshot-only"
+        hytaleOwnsWholeSaveBackups = $true
+        externalHytaleBackupReference = if ([string]::IsNullOrWhiteSpace($ExternalHytaleBackupReference)) {
+            $null
+        } else {
+            $ExternalHytaleBackupReference.Trim()
+        }
+    }
+    releaseRehearsal = [ordered]@{
+        liveWorldStatus = "pending-user-run"
+        publicCutoverStatus = "not-authorized"
+    }
+}
+
+$outputParent = Split-Path -Path $OutputPath -Parent
+New-Item -ItemType Directory -Path $outputParent -Force | Out-Null
+$json = $evidence | ConvertTo-Json -Depth 12
+[IO.File]::WriteAllText($OutputPath, $json + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+Write-Host "Persistence release candidate evidence written to $OutputPath"
+Write-Host "Candidate SHA-256: $($evidence.package.artifact.sha256)"
