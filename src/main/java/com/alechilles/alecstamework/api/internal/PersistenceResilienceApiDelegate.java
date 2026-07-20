@@ -95,8 +95,10 @@ final class PersistenceResilienceApiDelegate {
         ArrayList<PersistenceResilienceView.CoverageView> views = new ArrayList<>();
         persistence.getPersistenceCoverageRegistry().snapshot().forEach((dimension, state) ->
                 views.add(new PersistenceResilienceView.CoverageView(
-                        dimension, state.ready(), state.reason(),
-                        state.generation(), state.updatedAtMs())));
+                        dimension, state.status().name(), state.ready(), state.reason(),
+                        state.generation(), state.updatedAtMs(),
+                        state.coveredScopeHashes().size(), state.absenceAuthoritative(),
+                        state.nextSafeTrigger())));
         views.sort(Comparator.comparing(PersistenceResilienceView.CoverageView::dimension));
         return List.copyOf(views);
     }

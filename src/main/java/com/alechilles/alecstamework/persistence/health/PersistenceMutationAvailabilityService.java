@@ -40,7 +40,7 @@ public final class PersistenceMutationAvailabilityService {
             return deny(PersistenceMutationAvailabilityStatus.FEATURE_PAUSED,
                     "feature_paused_by_operator", null);
         }
-        if (!coverage.areReady(context.requiredCoverageDimensions())) {
+        if (!coverage.areReady(context.requiredCoverageDimensions(), context.scopes())) {
             return deny(PersistenceMutationAvailabilityStatus.AUTHORITY_NOT_READY,
                     "required_evidence_coverage_unavailable", null);
         }

@@ -56,7 +56,10 @@ public final class PersistenceDiagnosticsService {
         for (var entry : runtime.getPersistenceCoverageRegistry().snapshot().entrySet()) {
             PersistenceCoverageRegistry.CoverageState state = entry.getValue();
             coverage.put(entry.getKey(), new CoverageView(
-                    state.ready(), state.reason(), state.generation(), state.updatedAtMs()));
+                    state.status().name(), state.ready(), state.reason(),
+                    state.generation(), state.updatedAtMs(),
+                    state.coveredScopeHashes().size(), state.absenceAuthoritative(),
+                    state.nextSafeTrigger()));
         }
         Map<String, CircuitView> circuits = new LinkedHashMap<>();
         Map<com.alechilles.alecstamework.persistence.incidents.PersistenceDomain,
@@ -251,7 +254,10 @@ public final class PersistenceDiagnosticsService {
                                  long droppedDiagnosticRecords) {
     }
 
-    public record CoverageView(boolean ready, String reason, long generation, long updatedAtMs) {
+    public record CoverageView(String status, boolean ready, String reason,
+                               long generation, long updatedAtMs,
+                               int coveredScopeCount, boolean absenceAuthoritative,
+                               String nextSafeTrigger) {
     }
 
     public record CircuitView(boolean configuredEnabled, boolean effectiveEnabled,

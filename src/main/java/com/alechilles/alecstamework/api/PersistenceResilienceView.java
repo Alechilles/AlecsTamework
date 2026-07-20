@@ -34,9 +34,13 @@ public record PersistenceResilienceView(
     }
 
     public record CoverageView(@Nonnull String dimension,
+                               @Nonnull String status,
                                boolean ready,
                                @Nullable String reasonCode,
                                long generation,
-                               long updatedAtMs) {
+                               long updatedAtMs,
+                               int coveredScopeCount,
+                               boolean absenceAuthoritative,
+                               @Nullable String nextSafeTrigger) {
     }
 }
