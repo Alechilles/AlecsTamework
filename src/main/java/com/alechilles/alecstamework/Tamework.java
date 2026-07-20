@@ -90,6 +90,7 @@ import com.alechilles.alecstamework.integration.creditor.CreditorIntegration;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CaptureChannelVfxSystem;
+import com.alechilles.alecstamework.items.CommandWorldChangeArrivalSystem;
 import com.alechilles.alecstamework.items.CommandWorldChangeTravelEventHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcInventoryCanonicalizationSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
@@ -1021,6 +1022,9 @@ public class Tamework extends JavaPlugin {
                 new CommandWorldChangeTravelEventHandler(commandItemFeatureHandler);
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CommandWorldChangeArrivalSystem(commandWorldChangeTravelEventHandler)
         );
         getEntityStoreRegistry().registerSystem(
                 new CommandLinkedNpcInventoryCanonicalizationSystem(commandItemFeatureHandler)

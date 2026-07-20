@@ -7,28 +7,27 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Routes connection and world-ready events into command-companion travel without recalling on login. */
+/** Routes connection and world-add events into exact player-arrival companion travel intents. */
 public final class CommandWorldChangeTravelEventHandler {
-    private static final long WORLD_CHANGE_SETTLE_DELAY_MS = 250L;
-
     private final CommandItemFeatureHandler commandItems;
     private final CommandWorldJoinSessionTracker sessions;
+    private final CommandWorldChangeArrivalTracker arrivals;
 
     public CommandWorldChangeTravelEventHandler(@Nonnull CommandItemFeatureHandler commandItems) {
-        this(commandItems, new CommandWorldJoinSessionTracker());
+        this(commandItems, new CommandWorldJoinSessionTracker(), new CommandWorldChangeArrivalTracker());
     }
 
     CommandWorldChangeTravelEventHandler(
             @Nonnull CommandItemFeatureHandler commandItems,
-            @Nonnull CommandWorldJoinSessionTracker sessions
+            @Nonnull CommandWorldJoinSessionTracker sessions,
+            @Nonnull CommandWorldChangeArrivalTracker arrivals
     ) {
         this.commandItems = Objects.requireNonNull(commandItems, "commandItems");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.arrivals = Objects.requireNonNull(arrivals, "arrivals");
     }
 
     public void onPlayerConnect(@Nullable PlayerConnectEvent event) {
@@ -37,8 +36,10 @@ public final class CommandWorldChangeTravelEventHandler {
     }
 
     public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {
-        sessions.onDisconnected(event == null || event.getPlayerRef() == null
-                ? null : event.getPlayerRef().getUuid());
+        UUID playerUuid = event == null || event.getPlayerRef() == null
+                ? null : event.getPlayerRef().getUuid();
+        sessions.onDisconnected(playerUuid);
+        arrivals.clear(playerUuid);
     }
 
     public void onAddPlayerToWorld(@Nullable AddPlayerToWorldEvent event) {
@@ -56,12 +57,14 @@ public final class CommandWorldChangeTravelEventHandler {
             world.execute(() -> commandItems.dismountPlayerAfterWorldJoin(world, playerUuid));
             return;
         }
-        CompletableFuture.runAsync(
-                () -> world.execute(() -> commandItems
-                        .queueWorldChangeTravelRelocationsForPlayerUuid(world, playerUuid)),
-                CompletableFuture.delayedExecutor(
-                        WORLD_CHANGE_SETTLE_DELAY_MS, TimeUnit.MILLISECONDS
-                )
-        );
+        arrivals.mark(playerUuid, world.getName());
+    }
+
+    void onPlayerAdded(@Nullable World world, @Nullable UUID playerUuid) {
+        if (world == null || playerUuid == null
+                || !arrivals.consume(playerUuid, world.getName())) {
+            return;
+        }
+        commandItems.queueWorldChangeTravelRelocationsForPlayerUuid(world, playerUuid);
     }
 }

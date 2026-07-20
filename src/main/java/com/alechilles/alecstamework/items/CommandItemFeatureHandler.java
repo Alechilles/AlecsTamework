@@ -535,7 +535,7 @@ public final class CommandItemFeatureHandler {
                         record.homePosition,
                         true,
                         settings.getOnTransferFailure(),
-                        null
+                        settings.getFollowMasterOnWorldChangeStateFilter()
                 );
                 queuedNpcUuids.add(record.npcUuid);
             }
