@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,6 +22,9 @@ class SqliteMigrationBackupServiceTest {
     @Test
     void vacuumBackupIncludesCommittedWalDataAndNeverOverwrites() throws Exception {
         Path database = tempDir.resolve("tamework.sqlite");
+        Path unrelatedWorldData = tempDir.resolve("world-region-data");
+        Files.createDirectories(unrelatedWorldData);
+        Files.writeString(unrelatedWorldData.resolve("region.bin"), "owned-by-hytale");
         SqliteConnectionManager connections = new SqliteConnectionManager(database);
         SqliteMigrationBackupService service = new SqliteMigrationBackupService();
         Path first;
@@ -36,8 +40,11 @@ class SqliteMigrationBackupServiceTest {
         }
 
         assertNotEquals(first, second);
+        assertEquals(database.toAbsolutePath().normalize().getParent(), first.getParent());
         assertTrue(Files.exists(first));
         assertTrue(Files.exists(second));
+        assertEquals("owned-by-hytale", Files.readString(unrelatedWorldData.resolve("region.bin")));
+        assertFalse(Files.exists(tempDir.resolve("world-region-data.bak")));
         Path firstManifest = SqliteMigrationBackupService.manifestPath(first);
         assertTrue(Files.exists(firstManifest));
         JsonObject manifest = JsonParser.parseString(Files.readString(firstManifest)).getAsJsonObject();
