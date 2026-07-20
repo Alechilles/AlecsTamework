@@ -27,7 +27,7 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
             DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneOffset.UTC);
 
     public TameworkDebugDbCommand() {
-        super("debugdb", "Show SQLite persistence diagnostics. Optional: integrity|checkpoint|vacuum");
+        super("debugdb", "Inspect, verify, or export bounded persistence diagnostics.");
         setAllowsExtraArguments(true);
     }
 
@@ -49,7 +49,11 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
         }
 
         String action = normalizeAction(getFirstArg(commandContext));
-        if ("integrity".equals(action)) {
+        if (TameworkPersistenceDiagnosticsCommandHandler.supports(action)) {
+            new TameworkPersistenceDiagnosticsCommandHandler().handle(
+                    commandContext, world, plugin, runtime, action);
+            return;
+        } else if ("integrity".equals(action)) {
             printIntegrity(commandContext, runtime.getIntegrityService().inspect());
         } else if ("checkpoint".equals(action)) {
             boolean scheduled = runtime.requestWalCheckpoint();
@@ -67,7 +71,7 @@ public final class TameworkDebugDbCommand extends AbstractPlayerCommand {
             ));
         } else if (action != null) {
             commandContext.sender().sendMessage(
-                    Message.raw("Usage: /tw debugdb [integrity|checkpoint|vacuum]"));
+                    Message.raw("Usage: /tw debugdb [health|incidents|incident|retry|export|integrity|checkpoint|vacuum]"));
             return;
         }
 

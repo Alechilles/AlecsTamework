@@ -68,14 +68,24 @@ public final class PersistenceIncidentRepository {
 
     @Nonnull
     public List<PersistenceIncident> listOpen(int requestedLimit) throws Exception {
+        return listRecent(true, requestedLimit);
+    }
+
+    @Nonnull
+    public List<PersistenceIncident> listRecent(boolean openOnly, int requestedLimit) throws Exception {
         int limit = Math.max(1, Math.min(requestedLimit, 500));
+        String sql = openOnly
+                ? """
+                  SELECT * FROM persistence_incidents
+                  WHERE status IN ('OPEN', 'RECOVERING')
+                  ORDER BY last_seen_at_ms DESC LIMIT ?
+                  """
+                : """
+                  SELECT * FROM persistence_incidents
+                  ORDER BY last_seen_at_ms DESC LIMIT ?
+                  """;
         try (Connection connection = connections.openConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                    SELECT * FROM persistence_incidents
-                    WHERE status IN ('OPEN', 'RECOVERING')
-                    ORDER BY last_seen_at_ms DESC
-                    LIMIT ?
-                    """)) {
+             PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, limit);
             try (ResultSet result = statement.executeQuery()) {
                 List<PersistenceIncident> incidents = new ArrayList<>();
@@ -93,6 +103,49 @@ public final class PersistenceIncidentRepository {
             statement.setString(1, incidentId);
             try (ResultSet result = statement.executeQuery()) {
                 return result.next() ? Optional.of(mapIncident(result)) : Optional.empty();
+            }
+        }
+    }
+
+    @Nonnull
+    public Optional<PersistenceIncident> findByIdOrUniquePrefix(@Nonnull String incidentId) throws Exception {
+        String normalized = incidentId.trim().toLowerCase(java.util.Locale.ROOT);
+        if (normalized.isEmpty() || !normalized.matches("[0-9a-f-]{4,64}")) return Optional.empty();
+        Optional<PersistenceIncident> exact = findById(normalized);
+        if (exact.isPresent()) return exact;
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT * FROM persistence_incidents
+                     WHERE lower(incident_id) LIKE ?
+                     ORDER BY last_seen_at_ms DESC LIMIT 2
+                     """)) {
+            statement.setString(1, normalized + "%");
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return Optional.empty();
+                PersistenceIncident match = mapIncident(result);
+                return result.next() ? Optional.empty() : Optional.of(match);
+            }
+        }
+    }
+
+    @Nonnull
+    public List<PersistenceScope> listScopes(@Nonnull String incidentId) throws Exception {
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT scope_type, scope_key, scope_hash, authority_dimension
+                     FROM persistence_incident_scopes WHERE incident_id = ?
+                     ORDER BY scope_type, scope_hash
+                     """)) {
+            statement.setString(1, incidentId);
+            try (ResultSet result = statement.executeQuery()) {
+                List<PersistenceScope> scopes = new ArrayList<>();
+                while (result.next()) {
+                    scopes.add(new PersistenceScope(
+                            PersistenceScopeType.valueOf(result.getString("scope_type")),
+                            result.getString("scope_key"), result.getString("scope_hash"),
+                            result.getString("authority_dimension")));
+                }
+                return List.copyOf(scopes);
             }
         }
     }
