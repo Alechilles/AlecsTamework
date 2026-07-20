@@ -200,3 +200,10 @@ Numeric and live persistence budgets are defined in
 [`Persistence-Performance-Budgets.md`](Persistence-Performance-Budgets.md). The automated indexed
 admission/reload gates run inside the full Maven suite; copied-world startup and tick deltas are recorded
 during the live rehearsal because a wall-clock unit test cannot represent Hytale world load behavior.
+
+The candidate verifier also runs the fail-closed live-rehearsal verifier self-test. After the exact JAR
+passes its user-assisted copied-world/client and operator-selected rollback matrix, validate the completed
+manifest with `scripts/tools/verify-persistence-live-rehearsal.ps1`. The schema, minimum repetitions,
+privacy boundary, performance budgets, and command are documented in
+[`Persistence-Live-Rehearsal.md`](Persistence-Live-Rehearsal.md). This verifier validates evidence only;
+it does not install the JAR, operate the client, copy a save, or create/restore a Hytale backup.

@@ -254,6 +254,11 @@ $sourceBefore = @(
 )
 
 $platformTestReport = Join-Path $evidenceRoot "platform-vitest.json"
+$currentPowerShell = (Get-Process -Id $PID).Path
+Invoke-CandidateCommand "live-rehearsal-verifier-tests" $tameworkRoot $currentPowerShell `
+    @("-NoLogo", "-NoProfile", "-File",
+        (Join-Path $tameworkRoot "scripts/tools/tests/test-verify-persistence-live-rehearsal.ps1")) `
+    (Join-Path $evidenceRoot "live-rehearsal-verifier-tests.log")
 Invoke-CandidateCommand "tamework-tests" $tameworkRoot (Join-Path $tameworkRoot "mvnw.cmd") `
     @("-q", "test") (Join-Path $evidenceRoot "tamework-tests.log")
 Invoke-CandidateCommand "telemetry-tests" $telemetryRoot (Join-Path $telemetryRoot "mvnw.cmd") `
@@ -330,6 +335,7 @@ $requiredTameworkReports = Get-RequiredSurefireReportEvidence $tameworkRoot @(
     "com.alechilles.alecstamework.architecture.EcsWriteSafetyGuardTest",
     "com.alechilles.alecstamework.architecture.PersistenceDegradationArchitectureTest",
     "com.alechilles.alecstamework.architecture.PersistenceFaultInjectionArchitectureTest",
+    "com.alechilles.alecstamework.architecture.PersistenceReleaseCandidateVerifierTest",
     "com.alechilles.alecstamework.performance.PersistenceResiliencePerformanceGateTest",
     "com.alechilles.alecstamework.persistence.diagnostics.PersistenceDiagnosticsServiceTest",
     "com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityServiceTest",
@@ -382,10 +388,21 @@ $dependencyEvidence = @(
     Get-TrackedFileEvidence "alecs-telemetry" $telemetryRoot "runtime/pom.xml"
     Get-TrackedFileEvidence "telemetry-platform" $platformRoot "package-lock.json"
 )
+$releaseToolingEvidence = @(
+    Get-TrackedFileEvidence "tamework" $tameworkRoot `
+        "scripts/tools/verify-persistence-release-candidate.ps1"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot `
+        "scripts/tools/verify-persistence-live-rehearsal.ps1"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot `
+        "scripts/tools/templates/persistence-live-rehearsal-template.json"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot `
+        "scripts/tools/tests/test-verify-persistence-live-rehearsal.ps1"
+)
 $documentationEvidence = @(
     Get-TrackedFileEvidence "tamework" $tameworkRoot "CHANGELOG.md"
     Get-TrackedFileEvidence "tamework" $tameworkRoot "docs/Persistence-Failure-Classification-Catalog.md"
     Get-TrackedFileEvidence "tamework" $tameworkRoot "docs/Persistence-Performance-Budgets.md"
+    Get-TrackedFileEvidence "tamework" $tameworkRoot "docs/Persistence-Live-Rehearsal.md"
     Get-TrackedFileEvidence "tamework" $tameworkRoot `
         "wiki/Developer-Documentation/Data-and-Persistence/Persistence-Sqlite-and-Data-Paths.md"
     Get-TrackedFileEvidence "tamework" $tameworkRoot `
@@ -416,6 +433,7 @@ $evidence = [ordered]@{
         requiredTameworkReports = $requiredTameworkReports
         requiredTelemetryReports = $requiredTelemetryReports
         requiredPlatformFiles = $requiredPlatformTests
+        liveRehearsalVerifierContract = "passed"
         platformTypecheck = "passed"
         platformLint = "passed"
         platformBuild = "passed"
@@ -426,6 +444,7 @@ $evidence = [ordered]@{
         asyncThreadGuard = "passed-required-report"
     }
     dependencies = $dependencyEvidence
+    releaseTooling = $releaseToolingEvidence
     documentation = $documentationEvidence
     performance = Get-PersistencePerformanceEvidence $tameworkRoot
     package = [ordered]@{

@@ -12,6 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PersistenceReleaseCandidateVerifierTest {
     private static final Path SCRIPT =
             Path.of("scripts/tools/verify-persistence-release-candidate.ps1");
+    private static final Path LIVE_SCRIPT =
+            Path.of("scripts/tools/verify-persistence-live-rehearsal.ps1");
+    private static final Path LIVE_TEMPLATE =
+            Path.of("scripts/tools/templates/persistence-live-rehearsal-template.json");
 
     @Test
     void verifierRunsEveryRepositoryGateBeforePackaging() throws Exception {
@@ -25,6 +29,8 @@ class PersistenceReleaseCandidateVerifierTest {
                 "Get-RequiredSurefireReportEvidence", "Get-RequiredVitestFileEvidence",
                 "Get-UnsafePlayerAccessScanEvidence", "PersistenceResiliencePerformanceGateTest.xml",
                 "requiredTameworkReports", "requiredTelemetryReports", "requiredPlatformFiles",
+                "live-rehearsal-verifier-tests", "liveRehearsalVerifierContract",
+                "releaseTooling", "verify-persistence-live-rehearsal.ps1",
                 "dependencies", "documentation", "knownLimitations", "requiredEntries")) {
             assertTrue(source.contains(required), "missing candidate gate: " + required);
         }
@@ -42,6 +48,7 @@ class PersistenceReleaseCandidateVerifierTest {
         for (String required : List.of(
                 "EcsWriteSafetyGuardTest",
                 "AsyncThreadSafetyGuardTest",
+                "PersistenceReleaseCandidateVerifierTest",
                 "HistoricalSchemaPrerequisiteRepairTest",
                 "SqliteMigrationBackupServiceTest",
                 "PersistenceHistoricalCorpusManifestTest",
@@ -72,5 +79,29 @@ class PersistenceReleaseCandidateVerifierTest {
         assertFalse(lower.contains("vacuum into"));
         assertFalse(lower.contains("userdata/saves"));
         assertFalse(lower.contains("userdata\\saves"));
+    }
+
+    @Test
+    void liveRehearsalVerifierRequiresExactArtifactsDomainRepetitionAndRollback() throws Exception {
+        String source = Files.readString(LIVE_SCRIPT);
+        String template = Files.readString(LIVE_TEMPLATE);
+
+        for (String required : List.of(
+                "candidateArtifactSha256", "sourceCommits", "five distinct fixtures",
+                "login-tame-and-two-spawns", "managed-coop-old-and-new-multi-resident",
+                "manual-and-passive-breeding-repeat", "inventory-and-storage-capture-release",
+                "cleanup-death-lost-revival", "same-and-cross-world-recall",
+                "hold-follow-restart-no-teleport", "linked-panel-canonical-state-name",
+                "scoped-fault-and-recovery", "diagnostic-export-and-telemetry-correlation",
+                "linkedProfiles must be >= 1000", "managedCoops must be >= 100",
+                "candidate tick p95 exceeds the 0.25 ms live budget", "unresolvedWarnings must be empty",
+                "tamework_sqlite_only", "rollback SQLite hash must match",
+                "operatorSignedOff", "wholeSaveBackupCreatedByTamework")) {
+            assertTrue(source.contains(required), "missing live rehearsal contract: " + required);
+        }
+        assertTrue(template.contains("\"operatorSignedOff\": false"));
+        assertTrue(template.contains("\"wholeSaveBackupCreatedByTamework\": false"));
+        assertFalse(source.toLowerCase().contains("copy-item"));
+        assertFalse(source.toLowerCase().contains("compress-archive"));
     }
 }
