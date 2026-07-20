@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.architecture;
 
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -42,5 +43,28 @@ class PersistenceFaultInjectionArchitectureTest {
             });
         }
         assertTrue(violations.isEmpty(), "Production fault-hook access expanded: " + violations);
+    }
+
+    @Test
+    void everyNamedCheckpointIsWiredToAProductionBoundary() throws Exception {
+        StringBuilder source = new StringBuilder();
+        try (Stream<Path> paths = Files.walk(MAIN)) {
+            paths.filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> !path.endsWith("PersistenceCheckpoint.java"))
+                    .forEach(path -> {
+                        try {
+                            source.append(Files.readString(path)).append('\n');
+                        } catch (Exception failure) {
+                            throw new IllegalStateException(failure);
+                        }
+                    });
+        }
+        List<String> missing = new ArrayList<>();
+        for (PersistenceCheckpoint checkpoint : PersistenceCheckpoint.values()) {
+            if (source.indexOf("PersistenceCheckpoint." + checkpoint.name()) < 0) {
+                missing.add(checkpoint.name());
+            }
+        }
+        assertTrue(missing.isEmpty(), "Persistence checkpoints lack production boundaries: " + missing);
     }
 }
