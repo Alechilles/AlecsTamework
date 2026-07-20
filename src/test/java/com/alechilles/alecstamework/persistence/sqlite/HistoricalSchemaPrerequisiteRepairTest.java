@@ -44,6 +44,10 @@ class HistoricalSchemaPrerequisiteRepairTest {
             assertEquals("00000000-0000-0000-0000-000000000001", scalarText(
                     connection, "SELECT owner_uuid FROM npc_profiles WHERE profile_id = 'profile-0'"
             ));
+            assertEquals("00000000-0000-0001-0000-000000000001", scalarText(
+                    connection,
+                    "SELECT current_npc_uuid FROM npc_profiles WHERE profile_id = 'profile-0'"
+            ));
             assertEquals(0, scalarInt(
                     connection, "SELECT created_at_ms FROM npc_profiles WHERE profile_id = 'profile-0'"
             ));
@@ -67,15 +71,16 @@ class HistoricalSchemaPrerequisiteRepairTest {
             statement.execute("INSERT INTO schema_migrations VALUES "
                     + "(2, 'schema_v2'), (3, 'schema_v3'), (4, 'schema_v4'), "
                     + "(2001, 'legacy_import')");
-            statement.execute("CREATE TABLE npc_profiles "
-                    + "(profile_id TEXT PRIMARY KEY, owner_uuid TEXT)");
+            statement.execute("CREATE TABLE npc_profiles ("
+                    + "profile_id TEXT PRIMARY KEY, current_npc_uuid TEXT UNIQUE, owner_uuid TEXT)");
         }
         try (PreparedStatement insert = connection.prepareStatement(
-                "INSERT INTO npc_profiles(profile_id, owner_uuid) VALUES (?, ?)"
+                "INSERT INTO npc_profiles(profile_id, current_npc_uuid, owner_uuid) VALUES (?, ?, ?)"
         )) {
             for (int index = 0; index < PROFILE_COUNT; index++) {
                 insert.setString(1, "profile-" + index);
-                insert.setString(2, index % 2 == 0
+                insert.setString(2, new java.util.UUID(1L, index + 1L).toString());
+                insert.setString(3, index % 2 == 0
                         ? new java.util.UUID(0L, index + 1L).toString()
                         : null);
                 insert.addBatch();

@@ -70,14 +70,17 @@ public final class ClaimsRuntimeFixture {
                 statement.execute("INSERT INTO schema_migrations VALUES (3, 'schema_v3')");
                 statement.execute("INSERT INTO schema_migrations VALUES (4, 'schema_v4')");
                 statement.execute("INSERT INTO schema_migrations VALUES (2001, 'legacy_import')");
-                statement.execute("CREATE TABLE npc_profiles (profile_id TEXT PRIMARY KEY, owner_uuid TEXT)");
+                statement.execute("CREATE TABLE npc_profiles ("
+                        + "profile_id TEXT PRIMARY KEY, current_npc_uuid TEXT UNIQUE, owner_uuid TEXT)");
             }
             connection.setAutoCommit(false);
             try (PreparedStatement insert = connection.prepareStatement(
-                    "INSERT INTO npc_profiles(profile_id, owner_uuid) VALUES (?, ?)")) {
+                    "INSERT INTO npc_profiles(profile_id, current_npc_uuid, owner_uuid) "
+                            + "VALUES (?, ?, ?)")) {
                 for (int i = 0; i < rows; i++) {
                     insert.setString(1, "profile-" + i);
-                    insert.setString(2, i % 2 == 0
+                    insert.setString(2, new java.util.UUID(1L, i + 1L).toString());
+                    insert.setString(3, i % 2 == 0
                             ? new java.util.UUID(0L, i + 1L).toString()
                             : null);
                     insert.addBatch();
