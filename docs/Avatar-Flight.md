@@ -12,6 +12,7 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 - Right-click with Flightmaster's Reins applies the airbrake.
 - Q with Flightmaster's Reins performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
+- Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
 While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and Reins actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.

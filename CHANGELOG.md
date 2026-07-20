@@ -62,6 +62,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed transformed avatar-flight players remaining under custom flight control after entering liquid instead of switching to native swimming.
 - Fixed avatar-flight wing-flap sounds accumulating during forward flight or remaining silent while hovering. Configured one-shot flap cues now play at a state-specific cadence without restarting movement animations.
 - Fixed transformed avatar-flight models sometimes freezing on their final flight frame after landing while stationary instead of immediately returning to idle.
 - Fixed AvatarFlight cleanup replaying equipment before restoring the player skin, which could leave clothing visible through equipped armor after dismounting.

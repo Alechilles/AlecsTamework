@@ -58,6 +58,25 @@ class AvatarFlightControllerTest {
     }
 
     @Test
+    void enteringFluidHandsActiveFlightBackToNativeMovement() {
+        AvatarFlightController.State active = new AvatarFlightController.State(
+                4.0, -3.0, -12.0, 0L, 0L, 0.5, 0.5, 0L, AvatarFlightMode.FORWARD_FLIGHT);
+        AvatarFlightController.Input input = new AvatarFlightController.Input(
+                1.0, 0.0, 0.0, true, false, true, false, false, 0.0, 0.0,
+                true, true, true, 0L, false, true);
+
+        AvatarFlightController.Output output = update(active, input);
+
+        assertEquals(AvatarFlightMode.GROUNDED, output.mode());
+        assertFalse(output.applyVelocity());
+        assertFalse(output.jumpApplied(), "a flap must not reassert custom flight while swimming");
+        assertFalse(output.boostApplied(), "a boost must not reassert custom flight while swimming");
+        assertEquals(0.0, output.velocityX(), 0.00001);
+        assertEquals(0.0, output.velocityY(), 0.00001);
+        assertEquals(0.0, output.velocityZ(), 0.00001);
+    }
+
+    @Test
     void groundedBoostActionCanStartAvatarFlight() {
         AvatarFlightController.Output output = update(
                 groundedState(0.0, 0.0, 0.0),

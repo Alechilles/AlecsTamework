@@ -48,11 +48,16 @@ final class AvatarFlightAnimationService {
               boolean applyingVelocity,
               boolean suppressingOverlays,
               boolean groundedMovementIntent,
+              boolean nativeSwimming,
               long now) {
         boolean hadAnimationOverrides = hasOverrides(flight);
         expireAbilityAnimation(ref, commandBuffer, flight, now);
         suppressPlayerOverlayAnimations(ref, commandBuffer, flight, config, suppressingOverlays, now);
         if (!applyingVelocity) {
+            if (nativeSwimming) {
+                clear(ref, commandBuffer, flight, config);
+                return;
+            }
             if (isGroundedIdleHandoffActive(flight)) {
                 if (groundedMovementIntent) {
                     clearMovementAnimation(ref, commandBuffer, flight);

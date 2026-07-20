@@ -158,7 +158,7 @@ public final class AvatarFlightMovementSystem
         syncOwnerClientFlyingState(ref, commandBuffer, flight, applyingVelocity);
         animationService.tick(
                 ref, commandBuffer, flight, config, output, applyingVelocity, suppressingOverlays,
-                groundedMovementIntent, now);
+                groundedMovementIntent, controllerInput.inFluid(), now);
         if (applyingVelocity) {
             applyVisualPose(ref, commandBuffer, controllerInput, output);
             velocity.addInstruction(
@@ -168,7 +168,11 @@ public final class AvatarFlightMovementSystem
             );
             applyFlightMovementState(ref, commandBuffer, output);
         } else if (hasFlightVisualOverrides) {
-            clearFlightMovementState(ref, commandBuffer, controllerInput);
+            if (controllerInput.inFluid()) {
+                releaseFlightMovementStateForSwimming(ref, commandBuffer);
+            } else {
+                clearFlightMovementState(ref, commandBuffer, controllerInput);
+            }
             resetVisualPose(ref, commandBuffer);
         }
         commandBuffer.putComponent(ref, flightType, flight);
@@ -351,7 +355,8 @@ public final class AvatarFlightMovementSystem
                 boostAllowed,
                 launchAllowed,
                 input.launchHoldMs(),
-                input.airbrakeActivated()
+                input.airbrakeActivated(),
+                input.inFluid()
         );
     }
 
@@ -451,6 +456,19 @@ public final class AvatarFlightMovementSystem
         commandBuffer.putComponent(ref, movementStatesType, component);
     }
 
+    private void releaseFlightMovementStateForSwimming(@Nonnull Ref<EntityStore> ref,
+                                                        @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        MovementStatesComponent component = commandBuffer.getComponent(ref, movementStatesType);
+        if (component == null || component.getMovementStates() == null) {
+            return;
+        }
+        MovementStates states = new MovementStates(component.getMovementStates());
+        states.flying = false;
+        states.gliding = false;
+        component.setMovementStates(states);
+        commandBuffer.putComponent(ref, movementStatesType, component);
+    }
+
     private void resetVisualPose(@Nonnull Ref<EntityStore> ref,
                                  @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         TransformComponent transform = commandBuffer.getComponent(ref, transformType);
@@ -499,6 +517,7 @@ public final class AvatarFlightMovementSystem
         double yaw = stale ? resolveYaw(ref, commandBuffer) : input.getYawRadians();
         double pitch = stale ? resolvePitch(ref, commandBuffer) : input.getPitchRadians();
         boolean onGround = stale ? states == null || states.onGround : input.isOnGround();
+        boolean inFluid = states != null && (states.inFluid || states.swimming);
         boolean reinsFlap = input != null && input.consumeReinsFlap(
                 now,
                 Math.round(config.getInput().getIntentTimeoutMs())
@@ -542,7 +561,8 @@ public final class AvatarFlightMovementSystem
                 true,
                 true,
                 launchHoldMs,
-                reinsAirbrakeActivated
+                reinsAirbrakeActivated,
+                inFluid
         );
         if (input != null) {
             input.clearTransientVerticalIntent();
