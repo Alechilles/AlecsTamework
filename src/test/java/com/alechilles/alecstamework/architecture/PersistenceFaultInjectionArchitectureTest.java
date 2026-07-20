@@ -15,6 +15,7 @@ class PersistenceFaultInjectionArchitectureTest {
     private static final Set<String> ALLOWED = Set.of(
             "persistence/operation/PersistenceCheckpoint.java",
             "persistence/operation/PersistenceCheckpointHook.java",
+            "persistence/health/PersistenceMutationAvailabilityService.java",
             "persistence/recovery/PostCommitPublicationRecoveryVerifier.java",
             "persistence/sqlite/PersistenceWriteBatchExecutor.java",
             "persistence/sqlite/PersistenceWriteQueue.java"

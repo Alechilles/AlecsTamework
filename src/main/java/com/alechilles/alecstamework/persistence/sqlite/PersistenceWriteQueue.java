@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.alechilles.alecstamework.persistence.operation.PersistenceOperationMetadata;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import com.alechilles.alecstamework.persistence.operation.PersistenceWriteFailureHandler;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -61,6 +62,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private final AtomicReference<PersistenceWriteFailureHandler> failureHandler =
             new AtomicReference<>(PersistenceWriteFailureHandler.NO_OP);
     private final PersistenceWriteBatchExecutor batchExecutor;
+    private final PersistenceCheckpointHook checkpoints;
     private final AtomicInteger activeBatchSize = new AtomicInteger();
     private final AtomicInteger pendingTaskCount = new AtomicInteger();
     private final AtomicBoolean drainTimedOut = new AtomicBoolean();
@@ -87,6 +89,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         this.connectionManager = connectionManager;
         this.healthService = healthService;
         this.closeJoinTimeoutMs = Math.max(1L, closeJoinTimeoutMs);
+        this.checkpoints = checkpoints;
         this.batchExecutor = new PersistenceWriteBatchExecutor(
                 connectionManager, healthService, metrics, failureHandler, logger, checkpoints);
         this.workerThread = new Thread(this::workerLoop, "tamework-persistence-writer");
@@ -309,6 +312,11 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     public void close() {
         if (state.get() == QueueState.CLOSED) {
             return;
+        }
+        try {
+            checkpoints.hit(PersistenceCheckpoint.DURING_SHUTDOWN_RESTART_RECONSTRUCTION, null);
+        } catch (Exception failure) {
+            healthService.markDegraded("persistence_shutdown_checkpoint_failed");
         }
         beginDraining();
         joinWorker(closeJoinTimeoutMs);

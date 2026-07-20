@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
 import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.operation.PersistenceOperationMetadata;
 import com.alechilles.alecstamework.persistence.operation.PersistenceWriteFailureHandler;
@@ -75,6 +76,30 @@ class PersistenceWriteCheckpointFaultTest {
         assertTrue(harness.health.isHealthy());
     }
 
+    @Test
+    void preparationAndSourceFinalizationCheckpointsPreserveKnownCommitOutcomes() throws Exception {
+        DeterministicPersistenceFaultInjector preparationFault = new DeterministicPersistenceFaultInjector()
+                .arm("prepared-commit", PersistenceCheckpoint.AFTER_OPERATION_PREPARATION,
+                        FaultMode.EXCEPTION_COMMIT_KNOWN_PRESENT, 1);
+        Harness prepared = new Harness("prepared.sqlite", preparationFault);
+        PersistenceWriteTask<Void> preparedTask = prepared.insert(
+                "prepared", 4, PersistenceOperationPhase.PREPARED, null);
+        prepared.executor.execute(List.of(preparedTask), false);
+        assertEquals(PersistenceWriteQueue.WriteStatus.COMMITTED, prepared.outcome(preparedTask).status());
+        assertEquals(List.of(4), prepared.values());
+
+        DeterministicPersistenceFaultInjector sourceFault = new DeterministicPersistenceFaultInjector()
+                .arm("source-before", PersistenceCheckpoint.BEFORE_SOURCE_ITEM_FINALIZATION,
+                        FaultMode.EXCEPTION_COMMIT_KNOWN_ABSENT, 1);
+        Harness source = new Harness("source.sqlite", sourceFault);
+        PersistenceWriteTask<Void> sourceTask = source.insert(
+                "source", 5, PersistenceOperationPhase.SOURCE_FINALIZATION, null);
+        source.executor.execute(List.of(sourceTask), false);
+        assertEquals(PersistenceWriteQueue.WriteStatus.FAILED, source.outcome(sourceTask).status());
+        assertEquals(List.of(), source.values());
+        assertTrue(source.health.isHealthy());
+    }
+
     private final class Harness {
         private final SqliteConnectionManager connections;
         private final PersistenceHealthService health = new PersistenceHealthService();
@@ -95,9 +120,16 @@ class PersistenceWriteCheckpointFaultTest {
         }
 
         private PersistenceWriteTask<Void> insert(String name, int value, Runnable publication) {
+            return insert(name, value, PersistenceOperationPhase.APPLYING, publication);
+        }
+
+        private PersistenceWriteTask<Void> insert(String name, int value,
+                                                  PersistenceOperationPhase phase,
+                                                  Runnable publication) {
             PersistenceOperationMetadata metadata = PersistenceOperationMetadata.builder(
                             name, PersistenceDomain.OWNER_MUTATION)
                     .atomicGroupId(name)
+                    .phase(phase)
                     .build();
             return new PersistenceWriteTask<>(metadata, connection -> {
                 try (Statement statement = connection.createStatement()) {

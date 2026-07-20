@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
 import com.alechilles.alecstamework.persistence.operation.PersistenceOperationMetadata;
 import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
 import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
@@ -107,6 +108,7 @@ final class PersistenceWriteBatchExecutor {
                 checkpoints.hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT,
                         tasks.getFirst().metadata());
                 for (PersistenceWriteTask<?> task : tasks) {
+                    hitBeforeLogicalMutation(task.metadata());
                     task.runWork(connection);
                     checkpoints.hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION, task.metadata());
                 }
@@ -126,8 +128,26 @@ final class PersistenceWriteBatchExecutor {
         }
         try {
             checkpoints.hit(PersistenceCheckpoint.AFTER_COMMIT_RETURN, tasks.getFirst().metadata());
+            for (PersistenceWriteTask<?> task : tasks) hitAfterLogicalCommit(task.metadata());
         } catch (Exception committedFailure) {
             throw new TransactionFailure(PersistenceTransactionOutcome.COMMITTED, committedFailure);
+        }
+    }
+
+    private void hitBeforeLogicalMutation(PersistenceOperationMetadata metadata) throws Exception {
+        if (metadata.phase() == PersistenceOperationPhase.SOURCE_FINALIZATION) {
+            checkpoints.hit(PersistenceCheckpoint.BEFORE_SOURCE_ITEM_FINALIZATION, metadata);
+            checkpoints.hit(PersistenceCheckpoint.BEFORE_JOURNAL_TERMINALIZATION, metadata);
+        } else if (metadata.phase() == PersistenceOperationPhase.TERMINAL) {
+            checkpoints.hit(PersistenceCheckpoint.BEFORE_JOURNAL_TERMINALIZATION, metadata);
+        }
+    }
+
+    private void hitAfterLogicalCommit(PersistenceOperationMetadata metadata) throws Exception {
+        if (metadata.phase() == PersistenceOperationPhase.PREPARED) {
+            checkpoints.hit(PersistenceCheckpoint.AFTER_OPERATION_PREPARATION, metadata);
+        } else if (metadata.phase() == PersistenceOperationPhase.SOURCE_FINALIZATION) {
+            checkpoints.hit(PersistenceCheckpoint.AFTER_SOURCE_ITEM_FINALIZATION, metadata);
         }
     }
 

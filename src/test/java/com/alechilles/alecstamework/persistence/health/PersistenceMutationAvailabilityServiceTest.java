@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineR
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineState;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScope;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.testing.DeterministicPersistenceFaultInjector;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -65,6 +67,24 @@ class PersistenceMutationAvailabilityServiceTest {
     @Test
     void verifiedScopesAreImmediatelyUsableWithoutLoginDelay() {
         assertTrue(service.decide(context(scope(PersistenceScopeType.PROFILE, "profile-first-login"))).allowed());
+    }
+
+    @Test
+    void deterministicAdmissionFaultFailsClosedWithoutChangingStorageHealth() {
+        var faults = new DeterministicPersistenceFaultInjector().arm(
+                "availability-denial",
+                PersistenceCheckpoint.BEFORE_AVAILABILITY_ADMISSION,
+                DeterministicPersistenceFaultInjector.FaultMode.DETERMINISTIC_DOMAIN_REJECTION,
+                1);
+        var injected = new PersistenceMutationAvailabilityService(
+                storage, quarantines, circuits, ignored -> true, faults);
+
+        PersistenceMutationAvailabilityDecision denied = injected.decide(
+                context(scope(PersistenceScopeType.PROFILE, "profile-test")));
+
+        assertEquals(PersistenceMutationAvailabilityStatus.RETRYABLE_DENIAL, denied.status());
+        assertEquals("availability_checkpoint_failed", denied.reasonCode());
+        assertTrue(storage.acceptsWrites());
     }
 
     private PersistenceMutationContext context(PersistenceScope scope) {

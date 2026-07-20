@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCirc
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRecord;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import java.util.Optional;
 import javax.annotation.Nonnull;
 
@@ -13,19 +15,35 @@ public final class PersistenceMutationAvailabilityService {
     private final PersistenceQuarantineRegistry quarantines;
     private final PersistenceFeatureCircuitRegistry circuits;
     private final PersistenceCoverageReadiness coverage;
+    private final PersistenceCheckpointHook checkpoints;
 
     public PersistenceMutationAvailabilityService(@Nonnull PersistenceStorageHealthService storageHealth,
                                                   @Nonnull PersistenceQuarantineRegistry quarantines,
                                                   @Nonnull PersistenceFeatureCircuitRegistry circuits,
                                                   @Nonnull PersistenceCoverageReadiness coverage) {
+        this(storageHealth, quarantines, circuits, coverage, PersistenceCheckpointHook.NO_OP);
+    }
+
+    PersistenceMutationAvailabilityService(@Nonnull PersistenceStorageHealthService storageHealth,
+                                            @Nonnull PersistenceQuarantineRegistry quarantines,
+                                            @Nonnull PersistenceFeatureCircuitRegistry circuits,
+                                            @Nonnull PersistenceCoverageReadiness coverage,
+                                            @Nonnull PersistenceCheckpointHook checkpoints) {
         this.storageHealth = storageHealth;
         this.quarantines = quarantines;
         this.circuits = circuits;
         this.coverage = coverage;
+        this.checkpoints = checkpoints;
     }
 
     @Nonnull
     public PersistenceMutationAvailabilityDecision decide(@Nonnull PersistenceMutationContext context) {
+        try {
+            checkpoints.hit(PersistenceCheckpoint.BEFORE_AVAILABILITY_ADMISSION, null);
+        } catch (Exception failure) {
+            return deny(PersistenceMutationAvailabilityStatus.RETRYABLE_DENIAL,
+                    "availability_checkpoint_failed", null);
+        }
         if (!storageHealth.acceptsWrites()) {
             return deny(PersistenceMutationAvailabilityStatus.GLOBAL_READ_ONLY,
                     storageHealth.getState().reason(), storageHealth.getState().incidentId());
