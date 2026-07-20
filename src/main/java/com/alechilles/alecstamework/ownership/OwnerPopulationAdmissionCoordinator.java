@@ -6,14 +6,10 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationReposi
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
-import com.alechilles.alecstamework.persistence.sqlite.ProfileOwnerMutation;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentReporter;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
-import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -134,7 +130,7 @@ public final class OwnerPopulationAdmissionCoordinator {
         UUID operationId = decision.reservation().tokenId();
         PopulationPersistenceTransition.Prepare persistencePrepare =
                 new PopulationPersistenceTransition.Prepare(
-                        operationRecord(operationId, plan),
+                        OwnerPopulationPersistenceRecords.prepared(operationId, plan),
                         plan.baselineState()
                 );
         try {
@@ -224,7 +220,7 @@ public final class OwnerPopulationAdmissionCoordinator {
         }
 
         PopulationPersistenceTransition.Commit persistenceCommit =
-                persistenceCommit(prepared.operationId(), prepared.plan());
+                OwnerPopulationPersistenceRecords.commit(prepared.operationId(), prepared.plan());
         try {
             PersistenceWriteQueue.WriteSubmission<PopulationPersistenceTransition.Result> submission =
                     repository.commitAsync(persistenceCommit);
@@ -404,87 +400,6 @@ public final class OwnerPopulationAdmissionCoordinator {
                 "owner-population-final-durability-failed",
                 result
         );
-    }
-
-    @Nonnull
-    private static CompanionPopulationOperationRecord operationRecord(
-            @Nonnull UUID operationId,
-            @Nonnull OwnerPopulationAdmissionPlan plan
-    ) {
-        long now = System.currentTimeMillis();
-        return new CompanionPopulationOperationRecord(
-                operationId.toString(),
-                plan.transition().profileId(),
-                plan.transition().operation().name(),
-                CompanionPopulationOperationRecord.State.PREPARED,
-                plan.baselineState().revision(),
-                recoveryStateJson(
-                        plan.oldStateJson(),
-                        plan.baselineState().ownerUuid(),
-                        plan.baselineState().lifecycleState(),
-                        plan.baselineState().ownershipWorldName()
-                ),
-                recoveryStateJson(
-                        plan.newStateJson(),
-                        plan.transition().newOwnerId(),
-                        plan.transition().lifecycleState().name(),
-                        plan.transition().destinationWorldName()
-                ),
-                plan.targetContextJson(),
-                now,
-                now,
-                0L,
-                null
-        );
-    }
-
-    @Nonnull
-    private static String recoveryStateJson(@Nonnull String original,
-                                            @Nullable UUID ownerUuid,
-                                            @Nonnull String lifecycleState,
-                                            @Nullable String ownershipWorldName) {
-        JsonObject json = JsonParser.parseString(original).getAsJsonObject();
-        if (ownerUuid == null) {
-            json.add("ownerUuid", JsonNull.INSTANCE);
-        } else {
-            json.addProperty("ownerUuid", ownerUuid.toString());
-        }
-        json.addProperty("lifecycleState", lifecycleState);
-        if (ownershipWorldName == null || ownershipWorldName.isBlank()) {
-            json.add("ownershipWorldName", JsonNull.INSTANCE);
-        } else {
-            json.addProperty("ownershipWorldName", ownershipWorldName.trim());
-        }
-        return json.toString();
-    }
-
-    @Nonnull
-    private static PopulationPersistenceTransition.Commit persistenceCommit(
-            @Nonnull UUID operationId,
-            @Nonnull OwnerPopulationAdmissionPlan plan
-    ) {
-        OwnerPopulationTransitionRequest transition = plan.transition();
-        return new PopulationPersistenceTransition.Commit(
-                operationId.toString(),
-                transition.profileId(),
-                plan.baselineState().revision(),
-                ownerMutation(transition.expectedOwnerId(), transition.newOwnerId()),
-                plan.finalNpcUuid(),
-                transition.destinationWorldName(),
-                transition.lifecycleState().name(),
-                plan.finalPhysicalWorldName(),
-                plan.finalPhysicalChunkX(),
-                plan.finalPhysicalChunkZ(),
-                plan.source()
-        );
-    }
-
-    @Nonnull
-    private static ProfileOwnerMutation ownerMutation(@Nullable UUID oldOwner, @Nullable UUID newOwner) {
-        if (Objects.equals(oldOwner, newOwner)) {
-            return ProfileOwnerMutation.unchanged();
-        }
-        return newOwner == null ? ProfileOwnerMutation.clear() : ProfileOwnerMutation.set(newOwner);
     }
 
     @Nonnull
