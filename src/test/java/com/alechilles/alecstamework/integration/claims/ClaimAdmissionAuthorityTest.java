@@ -302,7 +302,7 @@ class ClaimAdmissionAuthorityTest {
         ClaimPolicyContext policy = context(bridge);
         ClaimAdmissionService service = new ClaimAdmissionService(index);
         ClaimAdmissionDecision forced = service.reserve(
-                request(List.of(newActive("forced")), policy, 1, 1, true, 1_000_000L),
+                request(List.of(newActive("forced")), policy, 1, 1, true, 60_000_000_000L),
                 new ClaimLookupSession(policy)
         );
         index.reconcileCommittedEntry(
