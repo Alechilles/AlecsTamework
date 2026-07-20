@@ -149,6 +149,7 @@ import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
+import com.alechilles.alecstamework.persistence.recovery.TameworkScopedRecoveryWiring;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ownership.OwnerPopulationAdmissionCoordinator;
@@ -792,6 +793,7 @@ public class Tamework extends JavaPlugin {
         ownerPopulationRuntime = TameworkPopulationRuntimeLifecycle.initialize(
                 persistenceRuntime, getLogger()
         );
+        TameworkScopedRecoveryWiring.installAndStart(persistenceRuntime, ownerPopulationRuntime);
         commandNpcRelocationService.setRelocationAdmissionService(ownerPopulationRuntime.relocationAdmissionService());
         apiEventBus = new TameworkEventBus(getLogger());
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());

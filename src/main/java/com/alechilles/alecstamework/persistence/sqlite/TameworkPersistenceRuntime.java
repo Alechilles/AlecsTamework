@@ -302,7 +302,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 maintenanceService.start();
             }
         }
-        resilienceRuntime.scopedRecovery().scheduleOpenIncidentsAfterStartup();
         storageRecoveryCoordinator.start();
         return runtime;
     }

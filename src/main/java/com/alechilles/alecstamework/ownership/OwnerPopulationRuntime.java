@@ -51,6 +51,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     private final CompanionRelocationAdmissionService relocationAdmissionService;
     private final CompanionPopulationReconciliationRuntime reconciliationRuntime;
     private final BreedingReplayJournalLoader breedingReplayJournal;
+    private final OwnerPopulationCanonicalRecoveryService canonicalRecoveryService;
     private final CompanionPopulationBootstrapService.BootstrapResult bootstrapResult;
 
     private OwnerPopulationRuntime(
@@ -74,6 +75,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
             @Nonnull CompanionRelocationAdmissionService relocationAdmissionService,
             @Nonnull CompanionPopulationReconciliationRuntime reconciliationRuntime,
             @Nonnull BreedingReplayJournalLoader breedingReplayJournal,
+            @Nonnull OwnerPopulationCanonicalRecoveryService canonicalRecoveryService,
             @Nonnull CompanionPopulationBootstrapService.BootstrapResult bootstrapResult
     ) {
         this.index = index;
@@ -96,6 +98,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         this.relocationAdmissionService = relocationAdmissionService;
         this.reconciliationRuntime = reconciliationRuntime;
         this.breedingReplayJournal = breedingReplayJournal;
+        this.canonicalRecoveryService = canonicalRecoveryService;
         this.bootstrapResult = bootstrapResult;
     }
 
@@ -116,6 +119,12 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         );
         CompanionPopulationBootstrapService.BootstrapResult bootstrap =
                 bootstrapService.loadForReconciliation();
+        OwnerPopulationCanonicalRecoveryService canonicalRecoveryService =
+                new OwnerPopulationCanonicalRecoveryService(
+                        bootstrapService,
+                        persistence.getCompanionPopulationRepository(),
+                        persistence.getCompanionPopulationCoverageRepository(),
+                        persistence.getCompanionIdentityRepository());
         boolean canonicalReady = bootstrap.globalReadiness() != OwnerPopulationReadiness.DEGRADED;
         long coverageGeneration = System.currentTimeMillis();
         persistence.getPersistenceCoverageRegistry().publish(
@@ -262,6 +271,7 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                 relocationAdmissionService,
                 reconciliationRuntime,
                 breedingReplayJournal,
+                canonicalRecoveryService,
                 bootstrap
         );
     }
@@ -409,6 +419,11 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     @Nonnull
     public CompanionPopulationBootstrapService.BootstrapResult bootstrapResult() {
         return bootstrapResult;
+    }
+
+    @Nonnull
+    public OwnerPopulationCanonicalRecoveryService canonicalRecoveryService() {
+        return canonicalRecoveryService;
     }
 
     @Override
