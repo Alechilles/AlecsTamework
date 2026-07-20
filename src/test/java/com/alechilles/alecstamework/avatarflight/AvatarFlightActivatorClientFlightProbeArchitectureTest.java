@@ -34,7 +34,7 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     @Test
     void disablingAvatarFlightDoesNotOwnStandaloneClientFlightProbe() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
-        String disableBody = methodBody(source, "public Result disable", "public void onPlayerDisconnect");
+        String disableBody = methodBody(source, "public Result disable", "void preparePlayerDisconnect");
 
         assertFalse(disableBody.contains("AvatarFlightClientFlightProbe.disable("),
                 "avatar flight disable should not silently disable a manually enabled flightprobe session");
@@ -45,7 +45,7 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     @Test
     void disablingAvatarFlightResetsVisualPoseAndSavedFlyingState() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
-        String disableBody = methodBody(source, "public Result disable", "public void onPlayerDisconnect");
+        String disableBody = methodBody(source, "public Result disable", "void preparePlayerDisconnect");
 
         assertTrue(disableBody.contains("restoreClientFlyingState(store, ref)"),
                 "disable must send the owner client back to non-flying animation state");
@@ -56,7 +56,7 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     @Test
     void disablingAvatarFlightClearsForcedAnimationSlots() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
-        String disableBody = methodBody(source, "public Result disable", "public void onPlayerDisconnect");
+        String disableBody = methodBody(source, "public Result disable", "void preparePlayerDisconnect");
 
         assertTrue(disableBody.contains("clearForcedAnimations(store, ref)"),
                 "disabling avatar flight must clear any forced transformed-player and overlay animations");
@@ -73,7 +73,7 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
     @Test
     void disconnectCleanupDoesNotTouchThreadBoundPlayerComponents() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
-        String disconnectBody = source.substring(source.indexOf("public void onPlayerDisconnect"));
+        String disconnectBody = source.substring(source.indexOf("void preparePlayerDisconnect"));
 
         assertFalse(disconnectBody.contains("AvatarFlightClientFlightProbe.disable("),
                 "disconnect events can run off the world thread and must not resolve movement components");
@@ -81,6 +81,17 @@ class AvatarFlightActivatorClientFlightProbeArchitectureTest {
                 "disconnect cleanup should still clear probe bookkeeping");
         assertFalse(disconnectBody.contains("AvatarFlightActivationCapability"),
                 "disconnect cleanup should not manage removed double-jump activation bookkeeping");
+    }
+
+    /** Protects restart cleanup when the in-memory pre-transform model snapshot no longer exists. */
+    @Test
+    void disablingPersistedFlightFallsBackToPlayerSkinModel() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String disableBody = methodBody(source, "public Result disable", "void preparePlayerDisconnect");
+
+        assertTrue(disableBody.contains("boolean restoreModel = config != null && config.getModel().isApplyModel()"));
+        assertTrue(disableBody.contains("boolean restored = !restoreModel || modelService.restore(store, ref, playerUuid)"),
+                "model cleanup must call the skin fallback even when the process-local model snapshot was lost");
     }
 
     /** Protects armor clothing masks from being overwritten by the post-flight skin refresh. */

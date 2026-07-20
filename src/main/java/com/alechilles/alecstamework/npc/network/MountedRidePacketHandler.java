@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.network;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountLifecycleService;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightPacketInputCapture;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.alechilles.alecstamework.npc.components.TameworkMountedGlideComponent;
@@ -17,6 +19,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.AnimationSlot;
+import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.MountController;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.Position;
@@ -24,8 +27,11 @@ import com.hypixel.hytale.protocol.ToServerPacket;
 import com.hypixel.hytale.protocol.Vector2i;
 import com.hypixel.hytale.protocol.packets.entities.MountMovement;
 import com.hypixel.hytale.protocol.packets.interaction.DismountNPC;
+import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChain;
+import com.hypixel.hytale.protocol.packets.interaction.SyncInteractionChains;
 import com.hypixel.hytale.protocol.packets.player.ClientMovement;
 import com.hypixel.hytale.protocol.packets.player.MouseInteraction;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.io.handlers.IPacketHandler;
@@ -66,6 +72,9 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
     private Consumer<ToServerPacket> clientMovementDelegate;
     private Consumer<ToServerPacket> mountMovementDelegate;
     private Consumer<ToServerPacket> mouseInteractionDelegate;
+    private Consumer<ToServerPacket> interactionChainsDelegate;
+    private final AvatarFlightMountLifecycleService avatarFlightMountLifecycle =
+            new AvatarFlightMountLifecycleService();
     private final AvatarFlightPacketInputCapture avatarFlightPacketInputCapture = new AvatarFlightPacketInputCapture();
     private final MountedGlidePacketInputCapture glidePacketInputCapture = new MountedGlidePacketInputCapture();
     private long lastClientMovementDebugMs;
@@ -115,10 +124,15 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
         clientMovementDelegate = findRegisteredHandler(ClientMovement.PACKET_ID);
         mountMovementDelegate = findRegisteredHandler(MountMovement.PACKET_ID);
         mouseInteractionDelegate = findRegisteredHandler(MouseInteraction.PACKET_ID);
+        interactionChainsDelegate = findRegisteredHandler(SyncInteractionChains.PACKET_ID);
         packetHandler.registerHandler(DismountNPC.PACKET_ID, packet -> handle((DismountNPC) packet));
         packetHandler.registerHandler(ClientMovement.PACKET_ID, packet -> handleClientMovement((ClientMovement) packet));
         packetHandler.registerHandler(MountMovement.PACKET_ID, packet -> handleMountMovement((MountMovement) packet));
         packetHandler.registerHandler(MouseInteraction.PACKET_ID, packet -> handleMouseInteraction((MouseInteraction) packet));
+        packetHandler.registerHandler(
+                SyncInteractionChains.PACKET_ID,
+                packet -> handleInteractionChains((SyncInteractionChains) packet)
+        );
     }
 
     private void handleClientMovement(@Nonnull ClientMovement packet) {
@@ -142,6 +156,32 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
         PlayerInputDebugProbe.logMouseInteraction(packetHandler.getPlayerRef(), packet);
         tryHandleTameworkMouseInteraction(packet);
         delegate(mouseInteractionDelegate, packet);
+    }
+
+    private void handleInteractionChains(@Nonnull SyncInteractionChains packet) {
+        if (containsInitialUse(packet)) {
+            PlayerRef playerRef = packetHandler.getPlayerRef();
+            Ref<EntityStore> riderRef = playerRef == null ? null : playerRef.getReference();
+            if (riderRef != null && riderRef.isValid()) {
+                Store<EntityStore> store = riderRef.getStore();
+                World world = store == null || store.getExternalData() == null
+                        ? null : store.getExternalData().getWorld();
+                if (world != null) {
+                    world.execute(() -> handleAvatarFlightDismount(riderRef, store));
+                }
+            }
+        }
+        delegate(interactionChainsDelegate, packet);
+    }
+
+    static boolean containsInitialUse(@Nonnull SyncInteractionChains packet) {
+        if (packet.updates == null) return false;
+        for (SyncInteractionChain update : packet.updates) {
+            if (update != null && update.initial && update.interactionType == InteractionType.Use) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean tryHandleTameworkClientMovement(@Nonnull ClientMovement packet) {
@@ -265,6 +305,9 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
         if (player == null) {
             return;
         }
+        if (handleAvatarFlightDismount(riderRef, store)) {
+            return;
+        }
         Tamework instance = Tamework.getInstance();
         ComponentType<EntityStore, TameworkRideRiderComponent> riderType =
                 instance == null ? null : instance.getRideRiderComponentType();
@@ -304,6 +347,26 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
             return;
         }
         handleVanillaDismount(riderRef, store, player);
+    }
+
+    private boolean handleAvatarFlightDismount(@Nonnull Ref<EntityStore> riderRef,
+                                               @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, AvatarFlightMountSessionComponent> sessionType =
+                AvatarFlightMountSessionComponent.getComponentType();
+        if (sessionType == null || store.getComponent(riderRef, sessionType) == null) {
+            return false;
+        }
+        UUIDComponent identity = store.getComponent(riderRef, UUIDComponent.getComponentType());
+        UUID playerUuid = identity == null ? null : identity.getUuid();
+        if (playerUuid != null) {
+            avatarFlightMountLifecycle.end(
+                    store,
+                    riderRef,
+                    playerUuid,
+                    AvatarFlightMountLifecycleService.EndReason.NORMAL
+            );
+        }
+        return true;
     }
 
     private boolean handleMountedGlideDismount(@Nonnull Ref<EntityStore> riderRef,

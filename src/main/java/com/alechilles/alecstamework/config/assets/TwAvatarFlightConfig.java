@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.joml.Vector3f;
 
 /**
  * Asset-backed tuning for transformed-player avatar flight.
@@ -25,6 +26,24 @@ public final class TwAvatarFlightConfig implements
     private static final String DEFAULT_IDLE_ANIMATION = "FlyIdle";
     private static final String DEFAULT_FLIGHT_ANIMATION = "Fly";
     private static final String DEFAULT_FAST_FLIGHT_ANIMATION = "FlyFast";
+
+    private static final BuilderCodec<Vector3f> CAMERA_POSITION_OFFSET_CODEC = BuilderCodec.builder(
+            Vector3f.class,
+            Vector3f::new
+    )
+            .<Double>append(new KeyedCodec<>("X", Codec.DOUBLE),
+                    (vector, value) -> vector.x = value.floatValue(),
+                    vector -> (double) vector.x)
+            .add()
+            .<Double>append(new KeyedCodec<>("Y", Codec.DOUBLE),
+                    (vector, value) -> vector.y = value.floatValue(),
+                    vector -> (double) vector.y)
+            .add()
+            .<Double>append(new KeyedCodec<>("Z", Codec.DOUBLE),
+                    (vector, value) -> vector.z = value.floatValue(),
+                    vector -> (double) vector.z)
+            .add()
+            .build();
 
     private static final BuilderCodec<ModelSettings> MODEL_CODEC = BuilderCodec.builder(
             ModelSettings.class,
@@ -45,6 +64,16 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.scale)
             .documentation("Requested model scale before model-asset min/max clamping. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Vector3f>append(new KeyedCodec<>("CameraPositionOffset", CAMERA_POSITION_OFFSET_CODEC),
+                    (settings, value) -> settings.cameraPositionOffset = finiteVectorOrNull(value),
+                    settings -> settings.cameraPositionOffset)
+            .documentation("Optional runtime camera position offset. Omit to preserve the transformed ModelAsset camera offset. Inheritance: missing nested key inherits parent value.")
+            .add()
+            .<Double>append(new KeyedCodec<>("EyeHeight", Codec.DOUBLE),
+                    (settings, value) -> settings.eyeHeight = positiveOrNull(value),
+                    settings -> settings.eyeHeight)
+            .documentation("Optional runtime eye-height override used by first-person camera and other eye-height consumers. Omit to preserve the transformed ModelAsset value. Inheritance: missing nested key inherits parent value.")
+            .add()
             .build();
 
     private static final BuilderCodec<InputSettings> INPUT_CODEC = BuilderCodec.builder(
@@ -52,7 +81,7 @@ public final class TwAvatarFlightConfig implements
             InputSettings::new
     )
             .<Double>append(new KeyedCodec<>("IntentTimeoutMs", Codec.DOUBLE),
-                    (settings, value) -> settings.intentTimeoutMs = nonNegativeOrDefault(value, 250.0),
+                    (settings, value) -> settings.intentTimeoutMs = positiveOrDefault(value, 250.0),
                     settings -> settings.intentTimeoutMs)
             .documentation("Milliseconds before packet-derived movement intent decays to neutral. Inheritance: missing nested key inherits parent value.")
             .add()
@@ -276,9 +305,9 @@ public final class TwAvatarFlightConfig implements
             .documentation("Fast-flight recharge seconds required for each vigour charge while above the configured speed ratio. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("FastFlightRechargeSpeedRatio", Codec.DOUBLE),
-                    (settings, value) -> settings.fastFlightRechargeSpeedRatio = clamp01(value, 0.75),
+                    (settings, value) -> settings.fastFlightRechargeSpeedRatio = clamp01(value, 0.80),
                     settings -> settings.fastFlightRechargeSpeedRatio)
-            .documentation("Normalized forward-speed ratio required for fast-flight vigour recharge. Clamped to 0..1. Inheritance: missing nested key inherits parent value.")
+            .documentation("Normalized sustainable glide-speed ratio that activates the fast-flight animation and airborne vigour recharge. Clamped to 0..1. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("RechargeDelayAfterSpendSeconds", Codec.DOUBLE),
                     (settings, value) -> settings.rechargeDelayAfterSpendSeconds = nonNegativeOrDefault(value, 0.75),
@@ -317,7 +346,7 @@ public final class TwAvatarFlightConfig implements
             .documentation("Movement-slot animation used while the forward boost/fast-flight state is active. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("ResendIntervalMs", Codec.DOUBLE),
-                    (settings, value) -> settings.resendIntervalMs = positiveOrDefault(value, 250.0),
+                    (settings, value) -> settings.resendIntervalMs = nonNegativeOrDefault(value, 250.0),
                     settings -> settings.resendIntervalMs)
             .documentation("Minimum milliseconds between forced movement-animation packets while the same animation remains active. Set to 0 to send only when the animation changes, which preserves model-authored animation sound timing. Inheritance: missing nested key inherits parent value.")
             .add()
@@ -575,6 +604,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.riderVisual)
             .documentation("Avatar-flight rider visual and transformed-owner equipment visibility settings. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AvatarFlightMountingSettings>append(new KeyedCodec<>("Mounting", AvatarFlightMountingSettings.CODEC),
+                    (asset, value) -> asset.mounting = value == null ? new AvatarFlightMountingSettings() : value,
+                    asset -> asset.mounting)
+            .documentation("NPC-backed mounting and voluntary dismount settings. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<DebugSettings>append(new KeyedCodec<>("Debug", DEBUG_CODEC),
                     (asset, value) -> asset.debug = value == null ? new DebugSettings() : value,
                     asset -> asset.debug)
@@ -600,6 +634,7 @@ public final class TwAvatarFlightConfig implements
     AnimationSettings animation = new AnimationSettings();
     AvatarFlightAbilityAnimationSettings abilityAnimation = new AvatarFlightAbilityAnimationSettings();
     RiderVisualSettings riderVisual = new RiderVisualSettings();
+    AvatarFlightMountingSettings mounting = new AvatarFlightMountingSettings();
     DebugSettings debug = new DebugSettings();
 
     protected TwAvatarFlightConfig() {
@@ -683,6 +718,9 @@ public final class TwAvatarFlightConfig implements
         return abilityAnimation == null ? new AvatarFlightAbilityAnimationSettings() : abilityAnimation;
     }
     public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }
+    public AvatarFlightMountingSettings getMounting() {
+        return mounting == null ? new AvatarFlightMountingSettings() : mounting;
+    }
     public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
 
     private static String stringOrDefault(@Nullable String value, @Nonnull String fallback) {
@@ -711,14 +749,33 @@ public final class TwAvatarFlightConfig implements
         return Math.max(0.0, Math.min(1.0, resolved));
     }
 
+    @Nullable
+    private static Double positiveOrNull(@Nullable Double value) {
+        return value != null && Double.isFinite(value) && value > 0.0 ? value : null;
+    }
+
+    @Nullable
+    private static Vector3f finiteVectorOrNull(@Nullable Vector3f value) {
+        if (value == null || !Float.isFinite(value.x) || !Float.isFinite(value.y) || !Float.isFinite(value.z)) {
+            return null;
+        }
+        return new Vector3f(value);
+    }
+
     public static final class ModelSettings {
         boolean applyModel;
         String modelId = DEFAULT_MODEL_ID;
         double scale = 1.0;
+        Vector3f cameraPositionOffset;
+        Double eyeHeight;
 
         public boolean isApplyModel() { return applyModel; }
         public String getModelId() { return modelId; }
         public double getScale() { return scale; }
+        @Nullable public Vector3f getCameraPositionOffset() {
+            return cameraPositionOffset == null ? null : new Vector3f(cameraPositionOffset);
+        }
+        @Nullable public Double getEyeHeight() { return eyeHeight; }
     }
 
     public static final class InputSettings {
@@ -815,7 +872,7 @@ public final class TwAvatarFlightConfig implements
         double forwardBoostCost = 1.0;
         double groundedRechargeSecondsPerCharge = 4.0;
         double fastFlightRechargeSecondsPerCharge = 8.0;
-        double fastFlightRechargeSpeedRatio = 0.75;
+        double fastFlightRechargeSpeedRatio = 0.80;
         double rechargeDelayAfterSpendSeconds = 0.75;
         boolean hudEnabled = true;
         double hudResendIntervalMs = 100.0;

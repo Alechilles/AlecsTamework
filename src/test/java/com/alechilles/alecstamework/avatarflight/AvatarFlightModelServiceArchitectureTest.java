@@ -24,7 +24,7 @@ class AvatarFlightModelServiceArchitectureTest {
     void avatarFlightModelSwapInjectsPoseAnimationSetsIntoRuntimeModel() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
-        assertTrue(source.contains("createAvatarFlightModel(modelAsset, scale, config.getAnimation())"),
+        assertTrue(source.contains("createAvatarFlightModel(modelAsset, scale, modelSettings, config.getAnimation())"),
                 "transformed avatar models should be enriched before the ModelComponent is applied");
         assertTrue(source.contains("Model.createScaledModel(modelAsset, scale)"),
                 "enrichment should start from the normal scaled model so hitbox, camera, attachments, and texture stay intact");
@@ -73,6 +73,28 @@ class AvatarFlightModelServiceArchitectureTest {
         String savedRestoreBlock = source.substring(savedRestore, source.indexOf("return true;", savedRestore));
         assertTrue(savedRestoreBlock.contains("skin.setNetworkOutdated()"),
                 "dismount restore should force a skin refresh so armor visibility toggles do not leave stale clothing");
+    }
+
+    @Test
+    void avatarFlightRestoreRejectsMissingCosmeticFallbackModel() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        int fallbackCreation = source.indexOf("CosmeticsModule.get().createModel(skin.getPlayerSkin())");
+        int modelWrite = source.indexOf("store.putComponent(ref, ModelComponent.getComponentType()", fallbackCreation);
+        assertTrue(fallbackCreation >= 0);
+        assertTrue(modelWrite > fallbackCreation);
+        assertTrue(source.substring(fallbackCreation, modelWrite).contains("if (fallbackModel == null)"),
+                "restart recovery must not install a ModelComponent containing a null cosmetic model");
+    }
+
+    @Test
+    void avatarFlightModelCompositionAppliesOptionalCameraOverrides() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("cameraWithPositionOverride(baseModel.getCamera(), modelSettings)"));
+        assertTrue(source.contains("modelSettings.getEyeHeight().floatValue()"));
+        assertTrue(source.contains("baseCamera.getYaw()"));
+        assertTrue(source.contains("baseCamera.getPitch()"));
     }
 
     @Test

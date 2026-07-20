@@ -10,7 +10,6 @@ import com.hypixel.hytale.protocol.SavedMovementStates;
 import com.hypixel.hytale.server.core.entity.AnimationUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
-import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -74,8 +73,9 @@ public final class AvatarFlightActivator {
         ComponentType<EntityStore, AvatarFlightInputComponent> inputType = AvatarFlightInputComponent.getComponentType();
         AvatarFlightComponent flight = flightType == null ? null : store.getComponent(ref, flightType);
         Player player = store.getComponent(ref, Player.getComponentType());
-        boolean restoreEquipment = flight != null
-                && TwAvatarFlightConfig.resolve(flight.getConfigId()).getRiderVisual().isHideOwnerEquipment();
+        TwAvatarFlightConfig config = flight == null ? null : TwAvatarFlightConfig.resolve(flight.getConfigId());
+        boolean restoreEquipment = config != null && config.getRiderVisual().isHideOwnerEquipment();
+        boolean restoreModel = config != null && config.getModel().isApplyModel();
         AvatarFlightTrailService.stopFastGlideTrail(flight, ref, store);
         if (flightType != null) {
             store.tryRemoveComponent(ref, flightType);
@@ -90,14 +90,12 @@ public final class AvatarFlightActivator {
         riderVisualService.remove(store, ref);
         AvatarFlightSessionRegistry.markInactive(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
-        boolean hadSavedModel = modelService.hasSavedModel(playerUuid);
-        boolean restored = !hadSavedModel || modelService.restore(store, ref, playerUuid);
+        boolean restored = !restoreModel || modelService.restore(store, ref, playerUuid);
         if (restoreEquipment) {
             markEquipmentPresentationOutdated(store, ref);
         }
         return restored
-                ? Result.ok("Avatar flight disabled" + (hadSavedModel
-                ? " and model restored." : "."))
+                ? Result.ok("Avatar flight disabled" + (restoreModel ? " and model restored." : "."))
                 : Result.fail("Avatar flight disabled, but no saved model or skin fallback was available.");
     }
 
@@ -153,15 +151,15 @@ public final class AvatarFlightActivator {
         AnimationUtils.stopAnimation(ref, AnimationSlot.Emote, true, store);
     }
 
-    public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {
-        if (event == null || event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
-            return;
-        }
-        UUID playerUuid = event.getPlayerRef().getUuid();
+    void preparePlayerDisconnect(@Nonnull UUID playerUuid) {
         AvatarFlightClientFlightProbe.clear(playerUuid);
         AvatarFlightSessionRegistry.markDisconnecting(playerUuid);
         AvatarFlightPacketInputCapture.clear(playerUuid);
+    }
+
+    void finishPlayerDisconnect(@Nonnull UUID playerUuid) {
         modelService.clearSavedModel(playerUuid);
+        AvatarFlightSessionRegistry.markInactive(playerUuid);
     }
 
     @Nonnull

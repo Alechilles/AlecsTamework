@@ -328,6 +328,24 @@ class AvatarFlightMovementSystemArchitectureTest {
     }
 
     @Test
+    void fluidEntryReleasesFlightWithoutErasingNativeSwimmingState() throws Exception {
+        String movementSource = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String animationSource = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(movementSource.contains("states.inFluid || states.swimming"),
+                "water handoff should recognize both fluid contact and established swimming state");
+        assertTrue(movementSource.contains("releaseFlightMovementStateForSwimming(ref, commandBuffer)"),
+                "water entry should use a dedicated native movement handoff");
+        assertTrue(movementSource.contains("states.flying = false"),
+                "the synthetic client flying state must be cleared on water entry");
+        assertFalse(methodSlice(movementSource, "private void releaseFlightMovementStateForSwimming")
+                        .contains("states.swimming = false"),
+                "the water handoff must preserve native swimming state");
+        assertTrue(animationSource.contains("if (nativeSwimming)"),
+                "water entry should clear custom movement and pose animations instead of playing grounded idle");
+    }
+
+    @Test
     void avatarFlightSuppressesPlayerOverlayAnimationSlotsWhileActive() throws Exception {
         String source = Files.readString(ANIMATION_SOURCE, StandardCharsets.UTF_8);
 

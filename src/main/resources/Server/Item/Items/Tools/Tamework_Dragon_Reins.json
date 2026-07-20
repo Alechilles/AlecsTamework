@@ -29,6 +29,12 @@
       ]
     }
   },
+  "HudUI": [
+    {
+      "Path": "TameworkFlightmasterReinsHud.ui",
+      "Type": "Hud"
+    }
+  ],
   "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
   "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
   "Icon": "Icons/ItemsGenerated/Recipe_Page.png",

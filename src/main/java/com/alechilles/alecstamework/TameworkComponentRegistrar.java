@@ -2,7 +2,9 @@ package com.alechilles.alecstamework;
 
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
@@ -94,6 +96,18 @@ final class TameworkComponentRegistrar {
                         "TameworkAvatarFlightRiderVisual",
                         AvatarFlightRiderVisualComponent.CODEC
                 );
+        ComponentType<EntityStore, AvatarFlightMountSessionComponent> avatarFlightMountSession =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        AvatarFlightMountSessionComponent.class,
+                        "TameworkAvatarFlightMountSession",
+                        AvatarFlightMountSessionComponent.CODEC
+                );
+        ComponentType<EntityStore, AvatarFlightSourceComponent> avatarFlightSource =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        AvatarFlightSourceComponent.class,
+                        "TameworkAvatarFlightSource",
+                        AvatarFlightSourceComponent.CODEC
+                );
         ComponentType<EntityStore, TameworkLevelingComponent> leveling = plugin.getEntityStoreRegistry()
                 .registerComponent(TameworkLevelingComponent.class, "TameworkLeveling", TameworkLevelingComponent.CODEC);
         ComponentType<EntityStore, TameworkTraitsComponent> traits = plugin.getEntityStoreRegistry()
@@ -163,6 +177,7 @@ final class TameworkComponentRegistrar {
                 owner, tamed, hook, npcName, mountedNameplate, commandLinks, happiness, needs,
                 breeding, alarm, flyingCompanion, rideMount, rideRider, mountedGlide,
                 mountedGlideRider, avatarFlight, avatarFlightInput, avatarFlightRiderVisual,
+                avatarFlightMountSession, avatarFlightSource,
                 leveling, traits, talents, tranquilizerPeak, attachments, dynamicAttachments,
                 lifeStage, projectileImpactEffect, lingeringHazardProjectile, lingeringHazard,
                 apiSelfTestFixtureMarker, projectionIdentity, homingVisualProjectile, feedTroughWaterCharges
@@ -188,6 +203,8 @@ final class TameworkComponentRegistrar {
             ComponentType<EntityStore, AvatarFlightComponent> avatarFlight,
             ComponentType<EntityStore, AvatarFlightInputComponent> avatarFlightInput,
             ComponentType<EntityStore, AvatarFlightRiderVisualComponent> avatarFlightRiderVisual,
+            ComponentType<EntityStore, AvatarFlightMountSessionComponent> avatarFlightMountSession,
+            ComponentType<EntityStore, AvatarFlightSourceComponent> avatarFlightSource,
             ComponentType<EntityStore, TameworkLevelingComponent> leveling,
             ComponentType<EntityStore, TameworkTraitsComponent> traits,
             ComponentType<EntityStore, TameworkTalentsComponent> talents,

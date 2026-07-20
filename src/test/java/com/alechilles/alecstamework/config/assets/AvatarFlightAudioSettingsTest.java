@@ -11,6 +11,7 @@ class AvatarFlightAudioSettingsTest {
     void flapCadencesAreDisabledByDefault() {
         AvatarFlightAudioSettings settings = new AvatarFlightAudioSettings();
 
+        assertEquals(settings.getUpwardFlapSoundEvent(), settings.getAirbrakeSoundEvent());
         assertEquals("", settings.getIdleFlightFlapSoundEvent());
         assertEquals(0L, settings.getIdleFlightFlapIntervalMs());
         assertEquals("", settings.getFlightFlapSoundEvent());

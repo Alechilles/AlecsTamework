@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountPreflight;
+
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
 import com.alechilles.alecstamework.api.InteractionRequirementContext;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
@@ -41,6 +43,7 @@ import javax.annotation.Nullable;
 
 /** Tamework interact requirements. */
 final class TameworkInteractRequirements {
+    private final AvatarFlightMountPreflight avatarFlightMountPreflight = new AvatarFlightMountPreflight();
     private final ActionTameworkInteract owner;
     private final InteractionFeedHelper feedHelper;
     private final InteractionAlarmHelper alarmHelper;
@@ -683,6 +686,14 @@ final class TameworkInteractRequirements {
         }
         if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return false;
+        }
+        String mountMode = owner.getRoleStringParam(role, "MountMode");
+        if (InteractionMountMode.parse(mountMode) == InteractionMountMode.TAMEWORK_AVATAR_FLIGHT) {
+            Ref<EntityStore> playerRef = owner.resolveInteractionTarget(role, infoProvider);
+            String configId = owner.getRoleStringParam(role, InteractionMountEffects.AVATAR_FLIGHT_CONFIG_PARAM);
+            if (!avatarFlightMountPreflight.canStart(store, npcRef, playerRef, role, configId)) {
+                return false;
+            }
         }
         return true;
     }

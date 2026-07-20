@@ -42,6 +42,7 @@
 - Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.
 - Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `Origin` for injected pitch/bank poses.
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
+- Added asset-configured avatar-flight mounting for NPC interactions. Tamed mounts now transform their rider into the configured flight model, hide the same companion for the full session, and restore it with F, grounded back+crouch, or automatic lifecycle recovery. Disconnect and crash recovery restores orphaned companions, while server restarts invalidate persisted mount pairs and restore the player's ordinary skin model instead of resuming a stale transformation.
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
@@ -50,6 +51,9 @@
 - Fixed historical databases whose recorded early-schema markers outlived one or more prerequisite tables or profile columns. Startup now restores only the missing SQLite structure, preserves every existing profile row, and leaves identities conservatively dormant instead of failing the entire migration.
 - Persistence storage health now represents only SQLite authority. Domain conflicts use narrow evidence readiness, quarantine, and circuit states instead of broadly degrading every persistence-backed feature.
 - Healthy persistence scopes are usable immediately after login. There is no arbitrary login grace period, and login itself does not request companion recall.
+- Avatar-flight configs can now override transformed-model camera position and eye height per species while preserving the model's authored look yaw and pitch behavior.
+- Avatar-flight `FlyFast` animation and airborne Vigour recharge now remain active while horizontal speed is at or above 80% of sustainable glide speed, allowing strong ordinary flight and dives to maintain the state after a boost ends.
+- Avatar-flight airbraking now uses the upward-flap wing-displacement sound by default.
 - Removed Tamework's runtime asset-pack reordering and legacy pack replacement so asset precedence follows the game's manifest load-order configuration.
 - Enabled `TwCoopConfig` assets now keep Tamework as the sole occupancy and lifecycle authority only for their configured managed coops; coops without an enabled config remain purely vanilla. This preserves the post-overhaul model and does not restore the older vanilla-resident/Tamework-observer hybrid.
 - Managed-coop audits now include bounded per-resident and per-operation identity, UUID, slot, generation, retry, and persistence-queue lifecycle details.
@@ -75,6 +79,7 @@
 - Fixed profile-bounded owner-population evidence conflicts in upgraded worlds keeping every companion system degraded. When every conflicting UUID resolves to one canonical profile, startup now durably quarantines only those profiles, preserves their existing canonical rows and all projection evidence, and restores readiness for unrelated companions. Missing or ambiguous profile mappings still fail the broader authority closed.
 - Fixed captured companions stored in containers becoming quarantined after restart when capture had intentionally cleared their owner. New capture items persist that outcome independently of config load order, legacy items defer their historical source-owner hint to the durable captured snapshot, and an old profile fence clears only after a fresh complete reconciliation proves the contradiction is gone.
 - Fixed a historical applied owner-population operation with unprovable source finalization keeping every owner and claim admission degraded after restart. Startup now durably quarantines the exact operation and companion profile, retains the nonterminal journal for evidence-based recovery, and restores readiness for unrelated profiles. If either exact fence cannot be committed, Tamework still fails the broader authority closed.
+- Fixed transformed avatar-flight players remaining under custom flight control after entering liquid instead of switching to native swimming.
 - Fixed avatar-flight wing-flap sounds accumulating during forward flight or remaining silent while hovering. Configured one-shot flap cues now play at a state-specific cadence without restarting movement animations.
 - Fixed transformed avatar-flight models sometimes freezing on their final flight frame after landing while stationary instead of immediately returning to idle.
 - Fixed AvatarFlight cleanup replaying equipment before restoring the player skin, which could leave clothing visible through equipped armor after dismounting.

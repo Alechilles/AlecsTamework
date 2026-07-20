@@ -58,6 +58,9 @@ public final class AvatarFlightController {
         boolean explicitAirbrakeIntent = input.airbrake();
         boolean activeFlight = state.mode() != AvatarFlightMode.GROUNDED;
         boolean airbrakeApplied = explicitAirbrakeIntent && input.airbrakeActivated() && activeFlight;
+        if (input.inFluid()) {
+            return groundedOutput(state);
+        }
         if (config.getLaunch().isEnabled()
                 && input.launchAllowed()
                 && input.launchHoldMs() >= config.getLaunch().getMinChargeMs()
@@ -94,9 +97,7 @@ public final class AvatarFlightController {
         boolean boostReady = nextBoostAtMs == 0L || nowMs >= nextBoostAtMs;
         boolean flightStartIntent = (jumpIntent && flapReady) || (boostIntent && boostReady);
         if (!flightStartIntent && (input.onGround() || !activeFlight)) {
-            return new Output(AvatarFlightMode.GROUNDED, 0.0, 0.0, 0.0,
-                    nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, 0.0, 0.0, false, false, false, false, 0.0,
-                    true, false, 0.0, 0.0, 0.0);
+            return groundedOutput(state);
         }
         boolean pitchControlsActive = !explicitAirbrakeIntent && !descendIntent;
         double diveLoad = AvatarFlightManeuverMath.updateLoad(
@@ -252,7 +253,9 @@ public final class AvatarFlightController {
         boolean applyVelocity = mode != AvatarFlightMode.GROUNDED;
         double horizontalSpeed = horizontalVelocity.speed();
         boolean horizontalIdle = horizontalSpeed < HORIZONTAL_IDLE_SPEED;
-        boolean fastFlight = !horizontalIdle && boostActive && mode == AvatarFlightMode.FORWARD_FLIGHT;
+        boolean fastFlight = !horizontalIdle
+                && mode == AvatarFlightMode.FORWARD_FLIGHT
+                && AvatarFlightSpeedMetrics.isFastFlightSpeed(horizontalSpeed, config);
         double visualPitch = input.pitchRadians();
         double visualRoll = resolveVisualRoll(
                 state.velocityX(),
@@ -276,6 +279,31 @@ public final class AvatarFlightController {
         return new Output(mode, x, vertical, z, nextJumpAtMs, nextBoostAtMs, nextLaunchAtMs, diveLoad, climbLoad,
                 applyVelocity, jumpApplied, boostApplied, false, 0.0, horizontalIdle, fastFlight, visualPitch,
                 visualRoll, hudTargetSpeedRatio, airbrakeApplied);
+    }
+
+    @Nonnull
+    private static Output groundedOutput(@Nonnull State state) {
+        return new Output(
+                AvatarFlightMode.GROUNDED,
+                0.0,
+                0.0,
+                0.0,
+                state.nextJumpAtMs(),
+                state.nextBoostAtMs(),
+                state.nextLaunchAtMs(),
+                0.0,
+                0.0,
+                false,
+                false,
+                false,
+                false,
+                0.0,
+                true,
+                false,
+                0.0,
+                0.0,
+                0.0
+        );
     }
 
     private static double resolveHudTargetSpeedRatio(@Nonnull AvatarFlightMode mode,
@@ -601,7 +629,27 @@ public final class AvatarFlightController {
                         boolean boostAllowed,
                         boolean launchAllowed,
                         long launchHoldMs,
-                        boolean airbrakeActivated) {
+                        boolean airbrakeActivated,
+                        boolean inFluid) {
+        public Input(double forwardAxis,
+                     double strafeAxis,
+                     double verticalAxis,
+                     boolean jump,
+                     boolean crouch,
+                     boolean sprint,
+                     boolean airbrake,
+                     boolean onGround,
+                     double yawRadians,
+                     double pitchRadians,
+                     boolean flapAllowed,
+                     boolean boostAllowed,
+                     boolean launchAllowed,
+                     long launchHoldMs,
+                     boolean airbrakeActivated) {
+            this(forwardAxis, strafeAxis, verticalAxis, jump, crouch, sprint, airbrake, onGround, yawRadians,
+                    pitchRadians, flapAllowed, boostAllowed, launchAllowed, launchHoldMs, airbrakeActivated, false);
+        }
+
         public Input(double forwardAxis,
                      double strafeAxis,
                      double verticalAxis,
@@ -617,7 +665,7 @@ public final class AvatarFlightController {
                      boolean launchAllowed,
                      long launchHoldMs) {
             this(forwardAxis, strafeAxis, verticalAxis, jump, crouch, sprint, airbrake, onGround, yawRadians,
-                    pitchRadians, flapAllowed, boostAllowed, launchAllowed, launchHoldMs, false);
+                    pitchRadians, flapAllowed, boostAllowed, launchAllowed, launchHoldMs, false, false);
         }
 
         public Input(double forwardAxis,
@@ -633,7 +681,7 @@ public final class AvatarFlightController {
                      boolean flapAllowed,
                      boolean boostAllowed) {
             this(forwardAxis, strafeAxis, verticalAxis, jump, crouch, sprint, airbrake, onGround, yawRadians,
-                    pitchRadians, flapAllowed, boostAllowed, true, 0L, false);
+                    pitchRadians, flapAllowed, boostAllowed, true, 0L, false, false);
         }
     }
 

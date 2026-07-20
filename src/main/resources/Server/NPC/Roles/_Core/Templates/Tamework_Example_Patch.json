@@ -144,7 +144,11 @@
     },
     "MountMode": {
       "Value": "",
-      "Description": "Set to TameworkMountedGlide to use the clean-slate glide mount controller."
+      "Description": "Set to TameworkRide, TameworkMountedGlide, or TameworkAvatarFlight to select a Tamework mount controller. Leave empty for native mounting."
+    },
+    "AvatarFlightConfig": {
+      "Value": "",
+      "Description": "TwAvatarFlightConfig asset id used when MountMode is TameworkAvatarFlight."
     },
     "MountGlideState": {
       "Value": "Ridden",

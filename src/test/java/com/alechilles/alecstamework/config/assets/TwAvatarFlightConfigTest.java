@@ -1,12 +1,16 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.hypixel.hytale.codec.ExtraInfo;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
+import org.bson.BsonDocument;
+import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TwAvatarFlightConfigTest {
@@ -18,6 +22,8 @@ class TwAvatarFlightConfigTest {
         assertTrue(config.isEnabled());
         assertFalse(config.getModel().isApplyModel());
         assertEquals("NordicDrake", config.getModel().getModelId());
+        assertNull(config.getModel().getCameraPositionOffset());
+        assertNull(config.getModel().getEyeHeight());
         assertEquals(750L, config.getInput().getIntentTimeoutMs());
         assertEquals(250L, config.getInput().getAirborneJumpActivationDelayMs());
         assertTrue(config.getMovement().getMaxForwardSpeed() > 0.0);
@@ -84,7 +90,7 @@ class TwAvatarFlightConfigTest {
         assertEquals(1.0, config.getVigour().getForwardBoostCost(), 0.00001);
         assertEquals(4.0, config.getVigour().getGroundedRechargeSecondsPerCharge(), 0.00001);
         assertEquals(8.0, config.getVigour().getFastFlightRechargeSecondsPerCharge(), 0.00001);
-        assertEquals(0.75, config.getVigour().getFastFlightRechargeSpeedRatio(), 0.00001);
+        assertEquals(0.80, config.getVigour().getFastFlightRechargeSpeedRatio(), 0.00001);
         assertEquals(0.75, config.getVigour().getRechargeDelayAfterSpendSeconds(), 0.00001);
         assertTrue(config.getVigour().isHudEnabled());
         assertEquals(100L, config.getVigour().getHudResendIntervalMs());
@@ -379,6 +385,43 @@ class TwAvatarFlightConfigTest {
 
         assertTrue(child.getModel().isApplyModel());
         assertEquals("ChildDragon", child.getModel().getModelId());
+    }
+
+    @Test
+    void explicitNestedModelSectionInheritsMissingCameraOverrides() throws Exception {
+        TwAvatarFlightConfig parent = TwAvatarFlightConfig.defaultConfig();
+        TwAvatarFlightConfig child = TwAvatarFlightConfig.defaultConfig();
+        setNestedField(parent, "model", "cameraPositionOffset", new Vector3f(1.0f, 2.0f, 8.0f));
+        setNestedField(parent, "model", "eyeHeight", 4.65);
+        setNestedField(child, "model", "scale", 1.2);
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("Model"),
+                Map.of("Model", Set.of("Scale"))
+        );
+
+        assertEquals(new Vector3f(1.0f, 2.0f, 8.0f), child.getModel().getCameraPositionOffset());
+        assertEquals(4.65, child.getModel().getEyeHeight(), 0.00001);
+        assertEquals(1.2, child.getModel().getScale(), 0.00001);
+    }
+
+    @Test
+    void decodesOptionalModelCameraOverrides() {
+        TwAvatarFlightConfig config = TwAvatarFlightConfig.CODEC.decode(
+                BsonDocument.parse("""
+                        {
+                          "Model": {
+                            "CameraPositionOffset": { "X": 1.0, "Y": 0.5, "Z": 8.0 },
+                            "EyeHeight": 4.65
+                          }
+                        }
+                        """),
+                new ExtraInfo()
+        );
+
+        assertEquals(new Vector3f(1.0f, 0.5f, 8.0f), config.getModel().getCameraPositionOffset());
+        assertEquals(4.65, config.getModel().getEyeHeight(), 0.00001);
     }
 
     @Test

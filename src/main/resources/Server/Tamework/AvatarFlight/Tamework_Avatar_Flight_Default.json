@@ -112,7 +112,7 @@
     "LaunchReleaseFullSoundEvent": "SFX_Tamework_AvatarFlight_Launch_Release_Full",
     "UpwardFlapSoundEvent": "SFX_Tamework_AvatarFlight_Flap",
     "ForwardBoostSoundEvent": "SFX_Tamework_AvatarFlight_Forward_Boost",
-    "AirbrakeSoundEvent": "SFX_Tamework_AvatarFlight_Airbrake",
+    "AirbrakeSoundEvent": "SFX_Tamework_AvatarFlight_Flap",
     "IdleFlightFlapSoundEvent": "",
     "IdleFlightFlapIntervalMs": 0.0,
     "FlightFlapSoundEvent": "",
@@ -134,7 +134,7 @@
     "ForwardBoostCost": 1.0,
     "GroundedRechargeSecondsPerCharge": 4.0,
     "FastFlightRechargeSecondsPerCharge": 8.0,
-    "FastFlightRechargeSpeedRatio": 0.75,
+    "FastFlightRechargeSpeedRatio": 0.8,
     "RechargeDelayAfterSpendSeconds": 0.75,
     "HudEnabled": true,
     "HudResendIntervalMs": 100.0
@@ -184,6 +184,12 @@
     "SeatOffsetY": 1.35,
     "SeatOffsetZ": -0.25,
     "EquipmentResendIntervalMs": 250.0
+  },
+  "Mounting": {
+    "DismountHoldMs": 750.0,
+    "RequireGroundedDismount": true,
+    "RestoreNpcAtLastSafeGround": true,
+    "PlayerDismountOffset": 1.75
   },
   "Debug": {
     "LogControllerTicks": true,

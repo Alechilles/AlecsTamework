@@ -19,7 +19,7 @@ public final class AvatarFlightAudioSettings {
     public static final String DEFAULT_FULL_SOUND = "SFX_Tamework_AvatarFlight_Launch_Release_Full";
     public static final String DEFAULT_UPWARD_FLAP_SOUND = "SFX_Tamework_AvatarFlight_Flap";
     public static final String DEFAULT_FORWARD_BOOST_SOUND = "SFX_Tamework_AvatarFlight_Forward_Boost";
-    public static final String DEFAULT_AIRBRAKE_SOUND = "SFX_Tamework_AvatarFlight_Airbrake";
+    public static final String DEFAULT_AIRBRAKE_SOUND = DEFAULT_UPWARD_FLAP_SOUND;
     public static final double DEFAULT_EARLY_INTERVAL_MS = 600.0;
     public static final double DEFAULT_FULL_INTERVAL_MS = 180.0;
     public static final double DEFAULT_MIN_VOLUME = 0.32;

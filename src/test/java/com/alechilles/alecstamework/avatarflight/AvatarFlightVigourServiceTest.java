@@ -34,7 +34,7 @@ class AvatarFlightVigourServiceTest {
                 new AvatarFlightVigourService.State(2.0, 1000L, 0L),
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 9000L
         );
 
@@ -44,7 +44,7 @@ class AvatarFlightVigourServiceTest {
     }
 
     @Test
-    void ordinaryAirborneCruiseDoesNotRecharge() {
+    void sustainedAirborneCruiseRecharges() {
         AvatarFlightVigourService.Result result = AvatarFlightVigourService.recharge(
                 new AvatarFlightVigourService.State(2.0, 1000L, 0L),
                 CONFIG,
@@ -53,9 +53,23 @@ class AvatarFlightVigourServiceTest {
                 9000L
         );
 
+        assertEquals(AvatarFlightVigourService.RechargeMode.FAST_FLIGHT, result.mode());
+        assertEquals(3.0, result.state().charges(), EPSILON);
+        assertEquals(9000L, result.state().lastUpdateAtMs());
+    }
+
+    @Test
+    void slowAirborneFlightDoesNotRecharge() {
+        AvatarFlightVigourService.Result result = AvatarFlightVigourService.recharge(
+                new AvatarFlightVigourService.State(2.0, 1000L, 0L),
+                CONFIG,
+                false,
+                11.0,
+                9000L
+        );
+
         assertEquals(AvatarFlightVigourService.RechargeMode.NONE, result.mode());
         assertEquals(2.0, result.state().charges(), EPSILON);
-        assertEquals(9000L, result.state().lastUpdateAtMs());
     }
 
     @Test
@@ -75,7 +89,7 @@ class AvatarFlightVigourServiceTest {
                 spent,
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 1700L
         );
 
@@ -88,7 +102,7 @@ class AvatarFlightVigourServiceTest {
                 spent,
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 9750L
         );
         assertEquals(5.0, directRecovery.state().charges(), EPSILON,
@@ -98,7 +112,7 @@ class AvatarFlightVigourServiceTest {
                 delayed.state(),
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 9750L
         );
 
@@ -153,7 +167,7 @@ class AvatarFlightVigourServiceTest {
                 spent,
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 -3500L
         );
 
@@ -166,7 +180,7 @@ class AvatarFlightVigourServiceTest {
                 delayed.state(),
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 -3000L
         );
 

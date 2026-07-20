@@ -2,6 +2,22 @@
 
 Avatar flight is the transformed-player flight path used by dragon-style mounts. The real player becomes the flight model, while Tamework can attach a visual rider copy for the seated player appearance.
 
+## NPC Mounting
+
+Avatar flight can start from an ordinary optimized `Mount` interaction. Set the NPC role parameters `MountMode` to `TameworkAvatarFlight` and `AvatarFlightConfig` to an enabled `TwAvatarFlightConfig` asset id. The normal mount entry still owns tame, owner, crouch, and mountable requirements, so no species-specific Java is needed.
+
+During the ride, Tamework keeps the same source NPC entity and its ownership, name, needs, traits, health, inventory, and integration components. The NPC is placed in an inert role and hidden from interaction/tracking while the real player uses the configured transformed model. Dismount and forced recovery restore that same NPC instead of spawning a copy.
+
+```json
+"IsMountable": { "Value": true },
+"MountMode": { "Value": "TameworkAvatarFlight" },
+"AvatarFlightConfig": { "Value": "MyDragonAvatarFlight" }
+```
+
+The player and source NPC carry paired `TameworkAvatarFlightMountSession` and `TameworkAvatarFlightSource` components. Death, disconnect, world transfer, source removal, disabled/missing config, and orphan recovery use the same idempotent cleanup path. Cross-world mounted travel is not supported; transferring worlds ends the session.
+
+On a clean disconnect, Tamework queues that cleanup on the player's world thread before the entity is discarded. If the player is already gone after a client crash, the source-side watchdog detects the missing rider and restores the parked NPC. Persisted mount pairs also include a server-runtime epoch, so a pair saved before a server crash or restart is treated as stale instead of silently resuming in the next process. Stale player sessions restore the ordinary player model from the saved skin when the process-local pre-mount model snapshot is no longer available. Exceptional cleanup restores the companion at its original mount position; the last-safe-ground option applies only to normal dismounts.
+
 ## Controls
 
 - Forward movement starts or resumes glide.
@@ -12,6 +28,8 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 - Right-click with Flightmaster's Reins applies the airbrake.
 - Q with Flightmaster's Reins performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
+- Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
+- Press F to immediately dismount from an NPC-backed avatar-flight session. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
 While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and Reins actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.
@@ -27,10 +45,10 @@ Default balance:
 - `ForwardBoostCost`: 1.
 - `GroundedRechargeSecondsPerCharge`: 4.
 - `FastFlightRechargeSecondsPerCharge`: 8.
-- `FastFlightRechargeSpeedRatio`: 0.75 of boosted horizontal speed cap.
+- `FastFlightRechargeSpeedRatio`: 0.80 of sustainable horizontal glide speed; this also selects `FastFlightAnimation`.
 - `RechargeDelayAfterSpendSeconds`: 0.75.
 
-Fast-flight recharge uses boosted max horizontal speed, calculated as `Movement.MaxForwardSpeed + Boost.ForwardImpulse`. With defaults, the threshold is `(14 + 7) * 0.75 = 15.75`, so ordinary cruise at `14` speed does not recharge by itself.
+Fast flight uses the sustainable horizontal cap, calculated as `max(Movement.MaxForwardSpeed, Movement.MaxGlideSpeed)`. With defaults, the threshold is `max(14, 15) * 0.80 = 12`. While horizontal speed remains at or above that threshold, Tamework keeps `FastFlightAnimation` active and applies airborne fast-flight Vigour recharge. Ordinary forward cruise at `14` qualifies, while slow or stalled flight does not.
 
 The recharge delay means a spent charge requires the delay plus the recharge cadence. With defaults, one airborne fast-flight charge after spending requires `0.75 + 8 = 8.75` seconds of continuous qualifying speed.
 
@@ -50,7 +68,7 @@ Fast glide starts at `Trails.FastGlideStartSpeedRatio * Movement.MaxGlideSpeed` 
 
 ## Glide Balance
 
-Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: forward input can seed movement from hover or stall, but flat unpowered flight decays gradually toward the `Movement.GlideStartKickSpeed` floor instead of preserving `Movement.NeutralGlideSpeed` forever. Very shallow downward pitch, currently less than about `8°`, is treated like neutral glide for speed and sink so tiny dive angles cannot preserve max glide speed or carry leftover flap lift indefinitely. This neutral/shallow speed bleed is intentionally gentle, with default `Movement.NeutralGlideDeceleration` set to `0.15`, so it preserves more horizontal momentum than a shallow climb while still losing altitude through glide sink. Higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward past the shallow-dive dead zone can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `15.75` fast-flight recharge threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
+Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: forward input can seed movement from hover or stall, but flat unpowered flight decays gradually toward the `Movement.GlideStartKickSpeed` floor instead of preserving `Movement.NeutralGlideSpeed` forever. Very shallow downward pitch, currently less than about `8°`, is treated like neutral glide for speed and sink so tiny dive angles cannot preserve max glide speed or carry leftover flap lift indefinitely. This neutral/shallow speed bleed is intentionally gentle, with default `Movement.NeutralGlideDeceleration` set to `0.15`, so it preserves more horizontal momentum than a shallow climb while still losing altitude through glide sink. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward past the shallow-dive dead zone can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, sustained speed at or above `12` enters fast flight and recharges Vigour. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost remains the only default path above the sustainable glide cap.
 
 Sink rate scales with speed. At or above `Movement.StallSpeedThreshold`, neutral glide uses `Movement.GlideSinkSpeed`. As horizontal speed falls toward zero, sink blends toward `Movement.StallSinkSpeed`, so stalled or nearly stalled flight loses altitude much faster than a clean glide.
 
@@ -83,6 +101,22 @@ The script creates a `<ModelId>_AvatarFlight` server model, a copied `.blockymod
 The generator warns when player-style locomotion sets that the native transformed-player client can request while grounded are missing: `Sprint`, `JumpSprint`, and `StepSprint`. Keep real asset-level keys for these aliases in static avatar models, usually by mapping them to the model's `Run`, `JumpRun`, and `StepRun` sets when no dedicated sprint variants exist. The generator does not add them automatically because animation choice belongs to the model author. Runtime animation injection adds only forced flight pose clips and preserves every model-authored grounded locomotion set unchanged; native grounded walk/run/sprint selection can consult those declared animation set ids before Tamework sends any custom movement animation.
 
 ## Config Fields
+
+### Model Camera
+
+- `Model.CameraPositionOffset`: optional runtime `X`/`Y`/`Z` camera offset. Omit it to use the transformed ModelAsset's camera offset. This is the primary per-config third-person framing control.
+- `Model.EyeHeight`: optional runtime eye-height override. It positions the first-person viewpoint vertically relative to the transformed player's entity root and also affects other engine eye-height consumers.
+
+The camera override preserves the ModelAsset's existing yaw and pitch target settings. The current client camera contract cannot anchor directly to an arbitrary model-attachment node such as the fake rider's `Head`, so `EyeHeight` provides the closest stable first-person alignment.
+
+### Mounting
+
+- `DismountHoldMs`: grounded back+crouch hold duration required for voluntary dismount.
+- `RequireGroundedDismount`: blocks voluntary dismount while airborne when true.
+- `RestoreNpcAtLastSafeGround`: restores the source at the most recent grounded avatar transform for a normal dismount; exceptional cleanup uses the original mount origin.
+- `PlayerDismountOffset`: distance used to place the player behind the restored NPC.
+
+Omitting `Mounting` inherits the complete parent section. An explicit `Mounting` object overrides only its explicit nested keys and inherits the remaining values.
 
 ### Animation
 
@@ -173,7 +207,7 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 - `ForwardBoostCost`: charge cost for a successful boost.
 - `GroundedRechargeSecondsPerCharge`: grounded recharge rate.
 - `FastFlightRechargeSecondsPerCharge`: airborne fast-flight recharge rate.
-- `FastFlightRechargeSpeedRatio`: required ratio of boosted horizontal speed cap.
+- `FastFlightRechargeSpeedRatio`: ratio of sustainable horizontal glide speed that activates both `FastFlightAnimation` and airborne fast-flight recharge.
 - `RechargeDelayAfterSpendSeconds`: delay before recharge resumes after spending.
 - `HudEnabled`: shows the compact speed and Vigour HUD.
 - `HudResendIntervalMs`: throttles unchanged HUD refreshes.
@@ -223,7 +257,7 @@ Omitting `Vfx` inherits the complete parent section. An explicit `Vfx` object ov
 - `LaunchReleasePartialSoundEvent`, `LaunchReleaseMidSoundEvent`, `LaunchReleaseFullSoundEvent`: one-shot release cues selected with the same launch-curve tiers as release VFX. Blank disables an individual tier.
 - `UpwardFlapSoundEvent`: one-shot wing displacement cue after an accepted upward flap. Blank disables it.
 - `ForwardBoostSoundEvent`: one-shot accelerating wind burst after an accepted forward boost. Blank disables it.
-- `AirbrakeSoundEvent`: one-shot catching-wind cue when an accepted airbrake press first becomes active. Holding airbrake does not replay it.
+- `AirbrakeSoundEvent`: one-shot wing-displacement cue when an accepted airbrake press first becomes active. Holding airbrake does not replay it; the default reuses `UpwardFlapSoundEvent`'s sound asset.
 - `IdleFlightFlapSoundEvent` / `IdleFlightFlapIntervalMs`: one-shot wing cue and cadence while hovering. Blank or zero disables it.
 - `FlightFlapSoundEvent` / `FlightFlapIntervalMs`: one-shot wing cue and cadence during normal forward flight. Blank or zero disables it; fast flight is excluded.
 
