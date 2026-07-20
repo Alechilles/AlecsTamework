@@ -145,6 +145,7 @@ Unloaded flow:
 - The source NPC is resolved after its chunk loads and its canonical population state reconciles; transient admission revision or claim-profile conflicts retry within the same bounded request.
 - Repeated clicks for the same command reuse that pending request, even if the player moved, while a command targeting another world or state remains distinct.
 - Retries run on bounded interval/time windows, and one click is sufficient while the attempting-recall status is shown.
+- A persistence preflight denial reports its status-specific availability message to the player and emits an exact, privacy-bounded telemetry breadcrumb. A finalized lost-recovery source that remains serialized in an unloaded chunk is treated as superseded cleanup evidence, so it cannot degrade owner-population readiness or block the recovered companion's later Recall.
 - On-load relocation resumes after `CommandNpcRelocationOnLoadSystem` yields to population reconciliation.
 - A same-world relocation that attempted its physical move but remains temporarily unobservable settles as `UNLOADED`, not `LOST`; observing the destination projection restores normal loaded status. A cross-world transfer attempt that cannot establish its destination remains conservative and becomes recoverable `LOST`.
 

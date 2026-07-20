@@ -267,6 +267,33 @@ class CompanionPopulationRepairRepositoryTest {
         }
     }
 
+    @Test
+    void finalizedLostRecoverySourceDoesNotDegradeCurrentPhysicalProjection() throws Exception {
+        try (Harness harness = harness("finalized-recovery-source.sqlite")) {
+            UUID staleSourceUuid = UUID.randomUUID();
+            UUID currentUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            insertFinalizedRecoveryProfile(
+                    harness.connections, staleSourceUuid, currentUuid, ownerUuid);
+            CompanionPopulationEvidenceSet evidence = new CompanionPopulationEvidenceSet(List.of(
+                    physical("stale-source", staleSourceUuid, ownerUuid, "flat_world", 1, 2),
+                    physical("current", currentUuid, ownerUuid, "default", 4, 5)
+            ));
+
+            CompanionPopulationRepairRepository.RepairResult result = harness.repair.mergeAsync(evidence)
+                    .completion().get(2, TimeUnit.SECONDS).value();
+
+            assertTrue(result.merged());
+            assertNull(result.reason());
+            CompanionPopulationStateRecord state = harness.population.loadAllStates().getFirst();
+            assertEquals(currentUuid, state.currentNpcUuid());
+            assertEquals(CompanionLifecycleState.UNLOADED.name(), state.lifecycleState());
+            assertEquals("default", state.physicalWorldName());
+            assertEquals(4, state.physicalChunkX());
+            assertEquals(5, state.physicalChunkZ());
+        }
+    }
+
     private Harness harness(String file) throws Exception {
         SqliteConnectionManager connections = new SqliteConnectionManager(tempDir.resolve(file));
         try (Connection connection = connections.openConnection()) {
@@ -308,6 +335,58 @@ class CompanionPopulationRepairRepositoryTest {
                     ) VALUES ('profile', 'default', 'RELEASED', NULL, NULL, NULL, 1, 'test', 1, 1)
                     """)) {
                 state.executeUpdate();
+            }
+        }
+    }
+
+    private static void insertFinalizedRecoveryProfile(
+            SqliteConnectionManager connections,
+            UUID staleSourceUuid,
+            UUID currentUuid,
+            UUID ownerUuid
+    ) throws Exception {
+        try (Connection connection = connections.openConnection()) {
+            try (PreparedStatement profile = connection.prepareStatement("""
+                    INSERT INTO npc_profiles (
+                        profile_id, current_npc_uuid, owner_uuid, last_world_name,
+                        created_at_ms, updated_at_ms, last_active_at_ms
+                    ) VALUES ('profile', ?, ?, 'default', 1, 1, 1)
+                    """)) {
+                profile.setString(1, currentUuid.toString());
+                profile.setString(2, ownerUuid.toString());
+                profile.executeUpdate();
+            }
+            try (PreparedStatement aliases = connection.prepareStatement("""
+                    INSERT INTO npc_uuid_aliases (npc_uuid, profile_id, is_current, mapped_at_ms)
+                    VALUES (?, 'profile', ?, 1)
+                    """)) {
+                aliases.setString(1, staleSourceUuid.toString());
+                aliases.setInt(2, 0);
+                aliases.executeUpdate();
+                aliases.setString(1, currentUuid.toString());
+                aliases.setInt(2, 1);
+                aliases.executeUpdate();
+            }
+            try (PreparedStatement state = connection.prepareStatement("""
+                    INSERT INTO companion_population_state (
+                        profile_id, ownership_world_name, lifecycle_state, physical_world_name,
+                        physical_chunk_x, physical_chunk_z, revision, source, created_at_ms, updated_at_ms
+                    ) VALUES ('profile', 'default', 'UNLOADED', 'default', 4, 5, 1,
+                              'lost-recovery-finalized', 1, 1)
+                    """)) {
+                state.executeUpdate();
+            }
+            try (PreparedStatement recovery = connection.prepareStatement("""
+                    INSERT INTO npc_recovery_operations (
+                        operation_id, profile_id, source_npc_uuid, planned_target_uuid,
+                        actual_target_uuid, state, active, generation, attempt_count,
+                        created_at_ms, updated_at_ms, completed_at_ms
+                    ) VALUES ('recovery', 'profile', ?, ?, ?, 'FINALIZED', 0, 2, 1, 1, 2, 2)
+                    """)) {
+                recovery.setString(1, staleSourceUuid.toString());
+                recovery.setString(2, currentUuid.toString());
+                recovery.setString(3, currentUuid.toString());
+                recovery.executeUpdate();
             }
         }
     }

@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
@@ -378,17 +380,30 @@ final class CommandMenuMoveService {
                 context.workingItem = refreshedLinks;
                 context.itemChanged = true;
             }
-            int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloadedRecipients);
+            CommandRelocationDispatchService.QueueResult relocationResult =
+                    relocationDispatchService.queueRelocationsForUnloaded(context, unloadedRecipients);
+            int queued = relocationResult.queued();
             if (context.itemChanged) {
                 hotbar.setItemStackForSlot(slot, context.workingItem);
             }
             if (affected <= 0 && queued <= 0) {
-                feedbackService.showWarningKey(
-                        player,
-                        returnHome
-                                ? "tamework.ui.notifications.command.move.returnHome.noneMoved"
-                                : "tamework.ui.notifications.command.execution.none"
-                );
+                if (relocationResult.firstRejection() != null) {
+                    feedbackService.showWarning(
+                            player,
+                            PersistencePlayerFeedback.resolve(
+                                    player,
+                                    PersistenceDomain.RECALL_RELOCATION,
+                                    relocationResult.firstRejection()
+                            )
+                    );
+                } else {
+                    feedbackService.showWarningKey(
+                            player,
+                            returnHome
+                                    ? "tamework.ui.notifications.command.move.returnHome.noneMoved"
+                                    : "tamework.ui.notifications.command.execution.none"
+                    );
+                }
                 return;
             }
             feedbackService.emitCommandExecutionFeedback(

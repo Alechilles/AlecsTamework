@@ -34,7 +34,16 @@ final class CompanionPopulationRepairEvidenceSelector {
             byProfile.computeIfAbsent(groupingKey, ignored -> new ArrayList<>()).add(observation);
         }
         List<CompanionPopulationEvidenceSet.ResolvedEvidence> selected = new ArrayList<>();
-        for (List<CompanionPopulationEvidenceSet.ResolvedEvidence> representations : byProfile.values()) {
+        for (Map.Entry<String, List<CompanionPopulationEvidenceSet.ResolvedEvidence>> entry
+                : byProfile.entrySet()) {
+            List<CompanionPopulationEvidenceSet.ResolvedEvidence> representations = entry.getValue();
+            if (entry.getKey().startsWith("profile:")) {
+                representations = CompanionPopulationRecoveredSourceFilter.filter(
+                        connection,
+                        entry.getKey().substring("profile:".length()),
+                        representations
+                );
+            }
             List<CompanionPopulationEvidenceSet.ResolvedEvidence> physical = representations.stream()
                     .filter(CompanionPopulationEvidenceSet.ResolvedEvidence::physical)
                     .toList();

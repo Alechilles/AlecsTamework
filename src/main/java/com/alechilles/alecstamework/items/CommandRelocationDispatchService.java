@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityStatus;
 import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -50,25 +52,26 @@ final class CommandRelocationDispatchService {
         this.persistenceGate = persistenceGate;
     }
 
-    int queueRelocationsForUnloaded(Context context, List<LinkedNpcRecord> unloadedLinked) {
+    QueueResult queueRelocationsForUnloaded(Context context, List<LinkedNpcRecord> unloadedLinked) {
         if (context == null || unloadedLinked == null || unloadedLinked.isEmpty() || relocationService == null) {
-            return 0;
+            return QueueResult.none();
         }
         boolean returnHome = resolutionService.isReturnHomeCommand(context.command);
         boolean recall = resolutionService.isRecallCommand(context.command);
         if (!returnHome && !recall) {
-            return 0;
+            return QueueResult.none();
         }
         if (!CommandTravelSettings.isRecallTeleportingEnabled()) {
-            return 0;
+            return QueueResult.none();
         }
         RelocationState postRelocationState = stepExecutionService.resolveRelocationState(context.command, returnHome, recall);
         World world = context.player != null ? context.player.getWorld() : null;
         UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
         if (world == null) {
-            return 0;
+            return QueueResult.none();
         }
         int queued = 0;
+        PersistenceMutationAvailabilityDecision firstRejection = null;
         for (LinkedNpcRecord record : unloadedLinked) {
             if (record == null || record.npcUuid == null) {
                 continue;
@@ -96,8 +99,23 @@ final class CommandRelocationDispatchService {
                     && deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid) != null) {
                 continue;
             }
-            if (!canRelocate(record.npcUuid, record.profileId, ownerUuid, world.getName(),
-                    record.lastKnownWorldName, returnHome ? "return_home" : "recall", false)) {
+            String operationKind = returnHome ? "return_home" : "recall";
+            PersistenceMutationAvailabilityDecision decision = canRelocate(
+                    record.npcUuid, record.profileId, ownerUuid, world.getName(),
+                    record.lastKnownWorldName, operationKind, false);
+            if (!decision.allowed()) {
+                if (firstRejection == null) {
+                    firstRejection = decision;
+                }
+                CommandRelocationPreflightDiagnostics.recordRejected(
+                        operationKind,
+                        decision,
+                        record.npcUuid,
+                        record.profileId,
+                        record.lastKnownWorldName,
+                        world.getName(),
+                        false
+                );
                 continue;
             }
             if (returnHome) {
@@ -156,7 +174,7 @@ final class CommandRelocationDispatchService {
             );
             queued++;
         }
-        return queued;
+        return new QueueResult(queued, firstRejection);
     }
 
     void maybeRelocateLoadedRecallCandidate(Context context, Candidate candidate) {
@@ -209,8 +227,19 @@ final class CommandRelocationDispatchService {
         World world = context.player == null ? null : context.player.getWorld();
         UUID ownerUuid = context.player == null ? null : context.player.getUuid();
         if (world != null && ownerUuid != null && candidate.npc.getUuid() != null) {
-            if (!canRelocate(candidate.npc.getUuid(), candidate.profileId, ownerUuid,
-                    world.getName(), world.getName(), "loaded_recall", true)) {
+            PersistenceMutationAvailabilityDecision decision = canRelocate(
+                    candidate.npc.getUuid(), candidate.profileId, ownerUuid,
+                    world.getName(), world.getName(), "loaded_recall", true);
+            if (!decision.allowed()) {
+                CommandRelocationPreflightDiagnostics.recordRejected(
+                        "loaded_recall",
+                        decision,
+                        candidate.npc.getUuid(),
+                        candidate.profileId,
+                        world.getName(),
+                        world.getName(),
+                        true
+                );
                 return;
             }
             relocationService.queueRelocation(
@@ -224,15 +253,27 @@ final class CommandRelocationDispatchService {
         return configured > 0.0 ? configured : fallback;
     }
 
-    private boolean canRelocate(UUID npcUuid,
-                                String profileId,
-                                UUID ownerUuid,
-                                String destinationWorld,
-                                String sourceWorld,
-                                String operationKind,
-                                boolean liveProjectionExists) {
-        return persistenceGate == null || persistenceGate.decide(
+    private PersistenceMutationAvailabilityDecision canRelocate(
+            UUID npcUuid,
+            String profileId,
+            UUID ownerUuid,
+            String destinationWorld,
+            String sourceWorld,
+            String operationKind,
+            boolean liveProjectionExists
+    ) {
+        if (persistenceGate == null) {
+            return new PersistenceMutationAvailabilityDecision(
+                    PersistenceMutationAvailabilityStatus.ALLOW, "allowed", null);
+        }
+        return persistenceGate.decide(
                 npcUuid, profileId, ownerUuid, destinationWorld, sourceWorld,
-                operationKind, liveProjectionExists).allowed();
+                operationKind, liveProjectionExists);
+    }
+
+    record QueueResult(int queued, PersistenceMutationAvailabilityDecision firstRejection) {
+        private static QueueResult none() {
+            return new QueueResult(0, null);
+        }
     }
 }

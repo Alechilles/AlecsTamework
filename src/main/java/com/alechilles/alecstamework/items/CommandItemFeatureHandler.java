@@ -32,6 +32,8 @@ import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
@@ -797,7 +799,9 @@ public final class CommandItemFeatureHandler {
             working = refreshedLinks;
             updateHeldItem = true;
         }
-        int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloadedLinked);
+        CommandRelocationDispatchService.QueueResult relocationResult =
+                relocationDispatchService.queueRelocationsForUnloaded(context, unloadedLinked);
+        int queued = relocationResult.queued();
         if (context.workingItem != working) {
             working = context.workingItem;
             updateHeldItem = true;
@@ -806,7 +810,18 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.execution.none");
+            if (relocationResult.firstRejection() != null) {
+                feedbackService.showWarning(
+                        player,
+                        PersistencePlayerFeedback.resolve(
+                                player,
+                                PersistenceDomain.RECALL_RELOCATION,
+                                relocationResult.firstRejection()
+                        )
+                );
+            } else {
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.execution.none");
+            }
             return false;
         }
 

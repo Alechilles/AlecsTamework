@@ -14,13 +14,13 @@ class CommandAppliedStatePersistenceArchitectureTest {
         )).replace("\r\n", "\n");
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"
-        ));
+        )).replace("\r\n", "\n");
         String menuMove = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandMenuMoveService.java"
-        ));
+        )).replace("\r\n", "\n");
         String links = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandLinkMutationService.java"
-        ));
+        )).replace("\r\n", "\n");
 
         assertTrue(execution.contains("new RelocationState(\n                            stateStep.getState()"));
         assertTrue(handler.contains("appliedCommandStates.put"));
