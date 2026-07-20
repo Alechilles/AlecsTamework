@@ -467,8 +467,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         if (closed.get()) {
             return progress.get();
         }
-        Throwable root = rootCause(exception);
-        String reason = "reconciliation-startup-failed:" + root.getClass().getSimpleName();
+        String reason = "reconciliation_startup_failed";
         CompanionPersistedProjectionEvidenceRegistry registry =
                 persistence.getCompanionPersistedProjectionEvidenceRegistry();
         CompanionPersistedProjectionEvidenceRegistry.Snapshot projectionSnapshot =

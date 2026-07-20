@@ -152,9 +152,7 @@ public final class CompanionPopulationBootstrapService {
                     operations.isEmpty() ? "population-loaded" : "population-operations-pending"
             );
         } catch (Exception exception) {
-            persistenceHealth.markDegraded(
-                    "population_bootstrap_failed:" + exception.getClass().getSimpleName()
-            );
+            persistenceHealth.markDegraded("population_bootstrap_failed");
             index.replaceCommittedEntries(List.of(), OwnerPopulationReadiness.DEGRADED);
             claimOccupancyIndex.replaceCommittedEntries(List.of(), ClaimOccupancyReadiness.DEGRADED);
             return new BootstrapResult(
