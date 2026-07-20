@@ -9,11 +9,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** Deduplicates copied identities and rejects conflicting owner or physical observations. */
 public final class CompanionPopulationEvidenceSet {
+    private final List<CompanionPopulationEvidence> allEvidence;
     private final Map<UUID, ResolvedEvidence> byNpcUuid;
     private final Map<UUID, List<CompanionPopulationEvidence>> observationsByNpcUuid;
     private final Map<String, List<ProjectionObservation>> projectionObservationsByFingerprint;
@@ -21,9 +23,10 @@ public final class CompanionPopulationEvidenceSet {
 
     public CompanionPopulationEvidenceSet(@Nonnull Collection<CompanionPopulationEvidence> evidence) {
         Objects.requireNonNull(evidence, "evidence");
+        this.allEvidence = List.copyOf(evidence);
         Map<UUID, List<CompanionPopulationEvidence>> grouped = new LinkedHashMap<>();
         Map<String, List<ProjectionObservation>> projections = new LinkedHashMap<>();
-        for (CompanionPopulationEvidence observation : evidence) {
+        for (CompanionPopulationEvidence observation : allEvidence) {
             Objects.requireNonNull(observation, "observation");
             CompanionProjectionEvidence.ProjectionObservation projection =
                     observation.projectionObservation();
@@ -98,6 +101,24 @@ public final class CompanionPopulationEvidenceSet {
 
     public boolean isConflictFree() {
         return conflicts.isEmpty();
+    }
+
+    /** Excludes every known alias of contained conflict profiles while retaining projection markers. */
+    @Nonnull
+    public CompanionPopulationEvidenceSet excludingConflictUuids(
+            @Nonnull Set<UUID> excludedNpcUuids
+    ) {
+        Objects.requireNonNull(excludedNpcUuids, "excludedNpcUuids");
+        Set<UUID> conflictUuids = conflicts.stream()
+                .map(Conflict::npcUuid)
+                .collect(Collectors.toUnmodifiableSet());
+        if (!excludedNpcUuids.containsAll(conflictUuids)) {
+            throw new IllegalArgumentException("Every known conflict identity must be excluded.");
+        }
+        return new CompanionPopulationEvidenceSet(allEvidence.stream()
+                .filter(value -> value.kind().isProjectionMarker()
+                        || !excludedNpcUuids.contains(value.npcUuid()))
+                .toList());
     }
 
     @Nonnull

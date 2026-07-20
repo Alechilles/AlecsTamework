@@ -58,6 +58,14 @@ public final class PersistenceFailureReasonCatalog {
                 "managed_coop_release_finalized_index_refresh_rejected",
                 "public_population_commit_callback_failed",
                 "spawn_identity_durable_mark_failed");
+        register(entries, PersistenceFailureClass.SCOPED_IDENTITY_CONTRADICTION,
+                PersistenceDisposition.SCOPED_QUARANTINE, "exact canonical profile scope",
+                "canonical alias plus v7 profile quarantine", "domain canonical evidence verifier",
+                "tamework.ui.notifications.persistence.profileProtected",
+                "reconciliation_evidence_conflict_conflicting_dormant_lifecycle_evidence",
+                "reconciliation_evidence_conflict_conflicting_owner_evidence",
+                "reconciliation_evidence_conflict_conflicting_physical_death_evidence",
+                "reconciliation_evidence_conflict_duplicate_physical_identity");
         register(entries, PersistenceFailureClass.SCOPED_APPLY_AMBIGUITY,
                 PersistenceDisposition.SCOPED_QUARANTINE, "exact operation/profile/domain scopes",
                 "prepared journal or v7 quarantine", "domain canonical evidence verifier",
@@ -150,6 +158,7 @@ public final class PersistenceFailureReasonCatalog {
     }
 
     private static PersistenceDomain domain(String reason) {
+        if (reason.startsWith("reconciliation_")) return PersistenceDomain.RECONCILIATION;
         if (reason.startsWith("breeding_")) return PersistenceDomain.BREEDING;
         if (reason.startsWith("managed_coop_") || reason.startsWith("coop_")) {
             return PersistenceDomain.MANAGED_COOP_RELEASE;

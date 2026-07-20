@@ -4,7 +4,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
@@ -20,8 +22,31 @@ public final class CompanionIdentityRepository {
 
     @Nonnull
     public List<AliasRecord> loadAllAliases() throws Exception {
-        try (Connection connection = connectionManager.openConnection();
-             PreparedStatement statement = connection.prepareStatement(
+        try (Connection connection = connectionManager.openConnection()) {
+            return loadAliases(connection);
+        }
+    }
+
+    /** Reads aliases and canonical population-row presence from one SQLite snapshot. */
+    @Nonnull
+    public PopulationIdentitySnapshot loadPopulationIdentitySnapshot() throws Exception {
+        try (Connection connection = connectionManager.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                List<AliasRecord> aliases = loadAliases(connection);
+                Set<String> profileIds = loadPopulationProfileIds(connection);
+                connection.commit();
+                return new PopulationIdentitySnapshot(aliases, profileIds);
+            } catch (Exception failure) {
+                connection.rollback();
+                throw failure;
+            }
+        }
+    }
+
+    @Nonnull
+    private static List<AliasRecord> loadAliases(@Nonnull Connection connection) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
                      """
                      SELECT npc_uuid, profile_id, is_current, mapped_at_ms
                      FROM npc_uuid_aliases
@@ -42,9 +67,31 @@ public final class CompanionIdentityRepository {
         }
     }
 
+    @Nonnull
+    private static Set<String> loadPopulationProfileIds(@Nonnull Connection connection)
+            throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT profile_id FROM companion_population_state ORDER BY profile_id"
+        ); ResultSet resultSet = statement.executeQuery()) {
+            Set<String> profileIds = new LinkedHashSet<>();
+            while (resultSet.next()) {
+                profileIds.add(resultSet.getString("profile_id"));
+            }
+            return Set.copyOf(profileIds);
+        }
+    }
+
     public record AliasRecord(@Nonnull UUID npcUuid,
                               @Nonnull String profileId,
                               boolean current,
                               long mappedAtMs) {
+    }
+
+    public record PopulationIdentitySnapshot(@Nonnull List<AliasRecord> aliases,
+                                             @Nonnull Set<String> populationProfileIds) {
+        public PopulationIdentitySnapshot {
+            aliases = List.copyOf(aliases);
+            populationProfileIds = Set.copyOf(populationProfileIds);
+        }
     }
 }

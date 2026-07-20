@@ -142,6 +142,14 @@ its exact profile. The journal remains nonterminal and visible in diagnostics; o
 profile are denied. Bootstrap treats it as contained only while both v7 fences are active. If either
 fence is absent or its durable write fails, owner and claim readiness remains broadly fail-closed.
 
+A saved-evidence contradiction can also be contained when every conflicting UUID resolves through
+the canonical alias table to exactly one profile. Startup durably fences each unique affected profile,
+leaves its existing population row unchanged and conservatively counted, and excludes all known UUID
+aliases of those profiles only from the repair input. The unfiltered evidence remains available to the
+projection seal and diagnostics. Healthy profiles then merge normally and may publish `READY`.
+Unknown, multiply mapped, or unreadable identities and failed durable fences still degrade both owner
+coverage dimensions.
+
 A direct owner-component clear is not proof of release. Unless it matches an in-flight
 prepared transition or an explicit durable `RELEASED` operation, runtime reconciliation
 keeps the canonical slot and queues a component repair through the ownership mutation

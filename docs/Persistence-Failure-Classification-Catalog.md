@@ -56,6 +56,25 @@ publication both succeed.
 They are `POST_COMMIT_PUBLICATION_FAILURE` with `SCOPED_QUARANTINE` and use
 `PostCommitPublicationRecoveryVerifier` (or the registered domain-specific equivalent).
 
+## Scoped identity contradiction
+
+Startup evidence conflicts use normalized `reconciliation_evidence_conflict_*` reason codes. A
+conflict is eligible for `SCOPED_IDENTITY_CONTRADICTION` only when every conflicting NPC UUID maps
+through the durable alias table to exactly one canonical profile. Startup commits an exact
+`PROFILE` quarantine for each unique affected profile before continuing. It leaves those canonical
+rows untouched, excludes every known alias of those profiles from repair, and retains the complete
+original evidence set for projection sealing and diagnostics. Quarantined profiles remain included
+in conservative owner counts, so unrelated profiles can become ready without reopening capacity.
+
+- `reconciliation_evidence_conflict_conflicting_dormant_lifecycle_evidence`
+- `reconciliation_evidence_conflict_conflicting_owner_evidence`
+- `reconciliation_evidence_conflict_conflicting_physical_death_evidence`
+- `reconciliation_evidence_conflict_duplicate_physical_identity`
+
+An unknown UUID, a UUID mapped to multiple profiles, an unreadable alias table, or a failed fence
+commit cannot be narrowed safely. In those cases both owner-coverage dimensions remain broadly
+`DEGRADED` with `reconciliation-evidence-conflict`.
+
 ## Scoped apply ambiguity
 
 These may have retained a source, reservation, live projection, or canonical effect whose outcome

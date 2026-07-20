@@ -327,6 +327,8 @@ public final class CompanionPopulationReconciliationService {
                             .thenCompose(decision -> decision.mayProceed()
                                     ? mergeEvidence(
                                             evidenceSet,
+                                            decision.repairEvidenceSet(),
+                                            decision.containedProfileCount(),
                                             recovery,
                                             loadedIdentities.mutationRevision(),
                                             expectedLiveEvidenceRevision
@@ -342,13 +344,15 @@ public final class CompanionPopulationReconciliationService {
 
     @Nonnull
     private CompletableFuture<Result> mergeEvidence(
-            @Nonnull CompanionPopulationEvidenceSet evidenceSet,
+            @Nonnull CompanionPopulationEvidenceSet projectionEvidenceSet,
+            @Nonnull CompanionPopulationEvidenceSet repairEvidenceSet,
+            int containedProfileCount,
             @Nonnull CompanionPopulationOperationRecoveryService.RecoveryResult recovery,
             long loadedIdentityRevision,
             long expectedLiveEvidenceRevision
     ) {
         PersistenceWriteQueue.WriteSubmission<CompanionPopulationRepairRepository.RepairResult> submission =
-                repairRepository.mergeAsync(evidenceSet);
+                repairRepository.mergeAsync(repairEvidenceSet);
         return submission.completion().thenCompose(outcome -> {
             CompanionPopulationRepairRepository.RepairResult repair = outcome.value();
             if (!outcome.isCommitted() || repair == null || !repair.merged()) {
@@ -358,17 +362,18 @@ public final class CompanionPopulationReconciliationService {
                 return coveragePublisher.publishBothAsync(
                         CompanionPopulationCoverageRecord.State.DEGRADED,
                         reason,
-                        evidenceSet.evidence().size(),
+                        repairEvidenceSet.evidence().size(),
                         0
                 ).thenApply(ignored -> Result.degraded(reason));
             }
+            int profileCount = repair.profileCount() + containedProfileCount;
             return loadOperations().thenCompose(remaining -> {
                 if (!remaining.isEmpty()
                         && !recoveryGate.matchesDurableAmbiguities(remaining, recovery)) {
                     return coveragePublisher.publishBothAsync(
                             CompanionPopulationCoverageRecord.State.DEGRADED,
                             "reconciliation-operations-remain",
-                            repair.profileCount(),
+                            profileCount,
                             remaining.size()
                     ).thenApply(ignored -> Result.degraded("reconciliation-operations-remain"));
                 }
@@ -378,18 +383,18 @@ public final class CompanionPopulationReconciliationService {
                 return coveragePublisher.publishBothAsync(
                         CompanionPopulationCoverageRecord.State.RECONCILING,
                         stagedReason,
-                        repair.profileCount(),
+                        profileCount,
                         repair.reason() == null ? 0 : 1
                 ).thenApply(written -> written ? new Result(
                         stagedStatus,
                         stagedStatus == Status.READY ? "reconciliation-ready" : repair.reason(),
-                        repair.profileCount(),
+                        profileCount,
                         repair.duplicateObservations(),
                         recovery.committed() + recovery.retryable(),
                         recovery.canceled(),
                         loadedIdentityRevision,
                         expectedLiveEvidenceRevision,
-                        evidenceSet
+                        projectionEvidenceSet
                 ) : Result.degraded("reconciliation-coverage-publish-failed"));
             });
         });

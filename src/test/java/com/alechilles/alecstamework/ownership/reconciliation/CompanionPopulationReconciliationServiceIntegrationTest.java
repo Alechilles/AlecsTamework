@@ -24,6 +24,8 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationScanSe
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClass;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -273,6 +275,93 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                     harness.persistence().getQuarantineRepository().listActive());
             assertEquals(OwnerPopulationReadiness.READY,
                     harness.bootstrap().result().globalReadiness());
+        }
+    }
+
+    @Test
+    void profileBoundedEvidenceConflictLeavesCanonicalStateAndHealthyProfilesReady()
+            throws Exception {
+        UUID conflictedNpc = UUID.fromString("00000000-0000-0000-0000-000000000833");
+        UUID healthyNpc = UUID.fromString("00000000-0000-0000-0000-000000000834");
+        UUID historicalNpc = UUID.fromString("00000000-0000-0000-0000-000000000836");
+        CompanionPopulationReconciliationCatalog catalog = sealedCatalog(
+                List.of(),
+                List.of(physical("healthy", healthyNpc, OWNER_B, "beta", 4, 5)),
+                List.of(
+                        captured("conflict-a", conflictedNpc, OWNER_A, "alpha"),
+                        captured("conflict-b", conflictedNpc, OWNER_B, "alpha"),
+                        captured("historical-alias", historicalNpc, OWNER_A, "alpha")
+                ),
+                List.of(),
+                List.of()
+        );
+
+        try (Harness harness = Harness.openScoped(
+                tempDir.resolve("scoped-evidence-conflict"), catalog
+        )) {
+            seedCanonicalProfile(harness.persistence(), "profile-conflicted", historicalNpc);
+            assertTrue(harness.persistence().getNpcProfileRepository()
+                    .remapCurrentUuidAsync(historicalNpc, conflictedNpc));
+            assertTrue(harness.persistence().awaitWriteQueueIdle(3_000L));
+
+            CompanionPopulationReconciliationService.Result result = harness.reconcile(1);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.READY,
+                    result.status(), result.reason());
+            assertEquals(2, result.profileCount());
+            Map<UUID, CompanionPopulationStateRecord> states = harness.statesByNpc();
+            assertEquals(2, states.size());
+            assertState(states.get(conflictedNpc), OWNER_A, "alpha",
+                    CompanionLifecycleState.CAPTURED, null, null, null);
+            assertState(states.get(healthyNpc), OWNER_B, "beta",
+                    CompanionLifecycleState.UNLOADED, "beta", 4, 5);
+            assertEquals(PersistenceFailureClass.SCOPED_IDENTITY_CONTRADICTION,
+                    harness.persistence().getIncidentRepository().listOpen(10)
+                            .getFirst().failureClass());
+            assertTrue(harness.persistence().getQuarantineRegistry()
+                    .find(PersistenceScopeType.PROFILE, "profile-conflicted").isPresent());
+            assertCoverage(harness,
+                    CompanionPopulationReconciliationService.GLOBAL_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.READY);
+            assertCoverage(harness,
+                    CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.READY);
+
+            Projection projection = harness.bootstrap();
+            assertEquals(OwnerPopulationReadiness.READY,
+                    projection.result().globalReadiness());
+            assertEquals(1L, projection.ownerIndex().counts(OWNER_A, "alpha").globalCommitted());
+            assertEquals(1L, projection.ownerIndex().counts(OWNER_B, "beta").globalCommitted());
+            assertTrue(projection.identityResolver().resolveProfileId(healthyNpc).isPresent());
+        }
+    }
+
+    @Test
+    void evidenceConflictWithoutCanonicalAliasRemainsBroadlyDegraded() throws Exception {
+        UUID unknownNpc = UUID.fromString("00000000-0000-0000-0000-000000000835");
+        CompanionPopulationReconciliationCatalog catalog = sealedCatalog(
+                List.of(), List.of(), List.of(
+                        captured("unknown-a", unknownNpc, OWNER_A, "alpha"),
+                        captured("unknown-b", unknownNpc, OWNER_B, "alpha")
+                ), List.of(), List.of()
+        );
+
+        try (Harness harness = Harness.openScoped(
+                tempDir.resolve("unscoped-evidence-conflict"), catalog
+        )) {
+            CompanionPopulationReconciliationService.Result result = harness.reconcile(1);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.DEGRADED,
+                    result.status());
+            assertEquals("reconciliation-evidence-conflict", result.reason());
+            assertTrue(harness.persistence().getIncidentRepository().listOpen(10).isEmpty());
+            assertTrue(harness.persistence().getQuarantineRegistry().snapshot().isEmpty());
+            assertCoverage(harness,
+                    CompanionPopulationReconciliationService.GLOBAL_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.DEGRADED);
+            assertCoverage(harness,
+                    CompanionPopulationReconciliationService.PER_WORLD_OWNER_COVERAGE_KEY,
+                    CompanionPopulationCoverageRecord.State.DEGRADED);
         }
     }
 
@@ -564,6 +653,42 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                 committed.value().status());
     }
 
+    private static void seedCanonicalProfile(
+            TameworkPersistenceRuntime persistence,
+            String profileId,
+            UUID npcUuid
+    ) throws Exception {
+        long now = System.currentTimeMillis();
+        var baseline = new CompanionPopulationStateRecord(
+                profileId, npcUuid, OWNER_A, "alpha", "alpha",
+                CompanionLifecycleState.CAPTURED.name(), null, null, null,
+                0L, "test", now, now
+        );
+        var operation = new CompanionPopulationOperationRecord(
+                "seed-" + profileId,
+                profileId,
+                OwnerPopulationOperation.RESTORE.name(),
+                CompanionPopulationOperationRecord.State.PREPARED,
+                0L,
+                "{}",
+                "{}",
+                null,
+                now,
+                now,
+                0L,
+                null
+        );
+        var repository = persistence.getCompanionPopulationRepository();
+        assertTrue(repository.prepareAsync(new PopulationPersistenceTransition.Prepare(
+                operation, baseline)).completion().get(5L, TimeUnit.SECONDS).isCommitted());
+        assertTrue(repository.advanceOperationAsync(
+                operation.operationId(),
+                CompanionPopulationOperationRecord.State.PREPARED,
+                CompanionPopulationOperationRecord.State.FAILED,
+                "test-seed-complete"
+        ).completion().get(5L, TimeUnit.SECONDS).isCommitted());
+    }
+
     private static void assertState(
             CompanionPopulationStateRecord state,
             UUID owner,
@@ -784,7 +909,9 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                             },
                             new CompanionPopulationAmbiguityContainment(
                                     persistence.getIncidentReporter(),
-                                    persistence.getPersistenceScopeFactory()
+                                    persistence.getPersistenceScopeFactory(),
+                                    persistence.getCompanionIdentityRepository(),
+                                    persistence.getQuarantineRegistry()
                             )
                     )
                     : new CompanionPopulationReconciliationService(

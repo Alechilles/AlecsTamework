@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -90,6 +91,32 @@ class CompanionPopulationEvidenceSetTest {
 
         assertFalse(set.isConflictFree());
         assertEquals("conflicting-dormant-lifecycle-evidence", set.conflicts().getFirst().reason());
+    }
+
+    @Test
+    void conflictFilteringRetainsHealthyEvidenceAndEveryProjectionMarker() {
+        UUID conflict = new UUID(0L, 501L);
+        UUID healthy = new UUID(0L, 502L);
+        String fingerprint = projectionFingerprint();
+        CompanionPopulationEvidence marker = projection(
+                "marker", fingerprint, conflict, conflict, 3, 4
+        );
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                captured("owner-a", conflict, new UUID(0L, 601L)),
+                captured("owner-b", conflict, new UUID(0L, 602L)),
+                physical("healthy", healthy, new UUID(0L, 603L), "default", 1, 2),
+                marker
+        ));
+
+        CompanionPopulationEvidenceSet filtered = set.excludingConflictUuids(Set.of(conflict));
+
+        assertTrue(filtered.isConflictFree());
+        assertEquals(List.of(healthy), filtered.evidence().stream()
+                .map(CompanionPopulationEvidenceSet.ResolvedEvidence::npcUuid).toList());
+        assertEquals(marker, filtered.projectionObservations(fingerprint).getFirst().evidence());
+        assertTrue(filtered.observations(conflict).isEmpty());
+        assertThrows(IllegalArgumentException.class,
+                () -> set.excludingConflictUuids(Set.of(UUID.randomUUID())));
     }
 
     @Test

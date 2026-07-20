@@ -294,7 +294,9 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 (descriptor, offset) -> progress.set(tracker.update(descriptor, offset)),
                 new CompanionPopulationAmbiguityContainment(
                         persistence.getIncidentReporter(),
-                        persistence.getPersistenceScopeFactory()
+                        persistence.getPersistenceScopeFactory(),
+                        persistence.getCompanionIdentityRepository(),
+                        persistence.getQuarantineRegistry()
                 )
         );
         return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE).thenCompose(result -> {

@@ -62,14 +62,45 @@ final class CompanionPopulationRecoveryGate {
             @Nonnull CompanionPopulationEvidenceSet evidenceSet
     ) {
         if (evidenceSet.isConflictFree()) {
-            return CompletableFuture.completedFuture(Decision.permit());
+            return CompletableFuture.completedFuture(Decision.permit(evidenceSet, 0));
         }
+        if (containment.evidenceEnabled()) {
+            return containment.containEvidenceAsync(evidenceSet.conflicts())
+                    .thenCompose(result -> evaluateContainedEvidence(evidenceSet, result));
+        }
+        return publishEvidenceConflict(evidenceSet);
+    }
+
+    @Nonnull
+    private CompletableFuture<Decision> evaluateContainedEvidence(
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet,
+            @Nonnull CompanionPopulationAmbiguityContainment.EvidenceContainmentResult result
+    ) {
+        if (!result.complete()) {
+            return publishEvidenceConflict(evidenceSet);
+        }
+        CompanionPopulationEvidenceSet repairEvidence;
+        try {
+            repairEvidence = evidenceSet.excludingConflictUuids(result.containedNpcUuids());
+        } catch (RuntimeException failure) {
+            return publishEvidenceConflict(evidenceSet);
+        }
+        return repairEvidence.isConflictFree()
+                ? CompletableFuture.completedFuture(Decision.permit(
+                        repairEvidence, result.containedProfileCount()))
+                : publishEvidenceConflict(evidenceSet);
+    }
+
+    @Nonnull
+    private CompletableFuture<Decision> publishEvidenceConflict(
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet
+    ) {
         return coveragePublisher.publishBothAsync(
                 CompanionPopulationCoverageRecord.State.DEGRADED,
                 "reconciliation-evidence-conflict",
                 evidenceSet.evidence().size(),
                 evidenceSet.conflicts().size()
-        ).thenApply(written -> Decision.stop(written
+        ).thenApply(written -> Decision.stop(evidenceSet, written
                 ? "reconciliation-evidence-conflict"
                 : "reconciliation-coverage-publish-failed"));
     }
@@ -84,20 +115,26 @@ final class CompanionPopulationRecoveryGate {
                 "reconciliation-operation-ambiguous",
                 evidenceSet.evidence().size(),
                 recovery.ambiguous().size()
-        ).thenApply(written -> Decision.stop(written
+        ).thenApply(written -> Decision.stop(evidenceSet, written
                 ? "reconciliation-operation-ambiguous"
                 : "reconciliation-coverage-publish-failed"));
     }
 
-    record Decision(boolean mayProceed, @Nonnull String reason) {
+    record Decision(boolean mayProceed,
+                    @Nonnull String reason,
+                    @Nonnull CompanionPopulationEvidenceSet repairEvidenceSet,
+                    int containedProfileCount) {
         @Nonnull
-        private static Decision permit() {
-            return new Decision(true, "reconciliation-recovery-gate-passed");
+        private static Decision permit(@Nonnull CompanionPopulationEvidenceSet evidenceSet,
+                                       int containedProfileCount) {
+            return new Decision(true, "reconciliation-recovery-gate-passed",
+                    evidenceSet, containedProfileCount);
         }
 
         @Nonnull
-        private static Decision stop(@Nonnull String reason) {
-            return new Decision(false, reason);
+        private static Decision stop(@Nonnull CompanionPopulationEvidenceSet evidenceSet,
+                                     @Nonnull String reason) {
+            return new Decision(false, reason, evidenceSet, 0);
         }
     }
 }
