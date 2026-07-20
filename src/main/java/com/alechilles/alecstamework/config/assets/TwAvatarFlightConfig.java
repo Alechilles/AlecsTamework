@@ -278,7 +278,7 @@ public final class TwAvatarFlightConfig implements
             .<Double>append(new KeyedCodec<>("FastFlightRechargeSpeedRatio", Codec.DOUBLE),
                     (settings, value) -> settings.fastFlightRechargeSpeedRatio = clamp01(value, 0.80),
                     settings -> settings.fastFlightRechargeSpeedRatio)
-            .documentation("Normalized boosted-speed ratio that activates the fast-flight animation and airborne vigour recharge. Clamped to 0..1. Inheritance: missing nested key inherits parent value.")
+            .documentation("Normalized sustainable glide-speed ratio that activates the fast-flight animation and airborne vigour recharge. Clamped to 0..1. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("RechargeDelayAfterSpendSeconds", Codec.DOUBLE),
                     (settings, value) -> settings.rechargeDelayAfterSpendSeconds = nonNegativeOrDefault(value, 0.75),

@@ -47,7 +47,7 @@ public final class AvatarFlightSpeedMetrics {
         if (config == null) {
             return 0.0;
         }
-        return boostedHorizontalCap(config)
+        return glideHorizontalCap(config)
                 * finiteOrZero(config.getVigour().getFastFlightRechargeSpeedRatio());
     }
 

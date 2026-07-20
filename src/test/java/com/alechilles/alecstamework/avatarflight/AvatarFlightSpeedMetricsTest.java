@@ -12,15 +12,14 @@ class AvatarFlightSpeedMetricsTest {
     private static final TwAvatarFlightConfig CONFIG = TwAvatarFlightConfig.defaultConfig();
 
     @Test
-    void defaultConfigUsesBoostedCapForSpeedBalance() {
+    void defaultConfigUsesSustainableGlideCapForFastFlightThreshold() {
         assertEquals(15.0, AvatarFlightSpeedMetrics.glideHorizontalCap(CONFIG), EPSILON);
         assertEquals(21.0, AvatarFlightSpeedMetrics.boostedHorizontalCap(CONFIG), EPSILON);
-        assertEquals(16.8, AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG), EPSILON);
+        assertEquals(12.0, AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG), EPSILON);
         assertEquals(2.0 / 3.0, AvatarFlightSpeedMetrics.speedRatio(14.0, CONFIG), EPSILON);
-        assertTrue(AvatarFlightSpeedMetrics.glideHorizontalCap(CONFIG)
-                < AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG));
-        assertFalse(AvatarFlightSpeedMetrics.isFastFlightSpeed(16.79, CONFIG));
-        assertTrue(AvatarFlightSpeedMetrics.isFastFlightSpeed(16.8, CONFIG));
+        assertFalse(AvatarFlightSpeedMetrics.isFastFlightSpeed(11.99, CONFIG));
+        assertTrue(AvatarFlightSpeedMetrics.isFastFlightSpeed(12.0, CONFIG));
+        assertTrue(AvatarFlightSpeedMetrics.isFastFlightSpeed(14.0, CONFIG));
     }
 
     @Test

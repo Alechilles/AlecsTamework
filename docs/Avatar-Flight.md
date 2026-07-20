@@ -27,10 +27,10 @@ Default balance:
 - `ForwardBoostCost`: 1.
 - `GroundedRechargeSecondsPerCharge`: 4.
 - `FastFlightRechargeSecondsPerCharge`: 8.
-- `FastFlightRechargeSpeedRatio`: 0.80 of boosted horizontal speed cap; this also selects `FastFlightAnimation`.
+- `FastFlightRechargeSpeedRatio`: 0.80 of sustainable horizontal glide speed; this also selects `FastFlightAnimation`.
 - `RechargeDelayAfterSpendSeconds`: 0.75.
 
-Fast flight uses boosted max horizontal speed, calculated as `Movement.MaxForwardSpeed + Boost.ForwardImpulse`. With defaults, the threshold is `(14 + 7) * 0.80 = 16.8`. While horizontal speed remains at or above that threshold, Tamework keeps `FastFlightAnimation` active and applies airborne fast-flight Vigour recharge; ordinary cruise at `14` speed does neither.
+Fast flight uses the sustainable horizontal cap, calculated as `max(Movement.MaxForwardSpeed, Movement.MaxGlideSpeed)`. With defaults, the threshold is `max(14, 15) * 0.80 = 12`. While horizontal speed remains at or above that threshold, Tamework keeps `FastFlightAnimation` active and applies airborne fast-flight Vigour recharge. Ordinary forward cruise at `14` qualifies, while slow or stalled flight does not.
 
 The recharge delay means a spent charge requires the delay plus the recharge cadence. With defaults, one airborne fast-flight charge after spending requires `0.75 + 8 = 8.75` seconds of continuous qualifying speed.
 
@@ -50,7 +50,7 @@ Fast glide starts at `Trails.FastGlideStartSpeedRatio * Movement.MaxGlideSpeed` 
 
 ## Glide Balance
 
-Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: forward input can seed movement from hover or stall, but flat unpowered flight decays gradually toward the `Movement.GlideStartKickSpeed` floor instead of preserving `Movement.NeutralGlideSpeed` forever. Very shallow downward pitch, currently less than about `8°`, is treated like neutral glide for speed and sink so tiny dive angles cannot preserve max glide speed or carry leftover flap lift indefinitely. This neutral/shallow speed bleed is intentionally gentle, with default `Movement.NeutralGlideDeceleration` set to `0.15`, so it preserves more horizontal momentum than a shallow climb while still losing altitude through glide sink. Higher speeds require sustained diving or spending Vigour. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward past the shallow-dive dead zone can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, that is `15`, below the `16.8` fast-flight threshold. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost is the only default path to the boosted max-speed band.
+Unpowered forward glide has a passive sink so zero-Vigour flight eventually needs landing. Level forward glide does not act like a motor: forward input can seed movement from hover or stall, but flat unpowered flight decays gradually toward the `Movement.GlideStartKickSpeed` floor instead of preserving `Movement.NeutralGlideSpeed` forever. Very shallow downward pitch, currently less than about `8°`, is treated like neutral glide for speed and sink so tiny dive angles cannot preserve max glide speed or carry leftover flap lift indefinitely. This neutral/shallow speed bleed is intentionally gentle, with default `Movement.NeutralGlideDeceleration` set to `0.15`, so it preserves more horizontal momentum than a shallow climb while still losing altitude through glide sink. Pitching upward can trade speed for altitude, but it spends momentum instead of being refilled by forward input. Pitching downward past the shallow-dive dead zone can trade altitude for speed up to `Movement.MaxGlideSpeed`; with defaults, sustained speed at or above `12` enters fast flight and recharges Vigour. The pitch-down speed gain is deliberately slow so short dip-and-pull-up loops lose altitude over time. Active boost remains the only default path above the sustainable glide cap.
 
 Sink rate scales with speed. At or above `Movement.StallSpeedThreshold`, neutral glide uses `Movement.GlideSinkSpeed`. As horizontal speed falls toward zero, sink blends toward `Movement.StallSinkSpeed`, so stalled or nearly stalled flight loses altitude much faster than a clean glide.
 
@@ -173,7 +173,7 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 - `ForwardBoostCost`: charge cost for a successful boost.
 - `GroundedRechargeSecondsPerCharge`: grounded recharge rate.
 - `FastFlightRechargeSecondsPerCharge`: airborne fast-flight recharge rate.
-- `FastFlightRechargeSpeedRatio`: ratio of boosted horizontal speed cap that activates both `FastFlightAnimation` and airborne fast-flight recharge.
+- `FastFlightRechargeSpeedRatio`: ratio of sustainable horizontal glide speed that activates both `FastFlightAnimation` and airborne fast-flight recharge.
 - `RechargeDelayAfterSpendSeconds`: delay before recharge resumes after spending.
 - `HudEnabled`: shows the compact speed and Vigour HUD.
 - `HudResendIntervalMs`: throttles unchanged HUD refreshes.

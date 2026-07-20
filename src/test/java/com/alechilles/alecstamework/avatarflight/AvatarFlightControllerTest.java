@@ -582,7 +582,7 @@ class AvatarFlightControllerTest {
     }
 
     @Test
-    void pitchDownWithoutBoostStaysBelowFastRechargeSpeed() {
+    void pitchDownWithoutBoostCanEnterSustainableFastFlightBand() {
         AvatarFlightController.State state = new AvatarFlightController.State(0.0, 0.0, -14.0, 0L, 0L);
         AvatarFlightController.Output output = null;
         for (int tick = 0; tick < 20; tick++) {
@@ -604,8 +604,9 @@ class AvatarFlightControllerTest {
                 "pitch-down should still spend altitude for some speed above normal cruise");
         assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxGlideSpeed() + 0.00001,
                 "unboosted pitch-down must respect the glide-only speed ceiling");
-        assertTrue(horizontalSpeed < AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG),
-                "unboosted pitch-down must not reach the fast-flight recharge band");
+        assertTrue(horizontalSpeed >= AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG),
+                "a fast sustainable dive should enter the fast-flight band");
+        assertTrue(output.fastFlight());
         assertTrue(output.velocityY() < 0.0);
     }
 
@@ -638,8 +639,6 @@ class AvatarFlightControllerTest {
         assertTrue(altitudeChange < -1.0,
                 "short dive/pull-up loops must not sustain altitude indefinitely without Vigour; altitudeChange="
                         + altitudeChange + ", horizontalSpeed=" + horizontalSpeed);
-        assertTrue(horizontalSpeed < AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG),
-                "dive-only speed loops must stay below the fast-recharge band");
     }
 
     @Test
@@ -758,7 +757,8 @@ class AvatarFlightControllerTest {
         double horizontalSpeed = Math.hypot(output.velocityX(), output.velocityZ());
         assertTrue(horizontalSpeed > 11.0, "3s steep dive should build meaningful speed");
         assertTrue(horizontalSpeed <= CONFIG.getMovement().getMaxGlideSpeed() + 0.00001);
-        assertTrue(horizontalSpeed < AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG));
+        assertTrue(horizontalSpeed >= AvatarFlightSpeedMetrics.fastFlightThreshold(CONFIG));
+        assertTrue(output.fastFlight());
     }
 
     @Test
@@ -1028,10 +1028,15 @@ class AvatarFlightControllerTest {
                 new AvatarFlightController.State(0.0, 0.0, -CONFIG.getMovement().getMaxForwardSpeed(), 0L, 0L),
                 input(1.0, false, false, false, false, 0.0)
         );
+        AvatarFlightController.Output slow = update(
+                new AvatarFlightController.State(0.0, 0.0, -10.0, 0L, 0L),
+                input(1.0, false, false, false, false, 0.0)
+        );
 
         assertFalse(sustained.boostApplied());
         assertTrue(sustained.fastFlight(), "speed above the shared threshold should sustain FlyFast");
-        assertFalse(cruise.fastFlight(), "ordinary cruise should continue using Fly");
+        assertTrue(cruise.fastFlight(), "strong ordinary cruise should sustain FlyFast");
+        assertFalse(slow.fastFlight(), "slow flight should continue using Fly");
     }
 
     @Test
