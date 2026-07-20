@@ -4,6 +4,9 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRecord;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -46,6 +49,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedPanelCooldownSnapshotService cooldownSnapshotService;
     private final CommandLoadedNpcStatusSnapshotService loadedSnapshotService;
     private final CommandLinkedPanelLiveTargetResolver liveTargetResolver;
+    private final PersistenceQuarantineRegistry quarantineRegistry;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
@@ -58,7 +62,8 @@ final class CommandLinkedPanelEntryService {
                                    @Nullable NpcProfileRepository profileRepository,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandGroupService groupService,
-                                   @Nullable CommandNpcProfileActionResolver profileActionResolver) {
+                                   @Nullable CommandNpcProfileActionResolver profileActionResolver,
+                                   @Nullable PersistenceQuarantineRegistry quarantineRegistry) {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
         this.deathService = deathService;
         this.captureService = captureService;
@@ -82,6 +87,7 @@ final class CommandLinkedPanelEntryService {
         this.liveTargetResolver = profileActionResolver == null
                 ? null
                 : new CommandLinkedPanelLiveTargetResolver(profileActionResolver);
+        this.quarantineRegistry = quarantineRegistry;
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -232,7 +238,7 @@ final class CommandLinkedPanelEntryService {
                     );
                 }
                 if (loadedEntry != null) {
-                    entries.add(loadedEntry);
+                    entries.add(applyRecoveryHold(loadedEntry, record.profileId));
                     continue;
                 }
             }
@@ -251,7 +257,7 @@ final class CommandLinkedPanelEntryService {
                     recallLostRemainingMs = pendingRecall.remainingUntilLostMs();
                 }
             }
-            entries.add(new LinkedNpcEntry(
+            entries.add(applyRecoveryHold(new LinkedNpcEntry(
                     record.npcUuid,
                     displayName,
                     gender,
@@ -299,9 +305,18 @@ final class CommandLinkedPanelEntryService {
                     harvestCooldownKnown,
                     recallPending,
                     recallLostRemainingMs
-            ));
+            ), record.profileId));
         }
         return entries;
+    }
+
+    private LinkedNpcEntry applyRecoveryHold(LinkedNpcEntry entry, @Nullable String profileId) {
+        if (quarantineRegistry == null || profileId == null || profileId.isBlank()) return entry;
+        PersistenceQuarantineRecord hold = quarantineRegistry
+                .find(PersistenceScopeType.PROFILE, profileId)
+                .or(() -> quarantineRegistry.find(PersistenceScopeType.BREEDING_PARENT, profileId))
+                .orElse(null);
+        return hold == null ? entry : entry.withRecoveryHold(hold.incidentId());
     }
 
     @Nullable

@@ -174,6 +174,26 @@ class LinkedNpcPanelStatusTextServiceTest {
     }
 
     @Test
+    void scopedRecoveryHoldOverridesLifecycleStatusAndUsesOnlyShortReference() {
+        LinkedNpcEntry entry = new LinkedNpcEntry(
+                UUID.randomUUID(), "Held Companion", 0, 0, 0, 0, null,
+                0, 0, 0, 0, false, false, true, false, false, true,
+                0L, LinkedNpcTraitIndicator.EMPTY
+        ).withRecoveryHold("12345678-raw-tail-must-not-render");
+
+        assertEquals("12345678", entry.recoveryIncidentId());
+        assertEquals(
+                LocalizedText.format((String) null,
+                        "tamework.ui.linkedPanel.status.recoveryHeldReference", "12345678"),
+                LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry)
+        );
+
+        LinkedNpcEntry[] snapshots = LinkedNpcEntrySnapshotMapper.build(java.util.List.of(entry));
+        assertEquals(1, snapshots.length);
+        assertEquals("12345678", snapshots[0].recoveryIncidentId());
+    }
+
+    @Test
     void saturatedCooldownFormattingNeverWrapsNegative() {
         String clock = LinkedNpcPanelStatusTextService.formatRemainingClock(Long.MAX_VALUE);
         String duration = LinkedNpcPanelStatusTextService.formatRemainingTime(Long.MAX_VALUE, null);

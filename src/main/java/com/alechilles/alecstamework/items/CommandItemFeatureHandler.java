@@ -201,7 +201,8 @@ public final class CommandItemFeatureHandler {
                 persistenceRuntime != null ? persistenceRuntime.getNpcProfileRepository() : null,
                 linkPolicyService,
                 this.groupService,
-                profileActionResolver
+                profileActionResolver,
+                persistenceRuntime != null ? persistenceRuntime.getQuarantineRegistry() : null
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.panelPreferenceService = new CommandPanelPreferenceService();

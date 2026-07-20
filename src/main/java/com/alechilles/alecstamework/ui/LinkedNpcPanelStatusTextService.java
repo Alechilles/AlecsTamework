@@ -51,6 +51,14 @@ final class LinkedNpcPanelStatusTextService {
         if (entry == null) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.unloaded");
         }
+        if (entry.recoveryHeld()) {
+            if (entry.recoveryIncidentId() != null) {
+                return LocalizedText.format(language,
+                        "tamework.ui.linkedPanel.status.recoveryHeldReference",
+                        entry.recoveryIncidentId());
+            }
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.recoveryHeld");
+        }
         if (entry.dead()) {
             return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.dead");
         }

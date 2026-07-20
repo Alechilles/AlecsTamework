@@ -49,6 +49,8 @@ public final class LinkedNpcEntry {
     private final boolean harvestCooldownKnown;
     private final boolean recallPending;
     private final long recallLostRemainingMs;
+    private final boolean recoveryHeld;
+    private final String recoveryIncidentId;
     private final FutureStat futureStatA;
     private final FutureStat futureStatB;
     private final LinkedNpcTraitIndicator[] traitIndicators;
@@ -470,6 +472,8 @@ public final class LinkedNpcEntry {
         this.harvestCooldownKnown = harvestCooldownKnown;
         this.recallPending = recallPending;
         this.recallLostRemainingMs = Math.max(0L, recallLostRemainingMs);
+        this.recoveryHeld = false;
+        this.recoveryIncidentId = null;
         this.futureStatA = futureStatA;
         this.futureStatB = futureStatB;
         this.traitIndicators = sanitizeTraitIndicators(traitIndicators);
@@ -651,6 +655,19 @@ public final class LinkedNpcEntry {
         return recallLostRemainingMs;
     }
 
+    public boolean recoveryHeld() {
+        return recoveryHeld;
+    }
+
+    public String recoveryIncidentId() {
+        return recoveryIncidentId;
+    }
+
+    /** Returns an immutable presentation copy marked with its scoped recovery incident. */
+    public LinkedNpcEntry withRecoveryHold(String incidentId) {
+        return new LinkedNpcEntry(this, incidentId);
+    }
+
     public double healthRatio() {
         if (!hasHealth()) {
             return 0.0;
@@ -746,6 +763,64 @@ public final class LinkedNpcEntry {
             }
         }
         return out.isEmpty() ? LinkedNpcTraitIndicator.EMPTY : out.toArray(new LinkedNpcTraitIndicator[0]);
+    }
+
+    private LinkedNpcEntry(LinkedNpcEntry source, String incidentId) {
+        this.npcUuid = source.npcUuid;
+        this.displayName = source.displayName;
+        this.gender = source.gender;
+        this.currentHealth = source.currentHealth;
+        this.maxHealth = source.maxHealth;
+        this.currentHappiness = source.currentHappiness;
+        this.maxHappiness = source.maxHappiness;
+        this.targetHappinessPercent = source.targetHappinessPercent;
+        this.happinessModifierBreakdown = source.happinessModifierBreakdown;
+        this.currentHunger = source.currentHunger;
+        this.maxHunger = source.maxHunger;
+        this.currentThirst = source.currentThirst;
+        this.maxThirst = source.maxThirst;
+        this.loaded = source.loaded;
+        this.linked = source.linked;
+        this.active = source.active;
+        this.dead = source.dead;
+        this.captured = source.captured;
+        this.inCoop = source.inCoop;
+        this.lost = source.lost;
+        this.hasHome = source.hasHome;
+        this.deadRespawnRemainingMs = source.deadRespawnRemainingMs;
+        this.deathCauseHint = source.deathCauseHint;
+        this.speciesId = source.speciesId;
+        this.speciesLabel = source.speciesLabel;
+        this.groupId = source.groupId;
+        this.groupName = source.groupName;
+        this.groupColorHex = source.groupColorHex;
+        this.breedingEnabled = source.breedingEnabled;
+        this.breedingAvailable = source.breedingAvailable;
+        this.breedingCooldownActive = source.breedingCooldownActive;
+        this.breedingCooldownRemainingMs = source.breedingCooldownRemainingMs;
+        this.breedingCooldownRatio = source.breedingCooldownRatio;
+        this.breedingCooldownKnown = source.breedingCooldownKnown;
+        this.harvestCooldownActive = source.harvestCooldownActive;
+        this.harvestCooldownRemainingMs = source.harvestCooldownRemainingMs;
+        this.harvestCooldownRatio = source.harvestCooldownRatio;
+        this.harvestCooldownKnown = source.harvestCooldownKnown;
+        this.recallPending = source.recallPending;
+        this.recallLostRemainingMs = source.recallLostRemainingMs;
+        this.futureStatA = source.futureStatA;
+        this.futureStatB = source.futureStatB;
+        this.traitIndicators = source.traitIndicators.clone();
+        this.traitsActionVisible = source.traitsActionVisible;
+        this.traitsActionEnabled = source.traitsActionEnabled;
+        this.talentsActionVisible = source.talentsActionVisible;
+        this.talentsActionEnabled = source.talentsActionEnabled;
+        this.recoveryHeld = true;
+        this.recoveryIncidentId = normalizeIncidentId(incidentId);
+    }
+
+    private static String normalizeIncidentId(String incidentId) {
+        if (incidentId == null || incidentId.isBlank()) return null;
+        String normalized = incidentId.trim();
+        return normalized.substring(0, Math.min(8, normalized.length()));
     }
 
     private static double sanitizeRatio(double value) {

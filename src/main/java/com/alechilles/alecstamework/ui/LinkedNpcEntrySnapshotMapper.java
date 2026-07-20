@@ -39,7 +39,7 @@ final class LinkedNpcEntrySnapshotMapper {
             int maxHunger = Math.max(0, entry.maxHunger());
             int currentThirst = Math.max(0, entry.currentThirst());
             int maxThirst = Math.max(0, entry.maxThirst());
-            out.add(new LinkedNpcEntry(
+            LinkedNpcEntry snapshot = new LinkedNpcEntry(
                     entry.npcUuid(),
                     name,
                     entry.gender(),
@@ -87,7 +87,10 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.harvestCooldownKnown(),
                     entry.recallPending(),
                     entry.recallLostRemainingMs()
-            ));
+            );
+            out.add(entry.recoveryHeld()
+                    ? snapshot.withRecoveryHold(entry.recoveryIncidentId())
+                    : snapshot);
         }
         return out.toArray(new LinkedNpcEntry[0]);
     }
