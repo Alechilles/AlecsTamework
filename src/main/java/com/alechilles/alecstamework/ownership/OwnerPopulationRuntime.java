@@ -115,7 +115,8 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
                 persistence.getHealthService(),
                 index,
                 identityResolver,
-                claimOccupancyIndex
+                claimOccupancyIndex,
+                persistence.getQuarantineRegistry()
         );
         CompanionPopulationBootstrapService.BootstrapResult bootstrap =
                 bootstrapService.loadForReconciliation();

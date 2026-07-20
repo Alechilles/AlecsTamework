@@ -62,6 +62,17 @@ These may have retained a source, reservation, live projection, or canonical eff
 cannot safely be guessed. They retain the prepared journal and/or a durable v7 quarantine. Recovery
 must inspect the named domain's canonical and physical evidence; the operator cannot force-clear it.
 
+### Owner-population startup recovery
+
+- `operation_recovery_source_finalization_pending_spawner_item`
+- other bounded `operation_recovery_*` ambiguity reasons emitted for one exact journal/profile pair
+
+Startup retains the nonterminal journal and commits both exact `OPERATION` and `PROFILE` quarantine
+scopes before conflict-free evidence may advance. Bootstrap excludes that journal from the global
+pending-operation gate only while both fences are active; it still reports the journal in diagnostic
+counts. This permits unrelated profiles to become ready without treating the ambiguous companion as
+safe. A missing or failed fence commit keeps owner and claim authority broadly fail-closed.
+
 ### Breeding
 
 - `breeding_live_identity_remap_failed`

@@ -69,6 +69,7 @@
 - Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
+- Fixed a historical applied owner-population operation with unprovable source finalization keeping every owner and claim admission degraded after restart. Startup now durably quarantines the exact operation and companion profile, retains the nonterminal journal for evidence-based recovery, and restores readiness for unrelated profiles. If either exact fence cannot be committed, Tamework still fails the broader authority closed.
 - Fixed avatar-flight wing-flap sounds accumulating during forward flight or remaining silent while hovering. Configured one-shot flap cues now play at a state-specific cadence without restarting movement animations.
 - Fixed transformed avatar-flight models sometimes freezing on their final flight frame after landing while stationary instead of immediately returning to idle.
 - Fixed AvatarFlight cleanup replaying equipment before restoring the player skin, which could leave clothing visible through equipped armor after dismounting.

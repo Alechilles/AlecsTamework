@@ -354,6 +354,8 @@ $requiredTameworkReports = Get-RequiredSurefireReportEvidence $tameworkRoot @(
     "com.alechilles.alecstamework.items.CommandWorldChangeEligibilityTest",
     "com.alechilles.alecstamework.items.ManagedCoopLifecycleRecoveryServiceTest",
     "com.alechilles.alecstamework.npc.breeding.BreedingPairingCoordinatorTest",
+    "com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationAmbiguityContainmentTest",
+    "com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationServiceIntegrationTest",
     "com.alechilles.alecstamework.ownership.CompanionPermanentDeathCoordinatorTest",
     "com.alechilles.alecstamework.ownership.CompanionSpawnPopulationAdmissionServiceTest"
 )

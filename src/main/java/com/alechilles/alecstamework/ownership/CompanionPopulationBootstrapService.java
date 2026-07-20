@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyEntry;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyIndex;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionIdentityRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRecord;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRepository;
@@ -41,6 +43,7 @@ public final class CompanionPopulationBootstrapService {
     private final OwnerPopulationIndex index;
     private final CompanionIdentityResolver identityResolver;
     private final ClaimOccupancyIndex claimOccupancyIndex;
+    private final PersistenceQuarantineRegistry quarantines;
 
     public CompanionPopulationBootstrapService(
             @Nonnull CompanionPopulationRepository populationRepository,
@@ -51,6 +54,24 @@ public final class CompanionPopulationBootstrapService {
             @Nonnull CompanionIdentityResolver identityResolver,
             @Nonnull ClaimOccupancyIndex claimOccupancyIndex
     ) {
+        this(
+                populationRepository, coverageRepository, identityRepository,
+                persistenceHealth, index, identityResolver, claimOccupancyIndex,
+                new PersistenceQuarantineRegistry()
+        );
+    }
+
+    /** Uses durable v7 fences to keep contained journals from blocking unrelated readiness. */
+    public CompanionPopulationBootstrapService(
+            @Nonnull CompanionPopulationRepository populationRepository,
+            @Nonnull CompanionPopulationCoverageRepository coverageRepository,
+            @Nonnull CompanionIdentityRepository identityRepository,
+            @Nonnull PersistenceHealthService persistenceHealth,
+            @Nonnull OwnerPopulationIndex index,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull ClaimOccupancyIndex claimOccupancyIndex,
+            @Nonnull PersistenceQuarantineRegistry quarantines
+    ) {
         this.populationRepository = Objects.requireNonNull(populationRepository, "populationRepository");
         this.coverageRepository = Objects.requireNonNull(coverageRepository, "coverageRepository");
         this.identityRepository = Objects.requireNonNull(identityRepository, "identityRepository");
@@ -58,6 +79,7 @@ public final class CompanionPopulationBootstrapService {
         this.index = Objects.requireNonNull(index, "index");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
         this.claimOccupancyIndex = Objects.requireNonNull(claimOccupancyIndex, "claimOccupancyIndex");
+        this.quarantines = Objects.requireNonNull(quarantines, "quarantines");
     }
 
     @Nonnull
@@ -113,6 +135,9 @@ public final class CompanionPopulationBootstrapService {
             List<CompanionPopulationStateRecord> states = populationRepository.loadAllStates();
             List<CompanionPopulationOperationRecord> operations =
                     populationRepository.loadNonterminalOperations();
+            List<CompanionPopulationOperationRecord> uncontainedOperations = operations.stream()
+                    .filter(operation -> !isDurablyContained(operation))
+                    .toList();
             List<CompanionPopulationCoverageRecord> coverage = coverageRepository.loadAll();
             List<OwnerPopulationEntry> entries = toOwnerEntries(states);
             List<ClaimOccupancyEntry> claimEntries = toClaimEntries(states);
@@ -123,10 +148,11 @@ public final class CompanionPopulationBootstrapService {
             if (assumeStagedOwnerCoverage) {
                 promoteStagedOwnerCoverage(coverageStates);
             }
-            OwnerPopulationReadiness global = deriveGlobalReadiness(coverageStates, operations);
+            OwnerPopulationReadiness global = deriveGlobalReadiness(
+                    coverageStates, uncontainedOperations);
             OwnerPopulationReadiness perWorld = derivePerWorldReadiness(
                     coverageStates,
-                    operations,
+                    uncontainedOperations,
                     entries,
                     global
             );
@@ -149,7 +175,7 @@ public final class CompanionPopulationBootstrapService {
                     entries.size(),
                     operations.size(),
                     identityResolver.aliasCount(),
-                    operations.isEmpty() ? "population-loaded" : "population-operations-pending"
+                    bootstrapReason(operations, uncontainedOperations)
             );
         } catch (Exception exception) {
             persistenceHealth.markDegraded("population_bootstrap_failed");
@@ -164,6 +190,24 @@ public final class CompanionPopulationBootstrapService {
                     "population-bootstrap-failed"
             );
         }
+    }
+
+    private boolean isDurablyContained(@Nonnull CompanionPopulationOperationRecord operation) {
+        return quarantines.find(PersistenceScopeType.OPERATION, operation.operationId()).isPresent()
+                && quarantines.find(PersistenceScopeType.PROFILE, operation.profileId()).isPresent();
+    }
+
+    @Nonnull
+    private static String bootstrapReason(
+            @Nonnull List<CompanionPopulationOperationRecord> operations,
+            @Nonnull List<CompanionPopulationOperationRecord> uncontainedOperations
+    ) {
+        if (!uncontainedOperations.isEmpty()) {
+            return "population-operations-pending";
+        }
+        return operations.isEmpty()
+                ? "population-loaded"
+                : "population-loaded-with-quarantined-operations";
     }
 
     @Nonnull

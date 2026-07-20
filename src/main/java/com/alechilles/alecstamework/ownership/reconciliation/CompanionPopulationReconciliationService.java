@@ -37,6 +37,7 @@ public final class CompanionPopulationReconciliationService {
     private final BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver;
     private final CompanionPopulationCoveragePublisher coveragePublisher;
     private final CompanionPopulationFinalizationService finalizationService;
+    private final CompanionPopulationRecoveryGate recoveryGate;
 
     public CompanionPopulationReconciliationService(
             @Nonnull CompanionPopulationReconciliationCatalog catalog,
@@ -49,6 +50,28 @@ public final class CompanionPopulationReconciliationService {
             @Nonnull CompanionPersistedProjectionEvidenceRegistry projectionEvidenceRegistry,
             @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
             @Nonnull BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver
+    ) {
+        this(
+                catalog, reconciliationRepository, populationRepository, repairRepository,
+                scanSessionRepository, scanSessionEpoch, loadedNpcIdentityIndex,
+                projectionEvidenceRegistry, liveEvidenceRevision, progressObserver,
+                CompanionPopulationAmbiguityContainment.disabled()
+        );
+    }
+
+    /** Production constructor that can durably contain bounded operation ambiguities. */
+    public CompanionPopulationReconciliationService(
+            @Nonnull CompanionPopulationReconciliationCatalog catalog,
+            @Nonnull CompanionPopulationReconciliationRepository reconciliationRepository,
+            @Nonnull CompanionPopulationRepository populationRepository,
+            @Nonnull CompanionPopulationRepairRepository repairRepository,
+            @Nonnull CompanionPopulationScanSessionRepository scanSessionRepository,
+            @Nonnull String scanSessionEpoch,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
+            @Nonnull CompanionPersistedProjectionEvidenceRegistry projectionEvidenceRegistry,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
+            @Nonnull BiConsumer<CompanionPopulationEvidenceSource.Descriptor, Long> progressObserver,
+            @Nonnull CompanionPopulationAmbiguityContainment ambiguityContainment
     ) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.reconciliationRepository = Objects.requireNonNull(
@@ -72,6 +95,8 @@ public final class CompanionPopulationReconciliationService {
                 scanSessionRepository, scanSessionEpoch, loadedNpcIdentityIndex,
                 projectionEvidenceRegistry, liveEvidenceRevision, coveragePublisher
         );
+        this.recoveryGate = new CompanionPopulationRecoveryGate(
+                ambiguityContainment, coveragePublisher);
     }
 
     /**
@@ -298,34 +323,16 @@ public final class CompanionPopulationReconciliationService {
             return loadOperations().thenCompose(operations ->
                     operationRecovery.recoverAsync(
                             operations, evidenceSet, loadedIdentities
-                    ).thenCompose(recovery -> {
-                        if (!recovery.complete()) {
-                            return coveragePublisher.publishBothAsync(
-                                    CompanionPopulationCoverageRecord.State.DEGRADED,
-                                    "reconciliation-operation-ambiguous",
-                                    evidenceSet.evidence().size(),
-                                    recovery.ambiguous().size()
-                            ).thenApply(written -> Result.degraded(written
-                                    ? "reconciliation-operation-ambiguous"
-                                    : "reconciliation-coverage-publish-failed"));
-                        }
-                        if (!evidenceSet.isConflictFree()) {
-                            return coveragePublisher.publishBothAsync(
-                                    CompanionPopulationCoverageRecord.State.DEGRADED,
-                                    "reconciliation-evidence-conflict",
-                                    evidenceSet.evidence().size(),
-                                    evidenceSet.conflicts().size()
-                            ).thenApply(written -> Result.degraded(written
-                                    ? "reconciliation-evidence-conflict"
-                                    : "reconciliation-coverage-publish-failed"));
-                        }
-                        return mergeEvidence(
-                                evidenceSet,
-                                recovery,
-                                loadedIdentities.mutationRevision(),
-                                expectedLiveEvidenceRevision
-                        );
-                    })
+                    ).thenCompose(recovery -> recoveryGate.evaluateAsync(evidenceSet, recovery)
+                            .thenCompose(decision -> decision.mayProceed()
+                                    ? mergeEvidence(
+                                            evidenceSet,
+                                            recovery,
+                                            loadedIdentities.mutationRevision(),
+                                            expectedLiveEvidenceRevision
+                                    )
+                                    : CompletableFuture.completedFuture(
+                                            Result.degraded(decision.reason()))))
             );
         }).exceptionally(exception -> Result.degraded(
                 "reconciliation-finalize-failed:"
@@ -356,7 +363,8 @@ public final class CompanionPopulationReconciliationService {
                 ).thenApply(ignored -> Result.degraded(reason));
             }
             return loadOperations().thenCompose(remaining -> {
-                if (!remaining.isEmpty()) {
+                if (!remaining.isEmpty()
+                        && !recoveryGate.matchesDurableAmbiguities(remaining, recovery)) {
                     return coveragePublisher.publishBothAsync(
                             CompanionPopulationCoverageRecord.State.DEGRADED,
                             "reconciliation-operations-remain",

@@ -291,7 +291,11 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 loadedNpcIdentityIndex,
                 persistence.getCompanionPersistedProjectionEvidenceRegistry(),
                 liveEvidenceRevision,
-                (descriptor, offset) -> progress.set(tracker.update(descriptor, offset))
+                (descriptor, offset) -> progress.set(tracker.update(descriptor, offset)),
+                new CompanionPopulationAmbiguityContainment(
+                        persistence.getIncidentReporter(),
+                        persistence.getPersistenceScopeFactory()
+                )
         );
         return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE).thenCompose(result -> {
             if (CompanionPopulationReconciliationRetryPolicy.shouldRetry(result.reason())) {

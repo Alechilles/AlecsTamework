@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.integration.claims.ClaimOccupancyReadiness;
 import com.alechilles.alecstamework.ownership.CompanionIdentityResolver;
 import com.alechilles.alecstamework.ownership.CompanionLifecycleState;
 import com.alechilles.alecstamework.ownership.CompanionPopulationBootstrapService;
+import com.alechilles.alecstamework.ownership.CompanionSpawnSourceFinalizationContext;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCounts;
 import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
 import com.alechilles.alecstamework.ownership.OwnerPopulationEntry;
@@ -16,6 +17,9 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
 import com.alechilles.alecstamework.ownership.OwnerPopulationReadiness;
 import com.alechilles.alecstamework.ownership.OwnerPopulationTransitionRequest;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRecord;
+import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
+import com.alechilles.alecstamework.persistence.sqlite.ProfileOwnerMutation;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationScanSessionRepository;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationStateRecord;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
@@ -201,6 +205,74 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
             assertTrue(release.allowed());
             assertFalse(release.positiveDelta());
             assertTrue(index.cancel(release.reservation()));
+        }
+    }
+
+    @Test
+    void historicalSourceFinalizationAmbiguityIsScopedAndUnrelatedProfilesBecomeReady()
+            throws Exception {
+        UUID ambiguousNpc = UUID.fromString("00000000-0000-0000-0000-000000000831");
+        UUID healthyNpc = UUID.fromString("00000000-0000-0000-0000-000000000832");
+        CompanionPopulationReconciliationCatalog catalog = sealedCatalog(
+                List.of(),
+                List.of(
+                        physical("ambiguous-live", ambiguousNpc, OWNER_A, "alpha", 2, 3),
+                        physical("healthy-live", healthyNpc, OWNER_B, "beta", 4, 5)
+                ),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        try (Harness harness = Harness.openScoped(
+                tempDir.resolve("scoped-source-finalization"), catalog
+        )) {
+            seedAppliedSourceFinalization(harness.persistence(), ambiguousNpc);
+
+            CompanionPopulationReconciliationService.Result result = harness.reconcile(1);
+
+            assertEquals(CompanionPopulationReconciliationService.Status.READY,
+                    result.status(), result.reason());
+            assertEquals(2, result.profileCount());
+            assertEquals(1, harness.persistence().getCompanionPopulationRepository()
+                    .loadNonterminalOperations().size());
+            assertEquals(CompanionPopulationOperationRecord.State.APPLIED,
+                    harness.persistence().getCompanionPopulationRepository()
+                            .loadNonterminalOperations().getFirst().state());
+            assertTrue(harness.persistence().getQuarantineRegistry()
+                    .find(com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType.OPERATION,
+                            "operation-ambiguous").isPresent());
+            assertTrue(harness.persistence().getQuarantineRegistry()
+                    .find(com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType.PROFILE,
+                            "profile-ambiguous").isPresent());
+
+            Projection projection = harness.bootstrap();
+            assertEquals(OwnerPopulationReadiness.READY, projection.result().globalReadiness());
+            assertEquals(OwnerPopulationReadiness.READY, projection.result().perWorldReadiness());
+            assertEquals(1L, projection.ownerIndex().counts(OWNER_A, "alpha").globalCommitted());
+            assertEquals(1L, projection.ownerIndex().counts(OWNER_B, "beta").globalCommitted());
+            assertTrue(projection.identityResolver().resolveProfileId(healthyNpc).isPresent());
+
+            var profileFence = harness.persistence().getQuarantineRegistry().snapshot().stream()
+                    .filter(record -> record.scope().type()
+                            == com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType.PROFILE)
+                    .findFirst()
+                    .orElseThrow();
+            assertTrue(harness.persistence().getQuarantineRegistry().clearVerified(
+                    profileFence.quarantineId(),
+                    profileFence.generation(),
+                    profileFence.evidenceHash()
+            ));
+            Projection incompleteFenceProjection = harness.bootstrap();
+            assertEquals(OwnerPopulationReadiness.RECONCILING,
+                    incompleteFenceProjection.result().globalReadiness());
+            assertEquals("population-operations-pending",
+                    incompleteFenceProjection.result().reason());
+
+            harness.persistence().getQuarantineRegistry().reload(
+                    harness.persistence().getQuarantineRepository().listActive());
+            assertEquals(OwnerPopulationReadiness.READY,
+                    harness.bootstrap().result().globalReadiness());
         }
     }
 
@@ -427,6 +499,71 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
         );
     }
 
+    private static void seedAppliedSourceFinalization(
+            TameworkPersistenceRuntime persistence,
+            UUID npcUuid
+    ) throws Exception {
+        long now = System.currentTimeMillis();
+        var baseline = new CompanionPopulationStateRecord(
+                "profile-ambiguous", npcUuid, null, "alpha", "alpha",
+                CompanionLifecycleState.CAPTURED.name(), null, null, null,
+                0L, "test", now, now
+        );
+        String sourceContext = CompanionSpawnSourceFinalizationContext.extensionJson(
+                CompanionSpawnSourceFinalizationContext.Kind.SPAWNER_ITEM,
+                "source-finalization-a",
+                npcUuid,
+                OWNER_A,
+                0,
+                "filled",
+                "empty"
+        );
+        String targetContext = "{\"operation\":\"restore\",\"npcUuid\":\"" + npcUuid
+                + "\",\"world\":\"alpha\",\"chunkX\":2,\"chunkZ\":3,"
+                + sourceContext.substring(1);
+        var operation = new CompanionPopulationOperationRecord(
+                "operation-ambiguous",
+                baseline.profileId(),
+                OwnerPopulationOperation.RESTORE.name(),
+                CompanionPopulationOperationRecord.State.PREPARED,
+                0L,
+                "{\"ownerUuid\":null,\"lifecycleState\":\"CAPTURED\","
+                        + "\"ownershipWorldName\":\"alpha\"}",
+                "{\"ownerUuid\":\"" + OWNER_A + "\",\"lifecycleState\":\"ACTIVE\","
+                        + "\"ownershipWorldName\":\"alpha\"}",
+                targetContext,
+                now,
+                now,
+                0L,
+                null
+        );
+        var repository = persistence.getCompanionPopulationRepository();
+        assertTrue(repository.prepareAsync(new PopulationPersistenceTransition.Prepare(
+                operation, baseline)).completion().get(5L, TimeUnit.SECONDS).isCommitted());
+        assertTrue(repository.advanceOperationAsync(
+                operation.operationId(),
+                CompanionPopulationOperationRecord.State.PREPARED,
+                CompanionPopulationOperationRecord.State.APPLYING,
+                null
+        ).completion().get(5L, TimeUnit.SECONDS).isCommitted());
+        var committed = repository.commitAsync(new PopulationPersistenceTransition.Commit(
+                operation.operationId(),
+                baseline.profileId(),
+                0L,
+                ProfileOwnerMutation.set(OWNER_A),
+                npcUuid,
+                "alpha",
+                CompanionLifecycleState.ACTIVE.name(),
+                "alpha",
+                2,
+                3,
+                "test"
+        )).completion().get(5L, TimeUnit.SECONDS);
+        assertTrue(committed.isCommitted());
+        assertEquals(PopulationPersistenceTransition.ResultStatus.SOURCE_FINALIZATION_PENDING,
+                committed.value().status());
+    }
+
     private static void assertState(
             CompanionPopulationStateRecord state,
             UUID owner,
@@ -593,10 +730,28 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
             return open(path, catalog, identities);
         }
 
+        static Harness openScoped(
+                Path path,
+                CompanionPopulationReconciliationCatalog catalog
+        ) throws Exception {
+            LoadedNpcIdentityIndex identities = new LoadedNpcIdentityIndex();
+            identities.markInitializationComplete();
+            return open(path, catalog, identities, true);
+        }
+
         static Harness open(
                 Path path,
                 CompanionPopulationReconciliationCatalog catalog,
                 LoadedNpcIdentityIndex identities
+        ) throws Exception {
+            return open(path, catalog, identities, false);
+        }
+
+        private static Harness open(
+                Path path,
+                CompanionPopulationReconciliationCatalog catalog,
+                LoadedNpcIdentityIndex identities,
+                boolean scopedContainment
         ) throws Exception {
             TameworkPersistenceRuntime persistence = TameworkPersistenceRuntime.initialize(path, null);
             CompanionPopulationScanSessionRepository sessions =
@@ -614,8 +769,25 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                     new CompanionLiveEvidenceRevision();
             projections.bindLiveEvidenceRevision(liveEvidenceRevision);
             projections.begin(acquired.value().epoch());
-            CompanionPopulationReconciliationService service =
-                    new CompanionPopulationReconciliationService(
+            CompanionPopulationReconciliationService service = scopedContainment
+                    ? new CompanionPopulationReconciliationService(
+                            catalog,
+                            persistence.getCompanionPopulationReconciliationRepository(),
+                            persistence.getCompanionPopulationRepository(),
+                            persistence.getCompanionPopulationRepairRepository(),
+                            sessions,
+                            acquired.value().epoch(),
+                            identities,
+                            projections,
+                            liveEvidenceRevision,
+                            (descriptor, offset) -> {
+                            },
+                            new CompanionPopulationAmbiguityContainment(
+                                    persistence.getIncidentReporter(),
+                                    persistence.getPersistenceScopeFactory()
+                            )
+                    )
+                    : new CompanionPopulationReconciliationService(
                             catalog,
                             persistence.getCompanionPopulationReconciliationRepository(),
                             persistence.getCompanionPopulationRepository(),
@@ -667,7 +839,8 @@ class CompanionPopulationReconciliationServiceIntegrationTest {
                     persistence.getHealthService(),
                     ownerIndex,
                     identityResolver,
-                    claimIndex
+                    claimIndex,
+                    persistence.getQuarantineRegistry()
             );
             return new Projection(bootstrap.load(), ownerIndex, identityResolver, claimIndex);
         }

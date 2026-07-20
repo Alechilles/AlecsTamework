@@ -136,6 +136,12 @@ Direct contract coverage lives in
 locked by `PersistentWorldDirectoryCatalogTest` and
 `PersistedWorldCoverageLoaderTest`.
 
+A bounded historical operation ambiguity does not automatically invalidate this complete coverage.
+Before publishing unrelated profiles as ready, startup must durably fence both the exact operation and
+its exact profile. The journal remains nonterminal and visible in diagnostics; only that operation and
+profile are denied. Bootstrap treats it as contained only while both v7 fences are active. If either
+fence is absent or its durable write fails, owner and claim readiness remains broadly fail-closed.
+
 A direct owner-component clear is not proof of release. Unless it matches an in-flight
 prepared transition or an explicit durable `RELEASED` operation, runtime reconciliation
 keeps the canonical slot and queues a component repair through the ownership mutation
