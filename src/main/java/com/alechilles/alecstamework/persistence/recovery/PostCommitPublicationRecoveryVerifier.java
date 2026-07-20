@@ -42,6 +42,11 @@ public final class PostCommitPublicationRecoveryVerifier implements ScopedPersis
     }
 
     @Override
+    public boolean supports(@Nonnull PersistenceFailureClass failureClass) {
+        return failureClass == PersistenceFailureClass.POST_COMMIT_PUBLICATION_FAILURE;
+    }
+
+    @Override
     @Nonnull
     public ScopedRecoveryVerification verify(@Nonnull ScopedRecoveryContext context) {
         if (context.incident().failureClass()

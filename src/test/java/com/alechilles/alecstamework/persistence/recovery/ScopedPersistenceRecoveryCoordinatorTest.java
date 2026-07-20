@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.persistence.recovery;
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClassifier;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClass;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRegistry;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentRepository;
@@ -113,6 +114,35 @@ class ScopedPersistenceRecoveryCoordinatorTest {
         }
     }
 
+    @Test
+    void oneDomainCanSelectDifferentEvidenceVerifiersByFailureClass() throws Exception {
+        try (Harness harness = new Harness("select-verifier.sqlite")) {
+            String incidentId = harness.openIncident();
+            AtomicInteger selected = new AtomicInteger();
+            harness.coordinator.register(harness.verifier(
+                    "apply-verifier", PersistenceFailureClass.SCOPED_APPLY_AMBIGUITY,
+                    context -> {
+                        throw new AssertionError("wrong verifier selected");
+                    }));
+            harness.coordinator.register(harness.verifier(
+                    "publication-verifier", PersistenceFailureClass.POST_COMMIT_PUBLICATION_FAILURE,
+                    context -> {
+                        selected.incrementAndGet();
+                        PersistenceQuarantineRecord fence = context.quarantines().getFirst();
+                        return new ScopedRecoveryVerification(
+                                ScopedRecoveryResolution.RESOLVED_NEW_STATE, "publication_verified",
+                                Map.of(fence.quarantineId(), fence.evidenceHash()), () -> { }, null);
+                    }));
+
+            ScopedPersistenceRecoveryCoordinator.RecoveryResult result = harness.coordinator
+                    .request(incidentId, ScopedRecoveryTrigger.OPERATOR_REQUEST)
+                    .get(5, TimeUnit.SECONDS);
+
+            assertEquals(ScopedPersistenceRecoveryCoordinator.RecoveryStatus.RESOLVED, result.status());
+            assertEquals(1, selected.get());
+        }
+    }
+
     private static final class Harness implements AutoCloseable {
         private final SqliteConnectionManager connections;
         private final PersistenceWriteQueue queue;
@@ -153,6 +183,12 @@ class ScopedPersistenceRecoveryCoordinatorTest {
         }
 
         private ScopedPersistenceRecoveryVerifier verifier(VerificationFunction function) {
+            return verifier("owner-mutation-test-v1", null, function);
+        }
+
+        private ScopedPersistenceRecoveryVerifier verifier(String id,
+                                                            PersistenceFailureClass supported,
+                                                            VerificationFunction function) {
             return new ScopedPersistenceRecoveryVerifier() {
                 @Override
                 public PersistenceDomain domain() {
@@ -161,7 +197,12 @@ class ScopedPersistenceRecoveryCoordinatorTest {
 
                 @Override
                 public String verifierId() {
-                    return "owner-mutation-test-v1";
+                    return id;
+                }
+
+                @Override
+                public boolean supports(PersistenceFailureClass failureClass) {
+                    return supported == null || supported == failureClass;
                 }
 
                 @Override

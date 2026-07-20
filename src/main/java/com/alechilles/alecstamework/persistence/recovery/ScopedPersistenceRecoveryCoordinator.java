@@ -40,7 +40,7 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
     private final PersistenceWriteQueue writeQueue;
     private final ScheduledExecutorService executor;
     private final PersistenceIncidentSink incidentSink;
-    private final Map<PersistenceDomain, ScopedPersistenceRecoveryVerifier> verifiers =
+    private final Map<PersistenceDomain, List<ScopedPersistenceRecoveryVerifier>> verifiers =
             new EnumMap<>(PersistenceDomain.class);
     private final ConcurrentHashMap<String, CompletableFuture<RecoveryResult>> active =
             new ConcurrentHashMap<>();
@@ -85,10 +85,14 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
     }
 
     public synchronized void register(@Nonnull ScopedPersistenceRecoveryVerifier verifier) {
-        ScopedPersistenceRecoveryVerifier previous = verifiers.putIfAbsent(verifier.domain(), verifier);
-        if (previous != null) {
-            throw new IllegalArgumentException("Verifier already registered for " + verifier.domain());
+        List<ScopedPersistenceRecoveryVerifier> registered = verifiers.computeIfAbsent(
+                verifier.domain(), ignored -> new ArrayList<>());
+        boolean duplicate = registered.stream()
+                .anyMatch(existing -> existing.verifierId().equals(verifier.verifierId()));
+        if (duplicate) {
+            throw new IllegalArgumentException("Verifier already registered: " + verifier.verifierId());
         }
+        registered.add(verifier);
     }
 
     @Nonnull
@@ -154,7 +158,7 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
             return new RecoveryResult(RecoveryStatus.NOT_RECOVERABLE,
                     "incident_has_no_active_quarantine", incident.recoveryAttempts(), null);
         }
-        ScopedPersistenceRecoveryVerifier verifier = verifier(incident.domain());
+        ScopedPersistenceRecoveryVerifier verifier = verifier(incident);
         if (verifier == null) {
             return new RecoveryResult(RecoveryStatus.OPERATOR_ONLY,
                     "domain_recovery_verifier_unavailable", incident.recoveryAttempts(), null);
@@ -268,8 +272,13 @@ public final class ScopedPersistenceRecoveryCoordinator implements AutoCloseable
                 .build();
     }
 
-    private synchronized ScopedPersistenceRecoveryVerifier verifier(PersistenceDomain domain) {
-        return verifiers.get(domain);
+    private synchronized ScopedPersistenceRecoveryVerifier verifier(PersistenceIncident incident) {
+        List<ScopedPersistenceRecoveryVerifier> registered = verifiers.get(incident.domain());
+        if (registered == null) return null;
+        for (ScopedPersistenceRecoveryVerifier verifier : registered) {
+            if (verifier.supports(incident.failureClass())) return verifier;
+        }
+        return null;
     }
 
     private void reloadFences() throws Exception {
