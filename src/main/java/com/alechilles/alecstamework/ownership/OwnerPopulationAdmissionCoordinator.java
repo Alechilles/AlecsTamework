@@ -291,6 +291,11 @@ public final class OwnerPopulationAdmissionCoordinator {
         terminality.degrade(reason);
     }
 
+    /** Indicates that domain failures are fenced by v7 scopes rather than global indexes. */
+    boolean usesScopedPersistenceResilience() {
+        return persistenceGuard != null;
+    }
+
     /** Quarantines new admissions without poisoning persistence needed to finish in-flight work. */
     void markAdmissionReadinessDegraded() {
         index.setReadiness(OwnerPopulationReadiness.DEGRADED);

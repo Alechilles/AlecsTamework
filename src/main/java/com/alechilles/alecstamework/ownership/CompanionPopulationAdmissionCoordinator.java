@@ -367,6 +367,10 @@ public final class CompanionPopulationAdmissionCoordinator {
     }
 
     private void markBothReadinessDegraded(@Nonnull String reason) {
+        if (ownerCoordinator.usesScopedPersistenceResilience()) {
+            ownerCoordinator.markReadinessDegraded(reason);
+            return;
+        }
         claimAdmissionService.markReadinessDegraded();
         ownerCoordinator.markReadinessDegraded(reason);
     }

@@ -42,14 +42,33 @@ final class OwnerPopulationPersistenceGuard {
     }
 
     void reportFeatureAmbiguity(@Nonnull String reason) {
-        PersistenceScope domain = scopes.scope(
-                PersistenceScopeType.FEATURE_DOMAIN, PersistenceDomain.OWNER_MUTATION.name(),
+        PersistenceDomain domain = featureDomain(reason);
+        PersistenceScope domainScope = scopes.scope(
+                PersistenceScopeType.FEATURE_DOMAIN, domain.name(),
                 "owner_population_catalog");
         incidents.report(new PersistenceFailureContext(
-                normalize(reason), PersistenceDomain.OWNER_MUTATION,
+                normalize(reason), domain,
                 PersistenceOperationPhase.PUBLICATION, PersistenceTransactionOutcome.COMMITTED,
-                List.of(domain), true, true, false, false, false,
+                List.of(domainScope), true, true, false, false, false,
                 false, false, true, null, null));
+    }
+
+    @Nonnull
+    static PersistenceDomain featureDomain(@Nonnull String reason) {
+        String normalized = normalizeReason(reason);
+        if (normalized.startsWith("breeding_")) return PersistenceDomain.BREEDING_BIRTH;
+        if (normalized.startsWith("managed_coop_") || normalized.startsWith("coop_")) {
+            return PersistenceDomain.MANAGED_COOP_RELEASE;
+        }
+        if (normalized.startsWith("capture_")) return PersistenceDomain.CAPTURE_RELEASE;
+        if (normalized.startsWith("spawn_")) return PersistenceDomain.TAMED_SPAWN;
+        if (normalized.startsWith("recall_") || normalized.startsWith("relocation_")) {
+            return PersistenceDomain.RECALL_RELOCATION;
+        }
+        if (normalized.startsWith("death_") || normalized.startsWith("lost_")) {
+            return PersistenceDomain.DEATH_LOST_RECOVERY;
+        }
+        return PersistenceDomain.OWNER_MUTATION;
     }
 
     void reportAmbiguity(@Nonnull OwnerPopulationAdmissionPlan plan,
@@ -88,7 +107,11 @@ final class OwnerPopulationPersistenceGuard {
     }
 
     private String normalize(String reason) {
+        return normalizeReason(reason);
+    }
+
+    private static String normalizeReason(String reason) {
         if (reason == null || reason.isBlank()) return "owner_population_unresolved";
-        return reason.trim().replace('-', '_');
+        return reason.trim().replace('-', '_').toLowerCase(java.util.Locale.ROOT);
     }
 }
