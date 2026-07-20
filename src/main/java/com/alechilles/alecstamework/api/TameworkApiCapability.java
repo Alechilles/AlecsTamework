@@ -12,6 +12,7 @@ public enum TameworkApiCapability {
     EVENTS,
     COMPANION_XP_EVENTS,
     CONFIG_READ,
-    DIAGNOSTICS
+    DIAGNOSTICS,
+    PERSISTENCE_RESILIENCE
 }
 

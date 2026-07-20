@@ -2,6 +2,11 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.NpcProfileView;
+import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityRequest;
+import com.alechilles.alecstamework.api.PersistenceMutationDirection;
+import com.alechilles.alecstamework.api.PersistenceMutationDomain;
+import com.alechilles.alecstamework.api.PersistenceScopeKind;
+import com.alechilles.alecstamework.api.PersistenceScopeReference;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
@@ -10,6 +15,10 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import org.joml.Vector3d;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -18,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
 import org.junit.jupiter.api.Test;
@@ -47,7 +57,7 @@ class TameworkApiImplTest {
                     new TraitEffectRegistry(null, runtime.getNpcProfileRepository())
             );
 
-            assertEquals("0.7.0", api.getApiVersion());
+            assertEquals("0.8.0", api.getApiVersion());
             assertEquals(
                     EnumSet.of(
                             TameworkApiCapability.PROFILES,
@@ -61,7 +71,8 @@ class TameworkApiImplTest {
                             TameworkApiCapability.EVENTS,
                             TameworkApiCapability.COMPANION_XP_EVENTS,
                             TameworkApiCapability.CONFIG_READ,
-                            TameworkApiCapability.DIAGNOSTICS
+                            TameworkApiCapability.DIAGNOSTICS,
+                            TameworkApiCapability.PERSISTENCE_RESILIENCE
                     ),
                     api.getCapabilities()
             );
@@ -201,6 +212,31 @@ class TameworkApiImplTest {
 
             assertNotNull(api.configs().getGlobalConfig());
             assertNotNull(api.diagnostics().getPersistenceDiagnostics());
+            assertEquals("HEALTHY", api.diagnostics().getPersistenceResilience().storageState());
+            assertTrue(api.diagnostics().queryPersistenceAvailability(
+                    new PersistenceMutationAvailabilityRequest(
+                            PersistenceMutationDomain.OWNER_MUTATION,
+                            "integration-read-only-check",
+                            List.of(new PersistenceScopeReference(
+                                    PersistenceScopeKind.PROFILE, profileId,
+                                    "canonical_profile_catalog")),
+                            Set.of(), PersistenceMutationDirection.ZERO,
+                            null, null, false, false)).allowed());
+
+            String rawScopeKey = "profile-raw-api-test";
+            var reported = runtime.getIncidentReporter().report(new PersistenceFailureContext(
+                    "api_publication_failure", PersistenceDomain.OWNER_MUTATION,
+                    PersistenceOperationPhase.PUBLICATION, PersistenceTransactionOutcome.COMMITTED,
+                    List.of(runtime.getPersistenceScopeFactory().profile(rawScopeKey)),
+                    true, true, false, false, false,
+                    false, false, true, "operation-api-test",
+                    new IllegalStateException("publish")));
+            assertTrue(reported.durableCompletion().get(5, TimeUnit.SECONDS));
+            var incident = api.diagnostics().findPersistenceIncident(
+                    reported.incidentId().substring(0, 8)).orElseThrow();
+            assertEquals(reported.incidentId(), incident.incidentId());
+            assertEquals("PROFILE", incident.scopes().getFirst().kind());
+            assertFalse(rawScopeKey.equals(incident.scopes().getFirst().scopeHash()));
         }
     }
 

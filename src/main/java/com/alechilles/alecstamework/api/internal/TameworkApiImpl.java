@@ -15,11 +15,9 @@ import com.alechilles.alecstamework.api.NpcProfilesApi;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.OwnerPopulationCapDecisionViewV2;
 import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
-import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
-import com.alechilles.alecstamework.api.PopulationDiagnosticsView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
@@ -114,9 +112,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public final class TameworkApiImpl
-        implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi,
+        implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi,
         AutoCloseable {
-    static final String API_VERSION = "0.7.0";
+    static final String API_VERSION = "0.8.0";
     static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
@@ -131,6 +129,7 @@ public final class TameworkApiImpl
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final SimpleClaimsTamedDamagePolicy damagePolicy;
     private final PopulationPolicyApiDelegate populationPolicy;
+    private final DiagnosticsApi diagnosticsApi;
     private final InteractionExtensionApi interactionExtensionApi;
     private final TraitEffectApi traitEffectApi;
     private final BreedingCooldownResetService breedingCooldownResetService =
@@ -274,7 +273,8 @@ public final class TameworkApiImpl
             TameworkApiCapability.EVENTS,
             TameworkApiCapability.COMPANION_XP_EVENTS,
             TameworkApiCapability.CONFIG_READ,
-            TameworkApiCapability.DIAGNOSTICS
+            TameworkApiCapability.DIAGNOSTICS,
+            TameworkApiCapability.PERSISTENCE_RESILIENCE
     );
     private final Gson gson = new Gson();
 
@@ -324,6 +324,7 @@ public final class TameworkApiImpl
         this.stateSnapshotService = stateSnapshotService;
         this.damagePolicy = Objects.requireNonNull(damagePolicy);
         this.populationPolicy = new PopulationPolicyApiDelegate(populationPolicyAuthority);
+        this.diagnosticsApi = new TameworkDiagnosticsApi(persistenceRuntime, populationPolicy);
         this.interactionExtensionApi = Objects.requireNonNull(interactionExtensionApi);
         this.traitEffectApi = Objects.requireNonNull(traitEffectApi);
     }
@@ -396,7 +397,7 @@ public final class TameworkApiImpl
 
     @Override
     public DiagnosticsApi diagnostics() {
-        return this;
+        return diagnosticsApi;
     }
 
     private ProgressionMutationResult setHappinessByProfileId(@Nullable String profileId,
@@ -926,18 +927,6 @@ public final class TameworkApiImpl
     @Override
     public PopulationAdmissionApi populationAdmissions() {
         return populationPolicy.admissions();
-    }
-
-    @Nonnull
-    @Override
-    public PersistenceDiagnosticsView getPersistenceDiagnostics() {
-        return ApiMapper.mapPersistenceDiagnostics(persistenceRuntime.collectDiagnostics());
-    }
-
-    @Nonnull
-    @Override
-    public PopulationDiagnosticsView getPopulationDiagnostics() {
-        return populationPolicy.diagnostics();
     }
 
     private ProgressionMutationResult withLoadedProgressionTargetByProfileId(
