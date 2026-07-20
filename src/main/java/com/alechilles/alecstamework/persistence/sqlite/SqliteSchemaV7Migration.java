@@ -138,6 +138,22 @@ final class SqliteSchemaV7Migration {
                     updated_by TEXT
                 )
                 """);
+        statement.execute("""
+                CREATE TABLE IF NOT EXISTS persistence_feature_circuit_audit (
+                    sequence_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT NOT NULL UNIQUE,
+                    domain TEXT NOT NULL,
+                    previous_enabled INTEGER CHECK (previous_enabled IN (0, 1)),
+                    enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+                    reason_code TEXT,
+                    changed_at_ms INTEGER NOT NULL,
+                    changed_by TEXT
+                )
+                """);
+        statement.execute("""
+                CREATE INDEX IF NOT EXISTS idx_persistence_feature_circuit_audit_time
+                ON persistence_feature_circuit_audit(changed_at_ms DESC, sequence_id DESC)
+                """);
     }
 
     private void createStorageProbe(@Nonnull Statement statement) throws Exception {

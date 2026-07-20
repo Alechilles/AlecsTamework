@@ -36,6 +36,7 @@ class SqliteSchemaV7MigrationTest {
                     "persistence_incident_scopes",
                     "persistence_quarantines",
                     "persistence_feature_circuits",
+                    "persistence_feature_circuit_audit",
                     "persistence_storage_probe"
             ), tables(connection));
             Set<String> indexes = indexes(connection);

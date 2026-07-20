@@ -35,6 +35,10 @@ class TameworkCommandRootTest {
                 "tamework.command.tw.spawntamed",
                 root.getSubCommands().get("spawntamed").getPermission()
         );
+        assertEquals(
+                "tamework.command.tw.persistencecircuit",
+                root.getSubCommands().get("persistencecircuit").getPermission()
+        );
     }
 
     private static final class DisplayNameOwner implements CommandOwner {

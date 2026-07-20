@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PersistenceFeatureCircuitRepositoryTest {
@@ -40,6 +41,11 @@ class PersistenceFeatureCircuitRepositoryTest {
                             "emergency_pause", 11L, "console", restarted)
                     .completion().get(2, TimeUnit.SECONDS).isCommitted());
             assertFalse(restarted.isEnabled(PersistenceDomain.BREEDING_PAIRING));
+            var audit = repository.listRecentAudit(10);
+            assertEquals(2, audit.size());
+            assertEquals(PersistenceDomain.ALL_PERSISTENCE, audit.get(0).domain());
+            assertEquals(Boolean.TRUE, audit.get(0).previousEnabled());
+            assertFalse(audit.get(0).enabled());
         }
     }
 
