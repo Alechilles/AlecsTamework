@@ -1,6 +1,6 @@
-@SlotSize = 58;
-@SlotHeight = 74;
-@SlotGap = 6;
+@NativeHudWidth = 329;
+@NativeHudHeight = 107;
+@IconMaskColor = #142431;
 @BindingStyle = (
     FontName: "Secondary",
     FontSize: 10,
@@ -13,96 +13,58 @@
     Border: 8
 );
 
+// The base client hardcodes sword artwork in these three ability wells. This
+// item HUD replaces only those glyphs so the native frames and state UI remain.
 Group #Root {
-    Anchor: (Bottom: 250, Width: 250, Height: @SlotHeight);
-    LayoutMode: Left;
+    Anchor: (Right: 50, Bottom: 40, Width: @NativeHudWidth, Height: @NativeHudHeight);
+
+    Group #ForwardBoostControl {
+        Anchor: (Left: 68, Top: 23, Width: 50, Height: 54);
+        Background: @IconMaskColor;
+
+        Group #Icon {
+            Anchor: (Left: -1, Top: 1, Width: 52, Height: 52);
+            Background: "Tamework/AvatarFlightControls/ForwardBoost.png";
+        }
+    }
+
+    Group #UpwardFlapControl {
+        Anchor: (Left: 168, Top: 28, Width: 40, Height: 44);
+        Background: @IconMaskColor;
+
+        Group #Icon {
+            Anchor: (Left: -1, Top: 1, Width: 42, Height: 42);
+            Background: "Tamework/AvatarFlightControls/UpwardFlap.png";
+        }
+    }
+
+    Group #AirbrakeControl {
+        Anchor: (Left: 254, Top: 28, Width: 40, Height: 44);
+        Background: @IconMaskColor;
+
+        Group #Icon {
+            Anchor: (Left: -1, Top: 1, Width: 42, Height: 42);
+            Background: "Tamework/AvatarFlightControls/Airbrake.png";
+        }
+    }
 
     Group #LaunchControl {
-        Anchor: (Width: @SlotSize, Height: @SlotHeight);
+        Anchor: (Left: -36, Top: 20, Width: 58, Height: 78);
 
         Group #Frame {
-            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+            Anchor: (Left: 0, Top: 0, Width: 58, Height: 58);
             Background: "Tamework/AvatarFlightControls/ControlFrame.png";
 
             Group #Icon {
-                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+                Anchor: (Left: 0, Top: 0, Width: 58, Height: 58);
                 Background: "Tamework/AvatarFlightControls/Launch.png";
             }
         }
 
         Label #Binding {
-            Anchor: (Top: 50, Left: 3, Width: 52, Height: 19);
+            Anchor: (Left: 3, Top: 55, Width: 52, Height: 19);
             Background: @BindingBackground;
             Text: "CROUCH";
-            Style: @BindingStyle;
-        }
-    }
-
-    Group { Anchor: (Width: @SlotGap); }
-
-    Group #UpwardFlapControl {
-        Anchor: (Width: @SlotSize, Height: @SlotHeight);
-
-        Group #Frame {
-            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
-            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #Icon {
-                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
-                Background: "Tamework/AvatarFlightControls/UpwardFlap.png";
-            }
-        }
-
-        Label #Binding {
-            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
-            Background: @BindingBackground;
-            Text: "LMB";
-            Style: @BindingStyle;
-        }
-    }
-
-    Group { Anchor: (Width: @SlotGap); }
-
-    Group #ForwardBoostControl {
-        Anchor: (Width: @SlotSize, Height: @SlotHeight);
-
-        Group #Frame {
-            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
-            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #Icon {
-                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
-                Background: "Tamework/AvatarFlightControls/ForwardBoost.png";
-            }
-        }
-
-        Label #Binding {
-            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
-            Background: @BindingBackground;
-            Text: "Q";
-            Style: @BindingStyle;
-        }
-    }
-
-    Group { Anchor: (Width: @SlotGap); }
-
-    Group #AirbrakeControl {
-        Anchor: (Width: @SlotSize, Height: @SlotHeight);
-
-        Group #Frame {
-            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
-            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
-
-            Group #Icon {
-                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
-                Background: "Tamework/AvatarFlightControls/Airbrake.png";
-            }
-        }
-
-        Label #Binding {
-            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
-            Background: @BindingBackground;
-            Text: "RMB";
             Style: @BindingStyle;
         }
     }
