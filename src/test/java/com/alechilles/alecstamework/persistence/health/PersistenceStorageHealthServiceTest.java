@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PersistenceStorageHealthServiceTest {
@@ -44,5 +45,6 @@ class PersistenceStorageHealthServiceTest {
         });
         assertTrue(service.enterReadOnly("io_failure", null));
         assertEquals(PersistenceStorageState.READ_ONLY, service.getState().status());
+        assertNotNull(service.getState().incidentId());
     }
 }

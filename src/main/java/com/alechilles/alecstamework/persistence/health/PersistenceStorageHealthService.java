@@ -44,7 +44,9 @@ public final class PersistenceStorageHealthService {
     }
 
     public boolean enterReadOnly(@Nonnull String reason, @Nullable String incidentId) {
-        State next = new State(PersistenceStorageState.READ_ONLY, normalize(reason), normalizeNullable(incidentId),
+        String correlation = normalizeNullable(incidentId);
+        if (correlation == null) correlation = java.util.UUID.randomUUID().toString();
+        State next = new State(PersistenceStorageState.READ_ONLY, normalize(reason), correlation,
                 System.currentTimeMillis());
         while (true) {
             State current = state.get();

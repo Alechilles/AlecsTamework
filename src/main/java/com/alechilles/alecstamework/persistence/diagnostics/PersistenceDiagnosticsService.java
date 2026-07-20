@@ -117,19 +117,26 @@ public final class PersistenceDiagnosticsService {
     }
 
     @Nonnull
-    public CompletableFuture<ScopedPersistenceRecoveryCoordinator.RecoveryResult> retry(
+    public CompletableFuture<RetryResult> retry(
             @Nonnull String idOrPrefix) {
+        String normalized = idOrPrefix.trim();
+        var storage = runtime.getHealthService().getStorageHealthService().getState();
+        if (storage.incidentId() != null && storage.incidentId().startsWith(normalized)) {
+            return runtime.getStorageRecoveryCoordinator().requestNow().thenApply(result ->
+                    new RetryResult(result.status().name(), result.reason(),
+                            runtime.getStorageRecoveryCoordinator().attempts()));
+        }
         try {
             Optional<PersistenceIncident> found =
-                    runtime.getIncidentRepository().findByIdOrUniquePrefix(idOrPrefix);
+                    runtime.getIncidentRepository().findByIdOrUniquePrefix(normalized);
             if (found.isEmpty()) {
                 return CompletableFuture.completedFuture(
-                        new ScopedPersistenceRecoveryCoordinator.RecoveryResult(
-                                ScopedPersistenceRecoveryCoordinator.RecoveryStatus.NOT_FOUND,
-                                "incident_not_found", null, null));
+                        new RetryResult("NOT_FOUND", "incident_not_found", null));
             }
             return runtime.getScopedRecoveryCoordinator().request(
-                    found.orElseThrow().incidentId(), ScopedRecoveryTrigger.OPERATOR_REQUEST);
+                    found.orElseThrow().incidentId(), ScopedRecoveryTrigger.OPERATOR_REQUEST)
+                    .thenApply(result -> new RetryResult(
+                            result.status().name(), result.reason(), result.attempts()));
         } catch (Exception failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -386,6 +393,9 @@ public final class PersistenceDiagnosticsService {
     }
 
     public record BundleResult(String supportId, Path path, long sizeBytes, int memberCount) {
+    }
+
+    public record RetryResult(String status, String reason, Long attempts) {
     }
 
     private record BundleMember(String status, String error, byte[] content) {
