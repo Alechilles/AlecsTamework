@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
-import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationContext;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationDelta;
@@ -13,21 +12,15 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceScope;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /** Applies exact v7 availability and incident containment to owner-population operations. */
 final class OwnerPopulationPersistenceGuard {
-    private static final Set<String> REQUIRED_COVERAGE = Set.of(
-            PersistenceEvidenceDimension.CANONICAL_PROFILE_CATALOG.key(),
-            PersistenceEvidenceDimension.OWNER_POPULATION_CATALOG.key());
-
     private final PersistenceMutationAvailabilityService availability;
     private final PersistenceIncidentReporter incidents;
     private final PersistenceScopeFactory scopes;
+    private final OwnerPopulationPersistenceContextFactory contexts;
 
     OwnerPopulationPersistenceGuard(@Nonnull PersistenceMutationAvailabilityService availability,
                                     @Nonnull PersistenceIncidentReporter incidents,
@@ -35,15 +28,16 @@ final class OwnerPopulationPersistenceGuard {
         this.availability = availability;
         this.incidents = incidents;
         this.scopes = scopes;
+        this.contexts = new OwnerPopulationPersistenceContextFactory(scopes);
     }
 
     @Nonnull
     PersistenceMutationAvailabilityDecision decide(@Nonnull OwnerPopulationAdmissionPlan plan) {
         OwnerPopulationTransitionRequest transition = plan.transition();
-        List<PersistenceScope> exactScopes = exactScopes(plan);
+        OwnerPopulationPersistenceContextFactory.Context context = contexts.create(plan);
         return availability.decide(new PersistenceMutationContext(
-                PersistenceDomain.OWNER_MUTATION, transition.operation().name(), exactScopes,
-                REQUIRED_COVERAGE, delta(transition), null, null,
+                context.domain(), transition.operation().name(), context.scopes(),
+                context.requiredCoverage(), delta(transition), null, operationId(plan),
                 plan.source() != null, plan.finalNpcUuid() != null));
     }
 
@@ -65,26 +59,26 @@ final class OwnerPopulationPersistenceGuard {
                          @Nonnull PersistenceTransactionOutcome outcome,
                          boolean liveMutationMayBeVisible,
                          Throwable failure) {
+        OwnerPopulationPersistenceContextFactory.Context context = contexts.create(plan);
         incidents.report(new PersistenceFailureContext(
-                normalize(reason), PersistenceDomain.OWNER_MUTATION, phase, outcome,
-                exactScopes(plan), true, true, false, false, false,
+                normalize(reason), context.domain(), phase, outcome,
+                context.scopes(), true, true, false, false, false,
                 false, false, liveMutationMayBeVisible, operationId, failure));
     }
 
-    @Nonnull
-    private List<PersistenceScope> exactScopes(OwnerPopulationAdmissionPlan plan) {
-        OwnerPopulationTransitionRequest transition = plan.transition();
-        List<PersistenceScope> result = new ArrayList<>();
-        result.add(scopes.profile(transition.profileId()));
-        addOwner(result, transition.expectedOwnerId(), transition.sourceWorldName());
-        addOwner(result, transition.newOwnerId(), transition.destinationWorldName());
-        return List.copyOf(result);
-    }
-
-    private void addOwner(List<PersistenceScope> result, UUID ownerId, String worldName) {
-        if (ownerId == null) return;
-        result.add(scopes.ownerGlobal(ownerId));
-        result.add(scopes.ownerWorld(ownerId, worldName));
+    @javax.annotation.Nullable
+    private String operationId(OwnerPopulationAdmissionPlan plan) {
+        String context = plan.targetContextJson();
+        if (context == null || context.isBlank()) return null;
+        try {
+            com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(context).getAsJsonObject();
+            for (String key : List.of("operationId", "idempotencyKey")) {
+                if (json.has(key) && json.get(key).isJsonPrimitive()) return json.get(key).getAsString();
+            }
+        } catch (RuntimeException ignored) {
+            // Invalid target context is classified by the durable admission transaction.
+        }
+        return null;
     }
 
     private PersistenceMutationDelta delta(OwnerPopulationTransitionRequest transition) {

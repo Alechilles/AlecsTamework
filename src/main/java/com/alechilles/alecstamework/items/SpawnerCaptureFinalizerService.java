@@ -18,6 +18,9 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -129,21 +132,31 @@ public final class SpawnerCaptureFinalizerService {
         String idempotencyKey = "spawner-capture:" + prepared.npcUuid()
                 + ":clear-owner=" + prepared.config().isCaptureClearsOwner()
                 + ":tames-target=" + prepared.config().isCaptureTamesTarget();
-        if (durableContextJson == null || durableContextJson.isBlank()) {
-            return scheduler.schedule(
-                    prepared.targetRef(), prepared.store(),
-                    prepared.retainedOwnerId(), prepared.retainedOwnerName(),
-                    CompanionLifecycleState.CAPTURED, prepared.operation(), false,
-                    idempotencyKey, mutationCallbacks
-            );
-        }
+        String scopedContext = capturePersistenceContext(durableContextJson);
         return scheduler.scheduleWithDurableContext(
                 prepared.targetRef(), prepared.store(), null, null,
                 prepared.expectedLiveOwnerId(), prepared.retainedOwnerId(),
                 prepared.retainedOwnerName(), CompanionLifecycleState.CAPTURED,
-                prepared.operation(), false, idempotencyKey, durableContextJson,
+                prepared.operation(), false, idempotencyKey, scopedContext,
                 mutationCallbacks
         );
+    }
+
+    @Nonnull
+    private String capturePersistenceContext(@Nullable String durableContextJson) {
+        JsonObject context = new JsonObject();
+        if (durableContextJson != null && !durableContextJson.isBlank()) {
+            JsonElement parsed = JsonParser.parseString(durableContextJson);
+            if (!parsed.isJsonObject()) {
+                throw new IllegalArgumentException("Capture durability context must be an object.");
+            }
+            context = parsed.getAsJsonObject().deepCopy();
+        }
+        if (context.has("persistenceDomain")) {
+            throw new IllegalArgumentException("Capture context cannot replace persistenceDomain.");
+        }
+        context.addProperty("persistenceDomain", "CAPTURE_INTAKE");
+        return context.toString();
     }
 
     @Nonnull
