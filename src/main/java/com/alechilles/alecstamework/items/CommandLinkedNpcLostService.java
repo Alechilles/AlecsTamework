@@ -51,7 +51,6 @@ import javax.annotation.Nullable;
 public final class CommandLinkedNpcLostService {
     private static final String FIELD_SEPARATOR = "\t";
     private static final String VECTOR_SEPARATOR = ",";
-    private static final long BLOCKED_LOG_INTERVAL_MS = 5000L;
 
     private final ConcurrentHashMap<UUID, LostLinkedNpcSnapshot> snapshotsByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> recoverySnapshotsByNpc =
@@ -75,7 +74,6 @@ public final class CommandLinkedNpcLostService {
     private final CommandLostTransitionPersistenceService transitionPersistenceService;
     @Nullable
     private final CommandNpcProfileActionResolver profileActionResolver;
-    private volatile long lastBlockedMutationLogAtMs;
 
     public CommandLinkedNpcLostService() {
         this((Path) null, null, null, null, null, null, null, null);
@@ -162,14 +160,14 @@ public final class CommandLinkedNpcLostService {
         return List.copyOf(service.snapshotsByNpc.values());
     }
 
-    private CommandLinkedNpcLostService(@Nullable Path persistencePath,
-                                        @Nullable HytaleLogger logger,
-                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                        @Nullable CommandLinkedNpcCaptureService captureService,
-                                        @Nullable CommandLinkedNpcCoopService coopService,
-                                        @Nullable LostRepository repository,
-                                        @Nullable PersistenceHealthService healthService,
-                                        @Nullable CommandNpcProfileActionResolver profileActionResolver) {
+    CommandLinkedNpcLostService(@Nullable Path persistencePath,
+                                @Nullable HytaleLogger logger,
+                                @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                @Nullable CommandLinkedNpcCaptureService captureService,
+                                @Nullable CommandLinkedNpcCoopService coopService,
+                                @Nullable LostRepository repository,
+                                @Nullable PersistenceHealthService healthService,
+                                @Nullable CommandNpcProfileActionResolver profileActionResolver) {
         this.persistencePath = persistencePath != null ? persistencePath.toAbsolutePath().normalize() : null;
         this.logger = logger;
         this.stateSnapshotService = stateSnapshotService;
@@ -193,9 +191,6 @@ public final class CommandLinkedNpcLostService {
                                                 long queuedAtMs,
                                                 long droppedAtMs,
                                                 int retryAttempts) {
-        if (!canMutate()) {
-            return false;
-        }
         if (npcUuid == null) {
             return false;
         }
@@ -288,9 +283,6 @@ public final class CommandLinkedNpcLostService {
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
-        if (!canMutate()) {
-            return;
-        }
         if (reference == null || !reference.isValid() || store == null) {
             return;
         }
@@ -339,9 +331,6 @@ public final class CommandLinkedNpcLostService {
     public void onNpcRemoved(Ref<EntityStore> reference,
                              RemoveReason reason,
                              Store<EntityStore> store) {
-        if (!canMutate()) {
-            return;
-        }
         if (reference == null || store == null) {
             return;
         }
@@ -411,9 +400,6 @@ public final class CommandLinkedNpcLostService {
     }
 
     public void clearLostSnapshot(UUID npcUuid) {
-        if (!canMutate()) {
-            return;
-        }
         if (npcUuid == null) {
             return;
         }
@@ -434,9 +420,6 @@ public final class CommandLinkedNpcLostService {
                               UUID replacementNpcUuid,
                               @Nullable Vector3d lastKnownPosition,
                               @Nullable Vector3d homePosition) {
-        if (!canMutate()) {
-            return;
-        }
         if (originalNpcUuid == null || replacementNpcUuid == null || originalNpcUuid.equals(replacementNpcUuid)) {
             return;
         }
@@ -586,39 +569,6 @@ public final class CommandLinkedNpcLostService {
             return;
         }
         persistSnapshots();
-    }
-
-    private boolean canMutate() {
-        if (healthService == null || healthService.isHealthy()) {
-            return true;
-        }
-        PersistenceHealthService.HealthState state = healthService.getState();
-        long now = System.currentTimeMillis();
-        if (now - lastBlockedMutationLogAtMs < BLOCKED_LOG_INTERVAL_MS) {
-            return false;
-        }
-        lastBlockedMutationLogAtMs = now;
-        TameworkTelemetryEvents.recordErrorIfAvailable(
-                "lost_transition_blocked",
-                null,
-                TameworkTelemetryContext.persistence(
-                        "lost",
-                        "transition_blocked",
-                        state.reason(),
-                        "Persistence blocked lost transition."
-                ).build()
-        );
-        if (logger != null) {
-            logger.at(Level.WARNING).log(
-                    "Persistence blocked mutation in lost service: "
-                            + (state.reason() != null ? state.reason() : "unknown")
-            );
-        }
-        CoopDebugLogger.log(
-                "persistence blocked mutation service=lost reason="
-                        + (state.reason() != null ? state.reason() : "unknown")
-        );
-        return false;
     }
 
     private String encodeSnapshot(LostLinkedNpcSnapshot snapshot) {

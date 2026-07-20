@@ -24,7 +24,6 @@ import javax.annotation.Nullable;
 public final class CommandLinkedNpcCaptureService {
     private static final String FIELD_SEPARATOR = "\t";
     private static final String ARRAY_SEPARATOR = ";";
-    private static final long BLOCKED_TELEMETRY_INTERVAL_MS = 5000L;
 
     private final ConcurrentHashMap<UUID, CapturedLinkedNpcSnapshot> capturedByNpc = new ConcurrentHashMap<>();
     @Nullable
@@ -35,7 +34,6 @@ public final class CommandLinkedNpcCaptureService {
     private final NpcProfileRepository profileRepository;
     private final Path persistencePath;
     private final Object persistenceLock = new Object();
-    private volatile long lastBlockedTelemetryAtMs;
 
     public CommandLinkedNpcCaptureService() {
         this(null, null, null, null);
@@ -60,10 +58,10 @@ public final class CommandLinkedNpcCaptureService {
         return new ArrayList<>(service.capturedByNpc.values());
     }
 
-    private CommandLinkedNpcCaptureService(@Nullable Path persistencePath,
-                                           @Nullable CaptureRepository repository,
-                                           @Nullable PersistenceHealthService healthService,
-                                           @Nullable NpcProfileRepository profileRepository) {
+    CommandLinkedNpcCaptureService(@Nullable Path persistencePath,
+                                   @Nullable CaptureRepository repository,
+                                   @Nullable PersistenceHealthService healthService,
+                                   @Nullable NpcProfileRepository profileRepository) {
         this.persistencePath = persistencePath != null
                 ? persistencePath.toAbsolutePath().normalize()
                 : null;
@@ -120,9 +118,6 @@ public final class CommandLinkedNpcCaptureService {
     }
 
     public void recordCapturedSnapshot(@Nullable CapturedLinkedNpcSnapshot snapshot) {
-        if (!canMutate()) {
-            return;
-        }
         if (snapshot == null || snapshot.npcUuid() == null || snapshot.toolIds() == null || snapshot.toolIds().length == 0) {
             return;
         }
@@ -149,9 +144,6 @@ public final class CommandLinkedNpcCaptureService {
     }
 
     public void clearCapturedSnapshot(UUID npcUuid) {
-        if (!canMutate()) {
-            return;
-        }
         if (npcUuid == null) {
             return;
         }
@@ -279,32 +271,6 @@ public final class CommandLinkedNpcCaptureService {
             return;
         }
         persistSnapshots();
-    }
-
-    private boolean canMutate() {
-        if (healthService == null || healthService.isHealthy()) {
-            return true;
-        }
-        PersistenceHealthService.HealthState state = healthService.getState();
-        long now = System.currentTimeMillis();
-        if (now - lastBlockedTelemetryAtMs >= BLOCKED_TELEMETRY_INTERVAL_MS) {
-            lastBlockedTelemetryAtMs = now;
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    "capture_transition_blocked",
-                    null,
-                    TameworkTelemetryContext.persistence(
-                            "capture",
-                            "transition_blocked",
-                            state.reason(),
-                            "Persistence blocked capture transition."
-                    ).build()
-            );
-        }
-        CoopDebugLogger.log(
-                "persistence blocked mutation service=capture reason="
-                        + (state.reason() != null ? state.reason() : "unknown")
-        );
-        return false;
     }
 
     private void enqueueProfileUpdate(@Nullable CapturedLinkedNpcSnapshot snapshot) {

@@ -61,7 +61,6 @@ public final class CommandLinkedNpcDeathService {
     private static final String ARRAY_SEPARATOR = ";";
     private static final String ATTACHMENT_KV_SEPARATOR = ",";
     private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
-    private static final long BLOCKED_TELEMETRY_INTERVAL_MS = 5000L;
     private static final String REVIVE_COOLDOWN_MULTIPLIER_EFFECT_KEY = "ReviveCooldownMultiplier";
 
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
@@ -75,7 +74,6 @@ public final class CommandLinkedNpcDeathService {
     private final Object persistenceLock = new Object();
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
-    private volatile long lastBlockedTelemetryAtMs;
 
     public CommandLinkedNpcDeathService() {
         this(null, null, null, null, null);
@@ -106,11 +104,11 @@ public final class CommandLinkedNpcDeathService {
         return new ArrayList<>(service.deadByNpc.values());
     }
 
-    private CommandLinkedNpcDeathService(@Nullable Path persistencePath,
-                                         @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                                         @Nullable DeathRepository repository,
-                                         @Nullable PersistenceHealthService healthService,
-                                         @Nullable NpcProfileRepository profileRepository) {
+    CommandLinkedNpcDeathService(@Nullable Path persistencePath,
+                                 @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                 @Nullable DeathRepository repository,
+                                 @Nullable PersistenceHealthService healthService,
+                                 @Nullable NpcProfileRepository profileRepository) {
         this.persistencePath = persistencePath != null
                 ? persistencePath.toAbsolutePath().normalize()
                 : null;
@@ -122,9 +120,6 @@ public final class CommandLinkedNpcDeathService {
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
-        if (!canMutate()) {
-            return;
-        }
         if (reference == null || !reference.isValid() || store == null) {
             return;
         }
@@ -149,9 +144,6 @@ public final class CommandLinkedNpcDeathService {
         UUID npcUuid = npc.getUuid();
         if (!wasDeathRemoval(reference, reason, store)) {
             permanentlyReleasedDeaths.remove(npcUuid);
-            if (!canMutate()) {
-                return;
-            }
             if (deadByNpc.remove(npcUuid) != null) {
                 deleteSnapshot(npcUuid);
             }
@@ -161,18 +153,12 @@ public final class CommandLinkedNpcDeathService {
         String deathRoleId = resolveRoleId(npc);
         if (!CompanionRevivePolicy.supportsRevive(deathRoleId, links)) {
             permanentlyReleasedDeaths.add(npcUuid);
-            if (!canMutate()) {
-                return;
-            }
             if (deadByNpc.remove(npcUuid) != null) {
                 deleteSnapshot(npcUuid);
             }
             return;
         }
         permanentlyReleasedDeaths.remove(npcUuid);
-        if (!canMutate()) {
-            return;
-        }
         if (stateSnapshotService != null) {
             stateSnapshotService.refreshFromEntity(reference, store);
             DeadLinkedNpcSnapshot cached = stateSnapshotService.getSnapshot(npcUuid);
@@ -427,9 +413,6 @@ public final class CommandLinkedNpcDeathService {
     }
 
     public void clearDeadSnapshot(UUID npcUuid) {
-        if (!canMutate()) {
-            return;
-        }
         if (npcUuid == null) {
             return;
         }
@@ -443,7 +426,7 @@ public final class CommandLinkedNpcDeathService {
 
     @Nonnull
     public RespawnReadyUpdateResult markOwnerDeadSnapshotsRespawnReady(@Nullable UUID ownerUuid) {
-        if (!canMutate() || ownerUuid == null) {
+        if (!canStartNewMutation() || ownerUuid == null) {
             return RespawnReadyUpdateResult.empty();
         }
         long nowMs = System.currentTimeMillis();
@@ -624,30 +607,8 @@ public final class CommandLinkedNpcDeathService {
         persistSnapshots();
     }
 
-    private boolean canMutate() {
-        if (healthService == null || healthService.isHealthy()) {
-            return true;
-        }
-        PersistenceHealthService.HealthState state = healthService.getState();
-        long now = System.currentTimeMillis();
-        if (now - lastBlockedTelemetryAtMs >= BLOCKED_TELEMETRY_INTERVAL_MS) {
-            lastBlockedTelemetryAtMs = now;
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    "death_transition_blocked",
-                    null,
-                    TameworkTelemetryContext.persistence(
-                            "death",
-                            "transition_blocked",
-                            state.reason(),
-                            "Persistence blocked death transition."
-                    ).build()
-            );
-        }
-        CoopDebugLogger.log(
-                "persistence blocked mutation service=death reason="
-                        + (state.reason() != null ? state.reason() : "unknown")
-        );
-        return false;
+    private boolean canStartNewMutation() {
+        return healthService == null || healthService.isHealthy();
     }
 
     private String encodeSnapshot(DeadLinkedNpcSnapshot snapshot) {

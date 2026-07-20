@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import org.joml.Vector3d;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -16,6 +17,22 @@ class CommandLinkedNpcLostServiceTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void acceptedRelocationDropTerminalizesDuringReadOnlyRecovery() {
+        PersistenceHealthService health = new PersistenceHealthService();
+        health.markDegraded("test_storage_read_only");
+        CommandLinkedNpcLostService service = new CommandLinkedNpcLostService(
+                null, null, null, null, null, null, health, null);
+        UUID npcUuid = UUID.randomUUID();
+
+        assertTrue(service.recordLostFromRelocationDrop(
+                npcUuid, UUID.randomUUID(), null, null, null, 10L, 20L, 2));
+        assertTrue(service.isLost(npcUuid));
+
+        service.clearLostSnapshot(npcUuid);
+        assertFalse(service.isLost(npcUuid));
+    }
 
     @Test
     void recordsLostSnapshotAndPersistsIt() {
