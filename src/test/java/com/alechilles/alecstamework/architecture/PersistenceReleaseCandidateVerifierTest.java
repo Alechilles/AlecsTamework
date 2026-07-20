@@ -19,7 +19,8 @@ class PersistenceReleaseCandidateVerifierTest {
 
         for (String required : List.of(
                 "tamework-tests", "telemetry-tests", "platform-typecheck", "platform-lint",
-                "platform-tests", "--maxWorkers=4", "platform-build", "tamework-package",
+                "platform-tests", "--pool=threads", "--maxWorkers=4",
+                "platform-build", "tamework-package",
                 "Get-SurefireEvidence", "Get-VitestEvidence", "Get-PersistencePerformanceEvidence",
                 "PersistenceResiliencePerformanceGateTest.xml", "requiredEntries")) {
             assertTrue(source.contains(required), "missing candidate gate: " + required);

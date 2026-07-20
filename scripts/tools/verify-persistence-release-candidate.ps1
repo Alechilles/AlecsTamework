@@ -176,7 +176,8 @@ Invoke-CandidateCommand "platform-typecheck" $platformRoot "npm.cmd" `
 Invoke-CandidateCommand "platform-lint" $platformRoot "npm.cmd" `
     @("run", "lint") (Join-Path $evidenceRoot "platform-lint.log")
 Invoke-CandidateCommand "platform-tests" $platformRoot "npm.cmd" `
-    @("exec", "--", "vitest", "run", "--maxWorkers=4", "--reporter=json", "--outputFile=$platformTestReport") `
+    @("exec", "--", "vitest", "run", "--pool=threads", "--maxWorkers=4",
+        "--reporter=json", "--outputFile=$platformTestReport") `
     (Join-Path $evidenceRoot "platform-tests.log")
 Invoke-CandidateCommand "platform-build" $platformRoot "npm.cmd" `
     @("run", "build") (Join-Path $evidenceRoot "platform-build.log")
