@@ -172,7 +172,7 @@ function Initialize-ClaimsRuntimeScenario {
             matchedBeforeStartup = $true
         }
         $preexistingPreV6Backups = @(Get-ChildItem -LiteralPath (Split-Path $databasePath -Parent) `
-            -File -Filter "tamework_pre_v6_*.sqlite.bak" | ForEach-Object {
+            -File -Filter "tamework_pre_v7_*.sqlite.bak" | ForEach-Object {
                 [pscustomobject][ordered]@{
                     path = $_.FullName
                     length = $_.Length

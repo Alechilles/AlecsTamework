@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- Added scoped persistence incidents and durable quarantines so a conflict affecting one companion, owner, coop slot, breeding pair, or world can be contained without disabling unrelated Tamework systems.
+- Added automatic evidence-based recovery for committed owner-population and managed-coop publication failures, plus `/tw debugdb health`, `incidents`, `incident`, `retry`, and redacted support-bundle export commands. Retry verifies canonical evidence and never force-clears an unresolved companion.
+- Added administrator circuit breakers for individual persistence-backed features. Every feature remains enabled by default; pausing one feature blocks only new work and cannot bypass storage, evidence, capacity, or quarantine checks.
+- Added Public API `0.8.0` read-only persistence resilience snapshots, mutation-availability queries, and incident lookup for integrations that need the same fail-closed admission result as Tamework.
+- Added structured, privacy-bounded persistence telemetry breadcrumbs with boot, trace, operation, incident, phase, failure-signature, and recovery correlation. Telemetry remains optional and cannot affect persistence decisions.
 - Added `/tw debug set` and `/tw debug get` command groups for needs and breeding tuning. Their NPC-targeted commands now use Hytale's standard `--world`, `--entity`, cone, ray, sphere, range, role, and nearest selectors.
 - Replaced `/tw npcspawntamed <role> <quantity>` with `/tw spawntamed <role>`, including live role completion and optional `--count`, `--radius`, and `--attachment` switches.
 - Added read-only managed-coop integrity commands: `/tw coop audit`, `/tw coop import-status`, and an expanded `/tw debugdb integrity` covering SQLite, foreign keys, profile identity, lifecycle operations, and import conflicts.
@@ -10,7 +15,7 @@
 - `/tw gethappiness` now reports an NPC's active or latest breeding job id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result.
 - Added schema-v5 managed-coop lifecycle and import journals so interrupted capture, release, item intake, and legacy-resident import work can be resumed or quarantined instead of guessed.
 - Added a durable owned-companion population ledger with resumable startup reconciliation, persisted-world loading, crash-recoverable admission journals, global/per-world readiness, and indexed claim occupancy so limits remain authoritative across active, unloaded, captured, cooped, dead, lost, restoring, and dormant companion states.
-- Added Public API `0.7.0` world-aware population preflight, reservation-backed single and breeding-batch admissions, and population/provider/reconciliation diagnostics for integrations that create, restore, transfer, or place companions.
+- Added world-aware population preflight, reservation-backed single and breeding-batch admissions, and population/provider/reconciliation diagnostics for integrations that create, restore, transfer, or place companions.
 - Added reserved built-in interaction extensions for atomic mapped attachment equipment, replacement, and empty-hand removal. Asset packs can now consume newly equipped items, return the exact replaced or removed item, and roll back model, persistence, and inventory state together without per-item Java handlers.
 - Added `TwBreedingConfig.Inheritance.AttachmentInheritance.ExcludedSets` so equipment and other non-genetic model attachment sets can be excluded from offspring inheritance while normal appearance traits still inherit.
 - Added a private server licensing template for negotiated custom plugins,
@@ -40,6 +45,9 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Upgrading Tamework persistence to schema v7 now creates a verified, transactionally consistent snapshot of Tamework's SQLite database before migration. Tamework never copies the Hytale save or invokes a whole-world backup; Hytale, the host, and the operator remain responsible for complete-save backups.
+- Persistence storage health now represents only SQLite authority. Domain conflicts use narrow evidence readiness, quarantine, and circuit states instead of broadly degrading every persistence-backed feature.
+- Healthy persistence scopes are usable immediately after login. There is no arbitrary login grace period, and login itself does not request companion recall.
 - Removed Tamework's runtime asset-pack reordering and legacy pack replacement so asset precedence follows the game's manifest load-order configuration.
 - Enabled `TwCoopConfig` assets now keep Tamework as the sole occupancy and lifecycle authority only for their configured managed coops; coops without an enabled config remain purely vanilla. This preserves the post-overhaul model and does not restore the older vanilla-resident/Tamework-observer hybrid.
 - Managed-coop audits now include bounded per-resident and per-operation identity, UUID, slot, generation, retry, and persistence-queue lifecycle details.

@@ -8,10 +8,10 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.7.0`)**
+> **Experimental API Contract (`0.8.0`)**
 > This reference tracks the current `diagnostics()` contract in `TameworkApi`.
 
-Capability: `DIAGNOSTICS`
+Capabilities: `DIAGNOSTICS`, with the additive `PERSISTENCE_RESILIENCE` contract in API `0.8.0`.
 
 ## Entry Point
 `TameworkApi.diagnostics() -> DiagnosticsApi`
@@ -19,6 +19,19 @@ Capability: `DIAGNOSTICS`
 ## Methods
 - `PersistenceDiagnosticsView getPersistenceDiagnostics()`
 - `PopulationDiagnosticsView getPopulationDiagnostics()`
+- `PersistenceResilienceView getPersistenceResilience()`
+- `PersistenceMutationAvailabilityView queryPersistenceAvailability(PersistenceMutationAvailabilityRequest request)`
+- `Optional<PersistenceIncidentSummaryView> findPersistenceIncident(String incidentIdOrUniquePrefix)`
+
+## Persistence resilience
+
+`getPersistenceResilience()` is a process-local, read-only snapshot. It reports storage state and reason, the actionable storage incident id when present, active incident/quarantine totals, persisted feature-circuit states, and evidence-coverage states. Circuit entries contain `domain`, `enabled`, `reasonCode`, and `updatedAtMs`. Coverage entries contain `dimension`, `status`, `ready`, `reasonCode`, `generation`, `updatedAtMs`, `coveredScopeCount`, `absenceAuthoritative`, and `nextSafeTrigger`.
+
+`queryPersistenceAvailability(...)` applies the same fail-closed storage, exact-scope quarantine, circuit, and evidence gate used by Tamework. The request is value-only: domain, operation kind, public scope references, required evidence dimensions, mutation direction, optional correlation ids, and whether a source or live projection may already exist. It does not reserve capacity, consume a source, clear an incident, or mutate canonical state. The response contains `status`, stable `reasonCode`, and an optional short incident id.
+
+`findPersistenceIncident(...)` accepts an exact incident id or a unique prefix and returns a bounded, sanitized occurrence. Scope keys are never exposed; only installation-local scope hashes and authority dimensions are returned. This method may read SQLite and must not be called from a world tick callback.
+
+Older implementations retain binary compatibility through default methods: the resilience snapshot and availability query fail closed, and incident lookup returns empty.
 
 ## `PersistenceDiagnosticsView`
 - `databasePath`
@@ -143,6 +156,7 @@ Reconciliation is bounded and resumable. A `RECONCILING` or `DEGRADED` snapshot 
 - Intended for tooling/admin diagnostics, not gameplay rules.
 - Snapshot values are point-in-time and may change rapidly while writes are active.
 - Population diagnostics are read-only. They do not reserve capacity or repair ambiguous evidence.
+- `PERSISTENCE_RESILIENCE` means the additive read-only contract is implemented. It does not authorize integrations to bypass Tamework admission or recovery.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)

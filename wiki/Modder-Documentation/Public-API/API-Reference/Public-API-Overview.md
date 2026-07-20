@@ -10,7 +10,7 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 
 Use this page to bootstrap against `TameworkApi`, verify capabilities, and choose the correct family reference page.
 
-> **Experimental API Contract (`0.7.0`)**
+> **Experimental API Contract (`0.8.0`)**
 > The API is named **Public API** in docs and packages, but the contract is still experimental. Keep capability checks and plan for additive changes.
 
 ## Dependency and access pattern
@@ -114,7 +114,7 @@ See:
 - Do not write directly to `tamework.sqlite`.
 - Do not depend on repository classes like `NpcProfileRepository` or `CaptureRepository`.
 - Do not mutate or cache internal `Tw*Config` instances.
-- Do not assume API version `0.7.0` will match the mod version.
+- Do not assume API version `0.8.0` will match the mod version.
 
 ## Related Pages
 - [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)

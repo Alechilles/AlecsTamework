@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.7.0`)**
+> **Experimental API Contract (`0.8.0`)**
 > This API reserves owner and destination-claim capacity for a specific mutation. It is intentionally more explicit than the legacy owner-only cap query.
 
 Capability: `POLICY`

@@ -23,7 +23,7 @@ if (api == null) {
     return; // Tamework not loaded or API unavailable
 }
 
-if (!"0.7.0".equals(api.getApiVersion())) {
+if (!"0.8.0".equals(api.getApiVersion())) {
     // Optional: warn, then continue with capability-based gating
 }
 
@@ -31,11 +31,21 @@ EnumSet<TameworkApiCapability> caps = api.getCapabilities();
 if (!caps.contains(TameworkApiCapability.COMMAND_LINKS)) {
     return;
 }
+
+// Optional: ask the same read-only gate used by Tamework before beginning
+// persistence-backed integration work.
+if (caps.contains(TameworkApiCapability.PERSISTENCE_RESILIENCE)) {
+    var state = api.diagnostics().getPersistenceResilience();
+    if (!"HEALTHY".equals(state.storageState())) {
+        return;
+    }
+}
 ```
 
 ## Recommendations
 - Always null-check both `Tamework.getInstance()` and `getApi()`.
 - Gate each feature by capability instead of only version equality.
+- Treat persistence availability as a denial-only preflight. It does not reserve capacity and a later authoritative admission may still reject the operation.
 - Keep integration behavior optional; do not crash if Tamework is missing.
 
 ## Related Pages

@@ -138,7 +138,8 @@ function New-ClaimsRuntimeKnownProviderDiagnosticPolicy {
 function Get-ClaimsRuntimePreV6ProfileBaseline {
     param([psobject] $Evidence)
     if ($Evidence.integrityCheck -cne "ok" -or $Evidence.profileRows -lt 0 -or
-            $Evidence.migrationV6Count -ne 0 -or $Evidence.canonicalRows -ne -1) {
+            $Evidence.migrationV6Count -ne 0 -or $Evidence.migrationV7Count -ne 0 -or
+            $Evidence.canonicalRows -ne -1) {
         throw "UpgradeSaveSource must be an integrity-clean pre-v6 Tamework population database."
     }
     return [long]$Evidence.profileRows
@@ -157,7 +158,7 @@ function Get-ClaimsRuntimeUpgradeBackupEvidence {
     )
 
     $dataRoot = Split-Path -Path $DatabasePath -Parent
-    $files = @(Get-ChildItem -LiteralPath $dataRoot -File -Filter "tamework_pre_v6_*.sqlite.bak" |
+    $files = @(Get-ChildItem -LiteralPath $dataRoot -File -Filter "tamework_pre_v7_*.sqlite.bak" |
         Sort-Object FullName)
     $backups = [System.Collections.Generic.List[object]]::new()
     $preexistingPaths = @($PreexistingBackups | ForEach-Object { [IO.Path]::GetFullPath($_.path) })
@@ -176,19 +177,21 @@ function Get-ClaimsRuntimeUpgradeBackupEvidence {
             } else { $null }
             integrityCheck = if ($null -eq $sqlite) { $null } else { $sqlite.integrityCheck }
             migrationV6Count = if ($null -eq $sqlite) { $null } else { $sqlite.migrationV6Count }
+            migrationV7Count = if ($null -eq $sqlite) { $null } else { $sqlite.migrationV7Count }
             migrationVersions = if ($null -eq $sqlite) { $null } else { $sqlite.migrationVersions }
             profileRows = if ($null -eq $sqlite) { $null } else { $sqlite.profileRows }
             canonicalRows = if ($null -eq $sqlite) { $null } else { $sqlite.canonicalRows }
             createdByThisRun = [IO.Path]::GetFullPath($file.FullName) -notin $preexistingPaths
             passed = $file.Length -gt 0 -and $null -ne $sqlite -and
                 $sqlite.integrityCheck -ceq "ok" -and $sqlite.migrationV6Count -eq 0 -and
+                $sqlite.migrationV7Count -eq 0 -and
                 $sqlite.migrationVersions -ceq $ExpectedMigrationVersions -and
                 $sqlite.profileRows -eq $ExpectedProfileRows -and $sqlite.canonicalRows -eq -1
         })
     }
     $created = @($backups | Where-Object createdByThisRun)
     return [pscustomobject][ordered]@{
-        pattern = "tamework_pre_v6_*.sqlite.bak"
+        pattern = "tamework_pre_v7_*.sqlite.bak"
         passed = $created.Count -gt 0 -and -not ($created | Where-Object { -not $_.passed })
         preexistingBeforeStartup = @($PreexistingBackups)
         createdByThisRun = $created

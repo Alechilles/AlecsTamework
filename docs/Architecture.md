@@ -21,7 +21,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Settings announcement UI (`TameworkSettingsAnnouncementService`) with first-run welcome copy and version-specific upgrade notices.
 - Managed coop runtime (`TwCoopConfig`) with schema-v5 resident, lifecycle-operation, and import journals
 - Canonical owned-companion population runtime (`OwnerPopulationRuntime`) with atomic owner/claim reservations, weak generation-bound provider contracts, and lifecycle-aware physical occupancy
-- Schema v6 population reconciliation (`ownership/reconciliation`) with resumable persisted scan sessions and saved-world loading across profile state, saved worlds, base/custom containers, offline/online inventories, and nonterminal operation journals
+- Schema v7 persistence resilience and population reconciliation (`persistence/*`, `ownership/reconciliation`) with durable scoped incidents/quarantines, resumable persisted scan sessions, and saved-world loading across profile state, saved worlds, base/custom containers, offline/online inventories, and nonterminal operation journals
 - Optional asset patch generation (`Server/Tamework/Patches`) for JSON-like server assets that should stay valid when Tamework is absent
 - Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
 - Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
