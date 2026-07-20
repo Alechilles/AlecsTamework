@@ -34,7 +34,7 @@ class AvatarFlightVigourServiceTest {
                 new AvatarFlightVigourService.State(2.0, 1000L, 0L),
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 9000L
         );
 
@@ -75,7 +75,7 @@ class AvatarFlightVigourServiceTest {
                 spent,
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 1700L
         );
 
@@ -88,7 +88,7 @@ class AvatarFlightVigourServiceTest {
                 spent,
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 9750L
         );
         assertEquals(5.0, directRecovery.state().charges(), EPSILON,
@@ -98,7 +98,7 @@ class AvatarFlightVigourServiceTest {
                 delayed.state(),
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 9750L
         );
 
@@ -153,7 +153,7 @@ class AvatarFlightVigourServiceTest {
                 spent,
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 -3500L
         );
 
@@ -166,7 +166,7 @@ class AvatarFlightVigourServiceTest {
                 delayed.state(),
                 CONFIG,
                 false,
-                16.0,
+                17.0,
                 -3000L
         );
 

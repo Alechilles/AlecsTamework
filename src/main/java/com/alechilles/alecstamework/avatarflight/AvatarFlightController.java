@@ -252,7 +252,9 @@ public final class AvatarFlightController {
         boolean applyVelocity = mode != AvatarFlightMode.GROUNDED;
         double horizontalSpeed = horizontalVelocity.speed();
         boolean horizontalIdle = horizontalSpeed < HORIZONTAL_IDLE_SPEED;
-        boolean fastFlight = !horizontalIdle && boostActive && mode == AvatarFlightMode.FORWARD_FLIGHT;
+        boolean fastFlight = !horizontalIdle
+                && mode == AvatarFlightMode.FORWARD_FLIGHT
+                && AvatarFlightSpeedMetrics.isFastFlightSpeed(horizontalSpeed, config);
         double visualPitch = input.pitchRadians();
         double visualRoll = resolveVisualRoll(
                 state.velocityX(),

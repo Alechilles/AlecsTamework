@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import javax.annotation.Nullable;
 
 /**
- * Stateless speed math shared by avatar flight vigour balance checks.
+ * Stateless speed math shared by avatar flight presentation and vigour balance checks.
  */
 public final class AvatarFlightSpeedMetrics {
 
@@ -43,7 +43,7 @@ public final class AvatarFlightSpeedMetrics {
         return clamp01(finiteOrZero(horizontalSpeed) / cap);
     }
 
-    public static double fastRechargeThreshold(@Nullable TwAvatarFlightConfig config) {
+    public static double fastFlightThreshold(@Nullable TwAvatarFlightConfig config) {
         if (config == null) {
             return 0.0;
         }
@@ -51,9 +51,25 @@ public final class AvatarFlightSpeedMetrics {
                 * finiteOrZero(config.getVigour().getFastFlightRechargeSpeedRatio());
     }
 
-    public static boolean isFastFlightRechargeSpeed(double horizontalSpeed, @Nullable TwAvatarFlightConfig config) {
-        double threshold = fastRechargeThreshold(config);
+    public static boolean isFastFlightSpeed(double horizontalSpeed, @Nullable TwAvatarFlightConfig config) {
+        double threshold = fastFlightThreshold(config);
         return threshold > 0.0 && Double.isFinite(horizontalSpeed) && horizontalSpeed >= threshold;
+    }
+
+    /**
+     * @deprecated Use {@link #fastFlightThreshold(TwAvatarFlightConfig)}; the threshold now drives all fast-flight behavior.
+     */
+    @Deprecated
+    public static double fastRechargeThreshold(@Nullable TwAvatarFlightConfig config) {
+        return fastFlightThreshold(config);
+    }
+
+    /**
+     * @deprecated Use {@link #isFastFlightSpeed(double, TwAvatarFlightConfig)}; recharge follows the shared fast-flight state.
+     */
+    @Deprecated
+    public static boolean isFastFlightRechargeSpeed(double horizontalSpeed, @Nullable TwAvatarFlightConfig config) {
+        return isFastFlightSpeed(horizontalSpeed, config);
     }
 
     private static double finiteOrZero(double value) {

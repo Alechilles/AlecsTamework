@@ -134,7 +134,7 @@
     "ForwardBoostCost": 1.0,
     "GroundedRechargeSecondsPerCharge": 4.0,
     "FastFlightRechargeSecondsPerCharge": 8.0,
-    "FastFlightRechargeSpeedRatio": 0.75,
+    "FastFlightRechargeSpeedRatio": 0.8,
     "RechargeDelayAfterSpendSeconds": 0.75,
     "HudEnabled": true,
     "HudResendIntervalMs": 100.0

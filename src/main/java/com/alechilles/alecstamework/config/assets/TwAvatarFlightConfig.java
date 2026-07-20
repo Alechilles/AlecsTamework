@@ -276,9 +276,9 @@ public final class TwAvatarFlightConfig implements
             .documentation("Fast-flight recharge seconds required for each vigour charge while above the configured speed ratio. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("FastFlightRechargeSpeedRatio", Codec.DOUBLE),
-                    (settings, value) -> settings.fastFlightRechargeSpeedRatio = clamp01(value, 0.75),
+                    (settings, value) -> settings.fastFlightRechargeSpeedRatio = clamp01(value, 0.80),
                     settings -> settings.fastFlightRechargeSpeedRatio)
-            .documentation("Normalized forward-speed ratio required for fast-flight vigour recharge. Clamped to 0..1. Inheritance: missing nested key inherits parent value.")
+            .documentation("Normalized boosted-speed ratio that activates the fast-flight animation and airborne vigour recharge. Clamped to 0..1. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("RechargeDelayAfterSpendSeconds", Codec.DOUBLE),
                     (settings, value) -> settings.rechargeDelayAfterSpendSeconds = nonNegativeOrDefault(value, 0.75),
@@ -815,7 +815,7 @@ public final class TwAvatarFlightConfig implements
         double forwardBoostCost = 1.0;
         double groundedRechargeSecondsPerCharge = 4.0;
         double fastFlightRechargeSecondsPerCharge = 8.0;
-        double fastFlightRechargeSpeedRatio = 0.75;
+        double fastFlightRechargeSpeedRatio = 0.80;
         double rechargeDelayAfterSpendSeconds = 0.75;
         boolean hudEnabled = true;
         double hudResendIntervalMs = 100.0;

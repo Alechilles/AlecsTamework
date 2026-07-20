@@ -84,7 +84,7 @@ class TwAvatarFlightConfigTest {
         assertEquals(1.0, config.getVigour().getForwardBoostCost(), 0.00001);
         assertEquals(4.0, config.getVigour().getGroundedRechargeSecondsPerCharge(), 0.00001);
         assertEquals(8.0, config.getVigour().getFastFlightRechargeSecondsPerCharge(), 0.00001);
-        assertEquals(0.75, config.getVigour().getFastFlightRechargeSpeedRatio(), 0.00001);
+        assertEquals(0.80, config.getVigour().getFastFlightRechargeSpeedRatio(), 0.00001);
         assertEquals(0.75, config.getVigour().getRechargeDelayAfterSpendSeconds(), 0.00001);
         assertTrue(config.getVigour().isHudEnabled());
         assertEquals(100L, config.getVigour().getHudResendIntervalMs());

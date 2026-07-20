@@ -98,7 +98,7 @@ public final class AvatarFlightVigourService {
         if (grounded) {
             return cadence(RechargeMode.GROUNDED, vigour.getGroundedRechargeSecondsPerCharge());
         }
-        if (AvatarFlightSpeedMetrics.isFastFlightRechargeSpeed(horizontalSpeed, config)) {
+        if (AvatarFlightSpeedMetrics.isFastFlightSpeed(horizontalSpeed, config)) {
             return cadence(RechargeMode.FAST_FLIGHT, vigour.getFastFlightRechargeSecondsPerCharge());
         }
         return new RechargeCadence(RechargeMode.NONE, 0.0);
