@@ -214,6 +214,71 @@ class CommandNpcProfileActionResolverTest {
         assertTrue(target.isActionable());
     }
 
+    /** Regression for a second cleanup after recovery rotated the canonical projection UUID. */
+    @Test
+    void rotatedRecoveredCurrentProjectionCanEnterANewLostCycle() {
+        UUID originalUuid = UUID.randomUUID();
+        UUID recoveredUuid = UUID.randomUUID();
+        UUID rotatedCurrentUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                recoveredIdentity(
+                        "profile-a", rotatedCurrentUuid, originalUuid, recoveredUuid),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget target =
+                resolver.resolveLostTransition(rotatedCurrentUuid);
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
+        assertEquals(rotatedCurrentUuid, target.targetNpcUuid());
+        assertTrue(target.isActionable());
+    }
+
+    /** Regression for Recall unavailable after an already recovered projection unloaded. */
+    @Test
+    void rotatedRecoveredCurrentProjectionCanBeRecalledAfterUnload() {
+        UUID originalUuid = UUID.randomUUID();
+        UUID recoveredUuid = UUID.randomUUID();
+        UUID rotatedCurrentUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                recoveredIdentity(
+                        "profile-a", rotatedCurrentUuid, originalUuid, recoveredUuid),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget target =
+                resolver.resolveRelocation(record(rotatedCurrentUuid, "profile-a"));
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, target.status());
+        assertEquals(rotatedCurrentUuid, target.targetNpcUuid());
+        assertTrue(target.isActionable());
+    }
+
+    @Test
+    void rotatedHistoricalRecoveryProjectionRedirectsRecallButCannotStartLostCycle() {
+        UUID originalUuid = UUID.randomUUID();
+        UUID recoveredUuid = UUID.randomUUID();
+        UUID rotatedCurrentUuid = UUID.randomUUID();
+        CommandNpcProfileActionResolver resolver = resolver(
+                recoveredIdentity(
+                        "profile-a", rotatedCurrentUuid, originalUuid, recoveredUuid),
+                this::absent
+        );
+
+        CommandNpcProfileActionResolver.ActionTarget relocation =
+                resolver.resolveRelocation(record(recoveredUuid, "profile-a"));
+        CommandNpcProfileActionResolver.ActionTarget lostTransition =
+                resolver.resolveLostTransition(recoveredUuid);
+
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.RESOLVED, relocation.status());
+        assertEquals(rotatedCurrentUuid, relocation.targetNpcUuid());
+        assertTrue(relocation.redirected());
+        assertTrue(relocation.isActionable());
+        assertEquals(CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED, lostTransition.status());
+        assertEquals("profile_already_recovered", lostTransition.reason());
+        assertFalse(lostTransition.isActionable());
+    }
+
     @Test
     void recoveredHistoricalSourceCannotStartALostCycleForItsReplacement() {
         UUID originalUuid = UUID.randomUUID();
@@ -349,13 +414,24 @@ class CommandNpcProfileActionResolverTest {
             String profileId,
             UUID currentUuid,
             UUID historicalUuid) {
+        return recoveredIdentity(profileId, currentUuid, historicalUuid, currentUuid);
+    }
+
+    private NpcIdentityRepository.ProfileIdentity recoveredIdentity(
+            String profileId,
+            UUID currentUuid,
+            UUID historicalUuid,
+            UUID recoveredUuid) {
+        List<UUID> aliases = currentUuid.equals(recoveredUuid)
+                ? List.of(currentUuid, historicalUuid)
+                : List.of(currentUuid, historicalUuid, recoveredUuid);
         return new NpcIdentityRepository.ProfileIdentity(
                 profileId,
                 currentUuid,
-                List.of(currentUuid, historicalUuid),
+                aliases,
                 true,
                 new NpcIdentityRepository.ProfileFlags(
-                        false, false, true, false, null, currentUuid
+                        false, false, true, false, null, recoveredUuid
                 ),
                 null,
                 null

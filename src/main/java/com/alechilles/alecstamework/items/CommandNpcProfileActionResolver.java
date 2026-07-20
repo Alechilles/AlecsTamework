@@ -165,26 +165,25 @@ final class CommandNpcProfileActionResolver {
             return "profile_is_lost";
         }
         if (durable.lostReplacementUuid() != null
-                && !isCurrentRecoveredProjectionRemoval(identity, record, actionKind)
-                && (actionKind == ActionKind.LOST_TRANSITION || identity.liveUuids().isEmpty())) {
+                && actionKind == ActionKind.LOST_TRANSITION
+                && !isCurrentRecoveredProjection(identity, record)) {
             return "profile_already_recovered";
         }
         return null;
     }
 
     /**
-     * Completed recovery evidence still suppresses the historical source, but the exact recovered
-     * projection that is now canonical must be able to enter a later lost-recovery cycle.
+     * Completed recovery evidence still suppresses historical removal events, but the profile's
+     * current canonical projection can enter a later lost-recovery cycle. Its UUID can legitimately
+     * rotate after recovery when Hytale republishes the projection. Relocation remains profile-level
+     * and may separately redirect a historical command record to this canonical current projection.
      */
-    private boolean isCurrentRecoveredProjectionRemoval(
+    private boolean isCurrentRecoveredProjection(
             @Nonnull CommandNpcIdentityService.IdentityResolution identity,
-            @Nullable LinkedNpcRecord record,
-            @Nonnull ActionKind actionKind) {
-        UUID droppedNpcUuid = record != null ? record.npcUuid : null;
-        return actionKind == ActionKind.LOST_TRANSITION
-                && droppedNpcUuid != null
-                && droppedNpcUuid.equals(identity.currentNpcUuid())
-                && droppedNpcUuid.equals(identity.durableState().lostReplacementUuid());
+            @Nullable LinkedNpcRecord record) {
+        UUID projectedNpcUuid = record != null ? record.npcUuid : null;
+        return projectedNpcUuid != null
+                && projectedNpcUuid.equals(identity.currentNpcUuid());
     }
 
     @Nullable

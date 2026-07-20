@@ -263,6 +263,7 @@ public final class CommandLinkedNpcLostService {
         if (target.isActionable()) {
             return target.targetNpcUuid();
         }
+        CommandProfileActionDiagnostics.recordRejected("lost_transition", target);
         if (logger != null) {
             Level level = target.status() == CommandNpcProfileActionResolver.ResolutionStatus.BLOCKED
                     ? Level.FINE

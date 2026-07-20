@@ -176,8 +176,15 @@ final class CommandMenuMoveService {
             CommandNpcProfileActionResolver.ActionTarget relocationTarget =
                     resolveRelocationTarget(record);
             if (relocationTarget == null || !relocationTarget.isActionable()) {
-                feedbackService.showWarningKey(
-                        player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
+                CommandProfileActionDiagnostics.recordRejected(
+                        returnHome ? "return_home" : "recall", relocationTarget);
+                String feedbackKey = CommandProfileActionDiagnostics.feedbackKey(relocationTarget);
+                if (feedbackKey != null) {
+                    feedbackService.showWarningKey(player, feedbackKey);
+                } else {
+                    feedbackService.showWarningKey(
+                            player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
+                }
                 return;
             }
             record = relocationTarget.resolvedRecord();
