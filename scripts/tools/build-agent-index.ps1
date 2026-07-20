@@ -15,7 +15,11 @@ function Get-Files([string] $Path, [string] $Filter = "*") {
     if (-not (Test-Path $Path)) {
         return @()
     }
-    return @(Get-ChildItem -LiteralPath $Path -Recurse -File -Filter $Filter)
+    return @(Get-ChildItem -LiteralPath $Path -Recurse -File -Filter $Filter |
+        Where-Object {
+            $_.Extension -ne ".pyc" -and
+            $_.FullName -notmatch "[\\/]__pycache__[\\/]"
+        })
 }
 
 function Add-Section([System.Collections.Generic.List[string]] $Lines, [string] $Title) {
