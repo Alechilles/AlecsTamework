@@ -136,6 +136,7 @@ Loaded flow:
 - `/tw settings` can disable recall/return-home teleporting. When disabled, Recall is hidden from the linked panel and command wheel, loaded companions still receive normal move/home command hooks, and unloaded or distant forced relocation is skipped; use `Locate` to open a copyable current or last recorded world-position page.
 - A linked panel can remain open across a world or generated-instance transfer. Its Recall and Return Home actions resolve the player's current entity/store from the stable player reference at click time, rather than reusing the source-world entity reference captured when the panel opened.
 - Per-row movement actions validate and repair only the selected companion's canonical profile metadata. An unrelated damaged link on the same command item does not make a healthy selected companion unavailable.
+- Successful loaded Hold, Recall, and Return Home commands publish the state actually applied to the NPC into linked-item metadata. Cross-world following also rechecks the live source NPC against the configured state filter, so cached metadata alone cannot authorize travel.
 
 Unloaded flow:
 - Relocation commands enqueue pending relocations by NPC uuid.
@@ -145,6 +146,7 @@ Unloaded flow:
 - Repeated clicks for the same command reuse that pending request, even if the player moved, while a command targeting another world or state remains distinct.
 - Retries run on bounded interval/time windows, and one click is sufficient while the attempting-recall status is shown.
 - On-load relocation resumes after `CommandNpcRelocationOnLoadSystem` yields to population reconciliation.
+- A same-world relocation that attempted its physical move but remains temporarily unobservable settles as `UNLOADED`, not `LOST`; observing the destination projection restores normal loaded status. A cross-world transfer attempt that cannot establish its destination remains conservative and becomes recoverable `LOST`.
 
 Lost flow:
 - If relocation retry windows are exhausted, a linked companion can transition to `LOST`; the shipped default wait budget is 10 seconds.
@@ -177,6 +179,10 @@ Role-scoped behavior tuning belongs in `TwCompanionConfig.Command`:
 - `Travel.OnTransferFailure` (`QueueForRecall`, `MarkLost`, `Ignore`)
 - `Travel.FollowMasterOnWorldChange`
 - `Travel.FollowMasterOnWorldChangeStateFilter`
+
+Configured followers are selected after the player entity is installed in the destination world's
+entity store, rather than by a fixed delay from the earlier add-world event. The source NPC's live
+state must still pass `FollowMasterOnWorldChangeStateFilter` when the relocation is prepared.
 
 Generated portal instances are delete-on-remove worlds. If a linked companion remains inside when
 the instance closes, Tamework marks it during the world-removal event and publishes its complete
