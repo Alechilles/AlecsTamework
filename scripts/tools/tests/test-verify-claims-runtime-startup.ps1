@@ -320,6 +320,16 @@ $probe = New-ClaimsRuntimeSqliteReadinessProbe -JavaExecutable $Java `
             -SimpleClaimsJar $SimpleClaimsJar -QuestLinesClaimsJar $QuestLinesClaimsJar `
             -UpgradeSaveSource $upgradeSource -OutputRoot $existingOutput
     } -Pattern "brand new" -Message "existing output roots are refused"
+    $longOutput = Join-Path $testRoot ("long-output-" + ("x" * 80))
+    Assert-ClaimsThrows -Action {
+        Get-ClaimsRuntimeInputs -BuiltArtifact $BuiltArtifact -HytaleServerJar $HytaleServerJar `
+            -HytaleAssets $HytaleAssets -JavaExecutable $JavaExecutable `
+            -SimpleClaimsJar $SimpleClaimsJar -QuestLinesClaimsJar $QuestLinesClaimsJar `
+            -UpgradeSaveSource $upgradeSource -OutputRoot $longOutput
+    } -Pattern "SQLite snapshot path budget" `
+        -Message "overlong Windows SQLite snapshot paths are refused before launch"
+    Assert-ClaimsTest (-not (Test-Path -LiteralPath $longOutput)) `
+        "path-budget refusal creates no output root"
     $liveCandidate = Join-Path ([Environment]::GetFolderPath(
         [Environment+SpecialFolder]::ApplicationData
     )) ("Hytale\UserData\claims-harness-refusal-" + ([Guid]::NewGuid()).ToString("N"))

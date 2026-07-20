@@ -1,15 +1,12 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-
 function Read-ClaimsRuntimeManifest {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [string] $JarPath
     )
-
     $resolved = (Resolve-Path -LiteralPath $JarPath -ErrorAction Stop).Path
     $archive = [System.IO.Compression.ZipFile]::OpenRead($resolved)
     try {
@@ -26,7 +23,6 @@ function Read-ClaimsRuntimeManifest {
     } finally {
         $archive.Dispose()
     }
-
     foreach ($field in @("Group", "Name", "Version", "Main")) {
         if ([string]::IsNullOrWhiteSpace([string]$manifest.$field)) {
             throw "Manifest '$resolved' is missing required field '$field'."

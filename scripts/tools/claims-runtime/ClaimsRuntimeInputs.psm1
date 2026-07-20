@@ -100,6 +100,15 @@ function Get-ClaimsRuntimeInputs {
     if (Test-Path -LiteralPath $output) {
         throw "OutputRoot must be brand new and must not already exist: '$output'."
     }
+    $backupProbe = Join-Path $output (
+        "scenarios\copied-upgrade-save\home\universe\Tamework\Data\" +
+        "tamework_pre_v7_20000101-000000-999.sqlite.bak"
+    )
+    if ($backupProbe.Length -gt 240) {
+        throw "OutputRoot exceeds the Windows SQLite snapshot path budget " +
+            "($($backupProbe.Length) > 240 characters at the longest generated backup path). " +
+            "Choose a shorter disposable output root."
+    }
     Assert-ClaimsRuntimeNoReparseAncestors -Path $output -Label "OutputRoot"
     $roaming = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
     $liveUserData = Join-Path $roaming "Hytale\UserData"
