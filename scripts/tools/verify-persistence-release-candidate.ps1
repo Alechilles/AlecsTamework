@@ -118,6 +118,31 @@ function Get-VitestEvidence {
     }
 }
 
+function Get-PersistencePerformanceEvidence {
+    param([string] $Root)
+    $reportPath = Join-Path $Root `
+        "target/surefire-reports/TEST-com.alechilles.alecstamework.performance.PersistenceResiliencePerformanceGateTest.xml"
+    if (-not (Test-Path -LiteralPath $reportPath)) {
+        throw "Persistence performance report is missing: $reportPath"
+    }
+    $text = Get-Content -LiteralPath $reportPath -Raw
+    $availability = [regex]::Match($text,
+        'availability decisions=(\d+) activeScopes=(\d+) elapsedMs=(\d+) budgetMs=(\d+)')
+    $reload = [regex]::Match($text,
+        'quarantine reload activeScopes=(\d+) elapsedMs=(\d+) budgetMs=(\d+)')
+    if (-not $availability.Success -or -not $reload.Success) {
+        throw "Persistence performance measurements are missing from $reportPath"
+    }
+    return [ordered]@{
+        activeScopeFixtureSize = [long]$availability.Groups[2].Value
+        availabilityDecisions = [long]$availability.Groups[1].Value
+        availabilityElapsedMs = [long]$availability.Groups[3].Value
+        availabilityBudgetMs = [long]$availability.Groups[4].Value
+        quarantineReloadElapsedMs = [long]$reload.Groups[2].Value
+        quarantineReloadBudgetMs = [long]$reload.Groups[3].Value
+    }
+}
+
 function Read-ZipText {
     param([IO.Compression.ZipArchive] $Archive, [string] $EntryName)
     $entry = $Archive.GetEntry($EntryName)
@@ -232,6 +257,7 @@ $evidence = [ordered]@{
         platformLint = "passed"
         platformBuild = "passed"
     }
+    performance = Get-PersistencePerformanceEvidence $tameworkRoot
     package = [ordered]@{
         tameworkVersion = $pluginManifest.Version
         artifact = Get-FileEvidence $artifact.FullName
