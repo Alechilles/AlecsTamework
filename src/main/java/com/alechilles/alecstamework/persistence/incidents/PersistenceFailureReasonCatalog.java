@@ -34,6 +34,7 @@ public final class PersistenceFailureReasonCatalog {
                 "persistence_quarantine_index_reload_failed",
                 "persistence_v7_registry_load_failed",
                 "population_bootstrap_failed",
+                "persistence_shutdown_checkpoint_failed",
                 "reconciliation_startup_failed",
                 "sqlite_write_worker_failed");
         register(entries, PersistenceFailureClass.UNKNOWN_TRANSACTION_OUTCOME,

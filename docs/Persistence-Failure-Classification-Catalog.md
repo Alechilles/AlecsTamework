@@ -21,6 +21,7 @@ time or retry count.
 - `persistence_quarantine_index_reload_failed`
 - `persistence_v7_registry_load_failed`
 - `population_bootstrap_failed`
+- `persistence_shutdown_checkpoint_failed` (test-only injected shutdown/restart boundary)
 - `reconciliation_startup_failed`
 - `sqlite_write_worker_failed`
 - `write_commit_outcome_unknown`
