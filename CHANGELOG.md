@@ -24,7 +24,7 @@
 - Added a `/tw settings` needs resource mode with Accurate, Auto Fast, and Always Fast options so crowded servers can bypass expensive food/water path checks and consume valid nearby resources directly.
 - Added optional QuestLines Claims support for claim-aware companion population limits, with `/tw settings` able to select Auto, SimpleClaims, QuestLinesClaims, or Off as the claim provider.
 - Added an experimental transformed-player dragon flight debug prototype behind `/tw debugdragonflight`, with configurable avatar flight settings for jump lift, sprint boost, crouch descent, backward airbrake, hover damping, and pitch-based speed/altitude tradeoffs.
-- Added a creative-available Flightmaster's Talisman item for transformed dragon flight controls, with left click mapped to upward flaps and right click mapped to airbraking while avatar flight is active.
+- Added a creative-available Dragon Reins prototype item for transformed dragon flight controls, with left click mapped to upward flaps and right click mapped to airbraking while avatar flight is active.
 - Added `/tw debugdragonflight flightprobe` for temporarily enabling non-creative client flight and player input logging while testing avatar-flight controls.
 - Avatar flight can read client flight vertical velocity during diagnostics, but the native client flight capability remains a standalone probe because it overrides custom avatar movement.
 - Added Vigour charges and a compact speed/Vigour HUD for transformed avatar flight, with upward flaps and forward boosts spending charges and recharge limited to grounded recovery or high-speed flight.
@@ -65,13 +65,13 @@
 - SimpleClaims tamed-companion protection now follows its native full-world, admin, member-permission, player-ally, party-ally, and outsider policy. The configured `AllowDamagePermissionKey` is a Hytale server permission; the old raw SimpleClaims party-key grant remains for one compatibility release with a deprecation warning.
 - Updated Alec's Tamework from GPL-3.0 to a source-available license that allows unmodified dependency use and example/template reuse while reserving forks, modified copies, and Tamework system reuse for separate written permission.
 - Claim-aware tame, set-owner, legacy ownership, and breeding population limits now run through the selected claim provider while SimpleClaims damage protection remains SimpleClaims-specific.
-- Added a dedicated model and texture for Flightmaster's Talisman.
+- Renamed the Dragon Reins prototype to Flightmaster's Reins and replaced the recipe-page placeholder with a dedicated reins model and texture.
 - Avatar flight keeps the transformed NordicDrake model enabled by default while the experimental fake rider visual remains disabled.
 - `/tw debugplayermodel` now requires the explicit `unsafe` argument before replacing the player's model.
 - Avatar-flight Q boosts now use directional thrust by default, with upward boost lift capped below flaps and downward boost input applying full directional dive thrust.
 - Avatar-flight dive and climb tuning now uses ramping maneuver loads so diving builds speed more slowly, pitch-up spends momentum more gradually, and clean unboosted dive/pull-up loops recover most but not all lost altitude.
 - Avatar-flight charged launch now defaults to holding crouch on the ground instead of holding jump, keeping airborne crouch as direct descent once no grounded launch charge is active.
-- Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Talisman flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
+- Avatar flight no longer uses jump or double-jump as a flight entry input. Flightmaster's Reins flap and Q boost now explicitly start avatar flight before applying their movement ability when flight is inactive.
 
 ### Fixed
 - Fixed legacy generation-zero projection markers causing the detached saved-world scan to invalidate all population evidence dimensions. Generation zero now remains exact restart evidence, matching the loaded identity index and migration contract, while negative generations still fail closed.
@@ -143,21 +143,21 @@
 - Fixed experimental avatar-flight fake rider attachments to keep original model paths for player clothing, armor, and third-party equipment instead of generating runtime rider asset variants that could crash other clients.
 - Fixed transformed avatar flight sending hidden-equipment updates back to the local owner client every tick, removing a crash-adjacent warning loop seen when moving as the NordicDrake.
 - Fixed avatar flight input capture so stale movement-state fallback no longer makes jump, crouch, or sprint appear held after the packet state is gone.
-- Fixed Flightmaster's Talisman airbraking so right-click takes priority over forward input, damps horizontal and vertical velocity toward hover, and avatar flight pitch trading continues while gliding on existing momentum.
-- Tuned Flightmaster's Talisman airbraking to slow down more gradually, and forced avatar flight movement states so hovering, normal flight, and shift-boost flight can use flying animations instead of fall animation.
-- Fixed avatar flight hover restart after a full Flightmaster's Talisman airbrake stop, restored obvious held-crouch descent, corrected pitch speed/altitude trading so looking down dives and looking up spends momentum, and moved animation/pose overrides later in the tick order so flying animations and dragon pitch/roll are applied after base movement states.
+- Fixed Dragon Reins airbraking so right-click takes priority over forward input, damps horizontal and vertical velocity toward hover, and avatar flight pitch trading continues while gliding on existing momentum.
+- Tuned Dragon Reins airbraking to slow down more gradually, and forced avatar flight movement states so hovering, normal flight, and shift-boost flight can use flying animations instead of fall animation.
+- Fixed avatar flight hover restart after a full Dragon Reins airbrake stop, restored obvious held-crouch descent, corrected pitch speed/altitude trading so looking down dives and looking up spends momentum, and moved animation/pose overrides later in the tick order so flying animations and dragon pitch/roll are applied after base movement states.
 - Fixed avatar flight input projection so passive glide momentum after a sharp turn no longer gets misread as held-backward input and traps the player in slow reverse flight.
 - Reworked avatar flight pitch-up handling so looking upward redirects dive momentum into a sharper climbing arc, preserving stronger forward motion while trading speed for noticeable altitude before stalling.
 - Fixed avatar flight animation and pose sync so the owner client receives the same saved flying-state update used by native flight, pitch follows look pitch directly, turn banking applies from trajectory changes, and stale roll/pitch clears when landing or disabling avatar flight.
 - Fixed a sharp-turn avatar flight bug that could create runaway horizontal speed and leave airbraking unable to recover.
 - Fixed transformed dragon flight animations by explicitly sending configurable movement-slot animations (`FlyIdle`, `Fly`, and `FlyFast` by default) to the owner client while avatar flight is active.
 - Fixed transformed avatar flight interfering with native grounded sprint visuals; grounded transformed movement now leaves walk/run/sprint animation state, model-authored locomotion sets, and overlay slots to the base client, only suppressing overlays while custom flight visuals are active.
-- Fixed Flightmaster's Talisman sprint boost detection when client movement packets omit movement-state payloads but the current player movement state still reports sprinting.
-- Added Q forward boost for Flightmaster's Talisman, slowed dive-only speed gain, restored a small forward start from hover/stall, and fixed the compact avatar-flight HUD background color syntax.
+- Fixed Dragon Reins sprint boost detection when client movement packets omit movement-state payloads but the current player movement state still reports sprinting.
+- Added Q forward boost for Flightmaster's Reins, slowed dive-only speed gain, restored a small forward start from hover/stall, and fixed the compact avatar-flight HUD background color syntax.
 - Fixed avatar-flight sprint boost speed so shift can exceed normal cruise speed instead of being immediately clamped back to the regular forward cap.
 - Fixed airborne avatar-flight sprint detection by preserving and reading the live movement-state sprint flag instead of overwriting it during custom flight-state updates.
 - Fixed avatar-flight shift boosts feeling inactive when Hytale only exposes a one-frame airborne sprint pulse by keeping detected boost pulses active for a short configurable duration.
-- Fixed Flightmaster's Talisman Q and sprint-edge boosts so they apply once per press instead of repeating on cooldown, and removed the compact avatar-flight HUD root background that rendered as a missing-texture placeholder.
+- Fixed Flightmaster's Reins Q and sprint-edge boosts so they apply once per press instead of repeating on cooldown, and removed the compact avatar-flight HUD root background that rendered as a missing-texture placeholder.
 - Fixed `/tw debugplayermodel unsafe` so positive test scales are no longer clamped to the model asset's authored min/max range.
 - Fixed transformed avatar flight trying to layer player item/combat/emote animations onto dragon models by periodically suppressing non-movement animation slots while flight is active.
 - Fixed transformed avatar flight still rendering held player equipment on dragon models by continuously hiding the real transformed player's hand and armor equipment visuals while avatar flight is active, independent of fake rider visuals.
