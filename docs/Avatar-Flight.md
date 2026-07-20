@@ -23,16 +23,16 @@ On a clean disconnect, Tamework queues that cleanup on the player's world thread
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
 - Holding crouch on the ground charges a launch. Releasing after the minimum charge starts avatar flight with upward and forward launch impulse.
-- Avatar flight starts only from a charged launch release, left-click flap, or Q boost from Flightmaster's Reins. Normal jumps, double jumps, and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight with those controls.
-- Left-click with Flightmaster's Reins performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
-- Right-click with Flightmaster's Reins applies the airbrake.
-- Q with Flightmaster's Reins performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
+- Avatar flight starts only from a charged launch release, left-click flap, or Q boost from Flightmaster's Talisman. Normal jumps, double jumps, and walking off short ledges remain native grounded/falling movement until the player explicitly enters flight with those controls.
+- Left-click with Flightmaster's Talisman performs an upward flap. If avatar flight is not already active, the flap starts avatar flight first.
+- Right-click with Flightmaster's Talisman applies the airbrake.
+- Q with Flightmaster's Talisman performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
 - Press F to immediately dismount from an NPC-backed avatar-flight session. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
-While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and Reins actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.
+While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and talisman actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.
 
 ## Vigour
 
@@ -186,8 +186,8 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 ### Launch
 
 - `Enabled`: enables charged launch.
-- `PreferredInput`: primary launch input path. `CrouchHold` is the default built-in packet path because it is reliable and visually reads as a launch coil. `JumpHold` remains supported, and `ReinsPrimaryHold` is reserved for future/custom item hold integrations.
-- `FallbackInput`: fallback launch input path. Defaults to `CrouchHold`; `ReinsPrimaryHold` is not wired by the default Flightmaster's Reins item.
+- `PreferredInput`: primary launch input path. `CrouchHold` is the default built-in packet path because it is reliable and visually reads as a launch coil. `JumpHold` remains supported, and the legacy `ReinsPrimaryHold` config identifier is reserved for future/custom item hold integrations.
+- `FallbackInput`: fallback launch input path. Defaults to `CrouchHold`; `ReinsPrimaryHold` is not wired by the default Flightmaster's Talisman item.
 - `MinChargeMs`: minimum hold before release applies launch.
 - `MaxChargeMs`: hold duration that reaches full launch charge.
 - `ChargeExponent`: exponent applied to normalized charge amount.

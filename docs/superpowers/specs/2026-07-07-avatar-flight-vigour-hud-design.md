@@ -118,7 +118,7 @@ Vigour checks should sit in the avatar flight controller, not in item interactio
 
 Upward flap flow:
 
-1. Dragon Reins primary action queues a flap intent.
+1. Flightmaster's Talisman primary action queues a flap intent.
 2. Controller checks active avatar flight, cooldowns, and Vigour.
 3. If at least one charge is available, spend one charge and apply the upward boost.
 4. If no charge is available, do not apply the boost.

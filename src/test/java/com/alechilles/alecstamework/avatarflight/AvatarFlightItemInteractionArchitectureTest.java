@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Static checks for Dragon Reins item interactions driving avatar-flight controls. */
+/** Static checks for Flightmaster's Talisman interactions driving avatar-flight controls. */
 class AvatarFlightItemInteractionArchitectureTest {
     private static final Path SERVICE = Path.of(
             "src",
@@ -51,7 +51,7 @@ class AvatarFlightItemInteractionArchitectureTest {
             "interactions",
             "TameworkFlightBoostInteraction.java"
     );
-    private static final Path REINS_ITEM = Path.of(
+    private static final Path TALISMAN_ITEM = Path.of(
             "src",
             "main",
             "resources",
@@ -59,7 +59,7 @@ class AvatarFlightItemInteractionArchitectureTest {
             "Item",
             "Items",
             "Tools",
-            "Tamework_Dragon_Reins.json"
+            "Tamework_Flightmasters_Talisman.json"
     );
     private static final Path PACKET_HANDLER = Path.of(
             "src",
@@ -116,8 +116,8 @@ class AvatarFlightItemInteractionArchitectureTest {
     }
 
     @Test
-    void flightmastersReinsWireQAbilityToBoostInteraction() throws Exception {
-        String item = Files.readString(REINS_ITEM, StandardCharsets.UTF_8);
+    void flightmastersTalismanWiresQAbilityToBoostInteraction() throws Exception {
+        String item = Files.readString(TALISMAN_ITEM, StandardCharsets.UTF_8);
 
         assertTrue(item.contains("\"Ability1\""),
                 "Hytale maps the first item ability slot to the Q action");
@@ -125,7 +125,7 @@ class AvatarFlightItemInteractionArchitectureTest {
     }
 
     @Test
-    void dragonReinsButtonsDoNotUseRawMousePacketCapture() throws Exception {
+    void talismanButtonsDoNotUseRawMousePacketCapture() throws Exception {
         String handler = Files.readString(PACKET_HANDLER, StandardCharsets.UTF_8);
 
         assertFalse(handler.contains("AvatarFlightReinsInputCapture"));
@@ -133,7 +133,7 @@ class AvatarFlightItemInteractionArchitectureTest {
     }
 
     @Test
-    void reinsActionsDoNotDependOnMovementInputFreshness() throws Exception {
+    void talismanActionsDoNotDependOnMovementInputFreshness() throws Exception {
         String movementSystem = Files.readString(MOVEMENT_SYSTEM, StandardCharsets.UTF_8);
 
         assertTrue(movementSystem.contains("input.consumeReinsFlap("));

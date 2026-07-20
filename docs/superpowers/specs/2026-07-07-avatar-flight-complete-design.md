@@ -10,7 +10,7 @@ The target feel is dragonriding-inspired momentum flight: the player can dive to
 
 - Use transformed-player avatar flight as the primary flight system for NordicDrake-style mounts.
 - Keep behavior configurable through `TwAvatarFlightConfig` or focused companion config sections.
-- Use Flightmaster's Reins as the reliable held-item control surface.
+- Use Flightmaster's Talisman as the reliable held-item control surface.
 - Keep flight movement, Vigour spending, animation state, HUD state, rider visuals, and owner equipment hiding coherent as one player-facing feature.
 - Preserve the existing working avatar-flight direction and specify the next tuning and launch work.
 
@@ -33,7 +33,7 @@ The selected direction is transformed-avatar flight:
 - normal player movement and mouse look remain available enough to build custom flight;
 - the visible mount body is the player's transformed model;
 - a fake rider visual is attached to the mount so the player still appears to be riding;
-- Flightmaster's Reins provide reliable item-action controls for abilities that raw movement input does not expose cleanly.
+- Flightmaster's Talisman provide reliable item-action controls for abilities that raw movement input does not expose cleanly.
 
 This is the clean foundation for Tamework's dragon-style flight. The native mount system can still matter for other features, but it should not drive this flight mode unless a future Hytale update exposes better mounted input and motion hooks.
 
@@ -142,7 +142,7 @@ These values are design starting points. The important rule is not the exact exp
 
 ## Directional Q Boost
 
-Q with Flightmaster's Reins is the primary forward boost. It spends Vigour and applies directional thrust based on where the player is looking.
+Q with Flightmaster's Talisman is the primary forward boost. It spends Vigour and applies directional thrust based on where the player is looking.
 
 Design rules:
 
@@ -381,7 +381,7 @@ Longer-term direction:
 - Q is currently used for forward boost, so future attacks may need E/R or alternate Reins action slots.
 - Config should eventually support ability slots with cooldowns and costs.
 - NordicDrake examples could include fire breath and fireball.
-- Ability behavior belongs in avatar-flight config, not hardcoded into Flightmaster's Reins.
+- Ability behavior belongs in avatar-flight config, not hardcoded into Flightmaster's Talisman.
 
 Future ability config should preserve backward compatibility and should not make Reins species-specific.
 

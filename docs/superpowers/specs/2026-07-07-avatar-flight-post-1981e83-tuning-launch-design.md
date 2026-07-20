@@ -205,7 +205,7 @@ Preferred input:
 Other supported inputs:
 
 - `JumpHold` remains configurable, but is not the default after playtesting showed jump-hold was not reliably observable;
-- grounded Flightmaster's Reins primary hold;
+- grounded Flightmaster's Talisman primary hold;
 - hold left click while grounded to charge launch;
 - release to launch;
 - once airborne, left click returns to normal flap behavior.

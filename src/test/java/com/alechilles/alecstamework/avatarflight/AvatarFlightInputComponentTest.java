@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Tests one-shot Dragon Reins input state stored beside packet movement intent. */
+/** Tests one-shot talisman input state stored beside packet movement intent. */
 class AvatarFlightInputComponentTest {
 
     @Test
@@ -120,7 +120,7 @@ class AvatarFlightInputComponentTest {
         input.updateJumping(true, 1_300L, false);
 
         assertFalse(input.consumeAirborneJumpPress(1_350L, 1_000L),
-                "jump presses no longer activate avatar flight; use charged launch or Flightmaster's Reins");
+                "jump presses no longer activate avatar flight; use charged launch or Flightmaster's Talisman");
         assertFalse(input.consumeAirborneJumpPress(1_350L, 1_000L));
     }
 

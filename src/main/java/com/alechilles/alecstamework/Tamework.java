@@ -485,7 +485,7 @@ public class Tamework extends JavaPlugin {
                 TameworkManagedCoopCaptureCrateInteraction.class,
                 TameworkManagedCoopCaptureCrateInteraction.CODEC
         );
-        // Register the custom item interactions used by Dragon Reins flight controls.
+        // Register the custom item interactions used by Flightmaster's Talisman controls.
         Interaction.CODEC.register(
                 "TameworkFlightFlap",
                 TameworkFlightFlapInteraction.class,

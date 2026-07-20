@@ -1641,8 +1641,8 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 
 - Forward movement starts or resumes glide.
 - Mouse look controls heading and pitch.
-- Left-click with Dragon Reins performs an upward flap.
-- Right-click with Dragon Reins applies the airbrake.
+- Left-click with Flightmaster's Talisman performs an upward flap.
+- Right-click with Flightmaster's Talisman applies the airbrake.
 - Crouch applies direct downward movement.
 - Forward boost uses the configured boost input/action and spends Vigour.
 

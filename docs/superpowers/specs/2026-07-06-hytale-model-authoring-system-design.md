@@ -4,7 +4,7 @@
 
 Create an end-game Hytale model authoring system that helps Codex make high-quality Hytale-compatible models, textures, attachments, animations, and asset packages from concept art or text briefs.
 
-The immediate motivation is the failed Flightmaster's Reins modeling loop: a technically valid `.blockymodel` is not enough. The model also needs the right Hytale proportions, silhouette, texture density, material treatment, construction logic, rendered readability, and iterative critique. The final product should make those qualities systematic from the start.
+The immediate motivation is the failed Flightmaster's Talisman modeling loop: a technically valid `.blockymodel` is not enough. The model also needs the right Hytale proportions, silhouette, texture density, material treatment, construction logic, rendered readability, and iterative critique. The final product should make those qualities systematic from the start.
 
 The official asset corpus is the first subsystem, not the whole product. It supplies the source-backed examples, metadata, and quality signals that the authoring system uses for planning, generation, evaluation, and learning.
 
@@ -582,7 +582,7 @@ Query the corpus for official analogs by:
 - Texture treatment.
 - Scale.
 
-For Flightmaster's Reins, the expected retrieval set would include leather straps, brass buckles, wing ornaments, dangling gems, harness-like attachments, and small inventory-scale objects.
+For Flightmaster's Talisman, the expected retrieval set would include leather straps, brass buckles, wing ornaments, dangling gems, harness-like attachments, and small inventory-scale objects.
 
 ### 3. Construction Plan
 

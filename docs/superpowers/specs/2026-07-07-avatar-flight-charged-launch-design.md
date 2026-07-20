@@ -10,7 +10,7 @@ The selected direction is a charged launch: tapping jump remains a normal jump, 
 
 Prototype jump-hold launch first.
 
-Fallback if native jump suppression is unreliable: grounded Flightmaster's Reins primary-hold. In that fallback, holding left click on the ground charges launch, releasing launches, and left click returns to normal airborne flap behavior once flight has started.
+Fallback if native jump suppression is unreliable: grounded Flightmaster's Talisman primary-hold. In that fallback, holding left click on the ground charges launch, releasing launches, and left click returns to normal airborne flap behavior once flight has started.
 
 ## Source-Backed Input Notes
 
@@ -26,7 +26,7 @@ Relevant base-game evidence:
 Repo-side evidence:
 
 - `PlayerInputDebugProbe` already logs `jumping`, `crouching`, and mouse interaction packet button/motion data.
-- `TameworkFlightFlapInteraction` and `TameworkFlightBoostInteraction` currently treat Flightmaster's Reins actions as one-shot intents by only acting on `firstRun`.
+- `TameworkFlightFlapInteraction` and `TameworkFlightBoostInteraction` currently treat Flightmaster's Talisman actions as one-shot intents by only acting on `firstRun`.
 - `AvatarFlightInteractionControlService` already routes Reins actions into queued avatar-flight inputs.
 
 Inference: jump-hold charge is plausible because Tamework can read jump state before native input is processed. The risk is whether native jump can be filtered cleanly enough to prevent a small normal jump or jitter while charging.

@@ -277,7 +277,7 @@ class AvatarFlightMovementSystemArchitectureTest {
         assertTrue(source.contains("boolean activeFlight = flight.getMode() != AvatarFlightMode.GROUNDED"),
                 "movement input conversion must know whether the controller is already in avatar-flight mode");
         assertTrue(source.contains("boolean itemFlightStart = reinsFlap || reinsBoost"),
-                "inactive avatar flight should start from explicit Flightmaster's Reins actions");
+                "inactive avatar flight should start from explicit Flightmaster's Talisman actions");
         assertFalse(source.contains("input.consumeAirborneJumpPress("),
                 "jump/double-jump input must not enter avatar flight");
         assertTrue(source.contains("? reinsFlap || (!stale && input.isJumping())"),
@@ -295,7 +295,7 @@ class AvatarFlightMovementSystemArchitectureTest {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("input.consumeReinsBoost("),
-                "Flightmaster's Reins Q action should feed the existing boost intent path");
+                "Flightmaster's Talisman Q action should feed the existing boost intent path");
         assertTrue(source.contains("boolean boostIntent = reinsBoost || (activeFlight && sprintBoost)"),
                 "Q boost must not depend on unreliable airborne sprint detection when entering flight");
     }

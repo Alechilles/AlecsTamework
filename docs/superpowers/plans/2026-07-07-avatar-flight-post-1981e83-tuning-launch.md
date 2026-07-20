@@ -1927,7 +1927,7 @@ Default sample values:
 | `2000ms` | about 14.6 | about 9.6 | 2 |
 | `3000ms` | 18.0 | 11.0 | 2 |
 
-If jump-hold proves unreliable in a given Hytale build, the same launch backend can be bound to grounded Flightmaster's Reins primary hold.
+If jump-hold proves unreliable in a given Hytale build, the same launch backend can be bound to grounded Flightmaster's Talisman primary hold.
 ```
 
 Update `Glide Balance` to mention sustained dive/climb load:
@@ -1942,7 +1942,7 @@ Add player-facing bullets under the current unreleased section:
 
 ```markdown
 - Tuned avatar flight to use sustained dive/climb momentum curves so short dip loops no longer sustain infinite flight.
-- Changed Flightmaster's Reins Q boost into directional thrust with capped upward lift.
+- Changed Flightmaster's Talisman Q boost into directional thrust with capped upward lift.
 - Added configurable charged launch tuning for transformed avatar flight.
 ```
 

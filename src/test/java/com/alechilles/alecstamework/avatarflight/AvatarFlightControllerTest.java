@@ -29,7 +29,7 @@ class AvatarFlightControllerTest {
         );
 
         assertTrue(output.applyVelocity(),
-                "Flightmaster's Reins flap is an explicit flight entry action even from grounded mode");
+                "Flightmaster's Talisman flap is an explicit flight entry action even from grounded mode");
         assertTrue(output.jumpApplied());
     }
 
@@ -53,7 +53,7 @@ class AvatarFlightControllerTest {
         );
 
         assertTrue(output.applyVelocity(),
-                "Flightmaster's Reins flap can explicitly enter avatar flight while falling");
+                "Flightmaster's Talisman flap can explicitly enter avatar flight while falling");
         assertTrue(output.jumpApplied());
     }
 
@@ -85,7 +85,7 @@ class AvatarFlightControllerTest {
 
         assertEquals(AvatarFlightMode.FORWARD_FLIGHT, output.mode());
         assertTrue(output.applyVelocity(),
-                "Flightmaster's Reins boost should enter avatar flight before applying boost impulse");
+                "Flightmaster's Talisman boost should enter avatar flight before applying boost impulse");
         assertTrue(output.boostApplied());
     }
 

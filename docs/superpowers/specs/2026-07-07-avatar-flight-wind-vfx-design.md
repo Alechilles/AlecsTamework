@@ -11,8 +11,8 @@ The selected visual direction is wind pressure: translucent air arcs, ground rin
 Relevant existing behavior:
 
 - Holding jump on the ground charges a launch. Releasing after the minimum charge applies upward and forward launch impulse.
-- Left-click with Flightmaster's Reins queues an upward flap.
-- Q with Flightmaster's Reins queues a forward boost.
+- Left-click with Flightmaster's Talisman queues an upward flap.
+- Q with Flightmaster's Talisman queues a forward boost.
 - The movement controller already exposes one-tick output flags for `launchApplied`, `jumpApplied`, and `boostApplied`.
 - Fast flight is already derived from boost-active forward flight and is visible to animation/HUD code.
 

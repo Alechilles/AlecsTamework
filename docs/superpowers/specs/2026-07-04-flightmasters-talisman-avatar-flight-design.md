@@ -1,16 +1,16 @@
-# Dragon Reins Avatar Flight Design
+# Flightmaster's Talisman Avatar Flight Design
 
 ## Purpose
 
-Dragon Reins provide a real, held Tamework item that gives transformed dragon avatar flight an explicit control focus. The item is the player's signal that they intend to control a dragon-like form, while the active avatar flight config remains responsible for species-specific flight tuning and abilities.
+Flightmaster's Talisman provide a real, held Tamework item that gives transformed dragon avatar flight an explicit control focus. The item is the player's signal that they intend to control a dragon-like form, while the active avatar flight config remains responsible for species-specific flight tuning and abilities.
 
 This design keeps the current transformed-player avatar flight direction, avoids native client creative flight, and adds a reliable item-input layer for actions that movement packets do not expose well enough.
 
 ## Goals
 
-- Add a generic Tamework item named `Dragon Reins`.
-- Make Dragon Reins available through the creative inventory.
-- Use Dragon Reins as the required held item for active avatar-flight item controls.
+- Add a generic Tamework item named `Flightmaster's Talisman`.
+- Make Flightmaster's Talisman available through the creative inventory.
+- Use Flightmaster's Talisman as the required held item for active avatar-flight item controls.
 - Keep ability behavior config-driven instead of hardcoding NordicDrake actions into the item.
 - Support an initial control mapping that can be tested incrementally:
   - Left click: upward flap.
@@ -23,23 +23,23 @@ This design keeps the current transformed-player avatar flight direction, avoids
 
 - Do not implement the final real mount interaction flow in this pass.
 - Do not force hidden item swapping or automatic equipment management.
-- Do not make Dragon Reins contain NordicDrake-specific ability logic.
+- Do not make Flightmaster's Talisman contain NordicDrake-specific ability logic.
 - Do not depend on native creative/client flight mode for the main controller.
 - Do not assume Q, E, or R are usable until a focused input probe proves the packet or interaction path.
 
 ## Player Experience
 
-Dragon Reins are a normal item the player can hold. In the prototype flow, the player enters transformed dragon avatar flight through the existing debug command and holds Dragon Reins to access active flight controls.
+Flightmaster's Talisman are a normal item the player can hold. In the prototype flow, the player enters transformed dragon avatar flight through the existing debug command and holds Flightmaster's Talisman to access active flight controls.
 
-In the eventual mount flow, the mount or transform interaction should require the player to hold Dragon Reins. That makes the interaction understandable and avoids a hidden control mode.
+In the eventual mount flow, the mount or transform interaction should require the player to hold Flightmaster's Talisman. That makes the interaction understandable and avoids a hidden control mode.
 
-If the player is transformed but not holding Dragon Reins, avatar flight should remain active enough to avoid corrupting state, but intentional controls should be limited. The controller should fail quietly and predictably: the dragon does not flap or airbrake because the player is not holding the control item.
+If the player is transformed but not holding Flightmaster's Talisman, avatar flight should remain active enough to avoid corrupting state, but intentional controls should be limited. The controller should fail quietly and predictably: the dragon does not flap or airbrake because the player is not holding the control item.
 
 ## Architecture
 
-### Dragon Reins Item
+### Flightmaster's Talisman Item
 
-Dragon Reins are a generic Tamework item asset. The item exists to identify that the player is in dragon-control mode. It should not know about NordicDrake, fire breath, fireballs, or any other species-specific behavior.
+Flightmaster's Talisman are a generic Tamework item asset. The item exists to identify that the player is in dragon-control mode. It should not know about NordicDrake, fire breath, fireballs, or any other species-specific behavior.
 
 The item should be configured so Hytale sends usable item interaction events for the inputs we need to capture. Left and right mouse input are the first supported targets because Hytale exposes them through `MouseInteraction` and `PlayerMouseButtonEvent`.
 
@@ -55,7 +55,7 @@ Left and right click should be captured as edge-triggered actions, not held bool
 The input layer should check both conditions before applying reins controls:
 
 - The player has active avatar flight state.
-- The active held item is Dragon Reins.
+- The active held item is Flightmaster's Talisman.
 
 ### Flight Controller
 
@@ -72,7 +72,7 @@ While avatar flight is active, the controller should own transformed-dragon move
 
 ### Ability Configuration
 
-Abilities belong in avatar flight config, not on Dragon Reins. This lets NordicDrake, future dragons, and non-dragon flying forms share the same control item while defining different abilities.
+Abilities belong in avatar flight config, not on Flightmaster's Talisman. This lets NordicDrake, future dragons, and non-dragon flying forms share the same control item while defining different abilities.
 
 Future config shape should be conceptually similar to:
 
@@ -112,8 +112,8 @@ Assumptions to validate:
 
 ## Implementation Strategy
 
-1. Add Dragon Reins as a normal creative-available Tamework item.
-2. Add focused debug logging for Dragon Reins item interactions:
+1. Add Flightmaster's Talisman as a normal creative-available Tamework item.
+2. Add focused debug logging for Flightmaster's Talisman item interactions:
    - left click,
    - right click,
    - Q,
@@ -129,7 +129,7 @@ Assumptions to validate:
 
 ## Error Handling
 
-- If Dragon Reins are not held, ignore reins-only controls.
+- If Flightmaster's Talisman are not held, ignore talisman-only controls.
 - If avatar flight is inactive, item events should not trigger flight behavior.
 - If an ability is configured but unavailable, log a throttled debug or warning with config id and input slot.
 - Cooldowns should use explicit unset sentinels and must not assume positive world-time timestamps.
@@ -138,9 +138,9 @@ Assumptions to validate:
 
 Unit and architecture tests should cover:
 
-- Dragon Reins item asset exists and uses the expected id.
+- Flightmaster's Talisman item asset exists and uses the expected id.
 - The item is registered or discoverable through the same item path as other Tamework items.
-- Avatar flight item controls require both active avatar flight and Dragon Reins held.
+- Avatar flight item controls require both active avatar flight and Flightmaster's Talisman held.
 - Left click maps to one flap intent.
 - Right click maps to one airbrake intent.
 - Ability fields, when added, preserve default config compatibility.
@@ -148,15 +148,15 @@ Unit and architecture tests should cover:
 
 Manual test pass:
 
-- Spawn or obtain Dragon Reins from creative inventory.
+- Spawn or obtain Flightmaster's Talisman from creative inventory.
 - Enter avatar flight debug mode.
-- Confirm no item controls fire without Dragon Reins held.
-- Hold Dragon Reins and test left click, right click, shift, mouse look, and pitch.
+- Confirm no item controls fire without Flightmaster's Talisman held.
+- Hold Flightmaster's Talisman and test left click, right click, shift, mouse look, and pitch.
 - Run a focused Q/E/R logging pass before assigning abilities.
 
 ## Open Questions
 
 - What exact packet or event path do Q, E, and R use for item abilities?
-- Does Dragon Reins need a minimal root interaction asset to make Q/E/R visible to the server?
+- Does Flightmaster's Talisman need a minimal root interaction asset to make Q/E/R visible to the server?
 - Should airbrake be a click pulse, a held action, or configurable per flight profile?
-- Should the eventual mount interaction consume durability, require ownership, or only require holding Dragon Reins?
+- Should the eventual mount interaction consume durability, require ownership, or only require holding Flightmaster's Talisman?
