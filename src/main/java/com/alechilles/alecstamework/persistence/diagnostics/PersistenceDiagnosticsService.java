@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.annotation.Nonnull;
@@ -41,6 +42,9 @@ import javax.annotation.Nullable;
 public final class PersistenceDiagnosticsService {
     private static final int DEFAULT_INCIDENT_LIMIT = 100;
     private static final int JOURNAL_TAIL_BYTES = 256 * 1024;
+    static final int MAX_UNCOMPRESSED_BUNDLE_BYTES = 4 * 1024 * 1024;
+    static final long MAX_EXPORT_MILLIS = 10_000L;
+    private static final int MANIFEST_RESERVE_BYTES = 64 * 1024;
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private final TameworkPersistenceRuntime runtime;
     private final Path bundleDirectory;
@@ -144,6 +148,7 @@ public final class PersistenceDiagnosticsService {
 
     @Nonnull
     public BundleResult export(@Nullable String incidentIdOrPrefix) throws Exception {
+        long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(MAX_EXPORT_MILLIS);
         String supportId = UUID.randomUUID().toString();
         LinkedHashMap<String, BundleMember> members = new LinkedHashMap<>();
         members.put("health.json", complete(jsonBytes(health())));
@@ -179,12 +184,39 @@ public final class PersistenceDiagnosticsService {
                 "unavailable", "runtime_log_provider_unavailable",
                 "Server log discovery is not performed by Tamework. Use the sanitized incident journal included in this bundle.\n"
                         .getBytes(StandardCharsets.UTF_8)));
-        addJournalTail(members);
+        if (withinDeadline(deadlineNs)) {
+            addJournalTail(members);
+        } else {
+            members.put("breadcrumbs.jsonl", partial("bundle_time_limit"));
+        }
+        enforceLimits(members, deadlineNs);
         byte[] manifest = manifest(supportId, members);
         Files.createDirectories(bundleDirectory);
         Path bundle = bundleDirectory.resolve("tamework-persistence-" + supportId + ".zip");
         writeZip(bundle, manifest, members);
         return new BundleResult(supportId, bundle, Files.size(bundle), members.size() + 1);
+    }
+
+    private void enforceLimits(Map<String, BundleMember> members, long deadlineNs) {
+        int remaining = MAX_UNCOMPRESSED_BUNDLE_BYTES - MANIFEST_RESERVE_BYTES;
+        boolean timeExpired = !withinDeadline(deadlineNs);
+        for (Map.Entry<String, BundleMember> entry : members.entrySet()) {
+            BundleMember member = entry.getValue();
+            if (timeExpired || member.content().length > remaining) {
+                entry.setValue(partial(timeExpired ? "bundle_time_limit" : "bundle_size_limit"));
+                continue;
+            }
+            remaining -= member.content().length;
+            timeExpired = !withinDeadline(deadlineNs);
+        }
+    }
+
+    private BundleMember partial(String reason) {
+        return new BundleMember("partial", reason, new byte[0]);
+    }
+
+    private boolean withinDeadline(long deadlineNs) {
+        return System.nanoTime() <= deadlineNs;
     }
 
     private void addJournalTail(Map<String, BundleMember> members) throws Exception {
@@ -230,10 +262,12 @@ public final class PersistenceDiagnosticsService {
                     member.status(), member.error()));
         }
         BundleManifest manifest = new BundleManifest(
-                2, supportId, Instant.now().toString(),
+                3, supportId, Instant.now().toString(),
                 "bounded_redacted_persistence_evidence",
                 TameworkPersistenceTelemetry.PERSISTENCE_SUBSYSTEM_VERSION,
                 implementationVersion(),
+                MAX_UNCOMPRESSED_BUNDLE_BYTES,
+                MAX_EXPORT_MILLIS,
                 "No save or SQLite database is included. Tamework never creates whole-save backups. "
                         + "manifest.json is self-describing and not self-hashed.",
                 List.copyOf(files));
@@ -407,6 +441,7 @@ public final class PersistenceDiagnosticsService {
 
     private record BundleManifest(int formatVersion, String supportId, String createdAt,
                                   String scope, int schemaVersion, String pluginVersion,
+                                  int maxUncompressedBundleBytes, long maxExportMillis,
                                   String note, List<MemberManifest> members) {
     }
 

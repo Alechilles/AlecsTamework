@@ -59,9 +59,14 @@ class PersistenceDiagnosticsServiceTest {
             assertFalse(zip.stream().anyMatch(entry -> entry.getName().endsWith(".sqlite.bak")));
 
             JsonObject manifest = readJson(zip, zip.getEntry("manifest.json"));
+            assertEquals(3, manifest.get("formatVersion").getAsInt());
             assertEquals("bounded_redacted_persistence_evidence",
                     manifest.get("scope").getAsString());
             assertEquals(7, manifest.get("schemaVersion").getAsInt());
+            assertEquals(PersistenceDiagnosticsService.MAX_UNCOMPRESSED_BUNDLE_BYTES,
+                    manifest.get("maxUncompressedBundleBytes").getAsInt());
+            assertEquals(PersistenceDiagnosticsService.MAX_EXPORT_MILLIS,
+                    manifest.get("maxExportMillis").getAsLong());
             assertTrue(manifest.get("note").getAsString().contains("never creates whole-save backups"));
             Map<String, ZipEntry> entries = new HashMap<>();
             zip.stream().forEach(entry -> entries.put(entry.getName(), entry));
