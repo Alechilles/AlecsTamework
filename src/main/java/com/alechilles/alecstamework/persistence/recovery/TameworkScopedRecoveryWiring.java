@@ -17,6 +17,11 @@ public final class TameworkScopedRecoveryWiring {
             PersistenceDomain.OWNER_MUTATION,
             PersistenceDomain.ADMIN_TAMED_SPAWN,
             PersistenceDomain.TAMED_SPAWN,
+            PersistenceDomain.CAPTURE_INTAKE,
+            PersistenceDomain.CAPTURE_RELEASE,
+            PersistenceDomain.BREEDING_BIRTH,
+            PersistenceDomain.DEATH_LOST_RECOVERY,
+            PersistenceDomain.RECALL_RELOCATION,
             PersistenceDomain.RECONCILIATION);
     private static final List<PersistenceDomain> MANAGED_COOP_DOMAINS = List.of(
             PersistenceDomain.MANAGED_COOP_INTAKE,
