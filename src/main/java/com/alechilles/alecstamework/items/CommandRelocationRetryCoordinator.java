@@ -54,6 +54,7 @@ final class CommandRelocationRetryCoordinator {
                 pending.admissionApplying(),
                 pending.physicalMutationAttempted(),
                 liveNpcObservedOutsideDestination,
+                pending.crossWorldTransferAttempted(),
                 pending.crossWorldDestinationInstalled()
         );
         if (finishTerminal(outcome, world, npcUuid, pending, now)) {
@@ -88,6 +89,10 @@ final class CommandRelocationRetryCoordinator {
             }
             case COMMIT_UNCONFIRMED_AS_LOST -> {
                 owner.commitUnconfirmedRelocationAsLost(world, npcUuid, pending, now);
+                yield true;
+            }
+            case COMMIT_UNCONFIRMED_AS_UNLOADED -> {
+                owner.commitUnconfirmedRelocationAsUnloaded(world, npcUuid, pending);
                 yield true;
             }
             case DROP_AS_LOST -> {

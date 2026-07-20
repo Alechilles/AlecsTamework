@@ -533,6 +533,16 @@ public final class CommandNpcRelocationService {
         });
     }
 
+    void commitUnconfirmedRelocationAsUnloaded(
+            World world, UUID npcUuid, PendingRelocation pending) {
+        logTravelDiagnostic(
+                Level.INFO,
+                "Same-world relocation became unobservable after its physical move; "
+                        + "retaining unloaded destination state for npc=" + npcUuid
+        );
+        commitAdmission(world, npcUuid, pending);
+    }
+
     void cancelObservedSameWorldRelocation(
             World world, UUID npcUuid, PendingRelocation pending) {
         if (!removePending(npcUuid, pending)) {

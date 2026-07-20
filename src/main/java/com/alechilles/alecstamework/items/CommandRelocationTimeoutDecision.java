@@ -9,6 +9,7 @@ final class CommandRelocationTimeoutDecision {
                           boolean admissionApplying,
                           boolean physicalMutationAttempted,
                           boolean liveNpcObservedOutsideDestination,
+                          boolean crossWorldTransferAttempted,
                           boolean crossWorldDestinationInstalled) {
         if (!exhausted) {
             return Outcome.RETRY;
@@ -19,12 +20,15 @@ final class CommandRelocationTimeoutDecision {
         if (liveNpcObservedOutsideDestination && !crossWorldDestinationInstalled) {
             return Outcome.CANCEL_CONFIRMED_SAME_WORLD;
         }
-        return Outcome.COMMIT_UNCONFIRMED_AS_LOST;
+        return crossWorldTransferAttempted
+                ? Outcome.COMMIT_UNCONFIRMED_AS_LOST
+                : Outcome.COMMIT_UNCONFIRMED_AS_UNLOADED;
     }
 
     enum Outcome {
         RETRY,
         CANCEL_CONFIRMED_SAME_WORLD,
+        COMMIT_UNCONFIRMED_AS_UNLOADED,
         COMMIT_UNCONFIRMED_AS_LOST,
         DROP_AS_LOST
     }

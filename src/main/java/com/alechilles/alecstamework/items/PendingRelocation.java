@@ -35,6 +35,7 @@ final class PendingRelocation {
     long relocationIssuedAtMs;
     private boolean physicalMutationAttempted;
     private boolean crossWorldDestinationInstalled;
+    private boolean crossWorldTransferAttempted;
     int retryAttempts;
     int lastLoggedRetryAttempts;
     long lastRetryCountedAtMs;
@@ -151,8 +152,13 @@ final class PendingRelocation {
         if (crossWorldTransferInProgress) {
             return false;
         }
+        crossWorldTransferAttempted = true;
         crossWorldTransferInProgress = true;
         return true;
+    }
+
+    synchronized boolean crossWorldTransferAttempted() {
+        return crossWorldTransferAttempted;
     }
 
     synchronized void markCrossWorldTransferFinished() {

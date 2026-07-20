@@ -11,19 +11,27 @@ class CommandRelocationTimeoutDecisionTest {
     void exhaustedSameWorldMoveCancelsInsteadOfCommittingDestinationOrReportingLost() {
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.CANCEL_CONFIRMED_SAME_WORLD,
-                CommandRelocationTimeoutDecision.decide(true, true, true, true, false)
+                CommandRelocationTimeoutDecision.decide(true, true, true, true, false, false)
         );
     }
 
     @Test
-    void exhaustedAmbiguousOrCrossWorldMoveRemainsConservative() {
+    void exhaustedUnobservedSameWorldMoveRemainsUnloaded() {
+        assertEquals(
+                CommandRelocationTimeoutDecision.Outcome.COMMIT_UNCONFIRMED_AS_UNLOADED,
+                CommandRelocationTimeoutDecision.decide(true, true, true, false, false, false)
+        );
+    }
+
+    @Test
+    void exhaustedCrossWorldMoveRemainsConservative() {
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.COMMIT_UNCONFIRMED_AS_LOST,
-                CommandRelocationTimeoutDecision.decide(true, true, true, false, false)
+                CommandRelocationTimeoutDecision.decide(true, true, true, false, true, false)
         );
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.COMMIT_UNCONFIRMED_AS_LOST,
-                CommandRelocationTimeoutDecision.decide(true, true, true, true, true)
+                CommandRelocationTimeoutDecision.decide(true, true, true, true, true, true)
         );
     }
 
@@ -31,11 +39,11 @@ class CommandRelocationTimeoutDecisionTest {
     void nonTerminalRetryAndUnclaimedDropRemainUnchanged() {
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.RETRY,
-                CommandRelocationTimeoutDecision.decide(false, true, true, true, false)
+                CommandRelocationTimeoutDecision.decide(false, true, true, true, false, false)
         );
         assertEquals(
                 CommandRelocationTimeoutDecision.Outcome.DROP_AS_LOST,
-                CommandRelocationTimeoutDecision.decide(true, false, false, false, false)
+                CommandRelocationTimeoutDecision.decide(true, false, false, false, false, false)
         );
     }
 }

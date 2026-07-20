@@ -113,6 +113,18 @@ class PendingRelocationAdmissionStateTest {
     }
 
     @Test
+    void crossWorldAttemptEvidenceSurvivesTransferCompletion() {
+        PendingRelocation pending = pending();
+
+        assertFalse(pending.crossWorldTransferAttempted());
+        assertTrue(pending.markCrossWorldTransferStarted());
+        pending.markCrossWorldTransferFinished();
+
+        assertTrue(pending.crossWorldTransferAttempted());
+        assertFalse(pending.isCrossWorldTransferInProgress());
+    }
+
+    @Test
     void optimisticClaimConflictReturnsToPreparationInsteadOfTerminalizing() {
         PendingRelocation pending = reserved();
         CompanionRelocationAdmissionService.Admission admission = pending.beginApplyClaim();
