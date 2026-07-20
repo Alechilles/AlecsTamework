@@ -39,6 +39,7 @@ final class BreedingHytalePairingService {
     private final BreedingParentPreparationService parentPreparation;
     private final BreedingPairingAttemptSelector attemptSelector;
     private final BreedingPairingPopulationPreparationService populationPreparation;
+    private final TameworkBreedingServices breedingServices;
 
     BreedingHytalePairingService(
             @Nonnull BreedingPartnerService partnerService,
@@ -79,6 +80,7 @@ final class BreedingHytalePairingService {
         TameworkBreedingServices requiredServices = Objects.requireNonNull(
                 services, "services"
         );
+        this.breedingServices = requiredServices;
         BreedingPreparedPairingHandoffService handoff =
                 new BreedingPreparedPairingHandoffService(
                         requiredServices,
@@ -183,6 +185,15 @@ final class BreedingHytalePairingService {
         if (attempt == null) {
             logWarning("Breeding pairing blocked by restart replay safety: "
                     + replayContext(prepared) + " reason=" + selection.reason() + ".");
+            return false;
+        }
+        if (!breedingServices.pairingPersistenceGate().allows(
+                prepared.sourceIdentity().profileId(),
+                prepared.partnerIdentity().profileId(),
+                attempt.jobId(),
+                prepared.worldId())) {
+            logInfo("Breeding pairing admission rejected: status=PERSISTENCE_UNAVAILABLE"
+                    + " reason=breeding-pairing-persistence-unavailable");
             return false;
         }
         BreedingPairingCoordinator.PairingRequest request = request(

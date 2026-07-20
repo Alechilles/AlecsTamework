@@ -4,6 +4,16 @@ import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopAuthorityKey;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentRecord;
 import com.alechilles.alecstamework.persistence.sqlite.ManagedCoopResidentRepository.ResidentState;
+import com.alechilles.alecstamework.persistence.health.PersistenceCoverageRegistry;
+import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
+import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFeatureCircuitRegistry;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRecord;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRegistry;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineState;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
@@ -101,6 +111,48 @@ class ManagedCoopRuntimeSweepPlannerTest {
         assertEquals(ManagedCoopRuntimeSweepPlanner.Branch.NONE, roaming.branch());
         assertFalse(roaming.produce());
         assertEquals(ManagedCoopRuntimeSweepPlanner.Branch.NONE, enclosed.branch());
+    }
+
+    @Test
+    void quarantinedCoopDoesNotBlockAnIndependentCoop() throws Exception {
+        PersistenceCoverageRegistry coverage = readyCoverage();
+        PersistenceQuarantineRegistry quarantines = new PersistenceQuarantineRegistry();
+        PersistenceScopeFactory scopes = new PersistenceScopeFactory(new byte[32]);
+        ManagedCoopPersistenceGate gate = new ManagedCoopPersistenceGate(
+                new PersistenceMutationAvailabilityService(
+                        new PersistenceStorageHealthService(), quarantines,
+                        new PersistenceFeatureCircuitRegistry(), coverage),
+                scopes);
+        ManagedCoopContext blocked = context(0, 2, 6, 18, true, false, 10.0,
+                new String[] {"hen"});
+        ManagedCoopContext healthy = context(20, 2, 6, 18, true, false, 10.0,
+                new String[] {"hen"});
+        var blockedScope = scopes.coopAuthority(blocked.authorityKey().authorityId());
+        quarantines.openImmediate(new PersistenceQuarantineRecord(
+                "q", "incident", blockedScope, PersistenceDomain.MANAGED_COOP_INTAKE,
+                "coop_under_verification", PersistenceQuarantineState.ACTIVE,
+                "evidence", 1L, 1L, 1L, 0L, null));
+        FakeOccupancy occupancy = new FakeOccupancy();
+        ManagedCoopRuntimeSweepPlanner planner = new ManagedCoopRuntimeSweepPlanner(
+                occupancy, ignored -> true, gate);
+
+        var plan = planner.plan(List.of(blocked, healthy),
+                List.of(candidate(8, "hen", 1.0, true),
+                        candidate(9, "hen", 21.0, true)),
+                22, 1_000L, true);
+
+        assertEquals(ManagedCoopRuntimeSweepPlanner.Branch.NONE,
+                plan.coops().get(0).branch());
+        assertEquals(ManagedCoopRuntimeSweepPlanner.Branch.CAPTURE,
+                plan.coops().get(1).branch());
+    }
+
+    private static PersistenceCoverageRegistry readyCoverage() {
+        PersistenceCoverageRegistry coverage = new PersistenceCoverageRegistry();
+        for (PersistenceEvidenceDimension dimension : PersistenceEvidenceDimension.values()) {
+            coverage.publish(dimension, true, "test", 1L);
+        }
+        return coverage;
     }
 
     private static ManagedCoopCaptureCandidate candidate(long id,

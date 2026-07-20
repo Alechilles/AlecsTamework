@@ -49,6 +49,9 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
         importControl = ManagedCoopImportControl.shared();
         importControl.clearAll();
         ManagedCoopRuntimeServices services = persistence.getManagedCoopServices();
+        ManagedCoopPersistenceGate persistenceGate = new ManagedCoopPersistenceGate(
+                persistence.getMutationAvailabilityService(),
+                persistence.getPersistenceScopeFactory());
         BreedingCaptureCancellationService breedingCancellation =
                 new BreedingCaptureCancellationService();
         ManagedCoopCaptureCoordinator captureCoordinator = new ManagedCoopCaptureCoordinator(
@@ -135,7 +138,8 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                 new ManagedCoopReleaseEligibility(
                         population.index(),
                         population.claimOccupancyIndex(),
-                        population.identityResolver()));
+                        population.identityResolver()),
+                persistenceGate);
         authorityEligibility = new ManagedCoopAuthorityEligibilityIndex();
         ManagedCoopStaleEntityPolicy stalePolicy = new ManagedCoopStaleEntityPolicy(
                 services.residentIndex(),
@@ -186,10 +190,12 @@ public final class ManagedCoopRuntimeComposition implements AutoCloseable {
                 UUIDComponent.getComponentType(),
                 projectionIdentityType);
         itemIntakeHandler = new ManagedCoopItemIntakeHandler(
-                services.occupancyService(),
-                persistence.getNpcProfileRepository(),
-                captureCoordinator,
-                itemFinalizer);
+                new ManagedCoopCapturedItemEnvelopeCodec(),
+                services.occupancyService()::resolveCapturePlacement,
+                persistence.getNpcProfileRepository()::resolveProfileId,
+                captureCoordinator::coordinate,
+                itemFinalizer::complete,
+                persistenceGate);
         ManagedCoopCapturedItemAuthoringService itemAuthoring =
                 new ManagedCoopCapturedItemAuthoringService(
                         persistence.getNpcProfileRepository(), snapshots, breedingCancellation);

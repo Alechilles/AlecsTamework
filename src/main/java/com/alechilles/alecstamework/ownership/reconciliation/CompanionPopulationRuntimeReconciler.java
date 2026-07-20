@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationEntry;
 import com.alechilles.alecstamework.ownership.OwnerPopulationIndex;
 import com.alechilles.alecstamework.ownership.OwnerPopulationReadiness;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentReporter;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
 import java.util.Objects;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,6 +59,28 @@ public final class CompanionPopulationRuntimeReconciler
     ) {
         this(ownerIndex, claimIndex, identityResolver, writer, persistenceHealth,
                 new CompanionPopulationObservationPolicy(ownerIndex), liveEvidenceRevision);
+    }
+
+    public CompanionPopulationRuntimeReconciler(
+            @Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull CompanionIdentityResolver identityResolver,
+            @Nonnull CoalescedCompanionPopulationWriter writer,
+            @Nonnull PersistenceHealthService persistenceHealth,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
+            @Nonnull PersistenceIncidentReporter incidents,
+            @Nonnull PersistenceScopeFactory scopes
+    ) {
+        this.ownerIndex = Objects.requireNonNull(ownerIndex, "ownerIndex");
+        this.claimIndex = Objects.requireNonNull(claimIndex, "claimIndex");
+        this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
+        this.writer = Objects.requireNonNull(writer, "writer");
+        this.observationPolicy = new CompanionPopulationObservationPolicy(ownerIndex);
+        this.failureReporter = new CompanionPopulationObservationFailureReporter(
+                persistenceHealth, incidents, scopes);
+        this.liveEvidenceRevision = Objects.requireNonNull(
+                liveEvidenceRevision, "liveEvidenceRevision");
+        this.indexReplay = new CompanionPopulationIndexReplayService(ownerIndex, claimIndex);
     }
 
     CompanionPopulationRuntimeReconciler(
@@ -330,14 +354,13 @@ public final class CompanionPopulationRuntimeReconciler
             queued = false;
         }
         if (!queued) {
-            failureReporter.report(
+            boolean scoped = failureReporter.report(
                     observation,
                     "population-observation-queue-failed",
                     "QUEUE_REJECTED",
                     "observation-queue-failed"
             );
-            ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
-            claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
+            degradeLegacyIndexes(scoped);
         }
     }
 
@@ -378,14 +401,13 @@ public final class CompanionPopulationRuntimeReconciler
                         observation.profileId(), observation.currentNpcUuid()
                 );
             } catch (RuntimeException | LinkageError failure) {
-                failureReporter.report(
+                boolean scoped = failureReporter.report(
                         observation,
                         "population-observation-identity-conflict",
                         "IDENTITY_CACHE_CONFLICT",
                         CompanionPopulationObservationFailureReporter.failureDetail(failure)
                 );
-                ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
-                claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
+                degradeLegacyIndexes(scoped);
                 return;
             }
             if (applyPersistedDeferredObservation(observation, result.revision())) {
@@ -413,12 +435,17 @@ public final class CompanionPopulationRuntimeReconciler
             }
         }
         String reason = result.reason() == null ? result.status().name() : result.reason();
-        failureReporter.report(
+        boolean scoped = failureReporter.report(
                 observation,
                 "population-observation-failed:" + reason,
                 result.status().name(),
                 reason
         );
+        degradeLegacyIndexes(scoped);
+    }
+
+    private void degradeLegacyIndexes(boolean scopedContainment) {
+        if (scopedContainment) return;
         ownerIndex.setReadiness(OwnerPopulationReadiness.DEGRADED);
         claimIndex.setReadiness(ClaimOccupancyReadiness.DEGRADED);
     }

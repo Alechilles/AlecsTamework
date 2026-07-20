@@ -62,6 +62,8 @@ public final class ManagedCoopRuntimeSweepPlanner {
 
     private final OccupancyGateway occupancy;
     private final LifecycleGateway lifecycle;
+    @Nullable
+    private final ManagedCoopPersistenceGate persistenceGate;
     private final Map<String, Long> nextCaptureAt = new HashMap<>();
     private final Map<String, Long> nextReleaseAt = new HashMap<>();
     private final Map<String, Boolean> lastRoaming = new HashMap<>();
@@ -77,7 +79,18 @@ public final class ManagedCoopRuntimeSweepPlanner {
             @Nonnull ManagedCoopOccupancyService occupancy,
             @Nonnull ManagedCoopLifecycleAdmissionGuard lifecycle,
             @Nonnull ReleaseEligibilityGateway releaseEligibility) {
-        this(occupancyGateway(occupancy, releaseEligibility), lifecycleGateway(lifecycle));
+        this(occupancyGateway(occupancy, releaseEligibility), lifecycleGateway(lifecycle), null);
+    }
+
+    ManagedCoopRuntimeSweepPlanner(
+            @Nonnull ManagedCoopOccupancyService occupancy,
+            @Nonnull ManagedCoopLifecycleAdmissionGuard lifecycle,
+            @Nonnull ReleaseEligibilityGateway releaseEligibility,
+            @Nonnull ManagedCoopPersistenceGate persistenceGate) {
+        this(occupancyGateway(occupancy, releaseEligibility),
+                context -> lifecycle.inspect(context).allowed()
+                        && persistenceGate.automation(context).allowed(),
+                persistenceGate);
     }
 
     private static OccupancyGateway occupancyGateway(
@@ -114,13 +127,20 @@ public final class ManagedCoopRuntimeSweepPlanner {
     }
 
     ManagedCoopRuntimeSweepPlanner(@Nonnull OccupancyGateway occupancy) {
-        this(occupancy, context -> true);
+        this(occupancy, context -> true, null);
     }
 
     ManagedCoopRuntimeSweepPlanner(@Nonnull OccupancyGateway occupancy,
                                    @Nonnull LifecycleGateway lifecycle) {
+        this(occupancy, lifecycle, null);
+    }
+
+    ManagedCoopRuntimeSweepPlanner(@Nonnull OccupancyGateway occupancy,
+                                   @Nonnull LifecycleGateway lifecycle,
+                                   @Nullable ManagedCoopPersistenceGate persistenceGate) {
         this.occupancy = Objects.requireNonNull(occupancy, "occupancy");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
+        this.persistenceGate = persistenceGate;
     }
 
     /** Fast preflight used to avoid an entity-store scan when every coop is roaming or throttled. */
@@ -204,6 +224,10 @@ public final class ManagedCoopRuntimeSweepPlanner {
         }
         nextReleaseAt.put(context.coopKey(), saturatedAdd(nowMs, RELEASE_INTERVAL_MS));
         ResidentRecord resident = occupancy.firstHoused(context);
+        if (resident != null && persistenceGate != null
+                && !persistenceGate.release(context, resident).allowed()) {
+            resident = null;
+        }
         return resident == null
                 ? none(context, produce)
                 : new CoopPlan(context, Branch.RELEASE, null, resident, produce, true);
@@ -224,6 +248,10 @@ public final class ManagedCoopRuntimeSweepPlanner {
         }
         ManagedCoopCaptureCandidate candidate = nearestEligible(context, candidates, consumed);
         if (candidate == null) {
+            return none(context, false);
+        }
+        if (persistenceGate != null && !persistenceGate.intake(
+                context, candidate.stableProfileId(), null, true).allowed()) {
             return none(context, false);
         }
         consumed.add(candidate.npcUuid());

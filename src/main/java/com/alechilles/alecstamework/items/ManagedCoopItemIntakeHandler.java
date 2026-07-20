@@ -104,6 +104,8 @@ public final class ManagedCoopItemIntakeHandler {
     private final ProfileGateway profiles;
     private final CaptureGateway captures;
     private final FinalizationGateway finalization;
+    @Nullable
+    private final ManagedCoopPersistenceGate persistenceGate;
     private final ManagedCoopCapturedItemAttemptFactory attempts =
             new ManagedCoopCapturedItemAttemptFactory();
     private final ConcurrentHashMap<String, CompletableFuture<IntakeOutcome>> pending =
@@ -129,12 +131,15 @@ public final class ManagedCoopItemIntakeHandler {
             @Nonnull PlacementGateway placements,
             @Nonnull ProfileGateway profiles,
             @Nonnull CaptureGateway captures,
-            @Nonnull FinalizationGateway finalization) {
+            @Nonnull FinalizationGateway finalization,
+            @Nonnull ManagedCoopPersistenceGate... persistenceGates) {
         this.envelopes = Objects.requireNonNull(envelopes, "envelopes");
         this.placements = Objects.requireNonNull(placements, "placements");
         this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.captures = Objects.requireNonNull(captures, "captures");
         this.finalization = Objects.requireNonNull(finalization, "finalization");
+        if (persistenceGates.length > 1) throw new IllegalArgumentException("persistenceGates");
+        this.persistenceGate = persistenceGates.length == 0 ? null : persistenceGates[0];
     }
 
     /** Starts one managed intake. A returned REJECTED result still means vanilla must stay blocked. */
@@ -163,6 +168,10 @@ public final class ManagedCoopItemIntakeHandler {
             return reject(request, placement != null
                     ? fallback(placement.detail(), "managed_coop_item_capacity_rejected")
                     : "managed_coop_item_capacity_check_failed");
+        }
+        if (persistenceGate != null && !persistenceGate.intake(
+                request.context(), envelope.profileId(), placement.residentSlot(), true).allowed()) {
+            return reject(request, "managed_coop_intake_unavailable");
         }
         final CaptureAttempt attempt;
         try {

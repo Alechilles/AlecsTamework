@@ -82,6 +82,38 @@ public final class PersistenceScopeFactory {
     }
 
     @Nonnull
+    public PersistenceScope coopAuthority(@Nonnull String authorityKey) {
+        return scope(PersistenceScopeType.COOP_AUTHORITY, authorityKey, "managed_coop_catalog");
+    }
+
+    @Nonnull
+    public PersistenceScope coopSlot(@Nonnull String authorityKey, int slot) {
+        return scope(PersistenceScopeType.COOP_SLOT, authorityKey + "|slot=" + slot,
+                "managed_coop_catalog");
+    }
+
+    @Nonnull
+    public PersistenceScope breedingAttempt(@Nonnull String attemptId) {
+        return scope(PersistenceScopeType.BREEDING_ATTEMPT, attemptId, "breeding_replay_journal");
+    }
+
+    @Nonnull
+    public PersistenceScope breedingParent(@Nonnull String profileId) {
+        return scope(PersistenceScopeType.BREEDING_PARENT, profileId, "canonical_profile_catalog");
+    }
+
+    @Nonnull
+    public PersistenceScope world(@Nonnull String worldName) {
+        return scope(PersistenceScopeType.WORLD, worldName, "saved_world_entities");
+    }
+
+    @Nonnull
+    public PersistenceScope featureDomain(@Nonnull PersistenceDomain domain,
+                                          @Nullable String authorityDimension) {
+        return scope(PersistenceScopeType.FEATURE_DOMAIN, domain.name(), authorityDimension);
+    }
+
+    @Nonnull
     private String hash(PersistenceScopeType type, String key) {
         try {
             Mac hmac = Mac.getInstance("HmacSHA256");

@@ -17,6 +17,8 @@ import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulation
 import com.alechilles.alecstamework.ownership.reconciliation.CustomContainerReconciliationRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
+import com.alechilles.alecstamework.persistence.health.BreedingPersistenceMutationGate;
+import com.alechilles.alecstamework.npc.breeding.TameworkBreedingServices;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -158,9 +160,19 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
         BreedingReplayJournalLoader breedingReplayJournal = new BreedingReplayJournalLoader(
                 persistence.getCompanionPopulationRepository(),
                 persistence.getHealthService(),
-                persistence.getCompanionPersistedProjectionEvidenceRegistry()
+                persistence.getCompanionPersistedProjectionEvidenceRegistry(),
+                persistence.getPersistenceCoverageRegistry(),
+                persistence.getIncidentReporter(),
+                persistence.getPersistenceScopeFactory()
         );
         breedingReplayJournal.refresh();
+        BreedingPersistenceMutationGate breedingPersistenceGate =
+                new BreedingPersistenceMutationGate(
+                        persistence.getMutationAvailabilityService(),
+                        persistence.getPersistenceScopeFactory());
+        TameworkBreedingServices.shared().installPairingPersistenceGate(
+                (parentA, parentB, attemptId, worldId) -> breedingPersistenceGate.decide(
+                        parentA, parentB, attemptId, worldId).allowed());
         BreedingPopulationAdmissionService breedingAdmissionService =
                 new BreedingPopulationAdmissionService(
                         companionBatchCoordinator,

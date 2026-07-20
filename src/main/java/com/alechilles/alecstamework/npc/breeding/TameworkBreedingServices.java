@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.breeding;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.DoubleSupplier;
+import java.util.UUID;
 import javax.annotation.Nonnull;
 
 /**
@@ -19,6 +20,7 @@ public final class TameworkBreedingServices implements AutoCloseable {
     private final BreedingPopulationAdmissionService populationAdmissionService;
     private final BreedingJobDiagnosticsService jobDiagnosticsService;
     private final BreedingPreparedPopulationRegistry preparedPopulationRegistry;
+    private volatile PairingPersistenceGate pairingPersistenceGate = PairingPersistenceGate.ALLOW;
 
     /** Creates isolated production services. Prefer {@link #shared()} from runtime entrypoints. */
     public TameworkBreedingServices() {
@@ -91,6 +93,16 @@ public final class TameworkBreedingServices implements AutoCloseable {
         return preparedPopulationRegistry;
     }
 
+    /** Installs the plugin-lifecycle admission gate shared by manual and passive entry points. */
+    public void installPairingPersistenceGate(@Nonnull PairingPersistenceGate gate) {
+        pairingPersistenceGate = Objects.requireNonNull(gate, "gate");
+    }
+
+    @Nonnull
+    public PairingPersistenceGate pairingPersistenceGate() {
+        return pairingPersistenceGate;
+    }
+
     /** Permanently closes one world/store scope and releases its reservations. */
     public void clearScope(@Nonnull Object storeScope) {
         preparedPopulationRegistry.clearScope(storeScope, "breeding-world-scope-closed");
@@ -101,9 +113,22 @@ public final class TameworkBreedingServices implements AutoCloseable {
     /** Permanently closes this service bundle and releases every active reservation. */
     @Override
     public void close() {
+        pairingPersistenceGate = PairingPersistenceGate.DENY;
         preparedPopulationRegistry.clearAll("breeding-runtime-closed");
         jobRegistry.clearAll();
         jobDiagnosticsService.clearAll();
+    }
+
+    /** Value-only persistence boundary; implementations must not retain live game objects. */
+    @FunctionalInterface
+    public interface PairingPersistenceGate {
+        PairingPersistenceGate ALLOW = (parentA, parentB, attemptId, worldId) -> true;
+        PairingPersistenceGate DENY = (parentA, parentB, attemptId, worldId) -> false;
+
+        boolean allows(@Nonnull String parentA,
+                       @Nonnull String parentB,
+                       @Nonnull UUID attemptId,
+                       @Nonnull String worldId);
     }
 
     private static final class SharedHolder {

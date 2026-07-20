@@ -60,7 +60,9 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
                 identityResolver,
                 writer,
                 persistence.getHealthService(),
-                liveEvidenceRevision
+                liveEvidenceRevision,
+                persistence.getIncidentReporter(),
+                persistence.getPersistenceScopeFactory()
         );
         writer.setListener(runtimeReconciler);
         this.startupReconciler = new CompanionPopulationStartupReconciler(

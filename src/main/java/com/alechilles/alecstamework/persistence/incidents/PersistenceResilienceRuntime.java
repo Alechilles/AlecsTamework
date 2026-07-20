@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.persistence.incidents;
 
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
 import com.alechilles.alecstamework.persistence.health.PersistenceCoverageRegistry;
+import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.alechilles.alecstamework.persistence.health.PersistenceStorageHealthService;
 import com.alechilles.alecstamework.persistence.diagnostics.PersistenceIncidentSink;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
@@ -81,6 +82,10 @@ public final class PersistenceResilienceRuntime {
                 quarantines, storageHealth, writeQueue, incidentSink);
         writeQueue.setFailureHandler(new PersistenceIncidentWriteFailureHandler(reporter));
         PersistenceCoverageRegistry coverage = new PersistenceCoverageRegistry();
+        if (storageHealth.acceptsWrites()) {
+            coverage.publish(PersistenceEvidenceDimension.OPERATION_JOURNAL,
+                    true, "schema-v7-loaded", System.currentTimeMillis());
+        }
         PersistenceMutationAvailabilityService availability =
                 new PersistenceMutationAvailabilityService(
                         storageHealth, quarantines, circuits, coverage);

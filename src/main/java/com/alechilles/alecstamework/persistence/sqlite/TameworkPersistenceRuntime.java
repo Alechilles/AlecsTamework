@@ -24,6 +24,11 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineR
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRepository;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceResilienceRuntime;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
+import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.StorageRecoveryProbe;
@@ -303,9 +308,9 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
 
         if (health.isHealthy()) {
             runtime.runLegacyDatImport(logger);
-            runtime.reconcileStaleManagedCoopResidents(logger);
+            boolean coopRepairReady = runtime.reconcileStaleManagedCoopResidents(logger);
             if (health.isHealthy()) {
-                managedCoopServices.compositeIndexRefreshService().refresh();
+                if (coopRepairReady) runtime.publishManagedCoopIndexCoverage();
                 maintenanceService.start();
             }
         }
@@ -610,9 +615,9 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     }
 
     /** Repairs canonically disproved managed-coop residents before indexes become visible. */
-    private void reconcileStaleManagedCoopResidents(@Nullable HytaleLogger logger) {
+    private boolean reconcileStaleManagedCoopResidents(@Nullable HytaleLogger logger) {
         if (!healthService.isHealthy()) {
-            return;
+            return false;
         }
         try {
             ManagedCoopStaleResidentReconciler.RepairResult result =
@@ -622,23 +627,45 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                         "Repaired stale managed-coop residents: " + result.repairedCount()
                 );
             }
+            return true;
         } catch (Exception exception) {
             String reason = "managed_coop_stale_resident_repair_failed";
-            healthService.markDegraded(reason);
-            TameworkTelemetryEvents.recordErrorIfAvailable(
-                    reason,
-                    exception,
-                    TameworkTelemetryContext.persistence(
-                            "managed_coop", "startup_repair", reason,
-                            "Managed-coop startup reconciliation failed."
-                    ).build()
-            );
+            reportManagedCoopCoverageFailure(reason, exception);
             if (logger != null) {
-                logger.at(Level.SEVERE).log(
+                logger.at(Level.WARNING).log(
                         "Managed-coop startup reconciliation failed: " + exception.getMessage()
                 );
             }
+            return false;
         }
+    }
+
+    private void publishManagedCoopIndexCoverage() {
+        var refresh = managedCoopServices.compositeIndexRefreshService().refresh();
+        String reason = refresh.refreshed() ? "loaded" : refresh.detail();
+        resilienceRuntime.coverage().publish(PersistenceEvidenceDimension.MANAGED_COOP_CATALOG,
+                refresh.refreshed(), reason, System.currentTimeMillis());
+        if (!refresh.refreshed()) {
+            reportManagedCoopCoverageFailure("managed_coop_index_refresh_failed", null);
+        }
+    }
+
+    private void reportManagedCoopCoverageFailure(String reason, @Nullable Throwable failure) {
+        resilienceRuntime.coverage().publish(PersistenceEvidenceDimension.MANAGED_COOP_CATALOG,
+                false, reason, System.currentTimeMillis());
+        resilienceRuntime.reporter().report(new PersistenceFailureContext(
+                normalizeReason(reason), PersistenceDomain.MANAGED_COOP_AUTOMATION,
+                PersistenceOperationPhase.PUBLICATION, PersistenceTransactionOutcome.ROLLED_BACK,
+                List.of(resilienceRuntime.scopeFactory().featureDomain(
+                        PersistenceDomain.MANAGED_COOP_AUTOMATION,
+                        PersistenceEvidenceDimension.MANAGED_COOP_CATALOG.key())),
+                true, true, false, false, false,
+                false, true, false, null, failure));
+    }
+
+    private static String normalizeReason(String reason) {
+        if (reason == null || reason.isBlank()) return "managed_coop_coverage_unavailable";
+        return reason.trim().replace('-', '_').replace(':', '_').replace(';', '_');
     }
 
     private long safeSize(@Nonnull Path path) {
