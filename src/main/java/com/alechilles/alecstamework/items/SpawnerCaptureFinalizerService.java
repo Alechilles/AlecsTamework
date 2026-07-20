@@ -10,6 +10,8 @@ import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.ownership.OwnerMutationContext;
 import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -30,13 +32,24 @@ import javax.annotation.Nullable;
  */
 public final class SpawnerCaptureFinalizerService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
+    private final PersistenceCheckpointHook checkpoints;
+
+    public SpawnerCaptureFinalizerService() {
+        this(PersistenceCheckpointHook.NO_OP);
+    }
+
+    SpawnerCaptureFinalizerService(@Nonnull PersistenceCheckpointHook checkpoints) {
+        this.checkpoints = checkpoints;
+    }
 
     public void despawnNpc(Player player, Ref<EntityStore> targetRef, Entity targetEntity) {
         if (player == null) {
             return;
         }
         if (targetEntity instanceof NPCEntity npcEntity) {
+            hit(PersistenceCheckpoint.BEFORE_LIVE_ENTITY_REMOVAL);
             npcEntity.setToDespawn();
+            hit(PersistenceCheckpoint.AFTER_LIVE_ENTITY_REMOVAL);
             return;
         }
         if (targetRef == null || !targetRef.isValid()) {
@@ -49,7 +62,17 @@ public final class SpawnerCaptureFinalizerService {
         Store<EntityStore> store = world.getEntityStore().getStore();
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         if (npc != null) {
+            hit(PersistenceCheckpoint.BEFORE_LIVE_ENTITY_REMOVAL);
             npc.setToDespawn();
+            hit(PersistenceCheckpoint.AFTER_LIVE_ENTITY_REMOVAL);
+        }
+    }
+
+    private void hit(PersistenceCheckpoint checkpoint) {
+        try {
+            checkpoints.hit(checkpoint, null);
+        } catch (Exception failure) {
+            throw new PersistenceCaptureCheckpointException(failure);
         }
     }
 
@@ -266,6 +289,12 @@ public final class SpawnerCaptureFinalizerService {
         }
 
         default void onDurabilityDegraded(@Nonnull String reason) {
+        }
+    }
+
+    private static final class PersistenceCaptureCheckpointException extends RuntimeException {
+        private PersistenceCaptureCheckpointException(Exception cause) {
+            super(cause);
         }
     }
 }

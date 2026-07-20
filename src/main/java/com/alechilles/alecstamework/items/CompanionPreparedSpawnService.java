@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.ownership.CompanionSpawnPopulationAdmissionS
 import com.alechilles.alecstamework.ownership.OwnerComponentMutationService;
 import com.alechilles.alecstamework.ownership.PlannedCompanionSpawnProbe;
 import com.alechilles.alecstamework.ownership.PreparedCompanionSpawnBatch;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import com.alechilles.alecstamework.runtime.dispatch.LeaseBoundWorldDispatcher;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -31,11 +33,18 @@ import javax.annotation.Nullable;
  */
 final class CompanionPreparedSpawnService {
     private final CompanionSpawnPopulationAdmissionService admissionService;
+    private final PersistenceCheckpointHook checkpoints;
     private final CompanionSpawnCommitContinuation commitContinuation =
             new CompanionSpawnCommitContinuation();
 
     CompanionPreparedSpawnService(@Nonnull CompanionSpawnPopulationAdmissionService admissionService) {
+        this(admissionService, PersistenceCheckpointHook.NO_OP);
+    }
+
+    CompanionPreparedSpawnService(@Nonnull CompanionSpawnPopulationAdmissionService admissionService,
+                                  @Nonnull PersistenceCheckpointHook checkpoints) {
         this.admissionService = Objects.requireNonNull(admissionService, "admissionService");
+        this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
     }
 
     boolean spawnAndCommit(
@@ -235,6 +244,7 @@ final class CompanionPreparedSpawnService {
             int unitIndex
     ) {
         try {
+            hit(PersistenceCheckpoint.BEFORE_LIVE_ENTITY_SPAWN);
             Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(
                     store,
                     roleIndex,
@@ -250,6 +260,9 @@ final class CompanionPreparedSpawnService {
                     },
                     null
             );
+            if (spawned != null && spawned.first() != null && spawned.second() != null) {
+                hit(PersistenceCheckpoint.AFTER_LIVE_ENTITY_SPAWN);
+            }
             return spawned != null && spawned.first() != null && spawned.second() != null
                     ? SpawnAttempt.spawned(spawned)
                     : recoverSpawn(world, store, batch.spawn(unitIndex).plannedNpcUuid());
@@ -257,6 +270,14 @@ final class CompanionPreparedSpawnService {
             return SpawnAttempt.absent();
         } catch (RuntimeException | LinkageError failure) {
             return recoverSpawn(world, store, batch.spawn(unitIndex).plannedNpcUuid());
+        }
+    }
+
+    private void hit(PersistenceCheckpoint checkpoint) {
+        try {
+            checkpoints.hit(checkpoint, null);
+        } catch (Exception failure) {
+            throw new PersistenceSpawnCheckpointException(failure);
         }
     }
 
@@ -403,6 +424,12 @@ final class CompanionPreparedSpawnService {
     private static final class SpawnHolderPreparationException extends RuntimeException {
         private SpawnHolderPreparationException(String reason) {
             super(reason);
+        }
+    }
+
+    private static final class PersistenceSpawnCheckpointException extends RuntimeException {
+        private PersistenceSpawnCheckpointException(Exception cause) {
+            super(cause);
         }
     }
 }

@@ -18,7 +18,9 @@ class PersistenceFaultInjectionArchitectureTest {
             "persistence/health/PersistenceMutationAvailabilityService.java",
             "persistence/recovery/PostCommitPublicationRecoveryVerifier.java",
             "persistence/sqlite/PersistenceWriteBatchExecutor.java",
-            "persistence/sqlite/PersistenceWriteQueue.java"
+            "persistence/sqlite/PersistenceWriteQueue.java",
+            "items/CompanionPreparedSpawnService.java",
+            "items/SpawnerCaptureFinalizerService.java"
     );
 
     @Test
