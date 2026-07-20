@@ -117,6 +117,7 @@ XP can be diagnosed with a reason such as not tamed or owned, disabled harvest X
 - `/tw getflockdebug`
 - `/tw coop audit`, `/tw coop import-status`, `/tw coop reconcile`, `/tw coop rollback-preflight`
 - `/tw debugdb integrity`
+- `/tw debugdb health`, `incidents`, `incident`, `retry`, and `export`; exports are redacted, exclude the database/save, and produce a valid partial manifest if their 10-second or 4 MiB evidence budget is reached.
 - `/tw npcclean <roleId>` removes only matching NPCs proven unowned. It is unavailable until both owner-population and claim-occupancy reconciliation are `READY`, and it skips canonical identities with an owner or pending transition.
 - `/tw reloadconfig` (item-feature assets only)
 
