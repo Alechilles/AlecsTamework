@@ -15,6 +15,9 @@ class CommandAppliedStatePersistenceArchitectureTest {
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"
         ));
+        String menuMove = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/CommandMenuMoveService.java"
+        ));
         String links = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandLinkMutationService.java"
         ));
@@ -22,6 +25,8 @@ class CommandAppliedStatePersistenceArchitectureTest {
         assertTrue(execution.contains("new RelocationState(\n                            stateStep.getState()"));
         assertTrue(handler.contains("appliedCommandStates.put"));
         assertTrue(handler.contains("recipients, store, appliedCommandStates"));
+        assertTrue(menuMove.contains("appliedCommandStates.put"));
+        assertTrue(menuMove.contains("store,\n                    appliedCommandStates"));
         assertTrue(links.contains("commandState != null ? commandState : resolveCachedCommandState"));
     }
 

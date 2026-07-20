@@ -22,7 +22,9 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -348,16 +350,30 @@ final class CommandMenuMoveService {
                     : List.of();
 
             int affected = 0;
+            Map<UUID, String> appliedCommandStates = new HashMap<>();
             for (Candidate candidate : loadedRecipients) {
                 StepResult stepResult = executeCommand(context, candidate);
                 if (stepResult.applied) {
                     affected++;
                 }
+                if (stepResult.appliedState != null
+                        && candidate.npc != null
+                        && candidate.npc.getUuid() != null) {
+                    String cachedState = stepResult.appliedState.cachedValue();
+                    if (cachedState != null) {
+                        appliedCommandStates.put(candidate.npc.getUuid(), cachedState);
+                    }
+                }
                 if (stepResult.abortAll) {
                     break;
                 }
             }
-            ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(context.workingItem, loadedRecipients, store);
+            ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(
+                    context.workingItem,
+                    loadedRecipients,
+                    store,
+                    appliedCommandStates
+            );
             if (refreshedLinks != context.workingItem) {
                 context.workingItem = refreshedLinks;
                 context.itemChanged = true;
