@@ -60,7 +60,7 @@ class ManagedCoopReleasePopulationGatewayArchitectureTest {
         String population = Files.readString(ITEMS.resolve(
                 "ManagedCoopReleasePopulationCoordinator.java"));
         String composition = Files.readString(ITEMS.resolve(
-                "ManagedCoopRuntimeComposition.java"));
+                "ManagedCoopRuntimeComposition.java")).replace("\r\n", "\n");
         int commit = population.indexOf("backend.commit(prepared.backendHandle)");
         int publish = population.indexOf("publishFinalizedIndexes(result.reason())", commit);
 

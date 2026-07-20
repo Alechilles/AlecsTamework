@@ -11,7 +11,7 @@ class CommandAppliedStatePersistenceArchitectureTest {
     void successfulSetStateIntentOverridesThePreTickNpcStateSnapshot() throws Exception {
         String execution = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandStepExecutionService.java"
-        ));
+        )).replace("\r\n", "\n");
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java"
         ));

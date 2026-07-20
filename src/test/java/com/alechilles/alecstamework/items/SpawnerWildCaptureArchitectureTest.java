@@ -15,17 +15,21 @@ class SpawnerWildCaptureArchitectureTest {
         int wildBranch = source.indexOf("if (config.isCaptureTamesTarget())");
         int assignPlayer = source.indexOf("retainedOwnerId = player.getUuid()", wildBranch);
         int newOwnership = source.indexOf("OwnerPopulationOperation.NEW_OWNERSHIP", assignPlayer);
-        int capturedLifecycle = source.indexOf("CompanionLifecycleState.CAPTURED", newOwnership);
+        int preparedCapture = source.indexOf("return new PreparedCapture(", newOwnership);
+        int schedule = source.indexOf("scheduler.scheduleWithDurableContext(", preparedCapture);
         int durableExpectation = source.indexOf(
                 "prepared.expectedLiveOwnerId(), prepared.retainedOwnerId()",
-                capturedLifecycle
+                schedule
         );
+        int capturedLifecycle = source.indexOf("CompanionLifecycleState.CAPTURED", durableExpectation);
 
         assertTrue(wildBranch >= 0);
         assertTrue(assignPlayer > wildBranch);
         assertTrue(newOwnership > assignPlayer);
-        assertTrue(capturedLifecycle > newOwnership);
-        assertTrue(durableExpectation > capturedLifecycle);
+        assertTrue(preparedCapture > newOwnership);
+        assertTrue(schedule > preparedCapture);
+        assertTrue(durableExpectation > schedule);
+        assertTrue(capturedLifecycle > durableExpectation);
     }
 
     @Test
@@ -74,10 +78,10 @@ class SpawnerWildCaptureArchitectureTest {
     void captureChannelPropagatesAuthoredParticleTravelDuration() throws Exception {
         String interaction = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
-        ));
+        )).replace("\r\n", "\n");
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
-        ));
+        )).replace("\r\n", "\n");
 
         assertTrue(interaction.contains(
                 "new KeyedCodec<>(\"BeamNativeDurationSeconds\", Codec.DOUBLE)"
@@ -91,10 +95,10 @@ class SpawnerWildCaptureArchitectureTest {
     void captureChannelCanReverseParticlesFromTargetToHeldItem() throws Exception {
         String interaction = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
-        ));
+        )).replace("\r\n", "\n");
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
-        ));
+        )).replace("\r\n", "\n");
 
         assertTrue(interaction.contains("new KeyedCodec<>(\"BeamFromTarget\", Codec.BOOLEAN)"));
         assertTrue(interaction.contains("beamFromTarget,"));
@@ -106,10 +110,10 @@ class SpawnerWildCaptureArchitectureTest {
     void captureChannelPropagatesHomingMoteSettingsWithoutChangingTerminalGates() throws Exception {
         String interaction = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/interactions/TameworkCaptureChannelInteraction.java"
-        ));
+        )).replace("\r\n", "\n");
         String handler = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"
-        ));
+        )).replace("\r\n", "\n");
 
         assertTrue(interaction.contains("new KeyedCodec<>(\"HomingProjectileEnabled\", Codec.BOOLEAN)"));
         assertTrue(interaction.contains("new KeyedCodec<>(\"HomingProjectileModelId\", Codec.STRING)"));

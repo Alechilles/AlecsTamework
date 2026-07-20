@@ -69,7 +69,7 @@ class OwnerRestoreMutationContinuationArchitectureTest {
     @Test
     void captureAndReleaseDespawnOnlyFromAppliedContinuations() throws IOException {
         String capture = readItem("SpawnerCaptureFinalizerService.java");
-        int captureSchedule = capture.indexOf("scheduler.schedule(");
+        int captureSchedule = capture.indexOf("scheduler.scheduleWithDurableContext(");
         int captureApplied = capture.indexOf("public void onApplied", captureSchedule);
         int captureDespawn = capture.indexOf(
                 "despawnNpc(player, context.npcRef(), liveNpc)", captureApplied
