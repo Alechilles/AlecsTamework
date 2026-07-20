@@ -34,6 +34,17 @@ public final class SqliteMigrationBackupService {
                                               @Nonnull SqliteConnectionManager connectionManager,
                                               @Nonnull SqliteSchemaMigrator schemaMigrator,
                                               int targetVersion) throws Exception {
+        return backupBeforeVersion(sqlitePath, connectionManager, schemaMigrator, targetVersion,
+                MigrationBackupContext.runtimeDefault());
+    }
+
+    /** Creates only the Tamework SQLite snapshot and records optional external backup metadata. */
+    @Nonnull
+    public Optional<Path> backupBeforeVersion(@Nonnull Path sqlitePath,
+                                              @Nonnull SqliteConnectionManager connectionManager,
+                                              @Nonnull SqliteSchemaMigrator schemaMigrator,
+                                              int targetVersion,
+                                              @Nonnull MigrationBackupContext context) throws Exception {
         if (!Files.exists(sqlitePath) || Files.size(sqlitePath) == 0L) {
             return Optional.empty();
         }
@@ -48,8 +59,8 @@ public final class SqliteMigrationBackupService {
                 statement.execute("VACUUM INTO '" + escapedPath + "'");
             }
             try {
-                verifySnapshot(backupPath);
-                writeManifest(sqlitePath, backupPath, sourceVersion, targetVersion);
+                verifySnapshot(backupPath, sourceVersion);
+                writeManifest(sqlitePath, backupPath, sourceVersion, targetVersion, context);
             } catch (Exception invalidSnapshot) {
                 Files.deleteIfExists(manifestPath(backupPath));
                 Files.deleteIfExists(backupPath);
@@ -59,7 +70,7 @@ public final class SqliteMigrationBackupService {
         }
     }
 
-    private void verifySnapshot(Path backupPath) throws Exception {
+    private void verifySnapshot(Path backupPath, int sourceVersion) throws Exception {
         if (!Files.exists(backupPath) || Files.size(backupPath) == 0L) {
             throw new IllegalStateException("SQLite migration snapshot was not created: " + backupPath);
         }
@@ -70,12 +81,23 @@ public final class SqliteMigrationBackupService {
                 throw new IllegalStateException("SQLite migration snapshot failed integrity verification.");
             }
         }
+        if (sourceVersion > 0) {
+            try (Connection backup = DriverManager.getConnection("jdbc:sqlite:" + backupPath.toAbsolutePath());
+                 Statement statement = backup.createStatement();
+                 ResultSet schema = statement.executeQuery(
+                         "SELECT COALESCE(MAX(version), 0) FROM schema_migrations")) {
+                if (!schema.next() || schema.getInt(1) != sourceVersion) {
+                    throw new IllegalStateException("SQLite migration snapshot schema verification failed.");
+                }
+            }
+        }
     }
 
     private void writeManifest(Path sqlitePath,
                                Path backupPath,
                                int sourceVersion,
-                               int targetVersion) throws Exception {
+                               int targetVersion,
+                               MigrationBackupContext context) throws Exception {
         JsonObject manifest = new JsonObject();
         manifest.addProperty("formatVersion", 1);
         manifest.addProperty("createdAt", Instant.now().toString());
@@ -83,10 +105,16 @@ public final class SqliteMigrationBackupService {
         manifest.addProperty("snapshotFile", backupPath.getFileName().toString());
         manifest.addProperty("sourceSchemaVersion", sourceVersion);
         manifest.addProperty("targetSchemaVersion", targetVersion);
+        manifest.addProperty("sourcePluginVersion", context.sourcePluginVersion());
+        manifest.addProperty("targetPluginVersion", context.targetPluginVersion());
         manifest.addProperty("snapshotSizeBytes", Files.size(backupPath));
         manifest.addProperty("snapshotSha256", sha256(backupPath));
         manifest.addProperty("scope", "tamework_sqlite_only");
         manifest.addProperty("hytaleSaveBackupOwnedBy", "hytale_server_operator");
+        if (context.externalHytaleBackupReference() != null) {
+            manifest.addProperty("externalHytaleBackupReference",
+                    context.externalHytaleBackupReference());
+        }
 
         Path manifestPath = manifestPath(backupPath);
         Path temporary = manifestPath.resolveSibling(manifestPath.getFileName() + ".tmp");
@@ -161,5 +189,33 @@ public final class SqliteMigrationBackupService {
             suffix++;
         }
         return candidate;
+    }
+
+    /** Value-only metadata; the external reference never causes a Hytale backup operation. */
+    public record MigrationBackupContext(@Nonnull String sourcePluginVersion,
+                                         @Nonnull String targetPluginVersion,
+                                         String externalHytaleBackupReference) {
+        public MigrationBackupContext {
+            sourcePluginVersion = version(sourcePluginVersion, "unknown_not_persisted");
+            targetPluginVersion = version(targetPluginVersion, "development");
+            externalHytaleBackupReference = reference(externalHytaleBackupReference);
+        }
+
+        static MigrationBackupContext runtimeDefault() {
+            return new MigrationBackupContext("unknown_not_persisted",
+                    SqliteMigrationBackupService.class.getPackage().getImplementationVersion(), null);
+        }
+
+        private static String version(String value, String fallback) {
+            if (value == null || value.isBlank()) return fallback;
+            String normalized = value.trim().replaceAll("[^A-Za-z0-9._+\\-]", "_");
+            return normalized.substring(0, Math.min(80, normalized.length()));
+        }
+
+        private static String reference(String value) {
+            if (value == null || value.isBlank()) return null;
+            String normalized = value.trim().replaceAll("[^A-Za-z0-9._:\\-]", "_");
+            return normalized.substring(0, Math.min(160, normalized.length()));
+        }
     }
 }
