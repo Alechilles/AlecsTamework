@@ -205,5 +205,7 @@ The candidate verifier also runs the fail-closed live-rehearsal verifier self-te
 passes its user-assisted copied-world/client and operator-selected rollback matrix, validate the completed
 manifest with `scripts/tools/verify-persistence-live-rehearsal.ps1`. The schema, minimum repetitions,
 privacy boundary, performance budgets, and command are documented in
-[`Persistence-Live-Rehearsal.md`](Persistence-Live-Rehearsal.md). This verifier validates evidence only;
+[`Persistence-Live-Rehearsal.md`](Persistence-Live-Rehearsal.md). It independently hashes the supplied
+candidate JAR and rejects observations dated before the frozen candidate or materially in the future.
+This verifier validates evidence only;
 it does not install the JAR, operate the client, copy a save, or create/restore a Hytale backup.

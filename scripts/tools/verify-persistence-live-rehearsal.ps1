@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string] $CandidateManifest,
+    [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string] $CandidateArtifact,
     [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string] $RehearsalManifest,
     [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string] $OutputPath
 )
@@ -42,6 +43,20 @@ function Get-RehearsalNumber {
         Fail-Rehearsal "$Context.$Name must be numeric"
     }
     return [double]$value
+}
+
+function Get-RehearsalTimestamp {
+    param([object] $Object, [string] $Name, [string] $Context)
+    $value = Get-RehearsalProperty $Object $Name $Context
+    if ($value -is [DateTimeOffset]) { return $value.ToUniversalTime() }
+    if ($value -is [DateTime]) { return ([DateTimeOffset]$value).ToUniversalTime() }
+    $text = [string]$value
+    if ([string]::IsNullOrWhiteSpace($text)) { Fail-Rehearsal "$Context.$Name is blank" }
+    $parsed = [DateTimeOffset]::MinValue
+    if (-not [DateTimeOffset]::TryParse($text, [ref]$parsed)) {
+        Fail-Rehearsal "$Context.$Name is not a timestamp"
+    }
+    return $parsed.ToUniversalTime()
 }
 
 function Assert-RehearsalSha256 {
@@ -100,18 +115,42 @@ function Assert-Observation {
 }
 
 $candidatePath = (Resolve-Path -LiteralPath $CandidateManifest -ErrorAction Stop).Path
+$candidateArtifactPath = (Resolve-Path -LiteralPath $CandidateArtifact -ErrorAction Stop).Path
 $rehearsalPath = (Resolve-Path -LiteralPath $RehearsalManifest -ErrorAction Stop).Path
+if (-not (Test-Path -LiteralPath $candidateArtifactPath -PathType Leaf)) {
+    Fail-Rehearsal "candidate artifact must be a file"
+}
 $candidate = Get-Content -LiteralPath $candidatePath -Raw | ConvertFrom-Json
 $rehearsal = Get-Content -LiteralPath $rehearsalPath -Raw | ConvertFrom-Json
 
+if ((Get-RehearsalNumber $candidate "evidenceSchemaVersion" "candidate") -ne 1) {
+    Fail-Rehearsal "candidate.evidenceSchemaVersion must equal 1"
+}
+if ((Get-RehearsalString (Get-RehearsalProperty $candidate "releaseRehearsal" "candidate") `
+        "exactRepositoryAndPackageGates" "candidate.releaseRehearsal") -cne "passed") {
+    Fail-Rehearsal "candidate exact repository and package gates have not passed"
+}
+$candidateBackupBoundary = Get-RehearsalProperty $candidate "backupBoundary" "candidate"
+Assert-RehearsalFalse `
+    (Get-RehearsalBoolean $candidateBackupBoundary "wholeSaveBackupCreatedByTamework" `
+        "candidate.backupBoundary") `
+    "candidate.backupBoundary.wholeSaveBackupCreatedByTamework"
+$candidateGeneratedAt = Get-RehearsalTimestamp $candidate "generatedAtUtc" "candidate"
+if ($candidateGeneratedAt -gt [DateTimeOffset]::UtcNow.AddMinutes(5)) {
+    Fail-Rehearsal "candidate.generatedAtUtc is in the future"
+}
 if ((Get-RehearsalNumber $rehearsal "evidenceSchemaVersion" "rehearsal") -ne 1) {
     Fail-Rehearsal "rehearsal.evidenceSchemaVersion must equal 1"
 }
-$candidateArtifact = Get-RehearsalProperty (Get-RehearsalProperty $candidate "package" "candidate") `
+$candidateArtifactRecord = Get-RehearsalProperty (Get-RehearsalProperty $candidate "package" "candidate") `
     "artifact" "candidate.package"
 $candidateSha = Assert-RehearsalSha256 `
-    (Get-RehearsalString $candidateArtifact "sha256" "candidate.package.artifact") `
+    (Get-RehearsalString $candidateArtifactRecord "sha256" "candidate.package.artifact") `
     "candidate.package.artifact.sha256"
+$actualCandidateSha = (Get-FileHash -LiteralPath $candidateArtifactPath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualCandidateSha -cne $candidateSha) {
+    Fail-Rehearsal "actual candidate artifact hash does not match the candidate manifest"
+}
 $reportedSha = Assert-RehearsalSha256 `
     (Get-RehearsalString $rehearsal "candidateArtifactSha256" "rehearsal") `
     "rehearsal.candidateArtifactSha256"
@@ -126,10 +165,12 @@ foreach ($name in @("tamework", "alecs-telemetry", "telemetry-platform")) {
     $verifiedSources[$name] = $actual
 }
 
-$completedAt = Get-RehearsalString $rehearsal "completedAtUtc" "rehearsal"
-$parsedCompletedAt = [DateTimeOffset]::MinValue
-if (-not [DateTimeOffset]::TryParse($completedAt, [ref]$parsedCompletedAt)) {
-    Fail-Rehearsal "rehearsal.completedAtUtc is not a timestamp"
+$parsedCompletedAt = Get-RehearsalTimestamp $rehearsal "completedAtUtc" "rehearsal"
+if ($parsedCompletedAt -lt $candidateGeneratedAt) {
+    Fail-Rehearsal "rehearsal.completedAtUtc predates the frozen candidate"
+}
+if ($parsedCompletedAt -gt [DateTimeOffset]::UtcNow.AddMinutes(5)) {
+    Fail-Rehearsal "rehearsal.completedAtUtc is in the future"
 }
 
 $requiredCategories = @("fresh", "current", "old-managed-coop", "high-population", "historical-conflict")
@@ -291,6 +332,7 @@ $output = [ordered]@{
     verifiedAtUtc = [DateTime]::UtcNow.ToString("o")
     status = "passed"
     candidateArtifactSha256 = $candidateSha
+    candidateManifestSha256 = (Get-FileHash -LiteralPath $candidatePath -Algorithm SHA256).Hash.ToLowerInvariant()
     sourceCommits = $verifiedSources
     rehearsalManifestSha256 = (Get-FileHash -LiteralPath $rehearsalPath -Algorithm SHA256).Hash.ToLowerInvariant()
     fixtures = $fixtureEvidence

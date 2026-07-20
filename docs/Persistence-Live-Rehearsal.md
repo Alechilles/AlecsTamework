@@ -5,7 +5,7 @@ The schema-v7 single cutover has two different evidence stages:
 1. `verify-persistence-release-candidate.ps1` proves source, automated, package, privacy, and isolated-runtime prerequisites for one exact candidate.
 2. `verify-persistence-live-rehearsal.ps1` validates the operator-observed client, copied-world, performance, and rollback gates that automation cannot honestly infer.
 
-The second verifier does not operate Hytale, install a JAR, create a backup, copy a save, or decide that an observation passed. It validates a deliberately completed manifest, binds it to the frozen candidate, and emits a privacy-safe summary. An unfilled template fails closed.
+The second verifier does not operate Hytale, install a JAR, create a backup, copy a save, or decide that an observation passed. It independently hashes the supplied candidate JAR, validates a deliberately completed manifest, binds it to the frozen source/package manifest and candidate lifetime, and emits a privacy-safe summary. An unfilled template fails closed.
 
 ## Files
 
@@ -82,6 +82,7 @@ Copy the template into a private rehearsal workspace, replace every placeholder 
 ```powershell
 .\scripts\tools\verify-persistence-live-rehearsal.ps1 `
   -CandidateManifest ".\target\persistence-release-evidence\candidate.json" `
+  -CandidateArtifact ".\target\Alec's Tamework! v2.17.0.jar" `
   -RehearsalManifest "C:\rehearsal\persistence-live-rehearsal.json" `
   -OutputPath "C:\rehearsal\persistence-live-rehearsal-verified.json"
 ```
@@ -94,4 +95,4 @@ The self-test is:
 .\scripts\tools\tests\test-verify-persistence-live-rehearsal.ps1
 ```
 
-It proves the happy path and rejects artifact drift, fixture reuse, mixed-JAR boots, startup/tick regressions, insufficient domain repetitions, unresolved warnings, Tamework whole-save backup claims, mismatched rollback SQLite state, missing sign-off, and the unfilled template.
+It proves the happy path and rejects manifest or actual-JAR drift, pre-candidate or future-dated observations, fixture reuse, mixed-JAR boots, startup/tick regressions, insufficient domain repetitions, unresolved warnings, Tamework whole-save backup claims, mismatched rollback SQLite state, missing sign-off, and the unfilled template.

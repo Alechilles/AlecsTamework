@@ -48,11 +48,13 @@ function Invoke-LiveTestVerifier {
         [string] $PowerShell,
         [string] $Verifier,
         [string] $CandidatePath,
+        [string] $CandidateArtifactPath,
         [string] $RehearsalPath,
         [string] $OutputPath
     )
     $text = & $PowerShell -NoLogo -NoProfile -File $Verifier `
-        -CandidateManifest $CandidatePath -RehearsalManifest $RehearsalPath `
+        -CandidateManifest $CandidatePath -CandidateArtifact $CandidateArtifactPath `
+        -RehearsalManifest $RehearsalPath `
         -OutputPath $OutputPath 2>&1 | Out-String
     return [pscustomobject]@{ exitCode = $LASTEXITCODE; text = $text }
 }
@@ -65,12 +67,37 @@ function Assert-LiveTestRejects {
         [string] $Root,
         [string] $PowerShell,
         [string] $Verifier,
-        [string] $CandidatePath
+        [string] $CandidatePath,
+        [string] $CandidateArtifactPath
     )
     $inputPath = Join-Path $Root "$Name.json"
     $outputPath = Join-Path $Root "$Name-output.json"
     Write-LiveTestJson $inputPath $Rehearsal
-    $result = Invoke-LiveTestVerifier $PowerShell $Verifier $CandidatePath $inputPath $outputPath
+    $result = Invoke-LiveTestVerifier $PowerShell $Verifier $CandidatePath $CandidateArtifactPath `
+        $inputPath $outputPath
+    Assert-LiveTest ($result.exitCode -ne 0) "$Name must be rejected"
+    Assert-LiveTest ($result.text -match $Pattern) "$Name must report '$Pattern': $($result.text)"
+    Assert-LiveTest (-not (Test-Path -LiteralPath $outputPath)) "$Name must not emit passing output"
+}
+
+function Assert-LiveTestCandidateRejects {
+    param(
+        [string] $Name,
+        [object] $Candidate,
+        [object] $Rehearsal,
+        [string] $Pattern,
+        [string] $Root,
+        [string] $PowerShell,
+        [string] $Verifier,
+        [string] $CandidateArtifactPath
+    )
+    $candidatePath = Join-Path $Root "$Name-candidate.json"
+    $inputPath = Join-Path $Root "$Name.json"
+    $outputPath = Join-Path $Root "$Name-output.json"
+    Write-LiveTestJson $candidatePath $Candidate
+    Write-LiveTestJson $inputPath $Rehearsal
+    $result = Invoke-LiveTestVerifier $PowerShell $Verifier $candidatePath $CandidateArtifactPath `
+        $inputPath $outputPath
     Assert-LiveTest ($result.exitCode -ne 0) "$Name must be rejected"
     Assert-LiveTest ($result.text -match $Pattern) "$Name must report '$Pattern': $($result.text)"
     Assert-LiveTest (-not (Test-Path -LiteralPath $outputPath)) "$Name must not emit passing output"
@@ -84,7 +111,9 @@ $testRoot = Join-Path ([IO.Path]::GetTempPath()) `
     ("tamework-live-rehearsal-tests-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 
-$candidateHash = "a" * 64
+$candidateArtifactPath = Join-Path $testRoot "candidate.jar"
+[IO.File]::WriteAllText($candidateArtifactPath, "exact candidate bytes", [Text.UTF8Encoding]::new($false))
+$candidateHash = (Get-FileHash -LiteralPath $candidateArtifactPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $evidenceHash = "b" * 64
 $snapshotHash = "c" * 64
 $priorJarHash = "d" * 64
@@ -94,16 +123,20 @@ $commits = [ordered]@{
     "telemetry-platform" = "3" * 40
 }
 $candidate = [ordered]@{
+    evidenceSchemaVersion = 1
+    generatedAtUtc = [DateTimeOffset]::UtcNow.AddMinutes(-1).ToString("o")
     sources = @(
         [ordered]@{ name = "tamework"; commit = $commits.tamework; clean = $true },
         [ordered]@{ name = "alecs-telemetry"; commit = $commits["alecs-telemetry"]; clean = $true },
         [ordered]@{ name = "telemetry-platform"; commit = $commits["telemetry-platform"]; clean = $true }
     )
     package = [ordered]@{ artifact = [ordered]@{ sha256 = $candidateHash } }
+    backupBoundary = [ordered]@{ wholeSaveBackupCreatedByTamework = $false }
+    releaseRehearsal = [ordered]@{ exactRepositoryAndPackageGates = "passed" }
 }
 $rehearsal = [ordered]@{
     evidenceSchemaVersion = 1
-    completedAtUtc = "2026-07-20T12:00:00Z"
+    completedAtUtc = [DateTimeOffset]::UtcNow.ToString("o")
     candidateArtifactSha256 = $candidateHash
     sourceCommits = $commits
     fixtures = @(
@@ -172,11 +205,14 @@ try {
     $validOutput = Join-Path $testRoot "valid-output.json"
     Write-LiveTestJson $candidatePath $candidate
     Write-LiveTestJson $validPath $rehearsal
-    $valid = Invoke-LiveTestVerifier $powerShell $verifier $candidatePath $validPath $validOutput
+    $valid = Invoke-LiveTestVerifier $powerShell $verifier $candidatePath $candidateArtifactPath `
+        $validPath $validOutput
     Assert-LiveTest ($valid.exitCode -eq 0) "valid rehearsal must pass: $($valid.text)"
     $verified = Get-Content -LiteralPath $validOutput -Raw | ConvertFrom-Json
     Assert-LiveTest ($verified.status -ceq "passed") "verified output is passed"
     Assert-LiveTest ($verified.candidateArtifactSha256 -ceq $candidateHash) "candidate hash is retained"
+    Assert-LiveTest ($verified.candidateManifestSha256 -match '^[a-f0-9]{64}$') `
+        "candidate manifest hash is retained"
     Assert-LiveTest (-not $verified.backupBoundary.wholeSaveBackupCreatedByTamework) `
         "verified output preserves the no-whole-save-backup boundary"
     Assert-LiveTest ($verified.PSObject.Properties["rehearsalPath"] -eq $null) `
@@ -185,54 +221,88 @@ try {
     $mismatch = Copy-LiveTestObject $rehearsal
     $mismatch.candidateArtifactSha256 = "e" * 64
     Assert-LiveTestRejects "artifact-mismatch" $mismatch "artifact hash does not match" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
+
+    $substitutedArtifactPath = Join-Path $testRoot "substituted.jar"
+    [IO.File]::WriteAllText($substitutedArtifactPath, "different bytes", [Text.UTF8Encoding]::new($false))
+    Assert-LiveTestRejects "actual-artifact-mismatch" $rehearsal `
+        "actual candidate artifact hash does not match" `
+        $testRoot $powerShell $verifier $candidatePath $substitutedArtifactPath
+
+    $ungatedCandidate = Copy-LiveTestObject $candidate
+    $ungatedCandidate.releaseRehearsal.exactRepositoryAndPackageGates = "failed"
+    Assert-LiveTestCandidateRejects "ungated-candidate" $ungatedCandidate $rehearsal `
+        "exact repository and package gates have not passed" `
+        $testRoot $powerShell $verifier $candidateArtifactPath
+
+    $unsafeCandidate = Copy-LiveTestObject $candidate
+    $unsafeCandidate.backupBoundary.wholeSaveBackupCreatedByTamework = $true
+    Assert-LiveTestCandidateRejects "candidate-whole-save-backup" $unsafeCandidate $rehearsal `
+        "candidate.backupBoundary.wholeSaveBackupCreatedByTamework" `
+        $testRoot $powerShell $verifier $candidateArtifactPath
+
+    $futureCandidate = Copy-LiveTestObject $candidate
+    $futureCandidate.generatedAtUtc = [DateTimeOffset]::UtcNow.AddMinutes(10).ToString("o")
+    Assert-LiveTestCandidateRejects "future-candidate" $futureCandidate $rehearsal `
+        "candidate.generatedAtUtc is in the future" `
+        $testRoot $powerShell $verifier $candidateArtifactPath
 
     $sameFixture = Copy-LiveTestObject $rehearsal
     foreach ($fixture in $sameFixture.fixtures) { $fixture.id = "fixture-shared" }
     Assert-LiveTestRejects "shared-fixture" $sameFixture "duplicate fixture id" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $wrongBoot = Copy-LiveTestObject $rehearsal
     $wrongBoot.fixtures[0].bootArtifactSha256[1] = "e" * 64
     Assert-LiveTestRejects "wrong-boot-artifact" $wrongBoot "used a different artifact" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $slowStartup = Copy-LiveTestObject $rehearsal
     $slowStartup.fixtures[0].candidateServerReadyMs = 12001
     Assert-LiveTestRejects "startup-budget" $slowStartup "startup regression exceeds" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $shortObservation = Copy-LiveTestObject $rehearsal
     $shortObservation.observations.PSObject.Properties["manual-and-passive-breeding-repeat"].Value.attemptCount = 3
     Assert-LiveTestRejects "short-observation" $shortObservation "attemptCount must" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $slowTick = Copy-LiveTestObject $rehearsal
     $slowTick.performance.candidateTickP95Ms = 4.251
     Assert-LiveTestRejects "tick-budget" $slowTick "tick p95 exceeds" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $unresolved = Copy-LiveTestObject $rehearsal
     $unresolved.unresolvedWarnings = @("something-unclassified")
     Assert-LiveTestRejects "unresolved-warning" $unresolved "unresolvedWarnings must be empty" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $unsafeBackup = Copy-LiveTestObject $rehearsal
     $unsafeBackup.backupBoundary.wholeSaveBackupCreatedByTamework = $true
     Assert-LiveTestRejects "whole-save-backup" $unsafeBackup "wholeSaveBackupCreatedByTamework must be false" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $wrongRollbackState = Copy-LiveTestObject $rehearsal
     $wrongRollbackState.rollback.matchingPreV7SqliteSha256 = "e" * 64
     Assert-LiveTestRejects "rollback-sqlite" $wrongRollbackState "must match the verified pre-v7" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
     $unsigned = Copy-LiveTestObject $rehearsal
     $unsigned.operatorSignedOff = $false
     Assert-LiveTestRejects "unsigned" $unsigned "operatorSignedOff must be true" `
-        $testRoot $powerShell $verifier $candidatePath
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
 
-    $templateResult = Invoke-LiveTestVerifier $powerShell $verifier $candidatePath $template `
+    $predating = Copy-LiveTestObject $rehearsal
+    $predating.completedAtUtc = [DateTimeOffset]::UtcNow.AddMinutes(-2).ToString("o")
+    Assert-LiveTestRejects "predating-candidate" $predating "predates the frozen candidate" `
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
+
+    $future = Copy-LiveTestObject $rehearsal
+    $future.completedAtUtc = [DateTimeOffset]::UtcNow.AddMinutes(10).ToString("o")
+    Assert-LiveTestRejects "future-completion" $future "completedAtUtc is in the future" `
+        $testRoot $powerShell $verifier $candidatePath $candidateArtifactPath
+
+    $templateResult = Invoke-LiveTestVerifier $powerShell $verifier $candidatePath $candidateArtifactPath $template `
         (Join-Path $testRoot "template-output.json")
     Assert-LiveTest ($templateResult.exitCode -ne 0) "unfilled template must fail closed"
     Assert-LiveTest ($templateResult.text -match "completedAtUtc|candidateArtifactSha256") `

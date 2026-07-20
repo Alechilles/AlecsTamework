@@ -87,7 +87,11 @@ class PersistenceReleaseCandidateVerifierTest {
         String template = Files.readString(LIVE_TEMPLATE);
 
         for (String required : List.of(
-                "candidateArtifactSha256", "sourceCommits", "five distinct fixtures",
+                "CandidateArtifact", "actual candidate artifact hash does not match",
+                "candidateManifestSha256", "candidateArtifactSha256", "sourceCommits",
+                "candidate exact repository and package gates have not passed",
+                "predates the frozen candidate", "completedAtUtc is in the future",
+                "five distinct fixtures",
                 "login-tame-and-two-spawns", "managed-coop-old-and-new-multi-resident",
                 "manual-and-passive-breeding-repeat", "inventory-and-storage-capture-release",
                 "cleanup-death-lost-revival", "same-and-cross-world-recall",
