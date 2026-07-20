@@ -1,0 +1,19 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "FeatureCircuits": {
+    "AllPersistenceMutations": true,
+    "TamingOwnership": true,
+    "AdminTamedSpawn": true,
+    "CaptureIntake": true,
+    "CaptureRelease": true,
+    "ManagedCoopIntake": true,
+    "ManagedCoopRelease": true,
+    "ManagedCoopAutomation": true,
+    "BreedingPairing": true,
+    "BreedingBirth": true,
+    "RecallRelocation": true,
+    "DeathLostRecovery": true,
+    "AutomaticScopedRecovery": true
+  }
+}

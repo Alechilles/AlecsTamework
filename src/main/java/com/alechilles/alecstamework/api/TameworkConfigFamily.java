@@ -21,6 +21,7 @@ public enum TameworkConfigFamily {
     LEVELING,
     TRAIT,
     TALENT,
-    DEBUG
+    DEBUG,
+    PERSISTENCE
 }
 

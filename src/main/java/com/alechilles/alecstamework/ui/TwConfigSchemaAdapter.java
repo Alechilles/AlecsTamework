@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
+import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
@@ -159,6 +160,7 @@ final class TwConfigSchemaAdapter {
             case TALENT -> TwTalentConfig.CODEC;
             case COOP -> TwCoopConfig.CODEC;
             case DEBUG -> TwDebugConfig.CODEC;
+            case PERSISTENCE -> TwPersistenceConfig.CODEC;
             case OTHER -> null;
         };
     }

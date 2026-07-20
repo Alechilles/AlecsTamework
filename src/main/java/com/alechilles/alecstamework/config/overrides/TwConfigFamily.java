@@ -17,6 +17,7 @@ import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -50,6 +51,7 @@ public enum TwConfigFamily {
     TALENT("talent", "Talents", "Tamework/Talents", true, true),
     COOP("coop", "Coops", "Tamework/Items/Coops", true, true),
     DEBUG("debug", "Debug", "Tamework/Debug", true, true),
+    PERSISTENCE("persistence", "Persistence", "Tamework/Persistence", true, true),
     OTHER("other", "Other", "", false, false);
 
     private final String id;
@@ -153,6 +155,8 @@ public enum TwConfigFamily {
             case TALENT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTalentConfig.getAssetStore();
             case COOP -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwCoopConfig.getAssetStore();
             case DEBUG -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwDebugConfig.getAssetStore();
+            case PERSISTENCE ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwPersistenceConfig.getAssetStore();
             case OTHER -> null;
         };
     }

@@ -99,6 +99,23 @@ class TwConfigSchemaAdapterTest {
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "Rules.Conditions.Percent"));
     }
 
+    @Test
+    void persistenceSchemaExposesLocalFeatureCircuitDefaults() {
+        TwConfigAssetDescriptor descriptor =
+                descriptor(TwConfigFamily.PERSISTENCE, "TwPersistenceDefault");
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields =
+                TwConfigSchemaAdapter.fieldsFor(descriptor);
+
+        assertFalse(fields.isEmpty());
+        assertNotNull(TwConfigEditorFieldPolicy.findField(
+                fields, "FeatureCircuits.AllPersistenceMutations"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(
+                fields, "FeatureCircuits.ManagedCoopAutomation"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(
+                fields, "FeatureCircuits.AutomaticScopedRecovery"));
+    }
+
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family, String assetId) {
         return new TwConfigAssetDescriptor(
                 family,

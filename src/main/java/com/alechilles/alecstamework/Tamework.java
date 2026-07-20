@@ -52,6 +52,7 @@ import com.alechilles.alecstamework.config.assets.TwMountedGlideConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
+import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -311,6 +312,7 @@ public class Tamework extends JavaPlugin {
     private boolean traitAssetsRegistered;
     private boolean talentAssetsRegistered;
     private boolean debugAssetsRegistered;
+    private boolean persistenceAssetsRegistered;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
@@ -531,6 +533,7 @@ public class Tamework extends JavaPlugin {
         registerTraitAssets();
         registerTalentAssets();
         registerDebugAssets();
+        registerPersistenceAssets();
         CreditorIntegration.setup(this);
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
@@ -790,6 +793,7 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
+        applyPersistenceCircuitDefaults();
         ownerPopulationRuntime = TameworkPopulationRuntimeLifecycle.initialize(
                 persistenceRuntime, getLogger()
         );
@@ -1707,6 +1711,17 @@ public class Tamework extends JavaPlugin {
         );
     }
 
+    private void applyPersistenceCircuitDefaults() {
+        if (persistenceRuntime == null) return;
+        TwPersistenceConfig config = TwPersistenceConfig.resolveActive();
+        persistenceRuntime.getFeatureCircuitRegistry().applyDefaults(
+                config.featureCircuitDefaults());
+        getLogger().at(Level.INFO).log(
+                "Applied persistence circuit defaults from "
+                        + (config.getId() == null ? "<default>" : config.getId())
+                        + "; durable administrator overrides retain precedence.");
+    }
+
     public int reloadItemFeatureConfigs() {
         if (itemFeatureRegistry == null) {
             return 0;
@@ -2140,6 +2155,24 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsRemoved);
         debugAssetsRegistered = true;
+    }
+
+    private void registerPersistenceAssets() {
+        if (persistenceAssetsRegistered) return;
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwPersistenceConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Persistence")
+                        .setCodec(TwPersistenceConfig.CODEC)
+                        .setKeyFunction(TwPersistenceConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class, TwPersistenceConfig.class,
+                this::onPersistenceAssetsLoaded);
+        getEventRegistry().register(
+                RemovedAssetsEvent.class, TwPersistenceConfig.class,
+                this::onPersistenceAssetsRemoved);
+        persistenceAssetsRegistered = true;
     }
 
     private void onSpawnerAssetsLoaded(
@@ -2577,6 +2610,26 @@ public class Tamework extends JavaPlugin {
         TwDebugConfig.clearCache();
         applyDebugConfigDefaults();
         emitExperimentalConfigReload(TameworkConfigFamily.DEBUG, event.getRemovedAssets());
+    }
+
+    private void onPersistenceAssetsLoaded(
+            LoadedAssetsEvent<String, TwPersistenceConfig,
+                    DefaultAssetMap<String, TwPersistenceConfig>> event) {
+        TwPersistenceConfig.clearCache();
+        applyPersistenceCircuitDefaults();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(
+                    TameworkConfigFamily.PERSISTENCE, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onPersistenceAssetsRemoved(
+            RemovedAssetsEvent<String, TwPersistenceConfig,
+                    DefaultAssetMap<String, TwPersistenceConfig>> event) {
+        TwPersistenceConfig.clearCache();
+        applyPersistenceCircuitDefaults();
+        emitExperimentalConfigReload(
+                TameworkConfigFamily.PERSISTENCE, event.getRemovedAssets());
     }
 
     private int loadSpawnerItemAssets() {
