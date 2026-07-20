@@ -1,0 +1,109 @@
+@SlotSize = 58;
+@SlotHeight = 74;
+@SlotGap = 6;
+@BindingStyle = (
+    FontName: "Secondary",
+    FontSize: 10,
+    RenderBold: true,
+    TextColor: #eaf7fb,
+    Alignment: Center
+);
+@BindingBackground = PatchStyle(
+    TexturePath: "Tamework/AvatarFlightControls/InputBadge.png",
+    Border: 8
+);
+
+Group #Root {
+    Anchor: (Bottom: 250, Width: 250, Height: @SlotHeight);
+    LayoutMode: Left;
+
+    Group #LaunchControl {
+        Anchor: (Width: @SlotSize, Height: @SlotHeight);
+
+        Group #Frame {
+            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
+
+            Group #Icon {
+                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+                Background: "Tamework/AvatarFlightControls/Launch.png";
+            }
+        }
+
+        Label #Binding {
+            Anchor: (Top: 50, Left: 3, Width: 52, Height: 19);
+            Background: @BindingBackground;
+            Text: "CROUCH";
+            Style: @BindingStyle;
+        }
+    }
+
+    Group { Anchor: (Width: @SlotGap); }
+
+    Group #UpwardFlapControl {
+        Anchor: (Width: @SlotSize, Height: @SlotHeight);
+
+        Group #Frame {
+            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
+
+            Group #Icon {
+                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+                Background: "Tamework/AvatarFlightControls/UpwardFlap.png";
+            }
+        }
+
+        Label #Binding {
+            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
+            Background: @BindingBackground;
+            Text: "LMB";
+            Style: @BindingStyle;
+        }
+    }
+
+    Group { Anchor: (Width: @SlotGap); }
+
+    Group #ForwardBoostControl {
+        Anchor: (Width: @SlotSize, Height: @SlotHeight);
+
+        Group #Frame {
+            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
+
+            Group #Icon {
+                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+                Background: "Tamework/AvatarFlightControls/ForwardBoost.png";
+            }
+        }
+
+        Label #Binding {
+            Anchor: (Top: 50, Left: 16, Width: 26, Height: 19);
+            Background: @BindingBackground;
+            Text: "Q";
+            Style: @BindingStyle;
+        }
+    }
+
+    Group { Anchor: (Width: @SlotGap); }
+
+    Group #AirbrakeControl {
+        Anchor: (Width: @SlotSize, Height: @SlotHeight);
+
+        Group #Frame {
+            Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+            Background: "Tamework/AvatarFlightControls/ControlFrame.png";
+
+            Group #Icon {
+                Anchor: (Top: 0, Left: 0, Width: @SlotSize, Height: @SlotSize);
+                Background: "Tamework/AvatarFlightControls/Airbrake.png";
+            }
+        }
+
+        Label #Binding {
+            Anchor: (Top: 50, Left: 12, Width: 34, Height: 19);
+            Background: @BindingBackground;
+            Text: "RMB";
+            Style: @BindingStyle;
+        }
+    }
+}
