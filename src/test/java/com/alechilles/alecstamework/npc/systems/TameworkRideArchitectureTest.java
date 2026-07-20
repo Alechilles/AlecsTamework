@@ -25,9 +25,17 @@ class TameworkRideArchitectureTest {
                 "actions",
                 "InteractionMountEffects.java"
         );
+        String modes = readMain(
+                "com", "alechilles", "alecstamework", "npc", "actions", "InteractionMountMode.java"
+        );
+        String dispatcher = readMain(
+                "com", "alechilles", "alecstamework", "npc", "actions", "InteractionMountModeDispatcher.java"
+        );
         String tameworkRideMount = methodBody(content, "private boolean applyTameworkRideMount", "private void maybeLogTameworkRideMountDebug");
 
-        assertTrue(content.contains("MOUNT_MODE_TAMEWORK_RIDE"));
+        assertTrue(modes.contains("case \"tameworkride\" -> TAMEWORK_RIDE"));
+        assertTrue(dispatcher.contains("case TAMEWORK_RIDE -> rideMount.apply(request)"));
+        assertTrue(content.contains("request -> applyTameworkRideMount("));
         assertTrue(content.contains("applyTameworkRideMount"));
         assertFalse(tameworkRideMount.contains("new MountedComponent("));
         assertFalse(tameworkRideMount.contains("MountController.Minecart"));
@@ -241,9 +249,11 @@ class TameworkRideArchitectureTest {
         assertTrue(handler.contains("ClientMovement.PACKET_ID"));
         assertTrue(handler.contains("MountMovement.PACKET_ID"));
         assertTrue(handler.contains("MouseInteraction.PACKET_ID"));
+        assertTrue(handler.contains("SyncInteractionChains.PACKET_ID"));
         assertTrue(handler.contains("findRegisteredHandler(ClientMovement.PACKET_ID)"));
         assertTrue(handler.contains("findRegisteredHandler(MountMovement.PACKET_ID)"));
         assertTrue(handler.contains("findRegisteredHandler(MouseInteraction.PACKET_ID)"));
+        assertTrue(handler.contains("findRegisteredHandler(SyncInteractionChains.PACKET_ID)"));
         assertTrue(handler.contains("ACTIVE_TAMEWORK_RIDES"));
         assertTrue(handler.contains("public static void registerRide"));
         assertTrue(handler.contains("public static void unregisterRide"));
@@ -266,6 +276,7 @@ class TameworkRideArchitectureTest {
         assertTrue(handler.contains("delegate(clientMovementDelegate, packet)"));
         assertTrue(handler.contains("delegate(mountMovementDelegate, packet)"));
         assertTrue(handler.contains("delegate(mouseInteractionDelegate, packet)"));
+        assertTrue(handler.contains("delegate(interactionChainsDelegate, packet)"));
         assertTrue(handler.indexOf("if (!tryHandleTameworkClientMovement(packet))")
                 < handler.indexOf("delegate(clientMovementDelegate, packet)"));
         assertTrue(handler.contains("packet.wishMovement"));

@@ -76,6 +76,28 @@ class AvatarFlightModelServiceArchitectureTest {
     }
 
     @Test
+    void avatarFlightRestoreRejectsMissingCosmeticFallbackModel() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        int fallbackCreation = source.indexOf("CosmeticsModule.get().createModel(skin.getPlayerSkin())");
+        int modelWrite = source.indexOf("store.putComponent(ref, ModelComponent.getComponentType()", fallbackCreation);
+        assertTrue(fallbackCreation >= 0);
+        assertTrue(modelWrite > fallbackCreation);
+        assertTrue(source.substring(fallbackCreation, modelWrite).contains("if (fallbackModel == null)"),
+                "restart recovery must not install a ModelComponent containing a null cosmetic model");
+    }
+
+    @Test
+    void avatarFlightModelCompositionAppliesOptionalCameraOverrides() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("cameraWithPositionOverride(baseModel.getCamera(), modelSettings)"));
+        assertTrue(source.contains("modelSettings.getEyeHeight().floatValue()"));
+        assertTrue(source.contains("baseCamera.getYaw()"));
+        assertTrue(source.contains("baseCamera.getPitch()"));
+    }
+
+    @Test
     void avatarFlightInjectsOnlyStandardTameworkPoseIds() throws Exception {
         String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
 

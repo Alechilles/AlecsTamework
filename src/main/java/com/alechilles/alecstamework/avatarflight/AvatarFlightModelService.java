@@ -62,6 +62,9 @@ public final class AvatarFlightModelService {
             return false;
         }
         Model fallbackModel = CosmeticsModule.get().createModel(skin.getPlayerSkin());
+        if (fallbackModel == null) {
+            return false;
+        }
         store.putComponent(ref, ModelComponent.getComponentType(), new ModelComponent(fallbackModel));
         skin.setNetworkOutdated();
         return true;

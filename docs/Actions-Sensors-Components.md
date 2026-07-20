@@ -19,6 +19,7 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkNeedsResourceConsume`: Consumes configured needs resource targets (food/water seek flows).
 - `TameworkNeedsResourceRejectTarget`: Temporarily suppresses a failed needs seek target so later scans can choose another reachable source.
 - `TameworkNeedsResourceReleaseTarget`: Releases a successful needs seek target reservation without marking it as failed.
+- `TameworkForgetHostileTarget`: Removes the current sensor target from hostile target memory so it cannot be reacquired.
 - `TameworkRejectPositionTarget`: Temporarily suppresses a failed generic position target for the current NPC.
 - `TameworkHarvestDrop`: Drops harvest outputs with trait-aware bonus support.
 - `TameworkDebugMessage`: Emits debug text from instruction flows.
@@ -64,6 +65,8 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `TameworkTraitsComponent`
 - `TameworkAttachmentsComponent`
 - `TameworkLifeStageComponent`
+- `TameworkAvatarFlightMountSession` (player-side NPC/config link, phase, origin, last safe ground, and dismount hold state)
+- `TameworkAvatarFlightSource` (source-NPC reverse link and role/transform/visibility recovery snapshot)
 
 ## Item Interactions
 - `TameworkSpawn`

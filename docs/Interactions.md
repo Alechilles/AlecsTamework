@@ -113,6 +113,9 @@ Behavior:
 - `MountGlideMovementConfig` is optional and defaults to `Mount`. Use a custom movement config only when the role should override normal grounded mount movement.
 - Existing legacy `TameworkMountedGlide` motion controller or body motion entries may remain in older templates for compatibility, but current mounted glide behavior does not require authors to add them.
 - See [Mounted Glide Controller](Mounted-Glide.md) for the full setup and tuning fields.
+- Roles can use transformed-player flight by setting `MountMode` to `TameworkAvatarFlight` and `AvatarFlightConfig` to an enabled config asset id. Prompt and action eligibility both reject missing configs, dead participants, and existing native/ride/glide/avatar mount state.
+- NPC-backed avatar flight hides and parks the same companion entity until dismount. Press F to dismount immediately; grounded back+crouch remains an alternate hold input. Clean disconnects queue normal lifecycle cleanup, missing riders restore through the source watchdog, and server restarts invalidate persisted mount pairs before either side can resume. Forced cleanup also covers death, world transfer, missing sources, disabled configs, and orphaned sessions.
+- See [Avatar Flight](Avatar-Flight.md) for setup, controls, lifecycle behavior, and config fields.
 
 ### ModeCycle
 Common fields:

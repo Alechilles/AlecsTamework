@@ -35,6 +35,7 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Applies mount-related interaction effects. */
 final class InteractionMountEffects {
@@ -47,8 +48,7 @@ final class InteractionMountEffects {
     private static final String MOUNT_GLIDE_MOVEMENT_CONFIG_PARAM = "MountGlideMovementConfig";
     private static final String DEFAULT_MOUNT_GLIDE_MOVEMENT_CONFIG_ID = DEFAULT_MOUNT_MOVEMENT_CONFIG_ID;
     private static final String MOUNT_MODE_PARAM = "MountMode";
-    private static final String MOUNT_MODE_TAMEWORK_RIDE = "TameworkRide";
-    private static final String MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE = "TameworkMountedGlide";
+    static final String AVATAR_FLIGHT_CONFIG_PARAM = "AvatarFlightConfig";
     private static final String MOUNT_RIDE_STATE_PARAM = "MountRideState";
     private static final String MOUNT_GLIDE_STATE_PARAM = "MountGlideState";
     private static final String MOUNT_GLIDE_CONTROLLER_PARAM = "MountGlideController";
@@ -56,9 +56,19 @@ final class InteractionMountEffects {
     private static final String MOUNT_FLIGHT_CONTROLLER_PARAM = "MountFlightController";
 
     private final ActionTameworkInteract owner;
+    private final AvatarFlightMountStarter avatarFlightStarter = new AvatarFlightMountStarter();
+    private final InteractionMountModeDispatcher dispatcher;
 
     InteractionMountEffects(ActionTameworkInteract owner) {
         this.owner = owner;
+        this.dispatcher = new InteractionMountModeDispatcher(
+                this::applyNativeMount,
+                request -> applyTameworkRideMount(
+                        request.npcRef(), request.playerRef(), request.role(), request.store()),
+                request -> applyTameworkMountedGlideMount(
+                        request.npcRef(), request.playerRef(), request.role(), request.store()),
+                this::applyAvatarFlightMount
+        );
     }
 
     // Attempts to mount the interacting player onto the NPC and configure movement.
@@ -85,12 +95,25 @@ final class InteractionMountEffects {
         if (store.getArchetype(playerRef).contains(DeathComponent.getComponentType())) {
             return failMount(role, "resolve", "player_dead");
         }
-        if (MOUNT_MODE_TAMEWORK_RIDE.equalsIgnoreCase(mountMode)) {
-            return applyTameworkRideMount(npcRef, playerRef, role, store);
+        InteractionMountMode resolvedMode = InteractionMountMode.parse(mountMode);
+        if (!InteractionMountMode.isKnown(mountMode)) {
+            logUnknownMountMode(role, mountMode);
         }
-        if (MOUNT_MODE_TAMEWORK_MOUNTED_GLIDE.equalsIgnoreCase(mountMode)) {
-            return applyTameworkMountedGlideMount(npcRef, playerRef, role, store);
-        }
+        return dispatcher.dispatch(resolvedMode, new InteractionMountRequest(
+                npcRef, playerRef, role, store, mountMode == null ? "" : mountMode));
+    }
+
+    private boolean applyAvatarFlightMount(InteractionMountRequest request) {
+        String configId = owner.getRoleStringParam(request.role(), AVATAR_FLIGHT_CONFIG_PARAM);
+        return avatarFlightStarter.start(
+                request.store(), request.npcRef(), request.playerRef(), request.role(), configId);
+    }
+
+    private boolean applyNativeMount(InteractionMountRequest request) {
+        Ref<EntityStore> npcRef = request.npcRef();
+        Ref<EntityStore> playerRef = request.playerRef();
+        Role role = request.role();
+        Store<EntityStore> store = request.store();
         ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
         if (mountType == null) {
             return failMount(role, "native", "npc_mount_component_type_unavailable");
@@ -143,6 +166,16 @@ final class InteractionMountEffects {
                 anchorZ,
                 movementConfigId);
         return true;
+    }
+
+    private void logUnknownMountMode(@Nullable Role role, @Nullable String mountMode) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null) return;
+        instance.getLogger().at(Level.WARNING).log(
+                "Unknown Tamework MountMode '%s' for role=%s; using native mount behavior.",
+                mountMode,
+                role == null ? "<null>" : role.getRoleName()
+        );
     }
 
     private boolean applyTameworkMountedGlideMount(Ref<EntityStore> npcRef,

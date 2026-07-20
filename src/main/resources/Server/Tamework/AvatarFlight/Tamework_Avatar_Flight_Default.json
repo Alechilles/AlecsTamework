@@ -185,6 +185,12 @@
     "SeatOffsetZ": -0.25,
     "EquipmentResendIntervalMs": 250.0
   },
+  "Mounting": {
+    "DismountHoldMs": 750.0,
+    "RequireGroundedDismount": true,
+    "RestoreNpcAtLastSafeGround": true,
+    "PlayerDismountOffset": 1.75
+  },
   "Debug": {
     "LogControllerTicks": true,
     "LogInputTransitions": false

@@ -33,6 +33,7 @@ final class TwAvatarFlightConfigInheritance {
         inheritAnimation(target, parent, nested(nestedByTop, "Animation"), top);
         inheritAbilityAnimation(target, parent, nested(nestedByTop, "AbilityAnimation"), top);
         inheritRiderVisual(target, parent, nested(nestedByTop, "RiderVisual"), top);
+        inheritMounting(target, parent, nested(nestedByTop, "Mounting"), top);
         inheritDebug(target, parent, nested(nestedByTop, "Debug"), top);
     }
 
@@ -234,6 +235,17 @@ final class TwAvatarFlightConfigInheritance {
         else if (keys != null && parent.abilityAnimation != null) {
             if (target.abilityAnimation == null) target.abilityAnimation = parent.abilityAnimation;
             else target.abilityAnimation.inheritMissingFrom(parent.abilityAnimation, keys);
+        }
+    }
+
+    private static void inheritMounting(TwAvatarFlightConfig target,
+                                        TwAvatarFlightConfig parent,
+                                        @Nullable Set<String> keys,
+                                        Set<String> top) {
+        if (!top.contains("Mounting")) target.mounting = parent.mounting;
+        else if (keys != null && parent.mounting != null) {
+            if (target.mounting == null) target.mounting = parent.mounting;
+            else target.mounting.inheritMissingFrom(parent.mounting, keys);
         }
     }
 

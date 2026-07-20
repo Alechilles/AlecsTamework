@@ -20,14 +20,19 @@ import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetEditorPackService;
 import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
-import com.alechilles.alecstamework.avatarflight.AvatarFlightActivator;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightDisconnectRecoveryService;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightEquipmentVisualSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightHudSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightInputComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountSessionSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightMovementSystem;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualComponent;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightRiderVisualCleanupSystem;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceComponent;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceRecoverySystem;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightSourceVisibilitySystem;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -288,7 +293,6 @@ public class Tamework extends JavaPlugin {
     private CrashTelemetryService crashTelemetryService;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
-    private final AvatarFlightActivator avatarFlightActivator = new AvatarFlightActivator();
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -335,6 +339,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, AvatarFlightComponent> avatarFlightComponentType;
     private ComponentType<EntityStore, AvatarFlightInputComponent> avatarFlightInputComponentType;
     private ComponentType<EntityStore, AvatarFlightRiderVisualComponent> avatarFlightRiderVisualComponentType;
+    private ComponentType<EntityStore, AvatarFlightMountSessionComponent> avatarFlightMountSessionComponentType;
+    private ComponentType<EntityStore, AvatarFlightSourceComponent> avatarFlightSourceComponentType;
     private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
@@ -559,6 +565,8 @@ public class Tamework extends JavaPlugin {
         avatarFlightComponentType = components.avatarFlight();
         avatarFlightInputComponentType = components.avatarFlightInput();
         avatarFlightRiderVisualComponentType = components.avatarFlightRiderVisual();
+        avatarFlightMountSessionComponentType = components.avatarFlightMountSession();
+        avatarFlightSourceComponentType = components.avatarFlightSource();
         levelingComponentType = components.leveling();
         traitsComponentType = components.traits();
         talentsComponentType = components.talents();
@@ -596,6 +604,16 @@ public class Tamework extends JavaPlugin {
                         MovementStatesComponent.getComponentType(),
                         HeadRotation.getComponentType(),
                         TransformComponent.getComponentType()
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightMountSessionSystem(
+                        avatarFlightMountSessionComponentType,
+                        avatarFlightSourceComponentType,
+                        avatarFlightInputComponentType,
+                        UUIDComponent.getComponentType(),
+                        TransformComponent.getComponentType(),
+                        DeathComponent.getComponentType()
                 )
         );
         getEntityStoreRegistry().registerSystem(
@@ -834,6 +852,20 @@ public class Tamework extends JavaPlugin {
                 )
         );
         getEntityStoreRegistry().registerSystem(new CaptureChannelVfxSystem());
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightSourceRecoverySystem(
+                        avatarFlightSourceComponentType,
+                        avatarFlightMountSessionComponentType,
+                        UUIDComponent.getComponentType(),
+                        DeathComponent.getComponentType()
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new AvatarFlightSourceVisibilitySystem(
+                        avatarFlightSourceComponentType,
+                        EntityTrackerSystems.EntityViewer.getComponentType()
+                )
+        );
         SimpleClaimsTamedDamagePolicy damagePolicy = new SimpleClaimsTamedDamagePolicy();
         api = new TameworkApiImpl(
                 persistenceRuntime, apiEventBus,
@@ -1077,7 +1109,7 @@ public class Tamework extends JavaPlugin {
         TameworkEventRegistrationSupport.registerGlobal(
                 this,
                 PlayerDisconnectEvent.class,
-                avatarFlightActivator::onPlayerDisconnect,
+                new AvatarFlightDisconnectRecoveryService()::onPlayerDisconnect,
                 "avatar flight disconnect cleanup"
         );
         if (settingsAnnouncementService != null) {
@@ -2738,6 +2770,14 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, AvatarFlightRiderVisualComponent> getAvatarFlightRiderVisualComponentType() {
         return avatarFlightRiderVisualComponentType;
+    }
+
+    public ComponentType<EntityStore, AvatarFlightMountSessionComponent> getAvatarFlightMountSessionComponentType() {
+        return avatarFlightMountSessionComponentType;
+    }
+
+    public ComponentType<EntityStore, AvatarFlightSourceComponent> getAvatarFlightSourceComponentType() {
+        return avatarFlightSourceComponentType;
     }
 
     public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {

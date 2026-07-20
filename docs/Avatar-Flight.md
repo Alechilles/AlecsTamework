@@ -2,6 +2,22 @@
 
 Avatar flight is the transformed-player flight path used by dragon-style mounts. The real player becomes the flight model, while Tamework can attach a visual rider copy for the seated player appearance.
 
+## NPC Mounting
+
+Avatar flight can start from an ordinary optimized `Mount` interaction. Set the NPC role parameters `MountMode` to `TameworkAvatarFlight` and `AvatarFlightConfig` to an enabled `TwAvatarFlightConfig` asset id. The normal mount entry still owns tame, owner, crouch, and mountable requirements, so no species-specific Java is needed.
+
+During the ride, Tamework keeps the same source NPC entity and its ownership, name, needs, traits, health, inventory, and integration components. The NPC is placed in an inert role and hidden from interaction/tracking while the real player uses the configured transformed model. Dismount and forced recovery restore that same NPC instead of spawning a copy.
+
+```json
+"IsMountable": { "Value": true },
+"MountMode": { "Value": "TameworkAvatarFlight" },
+"AvatarFlightConfig": { "Value": "MyDragonAvatarFlight" }
+```
+
+The player and source NPC carry paired `TameworkAvatarFlightMountSession` and `TameworkAvatarFlightSource` components. Death, disconnect, world transfer, source removal, disabled/missing config, and orphan recovery use the same idempotent cleanup path. Cross-world mounted travel is not supported; transferring worlds ends the session.
+
+On a clean disconnect, Tamework queues that cleanup on the player's world thread before the entity is discarded. If the player is already gone after a client crash, the source-side watchdog detects the missing rider and restores the parked NPC. Persisted mount pairs also include a server-runtime epoch, so a pair saved before a server crash or restart is treated as stale instead of silently resuming in the next process. Stale player sessions restore the ordinary player model from the saved skin when the process-local pre-mount model snapshot is no longer available. Exceptional cleanup restores the companion at its original mount position; the last-safe-ground option applies only to normal dismounts.
+
 ## Controls
 
 - Forward movement starts or resumes glide.
@@ -13,6 +29,7 @@ Avatar flight is the transformed-player flight path used by dragon-style mounts.
 - Q with Flightmaster's Reins performs a forward boost. If avatar flight is not already active, the boost starts avatar flight before applying the boost impulse.
 - Crouch applies direct downward movement while airborne unless it began as a grounded launch charge.
 - Entering liquid exits custom flight velocity and returns control to native swimming until the player leaves the liquid.
+- Press F to immediately dismount from an NPC-backed avatar-flight session. Grounded back + crouch remains an alternate hold-to-dismount input; the default hold is `750ms`, and back intent suppresses launch charging while the hold is active.
 - Forward boost uses the configured boost input/action and spends Vigour. Q is the default reliable input path because airborne sprint is not consistently detectable.
 
 While transformed but not actively using Tamework's custom flight velocity, grounded movement-state ownership stays with the base player client. Tamework still reads packet input for launch and Reins actions and suppresses unsafe item/action overlay animation slots, but it does not rewrite grounded walk/run/sprint movement state. When custom flight ends, Tamework sends one cleanup pass for flight-owned movement and pose animation overrides, then native grounded animation selection resumes.
@@ -91,6 +108,15 @@ The generator warns when player-style locomotion sets that the native transforme
 - `Model.EyeHeight`: optional runtime eye-height override. It positions the first-person viewpoint vertically relative to the transformed player's entity root and also affects other engine eye-height consumers.
 
 The camera override preserves the ModelAsset's existing yaw and pitch target settings. The current client camera contract cannot anchor directly to an arbitrary model-attachment node such as the fake rider's `Head`, so `EyeHeight` provides the closest stable first-person alignment.
+
+### Mounting
+
+- `DismountHoldMs`: grounded back+crouch hold duration required for voluntary dismount.
+- `RequireGroundedDismount`: blocks voluntary dismount while airborne when true.
+- `RestoreNpcAtLastSafeGround`: restores the source at the most recent grounded avatar transform for a normal dismount; exceptional cleanup uses the original mount origin.
+- `PlayerDismountOffset`: distance used to place the player behind the restored NPC.
+
+Omitting `Mounting` inherits the complete parent section. An explicit `Mounting` object overrides only its explicit nested keys and inherits the remaining values.
 
 ### Animation
 

@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDebugCombat
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDebugMessage;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCaptureUntamed;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyInteract;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkForgetHostileTarget;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestAlarm;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestDrop;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
@@ -114,6 +115,10 @@ public final class TameworkNpcBuilderRegistrar {
             actionFactory.add(BuilderActionTameworkDebugMessage.BUILDER_ID, BuilderActionTameworkDebugMessage::new);
             actionFactory.add(BuilderActionTameworkDenyInteract.BUILDER_ID, BuilderActionTameworkDenyInteract::new);
             actionFactory.add(BuilderActionTameworkDenyCaptureUntamed.BUILDER_ID, BuilderActionTameworkDenyCaptureUntamed::new);
+            actionFactory.add(
+                    BuilderActionTameworkForgetHostileTarget.BUILDER_ID,
+                    BuilderActionTameworkForgetHostileTarget::new
+            );
             actionFactory.add(BuilderActionTameworkHarvestAlarm.BUILDER_ID, BuilderActionTameworkHarvestAlarm::new);
             actionFactory.add(BuilderActionTameworkHarvestDrop.BUILDER_ID, BuilderActionTameworkHarvestDrop::new);
             actionFactory.add(BuilderActionTameworkInteract.BUILDER_ID, BuilderActionTameworkInteract::new);

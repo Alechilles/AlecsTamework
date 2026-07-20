@@ -37,6 +37,7 @@
 - Added configurable one-shot animation hooks for successful avatar-flight upward flaps, forward boosts, and airbrake activation, including selectable Action or Movement slot layering, per-cue durations, and graceful validation against each transformed model.
 - Added an AvatarFlight asset namespace generator script that can create fake-rider-safe model and animation variants while preserving `Origin` for injected pitch/bank poses.
 - AvatarFlight namespace generation now warns when grounded player locomotion aliases (`Sprint`, `JumpSprint`, and `StepSprint`) are missing from transformed-player avatar models.
+- Added asset-configured avatar-flight mounting for NPC interactions. Tamed mounts now transform their rider into the configured flight model, hide the same companion for the full session, and restore it with F, grounded back+crouch, or automatic lifecycle recovery. Disconnect and crash recovery restores orphaned companions, while server restarts invalidate persisted mount pairs and restore the player's ordinary skin model instead of resuming a stale transformation.
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed

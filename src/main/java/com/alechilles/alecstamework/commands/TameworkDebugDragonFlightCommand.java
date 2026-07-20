@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.avatarflight.AvatarFlightActivator;
 import com.alechilles.alecstamework.avatarflight.AvatarFlightClientFlightProbe;
+import com.alechilles.alecstamework.avatarflight.AvatarFlightMountLifecycleService;
 import com.alechilles.alecstamework.debug.PlayerInputDebugProbe;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -21,6 +22,8 @@ import javax.annotation.Nonnull;
  */
 public final class TameworkDebugDragonFlightCommand extends AbstractPlayerCommand {
     private static final AvatarFlightActivator ACTIVATOR = new AvatarFlightActivator();
+    private static final AvatarFlightMountLifecycleService MOUNT_LIFECYCLE =
+            new AvatarFlightMountLifecycleService();
 
     public TameworkDebugDragonFlightCommand() {
         super("debugdragonflight", "Toggle transformed-player dragon flight testing.");
@@ -55,12 +58,22 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
             return;
         }
         if (isOff(action)) {
-            sendResult(commandContext, ACTIVATOR.disable(store, ref, playerUuid));
+            if (MOUNT_LIFECYCLE.hasMountSession(store, ref)) {
+                sendMountResult(commandContext, MOUNT_LIFECYCLE.end(
+                        store, ref, playerUuid, AvatarFlightMountLifecycleService.EndReason.COMMAND));
+            } else {
+                sendResult(commandContext, ACTIVATOR.disable(store, ref, playerUuid));
+            }
             return;
         }
         if ("toggle".equals(action)) {
             if (ACTIVATOR.status(store, ref, playerUuid).active()) {
-                sendResult(commandContext, ACTIVATOR.disable(store, ref, playerUuid));
+                if (MOUNT_LIFECYCLE.hasMountSession(store, ref)) {
+                    sendMountResult(commandContext, MOUNT_LIFECYCLE.end(
+                            store, ref, playerUuid, AvatarFlightMountLifecycleService.EndReason.COMMAND));
+                } else {
+                    sendResult(commandContext, ACTIVATOR.disable(store, ref, playerUuid));
+                }
             } else {
                 String configId = args.length > 1 ? args[1] : null;
                 sendResult(commandContext, ACTIVATOR.enable(store, ref, playerUuid, configId));
@@ -166,6 +179,11 @@ public final class TameworkDebugDragonFlightCommand extends AbstractPlayerComman
 
     private static void sendResult(@Nonnull CommandContext commandContext,
                                    @Nonnull AvatarFlightActivator.Result result) {
+        commandContext.sender().sendMessage(Message.raw(result.message()));
+    }
+
+    private static void sendMountResult(@Nonnull CommandContext commandContext,
+                                        @Nonnull AvatarFlightMountLifecycleService.Result result) {
         commandContext.sender().sendMessage(Message.raw(result.message()));
     }
 

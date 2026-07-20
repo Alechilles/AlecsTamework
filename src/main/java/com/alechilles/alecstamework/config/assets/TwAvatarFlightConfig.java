@@ -81,7 +81,7 @@ public final class TwAvatarFlightConfig implements
             InputSettings::new
     )
             .<Double>append(new KeyedCodec<>("IntentTimeoutMs", Codec.DOUBLE),
-                    (settings, value) -> settings.intentTimeoutMs = nonNegativeOrDefault(value, 250.0),
+                    (settings, value) -> settings.intentTimeoutMs = positiveOrDefault(value, 250.0),
                     settings -> settings.intentTimeoutMs)
             .documentation("Milliseconds before packet-derived movement intent decays to neutral. Inheritance: missing nested key inherits parent value.")
             .add()
@@ -346,7 +346,7 @@ public final class TwAvatarFlightConfig implements
             .documentation("Movement-slot animation used while the forward boost/fast-flight state is active. Inheritance: missing nested key inherits parent value.")
             .add()
             .<Double>append(new KeyedCodec<>("ResendIntervalMs", Codec.DOUBLE),
-                    (settings, value) -> settings.resendIntervalMs = positiveOrDefault(value, 250.0),
+                    (settings, value) -> settings.resendIntervalMs = nonNegativeOrDefault(value, 250.0),
                     settings -> settings.resendIntervalMs)
             .documentation("Minimum milliseconds between forced movement-animation packets while the same animation remains active. Set to 0 to send only when the animation changes, which preserves model-authored animation sound timing. Inheritance: missing nested key inherits parent value.")
             .add()
@@ -604,6 +604,11 @@ public final class TwAvatarFlightConfig implements
                     asset -> asset.riderVisual)
             .documentation("Avatar-flight rider visual and transformed-owner equipment visibility settings. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
             .add()
+            .<AvatarFlightMountingSettings>append(new KeyedCodec<>("Mounting", AvatarFlightMountingSettings.CODEC),
+                    (asset, value) -> asset.mounting = value == null ? new AvatarFlightMountingSettings() : value,
+                    asset -> asset.mounting)
+            .documentation("NPC-backed mounting and voluntary dismount settings. Inheritance: omitted section inherits; explicit nested keys override missing nested keys.")
+            .add()
             .<DebugSettings>append(new KeyedCodec<>("Debug", DEBUG_CODEC),
                     (asset, value) -> asset.debug = value == null ? new DebugSettings() : value,
                     asset -> asset.debug)
@@ -629,6 +634,7 @@ public final class TwAvatarFlightConfig implements
     AnimationSettings animation = new AnimationSettings();
     AvatarFlightAbilityAnimationSettings abilityAnimation = new AvatarFlightAbilityAnimationSettings();
     RiderVisualSettings riderVisual = new RiderVisualSettings();
+    AvatarFlightMountingSettings mounting = new AvatarFlightMountingSettings();
     DebugSettings debug = new DebugSettings();
 
     protected TwAvatarFlightConfig() {
@@ -712,6 +718,9 @@ public final class TwAvatarFlightConfig implements
         return abilityAnimation == null ? new AvatarFlightAbilityAnimationSettings() : abilityAnimation;
     }
     public RiderVisualSettings getRiderVisual() { return riderVisual == null ? new RiderVisualSettings() : riderVisual; }
+    public AvatarFlightMountingSettings getMounting() {
+        return mounting == null ? new AvatarFlightMountingSettings() : mounting;
+    }
     public DebugSettings getDebug() { return debug == null ? new DebugSettings() : debug; }
 
     private static String stringOrDefault(@Nullable String value, @Nonnull String fallback) {
