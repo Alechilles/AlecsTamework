@@ -33,7 +33,8 @@ final class TameworkPersistenceDiagnosticsCommandHandler {
             return;
         }
         PersistenceDiagnosticsService diagnostics =
-                new PersistenceDiagnosticsService(runtime, runtimeDataDirectory);
+                new PersistenceDiagnosticsService(
+                        runtime, runtimeDataDirectory, plugin.getCrashTelemetryService());
         String[] args = arguments(context);
         switch (action) {
             case "health" -> async(context, world, diagnostics::health,

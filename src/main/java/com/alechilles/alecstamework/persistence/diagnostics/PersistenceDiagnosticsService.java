@@ -8,6 +8,10 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineR
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScope;
 import com.alechilles.alecstamework.persistence.recovery.ScopedPersistenceRecoveryCoordinator;
 import com.alechilles.alecstamework.persistence.recovery.ScopedRecoveryTrigger;
+import com.alechilles.alecstamework.metrics.CrashTelemetryDiagnostics;
+import com.alechilles.alecstamework.metrics.CrashTelemetryService;
+import com.alechilles.alecstamework.metrics.TameworkPersistenceTelemetry;
+import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -40,12 +44,20 @@ public final class PersistenceDiagnosticsService {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private final TameworkPersistenceRuntime runtime;
     private final Path bundleDirectory;
+    private final CrashTelemetryService telemetry;
 
     public PersistenceDiagnosticsService(@Nonnull TameworkPersistenceRuntime runtime,
                                          @Nonnull Path runtimeDataDirectory) {
+        this(runtime, runtimeDataDirectory, null);
+    }
+
+    public PersistenceDiagnosticsService(@Nonnull TameworkPersistenceRuntime runtime,
+                                         @Nonnull Path runtimeDataDirectory,
+                                         @Nullable CrashTelemetryService telemetry) {
         this.runtime = runtime;
         this.bundleDirectory = runtimeDataDirectory.toAbsolutePath().normalize()
                 .resolve("Diagnostics").resolve("Persistence").resolve("bundles");
+        this.telemetry = telemetry;
     }
 
     @Nonnull
@@ -126,22 +138,40 @@ public final class PersistenceDiagnosticsService {
     @Nonnull
     public BundleResult export(@Nullable String incidentIdOrPrefix) throws Exception {
         String supportId = UUID.randomUUID().toString();
-        LinkedHashMap<String, byte[]> members = new LinkedHashMap<>();
-        members.put("health.json", jsonBytes(health()));
-        if (incidentIdOrPrefix == null) {
-            members.put("incidents.json", jsonBytes(incidents(false, DEFAULT_INCIDENT_LIMIT)));
-        } else {
+        LinkedHashMap<String, BundleMember> members = new LinkedHashMap<>();
+        members.put("health.json", complete(jsonBytes(health())));
+        PersistenceDiagnosticDatabaseSnapshotReader.Snapshot database;
+        try {
+            database = new PersistenceDiagnosticDatabaseSnapshotReader(
+                    new SqliteConnectionManager(runtime.getSqlitePath()),
+                    runtime.getPersistenceScopeFactory()).read();
+        } catch (Exception failure) {
+            database = PersistenceDiagnosticDatabaseSnapshotReader.unavailableSnapshot(
+                    "database_snapshot_failed:" + failure.getClass().getSimpleName());
+        }
+        members.put("incidents.json", section(database.incidents()));
+        members.put("quarantines.json", section(database.quarantines()));
+        members.put("operations.json", section(database.operations()));
+        members.put("integrity.json", section(database.integrity()));
+        members.put("reconciliation.json", section(database.reconciliation()));
+        if (incidentIdOrPrefix != null) {
             Optional<IncidentDetails> details = incident(incidentIdOrPrefix);
             if (details.isEmpty()) throw new IllegalArgumentException("incident_not_found_or_ambiguous");
-            members.put("incident.json", jsonBytes(details.orElseThrow()));
+            members.put("selected-incident.json", complete(jsonBytes(details.orElseThrow())));
         }
-        members.put("circuit-audit.json", jsonBytes(
+        members.put("circuit-audit.json", complete(jsonBytes(
                 runtime.getFeatureCircuitRepository().listRecentAudit(100).stream()
                         .map(record -> new CircuitAuditView(
                                 shortId(record.eventId()),
                                 PersistenceFeatureCircuitCatalog.key(record.domain()),
                                 record.previousEnabled(), record.enabled(), record.reasonCode(),
-                                record.changedAtMs())).toList()));
+                                record.changedAtMs())).toList())));
+        members.put("settings.json", complete(jsonBytes(settings())));
+        members.put("telemetry.json", complete(jsonBytes(telemetry())));
+        members.put("logs.txt", new BundleMember(
+                "unavailable", "runtime_log_provider_unavailable",
+                "Server log discovery is not performed by Tamework. Use the sanitized incident journal included in this bundle.\n"
+                        .getBytes(StandardCharsets.UTF_8)));
         addJournalTail(members);
         byte[] manifest = manifest(supportId, members);
         Files.createDirectories(bundleDirectory);
@@ -150,15 +180,23 @@ public final class PersistenceDiagnosticsService {
         return new BundleResult(supportId, bundle, Files.size(bundle), members.size() + 1);
     }
 
-    private void addJournalTail(Map<String, byte[]> members) throws Exception {
+    private void addJournalTail(Map<String, BundleMember> members) throws Exception {
         Path directory = runtime.getIncidentJournal().directory();
-        if (!Files.isDirectory(directory)) return;
+        if (!Files.isDirectory(directory)) {
+            members.put("breadcrumbs.jsonl", new BundleMember(
+                    "unavailable", "diagnostics_directory_missing", new byte[0]));
+            return;
+        }
         try (var stream = Files.list(directory)) {
             Optional<Path> latest = stream
                     .filter(path -> path.getFileName().toString().endsWith(".jsonl"))
                     .max(Comparator.comparingLong(this::lastModified));
             if (latest.isPresent()) {
-                members.put("incident-journal-tail.jsonl", readTail(latest.orElseThrow(), JOURNAL_TAIL_BYTES));
+                members.put("breadcrumbs.jsonl", complete(
+                        readTail(latest.orElseThrow(), JOURNAL_TAIL_BYTES)));
+            } else {
+                members.put("breadcrumbs.jsonl", new BundleMember(
+                        "unavailable", "no_local_incident_records", new byte[0]));
             }
         }
     }
@@ -176,26 +214,32 @@ public final class PersistenceDiagnosticsService {
         }
     }
 
-    private byte[] manifest(String supportId, Map<String, byte[]> members) throws Exception {
+    private byte[] manifest(String supportId, Map<String, BundleMember> members) throws Exception {
         List<MemberManifest> files = new ArrayList<>();
-        for (Map.Entry<String, byte[]> entry : members.entrySet()) {
+        for (Map.Entry<String, BundleMember> entry : members.entrySet()) {
+            BundleMember member = entry.getValue();
             files.add(new MemberManifest(
-                    entry.getKey(), entry.getValue().length, sha256(entry.getValue()), "complete"));
+                    entry.getKey(), member.content().length, sha256(member.content()),
+                    member.status(), member.error()));
         }
         BundleManifest manifest = new BundleManifest(
-                1, supportId, Instant.now().toString(),
+                2, supportId, Instant.now().toString(),
                 "bounded_redacted_persistence_evidence",
-                "No save or SQLite database is included. manifest.json is self-describing and not self-hashed.",
+                TameworkPersistenceTelemetry.PERSISTENCE_SUBSYSTEM_VERSION,
+                implementationVersion(),
+                "No save or SQLite database is included. Tamework never creates whole-save backups. "
+                        + "manifest.json is self-describing and not self-hashed.",
                 List.copyOf(files));
         return jsonBytes(manifest);
     }
 
-    private void writeZip(Path destination, byte[] manifest, Map<String, byte[]> members) throws Exception {
+    private void writeZip(Path destination, byte[] manifest,
+                          Map<String, BundleMember> members) throws Exception {
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(
                 destination, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE))) {
             writeEntry(zip, "manifest.json", manifest);
-            for (Map.Entry<String, byte[]> entry : members.entrySet()) {
-                writeEntry(zip, entry.getKey(), entry.getValue());
+            for (Map.Entry<String, BundleMember> entry : members.entrySet()) {
+                writeEntry(zip, entry.getKey(), entry.getValue().content());
             }
         }
     }
@@ -227,6 +271,61 @@ public final class PersistenceDiagnosticsService {
 
     private byte[] jsonBytes(Object value) {
         return (JSON.toJson(value) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private BundleMember section(PersistenceDiagnosticDatabaseSnapshotReader.Section<?> section) {
+        return new BundleMember(section.status(), section.error(), jsonBytes(section));
+    }
+
+    private BundleMember complete(byte[] content) {
+        return new BundleMember("complete", null, content);
+    }
+
+    private SettingsView settings() {
+        Map<String, CircuitView> circuits = new LinkedHashMap<>();
+        Map<com.alechilles.alecstamework.persistence.incidents.PersistenceDomain,
+                PersistenceFeatureCircuitRegistry.CircuitState> states =
+                runtime.getFeatureCircuitRegistry().snapshot();
+        for (String key : PersistenceFeatureCircuitCatalog.keys()) {
+            var domain = PersistenceFeatureCircuitCatalog.resolve(key);
+            var state = states.get(domain);
+            circuits.put(key, new CircuitView(
+                    state == null || state.enabled(),
+                    domain != null && runtime.getFeatureCircuitRegistry().isEnabled(domain),
+                    state == null ? null : state.reasonCode(),
+                    state == null ? 0L : state.updatedAtMs()));
+        }
+        return new SettingsView("local_config_plus_durable_operator_override", Map.copyOf(circuits));
+    }
+
+    private TelemetryView telemetry() {
+        if (telemetry == null) {
+            return new TelemetryView(false, false, 0, false, "unavailable", 0L);
+        }
+        try {
+            CrashTelemetryDiagnostics diagnostics = telemetry.diagnostics();
+            boolean endpointAvailable = diagnostics.endpoint() != null
+                    && !diagnostics.endpoint().isBlank()
+                    && !"<disabled>".equals(diagnostics.endpoint());
+            return new TelemetryView(diagnostics.enabled(), endpointAvailable,
+                    diagnostics.pendingReports(), diagnostics.flushInProgress(),
+                    flushResultClass(diagnostics.lastFlushResult()), diagnostics.lastFlushEpochMs());
+        } catch (Throwable ignored) {
+            return new TelemetryView(false, false, 0, false, "diagnostics_failed", 0L);
+        }
+    }
+
+    private String flushResultClass(String result) {
+        if (result == null || result.isBlank() || result.contains("No flush")) return "not_attempted";
+        String lower = result.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("success") || lower.contains("complete")) return "success";
+        if (lower.contains("fail") || lower.contains("reject") || lower.contains("error")) return "failure";
+        return "other";
+    }
+
+    private String implementationVersion() {
+        String version = PersistenceDiagnosticsService.class.getPackage().getImplementationVersion();
+        return version == null || version.isBlank() ? "development" : version;
     }
 
     private String sha256(byte[] content) throws Exception {
@@ -289,10 +388,23 @@ public final class PersistenceDiagnosticsService {
     public record BundleResult(String supportId, Path path, long sizeBytes, int memberCount) {
     }
 
-    private record MemberManifest(String name, long sizeBytes, String sha256, String status) {
+    private record BundleMember(String status, String error, byte[] content) {
+    }
+
+    private record MemberManifest(String name, long sizeBytes, String sha256,
+                                  String status, String error) {
     }
 
     private record BundleManifest(int formatVersion, String supportId, String createdAt,
-                                  String scope, String note, List<MemberManifest> members) {
+                                  String scope, int schemaVersion, String pluginVersion,
+                                  String note, List<MemberManifest> members) {
+    }
+
+    private record SettingsView(String precedence, Map<String, CircuitView> circuits) {
+    }
+
+    private record TelemetryView(boolean enabled, boolean endpointAvailable, int pendingReports,
+                                 boolean flushInProgress, String lastFlushResult,
+                                 long lastFlushAtMs) {
     }
 }

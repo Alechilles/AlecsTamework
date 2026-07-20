@@ -47,12 +47,22 @@ class PersistenceDiagnosticsServiceTest {
             assertNotNull(zip.getEntry("manifest.json"));
             assertNotNull(zip.getEntry("health.json"));
             assertNotNull(zip.getEntry("incidents.json"));
+            assertNotNull(zip.getEntry("quarantines.json"));
+            assertNotNull(zip.getEntry("operations.json"));
+            assertNotNull(zip.getEntry("integrity.json"));
+            assertNotNull(zip.getEntry("reconciliation.json"));
+            assertNotNull(zip.getEntry("breadcrumbs.jsonl"));
+            assertNotNull(zip.getEntry("telemetry.json"));
+            assertNotNull(zip.getEntry("settings.json"));
+            assertNotNull(zip.getEntry("logs.txt"));
             assertFalse(zip.stream().anyMatch(entry -> entry.getName().endsWith(".sqlite")));
             assertFalse(zip.stream().anyMatch(entry -> entry.getName().endsWith(".sqlite.bak")));
 
             JsonObject manifest = readJson(zip, zip.getEntry("manifest.json"));
             assertEquals("bounded_redacted_persistence_evidence",
                     manifest.get("scope").getAsString());
+            assertEquals(7, manifest.get("schemaVersion").getAsInt());
+            assertTrue(manifest.get("note").getAsString().contains("never creates whole-save backups"));
             Map<String, ZipEntry> entries = new HashMap<>();
             zip.stream().forEach(entry -> entries.put(entry.getName(), entry));
             JsonArray members = manifest.getAsJsonArray("members");
