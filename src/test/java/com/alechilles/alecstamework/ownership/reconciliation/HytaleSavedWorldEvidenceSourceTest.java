@@ -226,9 +226,22 @@ class HytaleSavedWorldEvidenceSourceTest {
     }
 
     @Test
-    void malformedSavedMarkerFailsClosedInsteadOfDisappearingFromExactLookup() {
+    void legacyGenerationZeroMarkerRemainsExactSavedProjectionEvidence() {
         TameworkProjectionIdentityComponent marker = marker();
         marker.setGeneration(0L);
+
+        CompanionPopulationEvidence evidence = HytaleSavedWorldEvidenceSource.projectionEvidence(
+                marker, null, null, null,
+                "alpha", "world-entities:alpha", 0, 0, 0
+        );
+
+        assertEquals(markerFingerprint(marker), evidence.projectionObservation().fingerprint());
+    }
+
+    @Test
+    void negativeGenerationSavedMarkerFailsClosedInsteadOfDisappearingFromExactLookup() {
+        TameworkProjectionIdentityComponent marker = marker();
+        marker.setGeneration(-1L);
 
         assertThrows(IllegalStateException.class, () ->
                 HytaleSavedWorldEvidenceSource.projectionEvidence(

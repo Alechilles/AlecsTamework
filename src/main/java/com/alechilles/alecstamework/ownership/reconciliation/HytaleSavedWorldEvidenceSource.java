@@ -341,9 +341,11 @@ public final class HytaleSavedWorldEvidenceSource implements CompanionPopulation
             int entityIndex,
             boolean deathObserved
     ) {
-        if (marker.getGeneration() < 1L) {
+        // Generation zero is the durable legacy-migration value and is also accepted by the
+        // loaded identity index. Retain it in the fingerprint so restart evidence stays exact.
+        if (marker.getGeneration() < 0L) {
             throw new IllegalStateException(
-                    "Saved projection marker generation must be positive."
+                    "Saved projection marker generation must not be negative."
             );
         }
         String fingerprint = CompanionProjectionEvidence.fingerprint(
