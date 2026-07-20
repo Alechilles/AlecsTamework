@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.metrics.TameworkTelemetryContext;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
 import com.alechilles.alecstamework.persistence.operation.PersistenceOperationMetadata;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import com.alechilles.alecstamework.persistence.operation.PersistenceWriteFailureHandler;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.sql.Connection;
@@ -25,6 +27,7 @@ final class PersistenceWriteBatchExecutor {
     private final PersistenceHealthService health;
     private final PersistenceWriteQueueMetrics metrics;
     private final AtomicReference<PersistenceWriteFailureHandler> failureHandler;
+    private final PersistenceCheckpointHook checkpoints;
     @Nullable
     private final HytaleLogger logger;
     private long lastRecoverableFailureReportAtMs;
@@ -34,11 +37,21 @@ final class PersistenceWriteBatchExecutor {
                                   PersistenceWriteQueueMetrics metrics,
                                   AtomicReference<PersistenceWriteFailureHandler> failureHandler,
                                   HytaleLogger logger) {
+        this(connections, health, metrics, failureHandler, logger, PersistenceCheckpointHook.NO_OP);
+    }
+
+    PersistenceWriteBatchExecutor(SqliteConnectionManager connections,
+                                  PersistenceHealthService health,
+                                  PersistenceWriteQueueMetrics metrics,
+                                  AtomicReference<PersistenceWriteFailureHandler> failureHandler,
+                                  HytaleLogger logger,
+                                  PersistenceCheckpointHook checkpoints) {
         this.connections = connections;
         this.health = health;
         this.metrics = metrics;
         this.failureHandler = failureHandler;
         this.logger = logger;
+        this.checkpoints = checkpoints == null ? PersistenceCheckpointHook.NO_OP : checkpoints;
     }
 
     void execute(@Nonnull List<PersistenceWriteTask<?>> batch, boolean suppressPublication) {
@@ -69,6 +82,10 @@ final class PersistenceWriteBatchExecutor {
                 metrics.recordBatchSuccess(tasks.size(), Math.max(0L, System.nanoTime() - startedNs));
                 return AttemptResult.success();
             } catch (TransactionFailure failure) {
+                if (failure.outcome() == PersistenceTransactionOutcome.COMMITTED) {
+                    metrics.recordBatchSuccess(tasks.size(), Math.max(0L, System.nanoTime() - startedNs));
+                    return AttemptResult.success();
+                }
                 boolean transientFailure = SqliteBusyFailureClassifier.isTransient(failure.failure());
                 if (transientFailure && attempt <= MAX_TRANSIENT_RETRIES) {
                     metrics.recordRetry();
@@ -87,7 +104,13 @@ final class PersistenceWriteBatchExecutor {
             connection.setAutoCommit(false);
             boolean commitStarted = false;
             try {
-                for (PersistenceWriteTask<?> task : tasks) task.runWork(connection);
+                checkpoints.hit(PersistenceCheckpoint.BEFORE_FIRST_SQL_STATEMENT,
+                        tasks.getFirst().metadata());
+                for (PersistenceWriteTask<?> task : tasks) {
+                    task.runWork(connection);
+                    checkpoints.hit(PersistenceCheckpoint.AFTER_LOGICAL_SQL_MUTATION, task.metadata());
+                }
+                checkpoints.hit(PersistenceCheckpoint.BEFORE_COMMIT, tasks.getFirst().metadata());
                 commitStarted = true;
                 connection.commit();
             } catch (Exception failure) {
@@ -100,6 +123,11 @@ final class PersistenceWriteBatchExecutor {
             throw failure;
         } catch (Exception failure) {
             throw new TransactionFailure(PersistenceTransactionOutcome.NOT_STARTED, failure);
+        }
+        try {
+            checkpoints.hit(PersistenceCheckpoint.AFTER_COMMIT_RETURN, tasks.getFirst().metadata());
+        } catch (Exception committedFailure) {
+            throw new TransactionFailure(PersistenceTransactionOutcome.COMMITTED, committedFailure);
         }
     }
 
@@ -207,7 +235,9 @@ final class PersistenceWriteBatchExecutor {
 
     private void runAfterCommit(PersistenceWriteTask<?> task) {
         try {
+            checkpoints.hit(PersistenceCheckpoint.BEFORE_RUNTIME_INDEX_PUBLICATION, task.metadata());
             task.runAfterCommit();
+            checkpoints.hit(PersistenceCheckpoint.AFTER_RUNTIME_INDEX_PUBLICATION, task.metadata());
         } catch (Exception failure) {
             notifyPublication(task.metadata(), failure);
             if (logger != null) {
@@ -254,6 +284,11 @@ final class PersistenceWriteBatchExecutor {
     }
 
     private void recordStorageFailure(String reason, Throwable failure) {
+        try {
+            checkpoints.hit(PersistenceCheckpoint.BEFORE_TELEMETRY_DIAGNOSTICS_EMISSION, null);
+        } catch (Exception diagnosticsFailure) {
+            return;
+        }
         TameworkTelemetryEvents.recordErrorIfAvailable(
                 "persistence_write_failed", failure,
                 TameworkTelemetryContext.persistence(

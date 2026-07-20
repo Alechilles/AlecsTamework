@@ -11,6 +11,9 @@ import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineR
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineState;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScope;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeType;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.testing.DeterministicPersistenceFaultInjector;
+import com.alechilles.alecstamework.persistence.testing.DeterministicPersistenceFaultInjector.FaultMode;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PostCommitPublicationRecoveryVerifierTest {
     @Test
@@ -82,6 +86,36 @@ class PostCommitPublicationRecoveryVerifierTest {
 
         assertEquals(ScopedRecoveryResolution.CONTRADICTORY_EVIDENCE, result.resolution());
         assertEquals("quarantine_domain_mismatch", result.resolutionCode());
+    }
+
+    @Test
+    void injectedReadbackAndPublicationBoundariesNeverClearOptimistically() throws Exception {
+        DeterministicPersistenceFaultInjector readbackFault = new DeterministicPersistenceFaultInjector()
+                .arm("readback-boundary", PersistenceCheckpoint.AFTER_CANONICAL_READBACK,
+                        FaultMode.DELAYED_OR_MISSING_EVIDENCE, 1);
+        PostCommitPublicationRecoveryVerifier unavailable = new PostCommitPublicationRecoveryVerifier(
+                PersistenceDomain.OWNER_MUTATION, "owner-test-v1", () -> { }, () -> { },
+                readbackFault);
+
+        ScopedRecoveryVerification retained = unavailable.verify(context(
+                incident(PersistenceFailureClass.POST_COMMIT_PUBLICATION_FAILURE),
+                fence(PersistenceDomain.OWNER_MUTATION)));
+
+        assertEquals(ScopedRecoveryResolution.AUTHORITY_UNAVAILABLE, retained.resolution());
+        assertEquals(null, retained.indexPublisher());
+
+        DeterministicPersistenceFaultInjector publicationFault = new DeterministicPersistenceFaultInjector()
+                .arm("publication-boundary", PersistenceCheckpoint.BEFORE_RUNTIME_INDEX_PUBLICATION,
+                        FaultMode.RUNTIME_PUBLICATION_EXCEPTION, 1);
+        PostCommitPublicationRecoveryVerifier publishFails = new PostCommitPublicationRecoveryVerifier(
+                PersistenceDomain.OWNER_MUTATION, "owner-test-v2", () -> { }, () -> { },
+                publicationFault);
+        ScopedRecoveryVerification verified = publishFails.verify(context(
+                incident(PersistenceFailureClass.POST_COMMIT_PUBLICATION_FAILURE),
+                fence(PersistenceDomain.OWNER_MUTATION)));
+
+        assertNotNull(verified.indexPublisher());
+        assertThrows(Exception.class, verified.indexPublisher()::publish);
     }
 
     private PostCommitPublicationRecoveryVerifier verifier(

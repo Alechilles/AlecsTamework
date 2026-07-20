@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.alechilles.alecstamework.persistence.operation.PersistenceOperationMetadata;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import com.alechilles.alecstamework.persistence.operation.PersistenceWriteFailureHandler;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.sql.Connection;
@@ -74,11 +75,20 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                           @Nonnull PersistenceHealthService healthService,
                           @Nullable HytaleLogger logger,
                           long closeJoinTimeoutMs) {
+        this(connectionManager, healthService, logger, closeJoinTimeoutMs,
+                PersistenceCheckpointHook.NO_OP);
+    }
+
+    PersistenceWriteQueue(@Nonnull SqliteConnectionManager connectionManager,
+                          @Nonnull PersistenceHealthService healthService,
+                          @Nullable HytaleLogger logger,
+                          long closeJoinTimeoutMs,
+                          @Nonnull PersistenceCheckpointHook checkpoints) {
         this.connectionManager = connectionManager;
         this.healthService = healthService;
         this.closeJoinTimeoutMs = Math.max(1L, closeJoinTimeoutMs);
         this.batchExecutor = new PersistenceWriteBatchExecutor(
-                connectionManager, healthService, metrics, failureHandler, logger);
+                connectionManager, healthService, metrics, failureHandler, logger, checkpoints);
         this.workerThread = new Thread(this::workerLoop, "tamework-persistence-writer");
         this.workerThread.setDaemon(true);
         this.workerThread.start();

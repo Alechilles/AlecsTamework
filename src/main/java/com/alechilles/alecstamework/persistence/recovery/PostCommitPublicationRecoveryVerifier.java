@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.persistence.recovery;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureClass;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceQuarantineRecord;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpoint;
+import com.alechilles.alecstamework.persistence.operation.PersistenceCheckpointHook;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -17,16 +19,27 @@ public final class PostCommitPublicationRecoveryVerifier implements ScopedPersis
     private final String verifierId;
     private final CanonicalAuthorityProbe authorityProbe;
     private final StorageRecoveryIndexPublisher indexPublisher;
+    private final PersistenceCheckpointHook checkpoints;
 
     public PostCommitPublicationRecoveryVerifier(
             @Nonnull PersistenceDomain domain,
             @Nonnull String verifierId,
             @Nonnull CanonicalAuthorityProbe authorityProbe,
             @Nonnull StorageRecoveryIndexPublisher indexPublisher) {
+        this(domain, verifierId, authorityProbe, indexPublisher, PersistenceCheckpointHook.NO_OP);
+    }
+
+    PostCommitPublicationRecoveryVerifier(
+            @Nonnull PersistenceDomain domain,
+            @Nonnull String verifierId,
+            @Nonnull CanonicalAuthorityProbe authorityProbe,
+            @Nonnull StorageRecoveryIndexPublisher indexPublisher,
+            @Nonnull PersistenceCheckpointHook checkpoints) {
         this.domain = Objects.requireNonNull(domain, "domain");
         this.verifierId = requireText(verifierId, "verifierId");
         this.authorityProbe = Objects.requireNonNull(authorityProbe, "authorityProbe");
         this.indexPublisher = Objects.requireNonNull(indexPublisher, "indexPublisher");
+        this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
     }
 
     @Override
@@ -60,11 +73,12 @@ public final class PostCommitPublicationRecoveryVerifier implements ScopedPersis
         }
         try {
             authorityProbe.verifyReadable();
+            checkpoints.hit(PersistenceCheckpoint.AFTER_CANONICAL_READBACK, null);
             return new ScopedRecoveryVerification(
                     ScopedRecoveryResolution.RESOLVED_NEW_STATE,
                     "committed_state_readback_verified",
                     evidenceHashes(context),
-                    indexPublisher,
+                    checkpointedPublisher(),
                     null);
         } catch (Exception failure) {
             return new ScopedRecoveryVerification(
@@ -74,6 +88,14 @@ public final class PostCommitPublicationRecoveryVerifier implements ScopedPersis
                     null,
                     failure);
         }
+    }
+
+    private StorageRecoveryIndexPublisher checkpointedPublisher() {
+        return () -> {
+            checkpoints.hit(PersistenceCheckpoint.BEFORE_RUNTIME_INDEX_PUBLICATION, null);
+            indexPublisher.publish();
+            checkpoints.hit(PersistenceCheckpoint.AFTER_RUNTIME_INDEX_PUBLICATION, null);
+        };
     }
 
     private boolean matchesDomain(ScopedRecoveryContext context) {
