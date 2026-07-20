@@ -53,6 +53,7 @@ class PersistenceReleaseCandidateVerifierTest {
             assertTrue(source.contains(required), "missing named release evidence: " + required);
         }
         assertTrue(source.contains("matchCount = 0"));
+        assertTrue(source.contains("Required Surefire report must appear exactly once"));
         assertTrue(source.contains("pending-user-run"));
         assertTrue(source.contains("pending-deployment-authorization"));
     }

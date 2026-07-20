@@ -96,10 +96,12 @@ function Get-RequiredSurefireReportEvidence {
     param([string] $Root, [string[]] $ClassNames)
     $evidence = @()
     foreach ($className in $ClassNames) {
-        $path = Join-Path $Root "target/surefire-reports/TEST-$className.xml"
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-            throw "Required Surefire report is missing: $className"
+        $reports = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter "TEST-$className.xml" |
+            Where-Object { $_.FullName -match "[\\/]target[\\/]surefire-reports[\\/]" })
+        if ($reports.Count -ne 1) {
+            throw "Required Surefire report must appear exactly once: $className (found $($reports.Count))"
         }
+        $path = $reports[0].FullName
         [xml] $xml = Get-Content -LiteralPath $path -Raw
         $suite = $xml.testsuite
         $failures = [long]$suite.failures
