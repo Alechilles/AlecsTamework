@@ -41,7 +41,7 @@ class HistoricalSchemaPrerequisiteRepairTest {
                             + "WHERE lifecycle_state = 'UNKNOWN_DORMANT' "
                             + "AND physical_world_name IS NULL"
             ));
-            assertEquals("owner-0", scalarText(
+            assertEquals("00000000-0000-0000-0000-000000000001", scalarText(
                     connection, "SELECT owner_uuid FROM npc_profiles WHERE profile_id = 'profile-0'"
             ));
             assertEquals(0, scalarInt(
@@ -75,7 +75,9 @@ class HistoricalSchemaPrerequisiteRepairTest {
         )) {
             for (int index = 0; index < PROFILE_COUNT; index++) {
                 insert.setString(1, "profile-" + index);
-                insert.setString(2, index % 2 == 0 ? "owner-" + index : null);
+                insert.setString(2, index % 2 == 0
+                        ? new java.util.UUID(0L, index + 1L).toString()
+                        : null);
                 insert.addBatch();
             }
             insert.executeBatch();

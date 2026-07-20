@@ -77,7 +77,9 @@ public final class ClaimsRuntimeFixture {
                     "INSERT INTO npc_profiles(profile_id, owner_uuid) VALUES (?, ?)")) {
                 for (int i = 0; i < rows; i++) {
                     insert.setString(1, "profile-" + i);
-                    insert.setString(2, i % 2 == 0 ? "owner-" + i : null);
+                    insert.setString(2, i % 2 == 0
+                            ? new java.util.UUID(0L, i + 1L).toString()
+                            : null);
                     insert.addBatch();
                 }
                 insert.executeBatch();
