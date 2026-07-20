@@ -76,7 +76,7 @@ These define the ordered placement rings the revive runtime can try.
 ### `Command.Travel`
 - `CrossWorldRecallEnabled`: allows recall to bridge world changes.
 - `OnTransferFailure`: what to do when the target transfer cannot complete.
-- `FollowMasterOnWorldChange`: automatically migrate the companion when the owner changes worlds.
+- `FollowMasterOnWorldChange`: automatically migrate the companion when the owner changes worlds. The shipped default is `false`; explicit cross-world Recall is unaffected.
 - `FollowMasterOnWorldChangeStateFilter`: only auto-follow across worlds when the companion is in one of these states.
 
 Accepted `OnTransferFailure` values:
@@ -143,7 +143,7 @@ Older packs may still contain ownership protection and revive enablement keys in
     "Travel": {
       "CrossWorldRecallEnabled": true,
       "OnTransferFailure": "QueueForRecall",
-      "FollowMasterOnWorldChange": true,
+      "FollowMasterOnWorldChange": false,
       "FollowMasterOnWorldChangeStateFilter": [
         "Follow",
         "Defend",

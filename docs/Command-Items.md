@@ -177,12 +177,14 @@ Role-scoped behavior tuning belongs in `TwCompanionConfig.Command`:
 - `RecallForceRelocateDistance`
 - `Travel.CrossWorldRecallEnabled`
 - `Travel.OnTransferFailure` (`QueueForRecall`, `MarkLost`, `Ignore`)
-- `Travel.FollowMasterOnWorldChange`
+- `Travel.FollowMasterOnWorldChange` (disabled by default; explicit Recall remains available)
 - `Travel.FollowMasterOnWorldChangeStateFilter`
 
-Configured followers are selected after the player entity is installed in the destination world's
-entity store, rather than by a fixed delay from the earlier add-world event. The source NPC's live
-state must still pass `FollowMasterOnWorldChangeStateFilter` when the relocation is prepared.
+Automatic world-change following is disabled in Tamework's shipped companion defaults. A role-specific
+config may deliberately opt in; configured followers are then selected after the player entity is
+installed in the destination world's entity store, and the source NPC's live state must still pass
+`FollowMasterOnWorldChangeStateFilter` when the relocation is prepared. Explicit Recall remains
+available across worlds when `CrossWorldRecallEnabled` is enabled.
 
 Generated portal instances are delete-on-remove worlds. If a linked companion remains inside when
 the instance closes, Tamework marks it during the world-removal event and publishes its complete

@@ -13,7 +13,7 @@
     "Travel": {
       "CrossWorldRecallEnabled": true,
       "OnTransferFailure": "QueueForRecall",
-      "FollowMasterOnWorldChange": true,
+      "FollowMasterOnWorldChange": false,
       "FollowMasterOnWorldChangeStateFilter": [
         "Follow",
         "Defend",

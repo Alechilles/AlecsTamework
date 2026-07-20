@@ -45,6 +45,7 @@
 - Added species-configurable avatar-flight model trails for successful launches, upward flaps, forward boosts, and sustained near-maximum-speed gliding, with separate start/stop thresholds to prevent flicker.
 
 ### Changed
+- Automatic companion following across login, portals, and other world changes is now disabled by default. Explicit Follow remains a local command, and explicit cross-world Recall remains available.
 - Upgrading Tamework persistence to schema v7 now creates a verified, transactionally consistent snapshot of Tamework's SQLite database before migration. Tamework never copies the Hytale save or invokes a whole-world backup; Hytale, the host, and the operator remain responsible for complete-save backups.
 - Fixed historical databases whose recorded early-schema markers outlived one or more prerequisite tables or profile columns. Startup now restores only the missing SQLite structure, preserves every existing profile row, and leaves identities conservatively dormant instead of failing the entire migration.
 - Persistence storage health now represents only SQLite authority. Domain conflicts use narrow evidence readiness, quarantine, and circuit states instead of broadly degrading every persistence-backed feature.

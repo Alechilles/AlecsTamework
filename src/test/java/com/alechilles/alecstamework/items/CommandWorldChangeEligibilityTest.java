@@ -5,7 +5,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression coverage for automatic companion travel admission at login and world changes. */
 class CommandWorldChangeEligibilityTest {
@@ -18,8 +17,8 @@ class CommandWorldChangeEligibilityTest {
     }
 
     @Test
-    void recordedFollowStateRemainsEligibleForAutomaticTravel() {
-        assertTrue(CommandWorldChangeEligibility.isEligible(
+    void recordedFollowStateDoesNotOverrideDisabledAutomaticTravel() {
+        assertFalse(CommandWorldChangeEligibility.isEligible(
                 record("Follow"),
                 TwCompanionConfig.resolveEffectiveForRole("Tamed_Deer_Stag")
         ));

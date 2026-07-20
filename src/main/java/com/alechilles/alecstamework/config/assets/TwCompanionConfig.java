@@ -41,7 +41,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     private static final double DEFAULT_PLACEMENT_MIN_RELATIVE_Y = -2.0;
     private static final double DEFAULT_PLACEMENT_MAX_RELATIVE_Y = 4.0;
     private static final boolean DEFAULT_CROSS_WORLD_RECALL_ENABLED = true;
-    private static final boolean DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE = true;
+    private static final boolean DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE = false;
     private static final String[] DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER =
             new String[] { "Follow", "Defend", "Aggressive" };
 
