@@ -389,7 +389,8 @@ public final class CompanionPopulationOperationRecoveryService {
         CompanionLifecycleState lifecycle = switch (evidence.lifecycleKind()) {
             case PHYSICAL_ENTITY -> CompanionLifecycleState.UNLOADED;
             case PHYSICAL_DEAD_ENTITY -> CompanionLifecycleState.DEAD_REVIVABLE;
-            case CAPTURED_SNAPSHOT, CAPTURED_ITEM -> CompanionLifecycleState.CAPTURED;
+            case CAPTURED_SNAPSHOT, CAPTURED_ITEM, CAPTURED_ITEM_LEGACY_OWNER_HINT ->
+                    CompanionLifecycleState.CAPTURED;
             case DEATH_SNAPSHOT -> CompanionLifecycleState.DEAD_REVIVABLE;
             case LOST_SNAPSHOT -> CompanionLifecycleState.LOST;
             case COOP_SNAPSHOT -> CompanionLifecycleState.COOP;

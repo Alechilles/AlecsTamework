@@ -133,6 +133,57 @@ class CompanionPopulationEvidenceSetTest {
                 set.evidence().getFirst().lifecycleKind());
     }
 
+    /** Protects support bundle 6d755cb8: pre-marker clear-owner items retain only a weak source hint. */
+    @Test
+    void capturedSnapshotOverridesLegacySourceOwnerHintAfterRestart() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID formerOwner = UUID.randomUUID();
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                dormant(
+                        "legacy-item",
+                        npcUuid,
+                        formerOwner,
+                        CompanionPopulationEvidence.Kind.CAPTURED_ITEM_LEGACY_OWNER_HINT
+                ),
+                dormant("snapshot", npcUuid, null, CompanionPopulationEvidence.Kind.CAPTURED_SNAPSHOT)
+        ));
+
+        assertTrue(set.isConflictFree());
+        CompanionPopulationEvidenceSet.ResolvedEvidence resolved = set.evidence().getFirst();
+        assertTrue(resolved.ownerObserved());
+        assertEquals(null, resolved.observedOwnerUuid());
+        assertEquals(CompanionPopulationEvidence.Kind.CAPTURED_SNAPSHOT, resolved.lifecycleKind());
+    }
+
+    @Test
+    void standaloneLegacySourceOwnerHintRemainsConservative() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID formerOwner = UUID.randomUUID();
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                dormant(
+                        "legacy-item",
+                        npcUuid,
+                        formerOwner,
+                        CompanionPopulationEvidence.Kind.CAPTURED_ITEM_LEGACY_OWNER_HINT
+                )
+        ));
+
+        assertTrue(set.isConflictFree());
+        assertEquals(formerOwner, set.evidence().getFirst().observedOwnerUuid());
+    }
+
+    @Test
+    void capturedSnapshotStillConflictsWithExplicitItemOwner() {
+        UUID npcUuid = UUID.randomUUID();
+        CompanionPopulationEvidenceSet set = new CompanionPopulationEvidenceSet(List.of(
+                captured("explicit-item", npcUuid, UUID.randomUUID()),
+                dormant("snapshot", npcUuid, null, CompanionPopulationEvidence.Kind.CAPTURED_SNAPSHOT)
+        ));
+
+        assertFalse(set.isConflictFree());
+        assertEquals("conflicting-owner-evidence", set.conflicts().getFirst().reason());
+    }
+
     @Test
     void savedCorpseAndDeathSnapshotResolveAsOneDeadNonliveRepresentation() {
         UUID npcUuid = UUID.randomUUID();

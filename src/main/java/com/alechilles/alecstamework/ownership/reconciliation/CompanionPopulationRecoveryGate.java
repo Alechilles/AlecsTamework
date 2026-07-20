@@ -15,13 +15,23 @@ import javax.annotation.Nonnull;
 final class CompanionPopulationRecoveryGate {
     private final CompanionPopulationAmbiguityContainment containment;
     private final CompanionPopulationCoveragePublisher coveragePublisher;
+    private final String scanEpoch;
 
     CompanionPopulationRecoveryGate(
             @Nonnull CompanionPopulationAmbiguityContainment containment,
             @Nonnull CompanionPopulationCoveragePublisher coveragePublisher
     ) {
+        this(containment, coveragePublisher, "<untracked>");
+    }
+
+    CompanionPopulationRecoveryGate(
+            @Nonnull CompanionPopulationAmbiguityContainment containment,
+            @Nonnull CompanionPopulationCoveragePublisher coveragePublisher,
+            @Nonnull String scanEpoch
+    ) {
         this.containment = Objects.requireNonNull(containment, "containment");
         this.coveragePublisher = Objects.requireNonNull(coveragePublisher, "coveragePublisher");
+        this.scanEpoch = Objects.requireNonNull(scanEpoch, "scanEpoch");
     }
 
     /** Durably contains bounded ambiguity, then validates the evidence merge gate. */
@@ -59,6 +69,16 @@ final class CompanionPopulationRecoveryGate {
 
     @Nonnull
     private CompletableFuture<Decision> evaluateEvidence(
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet
+    ) {
+        return containment.stageEvidenceRecoveryProofs(scanEpoch, evidenceSet)
+                .thenCompose(staged -> staged
+                        ? evaluateEvidenceAfterProofStage(evidenceSet)
+                        : publishEvidenceConflict(evidenceSet));
+    }
+
+    @Nonnull
+    private CompletableFuture<Decision> evaluateEvidenceAfterProofStage(
             @Nonnull CompanionPopulationEvidenceSet evidenceSet
     ) {
         if (evidenceSet.isConflictFree()) {

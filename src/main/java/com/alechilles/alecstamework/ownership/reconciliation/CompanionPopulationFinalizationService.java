@@ -18,6 +18,8 @@ final class CompanionPopulationFinalizationService {
     private final CompanionPopulationCoveragePublisher coverage;
     private final SessionTransition markSessionReady;
     private final SessionTransition invalidateReadySession;
+    @Nullable
+    private final ReconciliationEvidenceRecoveryProofRegistry recoveryProofs;
 
     CompanionPopulationFinalizationService(
             @Nonnull CompanionPopulationScanSessionRepository sessions,
@@ -25,7 +27,8 @@ final class CompanionPopulationFinalizationService {
             @Nonnull LoadedNpcIdentityIndex loadedIdentities,
             @Nonnull CompanionPersistedProjectionEvidenceRegistry projections,
             @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
-            @Nonnull CompanionPopulationCoveragePublisher coverage
+            @Nonnull CompanionPopulationCoveragePublisher coverage,
+            @Nullable ReconciliationEvidenceRecoveryProofRegistry recoveryProofs
     ) {
         this(
                 scanEpoch,
@@ -34,7 +37,8 @@ final class CompanionPopulationFinalizationService {
                 liveEvidenceRevision,
                 coverage,
                 epoch -> committedValue(sessions.markReadyAsync(epoch)),
-                epoch -> committedValue(sessions.invalidateReadyAsync(epoch))
+                epoch -> committedValue(sessions.invalidateReadyAsync(epoch)),
+                recoveryProofs
         );
         Objects.requireNonNull(sessions, "sessions");
     }
@@ -48,6 +52,20 @@ final class CompanionPopulationFinalizationService {
             @Nonnull SessionTransition markSessionReady,
             @Nonnull SessionTransition invalidateReadySession
     ) {
+        this(scanEpoch, loadedIdentities, projections, liveEvidenceRevision, coverage,
+                markSessionReady, invalidateReadySession, null);
+    }
+
+    CompanionPopulationFinalizationService(
+            @Nonnull String scanEpoch,
+            @Nonnull LoadedNpcIdentityIndex loadedIdentities,
+            @Nonnull CompanionPersistedProjectionEvidenceRegistry projections,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
+            @Nonnull CompanionPopulationCoveragePublisher coverage,
+            @Nonnull SessionTransition markSessionReady,
+            @Nonnull SessionTransition invalidateReadySession,
+            @Nullable ReconciliationEvidenceRecoveryProofRegistry recoveryProofs
+    ) {
         this.scanEpoch = Objects.requireNonNull(scanEpoch, "scanEpoch");
         this.loadedIdentities = Objects.requireNonNull(loadedIdentities, "loadedIdentities");
         this.projections = Objects.requireNonNull(projections, "projections");
@@ -59,6 +77,7 @@ final class CompanionPopulationFinalizationService {
         this.invalidateReadySession = Objects.requireNonNull(
                 invalidateReadySession, "invalidateReadySession"
         );
+        this.recoveryProofs = recoveryProofs;
     }
 
     @Nonnull
@@ -103,9 +122,13 @@ final class CompanionPopulationFinalizationService {
                     );
                 }
                 String postPublicationFailure = sealedAuthorityFailure(result);
-                return postPublicationFailure == null
-                        ? CompletableFuture.completedFuture(result.withoutFinalizationMetadata())
-                        : invalidateAndFail(result, postPublicationFailure);
+                if (postPublicationFailure != null) {
+                    return invalidateAndFail(result, postPublicationFailure);
+                }
+                if (recoveryProofs != null) {
+                    recoveryProofs.seal(scanEpoch);
+                }
+                return CompletableFuture.completedFuture(result.withoutFinalizationMetadata());
             });
         });
     }
@@ -188,6 +211,9 @@ final class CompanionPopulationFinalizationService {
             @Nonnull CompanionPopulationReconciliationService.Result result,
             @Nonnull String reason
     ) {
+        if (recoveryProofs != null) {
+            recoveryProofs.invalidate(scanEpoch);
+        }
         projections.degrade(scanEpoch, reason);
         return invokeTransition(invalidateReadySession).thenCompose(invalidated -> failure(
                 result,
@@ -235,6 +261,9 @@ final class CompanionPopulationFinalizationService {
             @Nonnull CompanionPopulationReconciliationService.Status status,
             @Nonnull String reason
     ) {
+        if (recoveryProofs != null) {
+            recoveryProofs.invalidate(scanEpoch);
+        }
         projections.degrade(scanEpoch, reason);
         CompanionPopulationReconciliationService.Status rejectedStatus =
                 status == CompanionPopulationReconciliationService.Status.READY

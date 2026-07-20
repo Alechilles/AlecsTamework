@@ -100,6 +100,7 @@ final class SpawnerItemStackMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.ATTACHMENTS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_OWNER_CLEARED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TAMED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME);
         if (progressionMetadataService != null) {

@@ -100,10 +100,12 @@ class SpawnerFeatureHandlerTest {
         int quantityGuard = source.indexOf("itemStack.getQuantity() != 1");
         int capturedMetadata = source.indexOf(".withMetadata(TameworkMetadataKeys.CAPTURED");
         int canonicalProfileMetadata = source.indexOf("TameworkMetadataKeys.COMPANION_PROFILE_ID");
+        int ownerOutcomeMetadata = source.indexOf("TameworkMetadataKeys.CAPTURE_OWNER_CLEARED");
 
         assertTrue(quantityGuard >= 0, "capture path must reject stacked spawner items");
         assertTrue(capturedMetadata >= 0, "capture path must write captured metadata");
         assertTrue(canonicalProfileMetadata >= 0, "capture path must persist canonical profile identity");
+        assertTrue(ownerOutcomeMetadata >= 0, "capture must persist its immutable owner outcome");
         assertTrue(quantityGuard < capturedMetadata, "stack guard must run before captured metadata is stamped");
     }
 

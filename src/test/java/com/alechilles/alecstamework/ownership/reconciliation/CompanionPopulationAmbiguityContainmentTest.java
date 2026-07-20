@@ -139,6 +139,51 @@ class CompanionPopulationAmbiguityContainmentTest {
         }
     }
 
+    /** Protects support bundle 6d755cb8: a corrected restart scan must heal its old profile fence. */
+    @Test
+    void freshConflictFreeLegacyCaptureEvidenceStagesRecoveryForTheExactProfile() throws Exception {
+        try (TameworkPersistenceRuntime persistence =
+                     TameworkPersistenceRuntime.initialize(tempDir.resolve("proof"), null)) {
+            UUID npcUuid = UUID.randomUUID();
+            UUID formerOwner = UUID.randomUUID();
+            String profileId = "profile-restart-capture";
+            seedCanonicalProfile(persistence, profileId, npcUuid);
+            ReconciliationEvidenceRecoveryProofRegistry proofs =
+                    new ReconciliationEvidenceRecoveryProofRegistry();
+            var containment = new CompanionPopulationAmbiguityContainment(
+                    persistence.getIncidentReporter(), persistence.getPersistenceScopeFactory(),
+                    persistence.getCompanionIdentityRepository(),
+                    persistence.getQuarantineRegistry(), proofs
+            );
+            var conflicting = new CompanionPopulationEvidenceSet(List.of(
+                    CompanionPopulationEvidenceSetTest.captured("item", npcUuid, formerOwner),
+                    CompanionPopulationEvidenceSetTest.dormant(
+                            "snapshot", npcUuid, null,
+                            CompanionPopulationEvidence.Kind.CAPTURED_SNAPSHOT
+                    )
+            ));
+            assertTrue(containment.containEvidenceAsync(conflicting.conflicts())
+                    .get(5L, TimeUnit.SECONDS).complete());
+
+            var corrected = new CompanionPopulationEvidenceSet(List.of(
+                    CompanionPopulationEvidenceSetTest.dormant(
+                            "legacy-item", npcUuid, formerOwner,
+                            CompanionPopulationEvidence.Kind.CAPTURED_ITEM_LEGACY_OWNER_HINT
+                    ),
+                    CompanionPopulationEvidenceSetTest.dormant(
+                            "snapshot", npcUuid, null,
+                            CompanionPopulationEvidence.Kind.CAPTURED_SNAPSHOT
+                    )
+            ));
+            assertTrue(containment.stageEvidenceRecoveryProofs("scan-fixed", corrected)
+                    .get(5L, TimeUnit.SECONDS));
+
+            assertFalse(proofs.isSealedConflictFree(profileId));
+            proofs.seal("scan-fixed");
+            assertTrue(proofs.isSealedConflictFree(profileId));
+        }
+    }
+
     @Test
     void aliasWithoutCanonicalPopulationStateCannotBeScoped() throws Exception {
         try (TameworkPersistenceRuntime persistence =

@@ -42,12 +42,15 @@ public final class CompanionPopulationAmbiguityContainment {
     private final CompanionIdentityRepository identities;
     @Nullable
     private final PersistenceQuarantineRegistry quarantines;
+    @Nullable
+    private final ReconciliationEvidenceRecoveryProofRegistry recoveryProofs;
 
     private CompanionPopulationAmbiguityContainment() {
         this.incidents = null;
         this.scopes = null;
         this.identities = null;
         this.quarantines = null;
+        this.recoveryProofs = null;
     }
 
     public CompanionPopulationAmbiguityContainment(
@@ -58,6 +61,7 @@ public final class CompanionPopulationAmbiguityContainment {
         this.scopes = Objects.requireNonNull(scopes, "scopes");
         this.identities = null;
         this.quarantines = null;
+        this.recoveryProofs = null;
     }
 
     public CompanionPopulationAmbiguityContainment(
@@ -66,10 +70,21 @@ public final class CompanionPopulationAmbiguityContainment {
             @Nonnull CompanionIdentityRepository identities,
             @Nonnull PersistenceQuarantineRegistry quarantines
     ) {
+        this(incidents, scopes, identities, quarantines, null);
+    }
+
+    public CompanionPopulationAmbiguityContainment(
+            @Nonnull PersistenceIncidentReporter incidents,
+            @Nonnull PersistenceScopeFactory scopes,
+            @Nonnull CompanionIdentityRepository identities,
+            @Nonnull PersistenceQuarantineRegistry quarantines,
+            @Nullable ReconciliationEvidenceRecoveryProofRegistry recoveryProofs
+    ) {
         this.incidents = Objects.requireNonNull(incidents, "incidents");
         this.scopes = Objects.requireNonNull(scopes, "scopes");
         this.identities = Objects.requireNonNull(identities, "identities");
         this.quarantines = Objects.requireNonNull(quarantines, "quarantines");
+        this.recoveryProofs = recoveryProofs;
     }
 
     @Nonnull
@@ -83,6 +98,51 @@ public final class CompanionPopulationAmbiguityContainment {
 
     boolean evidenceEnabled() {
         return enabled() && identities != null && quarantines != null;
+    }
+
+    @Nullable
+    ReconciliationEvidenceRecoveryProofRegistry recoveryProofs() {
+        return recoveryProofs;
+    }
+
+    /** Stages fresh, complete conflict-free profile proofs for previously quarantined profiles. */
+    @Nonnull
+    CompletableFuture<Boolean> stageEvidenceRecoveryProofs(
+            @Nonnull String scanEpoch,
+            @Nonnull CompanionPopulationEvidenceSet evidenceSet
+    ) {
+        if (!evidenceEnabled() || recoveryProofs == null) {
+            return CompletableFuture.completedFuture(true);
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            CompanionIdentityRepository.PopulationIdentitySnapshot snapshot = loadIdentities();
+            Map<String, Set<UUID>> aliasesByProfile = new LinkedHashMap<>();
+            for (CompanionIdentityRepository.AliasRecord alias : snapshot.aliases()) {
+                aliasesByProfile.computeIfAbsent(alias.profileId(), ignored -> new LinkedHashSet<>())
+                        .add(alias.npcUuid());
+            }
+            Set<UUID> conflictUuids = evidenceSet.conflicts().stream()
+                    .map(CompanionPopulationEvidenceSet.Conflict::npcUuid)
+                    .collect(Collectors.toUnmodifiableSet());
+            Set<String> conflictFree = new LinkedHashSet<>();
+            for (var quarantine : Objects.requireNonNull(quarantines).snapshot()) {
+                if (quarantine.domain() != PersistenceDomain.RECONCILIATION
+                        || quarantine.scope().type() != PersistenceScopeType.PROFILE
+                        || !quarantine.reasonCode().startsWith("reconciliation_evidence_conflict_")) {
+                    continue;
+                }
+                Set<UUID> aliases = aliasesByProfile.getOrDefault(
+                        quarantine.scope().key(), Set.of()
+                );
+                boolean observed = aliases.stream()
+                        .anyMatch(alias -> !evidenceSet.observations(alias).isEmpty());
+                if (observed && aliases.stream().noneMatch(conflictUuids::contains)) {
+                    conflictFree.add(quarantine.scope().key());
+                }
+            }
+            recoveryProofs.stage(scanEpoch, conflictFree);
+            return true;
+        }).exceptionally(ignored -> false);
     }
 
     /** Opens exact durable fences and reports whether every fence commit succeeded. */

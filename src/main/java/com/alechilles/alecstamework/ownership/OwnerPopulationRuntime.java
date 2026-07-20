@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionLiveEvidenceRevision;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationProgress;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationReconciliationRuntime;
+import com.alechilles.alecstamework.ownership.reconciliation.ReconciliationEvidenceRecoveryProofRegistry;
 import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationRuntimeReconciler;
 import com.alechilles.alecstamework.ownership.reconciliation.CustomContainerReconciliationRegistry;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
@@ -425,6 +426,11 @@ public final class OwnerPopulationRuntime implements AutoCloseable {
     @Nonnull
     public OwnerPopulationCanonicalRecoveryService canonicalRecoveryService() {
         return canonicalRecoveryService;
+    }
+
+    @Nonnull
+    public ReconciliationEvidenceRecoveryProofRegistry reconciliationEvidenceRecoveryProofs() {
+        return reconciliationRuntime.recoveryProofs();
     }
 
     @Override

@@ -41,6 +41,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
     private final ClaimOccupancyIndex claimIndex;
     private final LoadedNpcIdentityIndex loadedNpcIdentityIndex;
     private final CompanionLiveEvidenceRevision liveEvidenceRevision;
+    private final ReconciliationEvidenceRecoveryProofRegistry recoveryProofs;
     private final ScheduledExecutorService executor;
     private final LoadedNpcIdentityStartupGate loadedIdentityStartupGate;
     private final AtomicReference<CompanionPopulationReconciliationProgress> progress =
@@ -59,6 +60,22 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
             @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
             @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision
     ) {
+        this(persistence, bootstrapService, observationWriter, runtimeReconciler, ownerIndex,
+                claimIndex, loadedNpcIdentityIndex, liveEvidenceRevision,
+                new ReconciliationEvidenceRecoveryProofRegistry());
+    }
+
+    public CompanionPopulationStartupReconciler(
+            @Nonnull TameworkPersistenceRuntime persistence,
+            @Nonnull CompanionPopulationBootstrapService bootstrapService,
+            @Nonnull CoalescedCompanionPopulationWriter observationWriter,
+            @Nonnull CompanionPopulationRuntimeReconciler runtimeReconciler,
+            @Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
+            @Nonnull ReconciliationEvidenceRecoveryProofRegistry recoveryProofs
+    ) {
         this(
                 persistence,
                 bootstrapService,
@@ -68,6 +85,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                 claimIndex,
                 loadedNpcIdentityIndex,
                 liveEvidenceRevision,
+                recoveryProofs,
                 Executors.newSingleThreadScheduledExecutor(runnable -> {
                     Thread thread = new Thread(runnable, "tamework-population-reconciliation");
                     thread.setDaemon(true);
@@ -86,6 +104,23 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
             @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
             @Nonnull ScheduledExecutorService executor
     ) {
+        this(persistence, bootstrapService, observationWriter, runtimeReconciler, ownerIndex,
+                claimIndex, loadedNpcIdentityIndex, liveEvidenceRevision,
+                new ReconciliationEvidenceRecoveryProofRegistry(), executor);
+    }
+
+    CompanionPopulationStartupReconciler(
+            @Nonnull TameworkPersistenceRuntime persistence,
+            @Nonnull CompanionPopulationBootstrapService bootstrapService,
+            @Nonnull CoalescedCompanionPopulationWriter observationWriter,
+            @Nonnull CompanionPopulationRuntimeReconciler runtimeReconciler,
+            @Nonnull OwnerPopulationIndex ownerIndex,
+            @Nonnull ClaimOccupancyIndex claimIndex,
+            @Nonnull LoadedNpcIdentityIndex loadedNpcIdentityIndex,
+            @Nonnull CompanionLiveEvidenceRevision liveEvidenceRevision,
+            @Nonnull ReconciliationEvidenceRecoveryProofRegistry recoveryProofs,
+            @Nonnull ScheduledExecutorService executor
+    ) {
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.bootstrapService = Objects.requireNonNull(bootstrapService, "bootstrapService");
         this.observationWriter = Objects.requireNonNull(observationWriter, "observationWriter");
@@ -98,6 +133,7 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
         this.liveEvidenceRevision = Objects.requireNonNull(
                 liveEvidenceRevision, "liveEvidenceRevision"
         );
+        this.recoveryProofs = Objects.requireNonNull(recoveryProofs, "recoveryProofs");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.loadedIdentityStartupGate = new LoadedNpcIdentityStartupGate(
                 loadedNpcIdentityIndex, executor, closed::get
@@ -296,7 +332,8 @@ public final class CompanionPopulationStartupReconciler implements AutoCloseable
                         persistence.getIncidentReporter(),
                         persistence.getPersistenceScopeFactory(),
                         persistence.getCompanionIdentityRepository(),
-                        persistence.getQuarantineRegistry()
+                        persistence.getQuarantineRegistry(),
+                        recoveryProofs
                 )
         );
         return service.reconcileFullyAsync(DEFAULT_BATCH_SIZE).thenCompose(result -> {

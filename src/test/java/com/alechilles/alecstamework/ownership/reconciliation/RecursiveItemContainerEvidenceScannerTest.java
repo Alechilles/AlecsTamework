@@ -53,6 +53,29 @@ class RecursiveItemContainerEvidenceScannerTest {
                 .orElseThrow();
 
         assertEquals(sourceOwner, evidence.ownerUuid());
+        assertEquals(
+                CompanionPopulationEvidence.Kind.CAPTURED_ITEM_LEGACY_OWNER_HINT,
+                evidence.kind()
+        );
+    }
+
+    /** Protects support bundle 6d755cb8: configs are unavailable during the earliest restart scan. */
+    @Test
+    void explicitClearOutcomeDoesNotReAdoptSourceOwnerBeforeConfigsLoad() {
+        UUID npcUuid = UUID.randomUUID();
+        UUID sourceOwner = UUID.randomUUID();
+        BsonDocument metadata = new BsonDocument()
+                .append(TameworkMetadataKeys.CAPTURED, BsonBoolean.TRUE)
+                .append(TameworkMetadataKeys.TARGET_UUID, new BsonString(npcUuid.toString()))
+                .append(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID, new BsonString(sourceOwner.toString()))
+                .append(TameworkMetadataKeys.CAPTURE_OWNER_CLEARED, BsonBoolean.TRUE);
+
+        CompanionPopulationEvidence evidence = new LegacyCapturedItemEvidenceReader(null)
+                .read(item("Spawner_Test_State_Filled", metadata), "restart", "test")
+                .orElseThrow();
+
+        assertNull(evidence.ownerUuid());
+        assertEquals(CompanionPopulationEvidence.Kind.CAPTURED_ITEM, evidence.kind());
     }
 
     @Test

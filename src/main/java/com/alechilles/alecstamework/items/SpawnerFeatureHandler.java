@@ -688,6 +688,11 @@ public final class SpawnerFeatureHandler {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
         updated = itemStackMetadataService.applyOwnerMetadata(updated, ownerToStore);
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.CAPTURE_OWNER_CLEARED,
+                Codec.BOOLEAN,
+                config.isCaptureClearsOwner() && !config.isCaptureTamesTarget()
+        );
         if (existingOwner != null) {
             updated = updated.withMetadata(
                     TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,

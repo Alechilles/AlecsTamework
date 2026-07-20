@@ -127,7 +127,9 @@ public final class CompanionPopulationEvidenceSet {
         List<CompanionPopulationEvidence> physical = observations.stream()
                 .filter(value -> value.kind().isPhysical())
                 .toList();
-        List<CompanionPopulationEvidence> authoritative = physical.isEmpty() ? observations : physical;
+        List<CompanionPopulationEvidence> authoritative = physical.isEmpty()
+                ? authoritativeDormantOwnerEvidence(observations)
+                : physical;
         if (physical.isEmpty() && conflictingDormantKinds(observations)) {
             return Resolution.conflict(npcUuid, "conflicting-dormant-lifecycle-evidence", observations);
         }
@@ -193,6 +195,26 @@ public final class CompanionPopulationEvidenceSet {
         ), null);
     }
 
+    /**
+     * A captured snapshot is the durable owner authority for an unmarked legacy captured item.
+     * Explicit item owners and explicit clear outcomes remain ordinary conflict-producing evidence.
+     */
+    @Nonnull
+    private static List<CompanionPopulationEvidence> authoritativeDormantOwnerEvidence(
+            @Nonnull List<CompanionPopulationEvidence> observations
+    ) {
+        boolean capturedSnapshotPresent = observations.stream().anyMatch(
+                value -> value.kind() == CompanionPopulationEvidence.Kind.CAPTURED_SNAPSHOT
+        );
+        if (!capturedSnapshotPresent) {
+            return observations;
+        }
+        return observations.stream()
+                .filter(value -> value.kind()
+                        != CompanionPopulationEvidence.Kind.CAPTURED_ITEM_LEGACY_OWNER_HINT)
+                .toList();
+    }
+
     private static boolean conflictingDormantKinds(
             @Nonnull List<CompanionPopulationEvidence> observations
     ) {
@@ -227,6 +249,7 @@ public final class CompanionPopulationEvidenceSet {
                 CompanionPopulationEvidence.Kind.LOST_SNAPSHOT,
                 CompanionPopulationEvidence.Kind.COOP_SNAPSHOT,
                 CompanionPopulationEvidence.Kind.CAPTURED_ITEM,
+                CompanionPopulationEvidence.Kind.CAPTURED_ITEM_LEGACY_OWNER_HINT,
                 CompanionPopulationEvidence.Kind.PROFILE_RECORD
         };
         for (CompanionPopulationEvidence.Kind kind : priority) {

@@ -37,18 +37,45 @@ public final class LegacyCapturedItemEvidenceReader {
                 TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
                 Codec.UUID_STRING
         );
-        UUID effectiveOwner = currentOwner != null ? currentOwner : conservativeLegacyOwner(stack, sourceOwner);
+        OwnerEvidence owner = resolveOwnerEvidence(stack, currentOwner, sourceOwner);
         return Optional.of(new CompanionPopulationEvidence(
                 evidenceKey,
                 npcUuid,
-                effectiveOwner,
-                CompanionPopulationEvidence.Kind.CAPTURED_ITEM,
+                owner.ownerUuid(),
+                owner.kind(),
                 null,
                 null,
                 null,
                 null,
                 source
         ));
+    }
+
+    @Nonnull
+    private OwnerEvidence resolveOwnerEvidence(@Nonnull ItemStack stack,
+                                                @Nullable UUID currentOwner,
+                                                @Nullable UUID sourceOwner) {
+        if (currentOwner != null) {
+            return OwnerEvidence.authoritative(currentOwner);
+        }
+        Boolean ownerCleared = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.CAPTURE_OWNER_CLEARED,
+                Codec.BOOLEAN
+        );
+        if (ownerCleared != null) {
+            return OwnerEvidence.authoritative(Boolean.TRUE.equals(ownerCleared) ? null : sourceOwner);
+        }
+        ItemFeatureConfig config = itemFeatures != null ? itemFeatures.get(stack.getItemId()) : null;
+        if (config != null) {
+            return OwnerEvidence.authoritative(config.isCaptureClearsOwner() ? null : sourceOwner);
+        }
+        if (sourceOwner != null) {
+            return new OwnerEvidence(
+                    sourceOwner,
+                    CompanionPopulationEvidence.Kind.CAPTURED_ITEM_LEGACY_OWNER_HINT
+            );
+        }
+        return OwnerEvidence.authoritative(null);
     }
 
     private boolean isFilledSpawner(@Nonnull ItemStack stack) {
@@ -64,16 +91,13 @@ public final class LegacyCapturedItemEvidenceReader {
         return config == null || config.isSpawnerEnabled();
     }
 
-    @Nullable
-    private UUID conservativeLegacyOwner(@Nonnull ItemStack stack, @Nullable UUID sourceOwner) {
-        if (sourceOwner == null) {
-            return null;
+    private record OwnerEvidence(
+            @Nullable UUID ownerUuid,
+            @Nonnull CompanionPopulationEvidence.Kind kind
+    ) {
+        @Nonnull
+        private static OwnerEvidence authoritative(@Nullable UUID ownerUuid) {
+            return new OwnerEvidence(ownerUuid, CompanionPopulationEvidence.Kind.CAPTURED_ITEM);
         }
-        ItemFeatureConfig config = itemFeatures != null ? itemFeatures.get(stack.getItemId()) : null;
-        if (config != null && config.isCaptureClearsOwner()) {
-            return null;
-        }
-        // An unknown legacy config cannot safely prove that the source owner was intentionally cleared.
-        return sourceOwner;
     }
 }

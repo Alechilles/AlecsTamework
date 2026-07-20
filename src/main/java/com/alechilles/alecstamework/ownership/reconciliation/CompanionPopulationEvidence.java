@@ -28,6 +28,8 @@ public record CompanionPopulationEvidence(
         LOST_SNAPSHOT,
         COOP_SNAPSHOT,
         CAPTURED_ITEM,
+        /** Owner inferred only from an unmarked legacy item's historical capture source. */
+        CAPTURED_ITEM_LEGACY_OWNER_HINT,
         PROFILE_RECORD,
         PROJECTION_MARKER;
 

@@ -15,6 +15,8 @@ public final class TameworkMetadataKeys {
     public static final String ATTACHMENTS = "Tamework.Attachments";
     public static final String OWNER_UUID = "Tamework.OwnerUuid";
     public static final String CAPTURE_SOURCE_OWNER_UUID = "Tamework.CaptureSourceOwnerUuid";
+    /** Immutable capture outcome; unlike the source owner this remains valid before configs load. */
+    public static final String CAPTURE_OWNER_CLEARED = "Tamework.CaptureOwnerCleared";
     public static final String TAMED = "Tamework.Tamed";
     public static final String HAPPINESS_CONFIG_ID = "Tamework.Happiness.ConfigId";
     public static final String HAPPINESS_VALUE = "Tamework.Happiness.Value";

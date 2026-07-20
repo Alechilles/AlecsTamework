@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.items.LoadedNpcIdentityIndex;
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationCoverageRecord;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompanionPopulationFinalizationServiceTest {
     @Test
@@ -79,6 +81,7 @@ class CompanionPopulationFinalizationServiceTest {
                 fixture.projections().snapshot().state()
         );
         assertEquals(0, fixture.invalidations().get());
+        assertTrue(fixture.recoveryProofs().isSealedConflictFree("profile-a"));
         assertNull(result.loadedIdentityRevision());
         assertNull(result.liveEvidenceRevision());
         assertNull(result.projectionEvidenceSet());
@@ -152,6 +155,7 @@ class CompanionPopulationFinalizationServiceTest {
                 CompanionPersistedProjectionEvidenceRegistry.State.DEGRADED,
                 fixture.projections().snapshot().state()
         );
+        assertFalse(fixture.recoveryProofs().isSealedConflictFree("profile-a"));
         assertEquals(2, coverage.count(CompanionPopulationCoverageRecord.State.DEGRADED));
     }
 
@@ -402,6 +406,9 @@ class CompanionPopulationFinalizationServiceTest {
         CompanionPopulationCoveragePublisher coverage = new CompanionPopulationCoveragePublisher(
                 catalog(), coverageWriter
         );
+        ReconciliationEvidenceRecoveryProofRegistry recoveryProofs =
+                new ReconciliationEvidenceRecoveryProofRegistry();
+        recoveryProofs.stage(epoch, Set.of("profile-a"));
         CompanionPopulationFinalizationService finalization =
                 new CompanionPopulationFinalizationService(
                         epoch,
@@ -410,7 +417,8 @@ class CompanionPopulationFinalizationServiceTest {
                         liveEvidence,
                         coverage,
                         readyTransition,
-                        invalidationTransition
+                        invalidationTransition,
+                        recoveryProofs
                 );
         CompanionPopulationEvidenceSet evidence = new CompanionPopulationEvidenceSet(List.of());
         CompanionPopulationReconciliationService.Result readyResult =
@@ -432,7 +440,8 @@ class CompanionPopulationFinalizationServiceTest {
                 liveEvidence,
                 projections,
                 readyCommit,
-                invalidations
+                invalidations,
+                recoveryProofs
         );
     }
 
@@ -456,7 +465,8 @@ class CompanionPopulationFinalizationServiceTest {
             CompanionLiveEvidenceRevision liveEvidence,
             CompanionPersistedProjectionEvidenceRegistry projections,
             CompletableFuture<Boolean> readyCommit,
-            AtomicInteger invalidations
+            AtomicInteger invalidations,
+            ReconciliationEvidenceRecoveryProofRegistry recoveryProofs
     ) {
     }
 

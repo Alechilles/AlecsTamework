@@ -93,10 +93,11 @@ public final class CompanionPopulationReconciliationService {
         );
         this.finalizationService = new CompanionPopulationFinalizationService(
                 scanSessionRepository, scanSessionEpoch, loadedNpcIdentityIndex,
-                projectionEvidenceRegistry, liveEvidenceRevision, coveragePublisher
+                projectionEvidenceRegistry, liveEvidenceRevision, coveragePublisher,
+                ambiguityContainment.recoveryProofs()
         );
         this.recoveryGate = new CompanionPopulationRecoveryGate(
-                ambiguityContainment, coveragePublisher);
+                ambiguityContainment, coveragePublisher, scanSessionEpoch);
     }
 
     /**

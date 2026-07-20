@@ -32,6 +32,7 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
     private final CompanionPopulationStartupReconciler startupReconciler;
     private final CompanionPopulationCoverageProjection coverageProjection;
     private final TameworkPersistenceRuntime persistence;
+    private final ReconciliationEvidenceRecoveryProofRegistry recoveryProofs;
 
     public CompanionPopulationReconciliationRuntime(
             @Nonnull TameworkPersistenceRuntime persistence,
@@ -51,6 +52,7 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
         persistence.getCompanionPersistedProjectionEvidenceRegistry()
                 .bindLoadedIdentityIndex(loadedNpcIdentityIndex);
         this.liveEvidenceRevision = new CompanionLiveEvidenceRevision();
+        this.recoveryProofs = new ReconciliationEvidenceRecoveryProofRegistry();
         persistence.getCompanionPersistedProjectionEvidenceRegistry()
                 .bindLiveEvidenceRevision(liveEvidenceRevision);
         this.writer = new CoalescedCompanionPopulationWriter(
@@ -76,7 +78,8 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
                 ownerIndex,
                 claimIndex,
                 loadedNpcIdentityIndex,
-                liveEvidenceRevision
+                liveEvidenceRevision,
+                recoveryProofs
         );
         this.coverageProjection = new CompanionPopulationCoverageProjection(
                 persistence.getPersistenceCoverageRegistry(),
@@ -136,6 +139,11 @@ public final class CompanionPopulationReconciliationRuntime implements AutoClose
         coverageProjection.begin();
         return startupReconciler.restartAfterExternalRepair()
                 .thenApply(this::publishCoverage);
+    }
+
+    @Nonnull
+    public ReconciliationEvidenceRecoveryProofRegistry recoveryProofs() {
+        return recoveryProofs;
     }
 
     private CompanionPopulationReconciliationProgress publishCoverage(

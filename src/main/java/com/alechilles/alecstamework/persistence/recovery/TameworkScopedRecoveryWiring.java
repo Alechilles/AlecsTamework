@@ -39,6 +39,11 @@ public final class TameworkScopedRecoveryWiring {
         ScopedPersistenceRecoveryCoordinator coordinator =
                 persistence.getScopedRecoveryCoordinator();
         installOwnerVerifiers(coordinator, population.canonicalRecoveryService());
+        coordinator.register(new ReconciliationEvidenceRecoveryVerifier(
+                population.reconciliationEvidenceRecoveryProofs(),
+                population.canonicalRecoveryService()::verifyReadable,
+                population.canonicalRecoveryService()::republish
+        ));
         installManagedCoopVerifiers(coordinator, persistence.getManagedCoopServices());
         coordinator.scheduleOpenIncidentsAfterStartup();
     }
