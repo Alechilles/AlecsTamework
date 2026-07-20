@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership.reconciliation;
 
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyGlobalPersistenceFailureBridge;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceFailureContext;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentReporter;
@@ -48,7 +49,8 @@ final class CompanionPopulationObservationFailureReporter {
         boolean scoped = incidents != null && scopes != null;
         if (scoped) {
             reportScoped(observation, healthReason, status);
-        } else if (!persistenceHealth.markDegraded(healthReason)) {
+        } else if (!LegacyGlobalPersistenceFailureBridge.markDegraded(
+                persistenceHealth, healthReason)) {
             return false;
         }
         Consumer<String> sink = warningSink;

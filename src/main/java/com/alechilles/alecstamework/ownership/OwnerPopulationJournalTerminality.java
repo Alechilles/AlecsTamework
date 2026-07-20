@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyGlobalPersistenceFailureBridge;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceOperationPhase;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceTransactionOutcome;
 import java.util.Objects;
@@ -31,7 +32,8 @@ final class OwnerPopulationJournalTerminality {
     void degrade(@Nonnull String reason) {
         if (persistenceGuard == null) {
             index.setReadiness(OwnerPopulationReadiness.DEGRADED);
-            health.markDegraded(Objects.requireNonNull(reason, "reason"));
+            LegacyGlobalPersistenceFailureBridge.markDegraded(
+                    health, Objects.requireNonNull(reason, "reason"));
             return;
         }
         persistenceGuard.reportFeatureAmbiguity(Objects.requireNonNull(reason, "reason"));

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
+import com.alechilles.alecstamework.persistence.sqlite.LegacyGlobalPersistenceFailureBridge;
 import com.alechilles.alecstamework.persistence.health.PersistenceCoverageRegistry;
 import com.alechilles.alecstamework.persistence.health.PersistenceEvidenceDimension;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
@@ -80,7 +81,8 @@ final class BreedingReplayJournalLoader {
         } catch (Exception | LinkageError failure) {
             replayService.markUnavailable();
             if (coverage == null || incidents == null || scopes == null) {
-                health.markDegraded("breeding_replay_journal_load_failed");
+                LegacyGlobalPersistenceFailureBridge.markDegraded(
+                        health, "breeding_replay_journal_load_failed");
                 return;
             }
             coverage.publish(PersistenceEvidenceDimension.BREEDING_REPLAY_JOURNAL,

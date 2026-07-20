@@ -1,26 +1,25 @@
 package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class OwnerPopulationFeatureDomainTest {
-    @ParameterizedTest
-    @CsvSource({
-            "breeding_population_commit_failed, BREEDING_BIRTH",
-            "managed_coop_population_commit_failed, MANAGED_COOP_RELEASE",
-            "coop_release_live_identity_remap_failed, MANAGED_COOP_RELEASE",
-            "spawn_identity_remap_failed, TAMED_SPAWN",
-            "capture_source_finalize_failed, CAPTURE_RELEASE",
-            "recall_relocation_commit_failed, RECALL_RELOCATION",
-            "lost_recovery_commit_failed, DEATH_LOST_RECOVERY",
-            "public_population_commit_failed, OWNER_MUTATION"
-    })
-    void unresolvedFeatureFailuresDoNotCollapseIntoOneOwnerDomain(
-            String reason,
-            PersistenceDomain expected) {
-        assertEquals(expected, OwnerPopulationPersistenceGuard.featureDomain(reason));
+    @Test
+    void unresolvedFeatureFailuresDoNotCollapseIntoOneOwnerDomain() {
+        Map<String, PersistenceDomain> cases = Map.of(
+                "breeding_population_commit_failed", PersistenceDomain.BREEDING_BIRTH,
+                "managed_coop_population_commit_failed", PersistenceDomain.MANAGED_COOP_RELEASE,
+                "coop_release_live_identity_remap_failed", PersistenceDomain.MANAGED_COOP_RELEASE,
+                "spawn_identity_remap_failed", PersistenceDomain.TAMED_SPAWN,
+                "capture_source_finalize_failed", PersistenceDomain.CAPTURE_RELEASE,
+                "recall_relocation_commit_failed", PersistenceDomain.RECALL_RELOCATION,
+                "lost_recovery_commit_failed", PersistenceDomain.DEATH_LOST_RECOVERY,
+                "public_population_commit_failed", PersistenceDomain.OWNER_MUTATION
+        );
+        cases.forEach((reason, expected) -> assertEquals(
+                expected, OwnerPopulationPersistenceGuard.featureDomain(reason), reason));
     }
 }
