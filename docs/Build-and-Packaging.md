@@ -157,7 +157,8 @@ pre-v6 probing, copied-save layout, archive filtering, new-backup discrimination
 copied config overrides, exact diagnostic allow/fail matrices, readiness success/timeout polling,
 graceful console stop, forced timeout cleanup, input refusal, and validate-only wiring.
 
-The process contract is grounded in Hytale 0.5.6 server code: `Options` supplies the explicit assets,
+The process contract was grounded in Hytale 0.5.6 server code and rerun successfully on the installed
+Hytale 0.5.7 server: `Options` supplies the explicit assets,
 universe, bind, offline-auth, Sentry, and file-watcher flags; the working directory supplies the default
 `mods` directory; `HytaleServer.boot` emits `Hytale Server Booted!`; console `StopCommand` invokes the
 graceful shutdown path; `HytaleServer.shutdown0` emits `Shutdown completed!`; and `PluginManager.start`
@@ -172,7 +173,7 @@ record with:
 .\scripts\tools\verify-persistence-release-candidate.ps1 `
   -TelemetryRoot "C:\worktrees\AlecsTelemetry" `
   -PlatformRoot "C:\worktrees\AlecsTelemetryPlatform" `
-  -HytaleVersion "0.5.6"
+  -HytaleVersion "0.5.7"
 ```
 
 The verifier reruns the complete Tamework and Alec's Telemetry Maven suites, the telemetry platform
@@ -185,6 +186,10 @@ and portal timeline suites. It records dependency-lock and persistence-document 
 unsafe player-access source scan, and distinguishes passed build gates from operator-only rehearsal,
 deployment, rollback, and public-download gates. A missing named report fails the candidate verifier
 even when the aggregate test count is otherwise green.
+
+`-HytaleVersion` is mandatory and must match the server artifact used by the subsequent isolated
+runtime harness. The verifier deliberately has no remembered default because an automatic Hytale
+update would otherwise leave a plausible but false release-evidence label.
 
 The verifier never opens or copies a Hytale world. Its backup section always records that Tamework did
 not create a whole-save backup. An operator may pass `-ExternalHytaleBackupReference` to record an

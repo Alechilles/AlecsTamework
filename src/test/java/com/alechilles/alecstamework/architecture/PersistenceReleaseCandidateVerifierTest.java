@@ -31,6 +31,8 @@ class PersistenceReleaseCandidateVerifierTest {
         assertTrue(source.indexOf("tamework-tests") < source.indexOf("tamework-package"));
         assertTrue(source.contains("worktree is dirty"));
         assertTrue(source.contains("commit changed while gates were running"));
+        assertTrue(source.contains("[string] $HytaleVersion,"));
+        assertFalse(source.contains("$HytaleVersion ="));
     }
 
     @Test

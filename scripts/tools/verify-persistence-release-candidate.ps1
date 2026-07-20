@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string] $TelemetryRoot,
     [Parameter(Mandatory = $true)][string] $PlatformRoot,
-    [string] $HytaleVersion = "0.5.6",
+    [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string] $HytaleVersion,
     [string] $ExternalHytaleBackupReference,
     [string] $OutputPath
 )
