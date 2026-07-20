@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
+import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -139,6 +141,16 @@ public final class ActionTameworkSetOwner extends TameworkActionBase {
                     decision.limit(),
                     resolveConfigScope()
             );
+            return;
+        }
+        if (livePlayer.getPlayerRef() != null && decision != null
+                && decision.persistenceAvailability() != null
+                && !decision.persistenceAvailability().allowed()) {
+            livePlayer.getPlayerRef().sendMessage(Message.raw(PersistencePlayerFeedback.resolve(
+                    livePlayer,
+                    PersistenceDomain.TAMING_OWNERSHIP,
+                    decision.persistenceAvailability()
+            )));
             return;
         }
         sendUnavailable(livePlayer, reason);

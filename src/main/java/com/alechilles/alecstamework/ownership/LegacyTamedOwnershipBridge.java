@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -234,6 +236,16 @@ public final class LegacyTamedOwnershipBridge {
                     decision.limit(),
                     resolveLimitScope()
             );
+            return;
+        }
+        if (player.getPlayerRef() != null && decision != null
+                && decision.persistenceAvailability() != null
+                && !decision.persistenceAvailability().allowed()) {
+            player.getPlayerRef().sendMessage(Message.raw(PersistencePlayerFeedback.resolve(
+                    player,
+                    PersistenceDomain.TAMING_OWNERSHIP,
+                    decision.persistenceAvailability()
+            )));
             return;
         }
         sendUnavailable(player, reason);

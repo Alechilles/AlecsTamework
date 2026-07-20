@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteConnectionManager;
 import com.alechilles.alecstamework.persistence.sqlite.SqliteSchemaMigrator;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityStatus;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -203,7 +204,9 @@ class OwnerPopulationAdmissionCoordinatorTest {
             ).get(2, TimeUnit.SECONDS);
 
             assertFalse(result.allowed());
-            assertEquals("owner-population-persistence-degraded", result.reason());
+            assertEquals("test", result.reason());
+            assertEquals(PersistenceMutationAvailabilityStatus.GLOBAL_READ_ONLY,
+                    result.decision().persistenceAvailability().status());
             assertEquals(0, harness.index.pendingReservationCount());
             assertEquals(0L, harness.index.counts(ownerUuid, "default").globalPending());
             assertTrue(harness.repository.loadAllStates().isEmpty());

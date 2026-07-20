@@ -11,6 +11,8 @@ import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerMutationScheduler;
 import com.alechilles.alecstamework.ownership.OwnerPopulationDecision;
 import com.alechilles.alecstamework.ownership.OwnerPopulationOperation;
+import com.alechilles.alecstamework.persistence.health.PersistencePlayerFeedback;
+import com.alechilles.alecstamework.persistence.incidents.PersistenceDomain;
 import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -227,7 +229,23 @@ final class InteractionOwnerAdmissionService {
             );
             return;
         }
+        if (sendPersistenceDenial(player, decision, PersistenceDomain.OWNER_MUTATION)) {
+            return;
+        }
         sendOwnerUnavailable(player, reason);
+    }
+
+    private static boolean sendPersistenceDenial(Player player,
+                                                  @Nullable OwnerPopulationDecision decision,
+                                                  PersistenceDomain domain) {
+        if (player == null || player.getPlayerRef() == null || decision == null
+                || decision.persistenceAvailability() == null
+                || decision.persistenceAvailability().allowed()) {
+            return false;
+        }
+        player.getPlayerRef().sendMessage(Message.raw(PersistencePlayerFeedback.resolve(
+                player, domain, decision.persistenceAvailability())));
+        return true;
     }
 
     private static boolean sendClaimDenial(Store<EntityStore> store,

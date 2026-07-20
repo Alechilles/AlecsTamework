@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
+import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityStatus;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceIncidentReporter;
 import com.alechilles.alecstamework.persistence.incidents.PersistenceScopeFactory;
 import java.util.Objects;
@@ -83,14 +84,21 @@ public final class OwnerPopulationAdmissionCoordinator {
             PersistenceMutationAvailabilityDecision availability = persistenceGuard.decide(plan);
             if (!availability.allowed()) {
                 OwnerPopulationDecision denied = index.denyBeforeReservation(
-                        plan.transition(), availability.reasonCode());
+                        plan.transition(), availability.reasonCode())
+                        .withPersistenceAvailability(availability);
                 return new OwnerPopulationReservationPreparation(
                         false, denied.reason(), plan, denied);
             }
         }
         if (!persistenceHealth.isHealthy()) {
+            var storage = persistenceHealth.getStorageHealthService().getState();
+            PersistenceMutationAvailabilityDecision availability =
+                    new PersistenceMutationAvailabilityDecision(
+                            PersistenceMutationAvailabilityStatus.GLOBAL_READ_ONLY,
+                            storage.reason(), storage.incidentId());
             OwnerPopulationDecision denied = index.denyBeforeReservation(
-                    plan.transition(), "owner-population-persistence-degraded");
+                    plan.transition(), storage.reason())
+                    .withPersistenceAvailability(availability);
             return new OwnerPopulationReservationPreparation(
                     false,
                     denied.reason(),
