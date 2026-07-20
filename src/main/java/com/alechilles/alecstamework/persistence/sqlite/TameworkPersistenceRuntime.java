@@ -162,18 +162,6 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                     sqlitePath,
                     connectionManager,
                     schemaMigrator,
-                    SqliteSchemaMigrator.SCHEMA_VERSION_V5
-            );
-            backupService.backupBeforeVersion(
-                    sqlitePath,
-                    connectionManager,
-                    schemaMigrator,
-                    SqliteSchemaMigrator.SCHEMA_VERSION_V6
-            );
-            backupService.backupBeforeVersion(
-                    sqlitePath,
-                    connectionManager,
-                    schemaMigrator,
                     SqliteSchemaMigrator.SCHEMA_VERSION_V7
             );
             backupAndResetPreV2SqliteIfNeeded(sqlitePath, connectionManager, schemaMigrator);

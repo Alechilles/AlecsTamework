@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -36,6 +38,14 @@ class SqliteMigrationBackupServiceTest {
         assertNotEquals(first, second);
         assertTrue(Files.exists(first));
         assertTrue(Files.exists(second));
+        Path firstManifest = SqliteMigrationBackupService.manifestPath(first);
+        assertTrue(Files.exists(firstManifest));
+        JsonObject manifest = JsonParser.parseString(Files.readString(firstManifest)).getAsJsonObject();
+        assertEquals("tamework_sqlite_only", manifest.get("scope").getAsString());
+        assertEquals("hytale_server_operator", manifest.get("hytaleSaveBackupOwnedBy").getAsString());
+        assertEquals(5, manifest.get("targetSchemaVersion").getAsInt());
+        assertEquals(Files.size(first), manifest.get("snapshotSizeBytes").getAsLong());
+        assertEquals(64, manifest.get("snapshotSha256").getAsString().length());
         try (Connection backup = java.sql.DriverManager.getConnection("jdbc:sqlite:" + first);
              Statement statement = backup.createStatement();
              ResultSet resultSet = statement.executeQuery("SELECT value FROM durable")) {
