@@ -31,7 +31,8 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw getflockdebug`
 - `/tw npcclean <roleId>`
 - `/tw showhitboxes`
-- `/tw debugdb [integrity|checkpoint|vacuum]`
+- `/tw debugdb [health|incidents|incident|retry|export|integrity|checkpoint|vacuum]`
+- `/tw persistencecircuit [list|enable <feature>|disable <feature> [reason]]`
 - `/tw coop audit`
 - `/tw coop import-status`
 - `/tw coop reconcile <x> <y> <z> [confirm <auditFingerprint>|cancel]`
@@ -78,8 +79,13 @@ enabled in `/tw settings`. Use `/tw debugneedstelemetry off` as the local kill s
 - `/tw coop audit` reports active managed authorities plus bounded resident/operation identity details: profile, slot, source/projection UUIDs, operation state, generation, retries, index revisions, and persistence queue lifecycle.
 - `/tw coop import-status` focuses on active import sessions, pending legacy sources, sources awaiting exact absence proof, and unresolved conflicts.
 - `/tw coop reconcile <x> <y> <z>` is report-only by default. Destructive progress requires the exact current audit fingerprint, the reconcile permission, and `confirm <fingerprint>`. Restart, cancellation, or any evidence/plan change revokes the process-local approval.
-- `/tw coop rollback-preflight` reports rollback blockers and available pre-v5 SQLite backup evidence without changing state. Live v5-to-v4 downgrade is unsupported; restore the matching complete pre-v5 save or roll forward.
+- `/tw coop rollback-preflight` reports rollback blockers and older SQLite snapshot evidence without changing state. A Tamework SQLite snapshot is not a whole-save backup. Tamework does not create or restore whole saves; a code/data rollback is an operator-managed Hytale/host procedure.
 - `/tw debugdb integrity` runs SQLite and foreign-key checks plus canonical identity, managed-coop lifecycle, and import invariants.
+- `/tw debugdb health` summarizes storage state, unavailable evidence dimensions, active quarantines, write-queue metrics, and paused circuits.
+- `/tw debugdb incidents [open|all]` lists bounded incident summaries; `/tw debugdb incident <incident-id>` shows one exact or uniquely prefixed incident.
+- `/tw debugdb retry <incident-id>` requests its registered evidence verifier. It cannot force-clear a quarantine, manufacture absence proof, or bypass an invariant.
+- `/tw debugdb export [recent|incident <incident-id>]` creates an administrator-only, redacted support ZIP under Tamework's diagnostics directory. It excludes the SQLite database, complete save, secrets, player names, raw stable identifiers, exact coordinates, arbitrary inventory contents, and unrestricted logs.
+- `/tw persistencecircuit` controls locally persisted emergency mutation pauses. Circuits default enabled, cannot be changed remotely, do not bypass persistence safety when re-enabled, and are not staged-rollout flags.
 - `/tw gethappiness` includes the active/latest breeding job's id, state, mode, partner, planned/admitted/outstanding/exact-spawned counts, population headroom, terminal reason, and rollback-attempt result.
 - Import conflicts intentionally fail closed. Preserve the database/save evidence and investigate the reported source rather than manually spawning or deleting residents.
 - Negative world timestamps are valid. Only `0` means unset for breeding cooldown and passive-sweep scheduling.

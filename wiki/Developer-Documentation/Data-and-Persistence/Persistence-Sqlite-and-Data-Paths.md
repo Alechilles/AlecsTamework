@@ -55,9 +55,11 @@ Parent: [Data and Persistence](/mod/alecs-tamework/data-and-persistence) | [Deve
 - Prepared/applying/compensating mutation journals in `companion_population_operations`; breeding-only `RETRYABLE` rows release readiness while retaining deterministic child replay evidence and are not generic pruning candidates
 - Resumable coverage cursors and source evidence for population reconciliation
 
-## Schema v6 population migration
+## Schema v7 resilience migration
 
-Before schema v6 is applied to an existing database, Tamework creates a transactionally consistent SQLite snapshot with `VACUUM INTO`. The backup is stored beside the live database as `tamework_pre_v6_YYYYMMDD-HHMMSS.sqlite.bak` (with a numeric suffix if needed). Keep the complete save and this backup together when testing an upgrade.
+Before schema v7 is applied to an existing database, Tamework creates a transactionally consistent snapshot of **only its own SQLite database** with `VACUUM INTO`. The snapshot is stored beside the live database as `tamework_pre_v7_YYYYMMDD-HHMMSS.sqlite.bak` (with a numeric suffix if needed). A companion manifest records its size, SHA-256 hash, source and target schema versions, and the explicit scope `tamework_sqlite_only`. Tamework opens the snapshot and runs SQLite integrity verification before migration begins.
+
+Tamework does not copy or archive the Hytale save, and it does not invoke Hytale's universe-backup operation. Whole-save backups remain the responsibility of Hytale, the host, and the server operator. The SQLite snapshot is a migration safeguard for Tamework-owned data; it is not a complete-world backup and cannot restore world/entity files by itself. No snapshot is created on an ordinary startup when schema v7 is already applied.
 
 The migration is additive. It seeds population rows from existing profile, capture, coop, death, and lost state without deleting companions. A legacy profile may be over the newly configured cap; reconciliation adopts it and reports over-cap state, while later positive admissions remain blocked. Do not delete rows to make counts fit.
 
@@ -75,7 +77,7 @@ Per-world readiness can remain reconciling when a canonical owner is known but i
 
 An owned profile with an unknown ownership world still consumes its owner's global slot. It cannot authorize a positive per-world admission until persisted evidence establishes the scope or a normal supported release removes the ownership.
 
-There is no automatic population-repair command. Population diagnostics are read-only: they report readiness, incomplete coverage, and pending-operation reasons without rewriting canonical state. Before recovery, stop the server and back up the complete save plus `tamework.sqlite`, `tamework.sqlite-wal`, and `tamework.sqlite-shm` when present. Prefer restoring the missing authoritative source or a known-good complete backup, then rerun reconciliation. Do not hand-edit counters, population rows, or operation journals; exceptional database correction should be performed offline from reviewed identity/source evidence with a rollback copy.
+There is no force-repair command. Population diagnostics report readiness, incomplete coverage, incidents, quarantines, and pending-operation reasons without guessing which identity is correct. `/tw debugdb retry <incident-id>` requests the applicable evidence verifier; it cannot force-clear a quarantine. Prefer restoring missing authoritative evidence or using an operator-managed recovery procedure. Do not hand-edit counters, population rows, quarantines, or operation journals. If external restoration is necessary, use Hytale/host backup tooling and ensure the world files and Tamework SQLite state come from one coherent operator-managed recovery point.
 
 ## Reconciliation coverage
 
@@ -129,13 +131,13 @@ Saved-world reconciliation records a physical entity with `DeathComponent` as de
 
 ## Upgrade and rollback guidance
 
-1. Stop the server and copy the complete universe/save, not only `tamework.sqlite`.
-2. Start the new build on that copy and wait for population diagnostics to reach `READY` (or investigate the reported dimension/reason).
-3. Verify owned active, unloaded, captured, cooped, dead, and lost companions remain represented once each.
-4. Verify offline inventories and nested captured items were covered.
-5. Test a new acquisition, transfer to a full owner, and stored-companion restore before upgrading the real save.
+1. Close the world session before replacing the JAR. The complete Hytale client does not need to be closed.
+2. If your hosting policy requires a whole-save recovery point, create it with Hytale's or the host's own backup tooling. Tamework does not create one.
+3. Start the new build. When migration is required, verify that the log reports a valid pre-v7 Tamework SQLite snapshot and manifest before schema v7 is applied.
+4. Healthy, verified scopes are usable immediately after login; there is no warm-up timer. Investigate only the specific authority dimension or incident reported by diagnostics.
+5. Verify owned active, unloaded, captured, cooped, dead, and lost companions remain represented once each, then test the persistence-backed operations relevant to the server.
 
-The supported data rollback after schema migration is restoration of the complete pre-migration save/database backup. Additive tables can remain on disk, but an older build's cross-world counter is not safe with `GLOBAL` caps enabled. Disable the cap before any code rollback that cannot understand schema v6 state.
+Do not treat `tamework_pre_v7_*.sqlite.bak` as a full rollback. A code downgrade that cannot understand schema v7 requires a reviewed operator-managed rollback of mutually consistent Hytale world data and Tamework persistence state. Tamework deliberately does not automate that restoration or force-clear unresolved identity and occupancy evidence.
 
 ## Maintenance advice
 - Treat persistence health degradation as a first-class runtime signal
@@ -146,8 +148,8 @@ The supported data rollback after schema migration is restoration of the complet
 - Import ambiguity is a health condition, not permission to choose a resident. Retain evidence and fail closed until the exact binding or absence proof is available.
 - Treat imported-source absence proof as process-scoped live evidence. Persist it for audit, but recheck and refresh it after restart before finalizing a restored vanilla block list.
 - Use `/tw debugdb integrity` for SQLite, foreign-key, identity, lifecycle, and import invariants; use `/tw coop audit` for the runtime-facing managed-coop summary.
-- `/tw coop rollback-preflight` is read-only. It can identify queue/operation/conflict/integrity blockers and pre-v5 SQLite snapshots, but a supported downgrade still requires the matching complete pre-v5 save; SQLite alone is not a complete-save backup.
-- Do not edit population rows or nonterminal journals by hand. Capture diagnostics and backups before repair work.
+- `/tw coop rollback-preflight` is read-only. It can identify queue/operation/conflict/integrity blockers and older SQLite snapshots, but SQLite alone is never a complete-save backup.
+- Do not edit population rows, quarantines, or nonterminal journals by hand. Export diagnostics before a reviewed operator-managed recovery.
 
 ## Related Pages
 - [Command Runtime and Linked Panel Internals](/mod/alecs-tamework/command-runtime-and-linked-panel-internals)

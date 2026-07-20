@@ -86,7 +86,7 @@ The limit counts canonical profiles with a non-null owner, not only loaded NPCs.
 - Owner transfers reserve the destination before releasing the source. A denied transfer leaves the old owner unchanged.
 - Existing over-cap companions are preserved; later positive admissions are blocked until the owner is below the cap.
 - A companion whose authoritative ownership world is unknown still counts globally, while per-world positive admissions remain blocked until reconciliation establishes its scope.
-- Tamework currently has no automatic population-repair command. Diagnostics report the unresolved source; recovery requires complete save/SQLite backups and restoration of authoritative evidence or a supported release flow, not manual counter/row edits.
+- Tamework has no force-repair command. Scoped recovery verifies authoritative evidence and keeps ambiguous companions conservatively counted; `/tw debugdb retry <incident-id>` requests verification but cannot bypass it. Whole-save backup and restoration remain Hytale/host/operator responsibilities, not Tamework runtime behavior.
 
 ### Claim Integration
 - `Provider` (`Auto`, `QuestLinesClaims`, `SimpleClaims`, or `Off`)
@@ -158,7 +158,7 @@ Claim limits count owned `ACTIVE` and durably `UNLOADED` physical companions. Ca
 - Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` values are imported only when the universe settings file does not already contain telemetry values.
 - `/tw settings` is intended for world-level operations and diagnostics, not per-mod content packs.
 - The login popup is shown at most once per player login session, so world changes do not reopen it repeatedly.
-- Positive owner/claim admissions fail closed while population state is `LOADING`, `RECONCILING`, or `DEGRADED`. This avoids treating incomplete upgrade coverage as zero companions.
+- Positive owner/claim admissions fail closed only when their required evidence dimension and scope are not authoritative. Healthy verified scopes are available immediately after login; there is no fixed startup or login delay.
 - Claim population and damage capabilities are independent. Enabling damage does not make breeding scan claims when no population rule is relevant.
 
 ## Relationship to `Tw*Config` Assets
@@ -172,7 +172,7 @@ Claim limits count owned `ACTIVE` and durably `UNLOADED` physical companions. Ca
 - Use `/tw settings` for server-specific tuning after deployment.
 - Keep the announcement copy focused on major setting changes and use `announcementId` changes sparingly so the popup stays meaningful.
 - Keep a backup of `universe/Tamework/Settings/` before major balancing experiments.
-- Before enabling a positive cap on an upgraded save, also back up the complete save and wait for `getPopulationDiagnostics()` readiness to report `READY` for the configured scope.
+- Before enabling a positive cap on an upgraded save, inspect `getPopulationDiagnostics()` for the configured scope. A reported authority gap must be resolved from its specific evidence; players do not need to wait when that scope is already verified. Use Hytale/host tooling if your operating policy calls for a whole-save recovery point.
 
 ## Related Pages
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
