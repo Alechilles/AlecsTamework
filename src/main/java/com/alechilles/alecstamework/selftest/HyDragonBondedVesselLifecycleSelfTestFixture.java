@@ -12,6 +12,8 @@ import com.alechilles.alecstamework.api.BondedVesselTransitionContext;
 import com.alechilles.alecstamework.api.BondedVesselTransitionRequest;
 import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.api.SpawnerVesselConfigView;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPersistedProjectionEvidenceRegistry;
+import com.alechilles.alecstamework.ownership.reconciliation.CompanionPopulationEvidenceSet;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselBindingRecord;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselOperationRecord;
 import com.alechilles.alecstamework.persistence.sqlite.BondedVesselRepository;
@@ -25,6 +27,7 @@ import com.alechilles.alecstamework.vessels.BondedVesselMutationAuthority;
 import com.alechilles.alecstamework.vessels.BondedVesselTransitionPlanner;
 import com.alechilles.alecstamework.vessels.SqliteBondedVesselJournal;
 import com.alechilles.alecstamework.vessels.runtime.BondedVesselInitialBindingService;
+import com.alechilles.alecstamework.vessels.runtime.BondedVesselItemProjectionReconciler;
 import com.alechilles.alecstamework.vessels.runtime.BondedVesselLifecycleObserver;
 import com.google.gson.Gson;
 import java.io.IOException;
@@ -195,9 +198,24 @@ final class HyDragonBondedVesselLifecycleSelfTestFixture {
 
             bindImmediately(LOST_PROFILE_ID, LOST_BINDING_ID, "lost");
             BondedVesselCoordinator lostCoordinator = coordinator(LOST_NPC_ID);
-            transition(lostCoordinator, LOST_PROFILE_ID, "summon-lost", BondedVesselTransition.SUMMON);
-            BondedVesselBindingRecord activeLost = repository.findBindingByProfile(LOST_PROFILE_ID);
             evidence.finalization.set(BondedVesselEvidenceAuthority.FinalizationStatus.FINALIZED);
+            BondedVesselOperationResult lostSummoned = transition(
+                    lostCoordinator, LOST_PROFILE_ID, "summon-lost", BondedVesselTransition.SUMMON);
+            BondedVesselBindingRecord activeLost = repository.findBindingByProfile(LOST_PROFILE_ID);
+
+            BondedVesselItemProjectionReconciler.Report missingReport =
+                    new BondedVesselItemProjectionReconciler(
+                            repository, events::add, Runnable::run, clock::getAndIncrement)
+                            .reconcileSealed(new CompanionPersistedProjectionEvidenceRegistry.Snapshot(
+                                    CompanionPersistedProjectionEvidenceRegistry.State.SEALED,
+                                    "self-test-sealed-missing-vessel-item",
+                                    new CompanionPopulationEvidenceSet(List.of()),
+                                    null, 0L, clock.getAndIncrement(), null))
+                            .toCompletableFuture().join();
+            BondedVesselBindingRecord missingActive =
+                    repository.findBindingByProfile(LOST_PROFILE_ID);
+
+            evidence.finalization.set(BondedVesselEvidenceAuthority.FinalizationStatus.INDETERMINATE);
             BondedVesselLifecycleObserver.Result lost = lifecycleObserver(evidence).observe(
                     new BondedVesselLifecycleObserver.Observation(
                             LOST_PROFILE_ID, LOST_NPC_ID,
@@ -206,15 +224,32 @@ final class HyDragonBondedVesselLifecycleSelfTestFixture {
                     .toCompletableFuture().join();
             BondedVesselBindingRecord lostBinding = repository.findBindingByProfile(LOST_PROFILE_ID);
             assertions.add(new ApiSelfTestAssertion(
-                    "isolated bonded vessel lost transition preserves exact item evidence",
-                    lost.status() == BondedVesselLifecycleObserver.Status.COMMITTED
+                    "isolated bonded vessel lost transition survives sealed item absence",
+                    lostSummoned.status() == BondedVesselOperationResult.Status.COMMITTED
+                            && activeLost.lifecycleState()
+                            == BondedVesselBindingRecord.LifecycleState.ACTIVE
+                            && LOST_NPC_ID.equals(activeLost.activeNpcUuid())
+                            && missingReport.status()
+                            == BondedVesselItemProjectionReconciler.Status.RECONCILED
+                            && missingReport.missing() == 1
+                            && missingActive.lifecycleState()
+                            == BondedVesselBindingRecord.LifecycleState.ACTIVE
+                            && missingActive.generation() == activeLost.generation()
+                            && missingActive.itemProjectionStatus()
+                            == BondedVesselBindingRecord.ItemProjectionStatus.MISSING
+                            && lost.status() == BondedVesselLifecycleObserver.Status.COMMITTED
                             && lostBinding.lifecycleState()
                             == BondedVesselBindingRecord.LifecycleState.LOST
                             && lostBinding.itemProjectionStatus()
-                            == BondedVesselBindingRecord.ItemProjectionStatus.PRESENT
+                            == BondedVesselBindingRecord.ItemProjectionStatus.MISSING
+                            && lostBinding.generation() == activeLost.generation() + 1L
                             && lostBinding.activeNpcUuid() == null,
-                    "status=" + lost.status() + " projection="
-                            + lostBinding.itemProjectionStatus()));
+                    "summon=" + lostSummoned.status() + " sealed=" + missingReport.status()
+                            + "/" + missingReport.missing() + " missingState="
+                            + missingActive.lifecycleState() + " loss=" + lost.status()
+                            + " projection=" + lostBinding.itemProjectionStatus()
+                            + " generation=" + activeLost.generation() + "->"
+                            + lostBinding.generation()));
         }
 
         private BondedVesselInitialBindingService bindingService(

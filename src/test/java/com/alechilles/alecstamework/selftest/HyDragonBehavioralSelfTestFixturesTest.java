@@ -22,7 +22,7 @@ class HyDragonBehavioralSelfTestFixturesTest {
                         "isolated bonded vessel summons and stores through one journal",
                         "isolated bonded vessel restart closes applied transition without reapplying",
                         "isolated bonded vessel death is duplicate-safe with offline item",
-                        "isolated bonded vessel lost transition preserves exact item evidence",
+                        "isolated bonded vessel lost transition survives sealed item absence",
                         "isolated population group rejects boundary overflow",
                         "isolated population reservations serialize and cancel exactly once",
                         "isolated population role change is evaluated all-or-none",
