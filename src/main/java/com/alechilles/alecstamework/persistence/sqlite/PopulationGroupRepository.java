@@ -60,6 +60,23 @@ public final class PopulationGroupRepository {
         );
     }
 
+    /**
+     * Atomically checks every positive group delta against authoritative committed and reserved
+     * counts, then persists the complete reservation. A denied request writes nothing.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<ReservationResult> reserveOperationAsync(
+            @Nonnull PopulationGroupOperationRecord operation,
+            @Nonnull List<ReservationEvidence> requestedEvidence) {
+        List<ReservationEvidence> immutableEvidence = List.copyOf(requestedEvidence);
+        validateReservationRequest(operation, immutableEvidence);
+        return writeQueue.submitTracked(
+                "population_group_operation_reserve",
+                connection -> reserveOperationInTransaction(connection, operation, immutableEvidence),
+                null
+        );
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<OperationResult> advanceOperationAsync(
             @Nonnull String operationId,
@@ -121,6 +138,24 @@ public final class PopulationGroupRepository {
         }
     }
 
+    /** Loads every durable attempt correlated to one higher-level population operation. */
+    @Nonnull
+    public List<PopulationGroupOperationRecord> loadOperationsByPopulationOperationId(
+            @Nonnull String populationOperationId) throws Exception {
+        String normalized = requireText(populationOperationId, "populationOperationId");
+        try (Connection connection = connectionManager.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     OPERATION_COLUMNS + " WHERE population_operation_id = ? "
+                             + "ORDER BY created_at_ms, operation_id")) {
+            statement.setString(1, normalized);
+            try (ResultSet result = statement.executeQuery()) {
+                List<PopulationGroupOperationRecord> operations = new ArrayList<>();
+                while (result.next()) operations.add(readOperation(result));
+                return List.copyOf(operations);
+            }
+        }
+    }
+
     @Nonnull
     public List<PopulationGroupCountEvidenceRecord> loadCountEvidence(@Nonnull String operationId)
             throws Exception {
@@ -169,6 +204,63 @@ public final class PopulationGroupRepository {
         return new ClassificationResult(Status.APPLIED, replacement, null);
     }
 
+    /** Transaction seam used by the unified owner/group admission coordinator. */
+    @Nonnull
+    ReservationResult reserveOperationInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull PopulationGroupOperationRecord operation,
+            @Nonnull List<ReservationEvidence> requestedEvidence) throws Exception {
+        PopulationGroupOperationRecord existing = findOperation(connection, operation.operationId());
+        if (existing != null) {
+            List<PopulationGroupCountEvidenceRecord> persisted =
+                    loadCountEvidence(connection, operation.operationId());
+            if (!sameOperation(existing, operation)
+                    || !sameReservationEvidence(persisted, requestedEvidence)) {
+                return new ReservationResult(Status.CONFLICT, existing, List.of(),
+                        "operation_id_in_use");
+            }
+            return new ReservationResult(
+                    Status.IDEMPOTENT,
+                    existing,
+                    persisted,
+                    "operation_exists"
+            );
+        }
+        PopulationGroupOperationRecord active = findActiveOperation(connection, operation.profileId());
+        if (active != null) {
+            return new ReservationResult(Status.CONFLICT, active, List.of(),
+                    "profile_operation_in_flight");
+        }
+
+        List<PopulationGroupCountEvidenceRecord> frozen = new ArrayList<>();
+        for (ReservationEvidence requested : requestedEvidence) {
+            String world = normalizedWorld(requested.scopeKind(), requested.scopeWorldName());
+            int[] committed = committedCounts(
+                    connection, requested.ownerUuid(), requested.groupId(), requested.scopeKind(), world);
+            int[] pending = pendingCounts(
+                    connection, requested.ownerUuid(), requested.groupId(), requested.scopeKind(), world);
+            if (exceeds(committed[0], pending[0], requested.ownedDelta(), requested.maxOwned())) {
+                return new ReservationResult(Status.DENIED, null, List.of(),
+                        "population-group-owned-limit");
+            }
+            if (exceeds(committed[1], pending[1], requested.activeDelta(), requested.maxActive())) {
+                return new ReservationResult(Status.DENIED, null, List.of(),
+                        "population-group-active-limit");
+            }
+            frozen.add(new PopulationGroupCountEvidenceRecord(
+                    operation.operationId(), requested.ownerUuid(), requested.groupId(),
+                    requested.scopeKind(), world, committed[0], committed[1], pending[0], pending[1],
+                    requested.ownedDelta(), requested.activeDelta(), requested.maxOwned(),
+                    requested.maxActive(), requested.policyRevision(),
+                    PopulationGroupCountEvidenceRecord.State.RESERVED,
+                    operation.createdAtMs(), operation.updatedAtMs()
+            ));
+        }
+        insertOperation(connection, operation);
+        for (PopulationGroupCountEvidenceRecord evidence : frozen) insertEvidence(connection, evidence);
+        return new ReservationResult(Status.PREPARED, operation, List.copyOf(frozen), null);
+    }
+
     /** Atomically applies frozen classification evidence and moves its journal to APPLIED. */
     OperationResult applyClassificationInTransaction(
             @Nonnull Connection connection,
@@ -196,6 +288,40 @@ public final class PopulationGroupRepository {
                 PopulationGroupOperationRecord.State.APPLIED, null, nowMs);
     }
 
+    /** Applies the frozen classification and closes its group journal in one outer transaction. */
+    @Nonnull
+    OperationResult commitClassificationOperationInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String operationId,
+            @Nonnull ClassificationMutation classification,
+            long nowMs) throws Exception {
+        PopulationGroupOperationRecord operation = findOperation(connection, operationId);
+        if (operation == null) return new OperationResult(Status.NOT_FOUND, null, "operation_not_found");
+        if (operation.state() == PopulationGroupOperationRecord.State.COMMITTED) {
+            PopulationGroupClassificationRecord existing = findClassification(
+                    connection, classification.replacement().profileId());
+            return existing != null && sameClassification(existing, classification.replacement())
+                    ? new OperationResult(Status.IDEMPOTENT, operation, "already_committed")
+                    : new OperationResult(Status.CONFLICT, operation,
+                            "committed_classification_mismatch");
+        }
+        if (operation.state() == PopulationGroupOperationRecord.State.APPLYING) {
+            OperationResult applied = applyClassificationInTransaction(
+                    connection, operationId, classification, nowMs);
+            if (applied.status() != Status.APPLIED && applied.status() != Status.IDEMPOTENT) {
+                return applied;
+            }
+            operation = findOperation(connection, operationId);
+        }
+        if (operation == null || operation.state() != PopulationGroupOperationRecord.State.APPLIED) {
+            return new OperationResult(Status.INVALID_STATE, operation,
+                    "operation_not_applied");
+        }
+        return advanceOperationInTransaction(connection, operationId,
+                PopulationGroupOperationRecord.State.APPLIED,
+                PopulationGroupOperationRecord.State.COMMITTED, null, nowMs);
+    }
+
     @Nonnull
     private OperationResult prepareOperationInTransaction(
             @Nonnull Connection connection,
@@ -219,7 +345,7 @@ public final class PopulationGroupRepository {
     }
 
     @Nonnull
-    private OperationResult advanceOperationInTransaction(
+    OperationResult advanceOperationInTransaction(
             @Nonnull Connection connection,
             @Nonnull String operationId,
             @Nonnull PopulationGroupOperationRecord.State expected,
@@ -319,6 +445,25 @@ public final class PopulationGroupRepository {
         }
     }
 
+    private void validateReservationRequest(PopulationGroupOperationRecord operation,
+                                            List<ReservationEvidence> evidence) {
+        Objects.requireNonNull(operation, "operation");
+        if (operation.state() != PopulationGroupOperationRecord.State.PREPARED) {
+            throw new IllegalArgumentException("Group operations must begin PREPARED.");
+        }
+        for (ReservationEvidence row : evidence) {
+            if (row.policyRevision() != operation.classificationRevision()) {
+                throw new IllegalArgumentException(
+                        "Reservation policy revision does not match its group operation.");
+            }
+        }
+    }
+
+    private boolean exceeds(int committed, int pending, int delta, int limit) {
+        if (delta <= 0 || limit == 0) return false;
+        return (long) committed + pending + delta > limit;
+    }
+
     private boolean revisionMatches(@Nullable PopulationGroupClassificationRecord existing,
                                     @Nullable Long expectedRevision) {
         return existing == null ? expectedRevision == null
@@ -350,6 +495,35 @@ public final class PopulationGroupRepository {
                 && Objects.equals(left.newLifecycleState(), right.newLifecycleState())
                 && Objects.equals(left.oldOwnershipWorldName(), right.oldOwnershipWorldName())
                 && Objects.equals(left.newOwnershipWorldName(), right.newOwnershipWorldName());
+    }
+
+    private boolean sameReservationEvidence(
+            List<PopulationGroupCountEvidenceRecord> persisted,
+            List<ReservationEvidence> requested) {
+        if (persisted.size() != requested.size()) return false;
+        List<ReservationEvidence> unmatched = new ArrayList<>(requested);
+        for (PopulationGroupCountEvidenceRecord row : persisted) {
+            int match = -1;
+            for (int index = 0; index < unmatched.size(); index++) {
+                ReservationEvidence candidate = unmatched.get(index);
+                if (row.ownerUuid().equals(candidate.ownerUuid())
+                        && row.groupId().equals(candidate.groupId())
+                        && row.scopeKind() == candidate.scopeKind()
+                        && Objects.equals(row.scopeWorldName(), normalizedWorld(
+                                candidate.scopeKind(), candidate.scopeWorldName()))
+                        && row.ownedDelta() == candidate.ownedDelta()
+                        && row.activeDelta() == candidate.activeDelta()
+                        && row.maxOwned() == candidate.maxOwned()
+                        && row.maxActive() == candidate.maxActive()
+                        && row.policyRevision() == candidate.policyRevision()) {
+                    match = index;
+                    break;
+                }
+            }
+            if (match < 0) return false;
+            unmatched.remove(match);
+        }
+        return unmatched.isEmpty();
     }
 
     private PopulationGroupCountEvidenceRecord.State evidenceState(
@@ -400,7 +574,8 @@ public final class PopulationGroupRepository {
         IDEMPOTENT,
         NOT_FOUND,
         INVALID_STATE,
-        CONFLICT
+        CONFLICT,
+        DENIED
     }
 
     public record ClassificationMutation(@Nullable Long expectedRevision,
@@ -421,6 +596,43 @@ public final class PopulationGroupRepository {
     public record OperationResult(@Nonnull Status status,
                                   @Nullable PopulationGroupOperationRecord operation,
                                   @Nullable String reason) {
+    }
+
+    public record ReservationEvidence(@Nonnull UUID ownerUuid,
+                                      @Nonnull String groupId,
+                                      @Nonnull PopulationGroupCountEvidenceRecord.ScopeKind scopeKind,
+                                      @Nullable String scopeWorldName,
+                                      int ownedDelta,
+                                      int activeDelta,
+                                      int maxOwned,
+                                      int maxActive,
+                                      long policyRevision) {
+        public ReservationEvidence {
+            ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
+            groupId = requireText(groupId, "groupId");
+            scopeKind = Objects.requireNonNull(scopeKind, "scopeKind");
+            if (maxOwned < 0 || maxActive < 0 || policyRevision < 0L) {
+                throw new IllegalArgumentException("Limits and policy revision must be non-negative.");
+            }
+            if (scopeKind == PopulationGroupCountEvidenceRecord.ScopeKind.GLOBAL
+                    && scopeWorldName != null && !scopeWorldName.isBlank()) {
+                throw new IllegalArgumentException("GLOBAL reservation evidence cannot name a world.");
+            }
+            if (scopeKind == PopulationGroupCountEvidenceRecord.ScopeKind.PER_WORLD
+                    && (scopeWorldName == null || scopeWorldName.isBlank())) {
+                throw new IllegalArgumentException("PER_WORLD reservation evidence requires a world.");
+            }
+        }
+    }
+
+    public record ReservationResult(@Nonnull Status status,
+                                    @Nullable PopulationGroupOperationRecord operation,
+                                    @Nonnull List<PopulationGroupCountEvidenceRecord> evidence,
+                                    @Nullable String reason) {
+        public ReservationResult {
+            status = Objects.requireNonNull(status, "status");
+            evidence = List.copyOf(evidence);
+        }
     }
 
     public record Counts(int committedOwned,

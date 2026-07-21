@@ -87,15 +87,17 @@ class CompanionProvisioningCoordinatorTest {
         assertEquals(CompanionProvisioningOperationRecord.State.DORMANT_APPLYING,
                 journal.findByOrigin("hydragon", "restart").state());
 
-        backend.pauseDormantCommit = false;
+        FakeBackend restartedBackend = new FakeBackend();
         CompanionProvisioningCoordinator restarted =
-                new CompanionProvisioningCoordinator(journal, backend, () -> 200L);
+                new CompanionProvisioningCoordinator(journal, restartedBackend, () -> 200L);
         CompanionProvisioningCoordinator.RecoveryReport report = await(restarted.recover(8));
         assertEquals(1, report.attempted());
         assertEquals(1, report.completed());
         assertEquals(0, report.failures());
         assertTrue(restarted.getByOrigin("hydragon", "restart").isPresent());
-        assertEquals(1, backend.dormantCommits);
+        assertEquals(0, backend.dormantCommits);
+        assertEquals(1, restartedBackend.dormantCommits,
+                "restart must reacquire the durable operation before committing");
     }
 
     private static CompanionProvisioningRequest activeRequest(String namespace, String key) {

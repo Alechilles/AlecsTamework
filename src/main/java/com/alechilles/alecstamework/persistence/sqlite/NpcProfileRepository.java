@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -44,6 +45,35 @@ public final class NpcProfileRepository {
                                 @Nonnull String[] toolIds,
                                 @Nonnull String[] activeSnapshotTypes,
                                 long updatedAtMs) {
+    }
+
+    /** Metadata for an intentionally non-physical canonical profile. */
+    public record DormantProfileMutation(@Nonnull String profileId,
+                                         @Nonnull UUID ownerUuid,
+                                         @Nonnull String roleId,
+                                         @Nonnull String ownershipWorldName,
+                                         @Nullable String displayName,
+                                         @Nullable String initialProfileJson,
+                                         long updatedAtMs) {
+        public DormantProfileMutation {
+            profileId = requireText(profileId, "profileId");
+            ownerUuid = Objects.requireNonNull(ownerUuid, "ownerUuid");
+            roleId = requireText(roleId, "roleId");
+            ownershipWorldName = requireText(ownershipWorldName, "ownershipWorldName");
+            displayName = normalize(displayName);
+            initialProfileJson = normalize(initialProfileJson);
+            if (updatedAtMs < 0L) throw new IllegalArgumentException("updatedAtMs cannot be negative");
+            if (initialProfileJson != null && !JsonParser.parseString(initialProfileJson).isJsonObject()) {
+                throw new IllegalArgumentException("initialProfileJson must be a JSON object");
+            }
+        }
+    }
+
+    public enum DormantProfileStatus { APPLIED, IDEMPOTENT, NOT_FOUND, CONFLICT }
+
+    public record DormantProfileResult(@Nonnull DormantProfileStatus status,
+                                       @Nullable ProfileRecord profile,
+                                       @Nullable String reason) {
     }
 
     @Nullable
@@ -118,6 +148,26 @@ public final class NpcProfileRepository {
         return writeQueue.submit(
                 "npc_profile_remap_uuid",
                 connection -> remapCurrentUuidInTransaction(connection, previousNpcUuid, currentNpcUuid)
+        );
+    }
+
+    /** Applies null-NPC profile metadata without inventing a physical NPC identity. */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<DormantProfileResult> applyDormantProfileAsync(
+            @Nonnull DormantProfileMutation mutation) {
+        AtomicReference<ProfileRecord> beforeRef = new AtomicReference<>();
+        return writeQueue.submitTracked(
+                "npc_profile_apply_dormant",
+                connection -> {
+                    beforeRef.set(loadProfileByIdInTransaction(connection, mutation.profileId()));
+                    return applyDormantProfileInTransaction(connection, mutation);
+                },
+                result -> {
+                    if (result != null && (result.status() == DormantProfileStatus.APPLIED
+                            || result.status() == DormantProfileStatus.IDEMPOTENT)) {
+                        notifyProfileChanged(beforeRef.get(), result.profile());
+                    }
+                }
         );
     }
 
@@ -806,6 +856,86 @@ public final class NpcProfileRepository {
         }
     }
 
+    /** Package transaction seam used by the unified dormant population commit. */
+    @Nonnull
+    DormantProfileResult applyDormantProfileInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull DormantProfileMutation mutation) throws Exception {
+        ExistingProfileRow existing = loadExistingProfileRowInTransaction(
+                connection, mutation.profileId());
+        if (existing == null) {
+            return new DormantProfileResult(DormantProfileStatus.NOT_FOUND, null,
+                    "dormant_profile_missing");
+        }
+        if (existing.currentNpcUuid() != null) {
+            return new DormantProfileResult(DormantProfileStatus.CONFLICT,
+                    loadProfileByIdInTransaction(connection, mutation.profileId()),
+                    "dormant_profile_has_current_npc");
+        }
+        if (!mutation.ownerUuid().toString().equals(existing.ownerUuid())) {
+            return new DormantProfileResult(DormantProfileStatus.CONFLICT,
+                    loadProfileByIdInTransaction(connection, mutation.profileId()),
+                    "dormant_profile_owner_mismatch");
+        }
+        if (existing.roleId() != null && !existing.roleId().equals(mutation.roleId())) {
+            return new DormantProfileResult(DormantProfileStatus.CONFLICT,
+                    loadProfileByIdInTransaction(connection, mutation.profileId()),
+                    "dormant_profile_role_mismatch");
+        }
+
+        String displayName = mutation.displayName() == null
+                ? existing.displayName() : mutation.displayName();
+        String stateJson = mergeDormantProfileJson(existing.stateJson(), mutation.initialProfileJson());
+        String stateHash = stateJson == null ? null : Integer.toHexString(stateJson.hashCode());
+        boolean unchanged = mutation.roleId().equals(existing.roleId())
+                && mutation.ownershipWorldName().equals(existing.lastWorldName())
+                && Objects.equals(displayName, existing.displayName())
+                && Objects.equals(stateJson, existing.stateJson())
+                && Objects.equals(stateHash, existing.stateHash());
+        if (!unchanged) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE npc_profiles
+                    SET role_id = ?, last_world_name = ?, display_name = ?, state_json = ?, state_hash = ?,
+                        updated_at_ms = ?
+                    WHERE profile_id = ? AND current_npc_uuid IS NULL AND owner_uuid = ?
+                    """)) {
+                statement.setString(1, mutation.roleId());
+                statement.setString(2, mutation.ownershipWorldName());
+                statement.setString(3, displayName);
+                statement.setString(4, stateJson);
+                statement.setString(5, stateHash);
+                statement.setLong(6, mutation.updatedAtMs());
+                statement.setString(7, mutation.profileId());
+                statement.setString(8, mutation.ownerUuid().toString());
+                if (statement.executeUpdate() != 1) {
+                    return new DormantProfileResult(DormantProfileStatus.CONFLICT,
+                            loadProfileByIdInTransaction(connection, mutation.profileId()),
+                            "dormant_profile_changed");
+                }
+            }
+        }
+        return new DormantProfileResult(
+                unchanged ? DormantProfileStatus.IDEMPOTENT : DormantProfileStatus.APPLIED,
+                loadProfileByIdInTransaction(connection, mutation.profileId()),
+                unchanged ? "dormant_profile_unchanged" : null
+        );
+    }
+
+    private String mergeDormantProfileJson(@Nullable String existingJson,
+                                           @Nullable String initialJson) {
+        if (initialJson == null) return existingJson;
+        JsonObject merged = existingJson == null
+                ? new JsonObject()
+                : JsonParser.parseString(existingJson).getAsJsonObject().deepCopy();
+        JsonObject supplied = JsonParser.parseString(initialJson).getAsJsonObject();
+        for (var entry : supplied.entrySet()) {
+            if (!"displayName".equals(entry.getKey())) {
+                merged.add(entry.getKey(), entry.getValue().deepCopy());
+            }
+        }
+        return merged.isEmpty() ? null : merged.toString();
+    }
+
     void notifyProfileChanged(@Nullable ProfileRecord before, @Nullable ProfileRecord after) {
         PersistenceChangeObserver observer = changeObserver;
         if (observer != null) {
@@ -958,12 +1088,24 @@ public final class NpcProfileRepository {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    private static String requireText(String value, String field) {
+        String normalized = Objects.requireNonNull(value, field).trim();
+        if (normalized.isEmpty()) throw new IllegalArgumentException(field + " is required");
+        return normalized;
+    }
+
+    @Nullable
+    private static String normalize(@Nullable String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     @Nullable
     private ExistingProfileRow loadExistingProfileRowInTransaction(@Nonnull Connection connection,
                                                                    @Nonnull String profileId) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
                 """
-                SELECT current_npc_uuid, owner_uuid, display_name, role_id, state_json, state_hash
+                SELECT current_npc_uuid, owner_uuid, last_world_name, display_name, role_id,
+                       state_json, state_hash
                 FROM npc_profiles
                 WHERE profile_id = ?
                 LIMIT 1
@@ -977,6 +1119,7 @@ public final class NpcProfileRepository {
                 return new ExistingProfileRow(
                         trimToNull(rs.getString("current_npc_uuid")),
                         trimToNull(rs.getString("owner_uuid")),
+                        trimToNull(rs.getString("last_world_name")),
                         trimToNull(rs.getString("display_name")),
                         trimToNull(rs.getString("role_id")),
                         trimToNull(rs.getString("state_json")),
@@ -988,6 +1131,7 @@ public final class NpcProfileRepository {
 
     private record ExistingProfileRow(@Nullable String currentNpcUuid,
                                       @Nullable String ownerUuid,
+                                      @Nullable String lastWorldName,
                                       @Nullable String displayName,
                                       @Nullable String roleId,
                                       @Nullable String stateJson,

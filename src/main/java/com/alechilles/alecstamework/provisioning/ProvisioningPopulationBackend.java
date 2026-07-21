@@ -28,6 +28,19 @@ public interface ProvisioningPopulationBackend {
     @Nonnull
     CompletionStage<AdmissionPreparation> prepareDormant(@Nonnull DormantRequest request);
 
+    /**
+     * Reacquires process-local admission capability after restart from the durable request. The
+     * returned operation id must remain stable; implementations may create a new lower-level
+     * journal attempt while preserving that higher-level provisioning identity.
+     */
+    @Nonnull
+    default CompletionStage<AdmissionPreparation> resumeDormant(
+            @Nonnull DormantRequest request,
+            @Nonnull UUID previousPopulationOperationId) {
+        Objects.requireNonNull(previousPopulationOperationId, "previousPopulationOperationId");
+        return prepareDormant(Objects.requireNonNull(request, "request"));
+    }
+
     @Nonnull
     ClaimResult claimDormant(@Nonnull UUID populationOperationId);
 

@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.integration.claims.ClaimAdmissionRequest;
 import com.alechilles.alecstamework.integration.claims.ClaimAdmissionService;
 import com.alechilles.alecstamework.integration.claims.ClaimLookupSession;
 import com.alechilles.alecstamework.integration.claims.ClaimOccupancySnapshot;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
@@ -67,6 +69,58 @@ public final class CompanionPopulationAdmissionCoordinator {
                 null,
                 null
         ));
+    }
+
+    /**
+     * Group-aware preparation seam installed by the unified transition coordinator. Owner, claim,
+     * and every group reservation are acquired all-or-none before a capability is returned.
+     */
+    @Nonnull
+    public CompletableFuture<CompanionPopulationPreparationResult> prepareWithGroupsAsync(
+            @Nonnull OwnerPopulationAdmissionPlan ownerPlan,
+            @Nonnull ClaimAdmissionRequest claimRequest,
+            @Nonnull ClaimLookupSession lookupSession,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull PopulationGroupOperationRecord groupOperation,
+            @Nonnull java.util.List<PopulationGroupRepository.ReservationEvidence> groupEvidence) {
+        Objects.requireNonNull(ownerPlan, "ownerPlan");
+        Objects.requireNonNull(claimRequest, "claimRequest");
+        Objects.requireNonNull(lookupSession, "lookupSession");
+        for (int attempt = 0; attempt < EVALUATION_RETRY_LIMIT; attempt++) {
+            ClaimAdmissionEvaluation evaluation = claimAdmissionService.evaluate(
+                    claimRequest, lookupSession);
+            CompanionPopulationReservationPreparation reservation =
+                    withinReservationBoundary(() -> reserveEvaluatedWithinReservationBoundary(
+                            ownerPlan, evaluation));
+            CompletableFuture<CompanionPopulationPreparationResult> preparation =
+                    prepareGroupReservedAsync(
+                            reservation, groupRepository, groupOperation, groupEvidence);
+            CompanionPopulationPreparationResult immediate = preparation.getNow(null);
+            if (immediate == null
+                    || !"claim-occupancy-changed-during-admission".equals(immediate.reason())) {
+                return preparation;
+            }
+        }
+        return CompletableFuture.completedFuture(new CompanionPopulationPreparationResult(
+                false, "claim-occupancy-changed-during-admission", null, null, null));
+    }
+
+    @Nonnull
+    private CompletableFuture<CompanionPopulationPreparationResult> prepareGroupReservedAsync(
+            @Nonnull CompanionPopulationReservationPreparation reservation,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull PopulationGroupOperationRecord groupOperation,
+            @Nonnull java.util.List<PopulationGroupRepository.ReservationEvidence> groupEvidence) {
+        if (!reservation.allowed() || reservation.ownerReservation() == null) {
+            return CompletableFuture.completedFuture(new CompanionPopulationPreparationResult(
+                    false, reservation.reason(),
+                    reservation.ownerReservation() == null
+                            ? null : reservation.ownerReservation().decision(),
+                    reservation.claimDecision(), null));
+        }
+        return ownerCoordinator.preparePopulationGroupCompositeReservedAsync(
+                        reservation.ownerReservation(), groupRepository, groupOperation, groupEvidence)
+                .thenApply(ownerResult -> finishPreparation(ownerResult, reservation.claimDecision()));
     }
 
     /**
@@ -290,6 +344,45 @@ public final class CompanionPopulationAdmissionCoordinator {
                     claimCommitted,
                     ownerCommit
             );
+        });
+    }
+
+    /** Commits claim occupancy plus owner/group durability for one live mutation. */
+    @Nonnull
+    public CompletableFuture<CompanionPopulationCommitResult> commitWithGroupsAsync(
+            @Nonnull PreparedCompanionPopulationAdmission prepared,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull String groupOperationId,
+            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
+            long nowMs) {
+        Objects.requireNonNull(prepared, "prepared");
+        boolean claimCommitted;
+        try {
+            claimCommitted = claimAdmissionService.commit(prepared.claimReservation());
+        } catch (RuntimeException | LinkageError failure) {
+            claimCommitted = false;
+        }
+        final boolean finalClaimCommitted = claimCommitted;
+        CompletableFuture<OwnerPopulationCommitResult> owner =
+                ownerCoordinator.commitPopulationGroupCompositeAsync(
+                        prepared.ownerAdmission(), groupRepository, groupOperationId,
+                        classification, nowMs);
+        return owner.handle((ownerCommit, failure) -> {
+            boolean ownerCommitted = failure == null && ownerCommit != null && ownerCommit.committed();
+            if (!finalClaimCommitted || !ownerCommitted) {
+                markReadinessDegradedSafely(!finalClaimCommitted
+                        ? "population_group_claim_commit_failed"
+                        : "population_group_owner_commit_failed");
+            }
+            return new CompanionPopulationCommitResult(
+                    finalClaimCommitted && ownerCommitted,
+                    finalClaimCommitted && ownerCommitted
+                            ? "companion-population-group-committed"
+                            : !finalClaimCommitted
+                            ? "companion-claim-index-commit-failed"
+                            : ownerCommit == null
+                            ? "companion-owner-finalize-exception" : ownerCommit.reason(),
+                    finalClaimCommitted, ownerCommit);
         });
     }
 

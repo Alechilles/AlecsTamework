@@ -164,7 +164,9 @@ public final class CompanionProvisioningCoordinator {
         return switch (operation.state()) {
             case PREPARING_DORMANT -> prepareDormant(operation, recovered);
             case DORMANT_PREPARED -> claimDormant(operation, recovered);
-            case DORMANT_APPLYING -> commitDormant(operation, recovered);
+            case DORMANT_APPLYING -> recovered
+                    ? resumeDormantApplying(operation)
+                    : commitDormant(operation, false);
             case DORMANT_COMMITTED -> finishDormantOrPrepareActive(operation, recovered);
             case ACTIVE_PREPARED -> claimActive(operation, recovered);
             case ACTIVE_APPLYING -> commitActive(operation, recovered);
@@ -176,11 +178,7 @@ public final class CompanionProvisioningCoordinator {
 
     private CompletionStage<CompanionProvisioningResult> prepareDormant(
             CompanionProvisioningOperationRecord operation, boolean recovered) {
-        ProvisioningPopulationBackend.DormantRequest request =
-                new ProvisioningPopulationBackend.DormantRequest(
-                        UUID.fromString(operation.operationId()), operation.provisionalProfileId(),
-                        operation.ownerUuid(), operation.targetRoleId(), operation.ownershipWorldName(),
-                        Objects.requireNonNull(operation.expectedPolicyRevision(), "expectedPolicyRevision"));
+        ProvisioningPopulationBackend.DormantRequest request = dormantRequest(operation);
         return backend.prepareDormant(request).thenCompose(prepared -> {
             if (prepared.status() != ProvisioningPopulationBackend.AdmissionPreparation.Status.PREPARED) {
                 return terminalFromPreparation(operation, prepared);
@@ -196,6 +194,30 @@ public final class CompanionProvisioningCoordinator {
             CompanionProvisioningOperationRecord operation, boolean recovered) {
         UUID populationOperationId = UUID.fromString(requireText(
                 operation.dormantPopulationOperationId(), "dormantPopulationOperationId"));
+        if (recovered) {
+            return backend.resumeDormant(dormantRequest(operation), populationOperationId)
+                    .thenCompose(prepared -> {
+                        if (prepared.status()
+                                != ProvisioningPopulationBackend.AdmissionPreparation.Status.PREPARED
+                                || prepared.populationOperationId() == null) {
+                            return terminalFromPreparation(operation, prepared);
+                        }
+                        if (!populationOperationId.equals(prepared.populationOperationId())) {
+                            return terminalAdvance(operation,
+                                    CompanionProvisioningOperationRecord.State.QUARANTINED,
+                                    "dormant-population-operation-changed-on-resume",
+                                    "QUARANTINED");
+                        }
+                        return claimDormantAcquired(operation, true, populationOperationId);
+                    });
+        }
+        return claimDormantAcquired(operation, false, populationOperationId);
+    }
+
+    private CompletionStage<CompanionProvisioningResult> claimDormantAcquired(
+            CompanionProvisioningOperationRecord operation,
+            boolean recovered,
+            UUID populationOperationId) {
         ProvisioningPopulationBackend.ClaimResult claim = backend.claimDormant(populationOperationId);
         if (!claim.claimed()) {
             return backend.cancelDormant(populationOperationId, claim.reason())
@@ -208,6 +230,31 @@ public final class CompanionProvisioningCoordinator {
                 null, null, null, null, claim.reason(),
                 recovered ? "RECOVERED_APPLYING" : "APPLYING")
                 .thenCompose(next -> resume(next, recovered));
+    }
+
+    private CompletionStage<CompanionProvisioningResult> resumeDormantApplying(
+            CompanionProvisioningOperationRecord operation) {
+        UUID populationOperationId = UUID.fromString(requireText(
+                operation.dormantPopulationOperationId(), "dormantPopulationOperationId"));
+        return backend.resumeDormant(dormantRequest(operation), populationOperationId)
+                .thenCompose(prepared -> {
+                    if (prepared.status()
+                            != ProvisioningPopulationBackend.AdmissionPreparation.Status.PREPARED
+                            || prepared.populationOperationId() == null
+                            || !populationOperationId.equals(prepared.populationOperationId())) {
+                        return terminalAdvance(operation,
+                                CompanionProvisioningOperationRecord.State.QUARANTINED,
+                                prepared.reason(), "QUARANTINED");
+                    }
+                    ProvisioningPopulationBackend.ClaimResult claim =
+                            backend.claimDormant(populationOperationId);
+                    if (!claim.claimed()) {
+                        return terminalAdvance(operation,
+                                CompanionProvisioningOperationRecord.State.QUARANTINED,
+                                claim.reason(), "QUARANTINED");
+                    }
+                    return commitDormant(operation, true);
+                });
     }
 
     private CompletionStage<CompanionProvisioningResult> commitDormant(
@@ -234,6 +281,14 @@ public final class CompanionProvisioningCoordinator {
                     recovered ? "RECOVERED_DORMANT" : "DORMANT_COMMITTED")
                     .thenCompose(next -> resume(next, recovered));
         });
+    }
+
+    private ProvisioningPopulationBackend.DormantRequest dormantRequest(
+            CompanionProvisioningOperationRecord operation) {
+        return new ProvisioningPopulationBackend.DormantRequest(
+                UUID.fromString(operation.operationId()), operation.provisionalProfileId(),
+                operation.ownerUuid(), operation.targetRoleId(), operation.ownershipWorldName(),
+                Objects.requireNonNull(operation.expectedPolicyRevision(), "expectedPolicyRevision"));
     }
 
     private CompletionStage<CompanionProvisioningResult> finishDormantOrPrepareActive(

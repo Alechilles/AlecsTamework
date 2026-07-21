@@ -5,6 +5,9 @@ import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationOperat
 import com.alechilles.alecstamework.persistence.sqlite.CompanionPopulationRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupOperationRecord;
+import com.alechilles.alecstamework.persistence.sqlite.PopulationGroupRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PopulationPersistenceTransition;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityDecision;
 import com.alechilles.alecstamework.persistence.health.PersistenceMutationAvailabilityService;
@@ -72,6 +75,73 @@ public final class OwnerPopulationAdmissionCoordinator {
     ) {
         OwnerPopulationReservationPreparation reservation = reserveInMemory(plan);
         return prepareReservedAsync(reservation);
+    }
+
+    /**
+     * Dedicated no-claim preparation used only by companion provisioning. Owner and group
+     * journals are inserted and advanced together; group denial rolls both durable writes back.
+     */
+    @Nonnull
+    public CompletableFuture<OwnerPopulationPreparationResult>
+    prepareProvisionedDormantCompositeAsync(
+            @Nonnull OwnerPopulationAdmissionPlan plan,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull PopulationGroupOperationRecord groupOperation,
+            @Nonnull java.util.List<PopulationGroupRepository.ReservationEvidence> groupEvidence) {
+        OwnerPopulationReservationPreparation reserved = reserveInMemory(plan);
+        return preparePopulationGroupCompositeReservedAsync(
+                reserved, groupRepository, groupOperation, groupEvidence);
+    }
+
+    /** Package seam used by the claim-bearing unified group coordinator after its shared lock. */
+    @Nonnull
+    CompletableFuture<OwnerPopulationPreparationResult>
+    preparePopulationGroupCompositeReservedAsync(
+            @Nonnull OwnerPopulationReservationPreparation reserved,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull PopulationGroupOperationRecord groupOperation,
+            @Nonnull java.util.List<PopulationGroupRepository.ReservationEvidence> groupEvidence) {
+        if (!reserved.allowed()) {
+            return CompletableFuture.completedFuture(new OwnerPopulationPreparationResult(
+                    false, reserved.reason(), reserved.decision(), null));
+        }
+        OwnerPopulationAdmissionPlan plan = reserved.plan();
+        OwnerPopulationDecision decision = reserved.decision();
+        UUID ownerOperationId = decision.reservation().tokenId();
+        PopulationPersistenceTransition.Prepare ownerPrepare =
+                new PopulationPersistenceTransition.Prepare(
+                        OwnerPopulationPersistenceRecords.prepared(ownerOperationId, plan),
+                        plan.baselineState());
+        try {
+            PersistenceWriteQueue.WriteSubmission<
+                    CompanionPopulationRepository.ProvisionedDormantPreparationResult> submission =
+                    repository.prepareProvisionedDormantCompositeAsync(
+                            ownerPrepare, groupRepository, groupOperation, groupEvidence);
+            if (submission == null || submission.completion() == null) {
+                index.cancel(decision.reservation());
+                return CompletableFuture.completedFuture(terminality.deniedPreparation(
+                        decision, "population-group-composite-prepare-stage-missing"));
+            }
+            return submission.completion().handle((outcome, failure) -> {
+                if (failure != null || outcome == null || !outcome.isCommitted()
+                        || outcome.value() == null || !outcome.value().prepared()) {
+                    index.cancel(decision.reservation());
+                    String reason = outcome != null && outcome.value() != null
+                            && outcome.value().reason() != null
+                            ? outcome.value().reason()
+                            : "population-group-composite-prepare-failed";
+                    return terminality.deniedPreparation(decision, reason);
+                }
+                PreparedOwnerPopulationAdmission prepared =
+                        new PreparedOwnerPopulationAdmission(ownerOperationId, plan, decision);
+                return new OwnerPopulationPreparationResult(
+                        true, "population-group-composite-prepared", decision, prepared);
+            });
+        } catch (RuntimeException | LinkageError failure) {
+            index.cancel(decision.reservation());
+            return CompletableFuture.completedFuture(terminality.deniedPreparation(
+                    decision, "population-group-composite-prepare-start-failed"));
+        }
     }
 
     /** Performs only the short in-memory compare/headroom/reservation phase. */
@@ -248,6 +318,122 @@ public final class OwnerPopulationAdmissionCoordinator {
             return terminality.commitStartFailed(
                     prepared, "owner-population-commit-start-failed"
             );
+        }
+    }
+
+    /** Commits the provisioning owner/profile/group boundary as one SQLite transaction. */
+    @Nonnull
+    public CompletableFuture<OwnerPopulationCommitResult> commitProvisionedDormantCompositeAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull NpcProfileRepository profileRepository,
+            @Nonnull NpcProfileRepository.DormantProfileMutation profileMutation,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull String groupOperationId,
+            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
+            long nowMs) {
+        Objects.requireNonNull(prepared, "prepared");
+        if (!prepared.transition(
+                PreparedOwnerPopulationAdmission.State.APPLYING,
+                PreparedOwnerPopulationAdmission.State.COMMITTING)) {
+            return CompletableFuture.completedFuture(new OwnerPopulationCommitResult(
+                    OwnerPopulationCommitResult.Status.INVALID_CAPABILITY,
+                    "owner-population-capability-not-applying", null));
+        }
+        if (!index.commit(prepared.reservation())) {
+            prepared.setState(PreparedOwnerPopulationAdmission.State.CANCELED);
+            terminality.degrade("provisioned_dormant_owner_index_commit_failed");
+            return CompletableFuture.completedFuture(new OwnerPopulationCommitResult(
+                    OwnerPopulationCommitResult.Status.INDEX_COMMIT_FAILED,
+                    "provisioned-dormant-owner-index-commit-failed", null));
+        }
+        PopulationPersistenceTransition.Commit ownerCommit =
+                OwnerPopulationPersistenceRecords.commit(prepared.operationId(), prepared.plan());
+        try {
+            PersistenceWriteQueue.WriteSubmission<
+                    CompanionPopulationRepository.ProvisionedDormantCommitResult> submission =
+                    repository.commitProvisionedDormantCompositeAsync(
+                            ownerCommit, profileRepository, profileMutation, groupRepository,
+                            groupOperationId, classification, nowMs);
+            if (submission == null || submission.completion() == null) {
+                return terminality.commitStartFailed(
+                        prepared, "provisioned-dormant-commit-stage-missing");
+            }
+            return submission.completion().handle((outcome, failure) -> {
+                if (failure == null && outcome != null && outcome.isCommitted()
+                        && outcome.value() != null && outcome.value().committed()) {
+                    prepared.setState(PreparedOwnerPopulationAdmission.State.COMMITTED);
+                    return new OwnerPopulationCommitResult(
+                            OwnerPopulationCommitResult.Status.COMMITTED,
+                            "provisioned-dormant-committed",
+                            outcome.value().ownerResult());
+                }
+                terminality.degrade("provisioned_dormant_composite_commit_failed");
+                prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
+                PopulationPersistenceTransition.Result result = outcome == null
+                        || outcome.value() == null ? null : outcome.value().ownerResult();
+                return new OwnerPopulationCommitResult(
+                        OwnerPopulationCommitResult.Status.PERSISTENCE_DEGRADED,
+                        "provisioned-dormant-composite-commit-failed", result);
+            });
+        } catch (RuntimeException | LinkageError failure) {
+            return terminality.commitStartFailed(
+                    prepared, "provisioned-dormant-commit-start-failed");
+        }
+    }
+
+    /** Commits a normal owner transition and its population groups in one SQLite transaction. */
+    @Nonnull
+    CompletableFuture<OwnerPopulationCommitResult> commitPopulationGroupCompositeAsync(
+            @Nonnull PreparedOwnerPopulationAdmission prepared,
+            @Nonnull PopulationGroupRepository groupRepository,
+            @Nonnull String groupOperationId,
+            @Nonnull PopulationGroupRepository.ClassificationMutation classification,
+            long nowMs) {
+        Objects.requireNonNull(prepared, "prepared");
+        if (!prepared.transition(
+                PreparedOwnerPopulationAdmission.State.APPLYING,
+                PreparedOwnerPopulationAdmission.State.COMMITTING)) {
+            return CompletableFuture.completedFuture(new OwnerPopulationCommitResult(
+                    OwnerPopulationCommitResult.Status.INVALID_CAPABILITY,
+                    "owner-population-capability-not-applying", null));
+        }
+        if (!index.commit(prepared.reservation())) {
+            prepared.setState(PreparedOwnerPopulationAdmission.State.CANCELED);
+            terminality.degrade("population_group_owner_index_commit_failed");
+            return CompletableFuture.completedFuture(new OwnerPopulationCommitResult(
+                    OwnerPopulationCommitResult.Status.INDEX_COMMIT_FAILED,
+                    "population-group-owner-index-commit-failed", null));
+        }
+        PopulationPersistenceTransition.Commit ownerCommit =
+                OwnerPopulationPersistenceRecords.commit(prepared.operationId(), prepared.plan());
+        try {
+            PersistenceWriteQueue.WriteSubmission<
+                    CompanionPopulationRepository.PopulationGroupCompositeCommitResult> submission =
+                    repository.commitPopulationGroupCompositeAsync(
+                            ownerCommit, groupRepository, groupOperationId, classification, nowMs);
+            if (submission == null || submission.completion() == null) {
+                return terminality.commitStartFailed(
+                        prepared, "population-group-composite-commit-stage-missing");
+            }
+            return submission.completion().handle((outcome, failure) -> {
+                if (failure == null && outcome != null && outcome.isCommitted()
+                        && outcome.value() != null && outcome.value().committed()) {
+                    prepared.setState(PreparedOwnerPopulationAdmission.State.COMMITTED);
+                    return new OwnerPopulationCommitResult(
+                            OwnerPopulationCommitResult.Status.COMMITTED,
+                            "population-group-composite-committed", outcome.value().ownerResult());
+                }
+                terminality.degrade("population_group_composite_commit_failed");
+                prepared.setState(PreparedOwnerPopulationAdmission.State.DEGRADED);
+                PopulationPersistenceTransition.Result result = outcome == null
+                        || outcome.value() == null ? null : outcome.value().ownerResult();
+                return new OwnerPopulationCommitResult(
+                        OwnerPopulationCommitResult.Status.PERSISTENCE_DEGRADED,
+                        "population-group-composite-commit-failed", result);
+            });
+        } catch (RuntimeException | LinkageError failure) {
+            return terminality.commitStartFailed(
+                    prepared, "population-group-composite-commit-start-failed");
         }
     }
 
