@@ -203,11 +203,16 @@ final class PersistenceDiagnosticDatabaseSnapshotReader {
     private void readOperations(Connection connection, String sql, String domain,
                                 List<OperationRow> out) throws Exception {
         try (Statement statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery(sql)) {
+            ResultSet rows = statement.executeQuery(sql)) {
             while (rows.next()) {
+                String operationId = rows.getString("operation_id");
+                String profileId = rows.getString("profile_id");
+                String identityHash = profileId == null || profileId.isBlank()
+                        ? scopes.operation(operationId).scopeHash()
+                        : scopes.profile(profileId).scopeHash();
                 out.add(new OperationRow(
-                        domain, rows.getString("operation_id"), rows.getString("operation_type"),
-                        rows.getString("state"), scopes.profile(rows.getString("profile_id")).scopeHash(),
+                        domain, operationId, rows.getString("operation_type"),
+                        rows.getString("state"), identityHash,
                         rows.getBoolean("has_source"), rows.getLong("created_at_ms"),
                         rows.getLong("updated_at_ms"), rows.getLong("completed_at_ms")));
             }

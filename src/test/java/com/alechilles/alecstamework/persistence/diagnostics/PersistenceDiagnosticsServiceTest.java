@@ -11,6 +11,9 @@ import com.google.gson.JsonParser;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.Map;
@@ -112,6 +115,47 @@ class PersistenceDiagnosticsServiceTest {
                     assertFalse(text.contains(privatePath));
                 }
             }
+        }
+    }
+
+    @Test
+    void exportIncludesPreProfileCaptureAttemptWithHashedIdentity() throws Exception {
+        String actorUuid = UUID.randomUUID().toString();
+        String targetUuid = UUID.randomUUID().toString();
+        TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null);
+        PersistenceDiagnosticsService.BundleResult result;
+        try {
+            try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + runtime.getSqlitePath());
+                 PreparedStatement statement = connection.prepareStatement("""
+                         INSERT INTO capture_attempts(
+                             attempt_id, actor_uuid, target_npc_uuid, source_item_id,
+                             source_context_json, spawner_config_id, spawner_config_revision,
+                             target_policy_bypassed, state, guaranteed, expires_at_ms,
+                             created_at_ms, updated_at_ms)
+                         VALUES (?, ?, ?, ?, '{}', ?, 1, 0, 'PREPARED', 0, 2000, 1000, 1000)
+                         """)) {
+                statement.setString(1, "capture-diagnostic");
+                statement.setString(2, actorUuid);
+                statement.setString(3, targetUuid);
+                statement.setString(4, "Spawner_Test");
+                statement.setString(5, "Capture_Test");
+                statement.executeUpdate();
+            }
+            result = new PersistenceDiagnosticsService(runtime, tempDir).export(null);
+        } finally {
+            runtime.close();
+        }
+
+        try (ZipFile zip = new ZipFile(result.path().toFile())) {
+            JsonObject operations = readJson(zip, zip.getEntry("operations.json"));
+            assertEquals("complete", operations.get("status").getAsString());
+            JsonObject operation = operations.getAsJsonArray("rows").get(0).getAsJsonObject();
+            assertEquals("capture_policy", operation.get("domain").getAsString());
+            assertEquals("capture-diagnostic", operation.get("operationId").getAsString());
+            assertEquals(64, operation.get("profileHash").getAsString().length());
+            String serialized = operations.toString();
+            assertFalse(serialized.contains(actorUuid));
+            assertFalse(serialized.contains(targetUuid));
         }
     }
 
