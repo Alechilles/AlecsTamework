@@ -60,20 +60,30 @@ class AvatarFlightHudSystemArchitectureTest {
     }
 
     @Test
-    void flightControlsUseNativeServerContentAnchorWithoutClearingOtherContent() throws Exception {
+    void flightControlsReplaceAndClearNativeServerContentAnchorWithoutSelectorCommands() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/ui/TameworkAvatarFlightControlOverlay.java"
         ));
 
         Assertions.assertTrue(source.contains("ANCHOR_ID = \"MapServerContent\""));
-        Assertions.assertTrue(source.contains("ROOT_SELECTOR = \"#TameworkAvatarFlightControls\""));
         Assertions.assertTrue(source.contains("UI_PATH = \"Hud/TameworkAvatarFlightControls.ui\""));
-        Assertions.assertTrue(source.contains("commandBuilder.remove(ROOT_SELECTOR)"));
         Assertions.assertTrue(source.contains("commandBuilder.append(UI_PATH)"));
         Assertions.assertTrue(source.contains("new UpdateAnchorUI("));
-        Assertions.assertTrue(source.contains("ANCHOR_ID,\n                false,"),
-                "the overlay must preserve unrelated content already mounted in the shared native anchor");
+        Assertions.assertEquals(2, countOccurrences(source, "ANCHOR_ID,\n                true,"));
+        Assertions.assertTrue(source.contains("ANCHOR_ID,\n                true,\n                null,\n                null"));
+        Assertions.assertFalse(source.contains("commandBuilder.remove("),
+                "missing selectors disconnect the client instead of becoming no-ops");
         Assertions.assertTrue(source.contains("writeNoCache"));
+    }
+
+    private static int countOccurrences(String text, String token) {
+        int count = 0;
+        int index = 0;
+        while ((index = text.indexOf(token, index)) >= 0) {
+            count++;
+            index += token.length();
+        }
+        return count;
     }
 
     @Test
