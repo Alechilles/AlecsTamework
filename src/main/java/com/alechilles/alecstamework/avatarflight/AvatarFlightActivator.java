@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.avatarflight;
 
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
-import com.alechilles.alecstamework.ui.TameworkAvatarFlightHud;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -90,7 +89,7 @@ public final class AvatarFlightActivator {
         if (flightType != null) {
             store.tryRemoveComponent(ref, flightType);
         }
-        TameworkAvatarFlightHud.removeFrom(player);
+        AvatarFlightHudSystem.hideHud(playerUuid, player);
         if (inputType != null) {
             store.tryRemoveComponent(ref, inputType);
         }
@@ -168,6 +167,7 @@ public final class AvatarFlightActivator {
     }
 
     void finishPlayerDisconnect(@Nonnull UUID playerUuid) {
+        AvatarFlightHudSystem.forgetHud(playerUuid);
         modelService.clearSavedModel(playerUuid);
         AvatarFlightSessionRegistry.markInactive(playerUuid);
     }

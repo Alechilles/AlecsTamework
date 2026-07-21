@@ -10,6 +10,19 @@ class AvatarFlightHudViewModelTest {
     private static final double EPSILON = 0.0001;
 
     @Test
+    void hudRefreshesOnlyChangedStateAfterThrottleInterval() {
+        AvatarFlightHudViewModel previous = AvatarFlightHudViewModel.visible(
+                0.25, 3.0, 6.0, false, "NONE");
+        AvatarFlightHudViewModel changed = AvatarFlightHudViewModel.visible(
+                0.5, 3.0, 6.0, false, "NONE");
+
+        assertFalse(AvatarFlightHudSystem.shouldRefresh(null, 1_000L, changed, 1_100L, 100L));
+        assertFalse(AvatarFlightHudSystem.shouldRefresh(previous, 1_000L, previous, 2_000L, 100L));
+        assertFalse(AvatarFlightHudSystem.shouldRefresh(previous, 1_000L, changed, 1_099L, 100L));
+        assertTrue(AvatarFlightHudSystem.shouldRefresh(previous, 1_000L, changed, 1_100L, 100L));
+    }
+
+    @Test
     void hiddenModelClearsAllRenderableValues() {
         AvatarFlightHudViewModel model = AvatarFlightHudViewModel.hidden();
 

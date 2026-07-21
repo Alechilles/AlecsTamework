@@ -31,6 +31,7 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(source.contains("Anchor"));
         Assertions.assertTrue(source.contains("Value.of("));
         Assertions.assertTrue(source.contains("#Root.Visible"));
+        Assertions.assertTrue(source.contains("#TameworkAvatarFlightControls.Visible"));
         Assertions.assertFalse(source.contains("#ControlsOverlay.Visible"));
         Assertions.assertTrue(source.contains("LAUNCH_TRACK_WIDTH"));
         Assertions.assertTrue(source.contains("LAUNCH_FILL_MAX_WIDTH"));
@@ -114,6 +115,7 @@ class AvatarFlightHudBinderTest {
         Assertions.assertTrue(ui.contains("@FlightControlSlotHeight = 74"));
         Assertions.assertTrue(ui.contains("Anchor: (Right: 220, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight)"));
         Assertions.assertTrue(ui.contains("LayoutMode: Left"));
+        Assertions.assertTrue(ui.contains("Visible: false;"));
         Assertions.assertTrue(ui.contains("Group #ForwardBoostIcon"));
         Assertions.assertTrue(ui.contains("Group #UpwardFlapIcon"));
         Assertions.assertTrue(ui.contains("Group #AirbrakeIcon"));

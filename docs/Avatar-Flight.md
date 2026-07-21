@@ -220,7 +220,7 @@ Omitting `AbilityAnimation` inherits the complete parent section. An explicit `A
 - `FastFlightRechargeSpeedRatio`: ratio of sustainable horizontal glide speed that activates both `FastFlightAnimation` and airborne fast-flight recharge.
 - `RechargeDelayAfterSpendSeconds`: delay before recharge resumes after spending.
 - `HudEnabled`: shows the compact speed and Vigour HUD.
-- `HudResendIntervalMs`: throttles unchanged HUD refreshes.
+- `HudResendIntervalMs`: minimum delay between changed HUD refreshes. Unchanged HUD state is not resent.
 
 ### Trails
 

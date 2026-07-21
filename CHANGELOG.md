@@ -79,7 +79,7 @@
 
 ### Fixed
 - Fixed avatar-flight fake riders sending full skin, cosmetic, and equipment attachment lists by default, which could crash the client on some transformed models. Fake riders now use the player's body model, texture, and skin gradient by default; full appearance attachments remain available as an explicit per-flight-config option.
-- Fixed the custom avatar-flight controls crashing the client shortly after appearing by using Hytale's safe base custom-HUD layer now that the native weapon strip is hidden.
+- Fixed the custom avatar-flight controls crashing the client shortly after appearing by using Hytale's safe base custom-HUD layer, reusing one keyed HUD across flight toggles, and throttling changed state instead of continuously resending unchanged UI commands.
 - Fixed direct cross-world Recall repeatedly draining the old source after a successful destination insert or trying to insert an NPC before its destination chunk was retained. Transfers now wait for the exact destination chunk and install a detached destination transform, while failed inserts restore the original source transform.
 - Fixed individual unloaded recalls sometimes waiting until another companion happened to load the source area. Each request now leases its own canonical source chunk, including across worlds, and legacy recovery history no longer blocks a genuinely missing recovered companion from becoming safely Lost.
 - Fixed Recall leaving companions permanently Unloaded when their persistent source world closed without per-NPC removal callbacks. Removed worlds now retire their exact loaded-identity evidence, allowing failed explicit transfers to become safely recoverable Lost companions.

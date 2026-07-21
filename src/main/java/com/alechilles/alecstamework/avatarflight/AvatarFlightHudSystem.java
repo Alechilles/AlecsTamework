@@ -30,7 +30,8 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
     private final ComponentType<EntityStore, AvatarFlightInputComponent> inputType;
     private final ComponentType<EntityStore, Player> playerType;
     private final Query<EntityStore> query;
-    private final Map<UUID, HudState> stateByPlayer = new HashMap<>();
+    // Command and mount activators are not owned by this system, so the main-thread connection cache is shared.
+    private static final Map<UUID, HudState> STATE_BY_PLAYER = new HashMap<>();
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, AvatarFlightMovementSystem.class)
     );
@@ -121,35 +122,58 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
         if (playerRef == null || player.getHudManager() == null) {
             return;
         }
-        HudState previous = stateByPlayer.get(playerUuid);
+        HudState previous = STATE_BY_PLAYER.get(playerUuid);
         boolean newSession = previous == null || previous.enabledAtMs() != enabledAtMs;
-        TameworkAvatarFlightHud hud = newSession ? null : previous.hud();
+        TameworkAvatarFlightHud hud = previous != null && previous.playerRef() == playerRef
+                ? previous.hud()
+                : null;
         if (hud == null) {
             hud = new TameworkAvatarFlightHud(playerRef, model);
             player.getHudManager().addCustomHud(playerRef, hud);
-            stateByPlayer.put(playerUuid, new HudState(enabledAtMs, hud, model, now));
+            STATE_BY_PLAYER.put(playerUuid, new HudState(enabledAtMs, playerRef, hud, model, now));
             return;
         }
-        if (!shouldRefresh(previous, model, now, resendIntervalMs)) {
+        if (newSession) {
+            hud.refresh(model);
+            STATE_BY_PLAYER.put(playerUuid, new HudState(enabledAtMs, playerRef, hud, model, now));
+            return;
+        }
+        if (!shouldRefresh(previous.model(), previous.lastSentAtMs(), model, now, resendIntervalMs)) {
             return;
         }
         hud.refresh(model);
-        stateByPlayer.put(playerUuid, new HudState(enabledAtMs, hud, model, now));
+        STATE_BY_PLAYER.put(playerUuid, new HudState(enabledAtMs, playerRef, hud, model, now));
     }
 
     private void removeHud(@Nonnull UUID playerUuid, @Nonnull Player player) {
         TameworkAvatarFlightHud.removeFrom(player);
-        stateByPlayer.remove(playerUuid);
+        STATE_BY_PLAYER.remove(playerUuid);
     }
 
-    private static boolean shouldRefresh(@Nullable HudState previous,
-                                         @Nonnull AvatarFlightHudViewModel model,
-                                         long now,
-                                         long resendIntervalMs) {
-        if (previous == null || !previous.model().equals(model)) {
-            return true;
+    static void hideHud(@Nonnull UUID playerUuid, @Nullable Player player) {
+        HudState previous = STATE_BY_PLAYER.get(playerUuid);
+        PlayerRef playerRef = player == null ? null : player.getPlayerRef();
+        if (previous == null || previous.playerRef() != playerRef) {
+            return;
         }
-        return now - previous.lastSentAtMs() >= Math.max(1L, resendIntervalMs);
+        AvatarFlightHudViewModel hidden = AvatarFlightHudViewModel.hidden();
+        previous.hud().refresh(hidden);
+        STATE_BY_PLAYER.put(playerUuid, new HudState(
+                previous.enabledAtMs(), playerRef, previous.hud(), hidden, System.currentTimeMillis()));
+    }
+
+    static void forgetHud(@Nonnull UUID playerUuid) {
+        STATE_BY_PLAYER.remove(playerUuid);
+    }
+
+    static boolean shouldRefresh(@Nullable AvatarFlightHudViewModel previousModel,
+                                 long lastSentAtMs,
+                                 @Nonnull AvatarFlightHudViewModel model,
+                                 long now,
+                                 long resendIntervalMs) {
+        return previousModel != null
+                && !previousModel.equals(model)
+                && now - lastSentAtMs >= Math.max(1L, resendIntervalMs);
     }
 
     private static boolean fullVigour(double charges, double maxCharges) {
@@ -184,6 +208,7 @@ public final class AvatarFlightHudSystem extends EntityTickingSystem<EntityStore
     }
 
     private record HudState(long enabledAtMs,
+                            @Nonnull PlayerRef playerRef,
                             @Nonnull TameworkAvatarFlightHud hud,
                             @Nonnull AvatarFlightHudViewModel model,
                             long lastSentAtMs) {

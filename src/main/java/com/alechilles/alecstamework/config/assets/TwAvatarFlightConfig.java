@@ -208,7 +208,7 @@ public final class TwAvatarFlightConfig implements
             .<Double>append(new KeyedCodec<>("HudResendIntervalMs", Codec.DOUBLE),
                     (settings, value) -> settings.hudResendIntervalMs = positiveOrDefault(value, 100.0),
                     settings -> settings.hudResendIntervalMs)
-            .documentation("Minimum milliseconds between repeated vigour HUD updates. Inheritance: missing nested key inherits parent value.")
+            .documentation("Minimum milliseconds between changed vigour HUD updates; unchanged state is not resent. Inheritance: missing nested key inherits parent value.")
             .add()
             .build();
 

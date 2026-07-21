@@ -18,6 +18,7 @@
 Group #TameworkAvatarFlightControls {
     Anchor: (Right: 220, Bottom: 40, Width: 250, Height: @FlightControlSlotHeight);
     LayoutMode: Left;
+    Visible: false;
 
     Group #LaunchControl {
         Anchor: (Width: @FlightControlSlotSize, Height: @FlightControlSlotHeight);

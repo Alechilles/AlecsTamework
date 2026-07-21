@@ -59,6 +59,10 @@ class AvatarFlightHudSystemArchitectureTest {
         Assertions.assertTrue(source.contains("player.getHudManager().addCustomHud(playerRef, hud)"));
         Assertions.assertFalse(source.contains("TameworkAvatarFlightControlOverlay"));
         Assertions.assertTrue(source.contains("TameworkAvatarFlightHud.removeFrom(player)"));
+        Assertions.assertTrue(source.contains("previous.playerRef() == playerRef"));
+        Assertions.assertTrue(source.contains("hud.refresh(model)"));
+        Assertions.assertTrue(source.contains("!previousModel.equals(model)"));
+        Assertions.assertTrue(source.contains("now - lastSentAtMs >= Math.max(1L, resendIntervalMs)"));
         Assertions.assertFalse(source.contains("Universe.get()"));
         Assertions.assertFalse(source.contains("PlayerRef.getComponent(Player"));
     }
@@ -92,7 +96,7 @@ class AvatarFlightHudSystemArchitectureTest {
     }
 
     @Test
-    void activatorDisableRemovesKeyedHudAfterFlightComponentRemoval() throws Exception {
+    void activatorDisableHidesReusableHudAfterFlightComponentRemoval() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/com/alechilles/alecstamework/avatarflight/AvatarFlightActivator.java"
         ));
@@ -100,10 +104,11 @@ class AvatarFlightHudSystemArchitectureTest {
         int disableIndex = source.indexOf("public Result disable");
         int playerLookup = source.indexOf("store.getComponent(ref, Player.getComponentType())", disableIndex);
         int removeFlight = source.indexOf("store.tryRemoveComponent(ref, flightType)", disableIndex);
-        int removeHud = source.indexOf("TameworkAvatarFlightHud.removeFrom(player)", disableIndex);
+        int hideHud = source.indexOf("AvatarFlightHudSystem.hideHud(playerUuid, player)", disableIndex);
 
         Assertions.assertTrue(playerLookup > disableIndex);
         Assertions.assertTrue(removeFlight > playerLookup);
-        Assertions.assertTrue(removeHud > removeFlight);
+        Assertions.assertTrue(hideHud > removeFlight);
+        Assertions.assertTrue(source.contains("AvatarFlightHudSystem.forgetHud(playerUuid)"));
     }
 }
