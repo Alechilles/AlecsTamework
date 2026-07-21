@@ -1,9 +1,12 @@
 package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
+import com.alechilles.alecstamework.api.BondedVesselReadinessView;
+import com.alechilles.alecstamework.api.BondedVesselsApi;
 import com.alechilles.alecstamework.api.CommandItemConfigView;
 import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.CommandLinksApi;
+import com.alechilles.alecstamework.api.CompanionProvisioningApi;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.GlobalConfigView;
@@ -18,6 +21,8 @@ import com.alechilles.alecstamework.api.OwnerPopulationCapRequestV2;
 import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationAdmissionApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
+import com.alechilles.alecstamework.api.PopulationGroupApi;
+import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.ProgressionApi;
 import com.alechilles.alecstamework.api.ProgressionMutationResult;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
@@ -291,6 +296,10 @@ public final class TameworkApiImpl
     private volatile ItemFeatureRegistry captureItemConfigs;
     @Nullable
     private volatile CapturePolicyRegistry capturePolicies;
+    private volatile BondedVesselsApi bondedVesselsApi = BondedVesselsApi.unavailable();
+    private volatile CompanionProvisioningApi companionProvisioningApi =
+            CompanionProvisioningApi.unavailable();
+    private volatile PopulationGroupApi populationGroupApi = PopulationGroupApi.unavailable();
 
     public TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
                            @Nonnull TameworkEventBus eventBus,
@@ -368,6 +377,48 @@ public final class TameworkApiImpl
         }
     }
 
+    /** Publishes the durable vessel facade only after its restart recovery is authoritative. */
+    public boolean activateBondedVesselsRuntime(@Nonnull BondedVesselsApiDelegate runtime) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (runtime.readiness().readiness() != BondedVesselReadinessView.Readiness.READY) {
+            return false;
+        }
+        bondedVesselsApi = runtime;
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.BONDED_VESSELS);
+        }
+        return true;
+    }
+
+    /** Publishes provisioning only after its journal recovery and backend reconciliation succeed. */
+    public boolean activateCompanionProvisioningRuntime(
+            @Nonnull CompanionProvisioningApiDelegate runtime,
+            boolean recoveryReady) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (!recoveryReady) {
+            return false;
+        }
+        companionProvisioningApi = runtime;
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING);
+        }
+        return true;
+    }
+
+    /** Publishes group projections only after durable reconciliation reports READY. */
+    public boolean activatePopulationGroupRuntime(@Nonnull PopulationGroupApiDelegate runtime) {
+        Objects.requireNonNull(runtime, "runtime");
+        if (runtime.getReconciliationStatus().readiness()
+                != PopulationGroupReconciliationView.Readiness.READY) {
+            return false;
+        }
+        populationGroupApi = runtime;
+        synchronized (capabilities) {
+            capabilities.add(TameworkApiCapability.POPULATION_GROUPS);
+        }
+        return true;
+    }
+
     /** Drops reflected optional-claim contracts after a settings change. */
     public void onRuntimeSettingsChanged() {
         damagePolicy.onRuntimeSettingsChanged();
@@ -407,6 +458,16 @@ public final class TameworkApiImpl
     @Override
     public TraitEffectApi traitEffects() {
         return traitEffectApi;
+    }
+
+    @Override
+    public BondedVesselsApi bondedVessels() {
+        return bondedVesselsApi;
+    }
+
+    @Override
+    public CompanionProvisioningApi companionProvisioning() {
+        return companionProvisioningApi;
     }
 
     @Override
@@ -1092,6 +1153,12 @@ public final class TameworkApiImpl
     @Override
     public PopulationAdmissionApi populationAdmissions() {
         return populationPolicy.admissions();
+    }
+
+    @Nonnull
+    @Override
+    public PopulationGroupApi populationGroups() {
+        return populationGroupApi;
     }
 
     private ProgressionMutationResult withLoadedProgressionTargetByProfileId(

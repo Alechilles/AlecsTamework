@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.NpcProfileView;
+import com.alechilles.alecstamework.api.BondedVesselReadinessView;
+import com.alechilles.alecstamework.api.PopulationGroupReconciliationView;
 import com.alechilles.alecstamework.api.PersistenceMutationAvailabilityRequest;
 import com.alechilles.alecstamework.api.PersistenceMutationDirection;
 import com.alechilles.alecstamework.api.PersistenceMutationDomain;
@@ -77,6 +79,11 @@ class TameworkApiImplTest {
                     ),
                     api.getCapabilities()
             );
+            assertEquals(BondedVesselReadinessView.Readiness.UNAVAILABLE,
+                    api.bondedVessels().readiness().readiness());
+            assertEquals(PopulationGroupReconciliationView.Readiness.UNAVAILABLE,
+                    api.policies().populationGroups().getReconciliationStatus().readiness());
+            assertTrue(api.companionProvisioning().getByProfileId("missing-profile").isEmpty());
 
             UUID npcUuid = UUID.randomUUID();
             UUID ownerUuid = UUID.randomUUID();
