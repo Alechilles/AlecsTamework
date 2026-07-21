@@ -378,9 +378,14 @@ public final class TameworkApiImpl
     }
 
     /** Publishes the durable vessel facade only after its restart recovery is authoritative. */
-    public boolean activateBondedVesselsRuntime(@Nonnull BondedVesselsApiDelegate runtime) {
+    public boolean activateBondedVesselsRuntime(
+            @Nonnull BondedVesselsApiDelegate runtime,
+            boolean exactEvidenceAuthorityReady,
+            boolean mutationAuthorityReady) {
         Objects.requireNonNull(runtime, "runtime");
-        if (runtime.readiness().readiness() != BondedVesselReadinessView.Readiness.READY) {
+        if (!exactEvidenceAuthorityReady
+                || !mutationAuthorityReady
+                || runtime.readiness().readiness() != BondedVesselReadinessView.Readiness.READY) {
             return false;
         }
         bondedVesselsApi = runtime;
@@ -406,9 +411,12 @@ public final class TameworkApiImpl
     }
 
     /** Publishes group projections only after durable reconciliation reports READY. */
-    public boolean activatePopulationGroupRuntime(@Nonnull PopulationGroupApiDelegate runtime) {
+    public boolean activatePopulationGroupRuntime(
+            @Nonnull PopulationGroupApiDelegate runtime,
+            boolean allPositivePathsInstalled) {
         Objects.requireNonNull(runtime, "runtime");
-        if (runtime.getReconciliationStatus().readiness()
+        if (!allPositivePathsInstalled
+                || runtime.getReconciliationStatus().readiness()
                 != PopulationGroupReconciliationView.Readiness.READY) {
             return false;
         }

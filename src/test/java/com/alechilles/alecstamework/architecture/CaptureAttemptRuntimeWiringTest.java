@@ -58,5 +58,8 @@ class CaptureAttemptRuntimeWiringTest {
         assertTrue(plugin.contains("companionProvisioningBackend.recoveryReady()"));
         assertTrue(api.contains("activateCompanionProvisioningRuntime("));
         assertTrue(api.contains("capabilities.add(TameworkApiCapability.COMPANION_PROVISIONING)"));
+        assertTrue(api.contains("boolean exactEvidenceAuthorityReady"));
+        assertTrue(api.contains("boolean mutationAuthorityReady"));
+        assertTrue(api.contains("boolean allPositivePathsInstalled"));
     }
 }
