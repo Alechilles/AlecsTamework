@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-/** Rejects client inventory-selection changes while an avatar-flight control lock is active. */
+/** Rejects client utility and tools selection while an avatar-flight control lock is active. */
 public final class AvatarFlightInventoryGuardSystem
         extends EntityEventSystem<EntityStore, InventoryActiveSlotRequestEvent> {
     private final ComponentType<EntityStore, AvatarFlightComponent> flightType;
@@ -48,10 +48,7 @@ public final class AvatarFlightInventoryGuardSystem
         if (flight == null || !event.isClientRequest()) {
             return false;
         }
-        return switch (event.getInventorySectionId()) {
-            case InventoryComponent.HOTBAR_SECTION_ID -> flight.getLockedHotbarSlot() >= 0;
-            case InventoryComponent.UTILITY_SECTION_ID, InventoryComponent.TOOLS_SECTION_ID -> true;
-            default -> false;
-        };
+        return event.getInventorySectionId() == InventoryComponent.UTILITY_SECTION_ID
+                || event.getInventorySectionId() == InventoryComponent.TOOLS_SECTION_ID;
     }
 }
