@@ -1,12 +1,17 @@
 package com.alechilles.alecstamework.vessels;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.api.BondedVesselOperationResult;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemLocatorRequest;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemLocatorResult;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemProjectionStatus;
 import com.alechilles.alecstamework.api.BondedVesselProjectionStatus;
+import com.alechilles.alecstamework.api.BondedVesselSourceItemEvidence;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationRequest;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationStatus;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationView;
@@ -204,6 +209,31 @@ class BondedVesselCoordinatorTest {
         assertEquals(0, mutation.applyCalls.get());
     }
 
+    @Test
+    void locationOnlyLookupReturnsTameworkGeneratedExactEvidence() {
+        BondedVesselHeldItemLocatorRequest locator = locator();
+
+        BondedVesselHeldItemLocatorResult result = join(coordinator().resolveHeldItemLocator(locator));
+
+        assertEquals(BondedVesselHeldItemProjectionStatus.VALID, result.status());
+        assertTrue(result.authoritative());
+        assertEquals(17L, result.resolvedSourceEvidence().orElseThrow().inventoryRevision());
+        assertEquals("source-fingerprint",
+                result.resolvedSourceEvidence().orElseThrow().itemFingerprint());
+        assertEquals(BINDING_ID, result.resolvedVessel().orElseThrow().bindingId());
+    }
+
+    @Test
+    void locationOnlyLookupRejectsAuthorityEvidenceFromAnotherSlot() {
+        evidence.heldObservation = exactHeldEvidence(4);
+
+        BondedVesselHeldItemLocatorResult result =
+                join(coordinator().resolveHeldItemLocator(locator()));
+
+        assertEquals(BondedVesselHeldItemProjectionStatus.SOURCE_CHANGED, result.status());
+        assertFalse(result.authoritative());
+    }
+
     private BondedVesselCoordinator coordinator() {
         return coordinator(journal, evidence, mutation);
     }
@@ -250,6 +280,24 @@ class BondedVesselCoordinatorTest {
                 3, 17L, "source-fingerprint", null, null);
     }
 
+    private BondedVesselHeldItemLocatorRequest locator() {
+        return new BondedVesselHeldItemLocatorRequest(
+                OWNER_ID, "player:owner", "inventory/main", 3,
+                "Draconic_Stone_Damaged", BondedVesselState.DEAD);
+    }
+
+    private BondedVesselEvidenceAuthority.HeldItemObservation exactHeldEvidence(int slot) {
+        return new BondedVesselEvidenceAuthority.HeldItemObservation(
+                BondedVesselEvidenceAuthority.HeldItemStatus.EXACT,
+                "held-item-exact",
+                new BondedVesselSourceItemEvidence(
+                        "Draconic_Stone_Damaged", "player:owner", "inventory/main",
+                        slot, 17L, "source-fingerprint"),
+                BINDING_ID,
+                "profile-dragon-1",
+                GENERATION);
+    }
+
     private BondedVesselEvidenceAuthority.SourceObservation observation(
             String holder,
             String container,
@@ -269,6 +317,7 @@ class BondedVesselCoordinatorTest {
 
     private static final class FakeEvidence implements BondedVesselEvidenceAuthority {
         private SourceObservation observation;
+        private HeldItemObservation heldObservation;
         private FinalizationStatus finalizationStatus = FinalizationStatus.FINALIZED;
 
         private FakeEvidence(BondedVesselTransitionContext context) {
@@ -277,6 +326,22 @@ class BondedVesselCoordinatorTest {
                     context.sourceContainerPath(), context.sourceInventorySlot(),
                     context.sourceInventoryRevision(), context.sourceItemId(),
                     context.sourceItemFingerprint());
+            this.heldObservation = new HeldItemObservation(
+                    HeldItemStatus.EXACT,
+                    "held-item-exact",
+                    new BondedVesselSourceItemEvidence(
+                            context.sourceItemId(), context.sourceHolderEvidenceId(),
+                            context.sourceContainerPath(), context.sourceInventorySlot(),
+                            context.sourceInventoryRevision(), context.sourceItemFingerprint()),
+                    BINDING_ID,
+                    "profile-dragon-1",
+                    GENERATION);
+        }
+
+        @Override
+        public CompletionStage<HeldItemObservation> locateHeldItem(
+                BondedVesselHeldItemLocatorRequest locator) {
+            return CompletableFuture.completedFuture(heldObservation);
         }
 
         @Override

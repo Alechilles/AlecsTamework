@@ -35,6 +35,18 @@ public interface BondedVesselsApi {
                 java.util.Objects.requireNonNull(request, "request")));
     }
 
+    /**
+     * Resolves a held slot without requiring an external plugin to fabricate Tamework's inventory
+     * revision or canonical fingerprint. The successful result returns that exact evidence.
+     */
+    @Nonnull
+    default CompletionStage<BondedVesselHeldItemLocatorResult> resolveHeldItemLocator(
+            @Nonnull BondedVesselHeldItemLocatorRequest request) {
+        return CompletableFuture.completedFuture(
+                BondedVesselHeldItemLocatorResult.unavailable(
+                        java.util.Objects.requireNonNull(request, "request")));
+    }
+
     @Nonnull
     CompletionStage<BondedVesselOperationResult> prepareTransition(
             @Nonnull BondedVesselTransitionRequest request

@@ -1,8 +1,13 @@
 package com.alechilles.alecstamework.vessels;
 
 import com.alechilles.alecstamework.api.BondedVesselDurableOperationStatus;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemLocatorRequest;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemLocatorResult;
 import com.alechilles.alecstamework.api.BondedVesselOperationResult;
 import com.alechilles.alecstamework.api.BondedVesselOperationView;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemProjectionRequest;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemProjectionStatus;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemProjectionView;
 import com.alechilles.alecstamework.api.BondedVesselProjectionStatus;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationRequest;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationStatus;
@@ -121,6 +126,155 @@ public final class BondedVesselCoordinator {
             markUnavailable("bonded-vessel-profile-read-failed");
             return Optional.empty();
         }
+    }
+
+    /** Resolves exact held-item evidence to canonical binding authority without trusting item metadata. */
+    @Nonnull
+    public CompletionStage<BondedVesselHeldItemProjectionView> resolveHeldItemProjection(
+            @Nonnull BondedVesselHeldItemProjectionRequest request) {
+        Objects.requireNonNull(request, "request");
+        return evidenceAuthority.resolveHeldItem(request.actorUuid(), request.sourceEvidence())
+                .thenApplyAsync(observation -> resolveHeldObservation(request, observation), executor)
+                .exceptionally(failure -> heldResult(
+                        request, BondedVesselHeldItemProjectionStatus.UNAVAILABLE,
+                        "bonded-vessel-held-item-resolution-failed", null));
+    }
+
+    /** Resolves a location-only request and returns Tamework-generated exact source evidence. */
+    @Nonnull
+    public CompletionStage<BondedVesselHeldItemLocatorResult> resolveHeldItemLocator(
+            @Nonnull BondedVesselHeldItemLocatorRequest request) {
+        Objects.requireNonNull(request, "request");
+        return evidenceAuthority.locateHeldItem(request)
+                .thenApplyAsync(observation -> resolveLocatedHeldObservation(request, observation), executor)
+                .exceptionally(failure -> locatedHeldResult(
+                        request, BondedVesselHeldItemProjectionStatus.UNAVAILABLE,
+                        "bonded-vessel-held-item-location-failed", null, null));
+    }
+
+    private BondedVesselHeldItemLocatorResult resolveLocatedHeldObservation(
+            BondedVesselHeldItemLocatorRequest request,
+            BondedVesselEvidenceAuthority.HeldItemObservation observation) {
+        if (observation == null) {
+            return locatedHeldResult(request, BondedVesselHeldItemProjectionStatus.UNAVAILABLE,
+                    "held-item-observation-missing", null, null);
+        }
+        BondedVesselHeldItemProjectionStatus observationStatus = switch (observation.status()) {
+            case EXACT -> null;
+            case NOT_FOUND -> BondedVesselHeldItemProjectionStatus.NOT_FOUND;
+            case NOT_BONDED -> BondedVesselHeldItemProjectionStatus.NOT_BONDED;
+            case CHANGED -> BondedVesselHeldItemProjectionStatus.SOURCE_CHANGED;
+            case AMBIGUOUS -> BondedVesselHeldItemProjectionStatus.AMBIGUOUS;
+            case UNAVAILABLE -> BondedVesselHeldItemProjectionStatus.UNAVAILABLE;
+        };
+        if (observationStatus != null) {
+            return locatedHeldResult(request, observationStatus, observation.reason(),
+                    observation.observedEvidence(), null);
+        }
+        var evidence = observation.observedEvidence();
+        if (!request.holderEvidenceId().equals(evidence.holderEvidenceId())
+                || !request.containerPath().equals(evidence.containerPath())
+                || request.inventorySlot() != evidence.inventorySlot()
+                || (request.expectedItemId() != null
+                && !request.expectedItemId().equals(evidence.itemId()))) {
+            return locatedHeldResult(request, BondedVesselHeldItemProjectionStatus.SOURCE_CHANGED,
+                    "held-item-locator-evidence-mismatch", evidence, null);
+        }
+        BondedVesselHeldItemProjectionRequest exactRequest =
+                new BondedVesselHeldItemProjectionRequest(
+                        request.actorUuid(), evidence, request.requiredState());
+        BondedVesselHeldItemProjectionView exactResult = resolveHeldObservation(exactRequest, observation);
+        return locatedHeldResult(
+                request,
+                exactResult.status(),
+                exactResult.reason(),
+                evidence,
+                exactResult.resolvedVessel().orElse(null));
+    }
+
+    private static BondedVesselHeldItemLocatorResult locatedHeldResult(
+            BondedVesselHeldItemLocatorRequest request,
+            BondedVesselHeldItemProjectionStatus status,
+            String reason,
+            @Nullable com.alechilles.alecstamework.api.BondedVesselSourceItemEvidence evidence,
+            @Nullable BondedVesselView vessel) {
+        return new BondedVesselHeldItemLocatorResult(
+                status, reason, request, evidence, vessel,
+                status == BondedVesselHeldItemProjectionStatus.VALID);
+    }
+
+    private BondedVesselHeldItemProjectionView resolveHeldObservation(
+            BondedVesselHeldItemProjectionRequest request,
+            BondedVesselEvidenceAuthority.HeldItemObservation observation) {
+        if (observation == null) {
+            return heldResult(request, BondedVesselHeldItemProjectionStatus.UNAVAILABLE,
+                    "held-item-observation-missing", null);
+        }
+        BondedVesselHeldItemProjectionStatus observationStatus = switch (observation.status()) {
+            case EXACT -> null;
+            case NOT_FOUND -> BondedVesselHeldItemProjectionStatus.NOT_FOUND;
+            case NOT_BONDED -> BondedVesselHeldItemProjectionStatus.NOT_BONDED;
+            case CHANGED -> BondedVesselHeldItemProjectionStatus.SOURCE_CHANGED;
+            case AMBIGUOUS -> BondedVesselHeldItemProjectionStatus.AMBIGUOUS;
+            case UNAVAILABLE -> BondedVesselHeldItemProjectionStatus.UNAVAILABLE;
+        };
+        if (observationStatus != null) {
+            return heldResult(request, observationStatus, observation.reason(), null);
+        }
+        if (!observation.exactlyMatches(request.sourceEvidence())) {
+            return heldResult(request, BondedVesselHeldItemProjectionStatus.SOURCE_CHANGED,
+                    "held-item-source-evidence-changed", null);
+        }
+        try {
+            BondedVesselBindingRecord binding = journal.findBinding(observation.bindingId().toString());
+            if (binding == null) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.NOT_FOUND,
+                        "held-item-binding-not-found", null);
+            }
+            BondedVesselView vessel = toView(binding);
+            if (!binding.profileId().equals(observation.profileId())) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.AMBIGUOUS,
+                        "held-item-profile-mismatch", vessel);
+            }
+            if (binding.generation() != observation.generation()) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.STALE_GENERATION,
+                        "held-item-stale-generation", vessel);
+            }
+            if (!binding.ownerUuid().equals(request.actorUuid())) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.OWNER_MISMATCH,
+                        "held-item-owner-mismatch", vessel);
+            }
+            if (vessel.state() != request.requiredState()) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.STATE_MISMATCH,
+                        "held-item-state-mismatch", vessel);
+            }
+            if (vessel.projectionStatus() == BondedVesselProjectionStatus.AMBIGUOUS) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.AMBIGUOUS,
+                        "held-item-projection-ambiguous", vessel);
+            }
+            if (vessel.projectionStatus() == BondedVesselProjectionStatus.QUARANTINED) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.QUARANTINED,
+                        "held-item-projection-quarantined", vessel);
+            }
+            if (vessel.projectionStatus() != BondedVesselProjectionStatus.PRESENT) {
+                return heldResult(request, BondedVesselHeldItemProjectionStatus.NOT_FOUND,
+                        "held-item-projection-not-present", vessel);
+            }
+            return new BondedVesselHeldItemProjectionView(
+                    BondedVesselHeldItemProjectionStatus.VALID,
+                    "held-item-projection-authoritative", request, vessel, true);
+        } catch (Exception failure) {
+            return heldResult(request, BondedVesselHeldItemProjectionStatus.UNAVAILABLE,
+                    "held-item-binding-read-failed", null);
+        }
+    }
+
+    private static BondedVesselHeldItemProjectionView heldResult(
+            BondedVesselHeldItemProjectionRequest request,
+            BondedVesselHeldItemProjectionStatus status,
+            String reason,
+            @Nullable BondedVesselView vessel) {
+        return new BondedVesselHeldItemProjectionView(status, reason, request, vessel, false);
     }
 
     @Nonnull

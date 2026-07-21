@@ -2,6 +2,10 @@ package com.alechilles.alecstamework.api.internal;
 
 import com.alechilles.alecstamework.api.BondedVesselOperationResult;
 import com.alechilles.alecstamework.api.BondedVesselOperationView;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemProjectionRequest;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemProjectionView;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemLocatorRequest;
+import com.alechilles.alecstamework.api.BondedVesselHeldItemLocatorResult;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationRequest;
 import com.alechilles.alecstamework.api.BondedVesselProjectionValidationView;
 import com.alechilles.alecstamework.api.BondedVesselReadinessView;
@@ -81,6 +85,19 @@ public final class BondedVesselsApiDelegate implements BondedVesselsApi {
             BondedVesselProjectionValidationRequest request
     ) {
         return coordinator.validateProjection(request);
+    }
+
+    @Override
+    public CompletionStage<BondedVesselHeldItemProjectionView> resolveHeldItemProjection(
+            BondedVesselHeldItemProjectionRequest request
+    ) {
+        return coordinator.resolveHeldItemProjection(request);
+    }
+
+    @Override
+    public CompletionStage<BondedVesselHeldItemLocatorResult> resolveHeldItemLocator(
+            BondedVesselHeldItemLocatorRequest request) {
+        return coordinator.resolveHeldItemLocator(request);
     }
 
     @Override
