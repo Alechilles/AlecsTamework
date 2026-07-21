@@ -92,6 +92,18 @@ Feature-specific gates:
   Soul Bond-exclusive Miniwyvern directly rather than capturing/binding one.
 - No feature emulates a missing Tamework authority with ad-hoc metadata.
 
+The shipped HyDragon feature matrix is therefore:
+
+| HyDragon feature | Required Tamework capabilities | Fail-closed result when missing |
+| --- | --- | --- |
+| Probabilistic Draconic Stone capture | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `CAPTURE_POLICY`, `POPULATION_GROUPS` | Disable capture before eligibility/entropy; retain the source item and target unchanged |
+| Bonded summon/store | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `BONDED_VESSELS`, `POPULATION_GROUPS` | Disable vessel mutation; retain the durable profile/binding/item state |
+| Damaged-stone repair | Bonded summon/store capabilities plus the durable bonded-operation query/resume surface | Do not consume Revitalizing Essence; after a prior consumption, retry/query the same operation and never guess whether to refund |
+| Soul Bond Miniwyvern creation | `PROFILES`, `POLICY`, `PERSISTENCE_RESILIENCE`, `POPULATION_GROUPS`, `COMPANION_PROVISIONING`, plus `INTERACTION_EXTENSIONS` for the shipped item | Disable creation; never create a HyDragon-local profile or bypass the one-owned group |
+| Elemental profile state | `PROFILE_DATA` | Disable persistence-dependent elemental abilities only |
+| Flight gate | Bundled `Tamework_Flightmasters_Talisman` item/config; no new API capability | Disable HyDragon flight interaction if the canonical item/config is absent |
+| Miniwyvern backpack | Deferred future `COMPANION_INVENTORY` | Not registered or shown in the initial release |
+
 `COMPANION_INVENTORY` is not part of API `0.9.0` or the initial HyDragon
 release. HyDragon does not query it or register a backpack interaction. The
 deferred [companion-inventory specification](companion-inventory.md) will assign
@@ -139,6 +151,20 @@ Energy, maximum summon duration, and charge depletion are deferred optional
 HyDragon extensions. They are not required for the MVP and are not Tamework
 binding/population authority.
 
+## Fixed MVP maintenance authority
+
+There is exactly one owner for each maintenance rule:
+
+| Rule | Authority | Baseline behavior |
+| --- | --- | --- |
+| Summon/store transition cooldown | Tamework bonded binding row configured by `Vessel.TransitionCooldownMs` | `10000` ms after each successful summon or store; HyDragon defines no duplicate timer |
+| Dead-to-stored vessel transition | Tamework `BondedVesselsApi` | Generation-fenced, idempotent, restart-resumable transition |
+| Revitalizing Essence consumption/refund | HyDragon durable repair saga | Consume once only after Tamework preparation; refund/claim only after a proven terminal pre-apply denial |
+| Energy, maximum summon duration, charge depletion | Deferred HyDragon extension | Absent from the MVP; Tamework does not infer or persist them |
+
+The corresponding HyDragon behavior is specified in
+[capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md).
+
 ## Public API additions
 
 ### Capture policy
@@ -163,8 +189,22 @@ event is never a cancelable pre-commit policy hook.
 ID and profile ID plus mutation-bound summon, store, and state-transition
 requests. Every request carries a caller namespace, idempotency key, expected
 binding generation, expected profile revision, actor UUID, and intended
-transition. Tokens are
-opaque and follow prepare/claim/apply/commit/cancel semantics.
+transition plus exact source holder/container/slot/revision/fingerprint
+evidence. Tokens are opaque and follow prepare/claim/apply/commit/cancel
+semantics, but they are process-local capabilities and are never the only
+restart credential. `resumeTransition(request)` revalidates the original
+caller/key, transition, revisions, and current exact source evidence before
+issuing a fresh token for the existing nonterminal operation; it never creates
+another operation or advances generation.
+
+`findOperation(callerNamespace, idempotencyKey)` returns a bounded immutable
+durable view for both nonterminal and terminal rows. Its status distinguishes
+at least `PREPARED`, `APPLYING`, `APPLIED`, `COMMITTED`, `CANCELED`,
+`TERMINAL_DENIED`, and `QUARANTINED`. `APPLIED` means Tamework authority may
+still finish source closure, so HyDragon must retry/resume and must not refund.
+Only `TERMINAL_DENIED` proves that a pre-apply repair denial may be compensated.
+Not-found, unavailable, and timeout/unknown never authorize a refund or a new
+idempotency key.
 
 Events:
 
@@ -211,6 +251,17 @@ policy also qualifies the companion for `DEAD_REVIVABLE` without a command-tool
 link. Provisioned death/revive events are canonical and command-link-independent;
 revive restores the same profile through normal active/group/claim admission.
 
+`findOperation(callerNamespace, idempotencyKey)` is restart-visible and returns
+nonterminal, terminal, and partial-success rows, not only final successes. Its
+operation status distinguishes `PREPARING`, `PREPARED`, `APPLYING`,
+`DORMANT_COMMITTED`, `PROJECTING`, `COMMITTED`, `PARTIAL_DORMANT`, `CANCELED`,
+`TERMINAL_DENIED`, and `QUARANTINED`. Once dormant profile creation has
+committed, every query/result
+includes the original caller namespace, idempotency key, operation/profile,
+owner, role, lifecycle, profile revision, and projection status. A retry of an
+active request after `PARTIAL_DORMANT` resumes projection of that profile; it
+must not allocate another profile.
+
 ### Deferred companion inventory
 
 This surface is not implemented or advertised in Public API `0.9.0`. A later
@@ -231,6 +282,33 @@ does not fail linkage. Existing records and public constructors are not changed;
 new data uses new versioned view/request types. New enum values are additive,
 and consumers must use default branches when switching over capabilities or
 event reasons.
+
+### Public DTO validation baseline
+
+Public request/view constructors reject invalid data before durable or world
+work begins:
+
+- caller namespaces, idempotency keys, item/config/role/world IDs, fingerprints,
+  and required reason strings are trimmed, nonblank, and length-bounded;
+- namespace plus idempotency key is operation origin/uniqueness; an optional
+  correlation ID is diagnostics-only and cannot alias, authorize, or resume an
+  operation;
+- revisions/generations are nonnegative except an explicitly documented
+  `CURRENT` sentinel such as provisioning policy revision `-1`; every other
+  negative value is invalid;
+- locations and health/probability inputs are finite and within their declared
+  bounds;
+- vessel requests include exact holder/container/slot/inventory-revision/item-
+  fingerprint evidence and transition-specific destination/live-NPC context;
+- dormant provisioning requires an ownership world and forbids a destination;
+  active provisioning additionally requires a finite destination; and
+- supplied expected policy/config revisions are persisted on preparation and
+  must match when nonnegative. `-1` resolves current policy once and persists
+  that resolved revision; it is not a permission to re-resolve during retry.
+
+Invalid DTOs throw/return a stable validation denial before opening a journal
+row. DTO constructors normalize representation but never silently clamp,
+invent identity, or downgrade a requested mutation.
 
 ## Event ordering and idempotency
 
@@ -349,6 +427,12 @@ dormant/active/failed-projection companion provisioning.
 open operations, quarantines, stale vessel evidence, and group
 counts/reservations. Player-facing messages omit raw SQLite details and binding
 secrets; admin output includes correlation IDs.
+`/tw diagnose provisioning <caller-namespace> <idempotency-key>` reports the
+bounded operation status, original origin/correlation, dormant-commit and
+projection phases, canonical profile/revision when present, and recovery reason
+without mutating or retrying the operation. `/tw api test` includes a failed-
+projection provisioning fixture and verifies that this diagnostic finds the
+same durable `PARTIAL_DORMANT` operation/profile after restart simulation.
 
 HyDragon's startup diagnostics log its version, detected Tamework mod/API
 versions, capability matrix, registered extension IDs, and configured group
@@ -398,3 +482,12 @@ feature is not registered.
 20. Provisioning uniqueness is scoped by `(caller namespace, idempotency key)`:
     same-pair retries return one result, while equal keys in two namespaces do
     not alias and still cannot bypass group/entitlement limits.
+21. A prepared repair can be found and resumed after restart without a retained
+    process-local token; `APPLIED` never refunds, while only
+    `TERMINAL_DENIED` permits HyDragon compensation.
+22. Provisioning operation queries expose nonterminal and
+    `PARTIAL_DORMANT` rows with the original namespace/key/correlation and
+    canonical profile, and the diagnostic fixture reports that same row.
+23. Public DTO contract tests reject blank/over-bound identity, invalid
+    revisions, non-finite locations, missing transition evidence, and invalid
+    dormant/active destination combinations before mutation.

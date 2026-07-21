@@ -201,6 +201,14 @@ Legacy/adoption reconciliation may preserve an already over-cap profile, but
 creating or activating another positive delta remains denied until policy or
 population changes through an explicit audited operation.
 
+There is no public/internal `force=true` escape hatch for positive group deltas.
+Admin commands may inspect, reconcile, release an existing profile, or apply an
+explicit audited config/policy change, but `ADMIN_OVERRIDE`, creation commands,
+revive commands, and direct API calls all remain subject to group caps. An
+emergency administrative repair may preserve/reclassify already-authoritative
+state; it cannot manufacture owned/active headroom or create another unique
+companion.
+
 `MaxActive` is separate from physical claim occupancy even though both count
 `ACTIVE` and `UNLOADED`: group active additionally counts `RESTORING` and is
 owner/group scoped, while claim limits are location/provider scoped.
@@ -246,6 +254,13 @@ create an owned canonical companion. Add capability
 - optional initial display name/home context supported by canonical profiles;
 - expected config/policy generation where supplied for diagnostics.
 
+`callerNamespace` is required, nonblank, and part of the unique durable origin
+with `idempotencyKey`; equal keys in different namespaces do not alias. An
+optional correlation ID is diagnostic linkage only. A nonnegative expected
+policy revision must match at preparation. The current-policy sentinel `-1`
+resolves once and persists that revision in the operation, so retry/recovery
+cannot silently adopt a later policy.
+
 The caller does not supply authoritative group IDs, profile IDs, owner-count
 deltas, or a live NPC UUID. Tamework resolves the role, group set, global owner
 policy, and destination claim context.
@@ -253,12 +268,13 @@ policy, and destination claim context.
 Provisioning is a two-stage idempotent workflow:
 
 1. Derive one provisional/canonical profile identity from the stable operation
-   and prepare a dedicated `PROVISION_DORMANT` V2 admission. Under the same
-   owner/group lock and operation journal, it reserves global owner capacity and
-   every positive group-owned delta but deliberately reserves no physical claim
-   and no active delta. It requires retained ownership-world context rather
-   than a spawn destination. This is not the current `NEW_OWNERSHIP` path, whose
-   claim/destination requirements remain unchanged.
+   and prepare a dedicated internal `PROVISION_DORMANT` no-claim admission.
+   Under the same owner/group lock and durable admission journal, it reserves
+   global owner capacity and every positive group-owned delta but deliberately
+   reserves no physical claim and no active delta. It requires retained
+   ownership-world context and forbids a spawn destination. This is not the
+   current V1 `NEW_OWNERSHIP` path, whose NPC/claim/destination requirements
+   remain unchanged.
 2. Commit exactly one canonical owned profile in lifecycle
    `PROVISIONED_DORMANT` and publish its profile ID. A retry with the same key
    returns it.
@@ -279,6 +295,12 @@ calls a claim provider. Only stage 3 uses normal restore admission and reserves
 destination claim plus active group capacity. Cancellation/expiry of stage 1
 releases its owner/group reservation exactly once.
 
+The no-claim operation kind is coordinator-internal and can be selected only by
+`CompanionProvisioningApi` after validating the provisioning request. Public
+`PopulationAdmissionRequest` V1 continues rejecting dormant provisioning and
+continues requiring its NPC/claim context; V2 callers cannot select
+`PROVISION_DORMANT` directly or use it as a generic owner-cap bypass.
+
 Add `PROVISIONED_DORMANT` to internal `CompanionLifecycleState` and public
 `PopulationCompanionLifecycle`. It means an intentionally created, owned,
 non-physical profile with no vessel/coop/death/lost authority. It consumes an
@@ -290,10 +312,20 @@ and compatibility test handles the new value explicitly or uses a safe default
 branch.
 
 Proposed immutable results distinguish `PROVISIONED_ACTIVE`,
-`PROVISIONED_DORMANT`, `ALREADY_PROVISIONED`, `DENIED`, `UNAVAILABLE`, and
-`QUARANTINED`, and include operation/profile IDs, committed lifecycle,
-projection reason, and population decision. Add post-commit
+`PROVISIONED_DORMANT`, `PARTIAL_DORMANT`, `ALREADY_PROVISIONED`, `DENIED`,
+`UNAVAILABLE`, and `QUARANTINED`, and include caller namespace/idempotency
+origin, optional diagnostic correlation ID, operation/profile IDs, committed
+lifecycle, profile revision, projection reason, and population decision. Add
+post-commit
 `CompanionProvisionedEvent`; it is a notification, not creation authority.
+
+The durable operation view/query also represents nonterminal and partial
+results. `findOperation(callerNamespace, idempotencyKey)` returns `PREPARING`,
+`PREPARED`, `APPLYING`, `DORMANT_COMMITTED`, `PROJECTING`, `COMMITTED`,
+`PARTIAL_DORMANT`, `CANCELED`, `TERMINAL_DENIED`, or `QUARANTINED` state with
+the original origin/correlation and canonical profile once allocated. It does not
+collapse `PARTIAL_DORMANT` to denial or not-found. Retry resumes optional
+projection for that profile and never starts another dormant-create stage.
 
 The API does not consume a caller's item or write its entitlement ledger.
 HyDragon links the returned profile and consumes its Soul Bond idempotently
@@ -322,11 +354,12 @@ match. Existing V1 requests that could create/change an owned profile without a
 known target role fail closed when group policy could apply; safe zero-delta
 legacy operations retain compatibility.
 
-The V2 operation kind includes `PROVISION_DORMANT`, available only through the
-provisioning coordinator. It carries ownership-world context, forbids a live
-destination/claim token, and produces the same journaled owner/group decision
-shape as other admissions. Public callers cannot select `ADMIN_OVERRIDE` to
-bypass group limits.
+The internal V2 operation kind includes `PROVISION_DORMANT`, available only
+through the provisioning coordinator. It carries ownership-world context,
+forbids a live NPC, destination, and claim token, and produces the same
+journaled owner/group decision shape as other admissions. Neither V1 nor direct
+public V2 callers may select it. Public callers also cannot select
+`ADMIN_OVERRIDE` to bypass group limits.
 
 A default fail-closed `PopulationGroupApi` exposes immutable:
 
@@ -392,6 +425,14 @@ rollback-tested.
 - unresolved/backfill/over-cap profile counts;
 - oldest pending group reservation and operation correlation;
 - readiness, quarantines, and persistence incident reason codes.
+
+`/tw diagnose provisioning <caller-namespace> <idempotency-key>` reads the
+durable provisioning operation by its full origin and reports nonterminal,
+dormant-committed, projecting, partial-dormant, terminal, and recovery state,
+including the canonical profile/revision once allocated. It is bounded and
+read-only. `/tw api test` must leave one failed-projection fixture long enough
+to prove the diagnostic returns that same `PARTIAL_DORMANT` profile after a
+restart/recovery pass, then release it through the normal path.
 
 Metrics expose aggregate counts/latencies only; no owner/profile identifiers.
 Diagnostics are bounded and read-only unless an explicit existing repair command
@@ -532,3 +573,15 @@ CHANGELOG, generated agent index, and `/tw api test` in the implementation PR.
 52. Equal idempotency strings under two caller namespaces do not alias one
     operation; retries within a namespace do, and neither path bypasses group
     limits.
+53. `PopulationAdmissionRequest` V1 rejects `PROVISION_DORMANT`; only the
+    provisioning coordinator can prepare the internal no-claim operation under
+    the unified owner/group lock and journal.
+54. Dormant provisioning reserves one owner/group-owned slot and exactly zero
+    active/physical-claim slots, supplies no NPC/destination/claim token, and
+    cannot be invoked as a public admission bypass.
+55. `ADMIN_FORCE`/`ADMIN_OVERRIDE` and admin creation/revive commands cannot
+    exceed group owned/active limits; administrative reconciliation may only
+    preserve or repair already-authoritative state.
+56. Provisioning operation queries and diagnostics expose preparing through
+    partial/terminal states by full `(caller namespace, idempotency key)` origin
+    and never turn `PARTIAL_DORMANT` into another profile creation.

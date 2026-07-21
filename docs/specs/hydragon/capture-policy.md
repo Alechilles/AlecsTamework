@@ -467,8 +467,9 @@ rather than expanding either multi-domain class.
 34. Public config views are immutable and old `SpawnerConfigView` binaries link.
 35. The event fires after durability, once logically, with defensive data.
 36. Listener exceptions cannot change capture outcome.
-37. `/tw api test` covers guaranteed success, deterministic injected failure,
-    duplicate callback, and capability presence.
+37. `/tw api test` covers guaranteed success with an RNG provider whose
+    invocation count remains exactly zero, deterministic injected probabilistic
+    failure, duplicate callback, and capability presence.
 38. `/tw diagnose` correlates an attempt with both config revisions, population
     operation, persistence incident, and recovery disposition.
 39. Performance tests show no per-tick allocation or scan proportional to all

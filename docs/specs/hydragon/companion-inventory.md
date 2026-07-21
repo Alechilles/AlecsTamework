@@ -30,6 +30,24 @@ The core conservation invariant is:
 Capacity shrink and permanent profile deletion may never silently destroy
 items.
 
+## Fixed deferred-design decisions
+
+Although implementation is deferred, the later update must preserve these
+decisions:
+
+- conservation counts `ACTIVE` and durable `OVERFLOW` rows even while their
+  independent guard is `LOCKED` or `QUARANTINED`;
+- config removal closes sessions and preserves rows in a config-independent,
+  owner-authenticated, withdraw-only overflow/recovery path;
+- the first inventory release has no world-drop disposition or durable world-
+  drop receipt; unattended recovery remains a durable row or owner/admin claim;
+- SQLite slot/claim payloads are enumerated by a dedicated bounded evidence
+  source and scanned with one shared depth/container/stack/byte budget;
+- `RequireOwner=false` is not public access, and dormant linked access requires
+  current exact actor-held command-tool or bonded-generation evidence; and
+- claim withdrawal uses a deletion-independent operation journal with no
+  required foreign key to the source profile/session.
+
 ## Non-goals
 
 - HyDragon-specific backpack art, unlock recipes, elemental storage, or capacity

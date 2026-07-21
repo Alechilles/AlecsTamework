@@ -336,12 +336,29 @@ Minimum operations:
 - lookup by binding ID or profile ID;
 - validate an item projection against binding/generation;
 - prepare, claim-for-apply, commit, and cancel supported transitions;
-- identify external callers by namespace plus idempotency key and reacquire or
-  query a transition after process/server restart;
+- identify external callers by namespace plus idempotency key;
+- `resumeTransition(request)`, which revalidates the original transition,
+  revisions, actor, and current exact holder/container/slot/inventory-revision/
+  item-fingerprint evidence before minting a fresh token for the existing
+  nonterminal operation after process/server restart;
+- `findOperation(callerNamespace, idempotencyKey)`, which queries nonterminal
+  and terminal durable state without requiring a process-local token;
 - inspect subsystem readiness and a bounded operation status.
 
 Tokens are opaque, expire, and cannot be fabricated or reused for a different
-binding/generation. Arbitrary state setters are not exposed.
+binding/generation. They are process-local apply capabilities, not durable
+restart identity, and callers never serialize them. Resume is idempotent: it
+does not prepare a second operation, extend policy/config authority, or reserve
+another generation. Arbitrary state setters are not exposed.
+
+The public durable operation status distinguishes `PREPARED`, `APPLYING`,
+`APPLIED`, `COMMITTED`, `CANCELED`, `TERMINAL_DENIED`, and `QUARANTINED`.
+`APPLIED` is materially different from a terminal denial: Tamework may still
+complete exact source finalization, so an external material saga must retry or
+resume and must not refund. `TERMINAL_DENIED` proves that authoritative apply
+did not happen. Not-found, unavailable, timeout, and unknown remain
+indeterminate/fail-closed and never authorize either a new repair key or a
+refund.
 
 Events `BondedVesselBoundEvent`, `BondedVesselStateChangedEvent`, and
 `BondedVesselBindingInvalidatedEvent` are immutable post-commit notifications.
@@ -496,3 +513,9 @@ the implementation must not expand either into a larger multi-domain class.
     consumption, after Tamework apply, and before either journal closes
     converges to exactly one repaired vessel or one terminal denial plus one
     material refund/recovery claim, never both a refund and repaired vessel.
+50. A prepared repair can be resumed after process/server restart from its
+    original request origin and current exact source evidence without retaining
+    or serializing the old token.
+51. `findOperation` exposes both nonterminal and terminal durable status;
+    `APPLIED` blocks refund while `TERMINAL_DENIED` alone permits compensation,
+    and not-found/unavailable/unknown remain fail-closed.
