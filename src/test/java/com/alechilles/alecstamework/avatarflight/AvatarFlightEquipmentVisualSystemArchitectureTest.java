@@ -98,7 +98,8 @@ class AvatarFlightEquipmentVisualSystemArchitectureTest {
         assertTrue(source.contains("if (!pendingInitialAttachment"));
         assertTrue(source.contains("equipment.armorSignature().equals(visual.getEquipmentSignature())"));
         assertTrue(source.contains("modelService.savedModelCopy(ownerUuid)"));
-        assertTrue(source.contains("riderVisualService.refresh(commandBuffer, ref, savedModel, equipment)"));
+        assertTrue(source.contains("settings.isIncludeAppearanceAttachments()"));
+        assertTrue(source.contains("riderVisualService.refresh("));
         assertTrue(source.contains("updated.setEquipmentSignature(equipment.armorSignature())"));
         assertTrue(source.contains("updated.setRiderAttachAfterMs(0L)"));
         assertTrue(source.contains("commandBuffer.putComponent(ref, visualType, updated)"));

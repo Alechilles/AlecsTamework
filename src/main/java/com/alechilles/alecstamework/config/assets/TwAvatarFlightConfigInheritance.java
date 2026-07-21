@@ -221,6 +221,9 @@ final class TwAvatarFlightConfigInheritance {
             if (!keys.contains("HideOwnerArmor")) target.riderVisual.hideOwnerArmor = parent.riderVisual.hideOwnerArmor;
             if (!keys.contains("HideOwnerHands")) target.riderVisual.hideOwnerHands = parent.riderVisual.hideOwnerHands;
             if (!keys.contains("ShowRider")) target.riderVisual.showRider = parent.riderVisual.showRider;
+            if (!keys.contains("IncludeAppearanceAttachments")) {
+                target.riderVisual.includeAppearanceAttachments = parent.riderVisual.includeAppearanceAttachments;
+            }
             if (!keys.contains("SeatOffsetX")) target.riderVisual.seatOffsetX = parent.riderVisual.seatOffsetX;
             if (!keys.contains("SeatOffsetY")) target.riderVisual.seatOffsetY = parent.riderVisual.seatOffsetY;
             if (!keys.contains("SeatOffsetZ")) target.riderVisual.seatOffsetZ = parent.riderVisual.seatOffsetZ;

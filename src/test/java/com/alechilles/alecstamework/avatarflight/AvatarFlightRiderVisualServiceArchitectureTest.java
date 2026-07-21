@@ -44,6 +44,10 @@ class AvatarFlightRiderVisualServiceArchitectureTest {
         assertTrue(source.contains("AvatarFlightPlayerSkinAttachmentResolver.resolve("));
         assertTrue(source.contains("AvatarFlightEquipmentAttachmentResolver.resolveSnapshot(ownerRef, store)"));
         assertTrue(source.contains("equipment.hiddenCosmetics()"));
+        assertTrue(source.contains("boolean includeAppearanceAttachments"));
+        assertTrue(source.contains("if (!includeAppearanceAttachments)"));
+        assertTrue(source.contains("return new ModelAttachment[]{skinAppearance.body()}"));
+        assertTrue(source.contains("includeAppearanceAttachments=%s includedAttachmentCount=%s"));
         assertTrue(source.contains("equipment.armorSignature()"));
         assertTrue(source.contains("equipment.hiddenCosmetics()"));
         assertTrue(source.contains("appearanceAttachments"));

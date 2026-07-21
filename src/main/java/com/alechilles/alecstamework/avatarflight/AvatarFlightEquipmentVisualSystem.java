@@ -111,7 +111,13 @@ public final class AvatarFlightEquipmentVisualSystem extends EntityTickingSystem
         if (savedModel == null) {
             return;
         }
-        if (riderVisualService.refresh(commandBuffer, ref, savedModel, equipment)) {
+        if (riderVisualService.refresh(
+                commandBuffer,
+                ref,
+                savedModel,
+                equipment,
+                settings.isIncludeAppearanceAttachments()
+        )) {
             AvatarFlightRiderVisualComponent updated = visual.clone();
             updated.setEquipmentSignature(equipment.armorSignature());
             updated.setRiderAttachAfterMs(0L);

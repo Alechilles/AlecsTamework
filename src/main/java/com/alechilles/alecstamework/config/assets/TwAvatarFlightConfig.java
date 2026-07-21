@@ -362,6 +362,11 @@ public final class TwAvatarFlightConfig implements
                     settings -> settings.showRider)
             .documentation("Whether avatar flight spawns a visual-only copy of the player's saved model as a rider. Disabled by default while the native mounted visual-rider path is unstable. Inheritance: missing nested key inherits parent value.")
             .add()
+            .<Boolean>append(new KeyedCodec<>("IncludeAppearanceAttachments", Codec.BOOLEAN),
+                    (settings, value) -> settings.includeAppearanceAttachments = value != null && value,
+                    settings -> settings.includeAppearanceAttachments)
+            .documentation("Whether the fake rider includes skin, cosmetic, and equipment attachments in addition to its body model. Disabled by default because full rider attachment sets can crash the current client on some transformed models. Inheritance: missing nested key inherits parent value.")
+            .add()
             .<Double>append(new KeyedCodec<>("SeatOffsetX", Codec.DOUBLE),
                     (settings, value) -> settings.seatOffsetX = finiteOrDefault(value, 0.0),
                     settings -> settings.seatOffsetX)
@@ -784,6 +789,7 @@ public final class TwAvatarFlightConfig implements
         boolean hideOwnerArmor;
         boolean hideOwnerHands;
         boolean showRider;
+        boolean includeAppearanceAttachments;
         double seatOffsetX;
         double seatOffsetY = 1.35;
         double seatOffsetZ = -0.25;
@@ -793,6 +799,7 @@ public final class TwAvatarFlightConfig implements
         public boolean isHideOwnerArmor() { return hideOwnerArmor; }
         public boolean isHideOwnerHands() { return hideOwnerHands; }
         public boolean isShowRider() { return showRider; }
+        public boolean isIncludeAppearanceAttachments() { return includeAppearanceAttachments; }
         public double getSeatOffsetX() { return seatOffsetX; }
         public double getSeatOffsetY() { return seatOffsetY; }
         public double getSeatOffsetZ() { return seatOffsetZ; }

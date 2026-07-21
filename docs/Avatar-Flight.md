@@ -96,6 +96,8 @@ When `RiderVisual.ShowRider` is enabled, the fake rider is attached to the trans
 
 Tamework sends the transformed dragon model first, then adds the fake rider attachment after a one-second settling period. This keeps the client's first transformed-model update separate from the larger rider-bearing update. Equipment changes after that initial attachment continue to refresh the rider normally.
 
+`RiderVisual.IncludeAppearanceAttachments` controls whether the rider also receives reconstructed skin, cosmetic, and equipment model attachments. It defaults to `false` because full attachment lists can crash the current client on some transformed models. Body-only mode still uses the player's body texture and skin gradient. Enable full appearance only for models that have been verified stable with it.
+
 ```powershell
 python scripts/tools/avatarflight_namespace_assets.py --mod-root "C:\Path\To\Mod" --model-id MyDragon
 ```

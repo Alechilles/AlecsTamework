@@ -67,7 +67,8 @@ public final class AvatarFlightRiderVisualService {
     public boolean refresh(@Nonnull CommandBuffer<EntityStore> commandBuffer,
                            @Nonnull Ref<EntityStore> ownerRef,
                            @Nonnull Model savedModel,
-                           @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment) {
+                           @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment,
+                           boolean includeAppearanceAttachments) {
         ModelComponent component = commandBuffer.getComponent(ownerRef, ModelComponent.getComponentType());
         if (component == null || component.getModel() == null) {
             logRiderAttachmentSkipped("missing_owner_model", null, savedModel);
@@ -75,13 +76,19 @@ public final class AvatarFlightRiderVisualService {
         }
         PlayerSkinComponent skin = commandBuffer.getComponent(ownerRef, PlayerSkinComponent.getComponentType());
         Model strippedModel = modelWithoutRiderAttachments(component.getModel());
-        Model withRider = modelWithRiderAttachment(strippedModel, savedModel, skin, equipment);
+        Model withRider = modelWithRiderAttachment(
+                strippedModel,
+                savedModel,
+                skin,
+                equipment,
+                includeAppearanceAttachments
+        );
         if (withRider == null) {
             logRiderAttachmentSkipped("missing_rider_model_texture", strippedModel, savedModel);
             return false;
         }
         commandBuffer.putComponent(ownerRef, ModelComponent.getComponentType(), new ModelComponent(withRider));
-        logRiderAttachment(strippedModel, savedModel, skin, equipment);
+        logRiderAttachment(strippedModel, savedModel, skin, equipment, includeAppearanceAttachments);
         return true;
     }
 
@@ -146,8 +153,14 @@ public final class AvatarFlightRiderVisualService {
     private static Model modelWithRiderAttachment(@Nonnull Model baseModel,
                                                   @Nonnull Model savedModel,
                                                   @Nullable PlayerSkinComponent skin,
-                                                  @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment) {
-        ModelAttachment[] riderAttachments = riderAttachments(savedModel, skin, equipment);
+                                                  @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment,
+                                                  boolean includeAppearanceAttachments) {
+        ModelAttachment[] riderAttachments = riderAttachments(
+                savedModel,
+                skin,
+                equipment,
+                includeAppearanceAttachments
+        );
         if (riderAttachments == null) {
             return null;
         }
@@ -192,7 +205,8 @@ public final class AvatarFlightRiderVisualService {
     @Nullable
     private static ModelAttachment[] riderAttachments(@Nonnull Model savedModel,
                                                       @Nullable PlayerSkinComponent skin,
-                                                      @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment) {
+                                                      @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment,
+                                                      boolean includeAppearanceAttachments) {
         String model = savedModel.getModel();
         String texture = savedModel.getTexture();
         if (model == null || model.isBlank() || texture == null || texture.isBlank()) {
@@ -207,8 +221,11 @@ public final class AvatarFlightRiderVisualService {
                         savedModel.getGradientSet(),
                         savedModel.getGradientId(),
                         equipment.hiddenCosmetics()
-                );
+        );
         if (skinAppearance != null) {
+            if (!includeAppearanceAttachments) {
+                return new ModelAttachment[]{skinAppearance.body()};
+            }
             return withBody(
                     skinAppearance.body(),
                     skinAppearance.attachments(),
@@ -218,6 +235,9 @@ public final class AvatarFlightRiderVisualService {
         ModelAttachment body = new ModelAttachment(
                 riderModel, texture, savedModel.getGradientSet(), savedModel.getGradientId(), 1.0
         );
+        if (!includeAppearanceAttachments) {
+            return new ModelAttachment[]{body};
+        }
         ModelAttachment[] appearanceAttachments = riderSafeAttachments(savedModel.getAttachments());
         if (appearanceAttachments == null || appearanceAttachments.length == 0) {
             return withBody(
@@ -296,7 +316,8 @@ public final class AvatarFlightRiderVisualService {
     private static void logRiderAttachment(@Nonnull Model baseModel,
                                            @Nonnull Model savedModel,
                                            @Nullable PlayerSkinComponent skin,
-                                           @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment) {
+                                           @Nonnull AvatarFlightEquipmentAttachmentResolver.EquipmentSnapshot equipment,
+                                           boolean includeAppearanceAttachments) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || instance.getLogger() == null) {
             return;
@@ -315,7 +336,8 @@ public final class AvatarFlightRiderVisualService {
                 "TameworkAvatarFlight debug: riderAttachment baseModelAsset=%s riderModelAsset=%s "
                         + "riderModel=%s attachmentModel=%s riderTexture=%s riderGradientSet=%s riderGradientId=%s "
                         + "riderAppearanceAttachmentCount=%s riderSkinAttachmentCount=%s "
-                        + "riderEquipmentAttachmentCount=%s riderHiddenCosmeticCount=%s",
+                        + "riderEquipmentAttachmentCount=%s riderHiddenCosmeticCount=%s "
+                        + "includeAppearanceAttachments=%s includedAttachmentCount=%s",
                 baseModel.getModelAssetId(),
                 savedModel.getModelAssetId(),
                 savedModel.getModel(),
@@ -326,7 +348,12 @@ public final class AvatarFlightRiderVisualService {
                 savedAttachmentCount,
                 resolvedAppearance == null ? 0 : resolvedAppearance.attachments().length,
                 equipment.attachments().length,
-                equipment.hiddenCosmetics().size()
+                equipment.hiddenCosmetics().size(),
+                includeAppearanceAttachments,
+                includeAppearanceAttachments
+                        ? 1 + (resolvedAppearance == null ? savedAttachmentCount : resolvedAppearance.attachments().length)
+                                + equipment.attachments().length
+                        : 1
         ));
     }
 
