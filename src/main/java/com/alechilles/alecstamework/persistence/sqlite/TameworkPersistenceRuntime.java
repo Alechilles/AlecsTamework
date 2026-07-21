@@ -78,6 +78,9 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final CompanionPopulationCoverageRepository companionPopulationCoverageRepository;
     private final CompanionIdentityRepository companionIdentityRepository;
     private final CompanionPopulationReconciliationPersistence populationReconciliationPersistence;
+    private final BondedVesselRepository bondedVesselRepository;
+    private final CompanionProvisioningRepository companionProvisioningRepository;
+    private final PopulationGroupRepository populationGroupRepository;
     private final SqliteSchemaMigrator schemaMigrator;
     private final PersistenceResilienceRuntime resilienceRuntime;
     private final StorageRecoveryCoordinator storageRecoveryCoordinator;
@@ -107,6 +110,9 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             @Nonnull CompanionPopulationCoverageRepository companionPopulationCoverageRepository,
             @Nonnull CompanionIdentityRepository companionIdentityRepository,
             @Nonnull CompanionPopulationReconciliationPersistence populationReconciliationPersistence,
+            @Nonnull BondedVesselRepository bondedVesselRepository,
+            @Nonnull CompanionProvisioningRepository companionProvisioningRepository,
+            @Nonnull PopulationGroupRepository populationGroupRepository,
             @Nonnull SqliteSchemaMigrator schemaMigrator,
             @Nonnull PersistenceResilienceRuntime resilienceRuntime,
             @Nonnull StorageRecoveryCoordinator storageRecoveryCoordinator,
@@ -134,6 +140,9 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.companionPopulationCoverageRepository = companionPopulationCoverageRepository;
         this.companionIdentityRepository = companionIdentityRepository;
         this.populationReconciliationPersistence = populationReconciliationPersistence;
+        this.bondedVesselRepository = bondedVesselRepository;
+        this.companionProvisioningRepository = companionProvisioningRepository;
+        this.populationGroupRepository = populationGroupRepository;
         this.schemaMigrator = schemaMigrator;
         this.resilienceRuntime = resilienceRuntime;
         this.storageRecoveryCoordinator = storageRecoveryCoordinator;
@@ -254,6 +263,12 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 new CompanionIdentityRepository(connectionManager);
         CompanionPopulationReconciliationPersistence populationReconciliationPersistence =
                 new CompanionPopulationReconciliationPersistence(connectionManager, writeQueue);
+        BondedVesselRepository bondedVesselRepository =
+                new BondedVesselRepository(connectionManager, writeQueue);
+        CompanionProvisioningRepository companionProvisioningRepository =
+                new CompanionProvisioningRepository(connectionManager, writeQueue);
+        PopulationGroupRepository populationGroupRepository =
+                new PopulationGroupRepository(connectionManager, writeQueue);
         SqliteMaintenanceService maintenanceService =
                 new SqliteMaintenanceService(connectionManager, npcProfileRepository, logger);
         StorageRecoveryProbe storageRecoveryProbe = new StorageRecoveryProbe(
@@ -288,6 +303,9 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 companionPopulationCoverageRepository,
                 companionIdentityRepository,
                 populationReconciliationPersistence,
+                bondedVesselRepository,
+                companionProvisioningRepository,
+                populationGroupRepository,
                 schemaMigrator,
                 resilienceRuntime,
                 storageRecoveryCoordinator,
@@ -507,6 +525,24 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public CompanionPopulationScanSessionRepository getCompanionPopulationScanSessionRepository() {
         return populationReconciliationPersistence.scanSessionRepository();
+    }
+
+    /** Durable authority for generation-fenced bonded-vessel transitions. */
+    @Nonnull
+    public BondedVesselRepository getBondedVesselRepository() {
+        return bondedVesselRepository;
+    }
+
+    /** Durable authority for idempotent companion-provisioning operations. */
+    @Nonnull
+    public CompanionProvisioningRepository getCompanionProvisioningRepository() {
+        return companionProvisioningRepository;
+    }
+
+    /** Durable authority for population-group classification and count evidence. */
+    @Nonnull
+    public PopulationGroupRepository getPopulationGroupRepository() {
+        return populationGroupRepository;
     }
 
     /** Restart-recovery view published only after a content-stable persisted-world scan. */

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkPersistenceRuntimeMigrationTest {
@@ -65,6 +66,15 @@ class TameworkPersistenceRuntimeMigrationTest {
         try (Connection upgradedConnection = connections.openConnection()) {
             assertTrue(migrator.isVersionApplied(
                     upgradedConnection, SqliteSchemaMigrator.SCHEMA_VERSION_V8));
+        }
+    }
+
+    @Test
+    void exposesAllSchemaV8IntegrationRepositoriesAfterStartup() {
+        try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            assertNotNull(runtime.getBondedVesselRepository());
+            assertNotNull(runtime.getCompanionProvisioningRepository());
+            assertNotNull(runtime.getPopulationGroupRepository());
         }
     }
 
