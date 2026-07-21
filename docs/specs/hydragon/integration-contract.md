@@ -1,6 +1,6 @@
 # Tamework-HyDragon integration contract
 
-Status: Proposed
+Status: Implementation complete; release verification pending
 Related Tamework specs: [index](README.md), [capture policy](capture-policy.md),
 [bonded vessels](bonded-vessels.md), [population groups](population-groups.md),
 and deferred [companion inventory](companion-inventory.md)
@@ -390,7 +390,7 @@ another group slot.
 
 ## Implementation file map
 
-| Area | Tamework anchors | Required change |
+| Area | Tamework anchors | Implemented responsibility |
 | --- | --- | --- |
 | API root/capabilities | `api/TameworkApi`, `TameworkApiCapability`, `api/internal/TameworkApiImpl` | API `0.9.0`, discrete capabilities, default unavailable facades |
 | Policies/config reads | `api/PolicyApi`, `TameworkConfigReadApi`, `api/internal/ApiMapper` | V2/default methods and immutable subsystem views |
@@ -398,7 +398,7 @@ another group slot.
 | Config families | `Tamework` asset registration, internal/public config enums, override/UI schema registries | Current capture-policy and group family wiring; inventory is deferred |
 | Persistence | `persistence/sqlite`, operation/recovery/incidents/health | Coordinated schema v8 and subsystem readiness |
 | Live contract tests | `selftest/ApiSelfTestRunner`, API compatibility/unit tests | Advertise/test every capability and unavailable fallback |
-| Public documentation | `wiki/Modder-Documentation/Public-API`, config references/recipes/indexes, `CHANGELOG.md` | Update API version/dependency examples and integration recipes atomically |
+| Public documentation | `wiki/Modder-Documentation/Public-API`, config references/recipes/indexes, `CHANGELOG.md` | API version/dependency examples and integration recipes align atomically |
 
 ## Registration lifecycle
 

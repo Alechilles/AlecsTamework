@@ -1,16 +1,16 @@
 # HyDragon enablement specifications
 
-Status: Proposed
-Target: Tamework 3.x (backward-compatible additions)
+Status: Implementation complete; release verification pending
+Target: Tamework 3.0.0 / experimental Public API 0.9.0
 Consumer: HyDragon plugin, requiring Tamework `>=3.0.0 <4.0.0`
 
-The current suite adds an experimental Public API `0.9.0` surface for capture
+The current implementation exposes an experimental Public API `0.9.0` surface for capture
 policy, bonded vessels, population groups, and companion provisioning; mod and
 API versions remain independent, so consumers must still use capability checks.
 The companion-inventory design is retained for a later update and is not part
 of API `0.9.0` or the current schema migration.
 
-This suite specifies the generic Tamework capabilities required to finish the
+This suite documents the generic Tamework capabilities implemented for the
 HyDragon gameplay loop. The capabilities are deliberately content-neutral:
 Tamework owns companion identity, lifecycle, admission, item/profile
 transactions, and persistence safety; HyDragon owns dragons, materials,
@@ -43,6 +43,12 @@ balance, elemental powers, rituals, encounters, and presentation.
 - The Miniwyvern backpack and generic companion inventory are deferred
   post-MVP. When implemented, inventories are canonical-profile-scoped and may
   never silently destroy items during capacity reduction or profile deletion.
+- HyDragon has never been released. Tamework provides no HyDragon-specific
+  legacy-item conversion, profile adoption, alias, or migration path; only
+  Tamework's own schema-v8 upgrade/reconciliation concerns apply.
+- HyDragon consumer assets use canonical English IDs and ship player-facing
+  catalogs for `en-US`, `pt-BR`, `de-DE`, `fr-FR`, and `es-ES`. Localization and
+  dragon-specific asset naming remain HyDragon responsibilities.
 
 ## Documents
 
@@ -59,7 +65,7 @@ HyDragon's suite begins at its
 
 ## Responsibility boundary
 
-### Tamework adds
+### Implemented in Tamework
 
 - Generic, asset-driven capture probability inside the authoritative capture
   transaction.
@@ -77,7 +83,7 @@ HyDragon's suite begins at its
 - Optional profile-scoped companion inventory with durable overflow and
   recovery claims, after the current HyDragon MVP integration is complete.
 
-### HyDragon adds
+### Implemented in HyDragon
 
 - Draconic Stone item tiers and capture values.
 - Draconic Altar, recipes, drops, Revitalizing Essence, and all presentation.
@@ -159,10 +165,11 @@ events, matching existing Tamework behavior. Invalid assets are excluded from
 resolution with an asset-ID-specific warning; the last valid compiled index
 remains authoritative during an unsuccessful hot reload.
 
-## Implementation landing requirements
+## Implemented surfaces and pending release gates
 
-The implementation should land as coordinated, reviewable slices, but the
-following surfaces must agree before release:
+The implementation landed as coordinated slices across the following surfaces.
+Final clean-build, packaged integration, documentation, and live-server gates
+must still prove that they agree before release:
 
 - one backup-first, transactional, idempotent schema v8 plan for attempt,
   binding, group-classification, provisioning, and operation data; inventory
@@ -182,14 +189,14 @@ No implementation slice may temporarily use `ProfileDataApi` or item metadata
 as canonical storage for a Tamework-owned state while waiting for its schema
 work.
 
-## Delivery order
+## Implemented dependency order
 
-1. Implement [capture policy](capture-policy.md) and its durable attempt journal.
-2. Implement [population groups](population-groups.md), including reconciliation,
-   group-aware public population admission, and companion provisioning.
-3. Implement [bonded vessels](bonded-vessels.md) on those admission primitives.
-4. Publish the [integration contract](integration-contract.md) and live API
-   fixture coverage.
+1. [Capture policy](capture-policy.md) and its durable attempt journal.
+2. [Population groups](population-groups.md), reconciliation, group-aware public
+   admission, and companion provisioning.
+3. [Bonded vessels](bonded-vessels.md) on those admission primitives.
+4. The [integration contract](integration-contract.md), bounded diagnostics, and
+   non-live operator API fixtures.
 
 Post-MVP: implement [companion inventory](companion-inventory.md) as a separate
 versioned update. HyDragon ships its initial Miniwyvern without a backpack.

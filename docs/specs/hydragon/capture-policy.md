@@ -1,7 +1,7 @@
 # Configurable capture policy
 
-Status: Implemented for Public API `0.9.0` / Tamework 3.0.0; runtime
-capability activation remains capture-journal-recovery-gated
+Status: Implementation complete; release verification pending
+Runtime: Public API `0.9.0` / Tamework 3.0.0; capability activation remains capture-journal-recovery-gated
 Depends on: existing `TwSpawnerConfig`, `TameworkSpawn`, canonical profiles, and
 population admission
 HyDragon counterpart: [capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md)
@@ -82,8 +82,8 @@ Each `Requirements` entry mirrors Tamework's extension-spec vocabulary:
 
 If no capture-policy config resolves for a role, the role-side values use the
 listed defaults. This deliberately keeps species resistance out of every stone
-item. The first implementation does not include item-local role overrides;
-they can be added later as an advanced explicit replace-map only if a real
+item. Public API `0.9.0` does not include item-local role overrides; a later
+API may add an advanced explicit replace-map only if a real
 cross-mod use case cannot be represented by role priority.
 
 `ChanceMode: Guaranteed` bypasses the entire `TwCapturePolicyConfig`, including
@@ -318,10 +318,10 @@ must not block the world thread.
 
 ## Public API and events
 
-Add capability `CAPTURE_POLICY`.
+Capability `CAPTURE_POLICY` advertises the implemented capture-policy surface.
 
-Add fail-closed default methods to `InteractionExtensionApi` (or a focused
-capture-policy extension facade) for namespaced `CaptureRequirementHandler`
+Fail-closed default methods on `InteractionExtensionApi` provide namespaced
+`CaptureRequirementHandler`
 registration. The immutable context includes attempt/config IDs, terminal vs
 pre-commit phase, target ref/role/store, actor UUID/player when safely available,
 held item ID, health fraction, and expected profile revision. Handlers execute
@@ -330,11 +330,11 @@ side-effect-free, and return a stable allow/deny reason. Missing handlers,
 exceptions, or registration-generation changes deny before rolling. Events are
 notifications and cannot substitute for this pre-commit requirement seam.
 
-Expose immutable `SpawnerCaptureMechanicsView` and `CapturePolicyConfigView`
+Immutable `SpawnerCaptureMechanicsView` and `CapturePolicyConfigView`
 objects through versioned config-read methods. Do not add constructor fields to
 the existing `SpawnerConfigView`.
 
-Add `CaptureAttemptResolvedEvent` with:
+`CaptureAttemptResolvedEvent` contains:
 
 - attempt and operation IDs;
 - spawner and target-policy config IDs/revisions and source item ID;
@@ -355,8 +355,9 @@ identified by attempt ID.
   target policy, including power/difficulty/chance and custom requirements, and
   preserve exact 3.0.0 capture behavior even if a later role policy matches
   their target.
-- Existing filled items require no metadata migration.
-- Add `/tw diagnose capture-attempt <id>` and summary counters for prepared,
+- No released HyDragon filled items exist, so this feature defines no
+  HyDragon-specific item migration or compatibility path.
+- `/tw diagnose capture-attempt <id>` reports summary counters for prepared,
   resolved-failure, applying, quarantined, recovered, and duplicate callbacks.
 - Admin output shows formula inputs, config revision, state, population token
   correlation, and persistence incident ID. Player output never reveals random
@@ -374,7 +375,7 @@ identified by attempt ID.
 | Target asset schema | new `config/assets/TwCapturePolicyConfig` and role index | Role resolution, difficulty codec, validation, inheritance |
 | Runtime feature DTO | `config/ItemFeatureConfig` | Immutable compiled capture policy |
 | Channel/eligibility | `items/CaptureChannel*`, `items/SpawnerCapturePolicyService` | Attempt identity and side-effect-free terminal eligibility only |
-| Chance commit | new focused service called by `SpawnerFeatureHandler.captureFromNpcAction` | Exactly-once formula/entropy resolution after source and target fencing |
+| Chance commit | `SpawnerCaptureChanceService`, called by `SpawnerFeatureHandler.captureFromNpcAction` | Exactly-once formula/entropy resolution after source and target fencing |
 | Orchestration | `items/SpawnerFeatureHandler` | Coordinate services only; do not embed formula/persistence logic |
 | Finalization | `items/SpawnerCaptureFinalizerService` | Apply only a durably successful attempt |
 | Population | `ownership/OwnerPopulationRuntime`, admission coordinators | Prepare/cancel owner, claim, and group capacity before a roll |
@@ -383,7 +384,7 @@ identified by attempt ID.
 | Capture extensions | `api/InteractionExtensionApi` or focused capture facade; `api/internal` registry | Namespaced side-effect-free requirement registration and generation fencing |
 | Diagnostics | `persistence/diagnostics`, `commands`, `selftest` | Inspection, counters, repair/recovery fixture |
 
-New classes should be focused, for example `SpawnerCaptureChanceService`,
+Implemented classes remain focused, including `SpawnerCaptureChanceService`,
 `CaptureAttemptRepository`, `CaptureAttemptRecoveryService`, and
 `CaptureAttemptDiagnosticsService`; `SpawnerFeatureHandler` remains an
 orchestrator.

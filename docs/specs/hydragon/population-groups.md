@@ -1,13 +1,13 @@
 # Owner population groups
 
-Status: Proposed
+Status: Implementation complete; release verification pending
 Depends on: existing canonical owner/claim population admission and persistence
 HyDragon counterparts: [Soul Bond and Miniwyvern](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/soul-bond-miniwyvern.md) and
 [dragon content and encounters](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/dragon-content-encounters.md)
 
 ## Goal
 
-Add config-defined companion groups with atomic per-owner owned and active
+The implemented config-defined companion groups enforce atomic per-owner owned and active
 limits. HyDragon uses this to allow many owned full dragons but only one summoned
 full dragon, and to permit only one Soul Bond Miniwyvern per player.
 
@@ -46,7 +46,7 @@ These predicates are safety invariants, not configurable lifecycle lists.
 
 ## Configuration
 
-Add `TwPopulationGroupConfig` at:
+`TwPopulationGroupConfig` assets load from:
 
 `Server/Tamework/PopulationGroups/*.json`
 
@@ -100,8 +100,8 @@ diagnostic output are deterministic.
 }
 ```
 
-The Rock Drake tamed role IDs above are proposed downstream assets; they do not
-exist in the current HyDragon pack yet.
+The Rock Drake tamed role IDs above are implemented downstream HyDragon assets;
+Tamework treats them as content-owned role declarations rather than hardcoded IDs.
 
 ```json
 {
@@ -133,7 +133,7 @@ Tamework-side race-safe enforcement behind HyDragon's entitlement check.
 - Ordinary asset loaded/removed events validate and atomically swap the compiled
   index. `/tw reloadconfig` remains item-feature-only and does not directly
   reload this family.
-- Add `POPULATION_GROUP` to internal/public config-family enums and emit
+- `POPULATION_GROUP` is present in internal/public config-family enums and emits
   `ConfigReloadedEvent` after a valid index swap.
 - Ambiguous, invalid, or unresolved group mapping fails closed for affected
   positive admissions; an unsuccessful reload retains the last valid index.
@@ -237,9 +237,8 @@ capacity.
 
 ## Generic companion provisioning
 
-The current public `NpcProfilesApi` is read-only, so integrations cannot safely
-create an owned canonical companion. Add capability
-`COMPANION_PROVISIONING` and a default fail-closed
+The public `NpcProfilesApi` remains read-only, so integrations create owned
+canonical companions through capability `COMPANION_PROVISIONING` and the default fail-closed
 `TameworkApi.companionProvisioning()` accessor.
 
 `CompanionProvisioningRequest` contains:
@@ -301,7 +300,7 @@ The no-claim operation kind is coordinator-internal and can be selected only by
 continues requiring its NPC/claim context; V2 callers cannot select
 `PROVISION_DORMANT` directly or use it as a generic owner-cap bypass.
 
-Add `PROVISIONED_DORMANT` to internal `CompanionLifecycleState` and public
+`PROVISIONED_DORMANT` is present in internal `CompanionLifecycleState` and public
 `PopulationCompanionLifecycle`. It means an intentionally created, owned,
 non-physical profile with no vessel/coop/death/lost authority. It consumes an
 owned slot, consumes no active or claim slot, and may transition only through
@@ -311,13 +310,13 @@ lifecycle switch, persistence codec, reconciliation classifier, public mapper,
 and compatibility test handles the new value explicitly or uses a safe default
 branch.
 
-Proposed immutable results distinguish `PROVISIONED_ACTIVE`,
+Implemented immutable results distinguish `PROVISIONED_ACTIVE`,
 `PROVISIONED_DORMANT`, `PARTIAL_DORMANT`, `ALREADY_PROVISIONED`, `DENIED`,
 `UNAVAILABLE`, and `QUARANTINED`, and include caller namespace/idempotency
 origin, optional diagnostic correlation ID, operation/profile IDs, committed
-lifecycle, profile revision, projection reason, and population decision. Add
-post-commit
-`CompanionProvisionedEvent`; it is a notification, not creation authority.
+lifecycle, profile revision, projection reason, and population decision. The
+post-commit `CompanionProvisionedEvent` is a notification, not creation
+authority.
 
 The durable operation view/query also represents nonterminal and partial
 results. `findOperation(callerNamespace, idempotencyKey)` returns `PREPARING`,
@@ -337,7 +336,7 @@ link. `CompanionRevivePolicy` treats an authoritative, non-released provisioning
 record plus the effective role's enabled revive policy as a supported path.
 Death commits `DEAD_REVIVABLE`, preserves the provisioning/profile identity and
 owned group slot, and releases active/claim occupancy. Revive uses normal
-active/group/claim admission and restores the same profile. Add canonical
+active/group/claim admission and restores the same profile. Canonical
 `ProvisionedCompanionDeathRecordedEvent` and
 `ProvisionedCompanionRevivedEvent`; they do not depend on nonempty `toolIds` or
 the existing command-link-conditioned death event. This avoids requiring a
@@ -345,10 +344,11 @@ hidden command item merely to keep a Soul Bond companion recoverable.
 
 ## Public API and events
 
-Add capabilities `POPULATION_GROUPS` and `COMPANION_PROVISIONING`.
+Capabilities `POPULATION_GROUPS` and `COMPANION_PROVISIONING` advertise these
+implemented surfaces.
 
-The existing `PopulationAdmissionRequest` record is not modified. Introduce a
-V2 request or an additive overload carrying `targetRoleId`; Tamework resolves
+The existing `PopulationAdmissionRequest` record remains unchanged. The V2
+request carries `targetRoleId`; Tamework resolves
 the authoritative group set and rejects a caller-provided set that does not
 match. Existing V1 requests that could create/change an owned profile without a
 known target role fail closed when group policy could apply; safe zero-delta
@@ -440,22 +440,22 @@ is invoked.
 
 ## Implementation file map
 
-| Area | Existing anchor | Proposed responsibility |
+| Area | Existing anchor | Implemented responsibility |
 | --- | --- | --- |
-| Asset family | new `config/assets/TwPopulationGroupConfig` and registry | Codec, inheritance, deterministic group/role index |
+| Asset family | `config/assets/TwPopulationGroupConfig` and registry | Codec, inheritance, deterministic group/role index |
 | Registration | `Tamework` asset-store setup/events; config override/UI registries | Path, store, reload event, editor/schema support |
-| Group domain | new focused classes under `ownership/groups` | Policy resolver, immutable classification, keys/counts/constraints |
+| Group domain | focused classes under `ownership/groups` | Policy resolver, immutable classification, keys/counts/constraints |
 | Unified authority | `OwnerPopulationIndex`, `CompanionPopulationAdmissionCoordinator` | Reserve owner/claim/group constraints under one lock/operation |
 | Requests/plans | owner transition drafts, spawn/breeding/coop/revive planners | Carry verified old/new roles and group sets |
-| Provisioning | new focused coordinator/facade using planned spawn and owner admission | Idempotent dormant profile creation and optional projection |
+| Provisioning | focused coordinator/facade using planned spawn and owner admission | Idempotent dormant profile creation and optional projection |
 | Persistence | `CompanionPopulationStateRecord`, population repository/bootstrap/operation records | Durable classification, migration, recovery/reconciliation |
 | Public API | `PopulationAdmissionApi`, `PopulationGroupApi`, `CompanionProvisioningApi`, V2 request/decision views, `api/internal` | Target-role context, provisioning, group views, capabilities/events |
 | Diagnostics | population metrics/diagnostics, commands, selftest | Counts, conflicts, readiness, fixtures |
 
-`OwnerPopulationIndex` is already at its target size and `TwCompanionConfig` is
-already oversized. Group behavior must be extracted rather than bolted into
-either class. Update canonical wiki config/API pages, examples, config indexes,
-CHANGELOG, generated agent index, and `/tw api test` in the implementation PR.
+`OwnerPopulationIndex` remains focused and `TwCompanionConfig` is already
+oversized. Group behavior is extracted rather than bolted into either class.
+Release verification checks the canonical wiki config/API pages, examples,
+config indexes, CHANGELOG, generated agent index, and `/tw api test` coverage.
 
 ## Acceptance tests
 

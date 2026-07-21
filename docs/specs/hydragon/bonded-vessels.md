@@ -1,13 +1,13 @@
 # Bonded companion vessels
 
-Status: Proposed
+Status: Implementation complete; release verification pending
 Depends on: [capture policy](capture-policy.md), canonical profiles, population
 admission, and [population groups](population-groups.md) for production use
 HyDragon counterpart: [capture, summoning, and maintenance](https://github.com/Alechilles/HyDragon/blob/main/docs/specs/capture-summoning-maintenance.md)
 
 ## Goal
 
-Add an opt-in spawner mode in which one non-stackable item remains durably
+The implemented opt-in spawner mode keeps one non-stackable item durably
 bound to one canonical companion profile across stored, active, dead, lost, and
 recovery states. It supports HyDragon's requirement that each Draconic Stone
 always refers to the same dragon while the player may own multiple stones.
@@ -32,7 +32,7 @@ future HyDragon extensions, not baseline vessel behavior.
 
 ## Configuration
 
-Add a top-level `Vessel` object to `TwSpawnerConfig` at:
+`TwSpawnerConfig` exposes a top-level `Vessel` object at:
 
 `Server/Tamework/Items/Spawners/*.json`
 
@@ -322,8 +322,8 @@ queue owning-world callbacks for ECS writes.
 
 ## Public API and events
 
-Add capability `BONDED_VESSELS` and a default fail-closed
-`TameworkApi.bondedVessels()` accessor. Proposed immutable types:
+Capability `BONDED_VESSELS` and the default fail-closed
+`TameworkApi.bondedVessels()` accessor expose these immutable types:
 
 - `BondedVesselView`
 - `BondedVesselTransitionRequest`
@@ -394,11 +394,11 @@ indistinguishable second success.
 
 ## Implementation file map
 
-| Area | Existing anchor | Proposed responsibility |
+| Area | Existing anchor | Implemented responsibility |
 | --- | --- | --- |
 | Config | `config/assets/TwSpawnerConfig`, `config/ItemFeatureConfig` | `Vessel` codec, validation, nested inheritance, runtime snapshot |
 | Item orchestration | `items/SpawnerFeatureHandler`, `SpawnerPreparedSpawnService`, `SpawnerSourceItemTransaction` | Route disposable vs bonded; exact source finalization |
-| Binding domain | new `items/vessels` package | Focused binding resolver, transition planner/coordinator, generation validator, source repair |
+| Binding domain | `vessels` and `vessels/runtime` packages | Focused binding resolver, transition planner/coordinator, generation validator, source repair |
 | Identity/lifecycle | `items/SpawnerNpcIdentityService`, `lifecycle`, `ownership` | Canonical profile/projection transitions |
 | Population | owner/claim admission plus [group admission](population-groups.md) | Reserve/commit/cancel before summon/store/revive |
 | Persistence | `persistence/sqlite`, `persistence/operation`, resilience/recovery | Schema v8 binding/operation repositories and recovery |
