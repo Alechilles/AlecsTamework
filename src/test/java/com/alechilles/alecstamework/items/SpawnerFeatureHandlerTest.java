@@ -127,6 +127,32 @@ class SpawnerFeatureHandlerTest {
     }
 
     @Test
+    void bondedCaptureDefersSourceReplacementAndAttemptClosureUntilInitialBind() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java"));
+
+        int beforeApply = source.indexOf("public boolean beforeApply(String profileId)");
+        int bondedGuard = source.indexOf("return bondedCapture || sourceItem.prepare(profiledItem)",
+                beforeApply);
+        int populationCommitted = source.indexOf("public void onPopulationCommitted(", bondedGuard);
+        int bind = source.indexOf("bindCapturedVessel(", populationCommitted);
+        int nonBondedCommit = source.indexOf("if (!bondedCapture && finalizedAttemptId", bind);
+        int committedBinding = source.indexOf(
+                "binding.status() == BondedVesselInitialBindingService.Status.COMMITTED");
+        int attemptCommit = source.indexOf("captureAttemptCoordinator.commit(captureAttemptId)",
+                committedBinding);
+
+        assertTrue(beforeApply >= 0 && bondedGuard > beforeApply,
+                "bonded capture must leave the empty source untouched before profile apply");
+        assertTrue(bind > populationCommitted,
+                "initial binding must start only after canonical population commit");
+        assertTrue(nonBondedCommit > bind,
+                "legacy capture attempt closure must be explicitly excluded for bonded sources");
+        assertTrue(attemptCommit > committedBinding,
+                "bonded capture attempt must close only after generation-one binding closure");
+    }
+
+    @Test
     void wildCaptureDoesNotInventAnOwnerWhenPreservingOwnership() {
         assertNull(SpawnerFeatureHandler.resolveCapturedOwnerMetadata(null, false));
     }

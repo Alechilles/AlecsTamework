@@ -14,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.LongSupplier;
+import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -44,11 +45,24 @@ public final class BondedVesselInitialBindingService {
 
     @Nonnull
     public CompletionStage<Result> bind(@Nonnull Request request) {
+        return bind(request, sourceFinalizer);
+    }
+
+    /**
+     * Creates a binding with a capture-scoped exact source finalizer. The scoped finalizer is
+     * useful for the live capture callback because it retains the exact pre-capture stack while
+     * the default finalizer remains available for restart recovery.
+     */
+    @Nonnull
+    public CompletionStage<Result> bind(
+            @Nonnull Request request,
+            @Nonnull SourceFinalizer scopedSourceFinalizer) {
         Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(scopedSourceFinalizer, "scopedSourceFinalizer");
         return CompletableFuture.supplyAsync(() -> findExisting(request), executor)
                 .thenCompose(existing -> existing == null
-                        ? create(request)
-                        : continueExisting(request, existing, false))
+                        ? create(request, scopedSourceFinalizer)
+                        : continueExisting(request, existing, false, scopedSourceFinalizer))
                 .exceptionally(failure -> Result.indeterminate(
                         "initial-binding-runtime-failure", request.bindingId(), request.profileId()));
     }
@@ -62,12 +76,77 @@ public final class BondedVesselInitialBindingService {
                         ? CompletableFuture.completedFuture(Result.indeterminate(
                                 "initial-binding-operation-not-found", request.bindingId(),
                                 request.profileId()))
-                        : continueExisting(request, existing, true))
+                        : continueExisting(request, existing, true, sourceFinalizer))
                 .exceptionally(failure -> Result.indeterminate(
                         "initial-binding-recovery-failure", request.bindingId(), request.profileId()));
     }
 
-    private CompletionStage<Result> create(Request request) {
+    /** Recovers only INITIAL_BIND rows; normal transition recovery owns every other action. */
+    @Nonnull
+    public CompletionStage<RecoveryReport> recoverPending(int limit) {
+        if (limit <= 0) return CompletableFuture.completedFuture(
+                new RecoveryReport(0, 0, 0, 0));
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return repository.loadRecoverableOperations().stream()
+                        .filter(operation -> operation.action()
+                                == BondedVesselOperationRecord.Action.INITIAL_BIND)
+                        .limit(limit).toList();
+            } catch (Exception failure) {
+                throw new IllegalStateException("Initial binding recovery read failed", failure);
+            }
+        }, executor).thenCompose(operations -> recoverSequentially(
+                operations, 0, new RecoveryAccumulator()));
+    }
+
+    private CompletionStage<RecoveryReport> recoverSequentially(
+            List<BondedVesselOperationRecord> operations,
+            int index,
+            RecoveryAccumulator accumulator) {
+        if (index >= operations.size()) return CompletableFuture.completedFuture(
+                new RecoveryReport(accumulator.scanned, accumulator.committed,
+                        accumulator.pending, accumulator.quarantined));
+        BondedVesselOperationRecord operation = operations.get(index);
+        Request request;
+        try {
+            BondedVesselBindingRecord binding = repository.findBinding(operation.bindingId());
+            if (binding == null) throw new IllegalStateException("Initial binding missing binding");
+            request = request(operation, binding);
+        } catch (Exception failure) {
+            accumulator.scanned++;
+            accumulator.pending++;
+            return recoverSequentially(operations, index + 1, accumulator);
+        }
+        return recover(request).handle((result, failure) -> {
+            accumulator.scanned++;
+            if (failure != null || result == null || result.status() == Status.INDETERMINATE) {
+                accumulator.pending++;
+            } else if (result.status() == Status.COMMITTED) {
+                accumulator.committed++;
+            } else if (result.status() == Status.QUARANTINED) {
+                accumulator.quarantined++;
+            } else {
+                accumulator.pending++;
+            }
+            return accumulator;
+        }).thenCompose(next -> recoverSequentially(operations, index + 1, next));
+    }
+
+    private static Request request(
+            BondedVesselOperationRecord operation,
+            BondedVesselBindingRecord binding) {
+        return new Request(
+                UUID.fromString(operation.operationId()), UUID.fromString(operation.bindingId()),
+                operation.callerNamespace(), operation.idempotencyKey(), operation.correlationId(),
+                operation.profileId(), binding.ownerUuid(), operation.expectedProfileRevision(),
+                operation.configId(), operation.configRevision(), operation.sourceItemId(),
+                operation.targetItemId(), operation.sourceFingerprint(),
+                operation.replacementFingerprint(), operation.sourceContextJson(),
+                Objects.requireNonNullElse(binding.itemEvidenceJson(), "{}"),
+                operation.policySnapshotJson(), operation.populationOperationId());
+    }
+
+    private CompletionStage<Result> create(Request request, SourceFinalizer selectedSourceFinalizer) {
         long now = nonNegativeNow();
         BondedVesselOperationRecord operation = operation(request, now);
         BondedVesselBindingRecord binding = binding(request, operation, now);
@@ -96,14 +175,15 @@ public final class BondedVesselInitialBindingService {
             }
             BondedVesselOperationRecord persisted = mutation.operation() == null
                     ? operation : mutation.operation();
-            return continueExisting(request, persisted, false);
+            return continueExisting(request, persisted, false, selectedSourceFinalizer);
         });
     }
 
     private CompletionStage<Result> continueExisting(
             Request request,
             BondedVesselOperationRecord operation,
-            boolean recovered) {
+            boolean recovered,
+            SourceFinalizer selectedSourceFinalizer) {
         String mismatch = mismatch(request, operation);
         if (mismatch != null) {
             return CompletableFuture.completedFuture(Result.denied(
@@ -124,7 +204,7 @@ public final class BondedVesselInitialBindingService {
         }
         CompletionStage<SourceFinalization> finalization;
         try {
-            finalization = sourceFinalizer.finalizeSource(request);
+            finalization = selectedSourceFinalizer.finalizeSource(request);
         } catch (RuntimeException | LinkageError failure) {
             finalization = null;
         }
@@ -356,6 +436,22 @@ public final class BondedVesselInitialBindingService {
         static Result indeterminate(String reason, UUID bindingId, String profileId) {
             return new Result(Status.INDETERMINATE, reason, bindingId, profileId);
         }
+    }
+
+    public record RecoveryReport(int scanned, int committed, int pending, int quarantined) {
+        public RecoveryReport {
+            if (scanned < 0 || committed < 0 || pending < 0 || quarantined < 0
+                    || committed + pending + quarantined != scanned) {
+                throw new IllegalArgumentException("Invalid initial binding recovery counts");
+            }
+        }
+    }
+
+    private static final class RecoveryAccumulator {
+        private int scanned;
+        private int committed;
+        private int pending;
+        private int quarantined;
     }
 
     private static String requireText(String value, String field) {

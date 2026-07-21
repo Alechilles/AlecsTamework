@@ -194,6 +194,9 @@ import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
 import com.alechilles.alecstamework.vessels.runtime.LoadedNpcBondedVesselProjectionEvidencePort;
 import com.alechilles.alecstamework.vessels.runtime.NpcProfileBondedVesselProfilePort;
 import com.alechilles.alecstamework.vessels.runtime.ProductionBondedVesselRuntime;
+import com.alechilles.alecstamework.vessels.runtime.BondedVesselInteractionDispatcher;
+import com.alechilles.alecstamework.vessels.runtime.BondedVesselSpawnerBridge;
+import com.alechilles.alecstamework.config.assets.TwSpawnerVesselConfigResolver;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileComponent;
 import com.alechilles.alecstamework.vfx.projectile.HomingVisualProjectileSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
@@ -2749,6 +2752,20 @@ public class Tamework extends JavaPlugin {
                     System::currentTimeMillis,
                     System::nanoTime);
             bondedVesselRuntime = runtime;
+            BondedVesselSpawnerBridge spawnerBridge = new BondedVesselSpawnerBridge(
+                    runtime.initialBindings(),
+                    new BondedVesselInteractionDispatcher(runtime.apiDelegate()),
+                    new TwSpawnerVesselConfigResolver(itemFeatureRegistry::revision));
+            CompanionReviveEligibilityService.current().setBondedLifecycleSink(
+                    (observation, result, target) -> runtime.lifecycleObserver().observe(
+                            new com.alechilles.alecstamework.vessels.runtime
+                                    .BondedVesselLifecycleObserver.Observation(
+                                    observation.profileId(), observation.currentNpcUuid(),
+                                    result.revision(), target,
+                                    target == com.alechilles.alecstamework.api.BondedVesselState.DEAD
+                                            ? "bonded-companion-death-recorded"
+                                            : "bonded-companion-lost-recorded",
+                                    observation.source())));
             runtime.bootstrap().recoverAndActivate().whenComplete((activation, failure) -> {
                 if (failure != null || activation == null || !activation.active()) {
                     String message = "Bonded-vessel runtime recovery failed; capability remains "
@@ -2760,6 +2777,9 @@ public class Tamework extends JavaPlugin {
                         getLogger().at(Level.WARNING).withCause(failure).log(message);
                     }
                     return;
+                }
+                if (spawnerFeatureHandler != null) {
+                    spawnerFeatureHandler.installBondedVesselBridge(spawnerBridge);
                 }
                 getLogger().at(Level.INFO).log(
                         "Bonded-vessel production runtime recovered and activated.");

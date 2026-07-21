@@ -19,14 +19,17 @@ public final class BondedVesselRuntimeBootstrap {
     private final BondedVesselsApiDelegate runtime;
     private final BooleanSupplier exactEvidenceReady;
     private final BooleanSupplier mutationAuthorityReady;
+    private final BondedVesselInitialBindingService initialBindings;
 
     public BondedVesselRuntimeBootstrap(
             @Nonnull TameworkApiImpl api,
             @Nonnull BondedVesselsApiDelegate runtime,
+            @Nonnull BondedVesselInitialBindingService initialBindings,
             @Nonnull BooleanSupplier exactEvidenceReady,
             @Nonnull BooleanSupplier mutationAuthorityReady) {
         this.api = Objects.requireNonNull(api, "api");
         this.runtime = Objects.requireNonNull(runtime, "runtime");
+        this.initialBindings = Objects.requireNonNull(initialBindings, "initialBindings");
         this.exactEvidenceReady = Objects.requireNonNull(
                 exactEvidenceReady, "exactEvidenceReady");
         this.mutationAuthorityReady = Objects.requireNonNull(
@@ -35,6 +38,24 @@ public final class BondedVesselRuntimeBootstrap {
 
     @Nonnull
     public CompletionStage<Activation> recoverAndActivate() {
+        final CompletionStage<BondedVesselInitialBindingService.RecoveryReport> initialRecovery;
+        try {
+            initialRecovery = initialBindings.recoverPending(128);
+        } catch (RuntimeException | LinkageError failure) {
+            return CompletableFuture.completedFuture(Activation.unavailable(
+                    "bonded-vessel-initial-binding-recovery-dispatch-failed"));
+        }
+        if (initialRecovery == null) {
+            return CompletableFuture.completedFuture(Activation.unavailable(
+                    "bonded-vessel-initial-binding-recovery-stage-missing"));
+        }
+        return initialRecovery.handle((report, failure) -> failure == null && report != null)
+                .thenCompose(ready -> ready ? recoverTransitionsAndActivate()
+                        : CompletableFuture.completedFuture(Activation.unavailable(
+                        "bonded-vessel-initial-binding-recovery-failed")));
+    }
+
+    private CompletionStage<Activation> recoverTransitionsAndActivate() {
         final CompletionStage<BondedVesselCoordinator.RecoveryReport> recovery;
         try {
             recovery = runtime.coordinator().recoverPending();

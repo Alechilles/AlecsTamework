@@ -48,7 +48,13 @@ public final class SqliteBondedVesselJournal implements BondedVesselJournal {
             return List.of();
         }
         List<BondedVesselOperationRecord> operations = repository.loadRecoverableOperations();
-        return operations.size() <= limit ? operations : List.copyOf(operations.subList(0, limit));
+        List<BondedVesselOperationRecord> publicTransitions = operations.stream()
+                .filter(operation -> operation.action() != BondedVesselOperationRecord.Action.INITIAL_BIND)
+                .filter(operation -> operation.action() != BondedVesselOperationRecord.Action.MARK_DEAD)
+                .filter(operation -> operation.action() != BondedVesselOperationRecord.Action.MARK_LOST)
+                .toList();
+        return publicTransitions.size() <= limit ? publicTransitions
+                : List.copyOf(publicTransitions.subList(0, limit));
     }
 
     @Override

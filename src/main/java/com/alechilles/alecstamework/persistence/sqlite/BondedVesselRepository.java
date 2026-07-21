@@ -92,6 +92,25 @@ public final class BondedVesselRepository {
         );
     }
 
+    /**
+     * Records post-apply item evidence for lifecycle transitions whose binding authority advances
+     * even when the owner is offline or the exact vessel item cannot be found.
+     */
+    @Nonnull
+    public PersistenceWriteQueue.WriteSubmission<MutationResult> finalizeAppliedItemProjectionAsync(
+            @Nonnull String operationId,
+            @Nonnull BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String itemEvidenceJson,
+            @Nullable String reason,
+            long nowMs) {
+        Objects.requireNonNull(projectionStatus, "projectionStatus");
+        return writeQueue.submitTracked(
+                "bonded_vessel_finalize_item_projection",
+                connection -> finalizeAppliedItemProjectionInTransaction(
+                        connection, operationId, projectionStatus, itemEvidenceJson, reason, nowMs),
+                null);
+    }
+
     @Nonnull
     public PersistenceWriteQueue.WriteSubmission<MutationResult> cancelPreparedAsync(
             @Nonnull String operationId,
@@ -296,6 +315,45 @@ public final class BondedVesselRepository {
         }
         return result(Status.APPLIED, findBinding(connection, operation.bindingId()),
                 findOperation(connection, operation.operationId()), null);
+    }
+
+    @Nonnull
+    private MutationResult finalizeAppliedItemProjectionInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull String operationId,
+            @Nonnull BondedVesselBindingRecord.ItemProjectionStatus projectionStatus,
+            @Nullable String itemEvidenceJson,
+            @Nullable String reason,
+            long nowMs) throws Exception {
+        BondedVesselOperationRecord operation = findOperation(connection, operationId);
+        if (operation == null) return result(Status.NOT_FOUND, null, null, "operation_not_found");
+        BondedVesselBindingRecord binding = findBinding(connection, operation.bindingId());
+        if (operation.state() != BondedVesselOperationRecord.State.APPLIED
+                || binding == null
+                || !operation.operationId().equals(binding.activeOperationId())
+                || binding.generation() != operation.candidateGeneration()) {
+            return result(Status.INVALID_STATE, binding, operation,
+                    "operation_not_applied_for_item_projection");
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE bonded_vessel_bindings
+                SET item_projection_status = ?, item_evidence_json = ?, diagnostic_reason = ?,
+                    row_revision = row_revision + 1, updated_at_ms = ?
+                WHERE binding_id = ? AND generation = ? AND active_operation_id = ?
+                """)) {
+            statement.setString(1, projectionStatus.name());
+            statement.setString(2, itemEvidenceJson);
+            statement.setString(3, reason);
+            statement.setLong(4, nowMs);
+            statement.setString(5, operation.bindingId());
+            statement.setLong(6, operation.candidateGeneration());
+            statement.setString(7, operation.operationId());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("Binding changed during item projection finalization.");
+            }
+        }
+        return result(Status.APPLIED, findBinding(connection, operation.bindingId()),
+                operation, reason);
     }
 
     @Nonnull

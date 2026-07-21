@@ -21,16 +21,22 @@ public final class ProductionBondedVesselRuntime {
     private final ProductionBondedVesselMutationAuthority mutationAuthority;
     private final BondedVesselsApiDelegate apiDelegate;
     private final BondedVesselRuntimeBootstrap bootstrap;
+    private final BondedVesselInitialBindingService initialBindings;
+    private final BondedVesselLifecycleObserver lifecycleObserver;
 
     private ProductionBondedVesselRuntime(
             ProductionBondedVesselEvidenceAuthority evidenceAuthority,
             ProductionBondedVesselMutationAuthority mutationAuthority,
             BondedVesselsApiDelegate apiDelegate,
-            BondedVesselRuntimeBootstrap bootstrap) {
+            BondedVesselRuntimeBootstrap bootstrap,
+            BondedVesselInitialBindingService initialBindings,
+            BondedVesselLifecycleObserver lifecycleObserver) {
         this.evidenceAuthority = evidenceAuthority;
         this.mutationAuthority = mutationAuthority;
         this.apiDelegate = apiDelegate;
         this.bootstrap = bootstrap;
+        this.initialBindings = initialBindings;
+        this.lifecycleObserver = lifecycleObserver;
     }
 
     @Nonnull
@@ -65,9 +71,19 @@ public final class ProductionBondedVesselRuntime {
         BondedVesselsApiDelegate delegate = BondedVesselsApiDelegate.journalBacked(
                 repository, planner, evidence, mutation, events, executor,
                 wallClockMs, monotonicNanos, TOKEN_LIFETIME_MS, RECOVERY_LIMIT);
+        BondedVesselInitialBindingService initialBindings =
+                new BondedVesselInitialBindingService(
+                        repository, new HytaleBondedVesselInitialSourceFinalizer(universe),
+                        events, executor, wallClockMs);
+        BondedVesselLifecycleObserver lifecycleObserver =
+                new BondedVesselLifecycleObserver(
+                        repository, new TwSpawnerVesselConfigResolver(itemConfigRevision),
+                        evidence, events, executor, wallClockMs);
         BondedVesselRuntimeBootstrap bootstrap = new BondedVesselRuntimeBootstrap(
-                api, delegate, evidence::isCapabilityReady, mutation::isCapabilityReady);
-        return new ProductionBondedVesselRuntime(evidence, mutation, delegate, bootstrap);
+                api, delegate, initialBindings,
+                evidence::isCapabilityReady, mutation::isCapabilityReady);
+        return new ProductionBondedVesselRuntime(
+                evidence, mutation, delegate, bootstrap, initialBindings, lifecycleObserver);
     }
 
     @Nonnull
@@ -88,5 +104,15 @@ public final class ProductionBondedVesselRuntime {
     @Nonnull
     public BondedVesselRuntimeBootstrap bootstrap() {
         return bootstrap;
+    }
+
+    @Nonnull
+    public BondedVesselInitialBindingService initialBindings() {
+        return initialBindings;
+    }
+
+    @Nonnull
+    public BondedVesselLifecycleObserver lifecycleObserver() {
+        return lifecycleObserver;
     }
 }

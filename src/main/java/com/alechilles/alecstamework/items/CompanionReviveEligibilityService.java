@@ -47,6 +47,7 @@ public final class CompanionReviveEligibilityService {
     private volatile CompanionProvisioningRepository provisioningRepository;
     private volatile NpcProfileRepository profileRepository;
     private volatile EventSink eventSink = EventSink.NO_OP;
+    private volatile BondedLifecycleSink bondedLifecycleSink = BondedLifecycleSink.NO_OP;
 
     public CompanionReviveEligibilityService() {
         this(false, "revive-eligibility-not-loaded");
@@ -175,6 +176,11 @@ public final class CompanionReviveEligibilityService {
         this.eventSink = eventSink == null ? EventSink.NO_OP : eventSink;
     }
 
+    /** Installs the command-link-independent durable vessel lifecycle writer. */
+    public void setBondedLifecycleSink(@Nullable BondedLifecycleSink sink) {
+        bondedLifecycleSink = sink == null ? BondedLifecycleSink.NO_OP : sink;
+    }
+
     /** Called by the population writer only after its SQLite transaction committed. */
     public void onPopulationCommitted(
             @Nonnull CompanionPopulationObservation observation,
@@ -187,13 +193,24 @@ public final class CompanionReviveEligibilityService {
             if (eligibility.authority() == Authority.PROVISIONED) {
                 emitProvisionedDeath(observation, result);
             } else {
-                emitBondedLifecycle(observation, result, BondedVesselState.DEAD);
+                observeBondedLifecycle(observation, result, BondedVesselState.DEAD);
             }
             remap(observation.profileId(), null);
         } else if (observation.lifecycleState() == CompanionLifecycleState.LOST
                 && eligibility.authority() == Authority.BONDED_VESSEL) {
-            emitBondedLifecycle(observation, result, BondedVesselState.LOST);
+            observeBondedLifecycle(observation, result, BondedVesselState.LOST);
             remap(observation.profileId(), null);
+        }
+    }
+
+    private void observeBondedLifecycle(
+            CompanionPopulationObservation observation,
+            CompanionPopulationObservationPersistResult result,
+            BondedVesselState target) {
+        try {
+            bondedLifecycleSink.observe(observation, result, target);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Population authority is already committed; reconciliation may retry this observation.
         }
     }
 
@@ -368,5 +385,13 @@ public final class CompanionReviveEligibilityService {
     public interface EventSink {
         EventSink NO_OP = event -> { };
         void emit(@Nonnull TameworkEvent event);
+    }
+
+    @FunctionalInterface
+    public interface BondedLifecycleSink {
+        BondedLifecycleSink NO_OP = (observation, result, target) -> { };
+        void observe(@Nonnull CompanionPopulationObservation observation,
+                     @Nonnull CompanionPopulationObservationPersistResult result,
+                     @Nonnull BondedVesselState target);
     }
 }

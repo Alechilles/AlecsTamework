@@ -3,6 +3,9 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.CaptureRequirementContext;
 import com.alechilles.alecstamework.api.CaptureRequirementPhase;
+import com.alechilles.alecstamework.api.BondedVesselMode;
+import com.alechilles.alecstamework.api.BondedVesselState;
+import com.alechilles.alecstamework.api.PopulationAdmissionLocation;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
@@ -11,11 +14,14 @@ import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.items.capturepolicy.runtime.CaptureAttemptCoordinator;
 import com.alechilles.alecstamework.persistence.sqlite.CaptureAttemptRecord;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.vessels.runtime.BondedVesselInitialBindingService;
+import com.alechilles.alecstamework.vessels.runtime.BondedVesselSpawnerBridge;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.InteractionType;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
@@ -31,6 +37,7 @@ import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -62,6 +69,8 @@ public final class SpawnerFeatureHandler {
     @Nullable
     private final CaptureAttemptCoordinator captureAttemptCoordinator;
     private final LongSupplier captureRequirementGeneration;
+    @Nullable
+    private volatile BondedVesselSpawnerBridge bondedVesselBridge;
     private final ConcurrentHashMap<UUID, UUID> channelAttemptIds = new ConcurrentHashMap<>();
     @Nullable
     private final SpawnerManagedCoopCaptureDetachService managedCoopDetachService;
@@ -452,6 +461,11 @@ public final class SpawnerFeatureHandler {
         return true;
     }
 
+    /** Installs the production bridge only after bonded-vessel recovery activated successfully. */
+    public void installBondedVesselBridge(@Nullable BondedVesselSpawnerBridge bridge) {
+        bondedVesselBridge = bridge;
+    }
+
     public void endCaptureChannel(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
         ItemFeatureConfig config = resolveConfigForItem(itemStack);
         World world = player == null ? null : player.getWorld();
@@ -505,6 +519,9 @@ public final class SpawnerFeatureHandler {
         ItemFeatureConfig config = buildSpawnerConfigForInteraction(baseConfig, null);
         if (config == null || !config.isSpawnerEnabled()) {
             return false;
+        }
+        if (config.getVesselMechanics().mode() == BondedVesselMode.BONDED) {
+            return bondedVesselBridge != null && hasUsableBondedProjection(itemStack);
         }
         if (itemStackMetadataService.isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
             return false;
@@ -579,6 +596,10 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         ItemFeatureConfig resolved = buildSpawnerConfigForInteraction(config, null);
+        if (resolved != null
+                && resolved.getVesselMechanics().mode() == BondedVesselMode.BONDED) {
+            return dispatchBondedToggle(player, itemStack, resolved, hotbarSlot);
+        }
         return resolved != null && preparedSpawnService.schedule(
                 player, itemStack, resolved, hotbarSlot, emptyItemIdOverride
         );
@@ -611,6 +632,53 @@ public final class SpawnerFeatureHandler {
     public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
         return captureFromNpcAction(player, targetRef, itemStack, config, null, UUID.randomUUID(), false,
                 null, null, 0L);
+    }
+
+    private boolean dispatchBondedToggle(
+            Player player, ItemStack itemStack, ItemFeatureConfig config, Integer hotbarSlot) {
+        BondedVesselSpawnerBridge bridge = bondedVesselBridge;
+        Integer exactSlot = resolveSourceHotbarSlot(player, hotbarSlot);
+        if (bridge == null || exactSlot == null || !hasUsableBondedProjection(itemStack)) {
+            logSpawnerFlowDebug("bonded vessel denied reason=runtime-or-source-unavailable");
+            return false;
+        }
+        PopulationAdmissionLocation destination = null;
+        org.joml.Vector3d position = spawnPositionService.resolveSpawnPosition(player, config);
+        World world = player.getWorld();
+        if (position != null && world != null) {
+            destination = new PopulationAdmissionLocation(
+                    world.getName(), ChunkUtil.chunkCoordinate(position.x),
+                    ChunkUtil.chunkCoordinate(position.z));
+        }
+        bridge.toggle(player.getUuid(), exactSlot, itemStack.getItemId(), destination)
+                .whenComplete((result, failure) -> {
+                    if (failure != null || result == null
+                            || result.status()
+                            != com.alechilles.alecstamework.vessels.runtime
+                            .BondedVesselInteractionDispatcher.Status.COMMITTED) {
+                        logSpawnerFlowDebug("bonded vessel transition did not commit reason="
+                                + (failure != null ? "runtime-failure"
+                                : result == null ? "missing-result" : result.reason()));
+                    }
+                });
+        return true;
+    }
+
+    static boolean hasUsableBondedProjection(ItemStack itemStack) {
+        if (itemStack == null || itemStack.isEmpty() || itemStack.getQuantity() != 1) return false;
+        String bindingId = itemStack.getFromMetadataOrNull(
+                TameworkMetadataKeys.VESSEL_BINDING_ID, Codec.STRING);
+        String profileId = itemStack.getFromMetadataOrNull(
+                TameworkMetadataKeys.VESSEL_PROFILE_ID, Codec.STRING);
+        Long generation = itemStack.getFromMetadataOrNull(
+                TameworkMetadataKeys.VESSEL_GENERATION, Codec.LONG);
+        String configId = itemStack.getFromMetadataOrNull(
+                TameworkMetadataKeys.VESSEL_CONFIG_ID, Codec.STRING);
+        String state = itemStack.getFromMetadataOrNull(
+                TameworkMetadataKeys.VESSEL_STATE, Codec.STRING);
+        return bindingId != null && profileId != null && generation != null && generation > 0L
+                && configId != null && (BondedVesselState.STORED.name().equals(state)
+                || BondedVesselState.ACTIVE.name().equals(state));
     }
 
     private boolean captureFromNpcAction(Player player,
@@ -666,6 +734,9 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         World world = player.getWorld();
+        if (world == null) {
+            return false;
+        }
         Store<EntityStore> worldStore = world != null && world.getEntityStore() != null
                 ? world.getEntityStore().getStore() : null;
         UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
@@ -828,18 +899,32 @@ public final class SpawnerFeatureHandler {
         updated = itemDisplayMetadataService.applyCapturedDisplayMetadata(updated, config);
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
         ItemStack capturedItem = updated;
+        boolean bondedCapture = config.getVesselMechanics().mode() == BondedVesselMode.BONDED;
+        BondedVesselSpawnerBridge captureBridge = bondedVesselBridge;
+        if (bondedCapture && (captureBridge == null
+                || !captureBridge.canBindSource(itemStack))) {
+            logSpawnerFlowDebug("capture denied reason=bonded-vessel-runtime-unavailable");
+            if (preparedMutation != null) {
+                preparedMutation.cancel("bonded-vessel-runtime-unavailable");
+            }
+            return false;
+        }
         ItemFeatureConfig finalizedConfig = config;
         UUID finalizedAttemptId = outcomeResolved ? attemptId : null;
         UUID finalizedOwnerToStore = ownerToStore;
         Integer sourceHotbarSlot = resolveSourceHotbarSlot(player, null);
+        if (bondedCapture && sourceHotbarSlot == null) {
+            logSpawnerFlowDebug("capture denied reason=bonded-source-slot-unavailable");
+            if (preparedMutation != null) {
+                preparedMutation.cancel("bonded-source-slot-unavailable");
+            }
+            return false;
+        }
         SpawnerSourceItemTransaction sourceItem = new SpawnerSourceItemTransaction(
-                playerInventoryService,
-                player,
-                sourceHotbarSlot,
-                itemStack,
-                logger,
-                "Spawner capture"
-        );
+                playerInventoryService, world, player.getUuid(), sourceHotbarSlot,
+                itemStack, logger, "Spawner capture");
+        AtomicReference<String> capturedProfileId = new AtomicReference<>();
+        AtomicReference<ItemStack> profiledCaptureItem = new AtomicReference<>();
         SpawnerCaptureFinalizerService.CaptureCallbacks callbacks =
                 new SpawnerCaptureFinalizerService.CaptureCallbacks() {
                     @Override
@@ -849,15 +934,14 @@ public final class SpawnerFeatureHandler {
                                 Codec.STRING,
                                 profileId
                         );
-                        if (!sourceItem.prepare(profiledItem)) {
-                            return false;
-                        }
-                        return true;
+                        capturedProfileId.set(profileId);
+                        profiledCaptureItem.set(profiledItem);
+                        return bondedCapture || sourceItem.prepare(profiledItem);
                     }
 
                     @Override
                     public void onApplyCompensated(String profileId, String reason) {
-                        sourceItem.compensate();
+                        if (!bondedCapture) sourceItem.compensate();
                         if (finalizedAttemptId != null && captureAttemptCoordinator != null) {
                             captureAttemptCoordinator.quarantineApply(finalizedAttemptId, reason);
                         }
@@ -866,7 +950,7 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onApplied(String profileId,
                                           com.alechilles.alecstamework.ownership.OwnerMutationContext context) {
-                        sourceItem.commit();
+                        if (!bondedCapture) sourceItem.commit();
                         linkedNpcSyncService.publishPreparedCapturedLinkedNpcSnapshot(
                                 preparedLinkedSnapshot,
                                 context.npcUuid()
@@ -913,7 +997,17 @@ public final class SpawnerFeatureHandler {
                     @Override
                     public void onPopulationCommitted(
                             com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result) {
-                        if (finalizedAttemptId != null && captureAttemptCoordinator != null) {
+                        if (bondedCapture) {
+                            bindCapturedVessel(
+                                    captureBridge, sourceItem, itemStack,
+                                    profiledCaptureItem.get(), capturedProfileId.get(),
+                                    world, player.getUuid(), sourceHotbarSlot, result,
+                                    preparedMutation == null ? null
+                                            : preparedMutation.populationOperationId(),
+                                    finalizedAttemptId);
+                        }
+                        if (!bondedCapture && finalizedAttemptId != null
+                                && captureAttemptCoordinator != null) {
                             captureAttemptCoordinator.commit(finalizedAttemptId);
                         }
                         if (detachPlan.requiresDetach()
@@ -1073,6 +1167,70 @@ public final class SpawnerFeatureHandler {
 
     private static String jsonEscape(String value) {
         return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private void bindCapturedVessel(
+            @Nullable BondedVesselSpawnerBridge bridge,
+            SpawnerSourceItemTransaction sourceItem,
+            ItemStack original,
+            @Nullable ItemStack captured,
+            @Nullable String profileId,
+            World world,
+            UUID ownerUuid,
+            @Nullable Integer sourceSlot,
+            com.alechilles.alecstamework.ownership.CompanionPopulationCommitResult result,
+            @Nullable UUID populationOperationId,
+            @Nullable UUID captureAttemptId) {
+        long revision = result == null || result.ownerCommit() == null
+                || result.ownerCommit().persistenceResult() == null
+                ? -1L : result.ownerCommit().persistenceResult().revision();
+        if (bridge == null || captured == null || profileId == null || sourceSlot == null
+                || revision < 0L) {
+            logger.at(Level.SEVERE).log(
+                    "Bonded capture committed its canonical profile but could not prepare "
+                            + "generation-one source finalization (profile=" + profileId + ").");
+            return;
+        }
+        BondedVesselSpawnerBridge.InitialCapturePlan plan = bridge.prepareInitialCapture(
+                ownerUuid, sourceSlot, original, captured, profileId, revision,
+                populationOperationId).orElse(null);
+        if (plan == null) {
+            logger.at(Level.SEVERE).log(
+                    "Bonded capture committed but its revision-pinned vessel config was unavailable "
+                            + "(profile=" + profileId + ").");
+            return;
+        }
+        bridge.bind(plan, (expected, replacement) -> {
+            CompletableFuture<Boolean> completion = new CompletableFuture<>();
+            try {
+                world.execute(() -> completion.complete(sourceItem.prepare(replacement)));
+            } catch (RuntimeException | LinkageError failure) {
+                completion.completeExceptionally(failure);
+            }
+            return completion;
+        }).whenComplete((binding, failure) -> {
+            if (failure == null && binding != null
+                    && binding.status() == BondedVesselInitialBindingService.Status.COMMITTED) {
+                sourceItem.commit();
+                if (captureAttemptId != null && captureAttemptCoordinator != null) {
+                    captureAttemptCoordinator.commit(captureAttemptId);
+                }
+                logSpawnerFlowDebug("bonded capture committed binding=" + binding.bindingId()
+                        + " profile=" + binding.profileId());
+                return;
+            }
+            if (captureAttemptId != null && captureAttemptCoordinator != null
+                    && binding != null
+                    && (binding.status() == BondedVesselInitialBindingService.Status.DENIED
+                    || binding.status() == BondedVesselInitialBindingService.Status.QUARANTINED)) {
+                captureAttemptCoordinator.quarantineApply(captureAttemptId, binding.reason());
+            }
+            logger.at(Level.SEVERE).log(
+                    "Bonded capture generation-one finalization remains pending or quarantined "
+                            + "(profile=" + profileId + ", reason="
+                            + (failure != null ? "runtime-failure"
+                            : binding == null ? "missing-result" : binding.reason()) + ").");
+        });
     }
 
     private static void spawnCaptureSuccessParticle(

@@ -130,6 +130,35 @@ class BondedVesselInitialBindingServiceTest {
         }
     }
 
+    @Test
+    void liveCaptureScopedFinalizerOverridesRestartFinalizer() throws Exception {
+        try (HydragonPersistenceTestHarness harness = harness("initial-bind-scoped.sqlite")) {
+            UUID owner = UUID.randomUUID();
+            String profileId = harness.insertProfile(owner, "dragon-role", "CAPTURED", "world", 7L);
+            BondedVesselRepository repository = new BondedVesselRepository(
+                    harness.connections, harness.queue);
+            AtomicInteger restartFinalizer = new AtomicInteger();
+            AtomicInteger scopedFinalizer = new AtomicInteger();
+            BondedVesselInitialBindingService service = service(repository, request -> {
+                restartFinalizer.incrementAndGet();
+                return CompletableFuture.completedFuture(new BondedVesselInitialBindingService
+                        .SourceFinalization(BondedVesselInitialBindingService.SourceStatus.INDETERMINATE,
+                        "restart-only"));
+            }, new ArrayList<>(), new AtomicLong(400L));
+
+            var result = service.bind(request(profileId, owner), request -> {
+                scopedFinalizer.incrementAndGet();
+                return CompletableFuture.completedFuture(new BondedVesselInitialBindingService
+                        .SourceFinalization(BondedVesselInitialBindingService.SourceStatus.REPLACED,
+                        "live-exact-source"));
+            }).toCompletableFuture().join();
+
+            assertEquals(BondedVesselInitialBindingService.Status.COMMITTED, result.status());
+            assertEquals(1, scopedFinalizer.get());
+            assertEquals(0, restartFinalizer.get());
+        }
+    }
+
     private static BondedVesselInitialBindingService service(
             BondedVesselRepository repository,
             BondedVesselInitialBindingService.SourceFinalizer finalizer,
