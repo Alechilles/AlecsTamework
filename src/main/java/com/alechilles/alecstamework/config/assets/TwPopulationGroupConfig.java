@@ -14,6 +14,7 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.schema.SchemaContext;
 import com.hypixel.hytale.codec.schema.config.Schema;
+import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +56,9 @@ public final class TwPopulationGroupConfig
         @Nonnull
         @Override
         public Schema toSchema(@Nonnull SchemaContext context) {
-            return Codec.STRING.toSchema(context);
+            StringSchema schema = new StringSchema();
+            schema.setEnum(new String[] { "Global", "PerWorld" });
+            return schema;
         }
     };
 
@@ -64,14 +67,16 @@ public final class TwPopulationGroupConfig
     )
             .<Integer>append(new KeyedCodec<>("MaxOwnedPerOwner", Codec.INTEGER),
                     (value, decoded) -> value.maxOwnedPerOwner = decoded, value -> value.maxOwnedPerOwner)
-            .documentation("Maximum owned profiles per owner; 0 is unlimited.").add()
+            .documentation("Maximum owned profiles per owner; 0 is unlimited. Within explicit Limits, omission inherits.")
+            .add()
             .<Integer>append(new KeyedCodec<>("MaxActivePerOwner", Codec.INTEGER),
                     (value, decoded) -> value.maxActivePerOwner = decoded, value -> value.maxActivePerOwner)
-            .documentation("Maximum active profiles per owner; 0 is unlimited.").add()
+            .documentation("Maximum active profiles per owner; 0 is unlimited. Within explicit Limits, omission inherits.")
+            .add()
             .<PopulationGroupScope>append(new KeyedCodec<>("Scope", SCOPE_CODEC),
                     (value, decoded) -> value.scope = decoded == null ? PopulationGroupScope.GLOBAL : decoded,
                     value -> value.scope)
-            .documentation("Global or PerWorld owner bucket scope.").add()
+            .documentation("Global or PerWorld owner bucket scope. Within explicit Limits, omission inherits.").add()
             .build();
 
     public static final AssetBuilderCodec<String, TwPopulationGroupConfig> CODEC = AssetBuilderCodec.builder(
@@ -89,7 +94,7 @@ public final class TwPopulationGroupConfig
             .documentation("Disabled assets are inert. Omitted value inherits from parent.").add()
             .<Integer>append(new KeyedCodec<>("Priority", Codec.INTEGER),
                     (asset, value) -> asset.priority = value == null ? 0 : value, asset -> asset.priority)
-            .documentation("Higher priority wins for duplicate GroupId; deterministic asset-ID ordering breaks ties.")
+            .documentation("Higher priority wins for duplicate GroupId; deterministic asset-ID ordering breaks ties. Omitted inherits.")
             .add()
             .<String>append(new KeyedCodec<>("GroupId", Codec.STRING),
                     (asset, value) -> asset.groupId = value, asset -> asset.groupId)
@@ -102,7 +107,7 @@ public final class TwPopulationGroupConfig
             .<LimitSettings>append(new KeyedCodec<>("Limits", LIMITS_CODEC),
                     (asset, value) -> asset.limits = value == null ? new LimitSettings() : value,
                     asset -> asset.limits)
-            .documentation("Per-owner limits. Omitted inherits the parent object; explicit nested fields override and missing nested fields inherit.")
+            .documentation("Per-owner limits; 0 is unlimited. Omitted inherits the parent object; explicit nested fields override and missing nested fields inherit.")
             .add()
             .build();
 

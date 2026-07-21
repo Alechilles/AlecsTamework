@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAvatarFlightConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwCapturePolicyConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
@@ -18,6 +19,7 @@ import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwPersistenceConfig;
+import com.alechilles.alecstamework.config.assets.TwPopulationGroupConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -43,6 +45,8 @@ public enum TwConfigFamily {
     HAPPINESS("happiness", "Happiness", "Tamework/Happiness", true, true),
     NEEDS("needs", "Needs", "Tamework/Needs", true, true),
     BREEDING("breeding", "Breeding", "Tamework/Breeding", true, true),
+    CAPTURE_POLICY("capture-policy", "Capture Policies", "Tamework/CapturePolicies", true, true),
+    POPULATION_GROUP("population-group", "Population Groups", "Tamework/PopulationGroups", true, true),
     ATTACHMENT_MIGRATION("attachment-migration", "Attachment Migrations", "Tamework/AttachmentMigrations", true, true),
     ATTACHMENT_DISPLAY("attachment-display", "Attachment Displays", "Tamework/AttachmentDisplays", true, true),
     DYNAMIC_ATTACHMENTS("dynamic-attachments", "Dynamic Attachments", "Tamework/DynamicAttachments", true, true),
@@ -144,6 +148,10 @@ public enum TwConfigFamily {
             case HAPPINESS -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwHappinessConfig.getAssetStore();
             case NEEDS -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwNeedsConfig.getAssetStore();
             case BREEDING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwBreedingConfig.getAssetStore();
+            case CAPTURE_POLICY ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwCapturePolicyConfig.getAssetStore();
+            case POPULATION_GROUP ->
+                    (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwPopulationGroupConfig.getAssetStore();
             case ATTACHMENT_MIGRATION ->
                     (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwAttachmentMigrationConfig.getAssetStore();
             case ATTACHMENT_DISPLAY ->

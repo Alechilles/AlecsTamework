@@ -92,7 +92,7 @@ public final class TwCapturePolicyConfig
             .<String[]>append(new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
                     (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
                     asset -> asset.roleIds)
-            .documentation("Exact source role IDs. Omitted inherits; an explicit array replaces parent (no merge). ")
+            .documentation("Exact source role IDs. Omitted inherits; an explicit array replaces parent (no merge).")
             .add()
             .<DifficultySettings>append(new KeyedCodec<>("Difficulty", DIFFICULTY_CODEC),
                     (asset, value) -> asset.difficulty = value == null ? new DifficultySettings() : value,
