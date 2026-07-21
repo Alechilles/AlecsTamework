@@ -26,6 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class CompanionRelocationAdmissionServiceTest {
     private static final UUID NPC = UUID.fromString("00000000-0000-0000-0000-000000000401");
@@ -52,6 +53,19 @@ class CompanionRelocationAdmissionServiceTest {
             assertEquals(new ClaimChunkCoordinate("alpha", 2, 3),
                     harness.runtime.claimOccupancyIndex().entry("relocation-profile")
                             .orElseThrow().physicalChunk());
+        }
+    }
+
+    /** Regression for unloaded recall requiring its committed source chunk before admission. */
+    @Test
+    void canonicalSourceResolvesFromTheSameIdentityAndClaimIndexesAsAdmission() throws Exception {
+        try (Harness harness = Harness.open(tempDir.resolve("canonical-source"))) {
+            harness.seedOwnedProfile();
+
+            assertEquals(new ClaimChunkCoordinate("alpha", 2, 3),
+                    harness.service.resolveCanonicalSource(NPC));
+            assertNull(harness.service.resolveCanonicalSource(
+                    UUID.fromString("00000000-0000-0000-0000-000000000498")));
         }
     }
 

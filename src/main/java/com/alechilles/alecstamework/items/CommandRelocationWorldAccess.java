@@ -82,10 +82,6 @@ final class CommandRelocationWorldAccess {
         return Math.floorDiv((int) Math.floor(coordinate), CHUNK_SIZE);
     }
 
-    long toChunkKey(int chunkX, int chunkZ) {
-        return (((long) chunkX) << 32) ^ (chunkZ & 0xffffffffL);
-    }
-
     @Nullable
     String normalizeWorldName(@Nullable String worldName) {
         return worldName == null || worldName.isBlank() ? null : worldName.trim();

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.ownership.CompanionRelocationAdmissionService;
 import java.util.HashSet;
 import java.util.Locale;
@@ -18,6 +19,8 @@ final class PendingRelocation {
     final String destinationWorldName;
     final Vector3d sourceHintPosition;
     final Vector3d alternateSourceHintPosition;
+    @Nullable
+    final ClaimChunkCoordinate canonicalSource;
     final UUID ownerUuid;
     final boolean assignOwnerAsMasterTarget;
     final boolean clearLockedTarget;
@@ -29,7 +32,8 @@ final class PendingRelocation {
     final TwCompanionConfig.TransferFailurePolicy onTransferFailure;
     final CompanionRelocationAdmissionService.ForcePolicy forcePolicy;
     private final Set<String> requiredStateFilter;
-    private final ConcurrentHashMap<Long, Long> lastChunkRequestAtMsByChunk = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ChunkRequestKey, Long> lastChunkRequestAtMsByChunk =
+            new ConcurrentHashMap<>();
     long nextScheduledApplyAtMs = Long.MAX_VALUE;
     boolean relocationIssued;
     long relocationIssuedAtMs;
@@ -50,6 +54,7 @@ final class PendingRelocation {
                       String destinationWorldName,
                       Vector3d sourceHintPosition,
                       Vector3d alternateSourceHintPosition,
+                      @Nullable ClaimChunkCoordinate canonicalSource,
                       UUID ownerUuid,
                       boolean assignOwnerAsMasterTarget,
                       boolean clearLockedTarget,
@@ -68,6 +73,7 @@ final class PendingRelocation {
         );
         this.sourceHintPosition = sourceHintPosition;
         this.alternateSourceHintPosition = alternateSourceHintPosition;
+        this.canonicalSource = canonicalSource;
         this.ownerUuid = ownerUuid;
         this.assignOwnerAsMasterTarget = assignOwnerAsMasterTarget;
         this.clearLockedTarget = clearLockedTarget;
@@ -83,13 +89,24 @@ final class PendingRelocation {
         this.lastRetryCountedAtMs = queuedAtMs;
     }
 
-    boolean shouldRequestChunk(long chunkKey, long nowMs, long cooldownMs) {
+    boolean shouldRequestChunk(String worldName,
+                               int chunkX,
+                               int chunkZ,
+                               long nowMs,
+                               long cooldownMs) {
+        ChunkRequestKey chunkKey = new ChunkRequestKey(worldName, chunkX, chunkZ);
         Long lastRequestAtMs = lastChunkRequestAtMsByChunk.get(chunkKey);
         if (lastRequestAtMs != null && nowMs - lastRequestAtMs < cooldownMs) {
             return false;
         }
         lastChunkRequestAtMsByChunk.put(chunkKey, nowMs);
         return true;
+    }
+
+    private record ChunkRequestKey(String worldName, int chunkX, int chunkZ) {
+        private ChunkRequestKey {
+            worldName = Objects.requireNonNull(worldName, "worldName");
+        }
     }
 
     synchronized boolean reserveScheduledApply(long dueAtMs) {

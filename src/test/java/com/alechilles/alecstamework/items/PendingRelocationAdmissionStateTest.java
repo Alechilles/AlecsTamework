@@ -157,6 +157,16 @@ class PendingRelocationAdmissionStateTest {
         assertFalse(original.hasSameCommandIntent(differentWorld));
     }
 
+    /** Regression for two worlds that use the same chunk coordinates during a transfer. */
+    @Test
+    void chunkRequestCooldownIsScopedByWorldAndCoordinates() {
+        PendingRelocation pending = pending();
+
+        assertTrue(pending.shouldRequestChunk("source", 4, 9, 1_000L, 1_500L));
+        assertFalse(pending.shouldRequestChunk("source", 4, 9, 1_200L, 1_500L));
+        assertTrue(pending.shouldRequestChunk("destination", 4, 9, 1_200L, 1_500L));
+    }
+
     private static PendingRelocation reserved() {
         PendingRelocation pending = pending();
         pending.beginAdmissionPreparation();
@@ -180,6 +190,7 @@ class PendingRelocationAdmissionStateTest {
                 UUID.fromString("00000000-0000-0000-0000-000000000501"),
                 destination,
                 worldName,
+                null,
                 null,
                 null,
                 UUID.fromString("00000000-0000-0000-0000-000000000502"),

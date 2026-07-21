@@ -14,7 +14,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Objects;
@@ -31,7 +30,6 @@ import org.joml.Vector3d;
  */
 public final class CommandNpcRelocationService {
     private static final long INITIAL_APPLY_DELAY_MS = 250L;
-    private static final long CHUNK_REQUEST_COOLDOWN_MS = 1500L;
     private static final long RELOCATION_CONFIRMATION_DELAY_MS = 250L;
     private static final long RELOCATION_CONFIRMATION_TIMEOUT_MS = 5000L;
     private static final double DESTINATION_CONFIRM_TOLERANCE = 4.0;
@@ -46,7 +44,7 @@ public final class CommandNpcRelocationService {
     private final CommandRelocationDropReporter dropReporter;
     private final CommandRelocationTimingPolicy timingPolicy = new CommandRelocationTimingPolicy();
     private final CommandRelocationRetryCoordinator retryCoordinator;
-    private final CommandRelocationChunkLeaseService<PendingRelocation, WorldChunk> chunkLeases;
+    private final CommandRelocationChunkRequestService chunkRequests;
     private final CommandRelocationDiagnostics diagnostics;
 
     public CommandNpcRelocationService() {
@@ -67,9 +65,12 @@ public final class CommandNpcRelocationService {
                 pending -> cancelAdmission(pending, false, null, null)
         );
         this.retryCoordinator = new CommandRelocationRetryCoordinator(this, timingPolicy);
-        this.chunkLeases = new CommandRelocationChunkLeaseService<>(
-                WorldChunk::addKeepLoaded,
-                WorldChunk::removeKeepLoaded
+        this.chunkRequests = new CommandRelocationChunkRequestService(
+                pendingByNpc,
+                lastKnownByNpc,
+                worldAccess,
+                diagnostics,
+                this::scheduleTryApply
         );
     }
 
@@ -229,6 +230,7 @@ public final class CommandNpcRelocationService {
                     world.getName(),
                     sourceHintPosition != null ? new Vector3d(sourceHintPosition) : null,
                     alternateSourceHintPosition != null ? new Vector3d(alternateSourceHintPosition) : null,
+                    admissionGate.resolveCanonicalSource(npcUuid),
                     ownerUuid,
                     assignOwnerAsMasterTarget,
                     clearLockedTarget,
@@ -254,10 +256,10 @@ public final class CommandNpcRelocationService {
                 scheduleTryApply(world, npcUuid, 0L);
                 return;
             }
-            chunkLeases.open(pending);
+            chunkRequests.open(pending);
             PendingRelocation replaced = pendingByNpc.put(npcUuid, pending);
             if (replaced != null) {
-                chunkLeases.release(replaced);
+                chunkRequests.release(replaced);
                 replaced.markCrossWorldTransferFinished();
                 if (replaced.admissionApplying() && replaced.physicalMutationAttempted()) {
                     commitUnconfirmedRelocationAsLost(
@@ -570,7 +572,9 @@ public final class CommandNpcRelocationService {
         if (destinationWorld == null || npcUuid == null || pending == null || !pending.allowCrossWorldTransfer) {
             return false;
         }
-        World sourceWorld = knownWorldByNpc.get(npcUuid);
+        World sourceWorld = pending.canonicalSource == null
+                ? knownWorldByNpc.get(npcUuid)
+                : chunkRequests.resolveCanonicalSourceWorld(destinationWorld, pending);
         if (sourceWorld == null || worldAccess.isSameWorld(sourceWorld, destinationWorld)) {
             if (sourceWorld == null && pending.markSourceWorldMissingLogged()) {
                 logTravelDiagnostic(
@@ -664,7 +668,7 @@ public final class CommandNpcRelocationService {
                             + ": source ref missing/invalid in world="
                             + sourceWorld.getName()
             );
-            requestSourceChunksForPending(sourceWorld, pending);
+            chunkRequests.requestSource(sourceWorld, destinationWorld, pending);
             pending.markCrossWorldTransferFinished();
             retryPendingFromWorld(destinationWorld, npcUuid, pending);
             return;
@@ -1044,51 +1048,20 @@ public final class CommandNpcRelocationService {
     }
 
     void requestChunksForPending(World world, PendingRelocation pending) {
-        if (world == null || pending == null) {
-            return;
-        }
-        requestChunkLoad(world, pending, pending.destination);
-        requestSourceHints(world, pending);
-    }
-
-    private void requestChunkLoad(World world, PendingRelocation pending, Vector3d position) {
-        if (world == null || pending == null || position == null) {
-            return;
-        }
-        int chunkX = worldAccess.toChunk(position.x);
-        int chunkZ = worldAccess.toChunk(position.z);
-        long chunkKey = worldAccess.toChunkKey(chunkX, chunkZ);
-        long now = System.currentTimeMillis();
-        if (!pending.shouldRequestChunk(chunkKey, now, CHUNK_REQUEST_COOLDOWN_MS)) {
-            return;
-        }
-        CompletableFuture<WorldChunk> request = world.getChunkAsync(chunkX, chunkZ);
-        request.whenComplete((chunk, throwable) -> {
-            if (pendingByNpc.get(pending.npcUuid) != pending) {
-                return;
-            }
-            if (throwable == null && chunk != null) {
-                if (!chunkLeases.retain(pending, chunk)) {
-                    diagnostics.chunkLeaseNotRetained(pending.npcUuid, chunkX, chunkZ);
-                }
-                scheduleTryApply(world, pending.npcUuid, INITIAL_APPLY_DELAY_MS);
-            } else {
-                diagnostics.chunkRequestFailed(pending.npcUuid, chunkX, chunkZ, throwable);
-            }
-        });
+        chunkRequests.requestDestinationAndSource(world, pending);
     }
 
     private boolean removePending(UUID npcUuid, PendingRelocation pending) {
         boolean removed = pendingByNpc.remove(npcUuid, pending);
         if (removed) {
-            chunkLeases.release(pending);
+            chunkRequests.release(pending);
         }
         return removed;
     }
 
     /** Releases engine chunk leases when the plugin is disabled between world sessions. */
     public void close() {
-        chunkLeases.close();
+        chunkRequests.close();
     }
 
     void scheduleTryApply(World world, UUID npcUuid, long delayMs) {
@@ -1201,28 +1174,4 @@ public final class CommandNpcRelocationService {
     public record PendingRecallSnapshot(UUID npcUuid, long queuedAtMs, long remainingUntilLostMs) {
     }
 
-    private void requestSourceChunksForPending(World sourceWorld, PendingRelocation pending) {
-        if (sourceWorld == null || pending == null) {
-            return;
-        }
-        requestSourceHints(sourceWorld, pending);
-    }
-
-    private void requestSourceHints(World sourceWorld, PendingRelocation pending) {
-        Vector3d hintedSource = pending.sourceHintPosition;
-        Vector3d alternateSource = pending.alternateSourceHintPosition;
-        Vector3d cachedSource = lastKnownByNpc.get(pending.npcUuid);
-        if (hintedSource != null) {
-            requestChunkLoad(sourceWorld, pending, hintedSource);
-        }
-        if (alternateSource != null
-                && (hintedSource == null || !worldAccess.isNear(alternateSource, hintedSource, 0.5))) {
-            requestChunkLoad(sourceWorld, pending, alternateSource);
-        }
-        if (cachedSource != null
-                && (hintedSource == null || !worldAccess.isNear(cachedSource, hintedSource, 0.5))
-                && (alternateSource == null || !worldAccess.isNear(cachedSource, alternateSource, 0.5))) {
-            requestChunkLoad(sourceWorld, pending, cachedSource);
-        }
-    }
 }

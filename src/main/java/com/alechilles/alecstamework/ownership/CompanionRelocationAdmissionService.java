@@ -77,6 +77,23 @@ public final class CompanionRelocationAdmissionService {
         return authority.cancel(admission.token()).thenApply(this::map);
     }
 
+    /**
+     * Resolves the currently committed physical source used by relocation admission.
+     *
+     * <p>Recall uses this before preparing admission so it can lease the exact source chunk. The
+     * later prepare/claim boundary still revalidates the same canonical indexes before mutation.</p>
+     */
+    @Nullable
+    public ClaimChunkCoordinate resolveCanonicalSource(@Nonnull UUID npcUuid) {
+        Objects.requireNonNull(npcUuid, "npcUuid");
+        String profileId = identityResolver.resolveProfileId(npcUuid).orElse(null);
+        if (profileId == null) {
+            return null;
+        }
+        ClaimOccupancyEntry claim = claimIndex.entry(profileId).orElse(null);
+        return claim == null ? null : claim.physicalChunk();
+    }
+
     private Plan plan(Request request) {
         String profileId = identityResolver.resolveProfileId(request.npcUuid()).orElse(null);
         if (profileId == null) {

@@ -250,6 +250,33 @@ class LostRepositoryTest {
                 repository.loadRecoveredProjectionSnapshot(SOURCE_A).status());
     }
 
+    /** Regression for a legacy self-finalization coexisting with the real replacement lineage. */
+    @Test
+    void recoveredProjectionIgnoresUnrelatedLegacyFinalizationForSameSource() throws Exception {
+        RecoveredFixture recovered = prepareRecoveredProjection();
+        try (Connection connection = connections.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO npc_recovery_operations (
+                         operation_id, profile_id, source_npc_uuid, planned_target_uuid,
+                         actual_target_uuid, state, active, generation, attempt_count,
+                         created_at_ms, updated_at_ms, completed_at_ms
+                     ) VALUES ('legacy-self-finalization', ?, ?, ?, ?,
+                               'FINALIZED', 0, 0, 1, 1, 1, 1)
+                     """)) {
+            statement.setString(1, recovered.profileId());
+            statement.setString(2, SOURCE_A.toString());
+            statement.setString(3, SOURCE_A.toString());
+            statement.setString(4, SOURCE_A.toString());
+            statement.executeUpdate();
+        }
+
+        RecoveredProjectionSnapshotLoadResult result =
+                repository.loadRecoveredProjectionSnapshot(TARGET_A);
+
+        assertEquals(RecoveredProjectionSnapshotLoadResult.Status.FOUND, result.status());
+        assertEquals(SOURCE_A, result.sourceNpcUuid());
+    }
+
     @Test
     void recoveredProjectionFallbackRejectsLifecycleAndOperationConflicts() throws Exception {
         RecoveredFixture recovered = prepareRecoveredProjection();

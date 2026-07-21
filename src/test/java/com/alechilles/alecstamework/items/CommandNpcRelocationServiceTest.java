@@ -209,4 +209,26 @@ class CommandNpcRelocationServiceTest {
                 ),
                 "Replacing an in-flight physical relocation must conservatively commit, not cancel it.");
     }
+
+    /** Regression for Recall D remaining unloaded until another recall loaded its source chunk. */
+    @Test
+    void queuedRecallLeasesItsCanonicalSourceChunkIndependently() throws Exception {
+        String service = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "items",
+                "CommandNpcRelocationService.java"
+        ), StandardCharsets.UTF_8);
+        String chunkRequests = Files.readString(Path.of(
+                "src", "main", "java", "com", "alechilles", "alecstamework", "items",
+                "CommandRelocationChunkRequestService.java"
+        ), StandardCharsets.UTF_8);
+
+        assertTrue(service.contains("admissionGate.resolveCanonicalSource(npcUuid)"),
+                "A queued recall must snapshot canonical occupancy before loading chunks.");
+        assertTrue(service.contains("chunkRequests.resolveCanonicalSourceWorld(destinationWorld, pending)"),
+                "Cross-world recall must resolve a source world without process-local live history.");
+        assertTrue(chunkRequests.contains("requestCanonicalSource(canonicalSourceWorld"),
+                "Every recall must request its own exact canonical source chunk.");
+        assertTrue(chunkRequests.contains("applyScheduler.schedule(\n                        destinationWorld"),
+                "A source chunk completion must retry against the requested destination world.");
+    }
 }

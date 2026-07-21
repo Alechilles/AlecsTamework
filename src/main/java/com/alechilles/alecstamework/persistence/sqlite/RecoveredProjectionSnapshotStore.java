@@ -231,11 +231,14 @@ final class RecoveredProjectionSnapshotStore {
                 SELECT planned_target_uuid, actual_target_uuid
                 FROM npc_recovery_operations
                 WHERE profile_id = ? AND source_npc_uuid = ?
+                  AND planned_target_uuid = ? AND actual_target_uuid = ?
                   AND state = 'FINALIZED' AND active = 0
                 ORDER BY completed_at_ms DESC, operation_id LIMIT 2
                 """)) {
             statement.setString(1, profileId);
             statement.setString(2, sourceNpcUuid.toString());
+            statement.setString(3, currentNpcUuid.toString());
+            statement.setString(4, currentNpcUuid.toString());
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
                     return "finalized_recovery_evidence_missing";

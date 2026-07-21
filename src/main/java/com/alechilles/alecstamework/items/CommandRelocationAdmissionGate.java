@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.integration.claims.ClaimChunkCoordinate;
 import com.alechilles.alecstamework.ownership.CompanionRelocationAdmissionService;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -14,6 +16,13 @@ final class CommandRelocationAdmissionGate {
 
     void setAuthority(@Nullable CompanionRelocationAdmissionService authority) {
         this.authority = authority;
+    }
+
+    @Nullable
+    ClaimChunkCoordinate resolveCanonicalSource(UUID npcUuid) {
+        CompanionRelocationAdmissionService service = authority;
+        return service == null || npcUuid == null
+                ? null : service.resolveCanonicalSource(npcUuid);
     }
 
     boolean ensure(PendingRelocation pending,
